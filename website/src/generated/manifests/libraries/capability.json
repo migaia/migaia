@@ -1395,6 +1395,7 @@
             "CAPABILITY_SOURCE // '@migaia/capability'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "CAPABILITY_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1619,7 +1620,45 @@
             "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'",
             "if (result.status === CapabilityEnableStatus.failed) console.error(result.error)"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "enabled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly enabled: \"enabled\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"enabled\""
+            },
+            {
+              "name": "gated",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly gated: \"gated\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"gated\""
+            },
+            {
+              "name": "cancelled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cancelled: \"cancelled\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"cancelled\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const CapabilityEnableStatus: { readonly enabled: \"enabled\"; readonly gated: \"gated\"; readonly cancelled: \"cancelled\"; readonly failed: \"failed\"; };"
@@ -1703,7 +1742,90 @@
             "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
             "if (error.code === CapabilityErrorCode.hostDisposed) {\n  /* ... */\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "hostDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostDisposed: \"HOST_DISPOSED\";",
+              "description": "Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived.",
+              "parameterDetails": [],
+              "returns": "\"HOST_DISPOSED\""
+            },
+            {
+              "name": "hostTransitioning",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostTransitioning: \"HOST_TRANSITIONING\";",
+              "description": "Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks.",
+              "parameterDetails": [],
+              "returns": "\"HOST_TRANSITIONING\""
+            },
+            {
+              "name": "notRegistered",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly notRegistered: \"NOT_REGISTERED\";",
+              "description": "Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first.",
+              "parameterDetails": [],
+              "returns": "\"NOT_REGISTERED\""
+            },
+            {
+              "name": "alreadyRegistered",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly alreadyRegistered: \"ALREADY_REGISTERED\";",
+              "description": "Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host.",
+              "parameterDetails": [],
+              "returns": "\"ALREADY_REGISTERED\""
+            },
+            {
+              "name": "invalidName",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidName: \"INVALID_NAME\";",
+              "description": "Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_NAME\""
+            },
+            {
+              "name": "invalidActivate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidActivate: \"INVALID_ACTIVATE\";",
+              "description": "Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_ACTIVATE\""
+            },
+            {
+              "name": "invalidHandle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidHandle: \"INVALID_HANDLE\";",
+              "description": "Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_HANDLE\""
+            },
+            {
+              "name": "gated",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly gated: \"GATED\";",
+              "description": "Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error.",
+              "parameterDetails": [],
+              "returns": "\"GATED\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags` or `definition`, for example on a hostile proxy. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "CapabilityErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1929,7 +2051,54 @@
             "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated",
             "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "off",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly off: \"off\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"off\""
+            },
+            {
+              "name": "gated",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly gated: \"gated\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"gated\""
+            },
+            {
+              "name": "activating",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly activating: \"activating\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"activating\""
+            },
+            {
+              "name": "on",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly on: \"on\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"on\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const CapabilityState: { readonly off: \"off\"; readonly gated: \"gated\"; readonly activating: \"activating\"; readonly on: \"on\"; readonly failed: \"failed\"; };"
@@ -2238,6 +2407,7 @@
             "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>;"
@@ -2296,13 +2466,13 @@
               "name": "flags",
               "type": "Readonly<Record<string, boolean>>",
               "optional": true,
-              "description": "Initial flag snapshot. The gate denies activation by default. Only own data properties whose * value is exactly `true` permit activation. * * The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the * input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates * pending activation and releases the current handle. A separate `disable()` call is * unnecessary."
+              "description": "Initial flag snapshot. The gate denies activation by default. Only own data properties whose value is exactly `true` permit activation. The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates pending activation and releases the current handle. A separate `disable()` call is unnecessary."
             },
             {
               "name": "onError",
               "type": "(name: string, error: unknown) => void",
               "optional": true,
-              "description": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` * diagnostics."
+              "description": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` diagnostics."
             }
           ],
           "identity": "packages/capability/dist/index.d.ts:createCapabilityHost:export declare function createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>;",
@@ -2566,7 +2736,7 @@
               "type": "Readonly<Record<string, boolean>>",
               "optional": true,
               "description": "`createCapabilityHost` 在创建时对 `options` 做一次准入快照：`flags`、`onError` 及其 receiver 只从这一份快照取得，之后修改或替换传入的 `options` 对象不会改变 host 行为。`options` 必须是对象或函数（`null`/原始值会抛 `TypeError`，`code: 'INVALID_OPTION'`）；`options.onError` 若提供必须是函数（否则同样抛 `INVALID_OPTION` 的 `TypeError`）；读取 `options.onError`/`options.flags` 本身抛错（例如恶意 Proxy 的 getter）会包装成 `code: 'INVALID_OPTION'` 的错误并携带原始异常为 `cause`。",
-              "descriptionEn": "Initial flag snapshot. The gate denies activation by default. Only own data properties whose * value is exactly `true` permit activation. * * The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the * input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates * pending activation and releases the current handle. A separate `disable()` call is * unnecessary.",
+              "descriptionEn": "Initial flag snapshot. The gate denies activation by default. Only own data properties whose value is exactly `true` permit activation. The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates pending activation and releases the current handle. A separate `disable()` call is unnecessary.",
               "descriptionZh": "`createCapabilityHost` 在创建时对 `options` 做一次准入快照：`flags`、`onError` 及其 receiver 只从这一份快照取得，之后修改或替换传入的 `options` 对象不会改变 host 行为。`options` 必须是对象或函数（`null`/原始值会抛 `TypeError`，`code: 'INVALID_OPTION'`）；`options.onError` 若提供必须是函数（否则同样抛 `INVALID_OPTION` 的 `TypeError`）；读取 `options.onError`/`options.flags` 本身抛错（例如恶意 Proxy 的 getter）会包装成 `code: 'INVALID_OPTION'` 的错误并携带原始异常为 `cause`。"
             },
             {
@@ -2574,7 +2744,7 @@
               "type": "(name: string, error: unknown) => void",
               "optional": true,
               "description": "`createCapabilityHost` 在创建时对 `options` 做一次准入快照：`flags`、`onError` 及其 receiver 只从这一份快照取得，之后修改或替换传入的 `options` 对象不会改变 host 行为。`options` 必须是对象或函数（`null`/原始值会抛 `TypeError`，`code: 'INVALID_OPTION'`）；`options.onError` 若提供必须是函数（否则同样抛 `INVALID_OPTION` 的 `TypeError`）；读取 `options.onError`/`options.flags` 本身抛错（例如恶意 Proxy 的 getter）会包装成 `code: 'INVALID_OPTION'` 的错误并携带原始异常为 `cause`。",
-              "descriptionEn": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` * diagnostics.",
+              "descriptionEn": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` diagnostics.",
               "descriptionZh": "`createCapabilityHost` 在创建时对 `options` 做一次准入快照：`flags`、`onError` 及其 receiver 只从这一份快照取得，之后修改或替换传入的 `options` 对象不会改变 host 行为。`options` 必须是对象或函数（`null`/原始值会抛 `TypeError`，`code: 'INVALID_OPTION'`）；`options.onError` 若提供必须是函数（否则同样抛 `INVALID_OPTION` 的 `TypeError`）；读取 `options.onError`/`options.flags` 本身抛错（例如恶意 Proxy 的 getter）会包装成 `code: 'INVALID_OPTION'` 的错误并携带原始异常为 `cause`。"
             }
           ],
@@ -2595,7 +2765,36 @@
           "errors": ["No documented errors are declared for GraphReadinessState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GraphReadinessState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": "Admission may proceed using the current readiness snapshot.",
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "blocked",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly blocked: \"blocked\";",
+              "description": "Admission is unavailable without declaring a terminal startup failure.",
+              "parameterDetails": [],
+              "returns": "\"blocked\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": "Admission failed; the paired snapshot error explains why.",
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "GraphReadinessState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2664,7 +2863,33 @@
             "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  readonly disposed: boolean\n}",
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "activate",
+              "kind": "method",
+              "optional": false,
+              "signature": "activate(context: Context): Handle | Promise<Handle>;",
+              "description": "Activates this capability. Async activation supports loading enhancements such as persistence on demand. Dynamic imports keep the disabled capability's chunk out of the initial bundle.",
+              "parameterDetails": [
+                {
+                  "name": "context",
+                  "type": "Context",
+                  "optional": false
+                }
+              ],
+              "returns": "Handle | Promise<Handle>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityDefinition<Context, Handle extends ICapabilityHandle = ICapabilityHandle> = { readonly name: string; /** * Activates this capability. * * Async activation supports loading enhancements such as persistence on demand. Dynamic imports * keep the disabled capability's chunk out of the initial bundle. */ activate(context: Context): Handle | Promise<Handle>; };"
@@ -2947,7 +3172,54 @@
             "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  readonly disposed: boolean\n}",
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly status: typeof CapabilityEnableStatus.enabled;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof CapabilityEnableStatus.enabled"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly status: typeof CapabilityEnableStatus.gated;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof CapabilityEnableStatus.gated"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly status: typeof CapabilityEnableStatus.cancelled;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof CapabilityEnableStatus.cancelled"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly status: typeof CapabilityEnableStatus.failed;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof CapabilityEnableStatus.failed"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityEnableResult = { readonly status: typeof CapabilityEnableStatus.enabled; } | { readonly status: typeof CapabilityEnableStatus.gated; } | { readonly status: typeof CapabilityEnableStatus.cancelled; } | { readonly status: typeof CapabilityEnableStatus.failed; readonly error: unknown; };"
@@ -3228,6 +3500,7 @@
             "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityEnableStatusValue = (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];"
@@ -3295,6 +3568,7 @@
             "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ICapabilityErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3519,7 +3793,18 @@
             "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost({ mount }, { flags: { notificationCenter: true } })\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}",
             "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void | PromiseLike<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void | PromiseLike<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityHandle = { dispose(): void | PromiseLike<void>; };"
@@ -3802,7 +4087,162 @@
             "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  readonly disposed: boolean\n}",
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "register",
+              "kind": "method",
+              "optional": false,
+              "signature": "register<Handle extends ICapabilityHandle>(definition: ICapabilityDefinition<Context, Handle>): void;",
+              "description": "Registers a capability. Duplicate names are programming errors.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "ICapabilityDefinition<Context, Handle>",
+                  "optional": false,
+                  "configurationType": "ICapabilityDefinition<Context, ICapabilityHandle>"
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "names",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly names: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "state",
+              "kind": "method",
+              "optional": false,
+              "signature": "state(name: string): ICapabilityState;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "ICapabilityState"
+            },
+            {
+              "name": "handle",
+              "kind": "method",
+              "optional": false,
+              "signature": "handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;",
+              "description": "Returns the enabled capability's handle, or `undefined` when it is not enabled.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Handle | undefined"
+            },
+            {
+              "name": "error",
+              "kind": "method",
+              "optional": false,
+              "signature": "error(name: string): unknown;",
+              "description": "Returns the last activation or release failure. Successful restart or reconfiguration clears it.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "setFlag",
+              "kind": "method",
+              "optional": false,
+              "signature": "setFlag(name: string, enabled: boolean): void;",
+              "description": "Updates one flag. Disabling synchronously invalidates pending activation and releases the handle. Enabling does not activate.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "enabled",
+                  "type": "boolean",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "setFlags",
+              "kind": "method",
+              "optional": false,
+              "signature": "setFlags(flags: Readonly<Record<string, boolean>>): void;",
+              "description": "Atomically replaces all flags. Missing capabilities are denied, so removed keys cannot retain an earlier `true` value.",
+              "parameterDetails": [
+                {
+                  "name": "flags",
+                  "type": "Readonly<Record<string, boolean>>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "enable",
+              "kind": "method",
+              "optional": false,
+              "signature": "enable(name: string): Promise<ICapabilityEnableResult>;",
+              "description": "Activates the capability and returns its structured activation outcome. Concurrent calls share one activation, so `activate` runs once. A false flag returns `{ status: 'gated' }` without activating the capability.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<ICapabilityEnableResult>"
+            },
+            {
+              "name": "disable",
+              "kind": "method",
+              "optional": false,
+              "signature": "disable(name: string): Promise<boolean>;",
+              "description": "Disables the capability and releases its handle. Returns whether an enabled capability was disabled.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<boolean>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": "Disables all capabilities in LIFO order and makes the host unusable. The first call returns the sole completion Promise. Later calls fail immediately with `HOST_TRANSITIONING` until that Promise settles. After completion, repeated calls return the original Promise by identity.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityHost<Context> = { /** Registers a capability. Duplicate names are programming errors. */ register<Handle extends ICapabilityHandle>(definition: ICapabilityDefinition<Context, Handle>): void; readonly names: readonly string[]; state(name: string): ICapabilityState; /** Returns the enabled capability's handle, or `undefined` when it is not enabled. */ handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined; /** * Returns the last activation or release failure. Successful restart or reconfiguration clears * it. */ error(name: string): unknown; /** * Updates one flag. Disabling synchronously invalidates pending activation and releases the * handle. Enabling does not activate. */ setFlag(name: string, enabled: boolean): void; /** * Atomically replaces all flags. Missing capabilities are denied, so removed keys cannot retain * an earlier `true` value. */ setFlags(flags: Readonly<Record<string, boolean>>): void; /** * Activates the capability and returns its structured activation outcome. * * Concurrent calls share one activation, so `activate` runs once. A false flag returns `{ status: * 'gated' }` without activating the capability. */ enable(name: string): Promise<ICapabilityEnableResult>; /** * Disables the capability and releases its handle. Returns whether an enabled capability was * disabled. */ disable(name: string): Promise<boolean>; /** * Disables all capabilities in LIFO order and makes the host unusable. The first call returns the * sole completion Promise. Later calls fail immediately with `HOST_TRANSITIONING` until that * Promise settles. After completion, repeated calls return the original Promise by identity. */ dispose(): Promise<void>; readonly disposed: boolean; };"
@@ -4084,7 +4524,27 @@
             "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>\n  readonly onError?: (name: string, error: unknown) => void\n}",
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "flags",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly flags?: Readonly<Record<string, boolean>>;",
+              "description": "Initial flag snapshot. The gate denies activation by default. Only own data properties whose value is exactly `true` permit activation. The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates pending activation and releases the current handle. A separate `disable()` call is unnecessary.",
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, boolean>>"
+            },
+            {
+              "name": "onError",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onError?: (name: string, error: unknown) => void;",
+              "description": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` diagnostics.",
+              "parameterDetails": [],
+              "returns": "(name: string, error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityHostOptions = { /** * Initial flag snapshot. The gate denies activation by default. Only own data properties whose * value is exactly `true` permit activation. * * The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the * input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates * pending activation and releases the current handle. A separate `disable()` call is * unnecessary. */ readonly flags?: Readonly<Record<string, boolean>>; /** * Reports activation or release failures. Reporter failures preserve gate state and `error(name)` * diagnostics. */ readonly onError?: (name: string, error: unknown) => void; };"
@@ -4362,7 +4822,27 @@
           "errors": ["No documented errors are declared for ICapabilityReadinessSource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityReadinessSource.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ICapabilityReadinessSource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4431,6 +4911,7 @@
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState];"
@@ -4711,6 +5192,7 @@
             "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];"
@@ -4773,7 +5255,27 @@
           "errors": ["No documented errors are declared for IGraphReadinessSnapshot."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphReadinessSnapshot.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: IGraphReadinessState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphReadinessState"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IGraphReadinessSnapshot",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4838,6 +5340,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphReadinessState.",
           "examples": [],
           "members": [],
+          "composes": ["GraphReadinessState"],
           "aliasOf": "IGraphReadinessState",
           "exportPath": ".",
           "overloadSignatures": ["export type IGraphReadinessState = GraphReadinessState;"],
@@ -4906,6 +5409,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotGraphReadiness.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotGraphReadiness",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4997,6 +5501,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CAPABILITY_GRAPH_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "CAPABILITY_GRAPH_SOURCE",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5062,7 +5567,162 @@
           "examples": [
             "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "graphDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly graphDisposed: \"GRAPH_DISPOSED\";",
+              "description": "Graph mutation/query reaches terminal state; create a new graph.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_DISPOSED\""
+            },
+            {
+              "name": "graphFrozen",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly graphFrozen: \"GRAPH_FROZEN\";",
+              "description": "Registration is attempted after readiness froze the static registry.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_FROZEN\""
+            },
+            {
+              "name": "invalidNode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidNode: \"GRAPH_INVALID_NODE\";",
+              "description": "A node, dependency, or start result fails structural admission.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_INVALID_NODE\""
+            },
+            {
+              "name": "duplicateNode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\";",
+              "description": "A second node uses an already registered ID.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_DUPLICATE_NODE\""
+            },
+            {
+              "name": "unknownProvider",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\";",
+              "description": "A dependency names a provider absent from the frozen registry.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_UNKNOWN_PROVIDER\""
+            },
+            {
+              "name": "duplicateEdge",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\";",
+              "description": "A consumer repeats the same provider edge.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_DUPLICATE_EDGE\""
+            },
+            {
+              "name": "dependencyCycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\";",
+              "description": "The required dependency graph contains a self-loop or cycle.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_DEPENDENCY_CYCLE\""
+            },
+            {
+              "name": "providerUnavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\";",
+              "description": "A direct provider lookup is not declared and ready.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_PROVIDER_UNAVAILABLE\""
+            },
+            {
+              "name": "startFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly startFailed: \"GRAPH_START_FAILED\";",
+              "description": "A node start failed and the graph entered failed state.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_START_FAILED\""
+            },
+            {
+              "name": "disposeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\";",
+              "description": "Release of one or more graph-owned node resources failed.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_DISPOSE_FAILED\""
+            },
+            {
+              "name": "admissionClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\";",
+              "description": "Startup or new work is rejected while the graph is quiescing.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_ADMISSION_CLOSED\""
+            },
+            {
+              "name": "unknownNode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unknownNode: \"GRAPH_UNKNOWN_NODE\";",
+              "description": "Diagnostic or direct value query names an absent node; correct the id before retrying.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_UNKNOWN_NODE\""
+            },
+            {
+              "name": "reentrantOperation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\";",
+              "description": "A lifecycle callback synchronously re-enters the same graph operation.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_REENTRANT_OPERATION\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"GRAPH_INVALID_OPTION\";",
+              "description": "Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_INVALID_OPTION\""
+            },
+            {
+              "name": "nodeHasDependents",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\";",
+              "description": "A reject-policy mutation targets a node that still has required dependents.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_NODE_HAS_DEPENDENTS\""
+            },
+            {
+              "name": "mutationAdmissionTimeout",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\";",
+              "description": "A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_MUTATION_ADMISSION_TIMEOUT\""
+            },
+            {
+              "name": "nodeNotSuspended",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\";",
+              "description": "`resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running.",
+              "parameterDetails": [],
+              "returns": "\"GRAPH_NODE_NOT_SUSPENDED\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "CapabilityGraphErrorCode",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5126,7 +5786,81 @@
           "errors": ["No documented errors are declared for CapabilityGraphNodeState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CapabilityGraphNodeState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "registered",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly registered: \"registered\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"registered\""
+            },
+            {
+              "name": "starting",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly starting: \"starting\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"starting\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "suspended",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly suspended: \"suspended\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"suspended\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            },
+            {
+              "name": "blocked",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly blocked: \"blocked\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"blocked\""
+            },
+            {
+              "name": "rolledBack",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly rolledBack: \"rolled-back\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"rolled-back\""
+            },
+            {
+              "name": "released",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly released: \"released\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"released\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "CapabilityGraphNodeState",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5190,7 +5924,63 @@
           "errors": ["No documented errors are declared for CapabilityGraphState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CapabilityGraphState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly open: \"open\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"open\""
+            },
+            {
+              "name": "starting",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly starting: \"starting\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"starting\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            },
+            {
+              "name": "quiescing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly quiescing: \"quiescing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"quiescing\""
+            },
+            {
+              "name": "terminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly terminal: \"terminal\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"terminal\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "CapabilityGraphState",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5264,6 +6054,7 @@
             "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export declare function createCapabilityGraph(options?: ICapabilityGraphOptions): ICapabilityGraph;"
@@ -5350,7 +6141,45 @@
           "errors": ["No documented errors are declared for GraphBlockedReason."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GraphBlockedReason.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "missing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly missing: \"missing\";",
+              "description": "A required provider is absent from the current graph.",
+              "parameterDetails": [],
+              "returns": "\"missing\""
+            },
+            {
+              "name": "suspended",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly suspended: \"suspended\";",
+              "description": "A required provider or its ancestor is suspended.",
+              "parameterDetails": [],
+              "returns": "\"suspended\""
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: \"removed\";",
+              "description": "A required provider was explicitly removed from this graph.",
+              "parameterDetails": [],
+              "returns": "\"removed\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": "A required provider failed to start or belongs to an unattributable failed batch.",
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "GraphBlockedReason",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5415,7 +6244,119 @@
           "errors": ["No documented errors are declared for ICapabilityGraph."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityGraph.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "register",
+              "kind": "method",
+              "optional": false,
+              "signature": "register<T>(node: IGraphNodeDefinition<T>): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "node",
+                  "type": "IGraphNodeDefinition<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "ready",
+              "kind": "method",
+              "optional": false,
+              "signature": "ready(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "nodeState",
+              "kind": "method",
+              "optional": false,
+              "signature": "nodeState(id: IGraphNodeId): IGraphNodeDiagnostic;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "IGraphNodeDiagnostic"
+            },
+            {
+              "name": "readValue",
+              "kind": "method",
+              "optional": false,
+              "signature": "readValue<T = unknown>(id: IGraphNodeId): T | undefined;",
+              "description": "Read the same value projection as nodeState without allocating a diagnostic. Existing nodes return undefined until the whole graph is ready and after disposal; undefined is valid data. An unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned.",
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "nodes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nodes: readonly IGraphNodeId[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IGraphNodeId[]"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: ICapabilityGraphState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICapabilityGraphState"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "consumer",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                },
+                {
+                  "name": "provider",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<T = unknown>(id: IGraphNodeId): T | undefined; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };"
@@ -5478,7 +6419,36 @@
           "errors": ["No documented errors are declared for ICapabilityGraphError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityGraphError.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: typeof CAPABILITY_GRAPH_SOURCE;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof CAPABILITY_GRAPH_SOURCE"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly code: ICapabilityGraphErrorCode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICapabilityGraphErrorCode"
+            },
+            {
+              "name": "detail",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly detail?: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            }
+          ],
+          "composes": ["Error"],
           "aliasOf": "ICapabilityGraphError",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5543,6 +6513,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityGraphErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ICapabilityGraphErrorCode",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5607,6 +6578,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityGraphNodeState.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ICapabilityGraphNodeState",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5670,7 +6642,18 @@
           "errors": ["No documented errors are declared for ICapabilityGraphOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityGraphOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "onError",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onError?: (error: unknown) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type ICapabilityGraphOptions = { readonly onError?: (error: unknown) => void; };"
@@ -5734,6 +6717,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityGraphState.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ICapabilityGraphState",
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5797,7 +6781,27 @@
           "errors": ["No documented errors are declared for IGraphDependency."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphDependency.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "provider",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provider: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "required",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly required: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphDependency = { readonly provider: IGraphNodeId; readonly required: true; };"
@@ -5864,7 +6868,45 @@
             "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}",
             "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "dependencies",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dependencies: readonly IGraphDependency[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IGraphDependency[]"
+            },
+            {
+              "name": "start",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly start: (context: IGraphStartContext) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(context: IGraphStartContext) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphNodeDefinition<T> = { readonly id: IGraphNodeId; readonly kind: string; readonly dependencies: readonly IGraphDependency[]; readonly start: (context: IGraphStartContext) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>; };"
@@ -5927,7 +6969,108 @@
           "errors": ["No documented errors are declared for IGraphNodeDiagnostic."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphNodeDiagnostic.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: ICapabilityGraphNodeState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICapabilityGraphNodeState"
+            },
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "reason",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly reason?: GraphBlockedReason;",
+              "description": "Cause for a blocked node when dependency availability is responsible.",
+              "parameterDetails": [],
+              "returns": "GraphBlockedReason"
+            },
+            {
+              "name": "binding",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly binding?: unknown;",
+              "description": "Optional composition binding retained by the dynamic owner.",
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly generation?: number;",
+              "description": "Monotonic lifecycle generation for this node.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "ordinal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ordinal?: number;",
+              "description": "Stable registration ordinal retained across same-edge replacement.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "rank",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly rank?: number;",
+              "description": "Deterministic schedule rank retained when topology edges do not change.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "level",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly level?: number;",
+              "description": "Dependency depth retained when topology edges do not change.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: GraphBlockedReason; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };"
@@ -5997,6 +7140,7 @@
             "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
           "members": [],
+          "composes": ["string"],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphNodeId = string & { readonly __graphNodeId: unique symbol; };"
@@ -6062,7 +7206,27 @@
             "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
             "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "release",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(context: IGraphReleaseContext) => void | PromiseLike<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphNodeInstance<T> = { readonly value: T; readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>; };"
@@ -6125,7 +7289,36 @@
           "errors": ["No documented errors are declared for IGraphReleaseContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphReleaseContext.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: IAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "nodeId",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nodeId: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly report: (error: unknown) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphReleaseContext = { readonly signal: IAbortSignal; readonly nodeId: IGraphNodeId; readonly report: (error: unknown) => void; };"
@@ -6191,7 +7384,45 @@
             "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
             "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "nodeId",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nodeId: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "get",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly get: <T = unknown>(provider: IGraphNodeId) => T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "<T = unknown>(provider: IGraphNodeId) => T"
+            },
+            {
+              "name": "own",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "<T>(resource: T, descriptor: IReleaseDescriptor) => T"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph",
           "overloadSignatures": [
             "export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: INativeAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };"
@@ -6346,6 +7577,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for collectPlanEdges.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function collectPlanEdges(index: ITopologyIndexReader, affected: ReadonlySet<string>): readonly IDependencyPlanEdge[];"
@@ -6421,7 +7653,81 @@
           "errors": ["No documented errors are declared for DependencyAction."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for DependencyAction.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "release",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly release: \"release\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"release\""
+            },
+            {
+              "name": "disable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disable: \"disable\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"disable\""
+            },
+            {
+              "name": "suspend",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly suspend: \"suspend\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"suspend\""
+            },
+            {
+              "name": "resume",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly resume: \"resume\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"resume\""
+            },
+            {
+              "name": "rebind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly rebind: \"rebind\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"rebind\""
+            },
+            {
+              "name": "restart",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly restart: \"restart\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"restart\""
+            },
+            {
+              "name": "activate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly activate: \"activate\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"activate\""
+            },
+            {
+              "name": "invalidate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidate: \"invalidate\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"invalidate\""
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare const DependencyAction: { readonly release: \"release\"; readonly disable: \"disable\"; readonly suspend: \"suspend\"; readonly resume: \"resume\"; readonly rebind: \"rebind\"; readonly restart: \"restart\"; readonly activate: \"activate\"; readonly invalidate: \"invalidate\"; };",
@@ -6485,7 +7791,18 @@
           "errors": ["No documented errors are declared for DependencyEdgeStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for DependencyEdgeStatus.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "optionalAbsent",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly optionalAbsent: \"optional-absent\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"optional-absent\""
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare const DependencyEdgeStatus: { readonly optionalAbsent: \"optional-absent\"; };"
@@ -6550,7 +7867,27 @@
           "examples": [
             "import { createTopologyIndex } from '@migaia/capability/graph/topology'\nimport {\n  DependencyMutationKind,\n  DependencyPolicy,\n  planDependencyMutation\n} from '@migaia/capability/graph/dependency'\n\nconst index = createTopologyIndex({\n  onCycle: (path) => {\n    throw new Error(`cycle: ${path.join(' -> ')}`)\n  },\n  onInvalid: (reason, id) => {\n    throw new Error(`${reason}: ${id ?? '<unknown>'}`)\n  }\n})\nindex.add({ id: 'provider', dependencies: [] })\nindex.add({\n  id: 'consumer',\n  dependencies: [{ provider: 'provider', required: true }]\n})\n\nconst plan = planDependencyMutation(\n  index,\n  () => ({ activated: true, enabled: true, suspended: false, stale: false }),\n  {\n  roots: ['provider'],\n  kind: DependencyMutationKind.remove,\n  policy: DependencyPolicy.cascade\n  }\n)\nplan.order // ['consumer', 'provider']"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "remove",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly remove: \"remove\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"remove\""
+            },
+            {
+              "name": "disable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disable: \"disable\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"disable\""
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare const DependencyMutationKind: { readonly remove: \"remove\"; readonly disable: \"disable\"; };",
@@ -6616,7 +7953,36 @@
           "examples": [
             "import { createTopologyIndex } from '@migaia/capability/graph/topology'\nimport {\n  DependencyMutationKind,\n  DependencyPolicy,\n  planDependencyMutation\n} from '@migaia/capability/graph/dependency'\n\nconst index = createTopologyIndex({\n  onCycle: (path) => {\n    throw new Error(`cycle: ${path.join(' -> ')}`)\n  },\n  onInvalid: (reason, id) => {\n    throw new Error(`${reason}: ${id ?? '<unknown>'}`)\n  }\n})\nindex.add({ id: 'provider', dependencies: [] })\nindex.add({\n  id: 'consumer',\n  dependencies: [{ provider: 'provider', required: true }]\n})\n\nconst plan = planDependencyMutation(\n  index,\n  () => ({ activated: true, enabled: true, suspended: false, stale: false }),\n  {\n  roots: ['provider'],\n  kind: DependencyMutationKind.remove,\n  policy: DependencyPolicy.cascade\n  }\n)\nplan.order // ['consumer', 'provider']"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "reject",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly reject: \"reject\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"reject\""
+            },
+            {
+              "name": "cascade",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cascade: \"cascade\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"cascade\""
+            },
+            {
+              "name": "suspend",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly suspend: \"suspend\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"suspend\""
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare const DependencyPolicy: { readonly reject: \"reject\"; readonly cascade: \"cascade\"; readonly suspend: \"suspend\"; };",
@@ -6681,6 +8047,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyEdgeStatus.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyEdgeStatus = (typeof DependencyEdgeStatus)[keyof typeof DependencyEdgeStatus];"
@@ -6743,7 +8110,36 @@
           "errors": ["No documented errors are declared for IDependencyMutationRequest."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyMutationRequest.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "roots",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly roots: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: DependencyMutationKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "DependencyMutationKind"
+            },
+            {
+              "name": "policy",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly policy: DependencyPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "DependencyPolicy"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyMutationRequest = Readonly<{ readonly roots: readonly string[]; readonly kind: DependencyMutationKind; readonly policy: DependencyPolicy; }>;"
@@ -6806,7 +8202,45 @@
           "errors": ["No documented errors are declared for IDependencyNodeState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyNodeState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "activated",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly activated: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "enabled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly enabled: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "suspended",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly suspended: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "stale",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly stale: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyNodeState = Readonly<{ readonly activated: boolean; readonly enabled: boolean; readonly suspended: boolean; readonly stale: boolean; }>;"
@@ -6869,7 +8303,45 @@
           "errors": ["No documented errors are declared for IDependencyPlan."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyPlan.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "steps",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly steps: readonly IDependencyPlanStep[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IDependencyPlanStep[]"
+            },
+            {
+              "name": "order",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly order: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "edges",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly edges: readonly IDependencyPlanEdge[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IDependencyPlanEdge[]"
+            },
+            {
+              "name": "blockedBy",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly blockedBy: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyPlan = Readonly<{ readonly steps: readonly IDependencyPlanStep[]; readonly order: readonly string[]; readonly edges: readonly IDependencyPlanEdge[]; readonly blockedBy: readonly string[]; }>;"
@@ -6932,7 +8404,45 @@
           "errors": ["No documented errors are declared for IDependencyPlanEdge."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyPlanEdge.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "provider",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provider: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "consumer",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly consumer: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "optional",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly optional: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly status?: IDependencyEdgeStatus;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IDependencyEdgeStatus"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyPlanEdge = Readonly<{ readonly provider: string; readonly consumer: string; readonly optional: boolean; readonly status?: IDependencyEdgeStatus; }>;"
@@ -6995,7 +8505,27 @@
           "errors": ["No documented errors are declared for IDependencyPlanStep."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyPlanStep.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "action",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly action: DependencyAction;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "DependencyAction"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyPlanStep = Readonly<{ readonly id: string; readonly action: DependencyAction; }>;"
@@ -7058,7 +8588,27 @@
           "errors": ["No documented errors are declared for IDependencyReplacementRequest."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyReplacementRequest.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "target",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly target: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "canRebind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly canRebind: (id: string) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(id: string) => boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyReplacementRequest = Readonly<{ readonly target: string; readonly canRebind: (id: string) => boolean; }>;"
@@ -7121,7 +8671,36 @@
           "errors": ["No documented errors are declared for IDependencyResumeRequest."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyResumeRequest.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "provider",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provider: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "generationChanged",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationChanged: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "canRebind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly canRebind: (id: string) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(id: string) => boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyResumeRequest = Readonly<{ readonly provider: string; readonly generationChanged: boolean; readonly canRebind: (id: string) => boolean; }>;"
@@ -7185,6 +8764,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyStateReader.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export type IDependencyStateReader = (id: string) => IDependencyNodeState;"
@@ -7268,6 +8848,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for planActivation.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function planActivation(index: ITopologyIndexReader, state: IDependencyStateReader, roots: readonly string[]): IDependencyPlan;"
@@ -7371,6 +8952,7 @@
             "import { createTopologyIndex } from '@migaia/capability/graph/topology'\nimport {\n  DependencyMutationKind,\n  DependencyPolicy,\n  planDependencyMutation\n} from '@migaia/capability/graph/dependency'\n\nconst index = createTopologyIndex({\n  onCycle: (path) => {\n    throw new Error(`cycle: ${path.join(' -> ')}`)\n  },\n  onInvalid: (reason, id) => {\n    throw new Error(`${reason}: ${id ?? '<unknown>'}`)\n  }\n})\nindex.add({ id: 'provider', dependencies: [] })\nindex.add({\n  id: 'consumer',\n  dependencies: [{ provider: 'provider', required: true }]\n})\n\nconst plan = planDependencyMutation(\n  index,\n  () => ({ activated: true, enabled: true, suspended: false, stale: false }),\n  {\n  roots: ['provider'],\n  kind: DependencyMutationKind.remove,\n  policy: DependencyPolicy.cascade\n  }\n)\nplan.order // ['consumer', 'provider']"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function planDependencyMutation(index: ITopologyIndexReader, state: IDependencyStateReader, request: IDependencyMutationRequest): IDependencyPlan;"
@@ -7472,6 +9054,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for planReplacement.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function planReplacement(index: ITopologyIndexReader, state: IDependencyStateReader, request: IDependencyReplacementRequest): IDependencyPlan;"
@@ -7573,6 +9156,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for planRestart.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function planRestart(index: ITopologyIndexReader, state: IDependencyStateReader, roots: readonly string[]): IDependencyPlan;"
@@ -7674,6 +9258,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for planResume.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function planResume(index: ITopologyIndexReader, state: IDependencyStateReader, request: IDependencyResumeRequest): IDependencyPlan;"
@@ -7761,6 +9346,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for planTeardown.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function planTeardown(index: ITopologyIndexReader): IDependencyPlan;"
@@ -7852,6 +9438,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveInstallSet.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
             "export declare function resolveInstallSet(index: ITopologyIndexReader, members: readonly string[], isLazy: (id: string) => boolean): ReadonlySet<string>;"
@@ -7960,6 +9547,7 @@
             "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n})"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;"
@@ -8013,7 +9601,7 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Receives contained startup, release, and late failures without replacing the primary graph * result."
+              "description": "Receives contained startup, release, and late failures without replacing the primary graph result."
             },
             {
               "name": "mutationAdmissionMs",
@@ -8048,8 +9636,8 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Receives contained startup, release, and late failures without replacing the primary graph * result.",
-              "descriptionEn": "Receives contained startup, release, and late failures without replacing the primary graph * result.",
+              "description": "Receives contained startup, release, and late failures without replacing the primary graph result.",
+              "descriptionEn": "Receives contained startup, release, and late failures without replacing the primary graph result.",
               "descriptionZh": ""
             },
             {
@@ -8102,7 +9690,36 @@
           "errors": ["No documented errors are declared for GraphBindingReleaseReason."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GraphBindingReleaseReason.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "remove",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly remove: \"remove\";",
+              "description": "The definition and its exact binding leave the graph.",
+              "parameterDetails": [],
+              "returns": "\"remove\""
+            },
+            {
+              "name": "replace",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly replace: \"replace\";",
+              "description": "Replacement relinquishes custody of the previous binding generation.",
+              "parameterDetails": [],
+              "returns": "\"replace\""
+            },
+            {
+              "name": "dispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dispose: \"dispose\";",
+              "description": "Terminal graph teardown relinquishes every remaining binding.",
+              "parameterDetails": [],
+              "returns": "\"dispose\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "GraphBindingReleaseReason",
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
@@ -8167,7 +9784,214 @@
           "errors": ["No documented errors are declared for IDynamicCapabilityGraph."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDynamicCapabilityGraph.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "nodes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nodes: readonly IGraphNodeId[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IGraphNodeId[]"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: ICapabilityGraphState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICapabilityGraphState"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generation: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "register",
+              "kind": "method",
+              "optional": false,
+              "signature": "register<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "node",
+                  "type": "IDynamicGraphNodeDefinition<T>",
+                  "optional": false
+                },
+                {
+                  "name": "binding",
+                  "type": "TBinding",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IGraphMutationResult>"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "optional": false,
+              "signature": "remove(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IGraphDependencyMutationOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IGraphMutationResult>"
+            },
+            {
+              "name": "suspend",
+              "kind": "method",
+              "optional": false,
+              "signature": "suspend(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IGraphDependencyMutationOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IGraphMutationResult>"
+            },
+            {
+              "name": "resume",
+              "kind": "method",
+              "optional": false,
+              "signature": "resume(id: IGraphNodeId): Promise<IGraphMutationResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IGraphMutationResult>"
+            },
+            {
+              "name": "dependentsOf",
+              "kind": "method",
+              "optional": false,
+              "signature": "dependentsOf(id: IGraphNodeId): IGraphDependents;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "IGraphDependents"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding, options?: IGraphReplaceOptions<TBinding>): Promise<IGraphMutationResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "node",
+                  "type": "IDynamicGraphNodeDefinition<T>",
+                  "optional": false
+                },
+                {
+                  "name": "binding",
+                  "type": "TBinding",
+                  "optional": true
+                },
+                {
+                  "name": "options",
+                  "type": "IGraphReplaceOptions<TBinding>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IGraphMutationResult>"
+            },
+            {
+              "name": "ready",
+              "kind": "method",
+              "optional": false,
+              "signature": "ready(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "nodeState",
+              "kind": "method",
+              "optional": false,
+              "signature": "nodeState(id: IGraphNodeId): IGraphNodeDiagnostic;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "IGraphNodeDiagnostic"
+            },
+            {
+              "name": "getBinding",
+              "kind": "method",
+              "optional": false,
+              "signature": "getBinding<T = TBinding>(id: IGraphNodeId): T | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "acquireBinding",
+              "kind": "method",
+              "optional": false,
+              "signature": "acquireBinding(id: IGraphNodeId): IGraphBindingLease<TBinding>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "IGraphNodeId",
+                  "optional": false
+                }
+              ],
+              "returns": "IGraphBindingLease<TBinding>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{ readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly generation: number; register<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>; remove(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>; suspend(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>; resume(id: IGraphNodeId): Promise<IGraphMutationResult>; dependentsOf(id: IGraphNodeId): IGraphDependents; replace<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding, options?: IGraphReplaceOptions<TBinding>): Promise<IGraphMutationResult>; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; getBinding<T = TBinding>(id: IGraphNodeId): T | undefined; acquireBinding(id: IGraphNodeId): IGraphBindingLease<TBinding>; dispose(): Promise<void>; }>;"
@@ -8230,7 +10054,54 @@
           "errors": ["No documented errors are declared for IDynamicCapabilityGraphOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDynamicCapabilityGraphOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": "Receives contained startup, release, and late failures without replacing the primary graph result.",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            },
+            {
+              "name": "mutationAdmissionMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly mutationAdmissionMs?: number;",
+              "description": "Maximum time an accepted mutation may wait behind an older serialized mutation.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "startBatch",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly startBatch: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>;",
+              "description": "Composition-owned startup for one topologically ordered affected frontier. Required.",
+              "parameterDetails": [],
+              "returns": "(entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>"
+            },
+            {
+              "name": "releaseBatch",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly releaseBatch: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>;",
+              "description": "Composition-owned physical release for one sealed cascade. Required.",
+              "parameterDetails": [],
+              "returns": "(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>"
+            },
+            {
+              "name": "releaseBinding",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>;",
+              "description": "Releases custody for an exact binding generation after its instance cleanup fence.",
+              "parameterDetails": [],
+              "returns": "(entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. Required. */ readonly startBatch: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. Required. */ readonly releaseBatch: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;"
@@ -8293,7 +10164,27 @@
           "errors": ["No documented errors are declared for IDynamicGraphDependency."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDynamicGraphDependency.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "provider",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provider: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "required",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly required: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IDynamicGraphDependency = Readonly<{ readonly provider: IGraphNodeId; readonly required: boolean; }>;"
@@ -8356,7 +10247,45 @@
           "errors": ["No documented errors are declared for IDynamicGraphNodeDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDynamicGraphNodeDefinition.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "dependencies",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dependencies: readonly IDynamicGraphDependency[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IDynamicGraphDependency[]"
+            },
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "start",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly start: (context: IGraphStartContext) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(context: IGraphStartContext) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IDynamicGraphNodeDefinition<T> = Omit<IGraphNodeDefinition<T>, 'dependencies'> & Readonly<{ readonly dependencies: readonly IDynamicGraphDependency[]; }>;"
@@ -8419,7 +10348,27 @@
           "errors": ["No documented errors are declared for IGraphBindingLease."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphBindingLease.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: TBinding;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TBinding"
+            },
+            {
+              "name": "release",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly release: () => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphBindingLease<TBinding> = Readonly<{ readonly value: TBinding; readonly release: () => void; }>;"
@@ -8482,7 +10431,36 @@
           "errors": ["No documented errors are declared for IGraphBindingReleaseEntry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphBindingReleaseEntry.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "binding",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly binding: TBinding;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TBinding"
+            },
+            {
+              "name": "reason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly reason: IGraphBindingReleaseReason;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphBindingReleaseReason"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphBindingReleaseEntry<TBinding> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding; readonly reason: IGraphBindingReleaseReason; }>;"
@@ -8546,6 +10524,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphBindingReleaseReason.",
           "examples": [],
           "members": [],
+          "composes": ["GraphBindingReleaseReason"],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphBindingReleaseReason = GraphBindingReleaseReason;"
@@ -8608,7 +10587,18 @@
           "errors": ["No documented errors are declared for IGraphDependencyMutationOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphDependencyMutationOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "policy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly policy?: IGraphDependencyMutationPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphDependencyMutationPolicy"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphDependencyMutationOptions = Readonly<{ readonly policy?: IGraphDependencyMutationPolicy; }>;"
@@ -8672,6 +10662,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphDependencyMutationPolicy.",
           "examples": [],
           "members": [],
+          "composes": ["Exclude"],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphDependencyMutationPolicy = Exclude<DependencyPolicy, typeof DependencyPolicy.suspend>;"
@@ -8734,7 +10725,27 @@
           "errors": ["No documented errors are declared for IGraphDependents."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphDependents.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "required",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly required: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "optional",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly optional: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IGraphDependents",
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
@@ -8798,7 +10809,36 @@
           "errors": ["No documented errors are declared for IGraphMutationResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphMutationResult.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "affected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly affected: readonly IGraphNodeId[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IGraphNodeId[]"
+            },
+            {
+              "name": "topologyChanged",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly topologyChanged: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generation: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphMutationResult = Readonly<{ readonly affected: readonly IGraphNodeId[]; readonly topologyChanged: boolean; readonly generation: number; }>;"
@@ -8861,7 +10901,36 @@
           "errors": ["No documented errors are declared for IGraphReleaseEntry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphReleaseEntry.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "binding",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly binding: TBinding | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TBinding | undefined"
+            },
+            {
+              "name": "instance",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly instance: IGraphNodeInstance<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeInstance<unknown>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphReleaseEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly instance: IGraphNodeInstance<unknown>; }>;"
@@ -8924,7 +10993,27 @@
           "errors": ["No documented errors are declared for IGraphReplaceOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphReplaceOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "restartDependents",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly restartDependents?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "onReplaced",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onReplaced?: (dependent: IGraphNodeId, nextBinding: TBinding | undefined) => void | PromiseLike<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(dependent: IGraphNodeId, nextBinding: TBinding | undefined) => void | PromiseLike<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphReplaceOptions<TBinding> = Readonly<{ readonly restartDependents?: boolean; readonly onReplaced?: (dependent: IGraphNodeId, nextBinding: TBinding | undefined) => void | PromiseLike<void>; }>;"
@@ -8987,7 +11076,36 @@
           "errors": ["No documented errors are declared for IGraphStartEntry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphStartEntry.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: IGraphNodeId;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphNodeId"
+            },
+            {
+              "name": "binding",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly binding: TBinding | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TBinding | undefined"
+            },
+            {
+              "name": "definition",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly definition: IDynamicGraphNodeDefinition<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IDynamicGraphNodeDefinition<unknown>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
             "export type IGraphStartEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly definition: IDynamicGraphNodeDefinition<unknown>; }>;"
@@ -9096,6 +11214,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for buildCapabilityTopology.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
             "export declare function buildCapabilityTopology(nodes: readonly ITopologyNode[], onUnknownProvider: (nodeId: string, provider: string) => never, onCycle: (path: readonly string[]) => never, onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never): ICapabilityTopology;"
@@ -9190,6 +11309,7 @@
             "import { createTopologyIndex } from '@migaia/capability/graph/topology'\nimport {\n  DependencyMutationKind,\n  DependencyPolicy,\n  planDependencyMutation\n} from '@migaia/capability/graph/dependency'\n\nconst index = createTopologyIndex({\n  onCycle: (path) => {\n    throw new Error(`cycle: ${path.join(' -> ')}`)\n  },\n  onInvalid: (reason, id) => {\n    throw new Error(`${reason}: ${id ?? '<unknown>'}`)\n  }\n})\nindex.add({ id: 'provider', dependencies: [] })\nindex.add({\n  id: 'consumer',\n  dependencies: [{ provider: 'provider', required: true }]\n})\n\nconst plan = planDependencyMutation(\n  index,\n  () => ({ activated: true, enabled: true, suspended: false, stale: false }),\n  {\n  roots: ['provider'],\n  kind: DependencyMutationKind.remove,\n  policy: DependencyPolicy.cascade\n  }\n)\nplan.order // ['consumer', 'provider']"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createTopologyIndex",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9261,7 +11381,63 @@
           "errors": ["No documented errors are declared for ICapabilityTopology."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityTopology.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ordered",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ordered: readonly ITopologyNode[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ITopologyNode[]"
+            },
+            {
+              "name": "providers",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly providers: ReadonlyMap<string, readonly ITopologyNode[]>;",
+              "description": "Provider-to-consumer facts retained for dynamic graph reuse.",
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<string, readonly ITopologyNode[]>"
+            },
+            {
+              "name": "consumers",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly consumers: ReadonlyMap<string, readonly ITopologyDependency[]>;",
+              "description": "Consumer-to-provider facts retained as the canonical edge snapshot.",
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<string, readonly ITopologyDependency[]>"
+            },
+            {
+              "name": "indegree",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly indegree: ReadonlyMap<string, number>;",
+              "description": "Remaining dependency count at topology admission.",
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<string, number>"
+            },
+            {
+              "name": "level",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly level: ReadonlyMap<string, number>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<string, number>"
+            },
+            {
+              "name": "ordinal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ordinal: ReadonlyMap<string, number>;",
+              "description": "Registration ordinal for stable same-level scheduling.",
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<string, number>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
             "export type ICapabilityTopology = { readonly ordered: readonly ITopologyNode[]; /** Provider-to-consumer facts retained for dynamic graph reuse. */ readonly providers: ReadonlyMap<string, readonly ITopologyNode[]>; /** Consumer-to-provider facts retained as the canonical edge snapshot. */ readonly consumers: ReadonlyMap<string, readonly ITopologyDependency[]>; /** Remaining dependency count at topology admission. */ readonly indegree: ReadonlyMap<string, number>; readonly level: ReadonlyMap<string, number>; /** Registration ordinal for stable same-level scheduling. */ readonly ordinal: ReadonlyMap<string, number>; };"
@@ -9324,7 +11500,27 @@
           "errors": ["No documented errors are declared for ITopologyDependency."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyDependency.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "provider",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provider: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "required",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly required: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
             "export type ITopologyDependency = { readonly provider: string; readonly required: boolean; };"
@@ -9387,7 +11583,18 @@
           "errors": ["No documented errors are declared for ITopologyIndex."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyIndex.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "begin",
+              "kind": "method",
+              "optional": false,
+              "signature": "begin(): ITopologyTransaction;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITopologyTransaction"
+            }
+          ],
+          "composes": ["ITopologyIndexReader", "ITopologyIndexWriter"],
           "aliasOf": "ITopologyIndex",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9451,7 +11658,27 @@
           "errors": ["No documented errors are declared for ITopologyIndexAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyIndexAdapter.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "onCycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly onCycle: (path: readonly string[]) => never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(path: readonly string[]) => never"
+            },
+            {
+              "name": "onInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(reason: ITopologyInvalidReason, nodeId?: string) => never"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITopologyIndexAdapter",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9515,7 +11742,27 @@
           "errors": ["No documented errors are declared for ITopologyIndexNode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyIndexNode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "dependencies",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dependencies: readonly ITopologyDependency[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ITopologyDependency[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITopologyIndexNode",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9579,7 +11826,117 @@
           "errors": ["No documented errors are declared for ITopologyIndexReader."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyIndexReader.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly size: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "optional": false,
+              "signature": "has(id: string): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "dependencies",
+              "kind": "method",
+              "optional": false,
+              "signature": "dependencies(id: string): readonly ITopologyDependency[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly ITopologyDependency[]"
+            },
+            {
+              "name": "dependents",
+              "kind": "method",
+              "optional": false,
+              "signature": "dependents(id: string): IGraphDependents;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "IGraphDependents"
+            },
+            {
+              "name": "missing",
+              "kind": "method",
+              "optional": false,
+              "signature": "missing(id: string): readonly ITopologyDependency[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly ITopologyDependency[]"
+            },
+            {
+              "name": "closure",
+              "kind": "method",
+              "optional": false,
+              "signature": "closure(roots: readonly string[]): readonly string[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "roots",
+                  "type": "readonly string[]",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "order",
+              "kind": "method",
+              "optional": false,
+              "signature": "order(ids?: Iterable<string>): readonly string[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ids",
+                  "type": "Iterable<string>",
+                  "optional": true
+                }
+              ],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): ICapabilityTopology;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICapabilityTopology"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITopologyIndexReader",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9643,7 +12000,59 @@
           "errors": ["No documented errors are declared for ITopologyIndexWriter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyIndexWriter.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "add",
+              "kind": "method",
+              "optional": false,
+              "signature": "add(node: ITopologyIndexNode): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "node",
+                  "type": "ITopologyIndexNode",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "optional": false,
+              "signature": "remove(id: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "setDependencies",
+              "kind": "method",
+              "optional": false,
+              "signature": "setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "dependencies",
+                  "type": "readonly ITopologyDependency[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITopologyIndexWriter",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9708,6 +12117,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyInvalidReason.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
             "export type ITopologyInvalidReason = (typeof TopologyInvalidReason)[keyof typeof TopologyInvalidReason];"
@@ -9770,7 +12180,36 @@
           "errors": ["No documented errors are declared for ITopologyNode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyNode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "dependencies",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dependencies: readonly ITopologyDependency[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ITopologyDependency[]"
+            },
+            {
+              "name": "ordinal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ordinal: number;",
+              "description": "Public registration ordinal; admitted nodes must cover each integer in [0, nodeCount).",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
             "export type ITopologyNode = { readonly id: string; readonly dependencies: readonly ITopologyDependency[]; /** Public registration ordinal; admitted nodes must cover each integer in [0, nodeCount). */ readonly ordinal: number; };"
@@ -9833,7 +12272,27 @@
           "errors": ["No documented errors are declared for ITopologyTransaction."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyTransaction.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "commit",
+              "kind": "method",
+              "optional": false,
+              "signature": "commit(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "rollback",
+              "kind": "method",
+              "optional": false,
+              "signature": "rollback(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": ["ITopologyIndexReader", "ITopologyIndexWriter"],
           "aliasOf": "ITopologyTransaction",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
@@ -9897,7 +12356,72 @@
           "errors": ["No documented errors are declared for TopologyInvalidReason."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TopologyInvalidReason.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "invalidNode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidNode: \"invalid-node\";",
+              "description": "A node descriptor is structurally invalid.",
+              "parameterDetails": [],
+              "returns": "\"invalid-node\""
+            },
+            {
+              "name": "duplicateNode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateNode: \"duplicate-node\";",
+              "description": "Two node descriptors use the same ID.",
+              "parameterDetails": [],
+              "returns": "\"duplicate-node\""
+            },
+            {
+              "name": "duplicateEdge",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateEdge: \"duplicate-edge\";",
+              "description": "A node repeats one required provider edge.",
+              "parameterDetails": [],
+              "returns": "\"duplicate-edge\""
+            },
+            {
+              "name": "duplicateOrdinal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateOrdinal: \"duplicate-ordinal\";",
+              "description": "Two node descriptors use the same registration ordinal.",
+              "parameterDetails": [],
+              "returns": "\"duplicate-ordinal\""
+            },
+            {
+              "name": "unknownNode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unknownNode: \"unknown-node\";",
+              "description": "A topology operation references a node that is not currently present.",
+              "parameterDetails": [],
+              "returns": "\"unknown-node\""
+            },
+            {
+              "name": "transactionOpen",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transactionOpen: \"transaction-open\";",
+              "description": "A nested transaction or base-index mutation is attempted while a transaction is open.",
+              "parameterDetails": [],
+              "returns": "\"transaction-open\""
+            },
+            {
+              "name": "transactionClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transactionClosed: \"transaction-closed\";",
+              "description": "A settled transaction is used after commit or rollback.",
+              "parameterDetails": [],
+              "returns": "\"transaction-closed\""
+            }
+          ],
+          "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
             "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: \"invalid-node\"; /** Two node descriptors use the same ID. */ readonly duplicateNode: \"duplicate-node\"; /** A node repeats one required provider edge. */ readonly duplicateEdge: \"duplicate-edge\"; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: \"duplicate-ordinal\"; /** A topology operation references a node that is not currently present. */ readonly unknownNode: \"unknown-node\"; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: \"transaction-open\"; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: \"transaction-closed\"; };"

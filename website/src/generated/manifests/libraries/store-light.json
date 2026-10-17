@@ -1410,7 +1410,8 @@
             {
               "name": "shape",
               "type": "IStoreDefinition<S>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IStoreDefinition<Record>"
             },
             {
               "name": "options",
@@ -1425,6 +1426,7 @@
             "const store = await createAsyncStore({\n  count: 0,\n  wasmField: someAsyncFieldBuilder() // mode: 'async'\n})"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createAsyncStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): Promise<IReactiveStore<S>>;"
@@ -1434,7 +1436,8 @@
               {
                 "name": "shape",
                 "type": "IStoreDefinition<S>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IStoreDefinition<Record>"
               },
               {
                 "name": "options",
@@ -1478,7 +1481,32 @@
               "content": "No additional advanced behavior is declared for createAsyncStore."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "Isolates the runtime explicitly. Defaults to `defaultRuntime`. The facade accepts `IRuntime` because it uses only interface capabilities such as node creation, batching, and scopes. A concrete `Runtime` requirement would force replacement runtimes to inherit the library class."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "warnAsyncActions",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "mutationPolicy",
+              "type": "IMutationPolicy",
+              "optional": true,
+              "description": "Optional MobX-style strict mutation policy. Direct field writes must run inside an action/$batch/$set/$hydrate; Store methods are actions."
+            }
+          ],
           "identity": "packages/store-light/dist/reactive-store.d.ts:createAsyncStore:export declare function createAsyncStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): Promise<IReactiveStore<S>>;",
           "guidance": [
             {
@@ -1617,7 +1645,40 @@
             }
           ],
           "usageScore": 76,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "`store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。",
+              "descriptionEn": "Isolates the runtime explicitly. Defaults to `defaultRuntime`. The facade accepts `IRuntime` because it uses only interface capabilities such as node creation, batching, and scopes. A concrete `Runtime` requirement would force replacement runtimes to inherit the library class.",
+              "descriptionZh": "`store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "`debugName?: string` —— 默认 `'Store'`；仅用作内部节点 `debugName` 前缀，不参与语义",
+              "descriptionEn": "",
+              "descriptionZh": "`debugName?: string` —— 默认 `'Store'`；仅用作内部节点 `debugName` 前缀，不参与语义"
+            },
+            {
+              "name": "warnAsyncActions",
+              "type": "boolean",
+              "optional": true,
+              "description": "`warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\"",
+              "descriptionEn": "",
+              "descriptionZh": "`warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
+            },
+            {
+              "name": "mutationPolicy",
+              "type": "IMutationPolicy",
+              "optional": true,
+              "description": "Q：`store.field = x` 没报错，但我明明传了 `mutationPolicy`。 检查是不是走了 `$batch`/`$set`/`$hydrate` 或方法（Action）内部——这几条路径会先 `runInAction()` 再执行，动作深度 > 0 时 `assertMutationAllowed` 自然放行。只有\"在这些路径之外直接赋值\"才会被拦截。",
+              "descriptionEn": "Optional MobX-style strict mutation policy. Direct field writes must run inside an action/$batch/$set/$hydrate; Store methods are actions.",
+              "descriptionZh": "Q：`store.field = x` 没报错，但我明明传了 `mutationPolicy`。 检查是不是走了 `$batch`/`$set`/`$hydrate` 或方法（Action）内部——这几条路径会先 `runInAction()` 再执行，动作深度 > 0 时 `assertMutationAllowed` 自然放行。只有\"在这些路径之外直接赋值\"才会被拦截。"
+            }
+          ],
           "fragment": "store-light-index--createAsyncStore"
         },
         {
@@ -1637,7 +1698,8 @@
             {
               "name": "shape",
               "type": "IStoreDefinition<S> & { [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : S[K]; }",
-              "optional": false
+              "optional": false,
+              "configurationType": "IStoreDefinition<Record> & { [K in keyof Record]: Record[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : Record[K]; }"
             },
             {
               "name": "options",
@@ -1660,6 +1722,7 @@
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S> & { [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : S[K]; }, options?: ICreateStoreOptions): IReactiveStore<S>;"
@@ -1669,7 +1732,8 @@
               {
                 "name": "shape",
                 "type": "IStoreDefinition<S> & { [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : S[K]; }",
-                "optional": false
+                "optional": false,
+                "configurationType": "IStoreDefinition<Record> & { [K in keyof Record]: Record[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : Record[K]; }"
               },
               {
                 "name": "options",
@@ -1713,7 +1777,32 @@
               "content": "No additional advanced behavior is declared for createStore."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "Isolates the runtime explicitly. Defaults to `defaultRuntime`. The facade accepts `IRuntime` because it uses only interface capabilities such as node creation, batching, and scopes. A concrete `Runtime` requirement would force replacement runtimes to inherit the library class."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "warnAsyncActions",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "mutationPolicy",
+              "type": "IMutationPolicy",
+              "optional": true,
+              "description": "Optional MobX-style strict mutation policy. Direct field writes must run inside an action/$batch/$set/$hydrate; Store methods are actions."
+            }
+          ],
           "identity": "packages/store-light/dist/reactive-store.d.ts:createStore:export declare function createStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S> & { [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : S[K]; }, options?: ICreateStoreOptions): IReactiveStore<S>;",
           "guidance": [
             {
@@ -1949,7 +2038,40 @@
             }
           ],
           "usageScore": 158,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "`store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。",
+              "descriptionEn": "Isolates the runtime explicitly. Defaults to `defaultRuntime`. The facade accepts `IRuntime` because it uses only interface capabilities such as node creation, batching, and scopes. A concrete `Runtime` requirement would force replacement runtimes to inherit the library class.",
+              "descriptionZh": "`store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "`debugName` — `string` — 可选 — `'Store'` — 调试名前缀，出现在内部节点的 `debugName`（形如 `${debugName}.${key}`）里，不参与状态语义",
+              "descriptionEn": "",
+              "descriptionZh": "`debugName` — `string` — 可选 — `'Store'` — 调试名前缀，出现在内部节点的 `debugName`（形如 `${debugName}.${key}`）里，不参与状态语义"
+            },
+            {
+              "name": "warnAsyncActions",
+              "type": "boolean",
+              "optional": true,
+              "description": "`warnAsyncActions` — `boolean` — 可选 — `false` — 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\"",
+              "descriptionEn": "",
+              "descriptionZh": "`warnAsyncActions` — `boolean` — 可选 — `false` — 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
+            },
+            {
+              "name": "mutationPolicy",
+              "type": "IMutationPolicy",
+              "optional": true,
+              "description": "`mutationPolicy` — `IMutationPolicy` — 可选 — 无 — 接入 MobX 风格的严格写入守卫，见 §7",
+              "descriptionEn": "Optional MobX-style strict mutation policy. Direct field writes must run inside an action/$batch/$set/$hydrate; Store methods are actions.",
+              "descriptionZh": "`mutationPolicy` — `IMutationPolicy` — 可选 — 无 — 接入 MobX 风格的严格写入守卫，见 §7"
+            }
+          ],
           "fragment": "store-light-index--createStore"
         },
         {
@@ -1984,6 +2106,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightAggregateError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightAggregateError(code: IStoreLightErrorCode, errors: unknown[], message: string): AggregateError;"
@@ -2127,6 +2250,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightError(code: IStoreLightErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -2185,7 +2309,14 @@
               "content": "No additional advanced behavior is declared for createStoreLightError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-light/dist/errors.d.ts:createStoreLightError:export declare function createStoreLightError(code: IStoreLightErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
@@ -2231,7 +2362,16 @@
             }
           ],
           "usageScore": 14,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。",
+              "descriptionEn": "",
+              "descriptionZh": "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。"
+            }
+          ],
           "fragment": "store-light-index--createStoreLightError"
         },
         {
@@ -2261,6 +2401,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightRangeError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;"
@@ -2399,6 +2540,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightTypeError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightTypeError(code: IStoreLightErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -2457,7 +2599,14 @@
               "content": "No additional advanced behavior is declared for createStoreLightTypeError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-light/dist/errors.d.ts:createStoreLightTypeError:export declare function createStoreLightTypeError(code: IStoreLightErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
           "guidance": [
             {
@@ -2503,7 +2652,16 @@
             }
           ],
           "usageScore": 14,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。",
+              "descriptionEn": "",
+              "descriptionZh": "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。"
+            }
+          ],
           "fragment": "store-light-index--createStoreLightTypeError"
         },
         {
@@ -2538,6 +2696,7 @@
             "const userResource = createStoreResource(\n  async ({ signal }) => {\n    const res = await fetch('/api/user', { signal })\n    return res.json()\n  },\n  { keepAliveMs: 30_000 }\n)\n\nuserResource.preload() // 提前触发加载\n// 组件渲染路径中：const user = userResource.read(); // loading 时 throw Promise"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createStoreResource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2592,11 +2751,97 @@
               "content": "No additional advanced behavior is declared for createStoreResource."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Owns cache TTL and provisional capture expiry, captured once at creation."
+            },
+            {
+              "name": "keepAliveMs",
+              "type": "number",
+              "optional": true,
+              "description": "Cache TTL only; React render safety comes from capture/commit leases."
+            },
+            {
+              "name": "dispose",
+              "type": "(value: T) => void | PromiseLike<void>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown, phase: IStoreResourceErrorPhase) => void",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "onTerminal",
+              "type": "() => void",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-light/dist/store-resource.d.ts:createStoreResource:export declare function createStoreResource<T>(factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>, options?: IStoreResourceOptions<T>): IStoreResource<T>;",
           "guidance": [],
           "usageScore": 48,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "`store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。",
+              "descriptionEn": "Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime.",
+              "descriptionZh": "`store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "`scheduler?: IScheduler` - owns cache and provisional-capture timers; defaults to `systemScheduler`, admitted once at creation.",
+              "descriptionEn": "`scheduler?: IScheduler` - owns cache and provisional-capture timers; defaults to `systemScheduler`, admitted once at creation.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "keepAliveMs",
+              "type": "number",
+              "optional": true,
+              "description": "`keepAliveMs?: number` —— 默认 `1000`；无持有者之后缓存值继续存活的毫秒数，必须是有限非负数",
+              "descriptionEn": "Cache TTL only; React render safety comes from capture/commit leases.",
+              "descriptionZh": "`keepAliveMs?: number` —— 默认 `1000`；无持有者之后缓存值继续存活的毫秒数，必须是有限非负数"
+            },
+            {
+              "name": "dispose",
+              "type": "(value: T) => void | PromiseLike<void>",
+              "optional": true,
+              "description": "`scope.resource()` 原样委托 `createStoreResource()` 的已知字段快照与 callback precedence，不会再次 spread/枚举 factory；用户的 effective `onTerminal` 保持不变。Scope 通过 `whenTerminal()` 从私有集合摘除自然终止的资源，不改写公开 disposer。`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定\"整个作用域要关闭了，个别资源的持有者不再重要\"。",
+              "descriptionEn": "",
+              "descriptionZh": "`scope.resource()` 原样委托 `createStoreResource()` 的已知字段快照与 callback precedence，不会再次 spread/枚举 factory；用户的 effective `onTerminal` 保持不变。Scope 通过 `whenTerminal()` 从私有集合摘除自然终止的资源，不改写公开 disposer。`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定\"整个作用域要关闭了，个别资源的持有者不再重要\"。"
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown, phase: IStoreResourceErrorPhase) => void",
+              "optional": true,
+              "description": "`onError?: (error: unknown, phase: 'load' | 'dispose' | 'listener') => void` —— 观察三个阶段的失败",
+              "descriptionEn": "",
+              "descriptionZh": "`onError?: (error: unknown, phase: 'load' | 'dispose' | 'listener') => void` —— 观察三个阶段的失败"
+            },
+            {
+              "name": "onTerminal",
+              "type": "() => void",
+              "optional": true,
+              "description": "`scope.resource()` 原样委托 `createStoreResource()` 的已知字段快照与 callback precedence，不会再次 spread/枚举 factory；用户的 effective `onTerminal` 保持不变。Scope 通过 `whenTerminal()` 从私有集合摘除自然终止的资源，不改写公开 disposer。`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定\"整个作用域要关闭了，个别资源的持有者不再重要\"。",
+              "descriptionEn": "",
+              "descriptionZh": "`scope.resource()` 原样委托 `createStoreResource()` 的已知字段快照与 callback precedence，不会再次 spread/枚举 factory；用户的 effective `onTerminal` 保持不变。Scope 通过 `whenTerminal()` 从私有集合摘除自然终止的资源，不改写公开 disposer。`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定\"整个作用域要关闭了，个别资源的持有者不再重要\"。"
+            }
+          ],
           "fragment": "store-light-index--createStoreResource"
         },
         {
@@ -2620,6 +2865,7 @@
             "import { createStore, createStoreResourceScope } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n)\n\nconst scope = createStoreResourceScope()\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n)\n\nfunction teardown() {\n  scope.dispose()\n  void settingsStore.$dispose()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createStoreResourceScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2691,6 +2937,7 @@
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare const FIELD_BUILDER: unique symbol;"],
           "overloadParameterDetails": [[]],
@@ -2753,7 +3000,33 @@
           "examples": [
             "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: typeof StoreFieldMode.async;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof StoreFieldMode.async"
+            },
+            {
+              "name": "create",
+              "kind": "method",
+              "optional": false,
+              "signature": "create(context: IFieldContext): Promise<F>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "context",
+                  "type": "IFieldContext",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<F>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IAsyncFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; readonly mode: typeof StoreFieldMode.async; create(context: IFieldContext): Promise<F>; };"
@@ -2816,7 +3089,45 @@
           "errors": ["No documented errors are declared for ICreateStoreOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICreateStoreOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": true,
+              "signature": "runtime?: IRuntime;",
+              "description": "Isolates the runtime explicitly. Defaults to `defaultRuntime`. The facade accepts `IRuntime` because it uses only interface capabilities such as node creation, batching, and scopes. A concrete `Runtime` requirement would force replacement runtimes to inherit the library class.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "debugName",
+              "kind": "property",
+              "optional": true,
+              "signature": "debugName?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "warnAsyncActions",
+              "kind": "property",
+              "optional": true,
+              "signature": "warnAsyncActions?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "mutationPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "mutationPolicy?: IMutationPolicy;",
+              "description": "Optional MobX-style strict mutation policy. Direct field writes must run inside an action/$batch/$set/$hydrate; Store methods are actions.",
+              "parameterDetails": [],
+              "returns": "IMutationPolicy"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICreateStoreOptions = { /** * Isolates the runtime explicitly. Defaults to `defaultRuntime`. * * The facade accepts `IRuntime` because it uses only interface capabilities such as node * creation, batching, and scopes. A concrete `Runtime` requirement would force replacement * runtimes to inherit the library class. */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };"
@@ -2932,6 +3243,7 @@
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
+          "composes": ["ISyncFieldBuilder", "IAsyncFieldBuilder", "ILegacyFieldBuilder"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFieldBuilder<F extends IDisposable> = ISyncFieldBuilder<F> | IAsyncFieldBuilder<F> | ILegacyFieldBuilder<F>;"
@@ -3000,7 +3312,42 @@
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "createSource",
+              "kind": "method",
+              "optional": false,
+              "signature": "createSource(debugName?: string): IFieldSource;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "debugName",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "IFieldSource"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFieldContext = { runtime: IRuntime; signal: INativeAbortSignal; createSource(debugName?: string): IFieldSource; };"
@@ -3066,7 +3413,51 @@
             "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "track",
+              "kind": "method",
+              "optional": false,
+              "signature": "track(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "commit",
+              "kind": "method",
+              "optional": false,
+              "signature": "commit<T>(write: () => T): T;",
+              "description": "Reserve the Runtime version before mutating external storage, then publish once.",
+              "parameterDetails": [
+                {
+                  "name": "write",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "observed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly observed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": ["IDisposable"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFieldSource = IDisposable & { track(): void; notify(): void; /** Reserve the Runtime version before mutating external storage, then publish once. */ commit<T>(write: () => T): T; readonly observed: boolean; };"
@@ -3129,7 +3520,27 @@
           "errors": ["No documented errors are declared for IHydrateOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHydrateOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "unknown",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly unknown?: 'ignore' | 'report' | 'strict';",
+              "description": "Unknown keys are ignored by default for backwards-compatible partial hydration.",
+              "parameterDetails": [],
+              "returns": "'ignore' | 'report' | 'strict'"
+            },
+            {
+              "name": "onUnknown",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onUnknown?: (key: string) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(key: string) => void"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IHydrateOptions = { /** Unknown keys are ignored by default for backwards-compatible partial hydration. */ readonly unknown?: 'ignore' | 'report' | 'strict'; readonly onUnknown?: (key: string) => void; };"
@@ -3192,7 +3603,24 @@
           "errors": ["No documented errors are declared for ILegacyFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILegacyFieldBuilder.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "create",
+              "kind": "method",
+              "optional": false,
+              "signature": "create(context: IFieldContext): Promise<F>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "context",
+                  "type": "IFieldContext",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<F>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ILegacyFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; create(context: IFieldContext): Promise<F>; };"
@@ -3258,7 +3686,24 @@
             "export type IMutationGuard = { assertMutationAllowed(operation?: string): void }\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T }",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "assertMutationAllowed",
+              "kind": "method",
+              "optional": false,
+              "signature": "assertMutationAllowed(operation?: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "operation",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMutationGuard = { assertMutationAllowed(operation?: string): void; };"
@@ -3324,7 +3769,24 @@
             "export type IMutationGuard = { assertMutationAllowed(operation?: string): void }\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T }",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "runInAction",
+              "kind": "method",
+              "optional": false,
+              "signature": "runInAction<T>(fn: () => T): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
+          ],
+          "composes": ["IMutationGuard"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T; };"
@@ -3433,7 +3895,18 @@
           "errors": ["No documented errors are declared for IRaw."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRaw.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IRaw<T> = { readonly [RAW]: true; readonly value: T; };"
@@ -3497,6 +3970,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveStore.",
           "examples": [],
           "members": [],
+          "composes": ["IStoreShape", "IReactiveStoreApi"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;"
@@ -3559,7 +4033,149 @@
           "errors": ["No documented errors are declared for IReactiveStoreApi."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveStoreApi.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "$runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "$runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "$async",
+              "kind": "property",
+              "optional": false,
+              "signature": "$async: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "$snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "$snapshot(): IStoreShape<S>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStoreShape<S>"
+            },
+            {
+              "name": "$subscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "$subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => void",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ISubscribeOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "$batch",
+              "kind": "method",
+              "optional": false,
+              "signature": "$batch(recipe: (draft: IStoreShape<S>) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "recipe",
+                  "type": "(draft: IStoreShape<S>) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "$set",
+              "kind": "method",
+              "optional": false,
+              "signature": "$set(patch: IWritableStorePatch<S>): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "patch",
+                  "type": "IWritableStorePatch<S>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "$plain",
+              "kind": "method",
+              "optional": false,
+              "signature": "$plain(): Record<string, unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Record<string, unknown>"
+            },
+            {
+              "name": "$hydrate",
+              "kind": "method",
+              "optional": false,
+              "signature": "$hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "partial",
+                  "type": "Record<string, unknown>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IHydrateOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "$disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly $disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "$own",
+              "kind": "method",
+              "optional": false,
+              "signature": "$own<T extends IDisposable>(resource: T): T;",
+              "description": "Registers an external resource, such as a collection, with this store's ownership scope. A store can hold root UI state and actions while collections hold frequently accessed structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those structures from leaking when the root is disposed. The resource must be unowned or owned by this `Runtime`. Cross-runtime resources are rejected.",
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "T",
+                  "optional": false,
+                  "configurationType": "IDisposable"
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "$dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "$dispose(): Promise<void>;",
+              "description": "Always returns a Promise. Native reactive nodes release synchronously in LIFO segments; external fields and owned resources drain through lifecycle. Resolves once every owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is enough (fire React `useEffect` cleanup, tear down a request scope) may call this without awaiting; `$disposed` already flips to `true` synchronously before any owned resource is touched, so read-path guards observe the disposed state immediately regardless of whether the caller awaits.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always returns a Promise. Native reactive nodes release synchronously in LIFO segments; * external fields and owned resources drain through lifecycle. Resolves once every owned * Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is enough * (fire React `useEffect` cleanup, tear down a request scope) may call this without awaiting; * `$disposed` already flips to `true` synchronously before any owned resource is touched, so * read-path guards observe the disposed state immediately regardless of whether the caller * awaits. */ $dispose(): Promise<void>; };"
@@ -3623,6 +4239,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceCapture.",
           "examples": [],
           "members": [],
+          "composes": ["object"],
           "aliasOf": "IResourceCapture",
           "exportPath": ".",
           "overloadSignatures": ["export type IResourceCapture = object;"],
@@ -3693,6 +4310,7 @@
             "isFieldBuilder(someValue) // 是否为 IFieldBuilder（sync/async/legacy 任一形态）"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposable>;"
@@ -3770,6 +4388,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isRaw.",
           "examples": ["isRaw(raw(() => {})) // true"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function isRaw(value: unknown): value is IRaw<unknown>;"
@@ -3841,6 +4460,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDefinition.",
           "examples": [],
           "members": [],
+          "composes": ["S", "ThisType"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;"
@@ -3906,6 +4526,7 @@
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IStoreFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3997,6 +4618,115 @@
           "fragment": "store-light-index--IStoreFieldMode"
         },
         {
+          "name": "IStoreLightErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreLightErrorCode = (typeof StoreLightErrorCode)[keyof typeof StoreLightErrorCode];",
+          "declarationLine": 95,
+          "source": "packages/store-light/dist/error-code.d.ts",
+          "purpose": "IStoreLightErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreLightErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStoreLightErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStoreLightErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreLightErrorCode.",
+          "examples": [
+            "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreLightErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreLightErrorCode = (typeof StoreLightErrorCode)[keyof typeof StoreLightErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStoreLightErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStoreLightErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStoreLightErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreLightErrorCode from @migaia/store-light, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreLightErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreLightErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreLightErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStoreLightErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-light/dist/error-code.d.ts:IStoreLightErrorCode:export type IStoreLightErrorCode = (typeof StoreLightErrorCode)[keyof typeof StoreLightErrorCode];",
+          "guidance": [
+            {
+              "id": "9-状态常量与错误构造工具",
+              "heading": "9. 状态常量与错误构造工具",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "除上述创建入口、`$`-API、FieldBuilder 协议之外，包根还导出以下常量与错误构造工具："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
+                    "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'@migaia/store-light'`，用于按来源过滤/断言错误。",
+                    "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。",
+                    "`createStoreLightRangeError(code, message)`：同上，但构造 `RangeError`；无 `cause` 选项。",
+                    "`createStoreLightTypeError(code, message, options?)`：同上，但构造 `TypeError`；`options.cause` 可选。",
+                    "`createStoreLightAggregateError(code, errors, message)`：构造 `AggregateError(errors, message)` 并打上 `(source, code)` 身份；`errors: unknown[]`（必填）在结果的 `.errors` 上保持可达。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这四个工厂函数是本包内部构造所有错误时使用的同一套工具，导出给需要\"以 `@migaia/store-light` 身份抛出自定义诊断错误\"的高级集成方（例如自定义 `FieldBuilder` 实现想复用同一套错误身份约定）；日常业务代码通常不需要直接调用它们，直接 `catch` 本包抛出的错误、按 `error.code` 分支即可（见下表）。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 22,
+          "configuration": [],
+          "fragment": "store-light-index--IStoreLightErrorCode"
+        },
+        {
           "name": "IStoreResource",
           "kind": "type",
           "signature": "export type IStoreResource<T> = { read(): T; preload(): void; retry(): void; /** @deprecated Use retainResource() or retainVersion(). */ retain(version?: number | IVersionToken): () => void; retainResource(): () => void; retainVersion(version: number | IVersionToken): () => void; /** Internal React bridge: protect version during render, then commit in layout. */ captureVersion(version: number): IResourceCapture; commitCapture(capture: IResourceCapture): () => void; dispose(): void; forceDispose(): void; /** Resolves once this resource reaches its terminal state. Never depends on GC. */ whenTerminal(): Promise<void>; subscribe(listener: () => void): () => void; getSnapshot(): number; readSnapshot(): IStoreResourceSnapshot<T>; captureSnapshot(existingLease?: object): { snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture; }; };",
@@ -4011,7 +4741,180 @@
           "errors": ["No documented errors are declared for IStoreResource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResource.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "read",
+              "kind": "method",
+              "optional": false,
+              "signature": "read(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "preload",
+              "kind": "method",
+              "optional": false,
+              "signature": "preload(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "retry",
+              "kind": "method",
+              "optional": false,
+              "signature": "retry(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "retain",
+              "kind": "method",
+              "optional": false,
+              "signature": "retain(version?: number | IVersionToken): () => void;",
+              "description": "",
+              "parameterDetails": [
+                {
+                  "name": "version",
+                  "type": "number | IVersionToken",
+                  "optional": true
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "retainResource",
+              "kind": "method",
+              "optional": false,
+              "signature": "retainResource(): () => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => void"
+            },
+            {
+              "name": "retainVersion",
+              "kind": "method",
+              "optional": false,
+              "signature": "retainVersion(version: number | IVersionToken): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "version",
+                  "type": "number | IVersionToken",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "captureVersion",
+              "kind": "method",
+              "optional": false,
+              "signature": "captureVersion(version: number): IResourceCapture;",
+              "description": "Internal React bridge: protect version during render, then commit in layout.",
+              "parameterDetails": [
+                {
+                  "name": "version",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "IResourceCapture"
+            },
+            {
+              "name": "commitCapture",
+              "kind": "method",
+              "optional": false,
+              "signature": "commitCapture(capture: IResourceCapture): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "capture",
+                  "type": "IResourceCapture",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "forceDispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "forceDispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "whenTerminal",
+              "kind": "method",
+              "optional": false,
+              "signature": "whenTerminal(): Promise<void>;",
+              "description": "Resolves once this resource reaches its terminal state. Never depends on GC.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "subscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "subscribe(listener: () => void): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "listener",
+                  "type": "() => void",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "getSnapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "getSnapshot(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "readSnapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "readSnapshot(): IStoreResourceSnapshot<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStoreResourceSnapshot<T>"
+            },
+            {
+              "name": "captureSnapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "captureSnapshot(existingLease?: object): { snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture; };",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "existingLease",
+                  "type": "object",
+                  "optional": true
+                }
+              ],
+              "returns": "{ snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture; }"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreResource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4314,7 +5217,18 @@
           "errors": ["No documented errors are declared for IStoreResourceConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "load",
+              "kind": "property",
+              "optional": false,
+              "signature": "load: IStoreResourceFactory<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStoreResourceFactory<T>"
+            }
+          ],
+          "composes": ["IStoreResourceOptions"],
           "aliasOf": "IStoreResourceConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4378,7 +5292,36 @@
           "errors": ["No documented errors are declared for IStoreResourceErrorPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceErrorPhase.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "load",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly load: \"load\";",
+              "description": "Loading or validating a factory-produced value failed.",
+              "parameterDetails": [],
+              "returns": "\"load\""
+            },
+            {
+              "name": "dispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dispose: \"dispose\";",
+              "description": "Releasing a value or invoking terminal housekeeping failed.",
+              "parameterDetails": [],
+              "returns": "\"dispose\""
+            },
+            {
+              "name": "listener",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly listener: \"listener\";",
+              "description": "Publishing a revision reached a throwing or rejecting subscriber.",
+              "parameterDetails": [],
+              "returns": "\"listener\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreResourceErrorPhase",
           "exportPath": ".",
           "overloadSignatures": ["export type IStoreResourceErrorPhase = StoreResourceErrorPhase;"],
@@ -4441,6 +5384,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IStoreResourceFactory",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4507,6 +5451,7 @@
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IStoreResourceKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4613,6 +5558,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceLoadContext.",
           "examples": [],
           "members": [],
+          "composes": ["IResourceFetchContext"],
           "aliasOf": "IStoreResourceLoadContext",
           "exportPath": ".",
           "overloadSignatures": ["export type IStoreResourceLoadContext = IResourceFetchContext;"],
@@ -4738,7 +5684,63 @@
           "errors": ["No documented errors are declared for IStoreResourceOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": true,
+              "signature": "runtime?: IRuntime;",
+              "description": "Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Owns cache TTL and provisional capture expiry, captured once at creation.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "keepAliveMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "keepAliveMs?: number;",
+              "description": "Cache TTL only; React render safety comes from capture/commit leases.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "dispose",
+              "kind": "property",
+              "optional": true,
+              "signature": "dispose?: (value: T) => void | PromiseLike<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(value: T) => void | PromiseLike<void>"
+            },
+            {
+              "name": "onError",
+              "kind": "property",
+              "optional": true,
+              "signature": "onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown, phase: IStoreResourceErrorPhase) => void"
+            },
+            {
+              "name": "onTerminal",
+              "kind": "property",
+              "optional": true,
+              "signature": "onTerminal?: () => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5000,7 +6002,38 @@
           "errors": ["No documented errors are declared for IStoreResourceScope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceScope.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "resource",
+              "kind": "method",
+              "optional": false,
+              "signature": "resource<T>(factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>, options?: IStoreResourceOptions<T>): IStoreResource<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "factory",
+                  "type": "IStoreResourceFactory<T> | IStoreResourceConfig<T>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IStoreResourceOptions<T>",
+                  "optional": true
+                }
+              ],
+              "returns": "IStoreResource<T>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreResourceScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5065,6 +6098,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreShape.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreShape<S> = { readonly [K in IBuilderKeys<S>]: S[K] extends IFieldBuilder<infer F> ? F : never; } & { [K in Exclude<keyof S, IBuilderKeys<S>>]: S[K] extends IRaw<infer T> ? T : S[K] extends IFieldBuilder<infer F> ? F : S[K] extends (...args: infer A) => infer R ? (...args: A) => R : S[K]; };"
@@ -5127,7 +6161,18 @@
           "errors": ["No documented errors are declared for ISubscribeOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISubscribeOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "fireImmediately",
+              "kind": "property",
+              "optional": true,
+              "signature": "fireImmediately?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": ["export type ISubscribeOptions = { fireImmediately?: boolean; };"],
           "overloadParameterDetails": [[]],
@@ -5190,7 +6235,33 @@
           "examples": [
             "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: typeof StoreFieldMode.sync;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof StoreFieldMode.sync"
+            },
+            {
+              "name": "create",
+              "kind": "method",
+              "optional": false,
+              "signature": "create(context: IFieldContext): F;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "context",
+                  "type": "IFieldContext",
+                  "optional": false
+                }
+              ],
+              "returns": "F"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISyncFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; readonly mode: typeof StoreFieldMode.sync; create(context: IFieldContext): F; };"
@@ -5254,6 +6325,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWritableStorePatch.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IWritableStorePatch<S> = Partial<Pick<IStoreShape<S>, ISettableKey<S> & keyof IStoreShape<S>>>;"
@@ -5326,6 +6398,7 @@
             "isRaw(raw(() => {})) // true"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare function raw<T>(value: T): IRaw<T>;"],
           "overloadParameterDetails": [
@@ -5397,6 +6470,7 @@
             "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_LIGHT_SOURCE = \"@migaia/store-light\";"
@@ -5503,7 +6577,27 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sync: \"sync\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"sync\""
+            },
+            {
+              "name": "async",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly async: \"async\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"async\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "StoreFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5595,6 +6689,356 @@
           "fragment": "store-light-index--StoreFieldMode"
         },
         {
+          "name": "StoreLightErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: \"STORE_DISPOSED\"; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: \"UNKNOWN_VERSION\"; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: \"IDENTITY_REQUIRED\"; /** * `storeReady()` receives an object with no initialization Promise registered by this module * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: \"NO_ASYNC_INIT\"; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: \"STORE_NOT_READY\"; /** * Store initialization and its subsequent cleanup both fail. Both failures are thrown in an * `AggregateError`. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\"; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\"; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input or field validation fails for `keepAliveMs`, a non-writable `$set` target, or an unknown * `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "declarationLine": 11,
+          "source": "packages/store-light/dist/error-code.d.ts",
+          "purpose": "Declares the public error codes for `@migaia/store-light` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-light'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2).",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreLightErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StoreLightErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StoreLightErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreLightErrorCode.",
+          "examples": [],
+          "members": [
+            {
+              "name": "storeDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly storeDisposed: \"STORE_DISPOSED\";",
+              "description": "Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance.",
+              "parameterDetails": [],
+              "returns": "\"STORE_DISPOSED\""
+            },
+            {
+              "name": "resourceDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly resourceDisposed: \"RESOURCE_DISPOSED\";",
+              "description": "A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal.",
+              "parameterDetails": [],
+              "returns": "\"RESOURCE_DISPOSED\""
+            },
+            {
+              "name": "captureInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly captureInvalid: \"CAPTURE_INVALID\";",
+              "description": "A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once.",
+              "parameterDetails": [],
+              "returns": "\"CAPTURE_INVALID\""
+            },
+            {
+              "name": "unknownVersion",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unknownVersion: \"UNKNOWN_VERSION\";",
+              "description": "A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads.",
+              "parameterDetails": [],
+              "returns": "\"UNKNOWN_VERSION\""
+            },
+            {
+              "name": "identityRequired",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly identityRequired: \"IDENTITY_REQUIRED\";",
+              "description": "A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity.",
+              "parameterDetails": [],
+              "returns": "\"IDENTITY_REQUIRED\""
+            },
+            {
+              "name": "noAsyncInit",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly noAsyncInit: \"NO_ASYNC_INIT\";",
+              "description": "`storeReady()` receives an object with no initialization Promise registered by this package * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object.",
+              "parameterDetails": [],
+              "returns": "\"NO_ASYNC_INIT\""
+            },
+            {
+              "name": "storeNotReady",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly storeNotReady: \"STORE_NOT_READY\";",
+              "description": "Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads.",
+              "parameterDetails": [],
+              "returns": "\"STORE_NOT_READY\""
+            },
+            {
+              "name": "initAndCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\";",
+              "description": "Store initialization and its subsequent cleanup both fail. Both failures are thrown in an * `AggregateError`. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure.",
+              "parameterDetails": [],
+              "returns": "\"INIT_AND_CLEANUP_FAILED\""
+            },
+            {
+              "name": "syncFieldRequired",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\";",
+              "description": "An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders.",
+              "parameterDetails": [],
+              "returns": "\"SYNC_FIELD_REQUIRED\""
+            },
+            {
+              "name": "actionBatchBoundary",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\";",
+              "description": "A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`.",
+              "parameterDetails": [],
+              "returns": "\"ACTION_BATCH_BOUNDARY\""
+            },
+            {
+              "name": "envUnsupported",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "description": "The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue.",
+              "parameterDetails": [],
+              "returns": "\"ENV_UNSUPPORTED\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Input or field validation fails for `keepAliveMs`, a non-writable `$set` target, or an unknown * `$hydrate` field. * * Correct the field or value named in the error message.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreLightErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: \"STORE_DISPOSED\"; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: \"UNKNOWN_VERSION\"; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: \"IDENTITY_REQUIRED\"; /** * `storeReady()` receives an object with no initialization Promise registered by this module * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: \"NO_ASYNC_INIT\"; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: \"STORE_NOT_READY\"; /** * Store initialization and its subsequent cleanup both fail. Both failures are thrown in an * `AggregateError`. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\"; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\"; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input or field validation fails for `keepAliveMs`, a non-writable `$set` target, or an unknown * `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StoreLightErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StoreLightErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Declares the public error codes for `@migaia/store-light` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-light'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2)."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreLightErrorCode from @migaia/store-light, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreLightErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreLightErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreLightErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StoreLightErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-light/dist/error-code.d.ts:StoreLightErrorCode:export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: \"STORE_DISPOSED\"; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: \"UNKNOWN_VERSION\"; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: \"IDENTITY_REQUIRED\"; /** * `storeReady()` receives an object with no initialization Promise registered by this package * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: \"NO_ASYNC_INIT\"; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: \"STORE_NOT_READY\"; /** * Store initialization and its subsequent cleanup both fail. Both failures are thrown in an * `AggregateError`. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\"; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\"; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input or field validation fails for `keepAliveMs`, a non-writable `$set` target, or an unknown * `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "guidance": [
+            {
+              "id": "9-状态常量与错误构造工具",
+              "heading": "9. 状态常量与错误构造工具",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "除上述创建入口、`$`-API、FieldBuilder 协议之外，包根还导出以下常量与错误构造工具："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
+                    "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'@migaia/store-light'`，用于按来源过滤/断言错误。",
+                    "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。",
+                    "`createStoreLightRangeError(code, message)`：同上，但构造 `RangeError`；无 `cause` 选项。",
+                    "`createStoreLightTypeError(code, message, options?)`：同上，但构造 `TypeError`；`options.cause` 可选。",
+                    "`createStoreLightAggregateError(code, errors, message)`：构造 `AggregateError(errors, message)` 并打上 `(source, code)` 身份；`errors: unknown[]`（必填）在结果的 `.errors` 上保持可达。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这四个工厂函数是本包内部构造所有错误时使用的同一套工具，导出给需要\"以 `@migaia/store-light` 身份抛出自定义诊断错误\"的高级集成方（例如自定义 `FieldBuilder` 实现想复用同一套错误身份约定）；日常业务代码通常不需要直接调用它们，直接 `catch` 本包抛出的错误、按 `error.code` 分支即可（见下表）。"
+                }
+              ]
+            },
+            {
+              "id": "10-错误信息全表",
+              "heading": "10. 错误信息全表",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "每个离开本包边界的错误都保留原生类型，并带 `source: '@migaia/store-light'` 与稳定 `code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与 cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`StoreLightErrorCode`", "码值", "触发条件 / 处理"],
+                  "rows": [
+                    [
+                      "`storeDisposed`",
+                      "`STORE_DISPOSED`",
+                      "Store 终结后继续访问；创建新 Store，不复活旧实例"
+                    ],
+                    [
+                      "`resourceDisposed`",
+                      "`RESOURCE_DISPOSED`",
+                      "Resource closing/disposed 后读取或保留；停止使用并创建新资源"
+                    ],
+                    [
+                      "`captureInvalid`",
+                      "`CAPTURE_INVALID`",
+                      "capture token 无效或已消费；重新捕获，token 只能提交一次"
+                    ],
+                    [
+                      "`unknownVersion`",
+                      "`UNKNOWN_VERSION`",
+                      "保留/捕获不可见版本；从当前 snapshot 重新取得版本"
+                    ],
+                    [
+                      "`identityRequired`",
+                      "`IDENTITY_REQUIRED`",
+                      "带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数"
+                    ],
+                    [
+                      "`noAsyncInit`",
+                      "`NO_ASYNC_INIT`",
+                      "对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待"
+                    ],
+                    [
+                      "`storeNotReady`",
+                      "`STORE_NOT_READY`",
+                      "异步字段 pending/failed 时访问；先等待 `storeReady()`"
+                    ],
+                    [
+                      "`initAndCleanupFailed`",
+                      "`INIT_AND_CLEANUP_FAILED`",
+                      "初始化与回滚同时失败；展开 `AggregateError.errors`"
+                    ],
+                    [
+                      "`syncFieldRequired`",
+                      "`SYNC_FIELD_REQUIRED`",
+                      "`createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()`"
+                    ],
+                    [
+                      "`actionBatchBoundary`",
+                      "`ACTION_BATCH_BOUNDARY`",
+                      "异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()`"
+                    ],
+                    [
+                      "`envUnsupported`",
+                      "`ENV_UNSUPPORTED`",
+                      "缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境"
+                    ],
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "keepAlive、写目标或 hydrate 选项非法；按 message 修正输入"
+                    ]
+                  ]
+                },
+                {
+                  "type": "table",
+                  "headers": ["错误信息", "触发条件"],
+                  "rows": [
+                    [
+                      "`[store] store is disposed`",
+                      "`$dispose()` 之后读写任意字段/调用任意 `$`-方法（`$own` 除外，它先校验其他条件）"
+                    ],
+                    [
+                      "`[store] store is ${status}; use createAsyncStore() before accessing async fields`",
+                      "读取尚未就绪（`pending`）或已失败（`failed`）的异步字段"
+                    ],
+                    [
+                      "`[store] createStore() only accepts synchronous fields; \"${key}\" is a FieldBuilder. Use createAsyncStore().`",
+                      "`createStore()`（非 `createAsyncStore`）的 shape 里含非 `mode: 'sync'` 的 `FieldBuilder`"
+                    ],
+                    [
+                      "`[store] field is not settable: ${key}`",
+                      "`$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）"
+                    ],
+                    [
+                      "`[store] unknown hydration field: ${key}`",
+                      "`$hydrate(partial, { unknown: 'strict' })` 遇到未知 key"
+                    ],
+                    [
+                      "`[store] store has no asynchronous initialization`",
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
+                    ],
+                    [
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
+                      "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
+                    ],
+                    [
+                      "`[store] resource is disposed`",
+                      "对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作"
+                    ],
+                    [
+                      "`[store] unknown resource version`",
+                      "`retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里"
+                    ],
+                    [
+                      "`[store] resource factory returned a disposed value`",
+                      "`factory` 返回了一个已经被标记为 disposed 的值（复用了已释放的引用）"
+                    ],
+                    [
+                      "`[store] disposable resource values must use reference identity`（`TypeError`）",
+                      "配置了 `dispose` 但 `factory` 产出的是原始类型（非对象/函数），无法用引用去重和追踪生命周期"
+                    ],
+                    [
+                      "`[store] invalid or consumed resource capture`",
+                      "`commitCapture()`/`captures.inspect()` 收到的 capture 已提交过、已失效，或不是本资源签发的"
+                    ],
+                    [
+                      "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "store-light-index--StoreLightErrorCode"
+        },
+        {
           "name": "storeReady",
           "kind": "function",
           "signature": "export declare function storeReady(store: object): Promise<void>;",
@@ -5616,6 +7060,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for storeReady.",
           "examples": ["await storeReady(store)"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function storeReady(store: object): Promise<void>;"
@@ -5845,7 +7290,63 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: \"idle\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"idle\""
+            },
+            {
+              "name": "loading",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loading: \"loading\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"loading\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            },
+            {
+              "name": "closing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closing: \"closing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"closing\""
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: \"disposed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"disposed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "StoreResourceKind",
           "exportPath": ".",
           "overloadSignatures": [

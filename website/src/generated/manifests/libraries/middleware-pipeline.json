@@ -484,7 +484,8 @@
             {
               "name": "options",
               "type": "ICreatePipelineOptions<TMode>",
-              "optional": false
+              "optional": false,
+              "configurationType": "ICreatePipelineOptions<IMiddlewarePipelineMode>"
             }
           ],
           "returns": "IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue> | IMiddlewarePipeline<TMode, TValue>",
@@ -506,6 +507,7 @@
             "const controller = new AbortController()\nconst pipeline = createPipeline<string>({\n  mode: MiddlewarePipelineMode.async,\n  signal: controller.signal,\n  assertActive: () => host.assertActive(),\n  onViolation: (kind) => diagnostics.report(kind),\n  combineStageAndDownstreamError: (stage, downstream) =>\n    new AggregateError([stage, downstream], 'middleware stage and downstream failed')\n})\n\nawait pipeline.run(stages, input, consume, { signal: request.signal })"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createPipeline",
           "exportPath": ".",
           "overloadSignatures": [
@@ -548,7 +550,8 @@
               {
                 "name": "options",
                 "type": "ICreatePipelineOptions<TMode>",
-                "optional": false
+                "optional": false,
+                "configurationType": "ICreatePipelineOptions<IMiddlewarePipelineMode>"
               }
             ]
           ],
@@ -598,7 +601,7 @@
               "name": "mode",
               "type": "TMode",
               "optional": false,
-              "description": "Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly."
+              "description": "Selects the execution algebra for every run; stages must match this mode or be lifted explicitly."
             },
             {
               "name": "onViolation",
@@ -628,7 +631,7 @@
               "name": "combineStageAndDownstreamError",
               "type": "(stage: unknown, downstream: unknown) => unknown",
               "optional": true,
-              "description": "Combines simultaneous asynchronous stage and downstream failures while retaining both * originals."
+              "description": "Combines simultaneous asynchronous stage and downstream failures while retaining both originals."
             }
           ],
           "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:createPipeline:export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue>;",
@@ -692,7 +695,7 @@
               "type": "TMode",
               "optional": false,
               "description": "本包只有一个构造入口：`createPipeline(options)`。构造选项固定执行代数，返回对象只含 `mode`、`lift()` 和 `run()`；具体运行状态只存在于单次 `run()` 调用中。",
-              "descriptionEn": "Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly.",
+              "descriptionEn": "Selects the execution algebra for every run; stages must match this mode or be lifted explicitly.",
               "descriptionZh": "本包只有一个构造入口：`createPipeline(options)`。构造选项固定执行代数，返回对象只含 `mode`、`lift()` 和 `run()`；具体运行状态只存在于单次 `run()` 调用中。"
             },
             {
@@ -732,7 +735,7 @@
               "type": "(stage: unknown, downstream: unknown) => unknown",
               "optional": true,
               "description": "`combineStageAndDownstreamError`：可选，仅异步洋葱帧同时失败时组合两个错误。",
-              "descriptionEn": "Combines simultaneous asynchronous stage and downstream failures while retaining both * originals.",
+              "descriptionEn": "Combines simultaneous asynchronous stage and downstream failures while retaining both originals.",
               "descriptionZh": "`combineStageAndDownstreamError`：可选，仅异步洋葱帧同时失败时组合两个错误。"
             }
           ],
@@ -759,6 +762,7 @@
             "import {\n  createPipeline,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  MiddlewarePipelineMode\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\n\npipeline.run(\n  [\n    function* (value) {\n      yield value + 1\n      return GENERATOR_CONTINUE\n    },\n    function* () {\n      return GENERATOR_HALT\n    }\n  ],\n  1,\n  () => {\n    throw new Error('halt 后不会到达 done')\n  }\n)"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "GENERATOR_CONTINUE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const GENERATOR_CONTINUE: unique symbol;"],
@@ -824,6 +828,7 @@
             "import {\n  createPipeline,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  MiddlewarePipelineMode\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\n\npipeline.run(\n  [\n    function* (value) {\n      yield value + 1\n      return GENERATOR_CONTINUE\n    },\n    function* () {\n      return GENERATOR_HALT\n    }\n  ],\n  1,\n  () => {\n    throw new Error('halt 后不会到达 done')\n  }\n)"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "GENERATOR_HALT",
           "exportPath": ".",
           "overloadSignatures": ["export declare const GENERATOR_HALT: unique symbol;"],
@@ -886,6 +891,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GENERATOR_UNDEFINED.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "GENERATOR_UNDEFINED",
           "exportPath": ".",
           "overloadSignatures": ["export declare const GENERATOR_UNDEFINED: unique symbol;"],
@@ -948,6 +954,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncGeneratorMiddlewareStage.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IAsyncGeneratorMiddlewareStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1012,6 +1019,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncMiddlewareStage.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IAsyncMiddlewareStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1077,7 +1085,63 @@
           "examples": [
             "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ICreatePipelineOptions,\n  type IMiddlewarePipeline\n} from '@migaia/middleware-pipeline'\n\nconst options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async> = {\n  mode: MiddlewarePipelineMode.async,\n  onViolation: (kind) => console.warn(kind)\n}\n\nconst pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string> =\n  createPipeline<string>(options)"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: TMode;",
+              "description": "Selects the execution algebra for every run; stages must match this mode or be lifted explicitly.",
+              "parameterDetails": [],
+              "returns": "TMode"
+            },
+            {
+              "name": "onViolation",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onViolation?: IMiddlewarePipelineViolationHandler;",
+              "description": "Reports duplicate or late next calls without starting a second downstream traversal.",
+              "parameterDetails": [],
+              "returns": "IMiddlewarePipelineViolationHandler"
+            },
+            {
+              "name": "assertActive",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly assertActive?: () => void;",
+              "description": "Checks owner admission before each frame; a thrown failure prevents that stage from starting.",
+              "parameterDetails": [],
+              "returns": "() => void"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signal?: IAbortSignal;",
+              "description": "Default cooperative abort signal; a run-level signal overrides it.",
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "signals",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signals?: IGeneratorMiddlewareSignals;",
+              "description": "Optional generator sentinel set; all three sentinel identities must be distinct.",
+              "parameterDetails": [],
+              "returns": "IGeneratorMiddlewareSignals"
+            },
+            {
+              "name": "combineStageAndDownstreamError",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;",
+              "description": "Combines simultaneous asynchronous stage and downstream failures while retaining both originals.",
+              "parameterDetails": [],
+              "returns": "(stage: unknown, downstream: unknown) => unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ICreatePipelineOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1141,7 +1205,36 @@
           "errors": ["No documented errors are declared for IGeneratorMiddlewareSignals."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGeneratorMiddlewareSignals.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "undefined",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly undefined: symbol;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "symbol"
+            },
+            {
+              "name": "halt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly halt: symbol;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "symbol"
+            },
+            {
+              "name": "continue",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly continue: symbol;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "symbol"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IGeneratorMiddlewareSignals",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1206,6 +1299,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGeneratorMiddlewareStage.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IGeneratorMiddlewareStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1271,7 +1365,70 @@
           "examples": [
             "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ICreatePipelineOptions,\n  type IMiddlewarePipeline\n} from '@migaia/middleware-pipeline'\n\nconst options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async> = {\n  mode: MiddlewarePipelineMode.async,\n  onViolation: (kind) => console.warn(kind)\n}\n\nconst pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string> =\n  createPipeline<string>(options)"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: TMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TMode"
+            },
+            {
+              "name": "lift",
+              "kind": "method",
+              "optional": false,
+              "signature": "lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "stage",
+                  "type": "IMiddlewarePipelineStage<TFrom, TValue>",
+                  "optional": false,
+                  "configurationType": "IMiddlewarePipelineStage<IMiddlewarePipelineLiftSource, TValue>"
+                },
+                {
+                  "name": "from",
+                  "type": "TFrom",
+                  "optional": false,
+                  "configurationType": "IMiddlewarePipelineLiftSource"
+                }
+              ],
+              "returns": "IMiddlewarePipelineStage<TMode, TValue>"
+            },
+            {
+              "name": "run",
+              "kind": "method",
+              "optional": false,
+              "signature": "run(stages: readonly IMiddlewarePipelineStage<TMode, TValue>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "stages",
+                  "type": "readonly IMiddlewarePipelineStage<TMode, TValue>[]",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "TValue",
+                  "optional": false
+                },
+                {
+                  "name": "done",
+                  "type": "IMiddlewarePipelineDone<TMode, TValue>",
+                  "optional": false
+                },
+                {
+                  "name": "control",
+                  "type": "IMiddlewarePipelineControlOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "IMiddlewarePipelineRunResult<TMode>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMiddlewarePipeline",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1335,7 +1492,18 @@
           "errors": ["No documented errors are declared for IMiddlewarePipelineContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineContext.",
           "examples": ["type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }"],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: IAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1399,7 +1567,18 @@
           "errors": ["No documented errors are declared for IMiddlewarePipelineControlOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineControlOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signal?: IAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineControlOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1464,6 +1643,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineDone.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineDone",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1528,6 +1708,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1591,7 +1772,36 @@
           "errors": ["No documented errors are declared for IMiddlewarePipelineLiftSource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineLiftSource.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sync: 'sync';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'sync'"
+            },
+            {
+              "name": "async",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly async: 'sync' | 'async';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'sync' | 'async'"
+            },
+            {
+              "name": "generator",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generator: 'sync' | 'generator';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'sync' | 'generator'"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineLiftSource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1656,6 +1866,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineMode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1720,6 +1931,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineRunResult.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineRunResult",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1783,7 +1995,36 @@
           "errors": ["No documented errors are declared for IMiddlewarePipelineStage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineStage.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sync: ISyncMiddlewareStage<TValue>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISyncMiddlewareStage<TValue>"
+            },
+            {
+              "name": "async",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly async: IAsyncMiddlewareStage<TValue>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAsyncMiddlewareStage<TValue>"
+            },
+            {
+              "name": "generator",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generator: IGeneratorMiddlewareStage<TValue>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGeneratorMiddlewareStage<TValue>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1848,6 +2089,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineSyncMode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineSyncMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1912,6 +2154,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineViolation.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1976,6 +2219,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineViolationHandler.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IMiddlewarePipelineViolationHandler",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2040,6 +2284,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncMiddlewareStage.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ISyncMiddlewareStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2104,6 +2349,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MIDDLEWARE_PIPELINE_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "MIDDLEWARE_PIPELINE_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2169,7 +2415,45 @@
           "examples": [
             "error.source === '@migaia/middleware-pipeline'\nerror.code === MiddlewarePipelineErrorCode.invalidOption"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "executionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly executionFailed: \"EXECUTION_FAILED\";",
+              "description": "Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors.",
+              "parameterDetails": [],
+              "returns": "\"EXECUTION_FAILED\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            },
+            {
+              "name": "aborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly aborted: \"ABORTED\";",
+              "description": "Cooperative abort observed with primitive or undefined reason; caller should inspect cause.",
+              "parameterDetails": [],
+              "returns": "\"ABORTED\""
+            },
+            {
+              "name": "abortCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\";",
+              "description": "Abort cleanup and abort primary both failed; caller should inspect errors in order.",
+              "parameterDetails": [],
+              "returns": "\"ABORT_CLEANUP_FAILED\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "MiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2234,6 +2518,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewarePipelineGeneratorSignals.",
           "examples": [],
           "members": [],
+          "composes": ["IGeneratorMiddlewareSignals"],
           "aliasOf": "MiddlewarePipelineGeneratorSignals",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2311,7 +2596,45 @@
             "import {\n  createPipeline,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  MiddlewarePipelineMode\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\n\npipeline.run(\n  [\n    function* (value) {\n      yield value + 1\n      return GENERATOR_CONTINUE\n    },\n    function* () {\n      return GENERATOR_HALT\n    }\n  ],\n  1,\n  () => {\n    throw new Error('halt 后不会到达 done')\n  }\n)",
             "const controller = new AbortController()\nconst pipeline = createPipeline<string>({\n  mode: MiddlewarePipelineMode.async,\n  signal: controller.signal,\n  assertActive: () => host.assertActive(),\n  onViolation: (kind) => diagnostics.report(kind),\n  combineStageAndDownstreamError: (stage, downstream) =>\n    new AggregateError([stage, downstream], 'middleware stage and downstream failed')\n})\n\nawait pipeline.run(stages, input, consume, { signal: request.signal })"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sync: \"sync\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"sync\""
+            },
+            {
+              "name": "async",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly async: \"async\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"async\""
+            },
+            {
+              "name": "generator",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generator: \"generator\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"generator\""
+            },
+            {
+              "name": "asyncGenerator",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly asyncGenerator: \"async-generator\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"async-generator\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "MiddlewarePipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2427,7 +2750,27 @@
           "errors": ["No documented errors are declared for MiddlewarePipelineViolation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewarePipelineViolation.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "late",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly late: \"late\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"late\""
+            },
+            {
+              "name": "duplicate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicate: \"duplicate\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"duplicate\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "MiddlewarePipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [

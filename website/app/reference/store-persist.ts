@@ -1,0 +1,1079 @@
+/**
+ * Verified against packages/store-persist/src plus README/USEGUIDE on 2026-10-17. Source
+ * clarifications: persistKeyed returns all handle fields, not only value/dispose; its object spread
+ * snapshots disposed=false and value before hydration. Default plain-object reconciliation
+ * preserves fields changed since the original startup snapshot; other shapes replace completely.
+ * dispose may start an unawaited final debounced write. Interrupted initial hydration can settle
+ * ready without setting hydrated=true. The default codec delegates to collectionsJsonCodec and only
+ * reads the old Map/Set tags; it does not emit those legacy tags.
+ */
+import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
+
+/** Constructs one bilingual explanation. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+/** Documents a concrete callable member. */
+const method = (
+  en: string,
+  zh: string,
+  params: Readonly<Record<string, IText>>,
+  returns: IText,
+  example: string
+): IMemberDoc => ({ summary: t(en, zh), params, returns, example })
+/** Backend origin is the canonical storage boundary, not a required concrete adapter. */
+const storage = t(
+  'Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.',
+  '调用方注入的 `@migaia/storage-contract` 键值存储投影，提供能力、读取、写入、移除与键枚举；二进制输出还需记录存储的字节读写方法。'
+)
+/** The key is always chosen by the application owning the archive. */
+const key = t(
+  'Archive key selected by the application and reused for reading, writing and removal.',
+  '应用为存档指定的键，读取、写入与移除均复用此键。'
+)
+/** Shared low-level cancellation context. */
+const ctx = t(
+  'Required context object; optional signal comes from the caller AbortController and is forwarded to the codec and storage operation.',
+  '必填上下文对象；可选信号来自调用方中止控制器，并转交编解码器与存储操作。'
+)
+/** Core example injects an ordinary Store through the minimal unit contract. */
+const coreExample = `import { createStore } from '@migaia/store-light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { persistUnit } from '@migaia/store-persist'
+const store = createStore({ count: 0 })
+const handle = persistUnit({
+  snapshot: () => store.$plain(),
+  restore: state => store.$hydrate(state),
+  subscribe: onChange => store.$subscribe(onChange, { fireImmediately: false })
+}, { key: 'counter', runtime: store.$runtime, storage: memoryStorageHost() })
+await handle.ready
+store.count = 1
+await handle.flush()
+handle.dispose()
+await store.$dispose()`
+/** Light adapter example owns both the subscription and original Store. */
+const lightExample = `import { createStore } from '@migaia/store-light'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { persist } from '@migaia/store-persist/light'
+const store = createStore({ theme: 'light' })
+const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })
+await handle.ready
+store.theme = 'dark'
+await handle.flush()
+handle.dispose()
+await store.$dispose()`
+/** Collection example releases persistence before its source collection. */
+const indexedExample = `import { observableMap } from '@migaia/store-indexed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { persistCollection } from '@migaia/store-persist/indexed'
+const cart = observableMap<string, number>()
+const handle = persistCollection(cart, { key: 'cart', storage: memoryStorageHost() })
+await handle.ready
+cart.set('book', 2)
+await handle.flush()
+handle.dispose()
+cart.dispose()`
+/** One writable definition gets one archive and one independent handle. */
+const keyedExample = `import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, familyDef } from '@migaia/store-keyed'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { persistKeyed } from '@migaia/store-persist/keyed'
+const runtime = createRuntime()
+const atomStore = createAtomStore(runtime)
+const preference = familyDef(() => ({ theme: 'light' }))
+const def = preference('u1')
+const handle = persistKeyed(atomStore, def, 'u1', { namespace: 'prefs', storage: memoryStorageHost() })
+await handle.ready
+atomStore.set(def, { theme: 'dark' })
+await handle.flush()
+handle.dispose()
+atomStore.dispose()`
+/** Canonical options reused only where the public wrapper exposes them. */
+const unitOptions: Readonly<Record<string, IMemberDoc>> = {
+  key: { summary: key },
+  runtime: {
+    summary: t(
+      'Owning IRuntime from the source Store, collection or AtomStore; persistence status signals are created in that graph.',
+      '来自源存储、集合或原子存储的所属运行时；持久化状态信号在同一依赖图中创建。'
+    )
+  },
+  storage: { summary: storage },
+  codec: {
+    summary: t(
+      'ICodec from storage-contract encoding the complete version/state envelope. Text and binary routes are supported; structured writes reject.',
+      '来自存储契约的编解码器，处理完整版本与状态信封；支持文本与二进制路径，结构化写入会拒绝。'
+    ),
+    default: t(
+      'defaultJsonCodec with Map/Set round trips and legacy-tag reading.',
+      '默认使用支持映射、集合往返及旧标签读取的本包编解码器。'
+    )
+  },
+  version: {
+    summary: t(
+      'Application schema version, a safe nonnegative integer compared with each saved envelope version.',
+      '应用数据结构版本，必须是安全非负整数，并与每个保存信封的版本比较。'
+    ),
+    default: t(
+      '0; an unequal saved version requires migrate.',
+      '默认零；保存版本不同时需要迁移函数。'
+    )
+  },
+  migrate: {
+    summary: t(
+      'Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.',
+      '版本不一致时同步调用，接收解码后的保存状态与存档版本；抛错或返回可等待对象会使水合失败。'
+    ),
+    params: {
+      persisted: t(
+        'Decoded archive state before merging into current memory.',
+        '合入当前内存前的已解码存档状态。'
+      ),
+      fromVersion: t(
+        'Schema version read from the stored envelope.',
+        '从已保存信封读取的数据结构版本。'
+      )
+    },
+    returns: t(
+      'Synchronous state compatible with the configured version.',
+      '返回与配置版本兼容的同步状态。'
+    ),
+    default: t(
+      'Omitted: version mismatch fails hydration with ENVELOPE_INVALID.',
+      '省略时版本不一致会以信封无效错误使水合失败。'
+    )
+  },
+  partialize: {
+    summary: t(
+      'Synchronous callback before each write, receiving the latest unit snapshot and selecting its persisted portion. Throws and thenables become write failures.',
+      '每次写入前同步调用，接收最新单元快照并选择需要保存的部分；抛错与可等待结果成为写入失败。'
+    ),
+    params: {
+      state: t(
+        'Latest synchronous source snapshot taken when the write executes.',
+        '写入执行时取得的最新同步源快照。'
+      )
+    },
+    returns: t(
+      'Synchronous complete or partial state placed inside the envelope.',
+      '返回放入信封的同步完整或部分状态。'
+    ),
+    default: t('Identity: persist the complete snapshot.', '默认原样返回，保存完整快照。')
+  },
+  merge: {
+    summary: t(
+      'Synchronous hydration callback receiving persisted partial state and the latest current state; return the complete state to restore. Throws or thenables fail hydration.',
+      '同步水合回调接收保存的部分状态与最新当前状态，返回需要恢复的完整状态；抛错或可等待结果使水合失败。'
+    ),
+    params: {
+      persisted: t(
+        'Decoded and optionally migrated partial archive state.',
+        '解码并按需迁移后的部分存档状态。'
+      ),
+      current: t(
+        'Current source snapshot immediately before restoration.',
+        '即将恢复前取得的当前源快照。'
+      )
+    },
+    returns: t('Synchronous complete source state for restore.', '返回用于恢复的同步完整源状态。'),
+    default: t(
+      'Plain objects retain current fields changed since the original startup snapshot and accept persisted values for unchanged fields. Arrays, Map, Set and other shapes replace completely.',
+      '普通对象保留自初始启动快照以来本地已改变的字段，未变字段接受保存值；数组、映射、集合及其他形状整体替换。'
+    )
+  },
+  debounceMs: {
+    summary: t(
+      'Quiet interval before requesting a serialized write; finite milliseconds in [0, 2147483647]. It does not bound storage latency.',
+      '请求串行写入前的安静间隔，必须是定时器范围内的有限毫秒数；不限制存储延迟。'
+    ),
+    default: t(
+      '0: enqueue a write without a debounce timer.',
+      '默认零，直接请求入队写入，不建立防抖定时器。'
+    )
+  },
+  maxWaitMs: {
+    summary: t(
+      'Maximum debounce window from the first post-hydration change; finite milliseconds in [0, 2147483647]. Relevant only when debounceMs is positive.',
+      '成功水合后首次变更起的防抖窗口上限，必须是定时器范围内的有限毫秒数；仅在防抖间隔为正时使用。'
+    ),
+    default: t(
+      'Omitted: only the quiet interval controls enqueueing.',
+      '省略时仅由安静间隔决定写入入队。'
+    )
+  },
+  scheduler: {
+    summary: t(
+      'Caller-selected IScheduler from @migaia/utils/scheduler; its monotonic now and cancellable schedule own the debounce window.',
+      '调用方选择的 `@migaia/utils/scheduler` 调度器，其单调时间与可取消调度共同持有防抖窗口。'
+    ),
+    default: t(
+      'Canonical systemScheduler resolved through lifecycle scheduler admission.',
+      '默认使用经生命周期调度接纳解析的规范系统调度器。'
+    )
+  }
+}
+/** Collection wrappers infer runtime from the owned source. */
+const collectionOptions = Object.fromEntries(
+  Object.entries(unitOptions).filter(([name]) => name !== 'runtime')
+)
+/** Light wrappers expose neither a runtime override nor a custom merge. */
+const lightOptions = Object.fromEntries(
+  Object.entries(collectionOptions).filter(([name]) => name !== 'merge')
+)
+/** Keyed options use namespace instead of an archive key and expose no migration callback. */
+const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
+  ...Object.fromEntries(
+    Object.entries(collectionOptions).filter(([name]) => name !== 'key' && name !== 'migrate')
+  ),
+  namespace: {
+    summary: t(
+      'Application-selected archive prefix; the full key is namespace followed by a colon and the caller id. clearFamily filters that exact prefix.',
+      '应用指定的存档前缀；完整键由前缀、冒号与调用方标识组成，批量清理按此精确前缀过滤。'
+    )
+  },
+  partialize: {
+    ...unitOptions.partialize!,
+    params: {
+      value: t(
+        'Latest value peeked from the writable definition in AtomStore.',
+        '从原子存储中可写定义读取的最新未追踪值。'
+      )
+    }
+  }
+}
+/** Shared live handle surface; keyed disposal property is overridden below. */
+const handleMembers: Readonly<Record<string, IMemberDoc>> = {
+  status: {
+    summary: t(
+      'IReactiveComputed selecting disposed first, then loading, then hydration/write error, otherwise ready. A write can be active while overall status remains ready.',
+      '计算信号优先选择已释放、加载、读写错误，否则为就绪；写入进行中整体仍可显示就绪。'
+    )
+  },
+  error: {
+    summary: t(
+      'Computed current hydration or write failure; simultaneous failures form AggregateError preserving both originals.',
+      '计算当前水合或写入失败；同时失败时形成聚合错误，保留两个原始原因。'
+    )
+  },
+  hydrated: {
+    summary: t(
+      'Computed true only after a successful hydration attempt; disposal does not convert an incomplete hydration into success.',
+      '仅在水合尝试成功后为真的计算信号；释放不会把未完成水合转换为成功。'
+    )
+  },
+  hydrationStatus: {
+    summary: t(
+      'Readonly .value projection reporting loading, success or error for the latest hydration attempt.',
+      '通过只读值属性报告最近水合尝试的加载、成功或错误状态。'
+    )
+  },
+  hydrationError: {
+    summary: t(
+      'Readonly .value containing the latest hydration failure; cleared when another hydration attempt starts.',
+      '只读值属性保存最近水合失败；新水合尝试开始时清除。'
+    )
+  },
+  writeStatus: {
+    summary: t(
+      'Readonly .value reporting idle, writing, error or disposed independently of hydration status.',
+      '只读值属性独立报告写入空闲、执行、错误或释放状态。'
+    )
+  },
+  writeError: {
+    summary: t(
+      'Readonly .value retaining the latest failed write or removal; successful writes clear it and a final disposal write may update it later.',
+      '只读值属性保留最近写入或移除失败；成功写入会清除，释放后的最终写入仍可再次更新。'
+    )
+  },
+  ready: {
+    summary: t(
+      'Original initial-hydration Promise: rejects on hydration failure and otherwise resolves. Disposal can interrupt hydration without rejection, so inspect hydrated as well; retries do not replace this Promise.',
+      '原始初次水合承诺，水合失败时拒绝，否则完成；释放可能中断水合而不拒绝，因此还需查看水合成功信号；重试不替换此承诺。'
+    )
+  },
+  settled: {
+    summary: t(
+      'Original initial-hydration Promise that resolves after either success or failure; it does not await future retries.',
+      '原始初次水合承诺，成功或失败后均完成，不等待未来重试。'
+    )
+  },
+  disposed: {
+    summary: t(
+      'Live terminal-disposal getter on the original IPersistHandle; becomes true once dispose is called.',
+      '原始持久化句柄上的实时终态释放读取器，调用释放方法后变为真。'
+    )
+  },
+  retryHydrate: method(
+    'Retries storage reading only after hydration failure and shares concurrent recovery attempts. Successful recovery reopens automatic writes.',
+    '仅在水合失败后重试存储读取，并共享并发恢复尝试；恢复成功后重新开放自动写入。',
+    {},
+    t(
+      'Promise of recovery; rejects on another failure or post-disposal invocation. Initial ready and settled remain their original Promises.',
+      '返回恢复承诺，再次失败或释放后调用时拒绝；初始就绪与完成承诺保持原对象。'
+    ),
+    'try { await handle.ready } catch { await handle.retryHydrate() }'
+  ),
+  flush: method(
+    'Cancels the debounce window, waits for initial hydration and pending writes, then requests a strict immediate serialized write.',
+    '取消防抖窗口，等待初次水合及待完成写入，再请求严格的立即串行写入。',
+    {},
+    t(
+      'Promise resolving after the write; hydration/write failures reject, and disposal during the wait produces AbortError.',
+      '写入完成后承诺完成；水合或写入失败会拒绝，等待期间释放产生中止错误。'
+    ),
+    'await handle.ready\nawait handle.flush()'
+  ),
+  clear: method(
+    'Cancels the debounce window and queues archive removal after earlier writes; it neither resets memory nor unsubscribes the source.',
+    '取消防抖窗口，在先前写入后排队移除存档；不重置内存，也不取消源订阅。',
+    {},
+    t(
+      'Promise resolving after removal; hydration/removal failures or disposal reject. A later source change can recreate the archive.',
+      '移除完成后承诺完成；水合、移除失败或释放会拒绝，后续源变更可重新创建存档。'
+    ),
+    'await handle.ready\nawait handle.clear()'
+  ),
+  dispose: method(
+    'Idempotently stops the subscription, cancels the debounce timer and aborts active adapter operations. A pending debounce window starts one unawaited final snapshot write.',
+    '幂等停止订阅、取消防抖定时器并中止活跃适配器操作；存在待执行防抖窗口时，会启动一次不等待的最终快照写入。',
+    {},
+    t(
+      'Nothing; scheduling is terminal. An adapter ignoring abort can still complete, and final-write failure remains in writeError.',
+      '无返回值，后续调度终止；忽略中止的适配器仍可能完成，最终写入失败保留在写入错误值中。'
+    ),
+    'await handle.flush()\nhandle.dispose()\nhandle.dispose()'
+  )
+}
+/** Returned handle lifecycle and operational scenarios. */
+const handleType = {
+  summary: t(
+    'Caller-owned hydration and serialized-write lifecycle from persistUnit or an adapter; it does not dispose the source state or injected backend.',
+    '由核心或适配器返回、调用方持有的水合与串行写入生命周期；不释放源状态或注入后端。'
+  ),
+  scenarios: [
+    t(
+      'Wait for hydration, recover a failed archive read, or flush changes before releasing source state.',
+      '等待水合、恢复存档读取失败，或在释放源状态前写完变更。'
+    )
+  ],
+  example: lightExample,
+  members: handleMembers
+}
+/** Error helpers preserve native objects and cause identity. */
+const errorFactory = (
+  name: string,
+  native: string,
+  mode: 'cause' | 'options' | 'errors'
+): ISymbolDoc => ({
+  role: 'operation',
+  purpose: t(
+    `Creates a native ${native} with stable store-persist source/code identity; original causes remain reachable and the helper returns without throwing.`,
+    '创建附有稳定持久化包来源与错误码的原生错误；保留原始原因可达路径，辅助函数只返回而不抛出。'
+  ),
+  params: {
+    code: t(
+      'Selected value from StorePersistErrorCode matching the real failure.',
+      '从本包错误码表选择、对应实际失败的码值。'
+    ),
+    message: t(
+      'Application-authored concrete failure explanation.',
+      '应用编写的具体失败说明文本。'
+    ),
+    ...(mode === 'cause'
+      ? {
+          cause: t(
+            'Optional original failure attached by identity as cause.',
+            '可选原始失败，按身份附加为原因。'
+          )
+        }
+      : mode === 'errors'
+        ? {
+            errors: t(
+              'Original failure objects retained in AggregateError.errors in input order.',
+              '按输入顺序保留在聚合错误列表中的原始失败对象。'
+            )
+          }
+        : {})
+  },
+  ...(mode === 'options'
+    ? {
+        optionDocs: {
+          cause: {
+            summary: t(
+              'Original failure retained on the native error cause property.',
+              '保留在原生错误原因属性上的原始失败。'
+            ),
+            default: t('Omitted: no cause property is supplied.', '省略时不提供原始原因属性。')
+          }
+        }
+      }
+    : {}),
+  returns: t(
+    `The tagged ${native}, preserving native runtime type and stack.`,
+    '返回附有身份的原生错误，保留运行时类型与堆栈。'
+  ),
+  example:
+    mode === 'errors'
+      ? `const error = ${name}(StorePersistErrorCode.hydrateAndWriteFailed, [readFailure, writeFailure], 'Both operations failed')`
+      : `const error = ${name}(StorePersistErrorCode.invalidOption, 'Invalid persistence options')`
+})
+/** Adapter factory description with independently owned persistence lifecycle. */
+const adapter = (
+  en: string,
+  zh: string,
+  params: Readonly<Record<string, IText>>,
+  options: string,
+  example: string
+): ISymbolDoc => ({
+  role: 'factory',
+  purpose: t(en, zh),
+  params,
+  options,
+  returns: t(
+    'Caller-owned persistence handle; invalid configuration throws synchronously, hydration failures reject ready and remain observable through status.',
+    '返回调用方持有的持久化句柄；非法配置同步抛错，水合失败拒绝初始承诺并通过状态可见。'
+  ),
+  example
+})
+/** Full persistence reference. */
+export const storePersistReference: ILibraryReference = {
+  modules: {
+    index: {
+      summary: t(
+        'Generic persistence engine and envelope/codec tools independent of concrete Store packages. Start with persistUnit for a custom synchronous snapshot/restore/subscribe boundary.',
+        '独立于具体状态包的通用持久化引擎与信封、编解码工具；自定义同步快照、恢复、订阅边界从核心工厂开始。'
+      ),
+      example: coreExample
+    },
+    light: {
+      summary: t(
+        'Store-light adapter: persist connects $plain, $hydrate and $subscribe to the shared persistence engine.',
+        '轻量存储适配入口，将普通快照、水合与订阅连接到共享持久化引擎。'
+      ),
+      example: lightExample
+    },
+    indexed: {
+      summary: t(
+        'Observable collection adapter: persistCollection observes snapshot changes and hydrates through whole-state replace.',
+        '响应式集合适配入口，观察快照变更，并通过整体替换恢复保存状态。'
+      ),
+      example: indexedExample
+    },
+    keyed: {
+      summary: t(
+        'Keyed-state adapter: persistKeyed owns one writable definition archive, while clearFamily removes records by namespace.',
+        '键控状态适配入口，为单个可写定义持有存档，并可按命名空间批量移除记录。'
+      ),
+      example: keyedExample
+    }
+  },
+  symbols: {
+    persistUnit: adapter(
+      'Connects a caller-provided synchronous state unit to asynchronous hydration and serialized writes. Automatic writes stay gated after hydration failure until successful retry.',
+      '将调用方提供的同步状态单元连接到异步水合与串行写入；水合失败后自动写入保持关闭，直到重试成功。',
+      {
+        unit: t(
+          'Application IPersistUnit with synchronous snapshot/restore and change subscription returning an unsubscribe function.',
+          '应用提供的单元，含同步快照、恢复，以及返回退订函数的变更订阅。'
+        )
+      },
+      'IPersistUnitOptions',
+      coreExample
+    ),
+    persist: adapter(
+      'Attaches Store-light persistence using $plain snapshots, $hydrate restoration and a non-immediate subscription; status signals use the Store runtime.',
+      '使用 `createStore` 产生的存储或同形对象，通过普通快照、水合恢复与非立即订阅接入持久化，状态信号使用源存储运行时。',
+      {
+        store: t(
+          'Store-light createStore result or another object implementing IPersistableStore; the caller retains its lifetime.',
+          '轻量存储工厂结果或其他实现最小存储边界的对象，由调用方保留其生命周期。'
+        )
+      },
+      'IPersistOptions',
+      lightExample
+    ),
+    persistCollection: adapter(
+      'Persists one observable collection via snapshot and replace, observing its owning Runtime effect while skipping the initial subscription evaluation.',
+      '使用 `observableMap` 等外部集合工厂产生的集合，通过快照与整体替换持久化状态；使用所属运行时副作用观察，跳过订阅初次求值。',
+      {
+        collection: t(
+          'Caller-owned store-indexed collection or structural IPersistableCollection with a tracked snapshot method.',
+          '调用方持有的索引集合，或具有可追踪快照方法的结构化集合边界。'
+        )
+      },
+      'IPersistCollectionOptions',
+      indexedExample
+    ),
+    persistKeyed: adapter(
+      'Persists one writable AtomStore definition under namespace:id, creating an independent engine per invocation. Returned value is captured before hydration; read live state through AtomStore.',
+      '使用 `createAtomStore` 持有 `familyDef` 创建的可写定义，按命名空间与标识持久化单值；每次调用创建独立引擎，返回值在水合前采样。',
+      {
+        atomStore: t(
+          'Caller-owned IAtomStore from @migaia/store-keyed, supplying the state runtime and subscription.',
+          '调用方持有、提供运行时与订阅的 `@migaia/store-keyed` 原子存储。'
+        ),
+        def: t(
+          'IWritableAtomDefinition returned by atomDef or a familyDef invocation, selecting exactly one value.',
+          '原子定义工厂或族定义调用返回的可写定义，精确选择单个值。'
+        ),
+        id: t(
+          'Application-selected stable identifier appended after namespace and a colon; it is not inferred from the definition.',
+          '应用指定的稳定标识，追加在命名空间与冒号之后，不从定义自动推导。'
+        )
+      },
+      'IPersistKeyedOptions',
+      keyedExample
+    ),
+    clearFamily: {
+      role: 'operation',
+      purpose: t(
+        'Enumerates backend keys and removes those starting with namespace plus a colon, sequentially. It does not inventory live definitions or alter their in-memory state.',
+        '枚举后端键并逐个移除以命名空间加冒号开头的记录；不盘点活跃定义，也不改变其内存状态。'
+      ),
+      params: {
+        storage,
+        namespace: t(
+          'Exact application-selected namespace used by persistKeyed; matching includes its trailing colon separator.',
+          '应用为键控持久化指定的精确命名空间，匹配包含尾部冒号分隔符。'
+        )
+      },
+      returns: t(
+        'Number of matched records after all removals succeed; backend failure rejects and earlier removals remain applied.',
+        '全部移除成功后返回匹配记录数；后端失败会拒绝，先前已移除记录保持生效。'
+      ),
+      example: "const count = await clearFamily(storage, 'prefs')"
+    },
+    assertEnvelope: {
+      role: 'operation',
+      purpose: t(
+        'Validates only the outer archive shape: non-array object, safe nonnegative version and a present non-null state. It does not validate the application state schema.',
+        '仅校验外层存档形状：非数组对象、安全非负版本与存在且非空的状态；不校验应用内部状态结构。'
+      ),
+      params: {
+        value: t(
+          'Decoded archive value returned by a codec or supplied by the application.',
+          '由编解码器返回或应用提供的已解码存档值。'
+        ),
+        key
+      },
+      returns: t(
+        'A new version/state envelope retaining the original state reference; invalid shape throws PersistEnvelopeError.',
+        '返回保留原状态引用的新版本状态信封；形状非法抛本包信封错误。'
+      ),
+      example:
+        "const envelope = assertEnvelope<{ count: number }>({ version: 0, state: { count: 1 } }, 'counter')"
+    },
+    defaultJsonCodec: {
+      role: 'constant',
+      purpose: t(
+        'Frozen storage-contract ICodec using collectionsJsonCodec text encoding, including Map/Set round trips. Decode also recognizes the two legacy persistence tags; invalid JSON and encode failures retain causes.',
+        '冻结的存储契约编解码器，使用集合文本编码支持映射与成员集合往返；解码还识别两种旧持久化标签，非法文本与编码失败保留原因。'
+      ),
+      example:
+        "const raw = await defaultJsonCodec.encode({ version: 0, state: new Set(['a']) })\nconst value = await defaultJsonCodec.decode(raw)"
+    },
+    writeEnvelope: {
+      role: 'operation',
+      purpose: t(
+        'Encodes the supplied value and routes it to text or binary storage. Structured output rejects; binary capability requires byte methods and Uint8Array output, while text routing requires a string.',
+        '编码传入值并写入文本或二进制存储路径；拒绝结构化输出，二进制能力要求字节方法及字节数组输出，文本路径要求字符串。'
+      ),
+      params: {
+        storage,
+        key,
+        codec: t(
+          'Caller-selected storage-contract ICodec used to encode this exact value.',
+          '调用方选择、用于编码此精确值的存储契约编解码器。'
+        ),
+        value: t(
+          'Application envelope or other value; this helper does not assert envelope shape.',
+          '应用信封或其他值；本函数不校验信封形状。'
+        ),
+        ctx
+      },
+      returns: t(
+        'Promise resolving after the selected backend write; codec, capability and backend failures reject.',
+        '所选后端写入完成后承诺完成；编解码、能力或后端失败会拒绝。'
+      ),
+      example:
+        "await writeEnvelope(storage, 'counter', defaultJsonCodec, { version: 0, state: { count: 1 } }, {})"
+    },
+    readEnvelope: {
+      role: 'operation',
+      purpose: t(
+        'Reads the selected text or byte route and decodes it, returning absence for a missing record. It does not assert envelope shape or perform schema migration.',
+        '读取所选文本或字节路径并解码，记录不存在时返回缺失；不校验信封形状，也不执行数据迁移。'
+      ),
+      params: {
+        storage,
+        key,
+        codec: t(
+          'The same storage-contract ICodec chosen for the archive representation.',
+          '为存档表示选择的同一存储契约编解码器。'
+        ),
+        ctx
+      },
+      returns: t(
+        'Decoded unknown value, or undefined for missing storage; unsupported binary reads and backend/codec failures reject.',
+        '返回未知类型的解码值，记录缺失时为空值；不受支持的二进制读取及后端、编解码失败会拒绝。'
+      ),
+      example:
+        "const raw = await readEnvelope(storage, 'counter', defaultJsonCodec, {})\nif (raw !== undefined) assertEnvelope(raw, 'counter')"
+    },
+    removeEnvelope: {
+      role: 'operation',
+      purpose: t(
+        'Forwards removal of exactly one archive key to the injected backend, without touching source memory or decoding the current value.',
+        '将单个存档键的移除交给注入后端，不触碰源内存，也不解码当前值。'
+      ),
+      params: { storage, key, ctx },
+      returns: t(
+        'Promise resolving after backend removal; backend failure rejects unchanged.',
+        '后端移除后承诺完成；后端失败原样拒绝。'
+      ),
+      example: "await removeEnvelope(storage, 'counter', {})"
+    },
+    createStorePersistError: errorFactory('createStorePersistError', 'Error', 'options'),
+    createStorePersistTypeError: errorFactory(
+      'createStorePersistTypeError',
+      'TypeError',
+      'options'
+    ),
+    createStorePersistAbortError: errorFactory(
+      'createStorePersistAbortError',
+      'DOMException named AbortError',
+      'cause'
+    ),
+    createStorePersistAggregateError: errorFactory(
+      'createStorePersistAggregateError',
+      'AggregateError',
+      'errors'
+    ),
+    PersistEnvelopeError: {
+      role: 'error',
+      purpose: t(
+        'Native TypeError subclass identifying invalid archive envelopes with this package source and ENVELOPE_INVALID code.',
+        '原生类型错误子类，用本包来源与信封无效错误码识别非法存档信封。'
+      ),
+      params: {
+        message: t(
+          'Caller-authored concrete envelope validation failure.',
+          '调用方编写的具体信封校验失败说明。'
+        )
+      },
+      returns: t(
+        'An error instance with native TypeError behavior and stable source/code.',
+        '返回保留原生类型错误行为与稳定来源、错误码的实例。'
+      ),
+      example: "const error = new PersistEnvelopeError('Invalid saved envelope')"
+    },
+    STORE_PERSIST_SOURCE: {
+      role: 'constant',
+      purpose: t(
+        'Stable @migaia/store-persist source attached to package-owned boundary errors; inspect it together with the stable code.',
+        '附加到包拥有边界错误上的稳定来源标记，读取时同时检查稳定错误码。'
+      ),
+      example: 'console.log(STORE_PERSIST_SOURCE)'
+    },
+    StorePersistErrorCode: {
+      role: 'constant',
+      purpose: t(
+        'Stable persistence failure codes covering configuration, envelope, codec, backend and disposal cancellation failures.',
+        '稳定持久化失败码，覆盖配置、信封、编解码器、后端与释放取消失败。'
+      ),
+      example: 'console.log(StorePersistErrorCode.envelopeInvalid)'
+    },
+    PersistState: {
+      role: 'constant',
+      purpose: t(
+        'Shared lifecycle vocabulary used by overall, hydration and write status projections; each projection permits only its documented subset.',
+        '整体、水合与写入状态投影共用的生命周期词表；各投影仅允许自身声明的子集。'
+      ),
+      example:
+        'if (handle.hydrationStatus.value === PersistState.success) console.log(handle.hydrated.value)'
+    },
+    PersistCodecOutput: {
+      role: 'constant',
+      purpose: t(
+        'Codec output representation vocabulary used for backend routing; the current persistence projection supports text and binary writes.',
+        '用于后端路径选择的编解码输出表示词表；当前持久化投影支持文本与二进制写入。'
+      ),
+      example: 'console.log(defaultJsonCodec.output === PersistCodecOutput.text)'
+    }
+  },
+  types: {
+    IEnvelope: {
+      scenarios: [
+        t(
+          'Validate decoded archives before restoring application state.',
+          '恢复应用状态前校验解码存档。'
+        )
+      ],
+      example: "const envelope = assertEnvelope({ version: 0, state: { count: 1 } }, 'counter')",
+      summary: t(
+        'Versioned archive container; version describes the application schema and state holds the complete or partial persisted snapshot.',
+        '带版本的存档容器；版本描述应用数据结构，状态保存完整或部分持久化快照。'
+      ),
+      members: {
+        version: unitOptions.version!,
+        state: {
+          summary: t(
+            'Persisted application snapshot; assertEnvelope rejects null or undefined but does not inspect its inner schema.',
+            '已保存的应用快照；外层校验拒绝空值，但不检查内部结构。'
+          )
+        }
+      }
+    },
+    IPersistUnitOptions: {
+      summary: t(
+        'Complete generic engine configuration, including caller-owned runtime, backend and synchronous state transformation callbacks.',
+        '通用引擎完整配置，包含调用方运行时、后端及同步状态转换回调。'
+      ),
+      members: unitOptions
+    },
+    IPersistOptions: {
+      summary: t(
+        'Light adapter options; source runtime is inferred and restoration uses the Store hydration behavior.',
+        '轻量适配选项，从源存储取得运行时，恢复使用原存储水合行为。'
+      ),
+      members: lightOptions
+    },
+    IPersistCollectionOptions: {
+      summary: t(
+        'Collection adapter options; source runtime is inferred and custom shape reconciliation can use merge.',
+        '集合适配选项，从源集合取得运行时，可用合并回调定义形状协调。'
+      ),
+      members: collectionOptions
+    },
+    IPersistKeyedOptions: {
+      summary: t(
+        'One writable definition archive configuration; namespace and explicit id determine the storage key.',
+        '单个可写定义存档配置；命名空间与显式标识共同决定存储键。'
+      ),
+      members: keyedOptions
+    },
+    IPersistHandle: handleType,
+    IPersistKeyedHandle: {
+      ...handleType,
+      summary: t(
+        'Full persistence handle plus the value captured before initial hydration. Read live values through AtomStore; this wrapper copies the original disposed getter into an initial false value.',
+        '完整持久化句柄及初次水合前采样的值；实时值从原子存储读取，本包装把原始释放读取器复制成初始假值。'
+      ),
+      example: keyedExample,
+      members: {
+        ...handleMembers,
+        value: {
+          summary: t(
+            'Initial atomStore.get(def) result captured before persistence construction; not a live getter and not refreshed by hydration.',
+            '持久化构造前读取的原子存储初始值；不是实时读取器，水合不会刷新它。'
+          )
+        },
+        disposed: {
+          summary: t(
+            'Initial false value copied by object spread from the original handle; it does not update after this keyed wrapper is disposed.',
+            '对象展开从原句柄复制的初始假值；键控包装释放后此属性不会更新。'
+          )
+        }
+      }
+    },
+    IPersistUnit: {
+      summary: t(
+        'Application-owned minimal synchronous snapshot/restore and change-subscription boundary consumed by persistUnit.',
+        '由应用持有、供核心工厂使用的最小同步快照、恢复与变更订阅边界。'
+      ),
+      members: {
+        snapshot: method(
+          'Synchronously supplies the current persistable state; the engine calls it at construction, hydration and write execution.',
+          '同步提供当前可保存状态，引擎在构造、水合与写入执行时调用。',
+          {},
+          t(
+            'Application state snapshot; a thrown error aborts the current construction or operation.',
+            '返回应用状态快照；抛错中止当前构造或操作。'
+          ),
+          'const state = unit.snapshot()'
+        ),
+        restore: method(
+          'Synchronously restores reconciled state during hydration. The engine suppresses subscription-triggered writes while restoration runs.',
+          '水合期间同步恢复协调后的状态；恢复执行时引擎抑制订阅触发的写入。',
+          {
+            state: t(
+              'Complete reconciled state selected by migration and merge.',
+              '经迁移与合并选定的完整协调状态。'
+            )
+          },
+          t(
+            'Nothing; state is restored, or a thrown error fails hydration.',
+            '无返回值；状态已恢复，抛错则水合失败。'
+          ),
+          'unit.restore(unit.snapshot())'
+        ),
+        subscribe: method(
+          'Registers the engine onChange callback for source changes. Invoke it synchronously without payload; its return is ignored. Registration failure aborts construction.',
+          '为源变更登记引擎回调，同步无参数调用且忽略返回值；登记失败会中止构造。',
+          {
+            onChange: t(
+              'Engine-owned no-argument callback scheduling a write; do not await it.',
+              '引擎提供的无参数写入调度回调，不应等待其结果。'
+            )
+          },
+          t(
+            'IDisposer function detaching the subscription; called once by handle disposal.',
+            '返回用于断开订阅的退订函数，句柄释放时调用一次。'
+          ),
+          'const unsubscribe = unit.subscribe(() => console.log(unit.snapshot()))\nunsubscribe()'
+        )
+      }
+    },
+    IPersistableCollection: {
+      summary: t(
+        'Structural collection contract: tracked snapshots, synchronous whole-state replacement and an owning Runtime.',
+        '结构化集合边界，提供可追踪快照、同步整体替换与所属运行时。'
+      ),
+      members: {
+        runtime: unitOptions.runtime!,
+        snapshot: method(
+          'Reads a synchronous snapshot that tracks collection revisions when called inside its Runtime effect.',
+          '读取同步快照，在所属运行时副作用内调用时追踪集合修订。',
+          {},
+          t(
+            'Current complete collection state using the collection snapshot semantics.',
+            '返回遵循源集合快照语义的当前完整状态。'
+          ),
+          'const state = collection.snapshot()'
+        ),
+        replace: method(
+          'Synchronously replaces complete collection state during persistence restoration; source collection validation remains authoritative.',
+          '持久化恢复期间同步替换完整集合状态，校验仍由源集合负责。',
+          {
+            state: t(
+              'Reconciled complete state selected by persistence hydration.',
+              '持久化水合选定的协调后完整状态。'
+            )
+          },
+          t(
+            'Nothing; collection state has been replaced or its validation error propagates.',
+            '无返回值；集合已替换，或原集合校验错误传播。'
+          ),
+          'collection.replace(collection.snapshot())'
+        )
+      }
+    },
+    IPersistableStore: {
+      summary: t(
+        'Structural Store contract owned by the adapter; store-light createStore results satisfy it without an additional wrapper.',
+        '适配器拥有的结构化存储边界；轻量存储工厂结果无需额外包装即可满足。'
+      ),
+      members: {
+        $runtime: unitOptions.runtime!,
+        $plain: method(
+          'Reads the current plain persistable Store record synchronously.',
+          '同步读取当前可持久化的普通存储记录。',
+          {},
+          t(
+            'Plain application record consumed as a persistence snapshot.',
+            '返回作为持久化快照使用的普通应用记录。'
+          ),
+          'console.log(store.$plain())'
+        ),
+        $subscribe: method(
+          'Registers a no-argument Store-change callback; persistence requests fireImmediately false to avoid an initial write.',
+          '登记无参数存储变更回调；持久化显式关闭立即回调，避免初次写入。',
+          {
+            fn: t(
+              'Synchronous notification callback returning void; source Store owns its failure policy.',
+              '返回空值的同步通知回调，失败策略由源存储负责。'
+            ),
+            options: t(
+              'Optional fireImmediately policy from the source Store; the adapter always supplies false.',
+              '源存储的可选立即触发策略；适配器始终提供假值。'
+            )
+          },
+          t('IDisposer removing this source subscription.', '返回移除此源订阅的退订函数。'),
+          'const unsubscribe = store.$subscribe(() => console.log(store.$plain()), { fireImmediately: false })\nunsubscribe()'
+        ),
+        $hydrate: method(
+          'Synchronously applies archive fields through the Store hydration path; the adapter supplies no unknown-field override.',
+          '通过源存储水合路径同步应用存档字段；适配器不覆盖未知字段策略。',
+          {
+            partial: t(
+              'Reconciled plain archive fields to apply to the Store.',
+              '要应用到源存储的协调后普通存档字段。'
+            ),
+            options: t(
+              'Optional source policy: unknown ignore/report/strict and synchronous onUnknown(key) returning void; throws follow the Store policy.',
+              '源可选策略：未知字段可忽略、报告或严格拒绝，未知键回调同步接收键并返回空值；抛错按源存储策略处理。'
+            )
+          },
+          t(
+            'Nothing; fields are restored or the Store validation failure propagates.',
+            '无返回值；字段已恢复，或源存储校验失败传播。'
+          ),
+          "store.$hydrate({ theme: 'dark' })"
+        )
+      }
+    },
+    IReadonlyPersistValue: {
+      summary: t(
+        'Minimal readonly value projection for hydration/write status and failure values; it declares no subscription or mutation methods.',
+        '水合、写入状态与失败值的最小只读投影，不声明订阅或写入方法。'
+      ),
+      members: {
+        value: {
+          summary: t(
+            'Current projected value; read it without mutating the underlying persistence signal.',
+            '当前投影值，读取时不修改底层持久化信号。'
+          )
+        }
+      }
+    },
+    PersistEnvelopeError: {
+      scenarios: [
+        t(
+          'Recognize malformed archive envelopes without relying on message text.',
+          '识别格式非法的存档信封，无需依赖消息文本。'
+        )
+      ],
+      example:
+        "const error = new PersistEnvelopeError('Invalid saved envelope')\nconsole.log(error instanceof TypeError)",
+      summary: t(
+        'Native TypeError subclass with package source and ENVELOPE_INVALID identity; no additional public methods beyond native Error.',
+        '带本包来源与信封无效身份的原生类型错误子类，除原生错误外没有新增公开方法。'
+      ),
+      members: {}
+    },
+    ...Object.fromEntries(
+      [
+        [
+          'IHydrationStatus',
+          'loading, success or error for hydration attempts.',
+          '水合尝试的加载、成功或错误状态。'
+        ],
+        [
+          'IWriteStatus',
+          'idle, writing, error or disposed for archive mutations.',
+          '存档变更的空闲、写入、错误或释放状态。'
+        ],
+        [
+          'IPersistStatus',
+          'loading, ready, error or disposed for aggregate lifecycle.',
+          '汇总生命周期的加载、就绪、错误或释放状态。'
+        ],
+        [
+          'IPersistState',
+          'All values of the PersistState lifecycle vocabulary.',
+          '持久化状态词表的全部值联合。'
+        ],
+        [
+          'IPersistCodecOutput',
+          'All text, structured and binary codec output values.',
+          '文本、结构化与二进制编解码输出值联合。'
+        ],
+        [
+          'IStorePersistErrorCode',
+          'All stable StorePersistErrorCode values for typed error handling.',
+          '用于类型化错误处理的本包稳定错误码值联合。'
+        ]
+      ].map(([name, en, zh]) => [name!, { summary: t(en!, zh!), members: {} }])
+    )
+  },
+  enums: {
+    PersistState: {
+      summary: t(
+        'Lifecycle terms used by distinct aggregate, hydration and write projections.',
+        '不同汇总、水合与写入投影使用的生命周期术语。'
+      ),
+      values: {
+        idle: t(
+          'Write lane has no currently executing mutation.',
+          '写入路径当前没有正在执行的变更。'
+        ),
+        active: t(
+          'Internal lifecycle accepts work before terminal disposal.',
+          '内部生命周期在终态释放前继续接受工作。'
+        ),
+        loading: t(
+          'A hydration attempt is reading or restoring the archive.',
+          '水合尝试正在读取或恢复存档。'
+        ),
+        writing: t(
+          'A serialized archive write or removal is executing.',
+          '串行存档写入或移除正在执行。'
+        ),
+        ready: t(
+          'Aggregate state is hydrated without a current read/write failure.',
+          '汇总状态已水合且当前没有读写失败。'
+        ),
+        success: t(
+          'The latest hydration attempt completed successfully.',
+          '最近一次水合尝试已经成功完成。'
+        ),
+        error: t(
+          'The corresponding hydration or write lane retains a failure.',
+          '对应的水合或写入路径保留失败。'
+        ),
+        disposed: t(
+          'The persistence lifecycle is terminal and stops new scheduling.',
+          '持久化生命周期已终止，停止接受新调度。'
+        )
+      }
+    },
+    PersistCodecOutput: {
+      summary: t(
+        'Codec representation tags interpreted by envelope backend routing.',
+        '信封后端路径选择解释的编解码表示标签。'
+      ),
+      values: {
+        text: t(
+          'Encode a string written through key/value text storage.',
+          '编码为字符串，通过文本键值存储写入。'
+        ),
+        structured: t(
+          'Structured record representation; persistence writes reject it because the minimal backend projection has no record channel.',
+          '结构化记录表示；最小后端投影没有记录通道，持久化写入拒绝此值。'
+        ),
+        binary: t(
+          'Encode Uint8Array and use byte storage when backend binary capability is available.',
+          '编码为字节数组，后端支持二进制能力时使用字节存储。'
+        )
+      }
+    },
+    StorePersistErrorCode: {
+      summary: t(
+        'Stable persistence configuration, data, codec and lifecycle failure identities.',
+        '稳定的持久化配置、数据、编解码与生命周期失败身份。'
+      ),
+      values: {
+        codecNotResolved: t(
+          'A supplied codec resolves to no usable codec; supply a valid ICodec.',
+          '传入值未解析为可用编解码器，应提供有效契约实现。'
+        ),
+        codecOutputMismatch: t(
+          'Representation conflicts with routing, including structured writes or a nonstring text result.',
+          '输出表示与路径冲突，包括结构化写入或非字符串文本结果。'
+        ),
+        backendCapability: t(
+          'Binary route is selected but required byte methods are unavailable.',
+          '已选择二进制路径，但必需字节方法不可用。'
+        ),
+        envelopeInvalid: t(
+          'Decoded archive shape or unmigrated version is invalid.',
+          '解码存档形状非法，或版本不同且未提供迁移。'
+        ),
+        encodeFailed: t(
+          'Default JSON encoding failed; the original failure remains as cause.',
+          '默认文本编码失败，原始失败仍保留为原因。'
+        ),
+        hydrateAndWriteFailed: t(
+          'Hydration and write failures coexist in a preserving AggregateError.',
+          '水合与写入失败并存于保留原始原因的聚合错误。'
+        ),
+        abortedByDispose: t(
+          'Disposal cancels a persistence operation with native AbortError identity.',
+          '释放以原生中止错误身份取消持久化操作。'
+        ),
+        invalidOption: t(
+          'Invalid key, version, callback, timer, backend or codec configuration.',
+          '存档键、版本、回调、计时、后端或编解码配置非法。'
+        )
+      }
+    }
+  },
+  enhancers: {}
+}

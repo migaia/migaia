@@ -1926,7 +1926,45 @@
             "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed'",
             "AtomKind.primitive // 'primitive'\nAtomKind.primitiveFactory // 'primitive-factory'\nAtomKind.derived // 'derived'\nAtomKind.writableDerived // 'writable-derived'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "primitive",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly primitive: \"primitive\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"primitive\""
+            },
+            {
+              "name": "primitiveFactory",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly primitiveFactory: \"primitive-factory\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"primitive-factory\""
+            },
+            {
+              "name": "derived",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly derived: \"derived\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"derived\""
+            },
+            {
+              "name": "writableDerived",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly writableDerived: \"writable-derived\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"writable-derived\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "AtomKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2011,6 +2049,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for computeUniqueKeys.",
           "examples": ["computeUniqueKeys(todos, (t) => t.id, 'myList') // 冻结的 Key[]"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function computeUniqueKeys<T, Key>(items: readonly T[], keyOf: (item: T, index: number) => Key, label: string): readonly Key[];"
@@ -2275,6 +2314,7 @@
             "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreKeyedAggregateError(code: IStoreKeyedErrorCode, errors: unknown[], message: string): AggregateError;"
@@ -2451,6 +2491,7 @@
             "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreKeyedError(code: IStoreKeyedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -2509,7 +2550,14 @@
               "content": "No additional advanced behavior is declared for createStoreKeyedError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-keyed/dist/errors.d.ts:createStoreKeyedError:export declare function createStoreKeyedError(code: IStoreKeyedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
@@ -2586,7 +2634,16 @@
             }
           ],
           "usageScore": 22,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
+              "descriptionEn": "",
+              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+            }
+          ],
           "fragment": "store-keyed-index--createStoreKeyedError"
         },
         {
@@ -2627,6 +2684,7 @@
             "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreKeyedRangeError(code: IStoreKeyedErrorCode, message: string, options?: { readonly cause?: unknown; }): RangeError;"
@@ -2685,7 +2743,14 @@
               "content": "No additional advanced behavior is declared for createStoreKeyedRangeError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-keyed/dist/errors.d.ts:createStoreKeyedRangeError:export declare function createStoreKeyedRangeError(code: IStoreKeyedErrorCode, message: string, options?: { readonly cause?: unknown; }): RangeError;",
           "guidance": [
             {
@@ -2762,7 +2827,16 @@
             }
           ],
           "usageScore": 22,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
+              "descriptionEn": "",
+              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+            }
+          ],
           "fragment": "store-keyed-index--createStoreKeyedRangeError"
         },
         {
@@ -2803,6 +2877,7 @@
             "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreKeyedTypeError(code: IStoreKeyedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -2861,7 +2936,14 @@
               "content": "No additional advanced behavior is declared for createStoreKeyedTypeError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-keyed/dist/errors.d.ts:createStoreKeyedTypeError:export declare function createStoreKeyedTypeError(code: IStoreKeyedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
           "guidance": [
             {
@@ -2938,7 +3020,16 @@
             }
           ],
           "usageScore": 22,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
+              "descriptionEn": "",
+              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+            }
+          ],
           "fragment": "store-keyed-index--createStoreKeyedTypeError"
         },
         {
@@ -2958,7 +3049,8 @@
             {
               "name": "read",
               "type": "(key: K) => (get: IAtomGet) => T",
-              "optional": false
+              "optional": false,
+              "configurationType": "(key: IFamilyKey) => (get: IAtomGet) => T"
             },
             {
               "name": "options",
@@ -2973,6 +3065,7 @@
             "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function derivedFamilyDef<K extends IFamilyKey, T>(read: (key: K) => (get: IAtomGet) => T, options?: IFamilyDefOptions): IFamilyDef<K, T>;"
@@ -2982,7 +3075,8 @@
               {
                 "name": "read",
                 "type": "(key: K) => (get: IAtomGet) => T",
-                "optional": false
+                "optional": false,
+                "configurationType": "(key: IFamilyKey) => (get: IAtomGet) => T"
               },
               {
                 "name": "options",
@@ -3031,7 +3125,7 @@
               "name": "maxSize",
               "type": "number",
               "optional": true,
-              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected."
+              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when the limit is exceeded. Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later lookup can create a new definition only after the old token becomes unreachable and is collected."
             },
             {
               "name": "debugLabel",
@@ -3214,7 +3308,7 @@
               "type": "number",
               "optional": true,
               "description": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。",
-              "descriptionEn": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected.",
+              "descriptionEn": "Limits the strong definition cache. Entries least recently accessed become weak references when the limit is exceeded. Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later lookup can create a new definition only after the old token becomes unreachable and is collected.",
               "descriptionZh": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。"
             },
             {
@@ -3242,7 +3336,8 @@
             {
               "name": "initial",
               "type": "(key: K) => T",
-              "optional": false
+              "optional": false,
+              "configurationType": "(key: IFamilyKey) => T"
             },
             {
               "name": "options",
@@ -3259,6 +3354,7 @@
             "import { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport type { IRuntime } from '@migaia/reactive'\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }))\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime)\n  const state = sessionByChatId(chatId) // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }))\n  return store\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function familyDef<K extends IFamilyKey, T>(initial: (key: K) => T, options?: IFamilyDefOptions): IFamilyDef<K, T, IWritableAtomDefinition<T>>;"
@@ -3268,7 +3364,8 @@
               {
                 "name": "initial",
                 "type": "(key: K) => T",
-                "optional": false
+                "optional": false,
+                "configurationType": "(key: IFamilyKey) => T"
               },
               {
                 "name": "options",
@@ -3317,7 +3414,7 @@
               "name": "maxSize",
               "type": "number",
               "optional": true,
-              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected."
+              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when the limit is exceeded. Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later lookup can create a new definition only after the old token becomes unreachable and is collected."
             },
             {
               "name": "debugLabel",
@@ -3500,7 +3597,7 @@
               "type": "number",
               "optional": true,
               "description": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。",
-              "descriptionEn": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected.",
+              "descriptionEn": "Limits the strong definition cache. Entries least recently accessed become weak references when the limit is exceeded. Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later lookup can create a new definition only after the old token becomes unreachable and is collected.",
               "descriptionZh": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。"
             },
             {
@@ -3552,6 +3649,7 @@
             "filterOutKey(todos, (t) => t.id, 't1') // { removed: boolean, next: readonly T[] }"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function filterOutKey<T, Key>(list: readonly T[], keyOf: (item: T, index: number) => Key, key: Key): { readonly removed: boolean; readonly next: readonly T[]; };"
@@ -3656,6 +3754,7 @@
             "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function findKeyIndex<T, Key>(items: readonly T[], keyOf: (item: T, index: number) => Key, key: Key): number;"
@@ -3745,17 +3844,20 @@
             {
               "name": "key1",
               "type": "K1",
-              "optional": false
+              "optional": false,
+              "configurationType": "keyof"
             },
             {
               "name": "key2",
               "type": "K2",
-              "optional": false
+              "optional": false,
+              "configurationType": "keyof"
             },
             {
               "name": "key3",
               "type": "K3",
-              "optional": false
+              "optional": false,
+              "configurationType": "keyof"
             }
           ],
           "returns": "IWritableDerivedDefinition<Source[K1], readonly [IAtomUpdate<Source[K1]>], void> | IWritableDerivedDefinition<Source[K1][K2], readonly [IAtomUpdate<Source[K1][K2]>], void> | IWritableDerivedDefinition<Source[K1][K2][K3], readonly [IAtomUpdate<Source[K1][K2][K3]>], void>",
@@ -3768,6 +3870,7 @@
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function focusDef<Source, K1 extends keyof Source>(source: IStandardWritableDef<Source>, key1: K1): IWritableDerivedDefinition<Source[K1], readonly [IAtomUpdate<Source[K1]>], void>;",
@@ -3784,7 +3887,8 @@
               {
                 "name": "key1",
                 "type": "K1",
-                "optional": false
+                "optional": false,
+                "configurationType": "keyof"
               }
             ],
             [
@@ -3796,12 +3900,14 @@
               {
                 "name": "key1",
                 "type": "K1",
-                "optional": false
+                "optional": false,
+                "configurationType": "keyof"
               },
               {
                 "name": "key2",
                 "type": "K2",
-                "optional": false
+                "optional": false,
+                "configurationType": "keyof"
               }
             ],
             [
@@ -3813,17 +3919,20 @@
               {
                 "name": "key1",
                 "type": "K1",
-                "optional": false
+                "optional": false,
+                "configurationType": "keyof"
               },
               {
                 "name": "key2",
                 "type": "K2",
-                "optional": false
+                "optional": false,
+                "configurationType": "keyof"
               },
               {
                 "name": "key3",
                 "type": "K3",
-                "optional": false
+                "optional": false,
+                "configurationType": "keyof"
               }
             ]
           ],
@@ -4056,6 +4165,7 @@
             "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IAtomKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4121,7 +4231,44 @@
           "examples": [
             "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(source: Source): Focus;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "source",
+                  "type": "Source",
+                  "optional": false
+                }
+              ],
+              "returns": "Focus"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set(source: Source, focus: Focus): Source;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "source",
+                  "type": "Source",
+                  "optional": false
+                },
+                {
+                  "name": "focus",
+                  "type": "Focus",
+                  "optional": false
+                }
+              ],
+              "returns": "Source"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IDefOptic<Source, Focus> = { get(source: Source): Focus; set(source: Source, focus: Focus): Source; };"
@@ -4186,7 +4333,42 @@
           "examples": [
             "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly size: number;",
+              "description": "Reports the number of strongly cached definitions.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "forget",
+              "kind": "method",
+              "optional": false,
+              "signature": "forget(key: K): boolean;",
+              "description": "Explicitly breaks canonical identity for a key. Existing instances remain unchanged. Later lookups return a new token, so callers must stop using the old token first.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** Reports the number of strongly cached definitions. */ readonly size: number; /** * Explicitly breaks canonical identity for a key. Existing instances remain unchanged. Later * lookups return a new token, so callers must stop using the old token first. */ forget(key: K): boolean; clear(): void; };"
@@ -4251,7 +4433,27 @@
           "examples": [
             "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "maxSize",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly maxSize?: number;",
+              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when the limit is exceeded. Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later lookup can create a new definition only after the old token becomes unreachable and is collected.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFamilyDefOptions = { /** * Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected. */ readonly maxSize?: number; readonly debugLabel?: string; };"
@@ -4317,6 +4519,7 @@
             "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
+          "composes": ["string", "number", "symbol"],
           "exportPath": ".",
           "overloadSignatures": ["export type IFamilyKey = string | number | symbol;"],
           "overloadParameterDetails": [[]],
@@ -4379,7 +4582,102 @@
           "examples": [
             "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: IStandardWritableDef<readonly T[]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStandardWritableDef<readonly T[]>"
+            },
+            {
+              "name": "items",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IDerivedDefinition<readonly ISplitItemDef<T>[]>"
+            },
+            {
+              "name": "of",
+              "kind": "method",
+              "optional": false,
+              "signature": "of(key: Key): ISplitItemDef<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "Key",
+                  "optional": false
+                }
+              ],
+              "returns": "ISplitItemDef<T>"
+            },
+            {
+              "name": "insert",
+              "kind": "method",
+              "optional": false,
+              "signature": "insert(store: IAtomStore, item: T, index?: number): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "store",
+                  "type": "IAtomStore",
+                  "optional": false
+                },
+                {
+                  "name": "item",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "optional": false,
+              "signature": "remove(store: IAtomStore, key: Key): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "store",
+                  "type": "IAtomStore",
+                  "optional": false
+                },
+                {
+                  "name": "key",
+                  "type": "Key",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "optional": false,
+              "signature": "prune(store: IAtomStore): number;",
+              "description": "Removes cached definitions for keys that are no longer in the source list. This does not release instances in `AtomStore`; use `store.release(def)` for that. Without pruning, a continually changing key space causes the cache map to grow indefinitely.",
+              "parameterDetails": [
+                {
+                  "name": "store",
+                  "type": "IAtomStore",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * Removes cached definitions for keys that are no longer in the source list. This does not * release instances in `AtomStore`; use `store.release(def)` for that. Without pruning, a * continually changing key space causes the cache map to grow indefinitely. */ prune(store: IAtomStore): number; };"
@@ -4444,7 +4742,54 @@
           "examples": [
             "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.writableDerived;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.writableDerived"
+            },
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly read: IAtomRead<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomRead<T>"
+            },
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly write: IAtomWriter<Args, Result>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomWriter<Args, Result>"
+            },
+            {
+              "name": "equals",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly equals?: (a: T, b: T) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(a: T, b: T) => boolean"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISplitItemDef<T> = IWritableDerivedDefinition<T, readonly [IAtomUpdate<T>], void>;"
@@ -4510,7 +4855,99 @@
             "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>",
             "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.primitive;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.primitive"
+            },
+            {
+              "name": "init",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly init: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.primitiveFactory;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.primitiveFactory"
+            },
+            {
+              "name": "create",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly create: () => T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => T"
+            },
+            {
+              "name": "previewSafe",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly previewSafe: boolean;",
+              "description": "Only explicitly marked factories may execute during speculative preview.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.writableDerived;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.writableDerived"
+            },
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly read: IAtomRead<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomRead<T>"
+            },
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly write: IAtomWriter<Args, Result>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomWriter<Args, Result>"
+            },
+            {
+              "name": "equals",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly equals?: (a: T, b: T) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(a: T, b: T) => boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStandardWritableDef<T> = IWritableAtomDefinition<T, readonly [IAtomUpdate<T>], void>;"
@@ -4559,6 +4996,311 @@
           "fragment": "store-keyed-index--IStandardWritableDef"
         },
         {
+          "name": "IStoreKeyedErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];",
+          "declarationLine": 70,
+          "source": "packages/store-keyed/dist/error-code.d.ts",
+          "purpose": "IStoreKeyedErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreKeyedErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStoreKeyedErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStoreKeyedErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreKeyedErrorCode.",
+          "examples": [
+            "function createStoreKeyedError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreKeyedRangeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError\n\nfunction createStoreKeyedTypeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\n\nfunction createStoreKeyedAggregateError(\n  code: IStoreKeyedErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError",
+            "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreKeyedErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStoreKeyedErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStoreKeyedErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStoreKeyedErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreKeyedErrorCode from @migaia/store-keyed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreKeyedErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreKeyedErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreKeyedErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStoreKeyedErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-keyed/dist/error-code.d.ts:IStoreKeyedErrorCode:export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];",
+          "guidance": [
+            {
+              "id": "7-2-storekeyederrorcode-与触发条件",
+              "heading": "7.2 StoreKeyedErrorCode 与触发条件",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                },
+                {
+                  "type": "table",
+                  "headers": ["抛出者", "错误类型", "code", "message", "触发条件"],
+                  "rows": [
+                    [
+                      "`AtomStore` 各方法入口",
+                      "`Error`",
+                      "`ATOM_STORE_DISPOSED`",
+                      "`cannot use a disposed atom store`",
+                      "store 已 `dispose()` 后调用 `get`/`peek`/`preview`/`set`/`sub`/`override`/`isObserved`/`release`。"
+                    ],
+                    [
+                      "`AtomStore` 各方法入口",
+                      "`TypeError`",
+                      "`INVALID_OPTION`",
+                      "`not an atom definition`",
+                      "传入的不是 `atomDef`/`derivedDef`/... 产出的合法定义对象。"
+                    ],
+                    [
+                      "`store.set()`",
+                      "`TypeError`",
+                      "`OVERRIDE_CONTRACT`",
+                      "`atom override resolved to a read-only definition`",
+                      "目标（可能经 override 解析后）是 `derived`，没有写语义。"
+                    ],
+                    [
+                      "`store.override()`",
+                      "`TypeError`",
+                      "`OVERRIDE_CONTRACT`",
+                      "`atom override must preserve the original write contract`",
+                      "违反 §3.4 的三条替换规则。"
+                    ],
+                    [
+                      "`store.override()` / `store.get()` 等解析路径",
+                      "`Error`",
+                      "`CYCLIC_OVERRIDE`",
+                      "`cyclic atom override`",
+                      "override 链形成环。"
+                    ],
+                    [
+                      "`store.preview()`",
+                      "`Error`",
+                      "`PREVIEW_UNSAFE`",
+                      "`atom factory is not marked preview-safe`",
+                      "`preview()` 遇到 `previewSafe: false` 的 `primitive-factory`。"
+                    ],
+                    [
+                      "`store.preview()`",
+                      "`Error`",
+                      "`CIRCULAR_PREVIEW`",
+                      "`circular atom preview detected`",
+                      "推测读之间出现循环依赖。"
+                    ],
+                    [
+                      "`focusDef`（构造期）",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`focusDef requires at least one path segment`",
+                      "未传任何 key。"
+                    ],
+                    [
+                      "`focusDef`/`readOpticPath`/`writeOpticPath`（读/写期）",
+                      "`TypeError`",
+                      "`INVALID_OPTION`",
+                      "`<label> cannot read path segment <key>` / `<label> cannot write path segment <key>`",
+                      "路径中途遇到 `null`/非对象值。"
+                    ],
+                    [
+                      "`splitDef(...).of(key)` 读",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`split def item was removed`",
+                      "读取时该 key 已不在源数组里。"
+                    ],
+                    [
+                      "`splitDef(...).of(key)` 写",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`cannot write a removed split def item`",
+                      "写入时该 key 已不在源数组里。"
+                    ],
+                    [
+                      "`splitDef(...).items` 求值 / `computeUniqueKeys`",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`splitDef keys must be unique`",
+                      "`keyOf` 对不同元素算出了相同的 key。"
+                    ],
+                    [
+                      "`familyDef` / `derivedFamilyDef`",
+                      "`RangeError`",
+                      "`INVALID_OPTION`",
+                      "`family maxSize must be a positive integer`",
+                      "`maxSize` 非正整数。"
+                    ],
+                    [
+                      "`familyDef` / `derivedFamilyDef`",
+                      "`RangeError`",
+                      "`INVALID_OPTION`",
+                      "`family debugLabel must be a string`",
+                      "`debugLabel` 非字符串。"
+                    ],
+                    [
+                      "`familyDef` / `derivedFamilyDef`",
+                      "`Error`",
+                      "`ENV_UNSUPPORTED`",
+                      "`family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox`",
+                      "宿主环境缺少这两个全局能力。"
+                    ],
+                    [
+                      "`atomDef`/`atomDefFactory`/`assertNotThenable`",
+                      "`TypeError`",
+                      "`INVALID_OPTION`",
+                      "`<context> returned a thenable — async initial values are not supported here; compose with @migaia/resource instead (...)`",
+                      "初值/工厂返回值是 thenable。"
+                    ],
+                    [
+                      "`atomDef({...})` 初值克隆（宿主不支持 `structuredClone`）",
+                      "`Error`",
+                      "`ENV_UNSUPPORTED`",
+                      "`primitive initial values require structuredClone support`",
+                      "宿主缺少 `structuredClone`。"
+                    ],
+                    [
+                      "`atomDef({...})` 初值克隆失败（`structuredClone` 抛错）",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`primitive initial value cannot be cloned independently`",
+                      "值本身不可结构化克隆，原异常在 `cause`。"
+                    ],
+                    [
+                      "`atomGetter(runtime)` / `atomSetter(runtime)`",
+                      "`Error`",
+                      "`CROSS_RUNTIME`",
+                      "`cross-runtime atom access is not allowed`",
+                      "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
+                    ],
+                    [
+                      "`AtomStore.dispose()`（多项失败）",
+                      "`AggregateError`",
+                      "`DISPOSAL_FAILED`",
+                      "`atom store disposal failed` / `family disposal failed for multiple entries`",
+                      "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
+                    ],
+                    [
+                      "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
+                      "`Error`",
+                      "—",
+                      "`this node is already owned by another Runtime`",
+                      "同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误工具",
+              "heading": "错误工具",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "包内部用来构造带 `(source, code)` 身份的错误；一般应用代码只需要读取捕获到的错误上的 `code`/`source` 字段做分支，构造函数主要面向在本包基础上二次封装的场景。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreKeyedError`｜5 秒上手："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreKeyedErrorCode`（必填）、`message: string`（必填）、`options?: { cause?: unknown }`（可选）。返回原生 `Error`，带 `source: '@migaia/store-keyed'` 与 `code`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreKeyedRangeError`｜3 秒上手 / `createStoreKeyedTypeError`｜3 秒上手 —— 参数与返回类型（`RangeError`/`TypeError`）之外与上面完全一致："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreKeyedAggregateError`｜5 秒上手 —— 多项失败时打包成 `AggregateError`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreKeyedErrorCode`（必填）、`errors: unknown[]`（必填）、`message: string`（必填）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreKeyedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StoreKeyedErrorCode.atomStoreDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_KEYED_SOURCE`｜3 秒上手 —— 字符串常量 `'@migaia/store-keyed'`，无调用参数："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "error.source === STORE_KEYED_SOURCE"
+                }
+              ]
+            }
+          ],
+          "usageScore": 36,
+          "configuration": [],
+          "fragment": "store-keyed-index--IStoreKeyedErrorCode"
+        },
+        {
           "name": "KeyedSplitCache",
           "kind": "class",
           "signature": "export declare class KeyedSplitCache<Key, Item> { #private; get(key: Key): Item | undefined; of(key: Key, create: () => Item): Item; /** * Evict cached keys `isLive` no longer reports; `shouldEvict` gates per-item (e.g. \"not still * observed\"); `onEvict` runs right before deletion for callers that must dispose the evicted * item. */ prune(isLive: (key: Key) => boolean, shouldEvict?: (item: Item) => boolean, onEvict?: (item: Item) => void): number; get size(): number; keys(): IterableIterator<Key>; values(): IterableIterator<Item>; clear(): void; }",
@@ -4579,6 +5321,7 @@
             {
               "name": "get",
               "kind": "method",
+              "optional": false,
               "signature": "get(key: Key): Item | undefined;",
               "description": null,
               "parameterDetails": [
@@ -4593,6 +5336,7 @@
             {
               "name": "of",
               "kind": "method",
+              "optional": false,
               "signature": "of(key: Key, create: () => Item): Item;",
               "description": null,
               "parameterDetails": [
@@ -4612,6 +5356,7 @@
             {
               "name": "prune",
               "kind": "method",
+              "optional": false,
               "signature": "prune(isLive: (key: Key) => boolean, shouldEvict?: (item: Item) => boolean, onEvict?: (item: Item) => void): number;",
               "description": "Evict cached keys `isLive` no longer reports; `shouldEvict` gates per-item (e.g. \"not still observed\"); `onEvict` runs right before deletion for callers that must dispose the evicted item.",
               "parameterDetails": [
@@ -4636,6 +5381,7 @@
             {
               "name": "size",
               "kind": "get",
+              "optional": false,
               "signature": "get size(): number;",
               "description": null,
               "parameterDetails": [],
@@ -4644,6 +5390,7 @@
             {
               "name": "keys",
               "kind": "method",
+              "optional": false,
               "signature": "keys(): IterableIterator<Key>;",
               "description": null,
               "parameterDetails": [],
@@ -4652,6 +5399,7 @@
             {
               "name": "values",
               "kind": "method",
+              "optional": false,
               "signature": "values(): IterableIterator<Item>;",
               "description": null,
               "parameterDetails": [],
@@ -4660,12 +5408,14 @@
             {
               "name": "clear",
               "kind": "method",
+              "optional": false,
               "signature": "clear(): void;",
               "description": null,
               "parameterDetails": [],
               "returns": "void"
             }
           ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare class KeyedSplitCache<Key, Item> { #private; get(key: Key): Item | undefined; of(key: Key, create: () => Item): Item; /** * Evict cached keys `isLive` no longer reports; `shouldEvict` gates per-item (e.g. \"not still * observed\"); `onEvict` runs right before deletion for callers that must dispose the evicted * item. */ prune(isLive: (key: Key) => boolean, shouldEvict?: (item: Item) => boolean, onEvict?: (item: Item) => void): number; get size(): number; keys(): IterableIterator<Key>; values(): IterableIterator<Item>; clear(): void; }"
@@ -4742,6 +5492,7 @@
             "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n})"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function opticDef<Source, Focus>(source: IStandardWritableDef<Source>, optic: IDefOptic<Source, Focus>): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;"
@@ -4838,6 +5589,7 @@
             "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens') // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens') // { a: { b: 2 } }，原对象不变"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown;"
@@ -5103,6 +5855,7 @@
             "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[];"
@@ -5210,6 +5963,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for requireKeyIndex.",
           "examples": ["requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed')"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function requireKeyIndex<T, Key>(items: readonly T[], keyOf: (item: T, index: number) => Key, key: Key, label: string): number;"
@@ -5316,6 +6070,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for selectDef.",
           "examples": ["const userName = selectDef(userDef, (user) => user.name)"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function selectDef<Source, Selected>(source: IAtomDefinition<Source>, select: (value: Source) => Selected, equals?: (left: Selected, right: Selected) => boolean): IDerivedDefinition<Selected>;"
@@ -5408,6 +6163,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for shallowArrayEquals.",
           "examples": ["shallowArrayEquals([1, 2], [1, 2]) // true"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean;"
@@ -5503,6 +6259,7 @@
             "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[];"
@@ -5602,6 +6359,7 @@
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function splitDef<T, Key = number>(source: IStandardWritableDef<readonly T[]>, keyOf?: (item: T, index: number) => Key): ISplitDefinition<T, Key>;"
@@ -5847,6 +6605,7 @@
             "error.source === STORE_KEYED_SOURCE"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_KEYED_SOURCE = \"@migaia/store-keyed\";"
@@ -5968,6 +6727,409 @@
           "fragment": "store-keyed-index--STORE_KEYED_SOURCE"
         },
         {
+          "name": "StoreKeyedErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\"; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: \"DISPOSAL_FAILED\"; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: \"CIRCULAR_PREVIEW\"; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: \"CYCLIC_OVERRIDE\"; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: \"OVERRIDE_CONTRACT\"; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: \"PREVIEW_UNSAFE\"; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by the family definition cache. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "declarationLine": 11,
+          "source": "packages/store-keyed/dist/error-code.d.ts",
+          "purpose": "Declares the public error codes for `@migaia/store-keyed` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-keyed'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2).",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreKeyedErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StoreKeyedErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StoreKeyedErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreKeyedErrorCode.",
+          "examples": [
+            "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]",
+            "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'",
+            "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')",
+            "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')",
+            "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)",
+            "if (error.code === StoreKeyedErrorCode.atomStoreDisposed) {\n  /* ... */\n}",
+            "import { StoreKeyedErrorCode } from '@migaia/store-keyed'\n\ntry {\n  store.set(readOnlyDerivedDef as never, 1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreKeyedErrorCode.overrideContract) {\n    // 处理\"写契约不匹配\"\n  }\n}"
+          ],
+          "members": [
+            {
+              "name": "atomStoreDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\";",
+              "description": "An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance.",
+              "parameterDetails": [],
+              "returns": "\"ATOM_STORE_DISPOSED\""
+            },
+            {
+              "name": "disposalFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposalFailed: \"DISPOSAL_FAILED\";",
+              "description": "Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause.",
+              "parameterDetails": [],
+              "returns": "\"DISPOSAL_FAILED\""
+            },
+            {
+              "name": "circularPreview",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly circularPreview: \"CIRCULAR_PREVIEW\";",
+              "description": "An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles.",
+              "parameterDetails": [],
+              "returns": "\"CIRCULAR_PREVIEW\""
+            },
+            {
+              "name": "cyclicOverride",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cyclicOverride: \"CYCLIC_OVERRIDE\";",
+              "description": "An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other.",
+              "parameterDetails": [],
+              "returns": "\"CYCLIC_OVERRIDE\""
+            },
+            {
+              "name": "overrideContract",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly overrideContract: \"OVERRIDE_CONTRACT\";",
+              "description": "An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides.",
+              "parameterDetails": [],
+              "returns": "\"OVERRIDE_CONTRACT\""
+            },
+            {
+              "name": "previewUnsafe",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly previewUnsafe: \"PREVIEW_UNSAFE\";",
+              "description": "A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview.",
+              "parameterDetails": [],
+              "returns": "\"PREVIEW_UNSAFE\""
+            },
+            {
+              "name": "crossRuntime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "description": "An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes.",
+              "parameterDetails": [],
+              "returns": "\"CROSS_RUNTIME\""
+            },
+            {
+              "name": "envUnsupported",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "description": "The host lacks `WeakRef` or `FinalizationRegistry` required by the family definition cache. * * Enable these capabilities in the host sandbox. This is a deployment issue.",
+              "parameterDetails": [],
+              "returns": "\"ENV_UNSUPPORTED\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreKeyedErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\"; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: \"DISPOSAL_FAILED\"; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: \"CIRCULAR_PREVIEW\"; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: \"CYCLIC_OVERRIDE\"; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: \"OVERRIDE_CONTRACT\"; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: \"PREVIEW_UNSAFE\"; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by the family definition cache. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StoreKeyedErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StoreKeyedErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Declares the public error codes for `@migaia/store-keyed` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-keyed'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2)."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreKeyedErrorCode from @migaia/store-keyed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreKeyedErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreKeyedErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreKeyedErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StoreKeyedErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-keyed/dist/error-code.d.ts:StoreKeyedErrorCode:export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\"; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: \"DISPOSAL_FAILED\"; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: \"CIRCULAR_PREVIEW\"; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: \"CYCLIC_OVERRIDE\"; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: \"OVERRIDE_CONTRACT\"; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: \"PREVIEW_UNSAFE\"; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by the family definition cache. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "guidance": [
+            {
+              "id": "7-2-storekeyederrorcode-与触发条件",
+              "heading": "7.2 StoreKeyedErrorCode 与触发条件",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                },
+                {
+                  "type": "table",
+                  "headers": ["抛出者", "错误类型", "code", "message", "触发条件"],
+                  "rows": [
+                    [
+                      "`AtomStore` 各方法入口",
+                      "`Error`",
+                      "`ATOM_STORE_DISPOSED`",
+                      "`cannot use a disposed atom store`",
+                      "store 已 `dispose()` 后调用 `get`/`peek`/`preview`/`set`/`sub`/`override`/`isObserved`/`release`。"
+                    ],
+                    [
+                      "`AtomStore` 各方法入口",
+                      "`TypeError`",
+                      "`INVALID_OPTION`",
+                      "`not an atom definition`",
+                      "传入的不是 `atomDef`/`derivedDef`/... 产出的合法定义对象。"
+                    ],
+                    [
+                      "`store.set()`",
+                      "`TypeError`",
+                      "`OVERRIDE_CONTRACT`",
+                      "`atom override resolved to a read-only definition`",
+                      "目标（可能经 override 解析后）是 `derived`，没有写语义。"
+                    ],
+                    [
+                      "`store.override()`",
+                      "`TypeError`",
+                      "`OVERRIDE_CONTRACT`",
+                      "`atom override must preserve the original write contract`",
+                      "违反 §3.4 的三条替换规则。"
+                    ],
+                    [
+                      "`store.override()` / `store.get()` 等解析路径",
+                      "`Error`",
+                      "`CYCLIC_OVERRIDE`",
+                      "`cyclic atom override`",
+                      "override 链形成环。"
+                    ],
+                    [
+                      "`store.preview()`",
+                      "`Error`",
+                      "`PREVIEW_UNSAFE`",
+                      "`atom factory is not marked preview-safe`",
+                      "`preview()` 遇到 `previewSafe: false` 的 `primitive-factory`。"
+                    ],
+                    [
+                      "`store.preview()`",
+                      "`Error`",
+                      "`CIRCULAR_PREVIEW`",
+                      "`circular atom preview detected`",
+                      "推测读之间出现循环依赖。"
+                    ],
+                    [
+                      "`focusDef`（构造期）",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`focusDef requires at least one path segment`",
+                      "未传任何 key。"
+                    ],
+                    [
+                      "`focusDef`/`readOpticPath`/`writeOpticPath`（读/写期）",
+                      "`TypeError`",
+                      "`INVALID_OPTION`",
+                      "`<label> cannot read path segment <key>` / `<label> cannot write path segment <key>`",
+                      "路径中途遇到 `null`/非对象值。"
+                    ],
+                    [
+                      "`splitDef(...).of(key)` 读",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`split def item was removed`",
+                      "读取时该 key 已不在源数组里。"
+                    ],
+                    [
+                      "`splitDef(...).of(key)` 写",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`cannot write a removed split def item`",
+                      "写入时该 key 已不在源数组里。"
+                    ],
+                    [
+                      "`splitDef(...).items` 求值 / `computeUniqueKeys`",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`splitDef keys must be unique`",
+                      "`keyOf` 对不同元素算出了相同的 key。"
+                    ],
+                    [
+                      "`familyDef` / `derivedFamilyDef`",
+                      "`RangeError`",
+                      "`INVALID_OPTION`",
+                      "`family maxSize must be a positive integer`",
+                      "`maxSize` 非正整数。"
+                    ],
+                    [
+                      "`familyDef` / `derivedFamilyDef`",
+                      "`RangeError`",
+                      "`INVALID_OPTION`",
+                      "`family debugLabel must be a string`",
+                      "`debugLabel` 非字符串。"
+                    ],
+                    [
+                      "`familyDef` / `derivedFamilyDef`",
+                      "`Error`",
+                      "`ENV_UNSUPPORTED`",
+                      "`family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox`",
+                      "宿主环境缺少这两个全局能力。"
+                    ],
+                    [
+                      "`atomDef`/`atomDefFactory`/`assertNotThenable`",
+                      "`TypeError`",
+                      "`INVALID_OPTION`",
+                      "`<context> returned a thenable — async initial values are not supported here; compose with @migaia/resource instead (...)`",
+                      "初值/工厂返回值是 thenable。"
+                    ],
+                    [
+                      "`atomDef({...})` 初值克隆（宿主不支持 `structuredClone`）",
+                      "`Error`",
+                      "`ENV_UNSUPPORTED`",
+                      "`primitive initial values require structuredClone support`",
+                      "宿主缺少 `structuredClone`。"
+                    ],
+                    [
+                      "`atomDef({...})` 初值克隆失败（`structuredClone` 抛错）",
+                      "`Error`",
+                      "`INVALID_OPTION`",
+                      "`primitive initial value cannot be cloned independently`",
+                      "值本身不可结构化克隆，原异常在 `cause`。"
+                    ],
+                    [
+                      "`atomGetter(runtime)` / `atomSetter(runtime)`",
+                      "`Error`",
+                      "`CROSS_RUNTIME`",
+                      "`cross-runtime atom access is not allowed`",
+                      "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
+                    ],
+                    [
+                      "`AtomStore.dispose()`（多项失败）",
+                      "`AggregateError`",
+                      "`DISPOSAL_FAILED`",
+                      "`atom store disposal failed` / `family disposal failed for multiple entries`",
+                      "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
+                    ],
+                    [
+                      "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
+                      "`Error`",
+                      "—",
+                      "`this node is already owned by another Runtime`",
+                      "同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误工具",
+              "heading": "错误工具",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "包内部用来构造带 `(source, code)` 身份的错误；一般应用代码只需要读取捕获到的错误上的 `code`/`source` 字段做分支，构造函数主要面向在本包基础上二次封装的场景。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreKeyedError`｜5 秒上手："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreKeyedErrorCode`（必填）、`message: string`（必填）、`options?: { cause?: unknown }`（可选）。返回原生 `Error`，带 `source: '@migaia/store-keyed'` 与 `code`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreKeyedRangeError`｜3 秒上手 / `createStoreKeyedTypeError`｜3 秒上手 —— 参数与返回类型（`RangeError`/`TypeError`）之外与上面完全一致："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreKeyedAggregateError`｜5 秒上手 —— 多项失败时打包成 `AggregateError`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreKeyedErrorCode`（必填）、`errors: unknown[]`（必填）、`message: string`（必填）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreKeyedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StoreKeyedErrorCode.atomStoreDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_KEYED_SOURCE`｜3 秒上手 —— 字符串常量 `'@migaia/store-keyed'`，无调用参数："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "error.source === STORE_KEYED_SOURCE"
+                }
+              ]
+            },
+            {
+              "id": "高阶组合示例-5-捕获包边界错误并按-code-分支处理",
+              "heading": "高阶组合示例 · 5. 捕获包边界错误并按 code 分支处理",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { StoreKeyedErrorCode } from '@migaia/store-keyed'\n\ntry {\n  store.set(readOnlyDerivedDef as never, 1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreKeyedErrorCode.overrideContract) {\n    // 处理\"写契约不匹配\"\n  }\n}"
+                }
+              ]
+            }
+          ],
+          "usageScore": 62,
+          "configuration": [],
+          "fragment": "store-keyed-index--StoreKeyedErrorCode"
+        },
+        {
           "name": "writeOpticPath",
           "kind": "function",
           "signature": "export declare function writeOpticPath(value: unknown, path: readonly PropertyKey[], next: unknown, label: string): unknown;",
@@ -6011,6 +7173,7 @@
             "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens') // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens') // { a: { b: 2 } }，原对象不变"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function writeOpticPath(value: unknown, path: readonly PropertyKey[], next: unknown, label: string): unknown;"
@@ -6503,6 +7666,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertNotThenable.",
           "examples": ["assertNotThenable(value, 'myFactory create()')"],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare function assertNotThenable(value: unknown, context: string): void;"
@@ -6760,6 +7924,7 @@
             "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T>;"
@@ -7012,6 +8177,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for atomDefFactory.",
           "examples": ["const list = atomDefFactory(() => [], 'list')"],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare function atomDefFactory<T>(create: () => T, debugLabel?: string): IPrimitiveFactoryDefinition<T>;"
@@ -7279,6 +8445,7 @@
             "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare function derivedDef<T>(read: IAtomRead<T>, debugLabel?: string, equals?: (a: T, b: T) => boolean): IDerivedDefinition<T>;"
@@ -7528,7 +8695,54 @@
             "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>",
             "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.writableDerived;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.writableDerived"
+            },
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly read: IAtomRead<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomRead<T>"
+            },
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly write: (...args: never[]) => unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(...args: never[]) => unknown"
+            },
+            {
+              "name": "equals",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly equals?: (a: T, b: T) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(a: T, b: T) => boolean"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": ["IPrimitiveDefinition", "IPrimitiveFactoryDefinition", "IDerivedDefinition"],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IAtomDefinition<T> = IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T> | IDerivedDefinition<T> | IErasedWritableDerived<T>;"
@@ -7594,6 +8808,7 @@
             "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IAtomGet = <T>(definition: IAtomDefinition<T>) => T;"
@@ -7657,6 +8872,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomRead.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": ["export type IAtomRead<T> = (get: IAtomGet) => T;"],
           "overloadParameterDetails": [[]],
@@ -7718,6 +8934,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomSet.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IAtomSet = <T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args) => Result;"
@@ -7783,6 +9000,7 @@
             "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": ["export type IAtomUpdate<T> = T | ((previous: T) => T);"],
           "overloadParameterDetails": [[]],
@@ -7844,6 +9062,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomWriter.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IAtomWriter<Args extends readonly unknown[], Result> = (get: IAtomGet, set: IAtomSet, ...args: Args) => Result;"
@@ -7910,7 +9129,45 @@
             "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>",
             "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.derived;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.derived"
+            },
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly read: IAtomRead<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomRead<T>"
+            },
+            {
+              "name": "equals",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly equals?: (a: T, b: T) => boolean;",
+              "description": "Provides an equality comparison for the store layer to apply.",
+              "parameterDetails": [],
+              "returns": "(a: T, b: T) => boolean"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** Provides an equality comparison for the store layer to apply. */ readonly equals?: (a: T, b: T) => boolean; };"
@@ -7975,7 +9232,36 @@
           "examples": [
             "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.primitive;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.primitive"
+            },
+            {
+              "name": "init",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly init: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IPrimitiveDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.primitive; readonly init: T; };"
@@ -8040,7 +9326,45 @@
           "examples": [
             "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.primitiveFactory;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.primitiveFactory"
+            },
+            {
+              "name": "create",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly create: () => T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => T"
+            },
+            {
+              "name": "previewSafe",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly previewSafe: boolean;",
+              "description": "Only explicitly marked factories may execute during speculative preview.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.primitiveFactory; readonly create: () => T; /** Only explicitly marked factories may execute during speculative preview. */ readonly previewSafe: boolean; };"
@@ -8107,6 +9431,7 @@
             "isAtomDefinition(count) // true\nisAtomDefinition({}) // false"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare const isAtomDefinition: (value: unknown) => value is IAtomDefinition<unknown>;"
@@ -8172,6 +9497,11 @@
             "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
+          "composes": [
+            "IPrimitiveDefinition",
+            "IPrimitiveFactoryDefinition",
+            "IWritableDerivedDefinition"
+          ],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IWritableAtomDefinition<T, Args extends readonly unknown[] = readonly [IAtomUpdate<T>], Result = void> = IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T> | IWritableDerivedDefinition<T, Args, Result>;"
@@ -8237,7 +9567,54 @@
             "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>",
             "focusDef(source, key1): IWritableDerivedDefinition<Source[key1], ...>;\nfocusDef(source, key1, key2): IWritableDerivedDefinition<Source[key1][key2], ...>;\nfocusDef(source, key1, key2, key3): IWritableDerivedDefinition<Source[key1][key2][key3], ...>;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof AtomKind.writableDerived;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof AtomKind.writableDerived"
+            },
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly read: IAtomRead<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomRead<T>"
+            },
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly write: IAtomWriter<Args, Result>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAtomWriter<Args, Result>"
+            },
+            {
+              "name": "equals",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly equals?: (a: T, b: T) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(a: T, b: T) => boolean"
+            },
+            {
+              "name": "debugLabel",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugLabel?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export type IWritableDerivedDefinition<T, Args extends readonly unknown[], Result> = IDefinitionBase & { readonly kind: typeof AtomKind.writableDerived; readonly read: IAtomRead<T>; readonly write: IAtomWriter<Args, Result>; readonly equals?: (a: T, b: T) => boolean; };"
@@ -8312,6 +9689,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for previewSafeAtomDefFactory.",
           "examples": ["const list = previewSafeAtomDefFactory(() => [], 'list')"],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare function previewSafeAtomDefFactory<T>(create: () => T, debugLabel?: string): IPrimitiveFactoryDefinition<T>;"
@@ -8396,7 +9774,8 @@
             {
               "name": "write",
               "type": "IAtomWriter<Args, Result>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IAtomWriter<readonly, Result>"
             },
             {
               "name": "debugLabel",
@@ -8416,6 +9795,7 @@
             "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
             "export declare function writableDef<T, Args extends readonly unknown[], Result>(read: IAtomRead<T>, write: IAtomWriter<Args, Result>, debugLabel?: string, equals?: (a: T, b: T) => boolean): IWritableDerivedDefinition<T, Args, Result>;"
@@ -8430,7 +9810,8 @@
               {
                 "name": "write",
                 "type": "IAtomWriter<Args, Result>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IAtomWriter<readonly, Result>"
               },
               {
                 "name": "debugLabel",
@@ -8534,6 +9915,7 @@
             "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/store",
           "overloadSignatures": [
             "export declare function createAtomStore(runtime: IRuntime): IAtomStore;"
@@ -8611,6 +9993,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defaultAtomStore.",
           "examples": ["const store = defaultAtomStore(defaultRuntime)"],
           "members": [],
+          "composes": [],
           "exportPath": "./atom/store",
           "overloadSignatures": [
             "export declare function defaultAtomStore(runtime: IRuntime): IAtomStore;"
@@ -8685,7 +10068,224 @@
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<T>(definition: IAtomDefinition<T>): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IAtomDefinition<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "optional": false,
+              "signature": "peek<T>(definition: IAtomDefinition<T>): T;",
+              "description": "Reads without tracking, so an adapter snapshot does not create edges in another dependency capture.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IAtomDefinition<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "preview",
+              "kind": "method",
+              "optional": false,
+              "signature": "preview<T>(definition: IAtomDefinition<T>): T;",
+              "description": "React/concurrent speculative read; value may be discarded after the turn.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IAtomDefinition<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IWritableAtomDefinition<T, Args, Result>",
+                  "optional": false,
+                  "configurationType": "IWritableAtomDefinition<T, readonly, Result>"
+                },
+                {
+                  "name": "args",
+                  "type": "Args",
+                  "optional": false,
+                  "configurationType": "readonly"
+                }
+              ],
+              "returns": "Result"
+            },
+            {
+              "name": "sub",
+              "kind": "method",
+              "optional": false,
+              "signature": "sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer;",
+              "description": "Subscribes to a definition and returns an unsubscribe function. Adapters subscribe through this boundary instead of accessing graph nodes, leaving instantiation strategies independent.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IAtomDefinition<T>",
+                  "optional": false
+                },
+                {
+                  "name": "onChange",
+                  "type": "() => void",
+                  "optional": false
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "override",
+              "kind": "method",
+              "optional": false,
+              "signature": "override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer;",
+              "description": "Routes a read-only derived definition to any definition with the same value type.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IDerivedDefinition<T>",
+                  "optional": false
+                },
+                {
+                  "name": "replacement",
+                  "type": "IAtomDefinition<NoInfer<T>>",
+                  "optional": false
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "override",
+              "kind": "method",
+              "optional": false,
+              "signature": "override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer;",
+              "description": "Replaces a primitive only with a definition that preserves standard `set(update)` semantics.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>",
+                  "optional": false
+                },
+                {
+                  "name": "replacement",
+                  "type": "IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>",
+                  "optional": false
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "override",
+              "kind": "method",
+              "optional": false,
+              "signature": "override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer;",
+              "description": "Preserves the exact `Args` and `Result` contract of a writable derived definition.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IWritableDerivedDefinition<T, Args, Result>",
+                  "optional": false,
+                  "configurationType": "IWritableDerivedDefinition<T, readonly, Result>"
+                },
+                {
+                  "name": "replacement",
+                  "type": "IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>",
+                  "optional": false,
+                  "configurationType": "IWritableDerivedDefinition<NoInfer<T>, NoInfer<readonly>, NoInfer<Result>>"
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "isObserved",
+              "kind": "method",
+              "optional": false,
+              "signature": "isObserved<T>(definition: IAtomDefinition<T>): boolean;",
+              "description": "Reports whether this store has observers for the definition without exposing its graph node.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IAtomDefinition<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "release",
+              "kind": "method",
+              "optional": false,
+              "signature": "release<T>(definition: IAtomDefinition<T>): boolean;",
+              "description": "Releases the instance for one definition. Unlike disposing the whole store, disposal of a legacy atom instance releases only its own definition. Other definitions in the same store remain intact.",
+              "parameterDetails": [
+                {
+                  "name": "definition",
+                  "type": "IAtomDefinition<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly size: number;",
+              "description": "Reports the number of instantiated definitions so release behavior is observable.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./atom/store",
           "overloadSignatures": [
             "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** * Reads without tracking, so an adapter snapshot does not create edges in another dependency * capture. */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * Subscribes to a definition and returns an unsubscribe function. * * Adapters subscribe through this boundary instead of accessing graph nodes, leaving * instantiation strategies independent. */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** Routes a read-only derived definition to any definition with the same value type. */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** Reports whether this store has observers for the definition without exposing its graph node. */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * Releases the instance for one definition. * * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own * definition. Other definitions in the same store remain intact. */ release<T>(definition: IAtomDefinition<T>): boolean; /** Reports the number of instantiated definitions so release behavior is observable. */ readonly size: number; dispose(): void; };"
@@ -8776,6 +10376,7 @@
             "const get = atomGetter(runtime)\nget(someInstanceAtom) // 读取前校验 atom.runtime === runtime"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
             "export declare function atomGetter(runtime: IRuntime): IAtomGetter;"
@@ -9018,6 +10619,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for atomSetter.",
           "examples": ["const set = atomSetter(runtime)\nset(someWritableInstanceAtom, nextValue)"],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
             "export declare function atomSetter(runtime: IRuntime): IAtomSetter;"
@@ -9256,6 +10858,7 @@
             "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": ["export type IAtomGetter = <T>(atom: IReadableAtom<T>) => T;"],
           "overloadParameterDetails": [[]],
@@ -9317,6 +10920,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomRead.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": ["export type IAtomRead<T> = (get: IAtomGetter) => T;"],
           "overloadParameterDetails": [[]],
@@ -9380,6 +10984,7 @@
             "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
             "export type IAtomSetter = <T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>, ...args: Args) => Result;"
@@ -9445,6 +11050,7 @@
             "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": ["export type IAtomUpdate<T> = T | ((previous: T) => T);"],
           "overloadParameterDetails": [[]],
@@ -9506,6 +11112,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomWrite.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
             "export type IAtomWrite<Args extends readonly unknown[], Result> = (get: IAtomGetter, set: IAtomSetter, ...args: Args) => Result;"
@@ -9571,7 +11178,63 @@
             "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'",
             "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "atomDefinition",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly atomDefinition?: IAtomDefinition<any>;",
+              "description": "Pure definition bridge used by the Provider-scoped React adapter.",
+              "parameterDetails": [],
+              "returns": "IAtomDefinition<any>"
+            },
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "observed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly observed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "read",
+              "kind": "method",
+              "optional": false,
+              "signature": "read(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "optional": false,
+              "signature": "peek(): T;",
+              "description": "Reads without tracking dependencies. React can call `getSnapshot` while another component captures dependencies. Reading `.value` would add the atom to that component's dependencies, so this path creates no graph edge.",
+              "parameterDetails": [],
+              "returns": "T"
+            }
+          ],
+          "composes": ["IDisposable"],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
             "export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * Reads without tracking dependencies. * * React can call `getSnapshot` while another component captures dependencies. Reading `.value` * would add the atom to that component's dependencies, so this path creates no graph edge. */ peek(): T; };"
@@ -9637,7 +11300,24 @@
             "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'",
             "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "write",
+              "kind": "method",
+              "optional": false,
+              "signature": "write(...args: Args): Result;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "args",
+                  "type": "Args",
+                  "optional": false
+                }
+              ],
+              "returns": "Result"
+            }
+          ],
+          "composes": ["IReadableAtom"],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
             "export type IWritableAtom<T, Args extends readonly unknown[], Result> = IReadableAtom<T> & { write(...args: Args): Result; };"

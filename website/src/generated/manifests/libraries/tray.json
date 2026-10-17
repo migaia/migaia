@@ -909,7 +909,8 @@
             {
               "name": "options",
               "type": "ICreateTrayOptions<THosts, TRouting>",
-              "optional": false
+              "optional": false,
+              "configurationType": "ICreateTrayOptions<readonly, readonly>"
             }
           ],
           "returns": "ITray<THosts, TRouting>",
@@ -919,6 +920,7 @@
             "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createTray",
           "exportPath": ".",
           "overloadSignatures": [
@@ -929,7 +931,8 @@
               {
                 "name": "options",
                 "type": "ICreateTrayOptions<THosts, TRouting>",
-                "optional": false
+                "optional": false,
+                "configurationType": "ICreateTrayOptions<readonly, readonly>"
               }
             ]
           ],
@@ -968,7 +971,32 @@
               "content": "No additional advanced behavior is declared for createTray."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "hosts",
+              "type": "THosts",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "routing",
+              "type": "TRouting",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure."
+            }
+          ],
           "identity": "packages/tray/dist/hosts/parent/tray.d.ts:createTray:export declare function createTray<const THosts extends readonly IAnyTrayHost[], const TRouting extends readonly ITrayRoutingPolicy[] = readonly []>(options: ICreateTrayOptions<THosts, TRouting>): ITray<THosts, TRouting>;",
           "guidance": [
             {
@@ -1136,7 +1164,40 @@
             }
           ],
           "usageScore": 44,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "hosts",
+              "type": "THosts",
+              "optional": false,
+              "description": "根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例； `createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。",
+              "descriptionEn": "",
+              "descriptionZh": "根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例； `createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。"
+            },
+            {
+              "name": "routing",
+              "type": "TRouting",
+              "optional": true,
+              "description": "`routing` — `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定 — 声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）",
+              "descriptionEn": "",
+              "descriptionZh": "`routing` — `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定 — 声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。",
+              "descriptionEn": "",
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。",
+              "descriptionEn": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+            }
+          ],
           "fragment": "tray-index--createTray"
         },
         {
@@ -1163,6 +1224,7 @@
             "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createTrayGraph",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1322,7 +1384,8 @@
             {
               "name": "name",
               "type": "TName",
-              "optional": false
+              "optional": false,
+              "configurationType": "string"
             },
             {
               "name": "pick",
@@ -1335,6 +1398,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineRoutingPolicy.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "defineRoutingPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1345,7 +1409,8 @@
               {
                 "name": "name",
                 "type": "TName",
-                "optional": false
+                "optional": false,
+                "configurationType": "string"
               },
               {
                 "name": "pick",
@@ -1473,7 +1538,8 @@
             {
               "name": "definition",
               "type": "ITrayHostDefinition<TName, TConfig, TPlugins, TExposes, TRouting>",
-              "optional": false
+              "optional": false,
+              "configurationType": "ITrayHostDefinition<string, TConfig, ITrayPlugins, ITrayExposePath, readonly>"
             }
           ],
           "returns": "ITrayHost<TName, TConfig, TPlugins, TExposes, TRouting>",
@@ -1484,6 +1550,7 @@
             "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "defineTrayHost",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1494,7 +1561,8 @@
               {
                 "name": "definition",
                 "type": "ITrayHostDefinition<TName, TConfig, TPlugins, TExposes, TRouting>",
-                "optional": false
+                "optional": false,
+                "configurationType": "ITrayHostDefinition<string, TConfig, ITrayPlugins, ITrayExposePath, readonly>"
               }
             ]
           ],
@@ -1720,6 +1788,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAnyTrayHost.",
           "examples": [],
           "members": [],
+          "composes": ["ITrayHost"],
           "exportPath": ".",
           "overloadSignatures": ["export type IAnyTrayHost = ITrayHost<any, any, any, any, any>;"],
           "overloadParameterDetails": [[]],
@@ -1766,6 +1835,93 @@
           "fragment": "tray-index--IAnyTrayHost"
         },
         {
+          "name": "IGraphReadinessSnapshot",
+          "kind": "type",
+          "signature": "export type IGraphReadinessSnapshot = { readonly state: IGraphReadinessState; readonly error: unknown | undefined; };",
+          "declarationLine": 19,
+          "source": "packages/capability/dist/graph-readiness.d.ts",
+          "purpose": "Immutable, one-time readiness fact passed to Graph and direct consumers.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReadinessSnapshot.",
+          "advanced": "No additional advanced behavior is declared for IGraphReadinessSnapshot.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IGraphReadinessSnapshot."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphReadinessSnapshot.",
+          "examples": [
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
+          ],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: IGraphReadinessState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGraphReadinessState"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IGraphReadinessSnapshot",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IGraphReadinessSnapshot = { readonly state: IGraphReadinessState; readonly error: unknown | undefined; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IGraphReadinessSnapshot when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IGraphReadinessSnapshot does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Immutable, one-time readiness fact passed to Graph and direct consumers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IGraphReadinessSnapshot from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IGraphReadinessSnapshot when its type contract and declared inputs match the result you need. Choose a different public symbol when IGraphReadinessSnapshot does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReadinessSnapshot."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IGraphReadinessSnapshot."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/tray:packages/capability/dist/graph-readiness.d.ts:IGraphReadinessSnapshot:export type IGraphReadinessSnapshot = { readonly state: IGraphReadinessState; readonly error: unknown | undefined; };",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "tray-index--IGraphReadinessSnapshot"
+        },
+        {
           "name": "ITray",
           "kind": "type",
           "signature": "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
@@ -1780,7 +1936,265 @@
           "errors": ["No documented errors are declared for ITray."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITray.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "routing",
+              "kind": "property",
+              "optional": false,
+              "signature": "routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>"
+            },
+            {
+              "name": "publish",
+              "kind": "method",
+              "optional": false,
+              "signature": "publish(topic: string, payload?: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "topic",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "payload",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "subscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "topic",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "import('./topics.js').ITrayTopicListener",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "spawn",
+              "kind": "method",
+              "optional": false,
+              "signature": "spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "host",
+                  "type": "N",
+                  "optional": false,
+                  "configurationType": "THosts"
+                },
+                {
+                  "name": "options",
+                  "type": "ITraySpawnOptions<IHostByName<THosts, N>>",
+                  "optional": false,
+                  "configurationType": "ITraySpawnOptions<IHostByName<THosts, THosts>>"
+                }
+              ],
+              "returns": "Promise<ITrayRemote<IHostByName<THosts, N>>>"
+            },
+            {
+              "name": "instance",
+              "kind": "method",
+              "optional": false,
+              "signature": "instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "host",
+                  "type": "H",
+                  "optional": false,
+                  "configurationType": "THosts"
+                },
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "ITrayRemote<H>"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "optional": false,
+              "signature": "remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "Readonly<{ graceMs?: number; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "list",
+              "kind": "method",
+              "optional": false,
+              "signature": "list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "filter",
+                  "type": "Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "readonly ITrayInstance[]"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(id: string): Promise<ITrayInstanceDetail>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<ITrayInstanceDetail>"
+            },
+            {
+              "name": "stop",
+              "kind": "method",
+              "optional": false,
+              "signature": "stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "Readonly<{ graceMs?: number; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "restart",
+              "kind": "method",
+              "optional": false,
+              "signature": "restart(id: string): Promise<ITrayInstance>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<ITrayInstance>"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "Readonly<{ config?: unknown; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<ITrayInstance>"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "TrayInstanceEvent",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: ITrayInstanceEventRecord) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "watch",
+              "kind": "method",
+              "optional": false,
+              "signature": "watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "Readonly<{ signal?: IAbortSignal; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "AsyncIterableIterator<ITrayInstanceEventRecord>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "Readonly<{ graceMs?: number; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "[Symbol.asyncDispose]",
+              "kind": "method",
+              "optional": false,
+              "signature": "[Symbol.asyncDispose](): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;"
@@ -2002,7 +2416,27 @@
           "errors": ["No documented errors are declared for ITrayCallOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayCallOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "signal?: IAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "timeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "timeoutMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayCallOptions = Readonly<{ signal?: IAbortSignal; timeoutMs?: number; }>;"
@@ -2126,7 +2560,103 @@
           "errors": ["No documented errors are declared for ITrayClient."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayClient.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "self",
+              "kind": "method",
+              "optional": false,
+              "signature": "self(): ITrayInstanceInfo;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayInstanceInfo"
+            },
+            {
+              "name": "to",
+              "kind": "method",
+              "optional": false,
+              "signature": "to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "host",
+                  "type": "H",
+                  "optional": false,
+                  "configurationType": "IAnyTrayHost"
+                },
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<ITrayRemote<H>>"
+            },
+            {
+              "name": "exit",
+              "kind": "method",
+              "optional": false,
+              "signature": "exit(error?: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "routing",
+              "kind": "property",
+              "optional": false,
+              "signature": "routing: 0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>;",
+              "description": "Existential internal host views erase callbacks; concrete tuples retain closed policy names.",
+              "parameterDetails": [],
+              "returns": "0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>"
+            },
+            {
+              "name": "publish",
+              "kind": "method",
+              "optional": false,
+              "signature": "publish(topic: string, payload?: unknown): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "topic",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "payload",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "subscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): Promise<() => Promise<void>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "topic",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "import('./topics.js').ITrayTopicListener",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<() => Promise<void>>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; /** Existential internal host views erase callbacks; concrete tuples retain closed policy names. */ routing: 0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>; publish(topic: string, payload?: unknown): Promise<void>; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): Promise<() => Promise<void>>; }>;"
@@ -2251,6 +2781,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayClientPlugin.",
           "examples": [],
           "members": [],
+          "composes": ["IDefinedPluginConstraint"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayClientPlugin<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient<TRouting>>; }>>;"
@@ -2377,7 +2908,53 @@
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<T>(key: ITrayKey): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "ITrayKey",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "own",
+              "kind": "method",
+              "optional": false,
+              "signature": "own<T>(resource: T, descriptor: IReleaseDescriptor): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "descriptor",
+                  "type": "IReleaseDescriptor",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayEntryContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2446,7 +3023,54 @@
             "import type { ITrayEntryDefinition, ITrayGraph } from '@migaia/tray'\n\ndeclare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
             "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly key: ITrayKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayKey"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: ITrayEntryKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayEntryKind"
+            },
+            {
+              "name": "requires",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly requires?: readonly ITrayKey[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ITrayKey[]"
+            },
+            {
+              "name": "readiness",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly readiness?: IGraphReadinessSnapshot;",
+              "description": "Initial fact is captured at admission. Only a blocked ready() may reacquire this property; supply a getter for fresh provider snapshots. Failed results remain cached permanently.",
+              "parameterDetails": [],
+              "returns": "IGraphReadinessSnapshot"
+            },
+            {
+              "name": "start",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayEntryDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2513,7 +3137,27 @@
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "release",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(context: IGraphReleaseContext) => void | PromiseLike<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayEntryInstance",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2580,7 +3224,45 @@
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: \"value\";",
+              "description": "Plain data label used by static admission and entry diagnostics.",
+              "parameterDetails": [],
+              "returns": "\"value\""
+            },
+            {
+              "name": "computed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly computed: \"computed\";",
+              "description": "Derived-data label; dependency execution still belongs to Capability Graph.",
+              "parameterDetails": [],
+              "returns": "\"computed\""
+            },
+            {
+              "name": "resource",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly resource: \"resource\";",
+              "description": "Resource label; the returned release descriptor still owns its lifetime.",
+              "parameterDetails": [],
+              "returns": "\"resource\""
+            },
+            {
+              "name": "service",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly service: \"service\";",
+              "description": "Service label for externally consumed capabilities without a second lifecycle.",
+              "parameterDetails": [],
+              "returns": "\"service\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayEntryKind",
           "exportPath": ".",
           "overloadSignatures": ["export type ITrayEntryKind = TrayEntryKind;"],
@@ -2645,6 +3327,7 @@
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ITrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2709,6 +3392,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayExposePath.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayExposePath<TPlugins extends ITrayPlugins> = { [K in keyof TPlugins]: `${TPlugins[K]['name']}.${IPluginFeatureName<TPlugins[K]>}`; }[number];"
@@ -2776,7 +3460,84 @@
             "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}",
             "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "keys",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly keys: readonly ITrayKey[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ITrayKey[]"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: ITrayState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayState"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            },
+            {
+              "name": "ready",
+              "kind": "method",
+              "optional": false,
+              "signature": "ready(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<T>(key: ITrayKey): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "ITrayKey",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "entryState",
+              "kind": "method",
+              "optional": false,
+              "signature": "entryState(key: ITrayKey): IGraphNodeState;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "ITrayKey",
+                  "optional": false
+                }
+              ],
+              "returns": "IGraphNodeState"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayGraph",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2864,7 +3625,18 @@
           "errors": ["No documented errors are declared for ITrayHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHost.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "runtime: ITrayRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayRuntime"
+            }
+          ],
+          "composes": ["ITrayHostDefinition"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayHost<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayHostDefinition<TName, TConfig, TPlugins, TExposes, TRouting> & Readonly<{ runtime: ITrayRuntime; [trayHostBrand]: true; }>;"
@@ -3003,7 +3775,74 @@
           "errors": ["No documented errors are declared for ITrayHostDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostDefinition.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: TName;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TName"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": true,
+              "signature": "config?: (input: unknown) => TConfig;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(input: unknown) => TConfig"
+            },
+            {
+              "name": "plugins",
+              "kind": "method",
+              "optional": false,
+              "signature": "plugins(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>): TPlugins;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "instance",
+                  "type": "ITrayInstanceInfo<TName, TConfig>",
+                  "optional": false
+                },
+                {
+                  "name": "trayPlugin",
+                  "type": "ITrayClientPlugin<TRouting>",
+                  "optional": false
+                }
+              ],
+              "returns": "TPlugins"
+            },
+            {
+              "name": "exposes",
+              "kind": "property",
+              "optional": false,
+              "signature": "exposes: readonly TExposes[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly TExposes[]"
+            },
+            {
+              "name": "supervisor",
+              "kind": "property",
+              "optional": true,
+              "signature": "supervisor?: ITraySupervisorPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITraySupervisorPolicy"
+            },
+            {
+              "name": "routing",
+              "kind": "property",
+              "optional": true,
+              "signature": "routing?: TRouting;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TRouting"
+            }
+          ],
+          "composes": ["ITrayRuntimeOptions"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayHostDefinition<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayRuntimeOptions & Readonly<{ name: TName; config?: (input: unknown) => TConfig; plugins(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>): TPlugins; exposes: readonly TExposes[]; supervisor?: ITraySupervisorPolicy; routing?: TRouting; }>;"
@@ -3066,7 +3905,36 @@
           "errors": ["No documented errors are declared for ITrayInstance."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayInstance.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "runtime: ITrayRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayRuntime"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "state: TrayInstanceState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TrayInstanceState"
+            },
+            {
+              "name": "inFlight",
+              "kind": "property",
+              "optional": false,
+              "signature": "inFlight: number;",
+              "description": "Business operations sent by this admission and not yet ended.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": ["ITrayInstanceInfo"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; /** Business operations sent by this admission and not yet ended. */ inFlight: number; }>;"
@@ -3129,7 +3997,126 @@
           "errors": ["No documented errors are declared for ITrayInstanceDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayInstanceDetail.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "identity",
+              "kind": "property",
+              "optional": false,
+              "signature": "identity: IRuntimePeerIdentity | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity | IRuntimeUnavailable"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "kind: RuntimeSourceKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeSourceKind"
+            },
+            {
+              "name": "direction",
+              "kind": "property",
+              "optional": false,
+              "signature": "direction: RuntimeConnectionDirection;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeConnectionDirection"
+            },
+            {
+              "name": "carrier",
+              "kind": "property",
+              "optional": false,
+              "signature": "carrier: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "connection",
+              "kind": "property",
+              "optional": false,
+              "signature": "connection: Readonly<{ status: string | IRuntimeUnavailable; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ status: string | IRuntimeUnavailable; }>"
+            },
+            {
+              "name": "unit",
+              "kind": "property",
+              "optional": false,
+              "signature": "unit: IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>"
+            },
+            {
+              "name": "health",
+              "kind": "property",
+              "optional": false,
+              "signature": "health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>"
+            },
+            {
+              "name": "restartCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "restartCount: IRuntimeUnavailable | IRuntimeMetric;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeMetric"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": false,
+              "signature": "methods: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "counters",
+              "kind": "property",
+              "optional": false,
+              "signature": "counters: IRuntimeUnavailable | IRuntimeCounters;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeCounters"
+            },
+            {
+              "name": "resources",
+              "kind": "property",
+              "optional": false,
+              "signature": "resources: IRuntimeUnavailable | IRuntimeResources;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeResources"
+            },
+            {
+              "name": "recent",
+              "kind": "property",
+              "optional": false,
+              "signature": "recent: readonly IRuntimeRecent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRuntimeRecent[]"
+            },
+            {
+              "name": "lastExit",
+              "kind": "property",
+              "optional": false,
+              "signature": "lastExit: IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>"
+            }
+          ],
+          "composes": ["ITrayInstance"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>;"
@@ -3192,7 +4179,27 @@
           "errors": ["No documented errors are declared for ITrayInstanceEventRecord."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayInstanceEventRecord.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "event",
+              "kind": "property",
+              "optional": false,
+              "signature": "event: TrayInstanceEvent;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TrayInstanceEvent"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "error?: Readonly<{ source?: string; code?: string; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ source?: string; code?: string; }>"
+            }
+          ],
+          "composes": ["ITrayInstance"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayInstanceEventRecord = ITrayInstance & Readonly<{ event: TrayInstanceEvent; error?: Readonly<{ source?: string; code?: string; }>; }>;"
@@ -3255,7 +4262,45 @@
           "errors": ["No documented errors are declared for ITrayInstanceInfo."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayInstanceInfo.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "host",
+              "kind": "property",
+              "optional": false,
+              "signature": "host: TName;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TName"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": false,
+              "signature": "config: TConfig;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TConfig"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "generation: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayInstanceInfo<TName extends string = string, TConfig = unknown> = Readonly<{ id: string; host: TName; config: TConfig; generation: number; }>;"
@@ -3326,6 +4371,7 @@
             "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
           "members": [],
+          "composes": ["string"],
           "aliasOf": "ITrayKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3413,7 +4459,45 @@
           "errors": ["No documented errors are declared for ITrayLaunchCommand."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayLaunchCommand.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "command",
+              "kind": "property",
+              "optional": false,
+              "signature": "command: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "args",
+              "kind": "property",
+              "optional": false,
+              "signature": "args: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "cwd",
+              "kind": "property",
+              "optional": true,
+              "signature": "cwd?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "env",
+              "kind": "property",
+              "optional": false,
+              "signature": "env: Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>>; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>>; }>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>>; }>; }>;"
@@ -3477,6 +4561,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayMethodPath.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayMethodPath<TPlugins extends ITrayPlugins, TExposes extends string> = TExposes extends string ? { [M in keyof IFeatureAt<TPlugins, TExposes> & string]: IFeatureAt<TPlugins, TExposes>[M] extends (...args: any[]) => any ? `${TExposes}.${M}` : never; }[keyof IFeatureAt<TPlugins, TExposes> & string] : never;"
@@ -3540,6 +4625,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayParentRoutingNames.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayParentRoutingNames<THosts, TRouting> = IBuiltInRoutingName | IPolicyNames<TRouting> | IHostRoutingNames<THosts>;"
@@ -3603,6 +4689,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPlugins.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayPlugins = readonly IPluginConstraint<any, any, any>[];"
@@ -3665,7 +4752,84 @@
           "errors": ["No documented errors are declared for ITrayRemote."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRemote.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "P",
+                  "optional": false,
+                  "configurationType": "ITrayMethodPath"
+                },
+                {
+                  "name": "args",
+                  "type": "IArgs<IMethodAt<IHostPlugins<H>, P>>",
+                  "optional": false,
+                  "configurationType": "IArgs<IMethodAt<IHostPlugins<H>, ITrayMethodPath>>"
+                }
+              ],
+              "returns": "Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "P",
+                  "optional": false,
+                  "configurationType": "ITrayMethodPath"
+                },
+                {
+                  "name": "args",
+                  "type": "IArgs<IMethodAt<IHostPlugins<H>, P>>",
+                  "optional": false,
+                  "configurationType": "IArgs<IMethodAt<IHostPlugins<H>, ITrayMethodPath>>"
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "stream",
+              "kind": "method",
+              "optional": false,
+              "signature": "stream<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "P",
+                  "optional": false,
+                  "configurationType": "ITrayMethodPath"
+                },
+                {
+                  "name": "args",
+                  "type": "IArgs<IMethodAt<IHostPlugins<H>, P>>",
+                  "optional": false,
+                  "configurationType": "IArgs<IMethodAt<IHostPlugins<H>, ITrayMethodPath>>"
+                }
+              ],
+              "returns": "AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayRemote<H extends IAnyTrayHost> = Readonly<{ id: string; request<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>; notify<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<void>; stream<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>; }>;"
@@ -3728,7 +4892,84 @@
           "errors": ["No documented errors are declared for ITrayRoutedRemote."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRoutedRemote.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "host",
+              "kind": "property",
+              "optional": false,
+              "signature": "host: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "P",
+                  "optional": false,
+                  "configurationType": "ITrayMethodPath"
+                },
+                {
+                  "name": "args",
+                  "type": "IArgs<IMethodAt<IHostPlugins<H>, P>>",
+                  "optional": false,
+                  "configurationType": "IArgs<IMethodAt<IHostPlugins<H>, ITrayMethodPath>>"
+                }
+              ],
+              "returns": "Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "P",
+                  "optional": false,
+                  "configurationType": "ITrayMethodPath"
+                },
+                {
+                  "name": "args",
+                  "type": "IArgs<IMethodAt<IHostPlugins<H>, P>>",
+                  "optional": false,
+                  "configurationType": "IArgs<IMethodAt<IHostPlugins<H>, ITrayMethodPath>>"
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "stream",
+              "kind": "method",
+              "optional": false,
+              "signature": "stream<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "P",
+                  "optional": false,
+                  "configurationType": "ITrayMethodPath"
+                },
+                {
+                  "name": "args",
+                  "type": "IArgs<IMethodAt<IHostPlugins<H>, P>>",
+                  "optional": false,
+                  "configurationType": "IArgs<IMethodAt<IHostPlugins<H>, ITrayMethodPath>>"
+                }
+              ],
+              "returns": "AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayRoutedRemote<H extends IAnyTrayHost> = Readonly<{ host: string; }> & Omit<ITrayRemote<H>, 'id'>;"
@@ -3792,6 +5033,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRouting.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayRouting<TNames extends string, THosts extends readonly IAnyTrayHost[]> = (<N extends TNames, H extends THosts[number]>(name: N, host: H) => ITrayRoutedRemote<H>) & Readonly<{ [N in TNames]: <H extends THosts[number]>(host: H) => ITrayRoutedRemote<H>; }>;"
@@ -3930,7 +5172,27 @@
           "errors": ["No documented errors are declared for ITrayRoutingContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRoutingContext.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "host",
+              "kind": "property",
+              "optional": false,
+              "signature": "host: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "sequence",
+              "kind": "property",
+              "optional": false,
+              "signature": "sequence: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayRoutingContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3994,7 +5256,18 @@
           "errors": ["No documented errors are declared for ITrayRoutingPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRoutingPolicy.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: TName;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TName"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayRoutingPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4135,6 +5408,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRuntime.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime];"
@@ -4197,7 +5471,117 @@
           "errors": ["No documented errors are declared for ITrayRuntimeOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRuntimeOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": true,
+              "signature": "runtime?: 'coroutine';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'coroutine'"
+            },
+            {
+              "name": "entry",
+              "kind": "property",
+              "optional": true,
+              "signature": "entry?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "limits",
+              "kind": "property",
+              "optional": true,
+              "signature": "limits?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "sandbox",
+              "kind": "property",
+              "optional": true,
+              "signature": "sandbox?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "runtime: 'thread';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'thread'"
+            },
+            {
+              "name": "entry",
+              "kind": "property",
+              "optional": false,
+              "signature": "entry: IUrlLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IUrlLike"
+            },
+            {
+              "name": "limits",
+              "kind": "property",
+              "optional": true,
+              "signature": "limits?: Readonly<{ heapBytes?: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ heapBytes?: number; }>"
+            },
+            {
+              "name": "sandbox",
+              "kind": "property",
+              "optional": true,
+              "signature": "sandbox?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "runtime: 'process';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'process'"
+            },
+            {
+              "name": "entry",
+              "kind": "property",
+              "optional": false,
+              "signature": "entry: IUrlLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IUrlLike"
+            },
+            {
+              "name": "limits",
+              "kind": "property",
+              "optional": true,
+              "signature": "limits?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "sandbox",
+              "kind": "property",
+              "optional": true,
+              "signature": "sandbox?: ITraySandbox;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITraySandbox"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: IUrlLike; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: IUrlLike; limits?: never; sandbox?: ITraySandbox; }>;"
@@ -4260,7 +5644,33 @@
           "errors": ["No documented errors are declared for ITraySandbox."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITraySandbox.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "wrap",
+              "kind": "method",
+              "optional": false,
+              "signature": "wrap(command: ITrayLaunchCommand): ITrayLaunchCommand;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "command",
+                  "type": "ITrayLaunchCommand",
+                  "optional": false
+                }
+              ],
+              "returns": "ITrayLaunchCommand"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITraySandbox = Readonly<{ name: string; wrap(command: ITrayLaunchCommand): ITrayLaunchCommand; }>;"
@@ -4399,7 +5809,18 @@
           "errors": ["No documented errors are declared for ITraySpawnOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITraySpawnOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITraySpawnOptions<H extends IAnyTrayHost> = Readonly<{ id: string; } & (undefined extends IHostConfig<H> ? { config?: unknown; } : { config: unknown; })>;"
@@ -4466,6 +5887,7 @@
             "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}"
           ],
           "members": [],
+          "composes": ["ICapabilityGraphState"],
           "aliasOf": "ITrayState",
           "exportPath": ".",
           "overloadSignatures": ["export type ITrayState = ICapabilityGraphState;"],
@@ -4527,7 +5949,27 @@
           "errors": ["No documented errors are declared for ITraySupervisorPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITraySupervisorPolicy.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "restart",
+              "kind": "property",
+              "optional": true,
+              "signature": "restart?: Readonly<{ mode?: 'never' | 'on-failure' | 'always'; maxRestarts?: number; windowMs?: number; initialDelayMs?: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ mode?: 'never' | 'on-failure' | 'always'; maxRestarts?: number; windowMs?: number; initialDelayMs?: number; }>"
+            },
+            {
+              "name": "startupTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "startupTimeoutMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITraySupervisorPolicy = Readonly<{ restart?: Readonly<{ mode?: 'never' | 'on-failure' | 'always'; maxRestarts?: number; windowMs?: number; initialDelayMs?: number; }>; startupTimeoutMs?: number; }>;"
@@ -4666,7 +6108,18 @@
           "errors": ["No documented errors are declared for ITrayTopicMeta."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayTopicMeta.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "from",
+              "kind": "property",
+              "optional": false,
+              "signature": "from: Readonly<{ id: string; host: string; generation: number; }> | Readonly<{ parent: true; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ id: string; host: string; generation: number; }> | Readonly<{ parent: true; }>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayTopicMeta",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4730,7 +6183,18 @@
           "errors": ["No documented errors are declared for leastInFlight."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for leastInFlight.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: \"leastInFlight\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"leastInFlight\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "leastInFlight",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4794,7 +6258,18 @@
           "errors": ["No documented errors are declared for roundRobin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for roundRobin.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: \"roundRobin\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"roundRobin\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "roundRobin",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4875,6 +6350,7 @@
             "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "serveTrayHost",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4929,7 +6405,20 @@
               "content": "No additional advanced behavior is declared for serveTrayHost."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure."
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/tray/dist/hosts/child/serve.d.ts:serveTrayHost:export declare function serveTrayHost(definition: IAnyTrayHost, options?: Partial<ITrayRuntimeOptions>): Promise<void>;",
           "guidance": [
             {
@@ -5097,7 +6586,24 @@
             }
           ],
           "usageScore": 26,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。",
+              "descriptionEn": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。",
+              "descriptionEn": "",
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+            }
+          ],
           "fragment": "tray-index--serveTrayHost"
         },
         {
@@ -5119,6 +6625,7 @@
             "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "TRAY_SOURCE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const TRAY_SOURCE = \"@migaia/tray\";"],
@@ -5317,7 +6824,288 @@
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "hostUnavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\";",
+              "description": "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_HOST_UNAVAILABLE\""
+            },
+            {
+              "name": "routingUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\";",
+              "description": "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_ROUTING_UNKNOWN\""
+            },
+            {
+              "name": "topicInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly topicInvalid: \"TRAY_TOPIC_INVALID\";",
+              "description": "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_TOPIC_INVALID\""
+            },
+            {
+              "name": "routingInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly routingInvalid: \"TRAY_ROUTING_INVALID\";",
+              "description": "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_ROUTING_INVALID\""
+            },
+            {
+              "name": "hostInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostInvalid: \"TRAY_HOST_INVALID\";",
+              "description": "Host definition violates instances R1; provide an admitted host DSL.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_HOST_INVALID\""
+            },
+            {
+              "name": "hostUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostUnknown: \"TRAY_HOST_UNKNOWN\";",
+              "description": "Spawn names an unregistered host in R3; register the host before spawning.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_HOST_UNKNOWN\""
+            },
+            {
+              "name": "hostMismatch",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostMismatch: \"TRAY_HOST_MISMATCH\";",
+              "description": "Remote host differs from the admission in R6; select the record's host.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_HOST_MISMATCH\""
+            },
+            {
+              "name": "reservedName",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly reservedName: \"TRAY_RESERVED_NAME\";",
+              "description": "Expose uses a reserved internal plugin in R1; rename the business plugin.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_RESERVED_NAME\""
+            },
+            {
+              "name": "valueNotPortable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\";",
+              "description": "Config or payload violates R3/R6 portable data; remove unsupported values.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_VALUE_NOT_PORTABLE\""
+            },
+            {
+              "name": "instanceDuplicate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\";",
+              "description": "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_INSTANCE_DUPLICATE\""
+            },
+            {
+              "name": "instanceUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\";",
+              "description": "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_INSTANCE_UNKNOWN\""
+            },
+            {
+              "name": "instanceNotReady",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\";",
+              "description": "Call targets a non-ready instance in R6; await its ready transition.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_INSTANCE_NOT_READY\""
+            },
+            {
+              "name": "instanceStartFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\";",
+              "description": "Install or generation init fails in R3/R5; inspect the preserved cause.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_INSTANCE_START_FAILED\""
+            },
+            {
+              "name": "pathNotExposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\";",
+              "description": "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_PATH_NOT_EXPOSED\""
+            },
+            {
+              "name": "childStateInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\";",
+              "description": "Child init repeats or names another host in R2; init once per generation.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_CHILD_STATE_INVALID\""
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: \"TRAY_DISPOSED\";",
+              "description": "Operation enters a closing registry in R3; create a new Tray.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_DISPOSED\""
+            },
+            {
+              "name": "loaderContractInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\";",
+              "description": "Loader shape or artifact descriptor is invalid; repair the loader contract before retrying.",
+              "parameterDetails": [],
+              "returns": "\"LOADER_CONTRACT_INVALID\""
+            },
+            {
+              "name": "loaderExecutionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\";",
+              "description": "Loader execution failed; inspect the preserved source error before deciding whether to retry.",
+              "parameterDetails": [],
+              "returns": "\"LOADER_EXECUTION_FAILED\""
+            },
+            {
+              "name": "adapterContractInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\";",
+              "description": "Adapter shape or produced plugin is invalid; repair adapter compatibility.",
+              "parameterDetails": [],
+              "returns": "\"ADAPTER_CONTRACT_INVALID\""
+            },
+            {
+              "name": "adapterExecutionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\";",
+              "description": "Adapter execution failed; inspect the preserved artifact compatibility cause.",
+              "parameterDetails": [],
+              "returns": "\"ADAPTER_EXECUTION_FAILED\""
+            },
+            {
+              "name": "runtimeContractInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\";",
+              "description": "Runtime host, name, options, or callback violates the Runtime boundary contract.",
+              "parameterDetails": [],
+              "returns": "\"RUNTIME_CONTRACT_INVALID\""
+            },
+            {
+              "name": "runtimeDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeDisposed: \"RUNTIME_DISPOSED\";",
+              "description": "Runtime admission was attempted after closing; create a fresh Runtime.",
+              "parameterDetails": [],
+              "returns": "\"RUNTIME_DISPOSED\""
+            },
+            {
+              "name": "runtimeExecutionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\";",
+              "description": "Runtime callback failed after exact lease admission; inspect the preserved callback cause.",
+              "parameterDetails": [],
+              "returns": "\"RUNTIME_EXECUTION_FAILED\""
+            },
+            {
+              "name": "runtimeAborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeAborted: \"RUNTIME_ABORTED\";",
+              "description": "Runtime cancellation or deadline was observed; callback settlement still owns the lease.",
+              "parameterDetails": [],
+              "returns": "\"RUNTIME_ABORTED\""
+            },
+            {
+              "name": "artifactCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\";",
+              "description": "Artifact cleanup failed after a primary mutation result; inspect cleanupErrors.",
+              "parameterDetails": [],
+              "returns": "\"ARTIFACT_CLEANUP_FAILED\""
+            },
+            {
+              "name": "invalidEntry",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidEntry: \"TRAY_INVALID_ENTRY\";",
+              "description": "Invalid entry descriptor or start result; caller must provide a complete static entry.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_INVALID_ENTRY\""
+            },
+            {
+              "name": "duplicateEntry",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\";",
+              "description": "Duplicate key during factory admission; caller must provide unique keys.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_DUPLICATE_ENTRY\""
+            },
+            {
+              "name": "unknownEntry",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\";",
+              "description": "Unknown lookup or dependency key; caller must use an admitted key.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_UNKNOWN_ENTRY\""
+            },
+            {
+              "name": "unavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unavailable: \"TRAY_UNAVAILABLE\";",
+              "description": "Entry is not ready or gate failed; caller must await readiness or repair the gate.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_UNAVAILABLE\""
+            },
+            {
+              "name": "gateReadFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\";",
+              "description": "Readiness getter failed; caller must inspect the preserved cause and fix the source.",
+              "parameterDetails": [],
+              "returns": "\"TRAY_GATE_READ_FAILED\""
+            },
+            {
+              "name": "hostMutationBypass",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\";",
+              "description": "Managed reads detect a mutation made through the escaped concrete Host.",
+              "parameterDetails": [],
+              "returns": "\"HOST_MUTATION_BYPASS\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "TrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5515,7 +7303,63 @@
           "errors": ["No documented errors are declared for TrayInstanceEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayInstanceEvent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "spawned",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly spawned: \"spawned\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"spawned\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "restarting",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly restarting: \"restarting\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"restarting\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            },
+            {
+              "name": "stopped",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly stopped: \"stopped\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"stopped\""
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: \"removed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"removed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "TrayInstanceEvent",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5581,6 +7425,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayInstanceEvent.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type TrayInstanceEvent = (typeof TrayInstanceEventValues)[keyof typeof TrayInstanceEventValues];"
@@ -5643,7 +7488,54 @@
           "errors": ["No documented errors are declared for TrayInstanceState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayInstanceState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "starting",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly starting: \"starting\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"starting\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "restarting",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly restarting: \"restarting\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"restarting\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            },
+            {
+              "name": "stopped",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly stopped: \"stopped\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"stopped\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "TrayInstanceState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5709,6 +7601,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayInstanceState.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type TrayInstanceState = (typeof TrayInstanceStateValues)[keyof typeof TrayInstanceStateValues];"
@@ -5771,7 +7664,36 @@
           "errors": ["No documented errors are declared for TrayRuntime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayRuntime.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "coroutine",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly coroutine: \"coroutine\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"coroutine\""
+            },
+            {
+              "name": "thread",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly thread: \"thread\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"thread\""
+            },
+            {
+              "name": "process",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly process: \"process\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"process\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "TrayRuntime",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5849,19 +7771,21 @@
           "purpose": "Snapshots adapter invocation once and assimilates foreign thenables safely.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineAdapter.",
           "advanced": "No additional advanced behavior is declared for defineAdapter.",
-          "parameters": ["'../host/typing.js': unknown"],
+          "parameters": ["adapter: IAdapter<TArtifact, THost, TPlugin>"],
           "parameterDetails": [
             {
-              "name": "'../host/typing.js'",
-              "type": "unknown",
-              "optional": false
+              "name": "adapter",
+              "type": "IAdapter<TArtifact, THost, TPlugin>",
+              "optional": false,
+              "configurationType": "IAdapter<TArtifact, import, import>"
             }
           ],
-          "returns": ".ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>",
+          "returns": "IAdapter<TArtifact, THost, TPlugin>",
           "errors": ["No documented errors are declared for defineAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineAdapter.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "defineAdapter",
           "exportPath": "./adapter",
           "overloadSignatures": [
@@ -5870,15 +7794,14 @@
           "overloadParameterDetails": [
             [
               {
-                "name": "'../host/typing.js'",
-                "type": "unknown",
-                "optional": false
+                "name": "adapter",
+                "type": "IAdapter<TArtifact, THost, TPlugin>",
+                "optional": false,
+                "configurationType": "IAdapter<TArtifact, import, import>"
               }
             ]
           ],
-          "overloadReturns": [
-            ".ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>"
-          ],
+          "overloadReturns": ["IAdapter<TArtifact, THost, TPlugin>"],
           "whenToUse": "Use defineAdapter when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when defineAdapter does not match the required inputs or return contract.",
           "sections": [
@@ -5935,7 +7858,18 @@
           "errors": ["No documented errors are declared for IAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapter.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "adapt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IAdapter",
           "exportPath": "./adapter",
           "overloadSignatures": [
@@ -5999,7 +7933,27 @@
           "errors": ["No documented errors are declared for IAdapterContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapterContext.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "deadlineAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deadlineAt: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IAdapterContext",
           "exportPath": "./adapter",
           "overloadSignatures": [
@@ -6081,7 +8035,8 @@
             {
               "name": "options",
               "type": "ICreateHostOptions<THost, TPlugins>",
-              "optional": false
+              "optional": false,
+              "configurationType": "ICreateHostOptions<ITrayHostSource, readonly>"
             }
           ],
           "returns": "Promise<ITrayResolvedHost<THost, TPlugins>>",
@@ -6091,6 +8046,7 @@
             "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(\n  definePlugin({\n    name: 'late',\n    features: {\n      value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n    },\n    install: () => ({ late: true })\n  })\n)\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6101,7 +8057,8 @@
               {
                 "name": "options",
                 "type": "ICreateHostOptions<THost, TPlugins>",
-                "optional": false
+                "optional": false,
+                "configurationType": "ICreateHostOptions<ITrayHostSource, readonly>"
               }
             ]
           ],
@@ -6242,7 +8199,7 @@
               "optional": true,
               "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
               "descriptionEn": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
-              "descriptionZh": ""
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
             }
           ],
           "fragment": "tray-host--createHost"
@@ -6263,6 +8220,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICanResolveReadyDefinitions.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ICanResolveReadyDefinitions",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6328,7 +8286,63 @@
           "examples": [
             "import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "create",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly create: () => THost;",
+              "description": "Constructs the one PluginHost instance owned by the resulting Tray host.",
+              "parameterDetails": [],
+              "returns": "() => THost"
+            },
+            {
+              "name": "plugins",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly plugins: TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>;",
+              "description": "Initial plugin definitions admitted and installed in tuple order.",
+              "parameterDetails": [],
+              "returns": "TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>"
+            },
+            {
+              "name": "mutationAdmissionMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutationAdmissionMs: number;",
+              "description": "Maximum wait for a serialized graph mutation to enter execution.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "quiescenceMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly quiescenceMs: number;",
+              "description": "Maximum bounded-shutdown wait for physical plugin quiescence.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "shutdown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>;",
+              "description": "Selects bounded shutdown or a strict drain that waits for physical completion.",
+              "parameterDetails": [],
+              "returns": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ICreateHostOptions",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6393,6 +8407,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHostBaselinePlugins.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IHostBaselinePlugins",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6456,7 +8471,18 @@
           "errors": ["No documented errors are declared for IPluginWithSynchronousShared."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginWithSynchronousShared.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "shared",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly shared?: (core: unknown) => Record<PropertyKey, unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(core: unknown) => Record<PropertyKey, unknown>"
+            }
+          ],
+          "composes": ["TPlugin"],
           "aliasOf": "IPluginWithSynchronousShared",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6521,6 +8547,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResolveReadyTrayPlugins.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IResolveReadyTrayPlugins",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6584,7 +8611,166 @@
           "errors": ["No documented errors are declared for ITrayHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHost.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "plugins",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly plugins: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "readyPlugins",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly readyPlugins: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: ITrayHostState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayHostState"
+            },
+            {
+              "name": "isActive",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly isActive: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            },
+            {
+              "name": "extensions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>"
+            },
+            {
+              "name": "pluginState",
+              "kind": "method",
+              "optional": false,
+              "signature": "pluginState(name: string): string;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "TKey",
+                  "optional": false,
+                  "configurationType": "keyof"
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>",
+                  "optional": false,
+                  "configurationType": "(event: IEventContext<ITrayHostEventMap[keyof]>) => void | PromiseLike<void>"
+                }
+              ],
+              "returns": "IUnsubscribe"
+            },
+            {
+              "name": "use",
+              "kind": "method",
+              "optional": false,
+              "signature": "use<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "plugin",
+                  "type": "TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]",
+                  "optional": false,
+                  "configurationType": "ITrayPluginConstraint & ITrayPluginAdmission<THost, readonly [ITrayPluginConstraint], TReady>[0]"
+                }
+              ],
+              "returns": "Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>"
+            },
+            {
+              "name": "unUse",
+              "kind": "method",
+              "optional": false,
+              "signature": "unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "TName",
+                  "optional": false,
+                  "configurationType": "string"
+                }
+              ],
+              "returns": "Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "plugin",
+                  "type": "TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]",
+                  "optional": false,
+                  "configurationType": "ITrayPluginConstraint & ITrayPluginAdmission<THost, readonly [ITrayPluginConstraint], TReady>[0]"
+                }
+              ],
+              "returns": "Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<ITrayHostDisposalResult>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<ITrayHostDisposalResult>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6724,7 +8910,18 @@
           "errors": ["No documented errors are declared for ITrayHostCreationError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostCreationError.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "detail",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly detail: ITrayHostCreationFailureDetail;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayHostCreationFailureDetail"
+            }
+          ],
+          "composes": ["Error"],
           "aliasOf": "ITrayHostCreationError",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6788,7 +8985,27 @@
           "errors": ["No documented errors are declared for ITrayHostCreationFailureDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostCreationFailureDetail.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "phase",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'factory' | 'admission' | 'graph' | 'setup' | 'commit'"
+            },
+            {
+              "name": "cleanupComplete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupComplete: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ITrayHostCreationFailureDetail",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6852,7 +9069,45 @@
           "errors": ["No documented errors are declared for ITrayHostDisposalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostDisposalResult.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: 'terminal';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'terminal'"
+            },
+            {
+              "name": "termination",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly termination: 'managed' | 'external-host';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'managed' | 'external-host'"
+            },
+            {
+              "name": "cleanupComplete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupComplete: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly error?: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            }
+          ],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ITrayHostDisposalResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6916,7 +9171,166 @@
           "errors": ["No documented errors are declared for ITrayHostDynamic."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostDynamic.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "extensions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>"
+            },
+            {
+              "name": "plugins",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly plugins: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "readyPlugins",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly readyPlugins: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: ITrayHostState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITrayHostState"
+            },
+            {
+              "name": "isActive",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly isActive: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown | undefined"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>"
+            },
+            {
+              "name": "pluginState",
+              "kind": "method",
+              "optional": false,
+              "signature": "pluginState(name: string): string;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "TKey",
+                  "optional": false,
+                  "configurationType": "keyof"
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>",
+                  "optional": false,
+                  "configurationType": "(event: IEventContext<ITrayHostEventMap[keyof]>) => void | PromiseLike<void>"
+                }
+              ],
+              "returns": "IUnsubscribe"
+            },
+            {
+              "name": "use",
+              "kind": "method",
+              "optional": false,
+              "signature": "use<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "plugin",
+                  "type": "TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]",
+                  "optional": false,
+                  "configurationType": "ITrayPluginConstraint & ITrayPluginAdmission<THost, readonly [ITrayPluginConstraint], TReady>[0]"
+                }
+              ],
+              "returns": "Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>"
+            },
+            {
+              "name": "unUse",
+              "kind": "method",
+              "optional": false,
+              "signature": "unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "TName",
+                  "optional": false,
+                  "configurationType": "string"
+                }
+              ],
+              "returns": "Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "plugin",
+                  "type": "TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]",
+                  "optional": false,
+                  "configurationType": "ITrayPluginConstraint & ITrayPluginAdmission<THost, readonly [ITrayPluginConstraint], TReady>[0]"
+                }
+              ],
+              "returns": "Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<ITrayHostDisposalResult>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<ITrayHostDisposalResult>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayHostDynamic",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -6980,7 +9394,90 @@
           "errors": ["No documented errors are declared for ITrayHostEventMap."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostEventMap.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "use",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly use: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "unUse",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unUse: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "replace",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly replace: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "registered",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly registered: Readonly<Record<string, unknown>>;",
+              "description": "Settled lifecycle aliases describe the logical operation without exposing Graph authority.",
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "replaced",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly replaced: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "mutationFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutationFailed: Readonly<{ readonly operation: 'use' | 'unUse' | 'replace'; readonly name: string; readonly error: Error; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ readonly operation: 'use' | 'unUse' | 'replace'; readonly name: string; readonly error: Error; }>"
+            },
+            {
+              "name": "disposing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposing: Readonly<{ readonly state: 'closing'; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ readonly state: 'closing'; }>"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITrayHostEventMap",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7045,6 +9542,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostSource.",
           "examples": [],
           "members": [],
+          "composes": ["PluginHost", "IHostHandle"],
           "aliasOf": "ITrayHostSource",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7109,6 +9607,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostState.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ITrayHostState",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7173,6 +9672,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginConstraint.",
           "examples": [],
           "members": [],
+          "composes": ["IPluginConstraint"],
           "aliasOf": "ITrayPluginConstraint",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7237,6 +9737,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginCore.",
           "examples": [],
           "members": [],
+          "composes": ["IPluginHostCoreFor"],
           "aliasOf": "ITrayPluginCore",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7300,7 +9801,63 @@
           "errors": ["No documented errors are declared for ITrayPluginMutationObservation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginMutationObservation.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "operation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly operation: 'use' | 'replace';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'use' | 'replace'"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "affected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly affected: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "topologyChanged",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly topologyChanged: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "view",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly view: TView;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TView"
+            },
+            {
+              "name": "cleanupComplete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupComplete: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ITrayPluginMutationObservation",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7364,7 +9921,81 @@
           "errors": ["No documented errors are declared for ITrayPluginMutationResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginMutationResult.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            }
+          ],
+          "composes": ["ITrayPluginMutationObservation"],
           "aliasOf": "ITrayPluginMutationResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7429,6 +10060,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginPhysicalCleanupResult.",
           "examples": [],
           "members": [],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ITrayPluginPhysicalCleanupResult",
           "exportPath": "./host",
           "overloadSignatures": ["export type ITrayPluginPhysicalCleanupResult = ICleanupResult;"],
@@ -7490,7 +10122,45 @@
           "errors": ["No documented errors are declared for ITrayPluginRemovalObservation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginRemovalObservation.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "affected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly affected: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "view",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly view: TView;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TView"
+            },
+            {
+              "name": "cleanupComplete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupComplete: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ITrayPluginRemovalObservation",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7554,7 +10224,135 @@
           "errors": ["No documented errors are declared for ITrayPluginRemovalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginRemovalResult.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            }
+          ],
+          "composes": ["ITrayPluginRemovalObservation"],
           "aliasOf": "ITrayPluginRemovalResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7621,6 +10419,7 @@
             "import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ITrayResolvedHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7685,6 +10484,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IUnsubscribe.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IUnsubscribe",
           "exportPath": "./host",
           "overloadSignatures": ["export type IUnsubscribe = () => void;"],
@@ -7746,7 +10546,45 @@
           "errors": ["No documented errors are declared for TrayHostState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayHostState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "active",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly active: \"active\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"active\""
+            },
+            {
+              "name": "closing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closing: \"closing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"closing\""
+            },
+            {
+              "name": "terminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly terminal: \"terminal\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"terminal\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "TrayHostState",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7836,6 +10674,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineLoader.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "defineLoader",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -7907,7 +10746,27 @@
           "errors": ["No documented errors are declared for ILoadedArtifact."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoadedArtifact.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: TArtifact;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TArtifact"
+            },
+            {
+              "name": "release",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly release: IReleaseDescriptor;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReleaseDescriptor"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoadedArtifact",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -7971,7 +10830,18 @@
           "errors": ["No documented errors are declared for ILoader."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoader.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "load",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly load: (source: TSource, context: ILoaderContext) => ILoadedArtifact<TArtifact> | PromiseLike<ILoadedArtifact<TArtifact>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(source: TSource, context: ILoaderContext) => ILoadedArtifact<TArtifact> | PromiseLike<ILoadedArtifact<TArtifact>>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoader",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -8035,7 +10905,36 @@
           "errors": ["No documented errors are declared for ILoaderContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoaderContext.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "deadlineAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deadlineAt: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly report: (error: unknown) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoaderContext",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -8099,7 +10998,81 @@
           "errors": ["No documented errors are declared for ILoadIntoHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoadIntoHostOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "host",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly host: TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>"
+            },
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: TSource;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TSource"
+            },
+            {
+              "name": "loader",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loader: ILoader<TSource, TArtifact>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILoader<TSource, TArtifact>"
+            },
+            {
+              "name": "adapter",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly adapter: IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>"
+            },
+            {
+              "name": "mutation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutation: TMutation;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TMutation"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signal?: IAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "timeoutMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly timeoutMs: number | false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | false"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoadIntoHostOptions",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -8163,7 +11136,135 @@
           "errors": ["No documented errors are declared for ILoadIntoHostResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoadIntoHostResult.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            },
+            {
+              "name": "ok",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ok: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            },
+            {
+              "name": "operation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly operation: 'use' | 'replace';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'use' | 'replace'"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "affected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly affected: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "topologyChanged",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly topologyChanged: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "view",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly view: TView;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TView"
+            },
+            {
+              "name": "cleanupComplete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupComplete: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ILoadIntoHostResult",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -8228,7 +11329,8 @@
             {
               "name": "options",
               "type": "ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>",
-              "optional": false
+              "optional": false,
+              "configurationType": "ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<ITrayHostTypeInfo>, ITrayPluginConstraint, ITrayHostTypeInfo, TMutation>"
             }
           ],
           "returns": "Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>>",
@@ -8236,6 +11338,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for loadIntoHost.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "loadIntoHost",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -8246,7 +11349,8 @@
               {
                 "name": "options",
                 "type": "ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>",
-                "optional": false
+                "optional": false,
+                "configurationType": "ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<ITrayHostTypeInfo>, ITrayPluginConstraint, ITrayHostTypeInfo, TMutation>"
               }
             ]
           ],
@@ -8401,7 +11505,7 @@
               "optional": true,
               "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
               "descriptionEn": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
-              "descriptionZh": ""
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
             }
           ],
           "fragment": "tray-loader--loadIntoHost"
@@ -8442,7 +11546,8 @@
             {
               "name": "host",
               "type": "THost",
-              "optional": false
+              "optional": false,
+              "configurationType": "ITrayHostTypeInfo"
             },
             {
               "name": "options",
@@ -8455,6 +11560,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRuntime.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8465,7 +11571,8 @@
               {
                 "name": "host",
                 "type": "THost",
-                "optional": false
+                "optional": false,
+                "configurationType": "ITrayHostTypeInfo"
               },
               {
                 "name": "options",
@@ -8511,16 +11618,28 @@
           ],
           "declaredConfiguration": [
             {
-              "name": "mode",
+              "name": "shutdown",
+              "type": "IRuntimeShutdownOptions",
+              "optional": true,
+              "description": "Selects bounded shutdown or a strict drain that waits for physical completion."
+            },
+            {
+              "name": "shutdown.mode",
               "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes."
             },
             {
-              "name": "quiescenceMs",
+              "name": "shutdown.quiescenceMs",
               "type": "number",
               "optional": true,
               "description": "Maximum bounded-shutdown wait for physical plugin quiescence."
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure."
             }
           ],
           "identity": "packages/tray/dist/runtime/create-runtime.d.ts:createRuntime:export declare function createRuntime<THost extends ITrayHostTypeInfo & Pick<ITrayHost<any, any, any>, 'on'>>(host: THost, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>;",
@@ -8528,7 +11647,15 @@
           "usageScore": 28,
           "configuration": [
             {
-              "name": "mode",
+              "name": "shutdown",
+              "type": "IRuntimeShutdownOptions",
+              "optional": true,
+              "description": "Selects bounded shutdown or a strict drain that waits for physical completion.",
+              "descriptionEn": "Selects bounded shutdown or a strict drain that waits for physical completion.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "shutdown.mode",
               "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
@@ -8536,12 +11663,20 @@
               "descriptionZh": ""
             },
             {
-              "name": "quiescenceMs",
+              "name": "shutdown.quiescenceMs",
               "type": "number",
               "optional": true,
               "description": "Maximum bounded-shutdown wait for physical plugin quiescence.",
               "descriptionEn": "Maximum bounded-shutdown wait for physical plugin quiescence.",
               "descriptionZh": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
+              "descriptionEn": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure.",
+              "descriptionZh": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
             }
           ],
           "fragment": "tray-runtime--createRuntime"
@@ -8563,7 +11698,63 @@
           "examples": [
             "import type { IRuntime } from '@migaia/tray/runtime'\n\n/** 等待 callback 结束，再观察当前 search generation 的卸载结果。 */\nasync function unloadSearch(runtime: IRuntime): Promise<void> {\n  /** completion 只在 callback 结束后读取。 */\n  const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\n  await ticket.completion\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: 'active' | 'closing' | 'terminal';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'active' | 'closing' | 'terminal'"
+            },
+            {
+              "name": "activeRuns",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly activeRuns: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "run",
+              "kind": "method",
+              "optional": false,
+              "signature": "run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>, THost, TReady>) => TResult | PromiseLike<TResult>): Promise<TResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "TName",
+                  "optional": false,
+                  "configurationType": "string"
+                },
+                {
+                  "name": "options",
+                  "type": "IRuntimeRunOptions",
+                  "optional": false
+                },
+                {
+                  "name": "execute",
+                  "type": "(context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>, THost, TReady>) => TResult | PromiseLike<TResult>",
+                  "optional": false,
+                  "configurationType": "(context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, string>, THost, TReady>) => TResult | PromiseLike<TResult>"
+                }
+              ],
+              "returns": "Promise<TResult>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<IRuntimeDisposalResult>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<IRuntimeDisposalResult>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8627,7 +11818,27 @@
           "errors": ["No documented errors are declared for IRuntimeDisposalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeDisposalResult.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly state: 'terminal';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'terminal'"
+            },
+            {
+              "name": "cleanupComplete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupComplete: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeDisposalResult",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8692,6 +11903,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeExtensionsFor.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IRuntimeExtensionsFor",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8755,7 +11967,63 @@
           "errors": ["No documented errors are declared for IRuntimeRunContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeRunContext.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "runId",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runId: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "plugin",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly plugin: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "extensions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly extensions: TExtensions;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TExtensions"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "deadlineAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deadlineAt: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly self: IRuntimeSelfMutation<THost, TReady>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeSelfMutation<THost, TReady>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeRunContext",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8819,7 +12087,27 @@
           "errors": ["No documented errors are declared for IRuntimeRunOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeRunOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signal?: IAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "timeoutMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly timeoutMs: number | false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | false"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeRunOptions",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8883,7 +12171,34 @@
           "errors": ["No documented errors are declared for IRuntimeSelfMutation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeSelfMutation.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "unUse",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unUse: () => IRuntimeSelfMutationTicket;",
+              "description": "Schedules removal of the callback's exact plugin generation after settlement.",
+              "parameterDetails": [],
+              "returns": "() => IRuntimeSelfMutationTicket"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): IRuntimeSelfMutationTicket;",
+              "description": "Schedules replacement of the callback's exact plugin generation after settlement.",
+              "parameterDetails": [
+                {
+                  "name": "plugin",
+                  "type": "TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]",
+                  "optional": false,
+                  "configurationType": "ITrayPluginConstraint & ITrayPluginAdmission<THost, readonly [ITrayPluginConstraint], TReady>[0]"
+                }
+              ],
+              "returns": "IRuntimeSelfMutationTicket"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeSelfMutation",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8947,7 +12262,18 @@
           "errors": ["No documented errors are declared for IRuntimeSelfMutationTicket."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeSelfMutationTicket.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "completion",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly completion: Promise<TResult>;",
+              "description": "Resolves only after callback settlement and canonical Host mutation completion.",
+              "parameterDetails": [],
+              "returns": "Promise<TResult>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeSelfMutationTicket",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -9011,7 +12337,27 @@
           "errors": ["No documented errors are declared for IRuntimeShutdownOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeShutdownOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: TrayShutdownMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TrayShutdownMode"
+            },
+            {
+              "name": "quiescenceMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly quiescenceMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeShutdownOptions",
           "exportPath": "./runtime",
           "overloadSignatures": [

@@ -34,6 +34,25 @@ import { Button } from '../components/ui/button.js'
 import { usePageNavigation } from '../components/page-navigation.js'
 import { normalizeExampleImports } from '../example-imports.js'
 import { commentExample, type IExampleCommentaryContext } from '../example-commentary.js'
+import { referenceFor } from '../reference/index.js'
+import {
+  localizeReference,
+  type ILocalizedEnhancerDoc,
+  type ILocalizedMemberDoc,
+  type ILocalizedReference,
+  type ILocalizedSymbolDoc,
+  type ILocalizedTypeDoc,
+  type ILocalizedValue
+} from '../reference/localize.js'
+import { essentialApiParts, essentialApis } from '../essential-apis.js'
+import {
+  callableShape,
+  constantMembers,
+  instanceSurface,
+  resolveFieldDoc,
+  returnedInstances,
+  type IInstanceSurface
+} from '../reference/surface.js'
 
 type IDocsLoaderData = ILibraryRouteContent & {
   readonly apiLinks?: readonly IGuideApiLink[]
@@ -43,6 +62,8 @@ type IDocsLoaderData = ILibraryRouteContent & {
   readonly optionTranslations?: Readonly<Record<string, string>>
   readonly optionFallbacks?: Readonly<Record<string, string>>
   readonly selectedTypeFragment?: string
+  /** Authored instance member descriptions for this library in the page locale. */
+  readonly reference?: ILocalizedReference
 }
 
 type IDocsRouteProps = {
@@ -243,7 +264,12 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
         journeyTopics: journeyModule.listGuideJourneys(librarySlug, guideLocale),
         optionTranslations,
         optionFallbacks,
-        selectedTypeFragment: selectedType?.fragment
+        selectedTypeFragment: selectedType?.fragment,
+        reference: (() => {
+          /** Audited libraries render every API sentence from their reference file. */
+          const libraryReference = domain === 'docs' ? referenceFor(librarySlug) : undefined
+          return libraryReference ? localizeReference(libraryReference, guideLocale) : undefined
+        })()
       }
     : null
 }
@@ -329,6 +355,7 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
         optionTranslations={loaderData?.optionTranslations}
         optionFallbacks={loaderData?.optionFallbacks}
         selectedTypeFragment={loaderData?.selectedTypeFragment}
+        reference={loaderData?.reference}
       />
     )
   return (
@@ -379,7 +406,8 @@ function DocsLibrary({
   modulePath,
   optionTranslations,
   optionFallbacks,
-  selectedTypeFragment
+  selectedTypeFragment,
+  reference
 }: {
   apiLinks: readonly IGuideApiLink[]
   guide?: IApiGuide
@@ -391,6 +419,7 @@ function DocsLibrary({
   optionTranslations?: Readonly<Record<string, string>>
   optionFallbacks?: Readonly<Record<string, string>>
   selectedTypeFragment?: string
+  reference?: ILocalizedReference
 }) {
   const copy = copyFor(locale)
   const routeParts = modulePath?.split('/').filter(Boolean) ?? []
@@ -472,7 +501,11 @@ function DocsLibrary({
         Boolean(selectedGuide),
         Boolean(selectedGuide?.options.length),
         Boolean(selectedGuide?.examples?.length),
-        Boolean(primaryExample(selectedGuide, selectedSymbol, api!.library))
+        Boolean(primaryExample(selectedGuide, selectedSymbol, api!.library)),
+        [...api!.symbols, ...libraryApis.flatMap((entry) => entry.symbols)],
+        Boolean(reference?.enhancers[selectedSymbol.name]),
+        Boolean(aliasedInstanceSurface(selectedSymbol, api!.symbols, reference)),
+        symbolDocFor(reference, api!.module, selectedSymbol.name)
       )
     : api
       ? moduleReferenceSections(library.documentation, api)
@@ -519,6 +552,7 @@ function DocsLibrary({
           {api && selectedSymbol ? (
             <SingleApiReference
               guide={selectedGuide}
+              reference={reference}
               locale={locale}
               library={library}
               libraryApis={libraryApis}
@@ -533,6 +567,7 @@ function DocsLibrary({
               library={library}
               libraryApis={libraryApis}
               api={api}
+              reference={reference}
               selectedTypeFragment={selectedTypeFragment}
             />
           ) : (
@@ -705,6 +740,17 @@ function LibraryModuleLinks({
    */
   const storageWebGroups =
     librarySlug === 'storage-web' ? groupStorageWebApiLinks(apiLinks, locale) : []
+  /** Curated entry points listed before the complete inventory; see `essential-apis.ts`. */
+  const essentialLinks = (essentialApis[librarySlug] ?? []).flatMap((entry) => {
+    const { module, name } = essentialApiParts(entry)
+    /** The navigation projection supplies the entry's kind marker and stable route segment. */
+    const link = apiLinks.find(
+      (candidate) => candidate.module === module && candidate.name === name
+    )
+    return link ? [link] : []
+  })
+  /** A library with a curated first group folds its complete inventory into one disclosure. */
+  const tiered = essentialLinks.length > 0 || primaryEntries.length > 0
   /** Real-world bindings keep transport-specific examples discoverable beside the contract APIs. */
   const rpcContractScenarioLinks =
     librarySlug === 'rpc-contract'
@@ -717,23 +763,6 @@ function LibraryModuleLinks({
       : []
   return (
     <>
-      {storageWebGroups.map((group) => (
-        <div className="left-rail-group" key={group.key}>
-          <span>{group.label}</span>
-          <div className="left-rail-children">
-            {group.links.map((link) => (
-              <Link
-                className={link.name === selectedSymbol?.name ? 'active' : ''}
-                data-kind={link.kind}
-                key={link.symbolPath}
-                to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
-              >
-                {link.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      ))}
       {rpcContractScenarioLinks.length > 0 ? (
         <div className="left-rail-group left-rail-primary">
           <span>{locale === 'zh' ? '场景应用' : 'Real-world scenarios'}</span>
@@ -747,6 +776,25 @@ function LibraryModuleLinks({
                 to={guidePath(locale, 'rpc-contract', anchor.replace('bindings-', ''))}
               >
                 {locale === 'zh' ? labelZh : labelEn}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {essentialLinks.length > 0 ? (
+        <div className="left-rail-group left-rail-primary left-rail-essentials">
+          <span>{locale === 'zh' ? '常用 API' : 'Essentials'}</span>
+          <div className="left-rail-children">
+            {essentialLinks.map((link) => (
+              <Link
+                className={
+                  link.module === api?.module && link.name === selectedSymbol?.name ? 'active' : ''
+                }
+                data-kind={link.kind}
+                key={`${link.module}:${link.symbolPath}`}
+                to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+              >
+                {link.name}
               </Link>
             ))}
           </div>
@@ -774,104 +822,165 @@ function LibraryModuleLinks({
           </Link>
         </div>
       ) : null}
-      {librarySlug !== 'storage-web' &&
-        rootApis.map((candidate) => (
-          <div className="left-rail-group" key={candidate.id}>
-            <Link
-              className={candidate === api && !selectedSymbol ? 'active' : ''}
-              to={docsModulePath(locale, librarySlug, candidate.module)}
-            >
-              {candidate.module === 'index'
-                ? locale === 'zh'
-                  ? '根包 API'
-                  : 'Root APIs'
-                : candidate.module}
-            </Link>
+      <RailInventory
+        enabled={tiered}
+        label={locale === 'zh' ? '全部 API' : 'All APIs'}
+        count={apiLinks.length}
+      >
+        {storageWebGroups.map((group) => (
+          <div className="left-rail-group" key={group.key}>
+            <span>{group.label}</span>
             <div className="left-rail-children">
-              {apiLinks
-                .filter(
-                  (link) =>
-                    link.module === candidate.module &&
-                    !(candidate.module === 'index' && webRpcMiddlewareNames.has(link.name))
-                )
-                .map((link) => (
-                  <Link
-                    className={link.name === selectedSymbol?.name ? 'active' : ''}
-                    data-kind={link.kind}
-                    key={link.symbolPath}
-                    to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
-                  >
-                    {link.name}
-                  </Link>
-                ))}
-              {librarySlug === 'logger' && candidate.module === 'plugins' ? (
-                <Link to={guidePath(locale, 'logger', 'custom-plugin')}>
-                  {locale === 'zh' ? '编写自定义插件 →' : 'Author a custom plugin →'}
+              {group.links.map((link) => (
+                <Link
+                  className={link.name === selectedSymbol?.name ? 'active' : ''}
+                  data-kind={link.kind}
+                  key={link.symbolPath}
+                  to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+                >
+                  {link.name}
                 </Link>
-              ) : null}
+              ))}
             </div>
           </div>
         ))}
-      {middlewarePluginLinks.length > 0 ? (
-        <div className="left-rail-group">
-          <span>{locale === 'zh' ? '中间件插件' : 'Middleware plugins'}</span>
-          <div className="left-rail-children">
-            {middlewarePluginLinks.map((link) => (
+        {librarySlug !== 'storage-web' &&
+          rootApis.map((candidate) => (
+            <div className="left-rail-group" key={candidate.id}>
               <Link
-                className={link.name === selectedSymbol?.name ? 'active' : ''}
-                data-kind={link.kind}
-                key={link.symbolPath}
-                to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+                className={candidate === api && !selectedSymbol ? 'active' : ''}
+                to={docsModulePath(locale, librarySlug, candidate.module)}
               >
-                {link.name}
+                {candidate.module === 'index'
+                  ? locale === 'zh'
+                    ? '根包 API'
+                    : 'Root APIs'
+                  : candidate.module}
               </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {librarySlug !== 'storage-web' &&
-        nestedGroups.map(([groupName, candidates]) => (
-          <div className="left-rail-group" key={groupName}>
-            <span>{moduleGroupLabel(locale, groupName)}</span>
+              <div className="left-rail-children">
+                {apiLinks
+                  .filter(
+                    (link) =>
+                      link.module === candidate.module &&
+                      !(candidate.module === 'index' && webRpcMiddlewareNames.has(link.name))
+                  )
+                  .map((link) => (
+                    <Link
+                      className={link.name === selectedSymbol?.name ? 'active' : ''}
+                      data-kind={link.kind}
+                      key={link.symbolPath}
+                      to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+                    >
+                      {link.name}
+                    </Link>
+                  ))}
+                {librarySlug === 'logger' && candidate.module === 'plugins' ? (
+                  <Link to={guidePath(locale, 'logger', 'custom-plugin')}>
+                    {locale === 'zh' ? '编写自定义插件 →' : 'Author a custom plugin →'}
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        {middlewarePluginLinks.length > 0 ? (
+          <div className="left-rail-group">
+            <span>{locale === 'zh' ? '中间件插件' : 'Middleware plugins'}</span>
             <div className="left-rail-children">
-              {candidates.map((candidate) => {
-                /** Public API links are authoritative for the nested module's expanded children. */
-                const candidateLinks = apiLinks.filter((link) => link.module === candidate.module)
-                /**
-                 * A module such as `features/control` needs one `control` link, not two identical
-                 * rows.
-                 */
-                const moduleLabel = candidate.module.split('/').slice(1).join(' / ')
-                /** The module landing link is redundant when its only API has the same reader label. */
-                const showModuleLink =
-                  candidateLinks.length !== 1 || candidateLinks[0]?.name !== moduleLabel
-                return (
-                  <div className="left-rail-symbol-group" key={candidate.id}>
-                    {showModuleLink ? (
-                      <Link
-                        className={candidate === api && !selectedSymbol ? 'active' : ''}
-                        to={docsModulePath(locale, librarySlug, candidate.module)}
-                      >
-                        {moduleLabel}
-                      </Link>
-                    ) : null}
-                    {candidateLinks.map((link) => (
-                      <Link
-                        className={link.name === selectedSymbol?.name ? 'active' : ''}
-                        data-kind={link.kind}
-                        key={link.symbolPath}
-                        to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
-                      >
-                        {link.name}
-                      </Link>
-                    ))}
-                  </div>
-                )
-              })}
+              {middlewarePluginLinks.map((link) => (
+                <Link
+                  className={link.name === selectedSymbol?.name ? 'active' : ''}
+                  data-kind={link.kind}
+                  key={link.symbolPath}
+                  to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+                >
+                  {link.name}
+                </Link>
+              ))}
             </div>
           </div>
-        ))}
+        ) : null}
+        {librarySlug !== 'storage-web' &&
+          nestedGroups.map(([groupName, candidates]) => (
+            <div className="left-rail-group" key={groupName}>
+              <span>{moduleGroupLabel(locale, groupName)}</span>
+              <div className="left-rail-children">
+                {candidates.map((candidate) => {
+                  /** Public API links are authoritative for the nested module's expanded children. */
+                  const candidateLinks = apiLinks.filter((link) => link.module === candidate.module)
+                  /**
+                   * A module such as `features/control` needs one `control` link, not two identical
+                   * rows.
+                   */
+                  const moduleLabel = candidate.module.split('/').slice(1).join(' / ')
+                  /**
+                   * The module landing link is redundant when its only API has the same reader
+                   * label.
+                   */
+                  const showModuleLink =
+                    candidateLinks.length !== 1 || candidateLinks[0]?.name !== moduleLabel
+                  return (
+                    <div className="left-rail-symbol-group" key={candidate.id}>
+                      {showModuleLink ? (
+                        <Link
+                          className={candidate === api && !selectedSymbol ? 'active' : ''}
+                          to={docsModulePath(locale, librarySlug, candidate.module)}
+                        >
+                          {moduleLabel}
+                        </Link>
+                      ) : null}
+                      {candidateLinks.map((link) => (
+                        <Link
+                          className={link.name === selectedSymbol?.name ? 'active' : ''}
+                          data-kind={link.kind}
+                          key={link.symbolPath}
+                          to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+                        >
+                          {link.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+      </RailInventory>
     </>
+  )
+}
+
+/**
+ * Folds a library's complete API inventory under one disclosure once a curated first group exists.
+ * Server markup is identical on every page (always closed) so the rail stays stable; after
+ * hydration the disclosure opens when it holds the active page's link.
+ */
+function RailInventory({
+  children,
+  count,
+  enabled,
+  label
+}: {
+  readonly children: React.ReactNode
+  /** Number of API links inside, shown beside the label. */
+  readonly count: number
+  /** False keeps the flat rail for small libraries without a curated group. */
+  readonly enabled: boolean
+  readonly label: string
+}) {
+  /** Disclosure element whose open state follows the active link after hydration. */
+  const disclosureRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (disclosureRef.current?.querySelector('a.active')) disclosureRef.current.open = true
+  })
+  if (!enabled) return <>{children}</>
+  return (
+    <details className="left-rail-inventory" ref={disclosureRef}>
+      <summary>
+        {label}
+        <small>{count}</small>
+      </summary>
+      {children}
+    </details>
   )
 }
 
@@ -1010,13 +1119,41 @@ function referenceSections(
   _curated: boolean,
   hasGuideOptions = false,
   _hasGuideExamples = false,
-  hasQuickExample = false
+  hasQuickExample = false,
+  symbols: readonly IApiSymbol[] = [],
+  hasInstalledCapabilities = false,
+  hasAliasedSurface = false,
+  symbolDoc?: ILocalizedSymbolDoc
 ): string[] {
+  /** Audited pages derive their inventory from the reference doc alone. */
+  if (symbolDoc)
+    return [
+      'overview',
+      ...(symbolDoc.example ? ['quick-start'] : []),
+      ...(Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns ? ['contract'] : []),
+      ...(constantMembers(symbol).length > 0 ? ['values'] : []),
+      ...(symbol.configuration.length > 0 ? ['configuration'] : []),
+      ...(hasInstalledCapabilities ? ['installed'] : []),
+      ...((symbol.kind === 'class' && instanceSurface(symbol, symbols).members.length > 0) ||
+      hasAliasedSurface
+        ? ['members']
+        : []),
+      ...(returnedInstances(symbol, symbols).length > 0 ? ['instance'] : []),
+      ...(symbolDoc.scenarios.length > 0 || symbolDoc.avoid.length > 0 ? ['scenarios'] : []),
+      'related-apis',
+      'signature'
+    ]
   return [
     'overview',
     ...(hasQuickExample ? ['quick-start'] : []),
+    ...(hasInstalledCapabilities ? ['installed'] : []),
     ...(constantMembers(symbol).length > 0 ? ['values'] : []),
     ...(symbol.configuration.length > 0 || hasGuideOptions ? ['configuration'] : []),
+    ...((symbol.kind === 'class' && instanceSurface(symbol, symbols).members.length > 0) ||
+    hasAliasedSurface
+      ? ['members']
+      : []),
+    ...(returnedInstances(symbol, symbols).length > 0 ? ['instance'] : []),
     ...(symbol.errors.some(
       (error) => error.trim() && !error.startsWith('No documented errors are declared for ')
     )
@@ -1042,14 +1179,22 @@ function ModuleOverview({
   library,
   libraryApis,
   api,
+  reference,
   selectedTypeFragment
 }: {
   readonly locale: ILocale
   readonly library: ILibrary
   readonly libraryApis: readonly IApi[]
   readonly api: IApi
+  readonly reference?: ILocalizedReference
   readonly selectedTypeFragment?: string
 }) {
+  /** A type route documents that type's instance surface before the module overview. */
+  const selectedType = selectedTypeFragment
+    ? api.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)
+    : undefined
+  /** Resolved members of the selected type, merged across the types it composes. */
+  const selectedSurface = selectedType ? instanceSurface(selectedType, api.symbols) : undefined
   const moduleSymbols = Array.from(
     new Map(api.symbols.map((symbol) => [symbol.fragment, symbol])).values()
   )
@@ -1062,7 +1207,10 @@ function ModuleOverview({
   const purposes = new Map<string, string>()
   for (const symbol of runtimeSymbols) {
     /** Concrete source-backed card description, excluding generator provenance. */
-    const rawPurpose = localizedSymbolPurpose(locale, symbol)
+    const rawPurpose = reference
+      ? (symbolDocFor(reference, api.module, symbol.name)?.purpose ??
+        instanceGuideFor(reference, api.module, symbol.name)?.summary)
+      : localizedSymbolPurpose(locale, symbol)
     /** Cards need one concise purpose rather than a repeated API contract paragraph. */
     const purpose = rawPurpose ? openingSentence(rawPurpose) : undefined
     if (purpose && !seenPurposes.has(purpose)) {
@@ -1090,7 +1238,39 @@ function ModuleOverview({
   const isWireErrorSchema = api.library === 'rpc-contract' && api.module === 'schema/wire-error'
   return (
     <>
-      <ModuleGuidance locale={locale} library={library} api={api} />
+      {selectedType && selectedSurface ? (
+        <ClassMemberReference
+          api={api}
+          bases={selectedSurface.bases}
+          libraryApis={libraryApis}
+          locale={locale}
+          guide={surfaceGuideFor(reference, api.module, selectedType, api.symbols)}
+          memberDoc={memberDocResolver(reference, api.module, selectedSurface.owners)}
+          members={selectedSurface.members}
+          strict={Boolean(reference)}
+          symbol={selectedType}
+        />
+      ) : null}
+      {reference ? (
+        reference.modules[api.module] ? (
+          <section className="section-block compact module-reference" id="module-overview">
+            <ReferenceParagraphs
+              library={api.library}
+              locale={locale}
+              text={reference.modules[api.module]!.summary}
+            />
+            {reference.modules[api.module]!.example ? (
+              <CodeBlock
+                code={reference.modules[api.module]!.example!}
+                label={readerFacingModuleName(locale, api.module)}
+                locale={locale}
+              />
+            ) : null}
+          </section>
+        ) : null
+      ) : (
+        <ModuleGuidance locale={locale} library={library} api={api} />
+      )}
       {isWireErrorSchema || runtimeSymbols.length > 0 || api.aliases.length > 0 ? (
         <section className="section-block compact" id="api-index">
           <p className="eyebrow">{locale === 'zh' ? 'API 参考' : 'API reference'}</p>
@@ -1272,6 +1452,15 @@ function optionAnchor(name: string): string {
 }
 
 /** Renders public type names as links while preserving the surrounding TypeScript expression. */
+/**
+ * Removes `/** … *\/` source comments from a declaration or type text. Those comments are English
+ * source notes; reader-facing prose comes from the localized reference, so leaving them inside a
+ * type cell or member signature would put untranslated sentences on Chinese pages.
+ */
+function withoutDocComments(text: string): string {
+  return text.replace(/\/\*\*[\s\S]*?\*\/\s*/g, '')
+}
+
 function TypeExpression({
   api,
   libraryApis,
@@ -1292,66 +1481,279 @@ function TypeExpression({
   )
   return (
     <code className="type-expression">
-      {value.split(/([A-Za-z_$][\w$]*)/u).map((part, index) => {
-        const match = typeSymbols.get(part)
-        return match ? (
-          <Link
-            className="type-link"
-            key={`${part}-${index}`}
-            to={docsModulePath(
-              locale,
-              api.library,
-              match.ownerApi.module,
-              symbolSlug(match.symbol, match.ownerApi.symbols)
-            )}
-          >
-            {part}
-          </Link>
-        ) : (
-          <Fragment key={`${part}-${index}`}>{part}</Fragment>
-        )
-      })}
+      {withoutDocComments(value)
+        .split(/([A-Za-z_$][\w$]*)/u)
+        .map((part, index) => {
+          const match = typeSymbols.get(part)
+          return match ? (
+            <Link
+              className="type-link"
+              key={`${part}-${index}`}
+              to={docsModulePath(
+                locale,
+                api.library,
+                match.ownerApi.module,
+                symbolSlug(match.symbol, match.ownerApi.symbols)
+              )}
+            >
+              {part}
+            </Link>
+          ) : (
+            <Fragment key={`${part}-${index}`}>{part}</Fragment>
+          )
+        })}
     </code>
   )
 }
 
-/** Renders every public instance method and property extracted from a class declaration. */
-function ClassMemberReference({
+/** Reader-facing label for each enhancer kind. */
+const enhancerKindLabels: Readonly<
+  Record<ILocalizedEnhancerDoc['kind'], readonly [string, string]>
+> = {
+  plugin: ['Plugin', '插件'],
+  host: ['Host definition', 'Host 定义'],
+  field: ['Store field', 'Store 字段'],
+  middleware: ['Middleware', '中间件'],
+  feature: ['Feature', 'Feature'],
+  transport: ['Transport', 'Transport'],
+  adapter: ['Adapter', '适配器'],
+  policy: ['Policy', '策略']
+}
+
+/**
+ * Renders what a host gains after an enhancer is installed: the install snippet, every granted API
+ * with its parameters, result, when-to-use note and snippet, behavior changes of existing host
+ * APIs, scenarios, and an end-to-end example.
+ */
+function InstalledCapabilities({
   api,
+  guide,
   libraryApis,
   locale,
-  members,
   symbol
 }: {
   readonly api: IApi
+  readonly guide: ILocalizedEnhancerDoc
   readonly libraryApis: readonly IApi[]
   readonly locale: ILocale
-  readonly members: readonly IApiMember[]
   readonly symbol: IApiSymbol
 }) {
-  if (members.length === 0) return null
-  /** Overloads share one authored description while retaining their exact signatures. */
-  const describedMembers = new Set<string>()
+  /** Locale index into the bilingual label tuples. */
+  const labelIndex = locale === 'zh' ? 1 : 0
   return (
-    <section className="section-block compact api-class-members" id={`${symbol.fragment}--members`}>
-      <p className="eyebrow">{locale === 'zh' ? '实例能力' : 'Instance capabilities'}</p>
-      <h2>{locale === 'zh' ? '实例 API' : 'Instance API'}</h2>
+    <section
+      className="section-block compact installed-capabilities"
+      id={`${symbol.fragment}--installed`}
+    >
+      <p className="eyebrow">
+        {enhancerKindLabels[guide.kind][labelIndex]}
+        {' → '}
+        <TypeExpression api={api} libraryApis={libraryApis} locale={locale} value={guide.target} />
+      </p>
+      <h2>{locale === 'zh' ? '安装后能力' : 'After installation'}</h2>
+      <p>
+        <InlineText library={api.library} locale={locale} text={guide.summary} />
+      </p>
+      <CodeBlock
+        code={guide.install}
+        label={locale === 'zh' ? `安装 ${symbol.name}` : `Install ${symbol.name}`}
+        locale={locale}
+      />
+      {guide.grants.length > 0 ? (
+        <>
+          <h3>{locale === 'zh' ? '新增 API' : 'Added APIs'}</h3>
+          <div className="option-reference class-member-reference">
+            {guide.grants.map((grant, index) => (
+              <section
+                className="option-entry class-member-entry"
+                id={`${symbol.fragment}--installed-${optionAnchor(grant.signature)}-${index + 1}`}
+                key={`${grant.signature}:${index}`}
+              >
+                <div className="option-heading">
+                  <h4>
+                    <code>{grant.signature}</code>
+                  </h4>
+                </div>
+                <p>
+                  <InlineText library={api.library} locale={locale} text={grant.summary} />
+                </p>
+                <dl className="option-meta class-member-meta">
+                  {Object.keys(grant.params).length > 0 ? (
+                    <div>
+                      <dt>{locale === 'zh' ? '参数' : 'Parameters'}</dt>
+                      <dd>
+                        <ul>
+                          {Object.entries(grant.params).map(([name, text]) => (
+                            <li key={name}>
+                              <code>{name}</code>
+                              {' — '}
+                              <InlineText library={api.library} locale={locale} text={text} />
+                            </li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {grant.returns ? (
+                    <div>
+                      <dt>{locale === 'zh' ? '返回' : 'Returns'}</dt>
+                      <dd>
+                        <InlineText library={api.library} locale={locale} text={grant.returns} />
+                      </dd>
+                    </div>
+                  ) : null}
+                  {grant.whenToUse ? (
+                    <div>
+                      <dt>{locale === 'zh' ? '何时使用' : 'When to use'}</dt>
+                      <dd>
+                        <InlineText library={api.library} locale={locale} text={grant.whenToUse} />
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+                {grant.example ? (
+                  <CodeBlock
+                    code={grant.example}
+                    label={
+                      locale === 'zh' ? `${grant.signature} 示例` : `${grant.signature} example`
+                    }
+                    locale={locale}
+                  />
+                ) : null}
+              </section>
+            ))}
+          </div>
+        </>
+      ) : null}
+      {guide.behaviors.length > 0 ? (
+        <>
+          <h3>{locale === 'zh' ? '对已有 API 的影响' : 'Changes to existing APIs'}</h3>
+          <ul>
+            {guide.behaviors.map((behavior) => (
+              <li key={behavior}>
+                <InlineText library={api.library} locale={locale} text={behavior} />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {guide.scenarios.length > 0 ? (
+        <>
+          <h3>{locale === 'zh' ? '应用场景' : 'Use cases'}</h3>
+          <ul>
+            {guide.scenarios.map((scenario) => (
+              <li key={scenario}>
+                <InlineText library={api.library} locale={locale} text={scenario} />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <CodeBlock
+        code={guide.example}
+        label={locale === 'zh' ? `${symbol.name} 完整示例` : `${symbol.name} end-to-end example`}
+        locale={locale}
+      />
+    </section>
+  )
+}
+
+/**
+ * Renders every public instance method and property of one instance surface: a class, an
+ * object-shaped type, or the result type a factory returns. For an audited library every sentence
+ * comes from its reference (`memberDoc`); declaration comments are never shown in their place, so a
+ * Chinese page carries no English fallback. Other libraries keep the declaration comment.
+ */
+function ClassMemberReference({
+  api,
+  bases = [],
+  heading,
+  id,
+  libraryApis,
+  locale,
+  guide,
+  memberDoc,
+  members,
+  strict = false,
+  symbol
+}: {
+  readonly api: IApi
+  /** Composed types whose members could not be resolved on this page; shown as links. */
+  readonly bases?: readonly string[]
+  /** Section heading; defaults to the generic instance API title. */
+  readonly heading?: React.ReactNode
+  /** Section anchor; defaults to `<fragment>--members`. */
+  readonly id?: string
+  readonly libraryApis: readonly IApi[]
+  readonly locale: ILocale
+  /** Reference doc of the instance type, when the library is audited. */
+  readonly guide?: ILocalizedTypeDoc
+  /** Resolves the reference doc of one member across the surface's composed types. */
+  readonly memberDoc?: (name: string) => ILocalizedMemberDoc | undefined
+  readonly members: readonly IApiMember[]
+  /** True for audited libraries: never substitute declaration comments for reference text. */
+  readonly strict?: boolean
+  readonly symbol: IApiSymbol
+}) {
+  if (members.length === 0 && bases.length === 0) return null
+  /** Section anchor shared by the outline and member entry ids. */
+  const sectionId = id ?? `${symbol.fragment}--members`
+  /** Locale labels used by every member entry. */
+  const label = (en: string, zh: string) => (locale === 'zh' ? zh : en)
+  return (
+    <section className="section-block compact api-class-members" id={sectionId}>
+      <p className="eyebrow">{label('Instance capabilities', '实例能力')}</p>
+      <h2>{heading ?? label('Instance API', '实例 API')}</h2>
+      {guide ? (
+        <div className="instance-guide">
+          <ReferenceParagraphs library={api.library} locale={locale} text={guide.summary} />
+          {guide.scenarios.length > 0 ? (
+            <>
+              <h3>{label('Use cases', '应用场景')}</h3>
+              <ul>
+                {guide.scenarios.map((scenario) => (
+                  <li key={scenario}>
+                    <InlineText library={api.library} locale={locale} text={scenario} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {guide.example ? (
+            <CodeBlock
+              code={guide.example}
+              label={label(`${symbol.name} usage example`, `${symbol.name} 用法示例`)}
+              locale={locale}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {bases.length > 0 ? (
+        <p className="instance-bases">
+          {label('Also includes every member of: ', '同时具备以下类型的全部能力：')}
+          {bases.map((base, index) => (
+            <Fragment key={base}>
+              {index > 0 ? ', ' : null}
+              <TypeExpression api={api} libraryApis={libraryApis} locale={locale} value={base} />
+            </Fragment>
+          ))}
+        </p>
+      ) : null}
       <div className="option-reference class-member-reference">
         {members.map((member, index) => {
-          /** Repeated extraction prose belongs to the first overload that declares it. */
-          const description =
-            member.description && !describedMembers.has(member.description)
-              ? member.description
-              : undefined
-          if (description) describedMembers.add(description)
-          /** Introduces the operation before its source-authored lifecycle and failure details. */
-          const purpose = description ? openingSentence(description) : undefined
-          /** Keeps the remaining contract intact in a separate reading paragraph. */
-          const detail = purpose ? description?.trim().slice(purpose.length).trim() : undefined
+          /** Reference doc for this member; overloads share it. */
+          const doc = memberDoc?.(member.name)
+          /** Usage notes and the snippet render once, on the first overload. */
+          const firstOverload =
+            members.findIndex((candidate) => candidate.name === member.name) === index
+          /** Reference text, or the declaration comment only outside audited libraries. */
+          const description = firstOverload
+            ? (doc?.summary ?? (strict ? undefined : (member.description ?? undefined)))
+            : undefined
           return (
             <section
               className="option-entry class-member-entry"
-              id={`${symbol.fragment}--member-${optionAnchor(member.name)}-${index + 1}`}
+              id={`${id ? `${id}-` : `${symbol.fragment}--member-`}${optionAnchor(member.name)}-${index + 1}`}
               key={`${member.signature}:${index}`}
             >
               <div className="option-heading">
@@ -1360,71 +1762,63 @@ function ClassMemberReference({
                 </h3>
                 <span className="option-requirement">
                   {member.kind === 'method'
-                    ? locale === 'zh'
-                      ? '方法'
-                      : 'Method'
+                    ? label('Method', '方法')
                     : member.kind === 'property'
-                      ? locale === 'zh'
-                        ? '属性'
-                        : 'Property'
+                      ? label('Property', '属性')
                       : member.kind}
                 </span>
               </div>
-              {purpose ? (
-                <p>
-                  <InlineText library={api.library} locale={locale} text={purpose} />
-                </p>
-              ) : null}
-              {detail ? (
-                <p>
-                  <InlineText library={api.library} locale={locale} text={detail} />
-                </p>
+              {description ? (
+                <ReferenceParagraphs library={api.library} locale={locale} text={description} />
               ) : null}
               <CodeBlock
-                code={member.signature}
-                commentaryContext={{
-                  library: api.library,
-                  apiName: `${symbol.name}.${member.name}`,
-                  kind: 'signature',
-                  parameterNames: member.parameterDetails.map((parameter) => parameter.name),
-                  purpose: member.description ?? member.name
-                }}
-                explain
-                label={locale === 'zh' ? `${member.name} 签名` : `${member.name} signature`}
+                code={withoutDocComments(member.signature)}
+                signature
+                label={label(`${member.name} signature`, `${member.name} 签名`)}
                 locale={locale}
               />
               <dl className="option-meta class-member-meta">
-                <div>
-                  <dt>{locale === 'zh' ? '参数' : 'Parameters'}</dt>
-                  <dd>
-                    {member.parameterDetails.length === 0
-                      ? locale === 'zh'
-                        ? '无'
-                        : 'None'
-                      : member.parameterDetails.map((parameter, parameterIndex) => (
-                          <Fragment key={`${parameter.name}:${parameterIndex}`}>
-                            {parameterIndex > 0 ? ', ' : null}
-                            <code>{parameter.name}</code>
-                            {parameter.optional ? '?' : ''}:{' '}
-                            <TypeExpression
-                              api={api}
-                              libraryApis={libraryApis}
-                              locale={locale}
-                              value={parameter.type}
-                            />
-                          </Fragment>
-                        ))}
-                  </dd>
-                </div>
+                {member.kind === 'method' ? (
+                  <div>
+                    <dt>{label('Parameters', '参数')}</dt>
+                    <dd>
+                      {member.parameterDetails.length === 0 ? (
+                        label('None', '无')
+                      ) : (
+                        <ul className="member-parameters">
+                          {member.parameterDetails.map((parameter, parameterIndex) => (
+                            <li key={`${parameter.name}:${parameterIndex}`}>
+                              <code>
+                                {parameter.name}
+                                {parameter.optional ? '?' : ''}
+                              </code>
+                              {': '}
+                              <TypeExpression
+                                api={api}
+                                libraryApis={libraryApis}
+                                locale={locale}
+                                value={parameter.type}
+                              />
+                              {doc?.params[parameter.name] ? (
+                                <>
+                                  {' — '}
+                                  <InlineText
+                                    library={api.library}
+                                    locale={locale}
+                                    text={doc.params[parameter.name]!}
+                                  />
+                                </>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>
-                    {member.kind === 'property'
-                      ? locale === 'zh'
-                        ? '类型'
-                        : 'Type'
-                      : locale === 'zh'
-                        ? '返回'
-                        : 'Returns'}
+                    {member.kind === 'method' ? label('Returns', '返回') : label('Type', '类型')}
                   </dt>
                   <dd>
                     <TypeExpression
@@ -1433,14 +1827,124 @@ function ClassMemberReference({
                       locale={locale}
                       value={member.returns}
                     />
+                    {doc?.returns ? (
+                      <>
+                        {' — '}
+                        <InlineText library={api.library} locale={locale} text={doc.returns} />
+                      </>
+                    ) : null}
                   </dd>
                 </div>
+                {doc?.default ? (
+                  <div>
+                    <dt>{label('Default', '默认值')}</dt>
+                    <dd>
+                      <InlineText library={api.library} locale={locale} text={doc.default} />
+                    </dd>
+                  </div>
+                ) : null}
+                {doc && doc.values.length > 0 ? (
+                  <div>
+                    <dt>{label('Values', '可选值')}</dt>
+                    <dd>
+                      <ValueList
+                        library={api.library}
+                        locale={locale}
+                        symbols={api.symbols}
+                        values={doc.values}
+                      />
+                    </dd>
+                  </div>
+                ) : null}
+                {firstOverload && doc?.whenToUse ? (
+                  <div>
+                    <dt>{label('When to use', '何时使用')}</dt>
+                    <dd>
+                      <InlineText library={api.library} locale={locale} text={doc.whenToUse} />
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
+              {firstOverload && doc?.example ? (
+                <CodeBlock
+                  code={doc.example}
+                  label={label(`${member.name} example`, `${member.name} 示例`)}
+                  locale={locale}
+                />
+              ) : null}
             </section>
           )
         })}
       </div>
     </section>
+  )
+}
+
+/** Renders reference prose without truncation; blank lines separate paragraphs. */
+function ReferenceParagraphs({
+  library,
+  locale,
+  text
+}: {
+  readonly library: string
+  readonly locale: ILocale
+  readonly text: string
+}) {
+  return (
+    <>
+      {text
+        .split(/\n\s*\n/)
+        .filter((paragraph) => paragraph.trim())
+        .map((paragraph) => (
+          <p key={paragraph}>
+            <InlineText library={library} locale={locale} text={paragraph.trim()} />
+          </p>
+        ))}
+    </>
+  )
+}
+
+/**
+ * Renders the allowed values of a field, each with its meaning. A value taken from an enum-like
+ * constant shows its literal and the constant member (`'listener-all'` ·
+ * `EventRemovalPolicy.listenerAll`).
+ */
+function ValueList({
+  library,
+  locale,
+  symbols,
+  values
+}: {
+  readonly library: string
+  readonly locale: ILocale
+  /** Module declarations used to resolve constant keys to their literals. */
+  readonly symbols: readonly IApiSymbol[]
+  readonly values: readonly ILocalizedValue[]
+}) {
+  return (
+    <ul className="value-list">
+      {values.map((entry) => {
+        /** Literal of a constant-backed value, read from the constant's declaration. */
+        const literal = entry.constant
+          ? constantMembers(
+              symbols.find((symbol) => symbol.name === entry.constant) ?? ({} as IApiSymbol)
+            ).find((member) => member.key === entry.value)?.value
+          : undefined
+        return (
+          <li key={entry.value}>
+            <code>{literal ?? entry.value}</code>
+            {entry.constant ? (
+              <>
+                {' · '}
+                <code>{`${entry.constant}.${entry.value}`}</code>
+              </>
+            ) : null}
+            {' — '}
+            <InlineText library={library} locale={locale} text={entry.meaning} />
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
@@ -1470,43 +1974,6 @@ function signatureHeadlines(signature: string): readonly string[] {
         return `${declaration.slice(0, declaration.indexOf('{'))}{ … }`
       return declaration.replace(/;$/, '')
     })
-}
-
-/** One literal member of an enum-like constant object, read from its generated declaration. */
-type IConstantMember = {
-  readonly key: string
-  readonly value: string
-  readonly description?: string
-}
-
-/**
- * Extracts the literal members of an enum-like `const` (error codes, kinds, policies) so the page
- * can list each key and value instead of collapsing the object to `{ … }`. Returns an empty list
- * unless every top-level member is a string, number, or boolean literal; nested shapes keep the
- * collapsed headline and the full signature disclosure.
- */
-function constantMembers(symbol: IApiSymbol): readonly IConstantMember[] {
-  if (symbol.kind !== 'const') return []
-  /** Object body of the single declaration, with surrounding `{ }` removed. */
-  const body = symbol.signature.match(/^\s*export declare const [\w$]+: \{([\s\S]*)\};?\s*$/)?.[1]
-  if (!body) return []
-  /** Body without comments; any remaining brace means a nested shape this list cannot show. */
-  const bare = body.replace(/\/\*\*[\s\S]*?\*\//g, '')
-  if (/[{}]/.test(bare)) return []
-  /** One member: optional JSDoc, a readonly key, and its literal value. */
-  const pattern =
-    /(?:\/\*\*([\s\S]*?)\*\/\s*)?readonly ([\w$]+|"[^"]*"|'[^']*'): ("[^"]*"|'[^']*'|-?\d+(?:\.\d+)?|true|false);/g
-  const members = [...body.matchAll(pattern)].map((match) => ({
-    key: match[2]!.replace(/^["']|["']$/g, ''),
-    value: match[3]!,
-    // Generated signatures are whitespace-collapsed, so JSDoc line stars sit inline: drop any
-    // standalone `*` run, then normalize spacing.
-    description: match[1]
-      ?.replace(/(?:^|\s)\*+(?=\s|$)/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-  }))
-  return members.length === (bare.match(/\breadonly\b/g) ?? []).length ? members : []
 }
 
 /**
@@ -1686,6 +2153,7 @@ function withoutFieldPreamble(name: string, text: string): string {
 /** Renders one runtime API as a focused reference article with subordinate typing. */
 function SingleApiReference({
   guide,
+  reference,
   locale,
   library,
   libraryApis,
@@ -1695,6 +2163,8 @@ function SingleApiReference({
   symbol
 }: {
   readonly guide?: IApiGuide
+  /** Authored member descriptions by instance type name, then member name. */
+  readonly reference?: ILocalizedReference
   readonly locale: ILocale
   readonly library: ILibrary
   readonly libraryApis: readonly IApi[]
@@ -1703,18 +2173,29 @@ function SingleApiReference({
   readonly optionFallbacks?: Readonly<Record<string, string>>
   readonly symbol: IApiSymbol
 }) {
+  /** Public result types can be exported from a sibling entry; local declarations take precedence. */
+  const symbols = [...api.symbols, ...libraryApis.flatMap((entry) => entry.symbols)]
   /** Generated declarations remain the source of related types and exact option types. */
-  const typingSymbols = api.symbols.filter(
+  const typingSymbols = symbols.filter(
     (candidate) => candidate.kind === 'type' || candidate.kind === 'interface'
   )
   /** The signature disclosure owns all transitive supporting definitions. */
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
-  /** Only the maintained opening sentence introduces the API. */
-  const purpose = openingSentence(
-    guide?.purpose ?? localizedSymbolPurpose(locale, symbol) ?? symbol.purpose
-  )
+  /** A class page documents its own (and inherited) instance members in the main flow. */
+  const ownSurface =
+    symbol.kind === 'class'
+      ? instanceSurface(symbol, symbols)
+      : aliasedInstanceSurface(symbol, symbols, reference)
+  /** A factory page documents the methods of the instance it returns. */
+  const instances = returnedInstances(symbol, symbols)
+  /** Reference doc of an audited library; every sentence below comes from it when present. */
+  const symbolDoc = symbolDocFor(reference, api.module, symbol.name)
+  /** Only the maintained opening sentence introduces the API outside audited libraries. */
+  const purpose = symbolDoc
+    ? symbolDoc.purpose
+    : openingSentence(guide?.purpose ?? localizedSymbolPurpose(locale, symbol) ?? symbol.purpose)
   /** Preserve the authored minimal example and its public import paths. */
-  const rawQuickExample = primaryExample(guide, symbol, api.library)
+  const rawQuickExample = symbolDoc ? symbolDoc.example : primaryExample(guide, symbol, api.library)
   /** Copyable imports resolve to the canonical public module. */
   const quickExample = rawQuickExample
     ? exampleWithPrimaryImport(rawQuickExample, api, symbol)
@@ -1724,7 +2205,7 @@ function SingleApiReference({
   /** Maintained options fill only fields absent from the extracted declaration. */
   const configuration: readonly IApiSymbol['configuration'][number][] = [
     ...symbol.configuration,
-    ...(guide?.options ?? [])
+    ...(symbolDoc ? [] : (guide?.options ?? []))
       .filter(
         (option) =>
           !symbol.configuration.some(
@@ -1749,6 +2230,26 @@ function SingleApiReference({
     field.description
   /** Prefer field-specific maintained text; retain snippets without added commentary. */
   const options = configuration.map((field) => {
+    /** Audited libraries render the reference field doc verbatim (nested paths resolved). */
+    const fieldDoc =
+      symbolDoc?.options[fieldIdentity(field.name)] ??
+      (symbolDoc?.optionsType
+        ? resolveFieldDoc(
+            symbolDoc.optionsType,
+            fieldIdentity(field.name),
+            (name) => instanceGuideFor(reference, api.module, name)?.members,
+            api.symbols
+          )
+        : undefined)
+    if (symbolDoc)
+      return {
+        ...field,
+        description: fieldDoc?.summary ?? '',
+        defaultValue: undefined,
+        defaultText: fieldDoc?.default,
+        values: fieldDoc?.values ?? [],
+        example: fieldDoc?.example
+      }
     /** Field guide uses the same option identity as the declaration projection. */
     const optionGuide = guide?.options.find(
       (option) => fieldIdentity(option.name) === fieldIdentity(field.name)
@@ -1776,19 +2277,23 @@ function SingleApiReference({
       ...field,
       description,
       defaultValue: optionGuide?.defaultValue,
+      defaultText: undefined as string | undefined,
+      values: [] as readonly ILocalizedValue[],
       example: optionGuide?.example
     }
   })
   /** Omit the default column when the content supplies no defaults for this API. */
-  const hasDefaults = options.some((option) => option.defaultValue?.trim())
+  const hasDefaults = options.some((option) => option.defaultValue?.trim() || option.defaultText)
   /** Only explicit package errors belong in the reference; generator placeholders are omitted. */
-  const errors = [
-    ...new Set(
-      symbol.errors.filter(
-        (error) => error.trim() && !error.startsWith('No documented errors are declared for ')
-      )
-    )
-  ]
+  const errors = symbolDoc
+    ? []
+    : [
+        ...new Set(
+          symbol.errors.filter(
+            (error) => error.trim() && !error.startsWith('No documented errors are declared for ')
+          )
+        )
+      ]
   /** Shell labels for field flags and defaults. */
   const ui = interfaceCopyFor(locale)
   /** Literal members of an enum-like constant; empty for every other kind. */
@@ -1802,7 +2307,9 @@ function SingleApiReference({
   /** Each member with one sentence that identifies it and is not repeated on the page. */
   const values = constants.map((member) => ({
     ...member,
-    description: freshSentence(member.description, valueShown)
+    description: symbolDoc
+      ? reference?.enums[symbol.name]?.values[member.key]
+      : freshSentence(member.description, valueShown)
   }))
   /** The owning module supplies concrete next API choices without repeating every signature. */
   const relatedApis = api.symbols
@@ -1818,9 +2325,22 @@ function SingleApiReference({
       <ApiHero api={api} library={library} locale={locale} symbol={symbol} />
       {purpose ? (
         <section className="api-overview" id={`${symbol.fragment}--overview`}>
-          <p className="lede">
-            <InlineText library={library.slug} locale={locale} text={purpose} />
-          </p>
+          {symbolDoc ? (
+            <div className="lede">
+              <ReferenceParagraphs library={library.slug} locale={locale} text={purpose} />
+              {reference?.enums[symbol.name] ? (
+                <ReferenceParagraphs
+                  library={library.slug}
+                  locale={locale}
+                  text={reference.enums[symbol.name]!.summary}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <p className="lede">
+              <InlineText library={library.slug} locale={locale} text={purpose} />
+            </p>
+          )}
         </section>
       ) : null}
       {quickExample ? (
@@ -1831,6 +2351,60 @@ function SingleApiReference({
         >
           <h2>{locale === 'zh' ? '最小示例' : 'Minimal example'}</h2>
           <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
+        </section>
+      ) : null}
+      {symbolDoc && (Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns) ? (
+        <section className="section-block compact" id={`${symbol.fragment}--contract`}>
+          <h2>{locale === 'zh' ? '参数与返回' : 'Parameters and result'}</h2>
+          <dl className="option-meta class-member-meta">
+            {Object.keys(symbolDoc.params).length > 0 ? (
+              <div>
+                <dt>{locale === 'zh' ? '参数' : 'Parameters'}</dt>
+                <dd>
+                  <ul className="member-parameters">
+                    {(callableShape(symbol)?.parameters ?? [])
+                      .filter((parameter) => symbolDoc.params[parameter.name])
+                      .map((parameter) => (
+                        <li key={parameter.name}>
+                          <code>
+                            {parameter.name}
+                            {parameter.optional ? '?' : ''}
+                          </code>
+                          {': '}
+                          <TypeExpression
+                            api={api}
+                            libraryApis={libraryApis}
+                            locale={locale}
+                            value={parameter.type}
+                          />
+                          {' — '}
+                          <InlineText
+                            library={library.slug}
+                            locale={locale}
+                            text={symbolDoc.params[parameter.name]!}
+                          />
+                        </li>
+                      ))}
+                  </ul>
+                </dd>
+              </div>
+            ) : null}
+            {symbolDoc.returns ? (
+              <div>
+                <dt>{locale === 'zh' ? '返回' : 'Returns'}</dt>
+                <dd>
+                  <TypeExpression
+                    api={api}
+                    libraryApis={libraryApis}
+                    locale={locale}
+                    value={callableShape(symbol)?.returns ?? symbol.returns}
+                  />
+                  {' — '}
+                  <InlineText library={library.slug} locale={locale} text={symbolDoc.returns} />
+                </dd>
+              </div>
+            ) : null}
+          </dl>
         </section>
       ) : null}
       {values.length ? (
@@ -1925,18 +2499,44 @@ function SingleApiReference({
                         data-empty={field.defaultValue ? undefined : 'true'}
                         data-label={ui.defaultLabel}
                       >
-                        {field.defaultValue ? <code>{field.defaultValue}</code> : '—'}
+                        {field.defaultText ? (
+                          <InlineText
+                            library={library.slug}
+                            locale={locale}
+                            text={field.defaultText}
+                          />
+                        ) : field.defaultValue ? (
+                          <code>{field.defaultValue}</code>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                     ) : null}
                     <td className="option-behavior">
                       {field.description ? (
-                        <p>
-                          <InlineText
+                        symbolDoc ? (
+                          <ReferenceParagraphs
                             library={library.slug}
                             locale={locale}
                             text={field.description}
                           />
-                        </p>
+                        ) : (
+                          <p>
+                            <InlineText
+                              library={library.slug}
+                              locale={locale}
+                              text={field.description}
+                            />
+                          </p>
+                        )
+                      ) : null}
+                      {field.values.length > 0 ? (
+                        <ValueList
+                          library={library.slug}
+                          locale={locale}
+                          symbols={api.symbols}
+                          values={field.values}
+                        />
                       ) : null}
                       {field.example ? (
                         <CodeBlock code={field.example} label={field.name} locale={locale} />
@@ -1949,6 +2549,53 @@ function SingleApiReference({
           </div>
         </section>
       ) : null}
+      {reference?.enhancers[symbol.name] ? (
+        <InstalledCapabilities
+          api={api}
+          guide={reference.enhancers[symbol.name]!}
+          libraryApis={libraryApis}
+          locale={locale}
+          symbol={symbol}
+        />
+      ) : null}
+      {ownSurface ? (
+        <ClassMemberReference
+          api={api}
+          bases={ownSurface.bases}
+          libraryApis={libraryApis}
+          locale={locale}
+          guide={instanceGuideFor(reference, api.module, symbol.name)}
+          memberDoc={memberDocResolver(reference, api.module, [symbol.name, ...ownSurface.owners])}
+          members={ownSurface.members}
+          strict={Boolean(reference)}
+          symbol={symbol}
+        />
+      ) : null}
+      {instances.map(({ type, surface }, index) => (
+        <ClassMemberReference
+          api={api}
+          bases={surface.bases}
+          heading={
+            <>
+              {locale === 'zh' ? '返回的实例：' : 'Returned instance: '}
+              <Link
+                to={docsModulePath(locale, api.library, api.module, symbolSlug(type, api.symbols))}
+              >
+                <code>{type.name}</code>
+              </Link>
+            </>
+          }
+          id={`${symbol.fragment}--instance${index === 0 ? '' : `-${index + 1}`}`}
+          key={type.name}
+          libraryApis={libraryApis}
+          locale={locale}
+          guide={surfaceGuideFor(reference, api.module, type, api.symbols)}
+          memberDoc={memberDocResolver(reference, api.module, surface.owners)}
+          members={surface.members}
+          strict={Boolean(reference)}
+          symbol={symbol}
+        />
+      ))}
       {errors.length ? (
         <section className="section-block compact" id={`${symbol.fragment}--errors`}>
           <h2>{locale === 'zh' ? '错误' : 'Errors'}</h2>
@@ -1959,6 +2606,32 @@ function SingleApiReference({
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+      {symbolDoc && (symbolDoc.scenarios.length > 0 || symbolDoc.avoid.length > 0) ? (
+        <section className="section-block compact" id={`${symbol.fragment}--scenarios`}>
+          <h2>{locale === 'zh' ? '适用场景' : 'When to use'}</h2>
+          {symbolDoc.scenarios.length > 0 ? (
+            <ul>
+              {symbolDoc.scenarios.map((scenario) => (
+                <li key={scenario}>
+                  <InlineText library={library.slug} locale={locale} text={scenario} />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {symbolDoc.avoid.length > 0 ? (
+            <>
+              <h3>{locale === 'zh' ? '不适用' : 'Avoid when'}</h3>
+              <ul>
+                {symbolDoc.avoid.map((item) => (
+                  <li key={item}>
+                    <InlineText library={library.slug} locale={locale} text={item} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </section>
       ) : null}
       <section className="section-block compact" id={`${symbol.fragment}--related-apis`}>
@@ -1988,13 +2661,6 @@ function SingleApiReference({
         <details>
           <summary>{locale === 'zh' ? '公开类型签名' : 'Public type signature'}</summary>
           <CodeBlock code={symbol.signature} signature label={symbol.name} locale={locale} />
-          <ClassMemberReference
-            api={api}
-            libraryApis={libraryApis}
-            locale={locale}
-            members={symbol.members}
-            symbol={symbol}
-          />
           <RelatedTypes api={api} locale={locale} symbols={relatedTypes} />
         </details>
       </section>
@@ -2090,6 +2756,82 @@ function collectRelatedTypes(
         pending.push(dependency)
   }
   return related
+}
+
+/** Reads a runtime symbol's reference doc by module-qualified key first. */
+function symbolDocFor(
+  reference: ILocalizedReference | undefined,
+  module: string,
+  name: string
+): ILocalizedSymbolDoc | undefined {
+  return reference?.symbols[`${module}:${name}`] ?? reference?.symbols[name]
+}
+
+/** Builds a member-doc lookup that searches the surface's declarations in order. */
+function memberDocResolver(
+  reference: ILocalizedReference | undefined,
+  module: string,
+  owners: readonly string[]
+): ((name: string) => ILocalizedMemberDoc | undefined) | undefined {
+  if (!reference) return undefined
+  return (name) => {
+    for (const owner of owners) {
+      const doc = instanceGuideFor(reference, module, owner)?.members[name]
+      if (doc) return doc
+    }
+    return undefined
+  }
+}
+
+/** Reads an instance guide by its module-qualified key first, then by bare type name. */
+function instanceGuideFor(
+  guides: ILocalizedReference | undefined,
+  module: string,
+  name: string
+): ILocalizedTypeDoc | undefined {
+  return guides?.types[`${module}:${name}`] ?? guides?.types[name]
+}
+
+/**
+ * Reads the guide of an instance type, falling back to the nearest composed type that has one, so a
+ * styled or branded alias (`IStyledEventChannel` → `IEventChannel`) shares its base guide.
+ */
+function surfaceGuideFor(
+  guides: ILocalizedReference | undefined,
+  module: string,
+  type: IApiSymbol,
+  symbols: readonly IApiSymbol[]
+): ILocalizedTypeDoc | undefined {
+  /** Types already inspected; guards recursive compositions. */
+  const seen = new Set<string>()
+  /** Breadth-first queue of type names, starting with the instance type itself. */
+  const queue = [type.name]
+  while (queue.length > 0) {
+    const name = queue.shift()!
+    if (seen.has(name)) continue
+    seen.add(name)
+    const guide = instanceGuideFor(guides, module, name)
+    if (guide) return guide
+    queue.push(...(symbols.find((candidate) => candidate.name === name)?.composes ?? []))
+  }
+  return undefined
+}
+
+/**
+ * Resolves the instance surface an authored guide assigns to a non-class entry (a constructor
+ * constant typed by a static constructor interface), or `undefined` when the guide names none.
+ */
+function aliasedInstanceSurface(
+  symbol: IApiSymbol,
+  symbols: readonly IApiSymbol[],
+  guides: ILocalizedReference | undefined
+): IInstanceSurface | undefined {
+  /** Declared type named by the guide as this entry's instance surface. */
+  const surfaceName = symbol.kind === 'class' ? undefined : guides?.types[symbol.name]?.surface
+  const declaration = surfaceName
+    ? symbols.find((candidate) => candidate.name === surfaceName)
+    : undefined
+  return declaration ? instanceSurface(declaration, symbols) : undefined
 }
 
 /** Groups runtime entries by their canonical implementation concern. */
@@ -3416,7 +4158,12 @@ function CodeBlock({
       data-comment-count={explain ? commentary.notes.length : undefined}
       data-output={isOutput ? 'true' : undefined}
     >
-      <figure className="code-frame">
+      <figure
+        className="code-frame"
+        data-code-kind={
+          signature || commentaryContext?.kind === 'signature' ? 'signature' : 'example'
+        }
+      >
         <figcaption className="code-toolbar">
           <span className="code-language">
             {isOutput
@@ -3715,6 +4462,11 @@ function referenceSectionLabel(locale: ILocale, section: string): string {
     configuration: ['Configuration', '配置参考'],
     errors: ['Errors', '错误'],
     'related-apis': ['Related APIs', '相关 API'],
+    members: ['Instance API', '实例 API'],
+    installed: ['After installation', '安装后能力'],
+    contract: ['Parameters and result', '参数与返回'],
+    scenarios: ['When to use', '适用场景'],
+    instance: ['Returned instance', '返回的实例'],
     signature: ['Type signature', '类型签名'],
     'core-usage': ['Contract', '参数、返回与边界']
   }

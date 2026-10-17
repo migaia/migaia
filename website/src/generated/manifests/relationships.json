@@ -86432,6 +86432,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/serialize/api#ISerializeErrorCode",
+      "to": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/en/docs/serialize/api#ISerializeErrorCode",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/serialize/api#ISerializeLifecycleError",
       "to": "/en/docs/serialize/api/core#serialize-core--ISerializeLifecycleError",
       "type": "symbol-alias"
@@ -86609,6 +86619,16 @@
     {
       "from": "/en/docs/serialize/api/core#serialize-core--SerializeCodecError",
       "to": "/en/docs/serialize/api#SerializeCodecError",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api#SerializeErrorCode",
+      "to": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/en/docs/serialize/api#SerializeErrorCode",
       "type": "alias-symbol"
     },
     {
@@ -87372,6 +87392,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/zh/docs/serialize/api#ISerializeErrorCode",
+      "to": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/zh/docs/serialize/api#ISerializeErrorCode",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/zh/docs/serialize/api#ISerializeLifecycleError",
       "to": "/zh/docs/serialize/api/core#serialize-core--ISerializeLifecycleError",
       "type": "symbol-alias"
@@ -87549,6 +87579,16 @@
     {
       "from": "/zh/docs/serialize/api/core#serialize-core--SerializeCodecError",
       "to": "/zh/docs/serialize/api#SerializeCodecError",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api#SerializeErrorCode",
+      "to": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/zh/docs/serialize/api#SerializeErrorCode",
       "type": "alias-symbol"
     },
     {
@@ -89783,6 +89823,36 @@
     },
     {
       "from": "/en/docs/serialize/api/core",
+      "to": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/en/docs/serialize/api/core",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/en/docs/serialize/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/serialize/getting-started",
+      "to": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/en/docs/serialize",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/serialize",
+      "to": "/en/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api/core",
       "to": "/en/docs/serialize/api/core#serialize-core--ISerializeLifecycleError",
       "type": "api-symbol"
     },
@@ -90199,6 +90269,36 @@
     {
       "from": "/en/docs/serialize",
       "to": "/en/docs/serialize/api/core#serialize-core--SerializeCodecError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api/core",
+      "to": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/en/docs/serialize/api/core",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/en/docs/serialize/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/serialize/getting-started",
+      "to": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/en/docs/serialize",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/serialize",
+      "to": "/en/docs/serialize/api/core#serialize-core--SerializeErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -90793,6 +90893,36 @@
     },
     {
       "from": "/zh/docs/serialize/api/core",
+      "to": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/zh/docs/serialize/api/core",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/zh/docs/serialize/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/serialize/getting-started",
+      "to": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "to": "/zh/docs/serialize",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/serialize",
+      "to": "/zh/docs/serialize/api/core#serialize-core--ISerializeErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core",
       "to": "/zh/docs/serialize/api/core#serialize-core--ISerializeLifecycleError",
       "type": "api-symbol"
     },
@@ -91209,6 +91339,36 @@
     {
       "from": "/zh/docs/serialize",
       "to": "/zh/docs/serialize/api/core#serialize-core--SerializeCodecError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core",
+      "to": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/zh/docs/serialize/api/core",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/zh/docs/serialize/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/serialize/getting-started",
+      "to": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
+      "to": "/zh/docs/serialize",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/serialize",
+      "to": "/zh/docs/serialize/api/core#serialize-core--SerializeErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -93033,6 +93193,36 @@
     },
     {
       "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
       "to": "/en/docs/storage-contract/api#storage-contract-index--isChangeFeedStore",
       "type": "api-symbol"
     },
@@ -93363,6 +93553,36 @@
     },
     {
       "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
       "to": "/en/docs/storage-contract/api#storage-contract-index--IStorageContractErrorDetails",
       "type": "api-symbol"
     },
@@ -93419,6 +93639,36 @@
     {
       "from": "/en/docs/storage-contract",
       "to": "/en/docs/storage-contract/api#storage-contract-index--IStorageKey",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--isUint8Array",
       "type": "architecture-symbol"
     },
     {
@@ -93989,6 +94239,36 @@
     {
       "from": "/en/docs/storage-contract",
       "to": "/en/docs/storage-contract/api#storage-contract-index--StorageContractError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -94943,6 +95223,36 @@
     },
     {
       "from": "/zh/docs/storage-contract/api",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "to": "/zh/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--isArrayBuffer",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api",
       "to": "/zh/docs/storage-contract/api#storage-contract-index--isChangeFeedStore",
       "type": "api-symbol"
     },
@@ -95273,6 +95583,36 @@
     },
     {
       "from": "/zh/docs/storage-contract/api",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "to": "/zh/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api",
       "to": "/zh/docs/storage-contract/api#storage-contract-index--IStorageContractErrorDetails",
       "type": "api-symbol"
     },
@@ -95329,6 +95669,36 @@
     {
       "from": "/zh/docs/storage-contract",
       "to": "/zh/docs/storage-contract/api#storage-contract-index--IStorageKey",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "to": "/zh/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--isUint8Array",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--isUint8Array",
       "type": "architecture-symbol"
     },
     {
@@ -95899,6 +96269,36 @@
     {
       "from": "/zh/docs/storage-contract",
       "to": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "to": "/zh/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--StorageContractErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -96013,6 +96413,36 @@
     },
     {
       "from": "/en/docs/storage-web/api",
+      "to": "/en/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "to": "/en/docs/storage-web/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "to": "/en/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-web/getting-started",
+      "to": "/en/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "to": "/en/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-web",
+      "to": "/en/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api",
       "to": "/en/docs/storage-web/api#storage-web-index--IStorageErrorDetails",
       "type": "api-symbol"
     },
@@ -96129,6 +96559,36 @@
     {
       "from": "/en/docs/storage-web",
       "to": "/en/docs/storage-web/api#storage-web-index--StorageError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api",
+      "to": "/en/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "to": "/en/docs/storage-web/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "to": "/en/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-web/getting-started",
+      "to": "/en/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "to": "/en/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-web",
+      "to": "/en/docs/storage-web/api#storage-web-index--StorageErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -96273,6 +96733,36 @@
     },
     {
       "from": "/zh/docs/storage-web/api",
+      "to": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "to": "/zh/docs/storage-web/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "to": "/zh/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-web/getting-started",
+      "to": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "to": "/zh/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-web",
+      "to": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api",
       "to": "/zh/docs/storage-web/api#storage-web-index--IStorageErrorDetails",
       "type": "api-symbol"
     },
@@ -96389,6 +96879,36 @@
     {
       "from": "/zh/docs/storage-web",
       "to": "/zh/docs/storage-web/api#storage-web-index--StorageError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api",
+      "to": "/zh/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "to": "/zh/docs/storage-web/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "to": "/zh/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-web/getting-started",
+      "to": "/zh/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api#storage-web-index--StorageErrorCode",
+      "to": "/zh/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-web",
+      "to": "/zh/docs/storage-web/api#storage-web-index--StorageErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -102173,6 +102693,66 @@
     },
     {
       "from": "/en/docs/storage-web/api/serialize",
+      "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "to": "/en/docs/storage-web/api/serialize",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "to": "/en/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-web/getting-started",
+      "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "to": "/en/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-web",
+      "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize",
+      "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "to": "/en/docs/storage-web/api/serialize",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "to": "/en/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-web/getting-started",
+      "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "to": "/en/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-web",
+      "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-web/api/serialize",
       "to": "/en/docs/storage-web/api/serialize#storage-web-serialize--ISelectedCodec",
       "type": "api-symbol"
     },
@@ -102339,6 +102919,66 @@
     {
       "from": "/zh/docs/storage-web",
       "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--binaryCodec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize",
+      "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "to": "/zh/docs/storage-web/api/serialize",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "to": "/zh/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-web/getting-started",
+      "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "to": "/zh/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-web",
+      "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize",
+      "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "to": "/zh/docs/storage-web/api/serialize",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "to": "/zh/docs/storage-web/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-web/getting-started",
+      "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
+      "to": "/zh/docs/storage-web",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-web",
+      "to": "/zh/docs/storage-web/api/serialize#storage-web-serialize--ICodecOutput",
       "type": "architecture-symbol"
     },
     {
@@ -102943,6 +103583,36 @@
     },
     {
       "from": "/en/docs/store-devtools/api",
+      "to": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "to": "/en/docs/store-devtools/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "to": "/en/docs/store-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-devtools/getting-started",
+      "to": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "to": "/en/docs/store-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-devtools",
+      "to": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-devtools/api",
       "to": "/en/docs/store-devtools/api#store-devtools-index--IStoreDevToolsOptions",
       "type": "api-symbol"
     },
@@ -103059,6 +103729,36 @@
     {
       "from": "/en/docs/store-devtools",
       "to": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsCommand",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-devtools/api",
+      "to": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "to": "/en/docs/store-devtools/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "to": "/en/docs/store-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-devtools/getting-started",
+      "to": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "to": "/en/docs/store-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-devtools",
+      "to": "/en/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -103383,6 +104083,36 @@
     },
     {
       "from": "/zh/docs/store-devtools/api",
+      "to": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "to": "/zh/docs/store-devtools/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "to": "/zh/docs/store-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-devtools/getting-started",
+      "to": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "to": "/zh/docs/store-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-devtools",
+      "to": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevtoolsErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api",
       "to": "/zh/docs/store-devtools/api#store-devtools-index--IStoreDevToolsOptions",
       "type": "api-symbol"
     },
@@ -103499,6 +104229,36 @@
     {
       "from": "/zh/docs/store-devtools",
       "to": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsCommand",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api",
+      "to": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "to": "/zh/docs/store-devtools/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "to": "/zh/docs/store-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-devtools/getting-started",
+      "to": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
+      "to": "/zh/docs/store-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-devtools",
+      "to": "/zh/docs/store-devtools/api#store-devtools-index--StoreDevtoolsErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -103703,6 +104463,36 @@
     },
     {
       "from": "/en/docs/store-indexed/api",
+      "to": "/en/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "to": "/en/docs/store-indexed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "to": "/en/docs/store-indexed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-indexed/getting-started",
+      "to": "/en/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "to": "/en/docs/store-indexed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-indexed",
+      "to": "/en/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-indexed/api",
       "to": "/en/docs/store-indexed/api#store-indexed-index--observableArray-function",
       "type": "api-symbol"
     },
@@ -103969,6 +104759,36 @@
     {
       "from": "/en/docs/store-indexed",
       "to": "/en/docs/store-indexed/api#store-indexed-index--STORE_INDEXED_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-indexed/api",
+      "to": "/en/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "to": "/en/docs/store-indexed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "to": "/en/docs/store-indexed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-indexed/getting-started",
+      "to": "/en/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "to": "/en/docs/store-indexed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-indexed",
+      "to": "/en/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -104173,6 +104993,36 @@
     },
     {
       "from": "/zh/docs/store-indexed/api",
+      "to": "/zh/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "to": "/zh/docs/store-indexed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "to": "/zh/docs/store-indexed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-indexed/getting-started",
+      "to": "/zh/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "to": "/zh/docs/store-indexed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-indexed",
+      "to": "/zh/docs/store-indexed/api#store-indexed-index--IStoreIndexedErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api",
       "to": "/zh/docs/store-indexed/api#store-indexed-index--observableArray-function",
       "type": "api-symbol"
     },
@@ -104439,6 +105289,36 @@
     {
       "from": "/zh/docs/store-indexed",
       "to": "/zh/docs/store-indexed/api#store-indexed-index--STORE_INDEXED_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api",
+      "to": "/zh/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "to": "/zh/docs/store-indexed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "to": "/zh/docs/store-indexed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-indexed/getting-started",
+      "to": "/zh/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
+      "to": "/zh/docs/store-indexed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-indexed",
+      "to": "/zh/docs/store-indexed/api#store-indexed-index--StoreIndexedErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -105033,6 +105913,36 @@
     },
     {
       "from": "/en/docs/store-keyed/api",
+      "to": "/en/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "to": "/en/docs/store-keyed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "to": "/en/docs/store-keyed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-keyed/getting-started",
+      "to": "/en/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "to": "/en/docs/store-keyed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-keyed",
+      "to": "/en/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-keyed/api",
       "to": "/en/docs/store-keyed/api#store-keyed-index--KeyedSplitCache",
       "type": "api-symbol"
     },
@@ -105329,6 +106239,36 @@
     {
       "from": "/en/docs/store-keyed",
       "to": "/en/docs/store-keyed/api#store-keyed-index--STORE_KEYED_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-keyed/api",
+      "to": "/en/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "to": "/en/docs/store-keyed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "to": "/en/docs/store-keyed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-keyed/getting-started",
+      "to": "/en/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "to": "/en/docs/store-keyed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-keyed",
+      "to": "/en/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -106163,6 +107103,36 @@
     },
     {
       "from": "/zh/docs/store-keyed/api",
+      "to": "/zh/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "to": "/zh/docs/store-keyed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "to": "/zh/docs/store-keyed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-keyed/getting-started",
+      "to": "/zh/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "to": "/zh/docs/store-keyed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-keyed",
+      "to": "/zh/docs/store-keyed/api#store-keyed-index--IStoreKeyedErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api",
       "to": "/zh/docs/store-keyed/api#store-keyed-index--KeyedSplitCache",
       "type": "api-symbol"
     },
@@ -106459,6 +107429,36 @@
     {
       "from": "/zh/docs/store-keyed",
       "to": "/zh/docs/store-keyed/api#store-keyed-index--STORE_KEYED_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api",
+      "to": "/zh/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "to": "/zh/docs/store-keyed/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "to": "/zh/docs/store-keyed/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-keyed/getting-started",
+      "to": "/zh/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
+      "to": "/zh/docs/store-keyed",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-keyed",
+      "to": "/zh/docs/store-keyed/api#store-keyed-index--StoreKeyedErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -109423,6 +110423,36 @@
     },
     {
       "from": "/en/docs/store-light/api",
+      "to": "/en/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "to": "/en/docs/store-light/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "to": "/en/docs/store-light/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-light/getting-started",
+      "to": "/en/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "to": "/en/docs/store-light",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-light",
+      "to": "/en/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-light/api",
       "to": "/en/docs/store-light/api#store-light-index--IStoreResource",
       "type": "api-symbol"
     },
@@ -109869,6 +110899,36 @@
     {
       "from": "/en/docs/store-light",
       "to": "/en/docs/store-light/api#store-light-index--StoreFieldMode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-light/api",
+      "to": "/en/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "to": "/en/docs/store-light/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "to": "/en/docs/store-light/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-light/getting-started",
+      "to": "/en/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "to": "/en/docs/store-light",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-light",
+      "to": "/en/docs/store-light/api#store-light-index--StoreLightErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -110733,6 +111793,36 @@
     },
     {
       "from": "/zh/docs/store-light/api",
+      "to": "/zh/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "to": "/zh/docs/store-light/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "to": "/zh/docs/store-light/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-light/getting-started",
+      "to": "/zh/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "to": "/zh/docs/store-light",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-light",
+      "to": "/zh/docs/store-light/api#store-light-index--IStoreLightErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-light/api",
       "to": "/zh/docs/store-light/api#store-light-index--IStoreResource",
       "type": "api-symbol"
     },
@@ -111179,6 +112269,36 @@
     {
       "from": "/zh/docs/store-light",
       "to": "/zh/docs/store-light/api#store-light-index--StoreFieldMode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-light/api",
+      "to": "/zh/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "to": "/zh/docs/store-light/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "to": "/zh/docs/store-light/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-light/getting-started",
+      "to": "/zh/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-light/api#store-light-index--StoreLightErrorCode",
+      "to": "/zh/docs/store-light",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-light",
+      "to": "/zh/docs/store-light/api#store-light-index--StoreLightErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -111743,6 +112863,66 @@
     },
     {
       "from": "/en/docs/store-middleware/api",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "to": "/en/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "to": "/en/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-middleware/getting-started",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "to": "/en/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-middleware",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "to": "/en/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "to": "/en/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-middleware/getting-started",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "to": "/en/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-middleware",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api",
       "to": "/en/docs/store-middleware/api#store-middleware-index--IMutationPolicyMode",
       "type": "api-symbol"
     },
@@ -111949,6 +113129,36 @@
     {
       "from": "/en/docs/store-middleware",
       "to": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareCore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "to": "/en/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "to": "/en/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-middleware/getting-started",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "to": "/en/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-middleware",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -112249,6 +113459,36 @@
     {
       "from": "/en/docs/store-middleware",
       "to": "/en/docs/store-middleware/api#store-middleware-index--STORE_MIDDLEWARE_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "to": "/en/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "to": "/en/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-middleware/getting-started",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "to": "/en/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-middleware",
+      "to": "/en/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -112813,6 +114053,66 @@
     },
     {
       "from": "/zh/docs/store-middleware/api",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "to": "/zh/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "to": "/zh/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-middleware/getting-started",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "to": "/zh/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-middleware",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationGuard",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "to": "/zh/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "to": "/zh/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-middleware/getting-started",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "to": "/zh/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-middleware",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicy",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api",
       "to": "/zh/docs/store-middleware/api#store-middleware-index--IMutationPolicyMode",
       "type": "api-symbol"
     },
@@ -113019,6 +114319,36 @@
     {
       "from": "/zh/docs/store-middleware",
       "to": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareCore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "to": "/zh/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "to": "/zh/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-middleware/getting-started",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
+      "to": "/zh/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-middleware",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--IStoreMiddlewareErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -113319,6 +114649,36 @@
     {
       "from": "/zh/docs/store-middleware",
       "to": "/zh/docs/store-middleware/api#store-middleware-index--STORE_MIDDLEWARE_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "to": "/zh/docs/store-middleware/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "to": "/zh/docs/store-middleware/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-middleware/getting-started",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
+      "to": "/zh/docs/store-middleware",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-middleware",
+      "to": "/zh/docs/store-middleware/api#store-middleware-index--StoreMiddlewareErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -114253,6 +115613,36 @@
     },
     {
       "from": "/en/docs/store-persist/api",
+      "to": "/en/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "to": "/en/docs/store-persist/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "to": "/en/docs/store-persist/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-persist/getting-started",
+      "to": "/en/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "to": "/en/docs/store-persist",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-persist",
+      "to": "/en/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-persist/api",
       "to": "/en/docs/store-persist/api#store-persist-index--IWriteStatus",
       "type": "api-symbol"
     },
@@ -114489,6 +115879,36 @@
     {
       "from": "/en/docs/store-persist",
       "to": "/en/docs/store-persist/api#store-persist-index--STORE_PERSIST_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-persist/api",
+      "to": "/en/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "to": "/en/docs/store-persist/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "to": "/en/docs/store-persist/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-persist/getting-started",
+      "to": "/en/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "to": "/en/docs/store-persist",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-persist",
+      "to": "/en/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -114993,6 +116413,36 @@
     },
     {
       "from": "/zh/docs/store-persist/api",
+      "to": "/zh/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "to": "/zh/docs/store-persist/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "to": "/zh/docs/store-persist/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-persist/getting-started",
+      "to": "/zh/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "to": "/zh/docs/store-persist",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-persist",
+      "to": "/zh/docs/store-persist/api#store-persist-index--IStorePersistErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-persist/api",
       "to": "/zh/docs/store-persist/api#store-persist-index--IWriteStatus",
       "type": "api-symbol"
     },
@@ -115229,6 +116679,36 @@
     {
       "from": "/zh/docs/store-persist",
       "to": "/zh/docs/store-persist/api#store-persist-index--STORE_PERSIST_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-persist/api",
+      "to": "/zh/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "to": "/zh/docs/store-persist/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "to": "/zh/docs/store-persist/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-persist/getting-started",
+      "to": "/zh/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
+      "to": "/zh/docs/store-persist",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-persist",
+      "to": "/zh/docs/store-persist/api#store-persist-index--StorePersistErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -116423,6 +117903,36 @@
     },
     {
       "from": "/en/docs/store-react/api",
+      "to": "/en/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "to": "/en/docs/store-react/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "to": "/en/docs/store-react/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-react/getting-started",
+      "to": "/en/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "to": "/en/docs/store-react",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-react",
+      "to": "/en/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-react/api",
       "to": "/en/docs/store-react/api#store-react-index--IStoreReadyBarrier",
       "type": "api-symbol"
     },
@@ -116659,6 +118169,36 @@
     {
       "from": "/en/docs/store-react",
       "to": "/en/docs/store-react/api#store-react-index--StoreProviderState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-react/api",
+      "to": "/en/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "to": "/en/docs/store-react/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "to": "/en/docs/store-react/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-react/getting-started",
+      "to": "/en/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "to": "/en/docs/store-react",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-react",
+      "to": "/en/docs/store-react/api#store-react-index--StoreReactErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -117733,6 +119273,36 @@
     },
     {
       "from": "/zh/docs/store-react/api",
+      "to": "/zh/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "to": "/zh/docs/store-react/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "to": "/zh/docs/store-react/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-react/getting-started",
+      "to": "/zh/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "to": "/zh/docs/store-react",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-react",
+      "to": "/zh/docs/store-react/api#store-react-index--IStoreReactErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-react/api",
       "to": "/zh/docs/store-react/api#store-react-index--IStoreReadyBarrier",
       "type": "api-symbol"
     },
@@ -117969,6 +119539,36 @@
     {
       "from": "/zh/docs/store-react",
       "to": "/zh/docs/store-react/api#store-react-index--StoreProviderState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-react/api",
+      "to": "/zh/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "to": "/zh/docs/store-react/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "to": "/zh/docs/store-react/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-react/getting-started",
+      "to": "/zh/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-react/api#store-react-index--StoreReactErrorCode",
+      "to": "/zh/docs/store-react",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-react",
+      "to": "/zh/docs/store-react/api#store-react-index--StoreReactErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -118713,6 +120313,36 @@
     },
     {
       "from": "/en/docs/store-shared/api",
+      "to": "/en/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "to": "/en/docs/store-shared/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "to": "/en/docs/store-shared/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-shared/getting-started",
+      "to": "/en/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "to": "/en/docs/store-shared",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-shared",
+      "to": "/en/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-shared/api",
       "to": "/en/docs/store-shared/api#store-shared-index--sharedInt32",
       "type": "api-symbol"
     },
@@ -118889,6 +120519,36 @@
     {
       "from": "/en/docs/store-shared",
       "to": "/en/docs/store-shared/api#store-shared-index--STORE_SHARED_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-shared/api",
+      "to": "/en/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "to": "/en/docs/store-shared/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "to": "/en/docs/store-shared/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-shared/getting-started",
+      "to": "/en/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "to": "/en/docs/store-shared",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-shared",
+      "to": "/en/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -119003,6 +120663,36 @@
     },
     {
       "from": "/zh/docs/store-shared/api",
+      "to": "/zh/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "to": "/zh/docs/store-shared/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "to": "/zh/docs/store-shared/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-shared/getting-started",
+      "to": "/zh/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "to": "/zh/docs/store-shared",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-shared",
+      "to": "/zh/docs/store-shared/api#store-shared-index--IStoreSharedErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-shared/api",
       "to": "/zh/docs/store-shared/api#store-shared-index--sharedInt32",
       "type": "api-symbol"
     },
@@ -119179,6 +120869,36 @@
     {
       "from": "/zh/docs/store-shared",
       "to": "/zh/docs/store-shared/api#store-shared-index--STORE_SHARED_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-shared/api",
+      "to": "/zh/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "to": "/zh/docs/store-shared/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "to": "/zh/docs/store-shared/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-shared/getting-started",
+      "to": "/zh/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
+      "to": "/zh/docs/store-shared",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-shared",
+      "to": "/zh/docs/store-shared/api#store-shared-index--StoreSharedErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -119923,6 +121643,36 @@
     },
     {
       "from": "/en/docs/store-ssr/api",
+      "to": "/en/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "to": "/en/docs/store-ssr/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "to": "/en/docs/store-ssr/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-ssr/getting-started",
+      "to": "/en/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "to": "/en/docs/store-ssr",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-ssr",
+      "to": "/en/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-ssr/api",
       "to": "/en/docs/store-ssr/api#store-ssr-index--ITrustedSSRState",
       "type": "api-symbol"
     },
@@ -120189,6 +121939,36 @@
     {
       "from": "/en/docs/store-ssr",
       "to": "/en/docs/store-ssr/api#store-ssr-index--STORE_SSR_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-ssr/api",
+      "to": "/en/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "to": "/en/docs/store-ssr/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "to": "/en/docs/store-ssr/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-ssr/getting-started",
+      "to": "/en/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "to": "/en/docs/store-ssr",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-ssr",
+      "to": "/en/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -120933,6 +122713,36 @@
     },
     {
       "from": "/zh/docs/store-ssr/api",
+      "to": "/zh/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "to": "/zh/docs/store-ssr/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "to": "/zh/docs/store-ssr/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-ssr/getting-started",
+      "to": "/zh/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "to": "/zh/docs/store-ssr",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-ssr",
+      "to": "/zh/docs/store-ssr/api#store-ssr-index--IStoreSsrErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api",
       "to": "/zh/docs/store-ssr/api#store-ssr-index--ITrustedSSRState",
       "type": "api-symbol"
     },
@@ -121199,6 +123009,36 @@
     {
       "from": "/zh/docs/store-ssr",
       "to": "/zh/docs/store-ssr/api#store-ssr-index--STORE_SSR_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api",
+      "to": "/zh/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "to": "/zh/docs/store-ssr/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "to": "/zh/docs/store-ssr/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-ssr/getting-started",
+      "to": "/zh/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
+      "to": "/zh/docs/store-ssr",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-ssr",
+      "to": "/zh/docs/store-ssr/api#store-ssr-index--StoreSsrErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -121433,6 +123273,36 @@
     },
     {
       "from": "/en/docs/store-wasm/api",
+      "to": "/en/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "to": "/en/docs/store-wasm/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "to": "/en/docs/store-wasm/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-wasm/getting-started",
+      "to": "/en/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "to": "/en/docs/store-wasm",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-wasm",
+      "to": "/en/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-wasm/api",
       "to": "/en/docs/store-wasm/api#store-wasm-index--IWasmFieldMode",
       "type": "api-symbol"
     },
@@ -121579,6 +123449,36 @@
     {
       "from": "/en/docs/store-wasm",
       "to": "/en/docs/store-wasm/api#store-wasm-index--STORE_WASM_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-wasm/api",
+      "to": "/en/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "to": "/en/docs/store-wasm/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "to": "/en/docs/store-wasm/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-wasm/getting-started",
+      "to": "/en/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "to": "/en/docs/store-wasm",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-wasm",
+      "to": "/en/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -121903,6 +123803,36 @@
     },
     {
       "from": "/zh/docs/store-wasm/api",
+      "to": "/zh/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "to": "/zh/docs/store-wasm/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "to": "/zh/docs/store-wasm/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-wasm/getting-started",
+      "to": "/zh/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "to": "/zh/docs/store-wasm",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-wasm",
+      "to": "/zh/docs/store-wasm/api#store-wasm-index--IStoreWasmErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api",
       "to": "/zh/docs/store-wasm/api#store-wasm-index--IWasmFieldMode",
       "type": "api-symbol"
     },
@@ -122049,6 +123979,36 @@
     {
       "from": "/zh/docs/store-wasm",
       "to": "/zh/docs/store-wasm/api#store-wasm-index--STORE_WASM_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api",
+      "to": "/zh/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "to": "/zh/docs/store-wasm/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "to": "/zh/docs/store-wasm/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-wasm/getting-started",
+      "to": "/zh/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
+      "to": "/zh/docs/store-wasm",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-wasm",
+      "to": "/zh/docs/store-wasm/api#store-wasm-index--StoreWasmErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -122313,6 +124273,36 @@
     },
     {
       "from": "/en/docs/store-worker/api",
+      "to": "/en/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "to": "/en/docs/store-worker/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "to": "/en/docs/store-worker/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-worker/getting-started",
+      "to": "/en/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "to": "/en/docs/store-worker",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-worker",
+      "to": "/en/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-worker/api",
       "to": "/en/docs/store-worker/api#store-worker-index--IWorkerComputedOptions",
       "type": "api-symbol"
     },
@@ -122429,6 +124419,36 @@
     {
       "from": "/en/docs/store-worker",
       "to": "/en/docs/store-worker/api#store-worker-index--STORE_WORKER_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/store-worker/api",
+      "to": "/en/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "to": "/en/docs/store-worker/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "to": "/en/docs/store-worker/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/store-worker/getting-started",
+      "to": "/en/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "to": "/en/docs/store-worker",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/store-worker",
+      "to": "/en/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -122753,6 +124773,36 @@
     },
     {
       "from": "/zh/docs/store-worker/api",
+      "to": "/zh/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "to": "/zh/docs/store-worker/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "to": "/zh/docs/store-worker/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-worker/getting-started",
+      "to": "/zh/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "to": "/zh/docs/store-worker",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-worker",
+      "to": "/zh/docs/store-worker/api#store-worker-index--IStoreWorkerErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-worker/api",
       "to": "/zh/docs/store-worker/api#store-worker-index--IWorkerComputedOptions",
       "type": "api-symbol"
     },
@@ -122869,6 +124919,36 @@
     {
       "from": "/zh/docs/store-worker",
       "to": "/zh/docs/store-worker/api#store-worker-index--STORE_WORKER_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/store-worker/api",
+      "to": "/zh/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "to": "/zh/docs/store-worker/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "to": "/zh/docs/store-worker/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/store-worker/getting-started",
+      "to": "/zh/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
+      "to": "/zh/docs/store-worker",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/store-worker",
+      "to": "/zh/docs/store-worker/api#store-worker-index--StoreWorkerErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -129873,6 +131953,36 @@
     },
     {
       "from": "/en/docs/tray/api",
+      "to": "/en/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "to": "/en/docs/tray/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "to": "/en/docs/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/tray/getting-started",
+      "to": "/en/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "to": "/en/docs/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/tray",
+      "to": "/en/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api",
       "to": "/en/docs/tray/api#tray-index--ITray",
       "type": "api-symbol"
     },
@@ -131359,6 +133469,36 @@
     {
       "from": "/zh/docs/tray",
       "to": "/zh/docs/tray/api#tray-index--IAnyTrayHost",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api",
+      "to": "/zh/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "to": "/zh/docs/tray/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "to": "/zh/docs/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/tray/getting-started",
+      "to": "/zh/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api#tray-index--IGraphReadinessSnapshot",
+      "to": "/zh/docs/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/tray",
+      "to": "/zh/docs/tray/api#tray-index--IGraphReadinessSnapshot",
       "type": "architecture-symbol"
     },
     {
@@ -136752,6 +138892,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/utils/api#IUtilsErrorCode",
+      "to": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/en/docs/utils/api#IUtilsErrorCode",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/utils/api#IUtilsReporter",
       "to": "/en/docs/utils/api/promise#utils-promise--IUtilsReporter",
       "type": "symbol-alias"
@@ -137149,6 +139299,16 @@
     {
       "from": "/en/docs/utils/api/error#utils-error--UtilsError",
       "to": "/en/docs/utils/api#UtilsError",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api#UtilsErrorCode",
+      "to": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/en/docs/utils/api#UtilsErrorCode",
       "type": "alias-symbol"
     },
     {
@@ -138512,6 +140672,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/zh/docs/utils/api#IUtilsErrorCode",
+      "to": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/zh/docs/utils/api#IUtilsErrorCode",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/zh/docs/utils/api#IUtilsReporter",
       "to": "/zh/docs/utils/api/promise#utils-promise--IUtilsReporter",
       "type": "symbol-alias"
@@ -138909,6 +141079,16 @@
     {
       "from": "/zh/docs/utils/api/error#utils-error--UtilsError",
       "to": "/zh/docs/utils/api#UtilsError",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api#UtilsErrorCode",
+      "to": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/zh/docs/utils/api#UtilsErrorCode",
       "type": "alias-symbol"
     },
     {
@@ -141263,6 +143443,36 @@
     },
     {
       "from": "/en/docs/utils/api/error",
+      "to": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/en/docs/utils/api/error",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/en/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/utils/getting-started",
+      "to": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/en/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error",
       "to": "/en/docs/utils/api/error#utils-error--normalizeSerializedErrorChain",
       "type": "api-symbol"
     },
@@ -141529,6 +143739,36 @@
     {
       "from": "/en/docs/utils",
       "to": "/en/docs/utils/api/error#utils-error--UtilsError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error",
+      "to": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/en/docs/utils/api/error",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/en/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/utils/getting-started",
+      "to": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/en/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils/api/error#utils-error--UtilsErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -142033,6 +144273,36 @@
     },
     {
       "from": "/zh/docs/utils/api/error",
+      "to": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/zh/docs/utils/api/error",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/zh/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/utils/getting-started",
+      "to": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "to": "/zh/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils/api/error#utils-error--IUtilsErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error",
       "to": "/zh/docs/utils/api/error#utils-error--normalizeSerializedErrorChain",
       "type": "api-symbol"
     },
@@ -142299,6 +144569,36 @@
     {
       "from": "/zh/docs/utils",
       "to": "/zh/docs/utils/api/error#utils-error--UtilsError",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error",
+      "to": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/zh/docs/utils/api/error",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/zh/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/utils/getting-started",
+      "to": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
+      "to": "/zh/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils/api/error#utils-error--UtilsErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -149603,6 +151903,36 @@
     },
     {
       "from": "/en/docs/wasm/api",
+      "to": "/en/docs/wasm/api#wasm-index--__wbg_init",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/wasm/api#wasm-index--__wbg_init",
+      "to": "/en/docs/wasm/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/wasm/api#wasm-index--__wbg_init",
+      "to": "/en/docs/wasm/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/wasm/getting-started",
+      "to": "/en/docs/wasm/api#wasm-index--__wbg_init",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/wasm/api#wasm-index--__wbg_init",
+      "to": "/en/docs/wasm",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/wasm",
+      "to": "/en/docs/wasm/api#wasm-index--__wbg_init",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/wasm/api",
       "to": "/en/docs/wasm/api#wasm-index--alloc_bytes",
       "type": "api-symbol"
     },
@@ -149950,6 +152280,36 @@
       "from": "/zh/docs/wasm",
       "to": "/zh/docs/wasm/api",
       "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/wasm/api",
+      "to": "/zh/docs/wasm/api#wasm-index--__wbg_init",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/wasm/api#wasm-index--__wbg_init",
+      "to": "/zh/docs/wasm/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/wasm/api#wasm-index--__wbg_init",
+      "to": "/zh/docs/wasm/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/wasm/getting-started",
+      "to": "/zh/docs/wasm/api#wasm-index--__wbg_init",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/wasm/api#wasm-index--__wbg_init",
+      "to": "/zh/docs/wasm",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/wasm",
+      "to": "/zh/docs/wasm/api#wasm-index--__wbg_init",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/wasm/api",

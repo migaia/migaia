@@ -719,7 +719,45 @@
             "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)",
             "type IResourceCacheSnapshot<T> = {\n  readonly version: 1\n  readonly data: T\n  readonly updatedAt: number\n  readonly expiresAt: number | null // null 表示无限生命周期的 JSON 安全形式\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly version: 1;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "1"
+            },
+            {
+              "name": "data",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly data: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "updatedAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly updatedAt: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "expiresAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly expiresAt: number | null;",
+              "description": "`null` represents an infinite lifetime in JSON-safe form.",
+              "parameterDetails": [],
+              "returns": "number | null"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IResourceCacheSnapshot",
           "exportPath": ".",
           "overloadSignatures": [
@@ -812,7 +850,27 @@
           "errors": ["No documented errors are declared for IResourceError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceError.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly code: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": ["Error"],
           "aliasOf": "IResourceError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -945,6 +1003,7 @@
             "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IResourceErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1077,6 +1136,7 @@
             "type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>"
           ],
           "members": [],
+          "composes": ["IGenerationRequest"],
           "aliasOf": "IResourceFetchContext",
           "exportPath": ".",
           "overloadSignatures": ["export type IResourceFetchContext = IGenerationRequest;"],
@@ -1142,6 +1202,7 @@
             "type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IResourceFetcher",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1208,7 +1269,90 @@
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
             "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "debugName",
+              "kind": "property",
+              "optional": true,
+              "signature": "debugName?: string;",
+              "description": "Human-readable owner label used in reactive diagnostics and request error context.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "ttl",
+              "kind": "property",
+              "optional": true,
+              "signature": "ttl?: number;",
+              "description": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a dependency changes or `refetch()` is called.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "autoStart",
+              "kind": "property",
+              "optional": true,
+              "signature": "autoStart?: boolean;",
+              "description": "Start the first request in the constructor. Defaults to true.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "kind": "property",
+              "optional": true,
+              "signature": "staleWhileRevalidate?: boolean;",
+              "description": "Keep stale success data visible while a background refresh runs.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "retry",
+              "kind": "property",
+              "optional": true,
+              "signature": "retry?: IResourceRetryPolicy;",
+              "description": "Retry count or predicate. Suspense Promise throws do not count.",
+              "parameterDetails": [],
+              "returns": "IResourceRetryPolicy"
+            },
+            {
+              "name": "retryDelay",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryDelay?: number | ((failureCount: number, error: unknown) => number);",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | ((failureCount: number, error: unknown) => number)"
+            },
+            {
+              "name": "keepAlive",
+              "kind": "property",
+              "optional": true,
+              "signature": "keepAlive?: boolean;",
+              "description": "Keep upstream reactive edges while no state consumer exists.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "initialSnapshot",
+              "kind": "property",
+              "optional": true,
+              "signature": "initialSnapshot?: IResourceCacheSnapshot<T>;",
+              "description": "SSR/persisted success cache used before optional revalidation.",
+              "parameterDetails": [],
+              "returns": "IResourceCacheSnapshot<T>"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1304,6 +1448,7 @@
             "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IResourceRetryPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1399,7 +1544,90 @@
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
             "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: typeof ResourceStatus.idle;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof ResourceStatus.idle"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: typeof ResourceStatus.pending;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof ResourceStatus.pending"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: typeof ResourceStatus.success;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof ResourceStatus.success"
+            },
+            {
+              "name": "data",
+              "kind": "property",
+              "optional": false,
+              "signature": "data: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "refreshing",
+              "kind": "property",
+              "optional": true,
+              "signature": "refreshing?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: typeof ResourceStatus.error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof ResourceStatus.error"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "error: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: typeof ResourceStatus.cancelled;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof ResourceStatus.cancelled"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "error: Error;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IResourceState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1495,6 +1723,7 @@
             {
               "name": "deps",
               "kind": "property",
+              "optional": false,
               "signature": "readonly deps: ReadonlySet<IObservable>;",
               "description": null,
               "parameterDetails": [],
@@ -1503,6 +1732,7 @@
             {
               "name": "depVersions",
               "kind": "property",
+              "optional": false,
               "signature": "readonly depVersions: ReadonlyMap<IObservable, number>;",
               "description": null,
               "parameterDetails": [],
@@ -1511,6 +1741,7 @@
             {
               "name": "runtime",
               "kind": "property",
+              "optional": false,
               "signature": "readonly runtime: IRuntime;",
               "description": null,
               "parameterDetails": [],
@@ -1519,6 +1750,7 @@
             {
               "name": "debugName",
               "kind": "property",
+              "optional": true,
               "signature": "debugName?: string;",
               "description": null,
               "parameterDetails": [],
@@ -1527,6 +1759,7 @@
             {
               "name": "state",
               "kind": "get",
+              "optional": false,
               "signature": "get state(): IResourceState<T>;",
               "description": "Reactive state-machine snapshot. Expired success values revalidate.",
               "parameterDetails": [],
@@ -1535,6 +1768,7 @@
             {
               "name": "promise",
               "kind": "get",
+              "optional": false,
               "signature": "get promise(): Promise<T>;",
               "description": "Shared promise for the current request or fresh cached value. Multiple readers receive the same promise; it starts work only when idle/stale.",
               "parameterDetails": [],
@@ -1543,6 +1777,7 @@
             {
               "name": "disposed",
               "kind": "get",
+              "optional": false,
               "signature": "get disposed(): boolean;",
               "description": null,
               "parameterDetails": [],
@@ -1551,6 +1786,7 @@
             {
               "name": "refreshing",
               "kind": "get",
+              "optional": false,
               "signature": "get refreshing(): boolean;",
               "description": "True while a fresh request runs without hiding an existing success value.",
               "parameterDetails": [],
@@ -1559,6 +1795,7 @@
             {
               "name": "fetchStatus",
               "kind": "get",
+              "optional": false,
               "signature": "get fetchStatus(): ResourceFetchStatus;",
               "description": "Transport status, separate from the visible data/error state.",
               "parameterDetails": [],
@@ -1567,6 +1804,7 @@
             {
               "name": "isStale",
               "kind": "get",
+              "optional": false,
               "signature": "get isStale(): boolean;",
               "description": "Whether the currently cached success value has crossed its TTL.",
               "parameterDetails": [],
@@ -1575,6 +1813,7 @@
             {
               "name": "observed",
               "kind": "get",
+              "optional": false,
               "signature": "get observed(): boolean;",
               "description": "Whether reactive consumers currently observe this resource's state.",
               "parameterDetails": [],
@@ -1583,6 +1822,7 @@
             {
               "name": "read",
               "kind": "method",
+              "optional": false,
               "signature": "read(): T;",
               "description": "Suspense-compatible read: returns cached data, throws the active Promise while pending, and throws the fetch error after failure.",
               "parameterDetails": [],
@@ -1591,6 +1831,7 @@
             {
               "name": "peek",
               "kind": "method",
+              "optional": false,
               "signature": "peek(): T;",
               "description": "Reads without tracking, with the same result semantics as `read()`. Success returns data, pending throws a Promise, and failure throws the error. It creates no dependency edges and does not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics can inspect current state without entering another consumer's tracking window.",
               "parameterDetails": [],
@@ -1599,6 +1840,7 @@
             {
               "name": "peekState",
               "kind": "method",
+              "optional": false,
               "signature": "peekState(): IResourceState<T>;",
               "description": "Inspects the canonical state without tracking, starting work or revalidating TTL.",
               "parameterDetails": [],
@@ -1607,6 +1849,7 @@
             {
               "name": "reset",
               "kind": "method",
+              "optional": false,
               "signature": "reset(): void;",
               "description": "Cancels this generation and drops its cache; the same Resource can start again from idle.",
               "parameterDetails": [],
@@ -1615,6 +1858,7 @@
             {
               "name": "refetch",
               "kind": "method",
+              "optional": false,
               "signature": "refetch(): Promise<T>;",
               "description": "Force a new request. Explicit refetches do not reuse a fresh cache entry; passive `promise`/`read()` consumers do.",
               "parameterDetails": [],
@@ -1623,6 +1867,7 @@
             {
               "name": "invalidate",
               "kind": "method",
+              "optional": false,
               "signature": "invalidate(): Promise<T>;",
               "description": "Mark cached data stale and immediately start a replacement request.",
               "parameterDetails": [],
@@ -1631,6 +1876,7 @@
             {
               "name": "cancel",
               "kind": "method",
+              "optional": false,
               "signature": "cancel(): void;",
               "description": "Cancel only the active generation; the Resource remains reusable.",
               "parameterDetails": [],
@@ -1639,6 +1885,7 @@
             {
               "name": "dehydrate",
               "kind": "method",
+              "optional": false,
               "signature": "dehydrate(): IResourceCacheSnapshot<T> | undefined;",
               "description": null,
               "parameterDetails": [],
@@ -1647,6 +1894,7 @@
             {
               "name": "hydrate",
               "kind": "method",
+              "optional": false,
               "signature": "hydrate(snapshot: IResourceCacheSnapshot<T>): void;",
               "description": null,
               "parameterDetails": [
@@ -1661,6 +1909,7 @@
             {
               "name": "markDirty",
               "kind": "method",
+              "optional": false,
               "signature": "markDirty(): void;",
               "description": "A reactive dependency changed. Coalesce diamond/batched invalidations.",
               "parameterDetails": [],
@@ -1669,6 +1918,7 @@
             {
               "name": "onDependencyDisconnected",
               "kind": "method",
+              "optional": false,
               "signature": "onDependencyDisconnected(): void;",
               "description": "A dependency was disposed; force re-evaluation so failure is observable.",
               "parameterDetails": [],
@@ -1677,12 +1927,14 @@
             {
               "name": "dispose",
               "kind": "method",
+              "optional": false,
               "signature": "dispose(): void;",
               "description": null,
               "parameterDetails": [],
               "returns": "void"
             }
           ],
+          "composes": [],
           "aliasOf": "Resource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1742,7 +1994,62 @@
               "content": "No additional advanced behavior is declared for Resource."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Human-readable owner label used in reactive diagnostics and request error context."
+            },
+            {
+              "name": "ttl",
+              "type": "number",
+              "optional": true,
+              "description": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a dependency changes or `refetch()` is called."
+            },
+            {
+              "name": "autoStart",
+              "type": "boolean",
+              "optional": true,
+              "description": "Start the first request in the constructor. Defaults to true."
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "type": "boolean",
+              "optional": true,
+              "description": "Keep stale success data visible while a background refresh runs."
+            },
+            {
+              "name": "retry",
+              "type": "IResourceRetryPolicy",
+              "optional": true,
+              "description": "Retry count or predicate. Suspense Promise throws do not count."
+            },
+            {
+              "name": "retryDelay",
+              "type": "number | ((failureCount: number, error: unknown) => number)",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "keepAlive",
+              "type": "boolean",
+              "optional": true,
+              "description": "Keep upstream reactive edges while no state consumer exists."
+            },
+            {
+              "name": "initialSnapshot",
+              "type": "IResourceCacheSnapshot<T>",
+              "optional": true,
+              "description": "SSR/persisted success cache used before optional revalidation."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks."
+            }
+          ],
           "identity": "packages/resource/dist/resource.class.d.ts:Resource:export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; dehydrate(): IResourceCacheSnapshot<T> | undefined; hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }",
           "guidance": [
             {
@@ -1897,7 +2204,80 @@
             }
           ],
           "usageScore": 232,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Human-readable owner label used in reactive diagnostics and request error context.",
+              "descriptionEn": "Human-readable owner label used in reactive diagnostics and request error context.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "ttl",
+              "type": "number",
+              "optional": true,
+              "description": "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
+              "descriptionEn": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a dependency changes or `refetch()` is called.",
+              "descriptionZh": "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。"
+            },
+            {
+              "name": "autoStart",
+              "type": "boolean",
+              "optional": true,
+              "description": "若提供了 `initialSnapshot`，构造期会先 `hydrate()` 它；随后若 `autoStart`（默认 `true`）为真且（没有初始快照，或初始快照已过期），立即发起首次请求。",
+              "descriptionEn": "Start the first request in the constructor. Defaults to true.",
+              "descriptionZh": "若提供了 `initialSnapshot`，构造期会先 `hydrate()` 它；随后若 `autoStart`（默认 `true`）为真且（没有初始快照，或初始快照已过期），立即发起首次请求。"
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "type": "boolean",
+              "optional": true,
+              "description": "`refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。",
+              "descriptionEn": "Keep stale success data visible while a background refresh runs.",
+              "descriptionZh": "`refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。"
+            },
+            {
+              "name": "retry",
+              "type": "IResourceRetryPolicy",
+              "optional": true,
+              "description": "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。",
+              "descriptionEn": "Retry count or predicate. Suspense Promise throws do not count.",
+              "descriptionZh": "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。"
+            },
+            {
+              "name": "retryDelay",
+              "type": "number | ((failureCount: number, error: unknown) => number)",
+              "optional": true,
+              "description": "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
+              "descriptionEn": "",
+              "descriptionZh": "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。"
+            },
+            {
+              "name": "keepAlive",
+              "type": "boolean",
+              "optional": true,
+              "description": "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+              "descriptionEn": "Keep upstream reactive edges while no state consumer exists.",
+              "descriptionZh": "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。"
+            },
+            {
+              "name": "initialSnapshot",
+              "type": "IResourceCacheSnapshot<T>",
+              "optional": true,
+              "description": "若提供了 `initialSnapshot`，构造期会先 `hydrate()` 它；随后若 `autoStart`（默认 `true`）为真且（没有初始快照，或初始快照已过期），立即发起首次请求。",
+              "descriptionEn": "SSR/persisted success cache used before optional revalidation.",
+              "descriptionZh": "若提供了 `initialSnapshot`，构造期会先 `hydrate()` 它；随后若 `autoStart`（默认 `true`）为真且（没有初始快照，或初始快照已过期），立即发起首次请求。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。",
+              "descriptionEn": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks.",
+              "descriptionZh": "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+            }
+          ],
           "fragment": "resource-index--Resource"
         },
         {
@@ -1918,6 +2298,7 @@
             "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "RESOURCE_SOURCE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const RESOURCE_SOURCE = \"@migaia/resource\";"],
@@ -2047,7 +2428,81 @@
           "examples": [
             "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "resourceDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly resourceDisposed: \"RESOURCE_DISPOSED\";",
+              "description": "Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations.",
+              "parameterDetails": [],
+              "returns": "\"RESOURCE_DISPOSED\""
+            },
+            {
+              "name": "requestAborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly requestAborted: \"REQUEST_ABORTED\";",
+              "description": "Identifies the `DOMException` used to abort a request and notify the `fetcher` through its * signal. Preserves `DOMException` with the `AbortError` name and attaches the semantic code as a * property. Callers usually recognize `error.name === 'AbortError'` and handle cancellation * quietly.",
+              "parameterDetails": [],
+              "returns": "\"REQUEST_ABORTED\""
+            },
+            {
+              "name": "requestCancelled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly requestCancelled: \"REQUEST_CANCELLED\";",
+              "description": "Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies the request-abort signal reason, this code identifies explicit cancellation state.",
+              "parameterDetails": [],
+              "returns": "\"REQUEST_CANCELLED\""
+            },
+            {
+              "name": "cancellationCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\";",
+              "description": "Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled.",
+              "parameterDetails": [],
+              "returns": "\"CANCELLATION_CLEANUP_FAILED\""
+            },
+            {
+              "name": "noActivePromise",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly noActivePromise: \"NO_ACTIVE_PROMISE\";",
+              "description": "Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths.",
+              "parameterDetails": [],
+              "returns": "\"NO_ACTIVE_PROMISE\""
+            },
+            {
+              "name": "invalidSnapshot",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidSnapshot: \"INVALID_SNAPSHOT\";",
+              "description": "Rejects a `hydrate()` snapshot whose `version` is not `1`, whose `updatedAt` is nonfinite, or * whose `expiresAt` is neither `null` nor finite. Also reports a snapshot accessor that throws. * `null` represents an unbounded expiration. Snapshots commonly come from SSR serialization or * persistence. Invalid formats fail at load rather than leaving the resource with a corrupt * expiration. Check the snapshot creation and serialization path.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_SNAPSHOT\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            },
+            {
+              "name": "suspenseProbeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\";",
+              "description": "Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure.",
+              "parameterDetails": [],
+              "returns": "\"SUSPENSE_PROBE_FAILED\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "ResourceErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2180,7 +2635,27 @@
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
             "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: \"idle\";",
+              "description": "No current request is running.",
+              "parameterDetails": [],
+              "returns": "\"idle\""
+            },
+            {
+              "name": "fetching",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fetching: \"fetching\";",
+              "description": "A request is running, with or without cached data.",
+              "parameterDetails": [],
+              "returns": "\"fetching\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "ResourceFetchStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2277,7 +2752,54 @@
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED'\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`)\n  }\n}\n\nconst runtime = createRuntime()\n\nconst user = new Resource<IUser>(async ({ signal }) => {\n  const response = await fetch('/api/user', { signal })\n  if (!response.ok) throw new UserRequestError(response.status)\n  return (await response.json()) as IUser\n}, runtime)\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...')\n    break\n  case ResourceStatus.success:\n    console.log(user.state.data)\n    break\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error)\n    break\n}\n\ntry {\n  const freshUser = await user.refetch()\n  console.log('refetched user', freshUser)\n} finally {\n  user.dispose()\n}",
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n  if (state.status === ResourceStatus.error) console.error(state.error)\n})\n\nexport function selectUser(id: string): void {\n  userId.value = id\n}\n\nselectUser('2') // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: \"idle\";",
+              "description": "No data or request result has been published.",
+              "parameterDetails": [],
+              "returns": "\"idle\""
+            },
+            {
+              "name": "pending",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pending: \"pending\";",
+              "description": "Initial data is still being requested.",
+              "parameterDetails": [],
+              "returns": "\"pending\""
+            },
+            {
+              "name": "success",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly success: \"success\";",
+              "description": "Cached data is available, including during background refresh.",
+              "parameterDetails": [],
+              "returns": "\"success\""
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: \"error\";",
+              "description": "The most recent request failed.",
+              "parameterDetails": [],
+              "returns": "\"error\""
+            },
+            {
+              "name": "cancelled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cancelled: \"cancelled\";",
+              "description": "Explicit cancellation published a stable AbortError result.",
+              "parameterDetails": [],
+              "returns": "\"cancelled\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "ResourceStatus",
           "exportPath": ".",
           "overloadSignatures": [

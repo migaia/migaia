@@ -7,6 +7,8 @@ import {
   type IApiSymbol,
   type ILibrary
 } from './content-contract.js'
+import { essentialApiParts, essentialApis } from './essential-apis.js'
+import { referenceFor } from './reference/index.js'
 
 export type ILibrarySummary = Omit<ILibrary, 'documentation'>
 
@@ -65,7 +67,15 @@ export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuide
   const module = await loader()
   return module.default.apis.flatMap((api) =>
     api.symbols
-      .filter((symbol) => isGuideApiLinkSymbol(slug, api, symbol))
+      .filter(
+        (symbol) =>
+          isGuideApiLinkSymbol(slug, api, symbol) ||
+          // Curated essentials (for example storage hosts exported as constants) stay linkable.
+          (essentialApis[slug] ?? []).some((entry) => {
+            const { module, name } = essentialApiParts(entry)
+            return module === api.module && name === symbol.name
+          })
+      )
       .map((symbol) => ({
         module: api.module,
         name: symbol.name,
@@ -89,6 +99,31 @@ export async function loadLibraryRouteContent(
   )
   /** Canonical owners needed only to resolve aliases from the selected module. */
   const aliasOwnerModules = new Set(selectedApi?.aliases.map((alias) => alias.ownerModule) ?? [])
+  /** Keep same-library result and dependency types even when a sibling entry exports them. */
+  const selectedSymbol = selectedApi?.symbols.find(
+    (symbol) => symbolSlug(symbol, selectedApi.symbols) === options.selectedSymbol
+  )
+  const reference = referenceFor(slug)
+  const surface = selectedSymbol
+    ? (
+        reference?.types[`${selectedApi!.module}:${selectedSymbol.name}`] ??
+        reference?.types[selectedSymbol.name]
+      )?.surface
+    : undefined
+  const relatedTypes = selectedSymbol
+    ? collectReferencedTypeNames(
+        {
+          ...selectedSymbol,
+          signature: [
+            selectedSymbol.signature,
+            selectedSymbol.returns,
+            ...selectedSymbol.parameterDetails.map((parameter) => parameter.type),
+            surface ?? ''
+          ].join(' ')
+        },
+        module.default.apis.flatMap((api) => api.symbols)
+      )
+    : new Set<string>()
   const library = module.default.library
   return {
     library: {
@@ -108,8 +143,8 @@ export async function loadLibraryRouteContent(
     apis: options.includeApiIndex
       ? module.default.apis.map((api) =>
           api === selectedApi
-            ? projectSelectedApi(api, options.selectedSymbol)
-            : projectApiIndexEntry(api, aliasOwnerModules.has(api.module))
+            ? projectSelectedApi(api, options.selectedSymbol, relatedTypes)
+            : projectApiIndexEntry(api, aliasOwnerModules.has(api.module), relatedTypes)
         )
       : []
   }
@@ -133,13 +168,17 @@ function projectReaderDocument(document: ILibrary['documentation']['readme'], li
 }
 
 /** Removes repository-only fields while retaining selected API documentation. */
-function projectSelectedApi(api: IApi, selectedSymbolPath?: string): IApi {
+function projectSelectedApi(
+  api: IApi,
+  selectedSymbolPath?: string,
+  relatedTypes?: ReadonlySet<string>
+): IApi {
   const selectedSymbol = selectedSymbolPath
     ? api.symbols.find((symbol) => symbolSlug(symbol, api.symbols) === selectedSymbolPath)
     : undefined
-  const relatedTypeNames = selectedSymbol
-    ? collectReferencedTypeNames(selectedSymbol, api.symbols)
-    : new Set<string>()
+  const relatedTypeNames =
+    relatedTypes ??
+    (selectedSymbol ? collectReferencedTypeNames(selectedSymbol, api.symbols) : new Set<string>())
   return {
     id: api.id,
     library: api.library,
@@ -172,7 +211,10 @@ function projectSelectedApi(api: IApi, selectedSymbolPath?: string): IApi {
             : (symbol.kind === 'type' || symbol.kind === 'interface') &&
                 relatedTypeNames.has(symbol.name)
               ? projectTypingSymbol(symbol)
-              : compactSymbol(symbol)
+              : symbol.kind === 'class' && relatedTypeNames.has(symbol.name)
+                ? // A class returned by the selected factory keeps its instance members.
+                  { ...compactSymbol(symbol), members: symbol.members, composes: symbol.composes }
+                : compactSymbol(symbol)
           : projectModuleIndexSymbol(symbol)
       )
   }
@@ -195,10 +237,16 @@ function collectReferencedTypeNames(
   selected: IApiSymbol,
   symbols: readonly IApiSymbol[]
 ): ReadonlySet<string> {
-  const typing = symbols.filter((symbol) => symbol.kind === 'type' || symbol.kind === 'interface')
+  /** Classes count as typing here because a factory may return a class instance. */
+  const typing = symbols.filter(
+    (symbol) => symbol.kind === 'type' || symbol.kind === 'interface' || symbol.kind === 'class'
+  )
   const names = new Set<string>()
-  const pending = typing.filter((symbol) =>
-    new RegExp(`\\b${symbol.name}\\b`).test(selected.signature)
+  /** Inherited bases may live outside the visible signature (`class X extends PrivateBase`). */
+  const pending = typing.filter(
+    (symbol) =>
+      new RegExp(`\\b${symbol.name}\\b`).test(selected.signature) ||
+      selected.composes?.includes(symbol.name)
   )
   while (pending.length > 0) {
     const symbol = pending.shift()
@@ -214,13 +262,18 @@ function collectReferencedTypeNames(
   return names
 }
 
-/** Keeps typing readable and recursively discoverable without full runtime prose. */
+/**
+ * Keeps typing readable and recursively discoverable without full runtime prose. Members and
+ * composed bases stay so a factory page can show the instance surface its result exposes.
+ */
 function projectTypingSymbol(symbol: IApiSymbol): IApiSymbol {
   return {
     ...compactSymbol(symbol),
     signature: symbol.signature,
     source: publicSourceName(symbol.source),
-    purpose: symbol.purpose
+    purpose: symbol.purpose,
+    members: symbol.members,
+    composes: symbol.composes
   }
 }
 
@@ -251,6 +304,7 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
       : symbol.lifecycleConcurrency,
     parameterDetails: symbol.parameterDetails,
     members: symbol.members,
+    composes: symbol.composes,
     examples: symbol.examples,
     guidance: symbol.guidance,
     configuration: symbol.configuration,
@@ -265,7 +319,11 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
 }
 
 /** Retains navigation fields plus compact alias-owner symbols for one library. */
-function projectApiIndexEntry(api: IApi, includeSymbols: boolean): IApi {
+function projectApiIndexEntry(
+  api: IApi,
+  includeSymbols: boolean,
+  relatedTypes: ReadonlySet<string>
+): IApi {
   return {
     id: api.id,
     library: api.library,
@@ -275,7 +333,11 @@ function projectApiIndexEntry(api: IApi, includeSymbols: boolean): IApi {
     guidePath: api.guidePath,
     architecturePath: api.architecturePath,
     aliases: [],
-    symbols: includeSymbols ? api.symbols.map(compactSymbol) : []
+    symbols: api.symbols
+      .filter((symbol) => includeSymbols || relatedTypes.has(symbol.name))
+      .map((symbol) =>
+        relatedTypes.has(symbol.name) ? projectTypingSymbol(symbol) : compactSymbol(symbol)
+      )
   }
 }
 

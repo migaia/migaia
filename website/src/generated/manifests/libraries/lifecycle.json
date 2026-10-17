@@ -2218,6 +2218,7 @@
             "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "abortableDelay",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2310,6 +2311,7 @@
             "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'\nimport { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "boundedWait",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2351,7 +2353,20 @@
               "content": "No additional advanced behavior is declared for boundedWait."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "reportCleanup",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/lifecycle/dist/bounded-wait.d.ts:boundedWait:export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; reportCleanup?: (error: unknown) => void; }) => Promise<boolean>;",
           "guidance": [
             {
@@ -2380,7 +2395,24 @@
             }
           ],
           "usageScore": 68,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
+              "descriptionEn": "",
+              "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
+            },
+            {
+              "name": "reportCleanup",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。 `scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。 返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。 监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。 任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。",
+              "descriptionEn": "",
+              "descriptionZh": "`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。 `scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。 返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。 监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。 任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。"
+            }
+          ],
           "fragment": "lifecycle-index--boundedWait"
         },
         {
@@ -2409,6 +2441,7 @@
             "const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5000 })\nconst result = await queue.enqueue(() => applyMutation(), { owner: 'sync-loop' })\nqueue.size // 排队中 + 正在执行的任务数"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createMutationQueue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2463,13 +2496,13 @@
               "name": "queueAdmissionTimeoutMs",
               "type": "number | false",
               "optional": true,
-              "description": "Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long."
+              "description": "Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — the core never invents a domain timeout. `false` disables even diagnostics. A number is the `plugin-host`-equivalent behavior: reject once a queued task has waited this long."
             },
             {
               "name": "admissionDiagnosticMs",
               "type": "number | false",
               "optional": true,
-              "description": "Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer."
+              "description": "Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables the diagnostic timer."
             },
             {
               "name": "onAdmissionDiagnostic",
@@ -2481,7 +2514,7 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`."
+              "description": "Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. Defaults to `systemScheduler`."
             }
           ],
           "identity": "packages/lifecycle/dist/mutation-queue.d.ts:createMutationQueue:export declare function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue;",
@@ -2527,7 +2560,7 @@
               "type": "number | false",
               "optional": true,
               "description": "`queueAdmissionTimeoutMs`：数字表示任务在队列中等待超过这个时长即被移出队列并以 `QUEUE_ADMISSION_TIMEOUT` reject；`undefined`（默认）只诊断、从不因排队超时而拒绝；`false` 连诊断计时器也不开。",
-              "descriptionEn": "Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long.",
+              "descriptionEn": "Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — the core never invents a domain timeout. `false` disables even diagnostics. A number is the `plugin-host`-equivalent behavior: reject once a queued task has waited this long.",
               "descriptionZh": "`queueAdmissionTimeoutMs`：数字表示任务在队列中等待超过这个时长即被移出队列并以 `QUEUE_ADMISSION_TIMEOUT` reject；`undefined`（默认）只诊断、从不因排队超时而拒绝；`false` 连诊断计时器也不开。"
             },
             {
@@ -2535,7 +2568,7 @@
               "type": "number | false",
               "optional": true,
               "description": "`admissionDiagnosticMs`：仅在 `queueAdmissionTimeoutMs` 为 `undefined` 且提供了 `onAdmissionDiagnostic` 时生效的诊断阈值；`false` 关闭诊断计时器。",
-              "descriptionEn": "Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer.",
+              "descriptionEn": "Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables the diagnostic timer.",
               "descriptionZh": "`admissionDiagnosticMs`：仅在 `queueAdmissionTimeoutMs` 为 `undefined` 且提供了 `onAdmissionDiagnostic` 时生效的诊断阈值；`false` 关闭诊断计时器。"
             },
             {
@@ -2551,7 +2584,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
-              "descriptionEn": "Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`.",
+              "descriptionEn": "Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. Defaults to `systemScheduler`.",
               "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
             }
           ],
@@ -2583,6 +2616,7 @@
             "const provisional = createProvisionalScope()\nconst db = provisional.own(await connect(), { force: (ctx) => db.close() })\ntry {\n  await provisional.commitTo(outerScope) // 按注册顺序逐个 own() 到 parent\n} catch (error) {\n  // parent 中途拒绝（如已在 closing）：已转移部分留在 parent 名下，剩余部分已被自动释放并 await 完成\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createProvisionalScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2716,6 +2750,7 @@
             "const scope = createSyncLifecycleScope()\nscope.own(node, { syncSafe: true, force: () => node.detach() })\nscope.close()\nconst failures = scope.dispose() // 同步返回，不可能有异步资源"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createSyncLifecycleScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2776,7 +2811,7 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`."
+              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`."
             }
           ],
           "identity": "packages/lifecycle/dist/sync-lifecycle-scope.d.ts:createSyncLifecycleScope:export declare function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope;",
@@ -2997,7 +3032,7 @@
               "type": "(error: unknown) => void",
               "optional": true,
               "description": "`policy`、`report`（必填，显式传 `undefined` 表示无诊断通道）。`add(source, error)` 按策略即时处理（`'report'` 策略立即调用 `report`；`'firstError'` 只记住第一个错误，其余经 `report` 观测）。`finalize(message)`：`'collect'` 返回收集到的数组；`'report'` 返回空数组（已在 `add` 时上报）；`'throw'` 单错原样抛、多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`；`'firstError'` 有错误时抛首个，否则返回空数组。",
-              "descriptionEn": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`.",
+              "descriptionEn": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`.",
               "descriptionZh": "`policy`、`report`（必填，显式传 `undefined` 表示无诊断通道）。`add(source, error)` 按策略即时处理（`'report'` 策略立即调用 `report`；`'firstError'` 只记住第一个错误，其余经 `report` 观测）。`finalize(message)`：`'collect'` 返回收集到的数组；`'report'` 返回空数组（已在 `add` 时上报）；`'throw'` 单错原样抛、多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`；`'firstError'` 有错误时抛首个，否则返回空数组。"
             }
           ],
@@ -3021,6 +3056,7 @@
             "const terminal = createTerminalController()\nterminal.close() // open → closing，幂等\nterminal.forceTerminal() // 直接进 terminal，resolve whenTerminal()\nawait terminal.whenTerminal()"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createTerminalController",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3111,7 +3147,27 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "order",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly order: \"order\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"order\""
+            },
+            {
+              "name": "plan",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly plan: \"plan\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"plan\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "DisposeTransactionKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3183,7 +3239,27 @@
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}",
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ICollectedError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3486,6 +3562,7 @@
             "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringLeaseRegistry(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IDisposer",
           "exportPath": ".",
           "overloadSignatures": ["export type IDisposer = () => void;"],
@@ -3551,7 +3628,18 @@
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "join",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly join: () => never;",
+              "description": "Rejects an attempt to join the disposal currently waiting for this callback.",
+              "parameterDetails": [],
+              "returns": "() => never"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IDisposerContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3616,6 +3704,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposeTransactionKind.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IDisposeTransactionKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3682,7 +3771,27 @@
             "import {\n  createMutationQueue,\n  type IMutationQueue,\n  type IMutationQueueOptions,\n  type IEnqueueOptions\n} from '@migaia/lifecycle'",
             "function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue\n\ntype IMutationQueueOptions = {\n  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）\n  readonly admissionDiagnosticMs?: number | false // 默认 1000\n  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IEnqueueOptions = {\n  readonly owner?: string\n  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值\n}\n\ntype IMutationQueue = {\n  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>\n  readonly size: number\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "owner",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly owner?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "queueAdmissionTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly queueAdmissionTimeoutMs?: number | false;",
+              "description": "Overrides the queue's default for this one task.",
+              "parameterDetails": [],
+              "returns": "number | false"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IEnqueueOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3750,6 +3859,7 @@
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3841,6 +3951,7 @@
             "import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ILifecycleErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4042,6 +4153,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleErrorPolicy.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILifecycleErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4108,6 +4220,7 @@
             "import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ILifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4177,7 +4290,29 @@
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
             "import { createProvisionalScope, type ILifecycleOwner } from '@migaia/lifecycle'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "own",
+              "kind": "method",
+              "optional": false,
+              "signature": "own<T>(resource: T, descriptor: IReleaseDescriptor): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "descriptor",
+                  "type": "IReleaseDescriptor",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILifecycleOwner",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4279,6 +4414,7 @@
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ILifecycleState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4343,6 +4479,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleStateValue.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILifecycleStateValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4407,6 +4544,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleUnitStateValue.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILifecycleUnitStateValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4473,7 +4611,38 @@
             "import {\n  createMutationQueue,\n  type IMutationQueue,\n  type IMutationQueueOptions,\n  type IEnqueueOptions\n} from '@migaia/lifecycle'",
             "function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue\n\ntype IMutationQueueOptions = {\n  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）\n  readonly admissionDiagnosticMs?: number | false // 默认 1000\n  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IEnqueueOptions = {\n  readonly owner?: string\n  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值\n}\n\ntype IMutationQueue = {\n  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>\n  readonly size: number\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "enqueue",
+              "kind": "method",
+              "optional": false,
+              "signature": "enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "task",
+                  "type": "() => T | PromiseLike<T>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IEnqueueOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<T>"
+            },
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly size: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMutationQueue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4540,7 +4709,45 @@
             "import {\n  createMutationQueue,\n  type IMutationQueue,\n  type IMutationQueueOptions,\n  type IEnqueueOptions\n} from '@migaia/lifecycle'",
             "function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue\n\ntype IMutationQueueOptions = {\n  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）\n  readonly admissionDiagnosticMs?: number | false // 默认 1000\n  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IEnqueueOptions = {\n  readonly owner?: string\n  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值\n}\n\ntype IMutationQueue = {\n  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>\n  readonly size: number\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "queueAdmissionTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly queueAdmissionTimeoutMs?: number | false;",
+              "description": "Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — the core never invents a domain timeout. `false` disables even diagnostics. A number is the `plugin-host`-equivalent behavior: reject once a queued task has waited this long.",
+              "parameterDetails": [],
+              "returns": "number | false"
+            },
+            {
+              "name": "admissionDiagnosticMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly admissionDiagnosticMs?: number | false;",
+              "description": "Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables the diagnostic timer.",
+              "parameterDetails": [],
+              "returns": "number | false"
+            },
+            {
+              "name": "onAdmissionDiagnostic",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly scheduler?: IScheduler;",
+              "description": "Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. Defaults to `systemScheduler`.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IMutationQueueOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4607,7 +4814,62 @@
             "import {\n  createProvisionalScope,\n  type IProvisionalScope,\n  type IProvisionalScopeOptions,\n  type ILifecycleOwner\n} from '@migaia/lifecycle'",
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "own",
+              "kind": "method",
+              "optional": false,
+              "signature": "own<T>(resource: T, descriptor: IReleaseDescriptor): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "descriptor",
+                  "type": "IReleaseDescriptor",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "commitTo",
+              "kind": "method",
+              "optional": false,
+              "signature": "commitTo(parent: ILifecycleOwner): Promise<void>;",
+              "description": "Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; everything not yet transferred is released by this scope (in reverse order) and **awaited** before the original error is rethrown — nothing is left owned by neither side, and the returned Promise settles only after the compensation has completed.",
+              "parameterDetails": [
+                {
+                  "name": "parent",
+                  "type": "ILifecycleOwner",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "rollback",
+              "kind": "method",
+              "optional": false,
+              "signature": "rollback(): Promise<void>;",
+              "description": "Releases every owned resource in reverse order, collecting every failure into one `AggregateError` (idempotent).",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IProvisionalScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4674,7 +4936,18 @@
             "import {\n  createProvisionalScope,\n  type IProvisionalScope,\n  type IProvisionalScopeOptions,\n  type ILifecycleOwner\n} from '@migaia/lifecycle'",
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "parentSignal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly parentSignal?: IAbortSignal;",
+              "description": "Forwarded so `signal` also reflects a parent's abort (e.g. a superseded generation).",
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IProvisionalScopeOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4743,7 +5016,54 @@
             "function executeReleaseDescriptor(\n  descriptor: IReleaseDescriptor,\n  context: IReleaseContext\n): Promise<readonly unknown[]>",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: IAbortSignal;",
+              "description": "Aborts when the owning transaction/scope enters `closing` (L-T26).",
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "deadlineAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deadlineAt: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly scheduler?: IScheduler;",
+              "description": "Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract. Defaults to `systemScheduler`. Callbacks and the graceful-phase deadline share this clock source so clock domains do not mix.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly report: (error: unknown) => void;",
+              "description": "Side-channel diagnostic reporter; its own throws are contained (L-T26).",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            },
+            {
+              "name": "disposer",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly disposer?: IDisposerContext;",
+              "description": "Owner-bound self-join guard; absent when a generic transaction has no scope owner.",
+              "parameterDetails": [],
+              "returns": "IDisposerContext"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IReleaseContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4817,7 +5137,72 @@
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "syncSafe",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly syncSafe?: boolean;",
+              "description": "Declares this descriptor may be accepted by `SyncLifecycleScope`. Does not change the static type of the general-purpose `LifecycleScope` (D-6) — a scope's sync/async nature is determined by which concrete type you construct, never inferred from descriptor content.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "order",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly order?: number;",
+              "description": "Release ordering key. Higher values release first, lower values release last (lower \"sinks to the bottom\" of the release order — the opposite of allocation order). Omitted keys are treated as `0`. Only meaningful in `DisposeTransaction`'s `order` mode (D-3: this package never computes order, it only executes an order supplied by the caller).",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "graceful",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly graceful?: (context: IReleaseContext) => void | PromiseLike<void>;",
+              "description": "Graceful release. A timeout abandons waiting for it (does not cancel it) and falls through to `force`.",
+              "parameterDetails": [],
+              "returns": "(context: IReleaseContext) => void | PromiseLike<void>"
+            },
+            {
+              "name": "gracefulTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly gracefulTimeoutMs?: number;",
+              "description": "Budget for the graceful phase, capped by the transaction's shared `deadlineAt` if one exists.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "force",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly force: (context: IReleaseContext) => void | PromiseLike<void>;",
+              "description": "Forced release. Must complete unconditionally; must not throw a recoverable error.",
+              "parameterDetails": [],
+              "returns": "(context: IReleaseContext) => void | PromiseLike<void>"
+            },
+            {
+              "name": "gcFallback",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly gcFallback?: boolean;",
+              "description": "Best-effort fallback for a forgotten asynchronous scope, unregistered on explicit release. A live scope strongly owns its resources, so this cannot collect an individual resource while its scope is reachable. It never replaces explicit disposal. SyncLifecycleScope accepts this shared descriptor field but does not register a finalizer.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "custom",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly custom?: (context: IReleaseContext) => void | PromiseLike<void>;",
+              "description": "Escape hatch: fully takes over this resource's release. The core only orders and collects errors.",
+              "parameterDetails": [],
+              "returns": "(context: IReleaseContext) => void | PromiseLike<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IReleaseDescriptor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4955,7 +5340,80 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "lifecycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly lifecycle: ILifecycleState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILifecycleState"
+            },
+            {
+              "name": "own",
+              "kind": "method",
+              "optional": false,
+              "signature": "own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "descriptor",
+                  "type": "ISyncReleaseDescriptor",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "release",
+              "kind": "method",
+              "optional": false,
+              "signature": "release(resource: unknown): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): readonly ICollectedError[];",
+              "description": "Always synchronous — this is the whole reason this type exists (D-6).",
+              "parameterDetails": [],
+              "returns": "readonly ICollectedError[]"
+            },
+            {
+              "name": "[Symbol.dispose]",
+              "kind": "method",
+              "optional": false,
+              "signature": "[Symbol.dispose](): void;",
+              "description": "Releases the scope synchronously for `using`, discarding the collected-error result.",
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ISyncLifecycleScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5059,7 +5517,27 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "errorPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly errorPolicy?: IErrorPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IErrorPolicy"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`.",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ISyncLifecycleScopeOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5163,7 +5641,18 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "syncSafe",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncSafe: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            }
+          ],
+          "composes": ["IReleaseDescriptor"],
           "aliasOf": "ISyncReleaseDescriptor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5267,7 +5756,45 @@
             "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function createTerminalController(): ITerminalController\n\ntype ITerminalController = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  close(): void\n  forceTerminal(): void\n  whenTerminal(): Promise<void>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "lifecycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly lifecycle: ILifecycleState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILifecycleState"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": "Idempotent. Moves `open` → `closing`; does nothing once past `open`.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "forceTerminal",
+              "kind": "method",
+              "optional": false,
+              "signature": "forceTerminal(): void;",
+              "description": "Idempotent. Moves straight to `terminal`, resolving `whenTerminal()`.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "whenTerminal",
+              "kind": "method",
+              "optional": false,
+              "signature": "whenTerminal(): Promise<void>;",
+              "description": "Resolves exactly once, when `terminal` is reached.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITerminalController",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5334,6 +5861,7 @@
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IUnitState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5403,7 +5931,207 @@
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "delayFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly delayFailed: \"DELAY_FAILED\";",
+              "description": "An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code.",
+              "parameterDetails": [],
+              "returns": "\"DELAY_FAILED\""
+            },
+            {
+              "name": "scopeClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeClosed: \"SCOPE_CLOSED\";",
+              "description": "Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string.",
+              "parameterDetails": [],
+              "returns": "\"SCOPE_CLOSED\""
+            },
+            {
+              "name": "scopeTerminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeTerminal: \"SCOPE_TERMINAL\";",
+              "description": "Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying.",
+              "parameterDetails": [],
+              "returns": "\"SCOPE_TERMINAL\""
+            },
+            {
+              "name": "scopeReentrantDispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\";",
+              "description": "Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it.",
+              "parameterDetails": [],
+              "returns": "\"SCOPE_REENTRANT_DISPOSE\""
+            },
+            {
+              "name": "scopeReentrantOwn",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\";",
+              "description": "Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending.",
+              "parameterDetails": [],
+              "returns": "\"SCOPE_REENTRANT_OWN\""
+            },
+            {
+              "name": "scopeSyncViolation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\";",
+              "description": "Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable.",
+              "parameterDetails": [],
+              "returns": "\"SCOPE_SYNC_VIOLATION\""
+            },
+            {
+              "name": "scopeDisposalFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\";",
+              "description": "Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code.",
+              "parameterDetails": [],
+              "returns": "\"SCOPE_DISPOSAL_FAILED\""
+            },
+            {
+              "name": "unitStartFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unitStartFailed: \"UNIT_START_FAILED\";",
+              "description": "Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions.",
+              "parameterDetails": [],
+              "returns": "\"UNIT_START_FAILED\""
+            },
+            {
+              "name": "generationSuperseded",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationSuperseded: \"GENERATION_SUPERSEDED\";",
+              "description": "Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack.",
+              "parameterDetails": [],
+              "returns": "\"GENERATION_SUPERSEDED\""
+            },
+            {
+              "name": "generationCancellationFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\";",
+              "description": "Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation.",
+              "parameterDetails": [],
+              "returns": "\"GENERATION_CANCELLATION_FAILED\""
+            },
+            {
+              "name": "generationDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationDisposed: \"GENERATION_DISPOSED\";",
+              "description": "Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried.",
+              "parameterDetails": [],
+              "returns": "\"GENERATION_DISPOSED\""
+            },
+            {
+              "name": "generationTimedOut",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationTimedOut: \"GENERATION_TIMED_OUT\";",
+              "description": "Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal.",
+              "parameterDetails": [],
+              "returns": "\"GENERATION_TIMED_OUT\""
+            },
+            {
+              "name": "quiescenceSealed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly quiescenceSealed: \"QUIESCENCE_SEALED\";",
+              "description": "Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path.",
+              "parameterDetails": [],
+              "returns": "\"QUIESCENCE_SEALED\""
+            },
+            {
+              "name": "quiescenceUnsealedWait",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\";",
+              "description": "Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself.",
+              "parameterDetails": [],
+              "returns": "\"QUIESCENCE_UNSEALED_WAIT\""
+            },
+            {
+              "name": "provisionalSettled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalSettled: \"PROVISIONAL_SETTLED\";",
+              "description": "Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one.",
+              "parameterDetails": [],
+              "returns": "\"PROVISIONAL_SETTLED\""
+            },
+            {
+              "name": "provisionalParentClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\";",
+              "description": "Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually.",
+              "parameterDetails": [],
+              "returns": "\"PROVISIONAL_PARENT_CLOSED\""
+            },
+            {
+              "name": "queueAdmissionTimeout",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\";",
+              "description": "Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold.",
+              "parameterDetails": [],
+              "returns": "\"QUEUE_ADMISSION_TIMEOUT\""
+            },
+            {
+              "name": "queueSelfDependency",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\";",
+              "description": "Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed.",
+              "parameterDetails": [],
+              "returns": "\"QUEUE_SELF_DEPENDENCY\""
+            },
+            {
+              "name": "releaseForceFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\";",
+              "description": "Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry.",
+              "parameterDetails": [],
+              "returns": "\"RELEASE_FORCE_FAILED\""
+            },
+            {
+              "name": "deadlineExceeded",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deadlineExceeded: \"DEADLINE_EXCEEDED\";",
+              "description": "Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code.",
+              "parameterDetails": [],
+              "returns": "\"DEADLINE_EXCEEDED\""
+            },
+            {
+              "name": "envUnsupported",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "description": "Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it.",
+              "parameterDetails": [],
+              "returns": "\"ENV_UNSUPPORTED\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, addition that overflows, or cleanup * observations without the error array required by `mergeCleanupResults`. Enforces scheduler * admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative delays in R-9. * Correct the scheduler or delay instead of retrying the same invalid input.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LifecycleErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5770,7 +6498,45 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "throw",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly throw: \"throw\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"throw\""
+            },
+            {
+              "name": "collect",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly collect: \"collect\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"collect\""
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly report: \"report\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"report\""
+            },
+            {
+              "name": "firstError",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly firstError: \"firstError\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"firstError\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LifecycleErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5838,7 +6604,450 @@
             "error.message === LifecycleErrorText.disposeTransactionFailed",
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "delayFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly delayFailed: \"[lifecycle] abortable delay failed\";",
+              "description": "Fallback for a delay admission or cleanup failure that cannot retain native Error identity.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] abortable delay failed\""
+            },
+            {
+              "name": "waitCleanupReporterInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\";",
+              "description": "Rejects a malformed optional wait-cleanup channel before any resource admission.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] wait cleanup reporter must be a function\""
+            },
+            {
+              "name": "provisionalCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\";",
+              "description": "Fallback message for a provisional registration/cleanup wrapper around a non-Error throw.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] provisional cleanup failed\""
+            },
+            {
+              "name": "disposeTransactionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\";",
+              "description": "Stable finalization message for transaction-level failures.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] dispose transaction failed\""
+            },
+            {
+              "name": "scopeReentrantDispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\";",
+              "description": "Explains that a disposer attempted to join the scope disposal that is waiting for it.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] cannot join the same scope disposal from its disposer\""
+            },
+            {
+              "name": "disposeDescriptorInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\";",
+              "description": "Stable message for a descriptor that cannot be admitted into a release transaction.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] release descriptor admission failed\""
+            },
+            {
+              "name": "cleanupResultInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\";",
+              "description": "Shared cleanup observation admission requires the error array used by the merge helper.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] cleanup result must provide a cleanupErrors array\""
+            },
+            {
+              "name": "syncGracefulOverBudget",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\";",
+              "description": "Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] synchronous graceful completed after its deadline\""
+            },
+            {
+              "name": "mutationAdmissionTimedOut",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\";",
+              "description": "Fallback message for a queue timeout wrapper around a non-Error primary.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] mutation admission timed out\""
+            },
+            {
+              "name": "generationCancellationFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\";",
+              "description": "Stable diagnostic for failed generation cancellation or complete timer/parent cleanup.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] generation cancellation failed\""
+            },
+            {
+              "name": "disposalLedgerClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\";",
+              "description": "Explains that a disposal ledger no longer accepts new item callbacks.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] disposal ledger is sealed\""
+            },
+            {
+              "name": "disposalLedgerReentrant",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\";",
+              "description": "Explains that a disposal ledger operation re-entered its active item boundary.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] disposal ledger operation is reentrant\""
+            },
+            {
+              "name": "envUnsupported",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly envUnsupported: \"[lifecycle] required host capability is unavailable\";",
+              "description": "Explains that the host lacks a usable native AbortController capability.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] required host capability is unavailable\""
+            },
+            {
+              "name": "abortSignalInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\";",
+              "description": "Explains that an observed cancellation source lacks its required listener methods.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] abort signal is invalid\""
+            },
+            {
+              "name": "schedulerTaskCancelGetterFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\";",
+              "description": "Explains that a scheduled task's cancel accessor threw during admission.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler task cancel getter failed\""
+            },
+            {
+              "name": "schedulerTaskInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\";",
+              "description": "Explains that a scheduler returned a task without the required cancel function.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler.schedule must return an object with a cancel() function\""
+            },
+            {
+              "name": "schedulerAccessorFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\";",
+              "description": "Explains that reading a scheduler's methods failed at an injection boundary.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler accessor failed\""
+            },
+            {
+              "name": "schedulerDeferInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\";",
+              "description": "Optional deferred registration must be callable before a scheduler owns any work.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler.defer must be a function when provided\""
+            },
+            {
+              "name": "schedulerInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\";",
+              "description": "Explains that an injected value is not a valid lifecycle scheduler.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler must provide now() and schedule() functions\""
+            },
+            {
+              "name": "schedulerNumberType",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\";",
+              "description": "Stable message for scheduler values whose runtime type is not numeric.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler time value must be a number\""
+            },
+            {
+              "name": "schedulerNumberRange",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\";",
+              "description": "Stable message for scheduler values outside the finite numeric domain.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler time value must be finite\""
+            },
+            {
+              "name": "schedulerDelayRange",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\";",
+              "description": "Stable message for scheduler delays that are finite but negative.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler delay must be non-negative\""
+            },
+            {
+              "name": "schedulerTimeOverflow",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\";",
+              "description": "Stable message for scheduler arithmetic whose finite operands produce an infinite target.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scheduler time arithmetic must remain finite\""
+            },
+            {
+              "name": "errorPolicyReporterMissing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\";",
+              "description": "Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\""
+            },
+            {
+              "name": "generationSupersededReason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\";",
+              "description": "`signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] superseded by a new generation\""
+            },
+            {
+              "name": "generationTimedOutReason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationTimedOutReason: \"[lifecycle] generation timed out\";",
+              "description": "`signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] generation timed out\""
+            },
+            {
+              "name": "unitDisposedReason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unitDisposedReason: \"[lifecycle] unit disposed\";",
+              "description": "`signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] unit disposed\""
+            },
+            {
+              "name": "scopeClosedReason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeClosedReason: \"[lifecycle] scope closed\";",
+              "description": "`signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scope closed\""
+            },
+            {
+              "name": "provisionalRolledBackReason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\";",
+              "description": "`signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] provisional scope rolled back\""
+            },
+            {
+              "name": "provisionalCommittedReason",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\";",
+              "description": "`signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] provisional scope committed\""
+            },
+            {
+              "name": "quiescenceSealed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\";",
+              "description": "Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] cannot retain a sealed quiescence key\""
+            },
+            {
+              "name": "quiescenceUnsealedWait",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\";",
+              "description": "Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\""
+            },
+            {
+              "name": "provisionalSettled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\";",
+              "description": "Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] provisional scope has already committed or rolled back\""
+            },
+            {
+              "name": "provisionalParentClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\";",
+              "description": "Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] commitTo() target is already closing or terminal\""
+            },
+            {
+              "name": "unitStartFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unitStartFailed: \"[lifecycle] start() failed\";",
+              "description": "Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] start() failed\""
+            },
+            {
+              "name": "unitTerminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unitTerminal: \"[lifecycle] unit is terminal\";",
+              "description": "Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] unit is terminal\""
+            },
+            {
+              "name": "unitClosing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unitClosing: \"[lifecycle] unit is closing\";",
+              "description": "Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] unit is closing\""
+            },
+            {
+              "name": "generationDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\";",
+              "description": "Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] cannot begin a new generation on a disposed GenerationController\""
+            },
+            {
+              "name": "generationSupersededBeforeAdopt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\";",
+              "description": "Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] generation superseded before its result could be adopted\""
+            },
+            {
+              "name": "sharedDeadlinePassed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\";",
+              "description": "Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] shared deadline already passed before this graceful phase could start\""
+            },
+            {
+              "name": "releaseForceFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly releaseForceFailed: \"[lifecycle] force() failed\";",
+              "description": "Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] force() failed\""
+            },
+            {
+              "name": "syncCallbackReturnedThenable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\";",
+              "description": "Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\""
+            },
+            {
+              "name": "scopeTerminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeTerminal: \"[lifecycle] scope is terminal\";",
+              "description": "Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scope is terminal\""
+            },
+            {
+              "name": "scopeClosing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeClosing: \"[lifecycle] scope is closing\";",
+              "description": "Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] scope is closing\""
+            },
+            {
+              "name": "scopeReentrantOwn",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\";",
+              "description": "Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] cannot call own() from within this scope’s own dispose()\""
+            },
+            {
+              "name": "syncScopeRequiresSyncSafe",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\";",
+              "description": "Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\""
+            },
+            {
+              "name": "syncScopeOwnsAsyncOwner",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\";",
+              "description": "Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\""
+            },
+            {
+              "name": "syncScopeDisposalFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\";",
+              "description": "Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED).",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] sync lifecycle scope disposal failed\""
+            },
+            {
+              "name": "generationTimeoutAccessorFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\";",
+              "description": "Explains that a generation timeout option could not be read at its admission boundary.",
+              "parameterDetails": [],
+              "returns": "\"[lifecycle] generation timeout option getter failed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6045,7 +7254,36 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly open: \"open\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"open\""
+            },
+            {
+              "name": "closing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closing: \"closing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"closing\""
+            },
+            {
+              "name": "terminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly terminal: \"terminal\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"terminal\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LifecycleState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6111,7 +7349,45 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: \"idle\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"idle\""
+            },
+            {
+              "name": "loading",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loading: \"loading\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"loading\""
+            },
+            {
+              "name": "loaded",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loaded: \"loaded\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"loaded\""
+            },
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: \"failed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"failed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LifecycleUnitState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6549,6 +7825,7 @@
             "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./abort",
           "overloadSignatures": [
             "export declare function createAbortController(): IAbortController;"
@@ -6657,7 +7934,33 @@
             "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "abort",
+              "kind": "method",
+              "optional": false,
+              "signature": "abort(reason?: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "reason",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./abort",
           "overloadSignatures": [
             "export type IAbortController = { readonly signal: INativeAbortSignal; abort(reason?: unknown): void; };"
@@ -6723,6 +8026,7 @@
             "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IObservedAbortFailureSink",
           "exportPath": "./abort",
           "overloadSignatures": [
@@ -6788,7 +8092,36 @@
           "examples": [
             "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "unsubscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "unsubscribe(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "retryRegistrationCleanup",
+              "kind": "method",
+              "optional": false,
+              "signature": "retryRegistrationCleanup(): void;",
+              "description": "Re-attempts cleanup after a host stores a listener after invoking it during registration.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "failures",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failures: readonly unknown[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly unknown[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IObservedAbortSubscription",
           "exportPath": "./abort",
           "overloadSignatures": [
@@ -6873,6 +8206,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observeAbortSubscription.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "observeAbortSubscription",
           "exportPath": "./abort",
           "overloadSignatures": [
@@ -6991,6 +8325,7 @@
             "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createDisposeTransaction",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7056,7 +8391,7 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`."
+              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`."
             },
             {
               "name": "deadlineAt",
@@ -7068,7 +8403,7 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract. * Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the * graceful-phase `boundedWait`."
+              "description": "Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract. Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the graceful-phase `boundedWait`."
             },
             {
               "name": "signal",
@@ -7087,6 +8422,12 @@
               "type": "{ drain(): Promise<void>; }",
               "optional": true,
               "description": "Awaited after every item settles, so in-flight work started by a release can still be drained."
+            },
+            {
+              "name": "pending.drain",
+              "type": "() => Promise<void>",
+              "optional": false,
+              "description": ""
             }
           ],
           "identity": "packages/lifecycle/dist/dispose-transaction.d.ts:createDisposeTransaction:export declare function createDisposeTransaction(mode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
@@ -7307,7 +8648,7 @@
               "type": "(error: unknown) => void",
               "optional": true,
               "description": "`graceful?` —— 优雅释放；超时只放弃等待（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。",
-              "descriptionEn": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`.",
+              "descriptionEn": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`.",
               "descriptionZh": "`graceful?` —— 优雅释放；超时只放弃等待（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。"
             },
             {
@@ -7323,7 +8664,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "`IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: IScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）、`disposer?: IDisposerContext`。由 `LifecycleScope` 驱动的 disposer 才有 `disposer.",
-              "descriptionEn": "Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract. * Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the * graceful-phase `boundedWait`.",
+              "descriptionEn": "Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract. Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the graceful-phase `boundedWait`.",
               "descriptionZh": "`IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: IScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）、`disposer?: IDisposerContext`。由 `LifecycleScope` 驱动的 disposer 才有 `disposer."
             },
             {
@@ -7349,6 +8690,14 @@
               "description": "`pending?`：每个 item 释放完后调用 `pending.drain()` 等待其触发的在途工作排空（典型传 `createPendingTracker()`）。",
               "descriptionEn": "Awaited after every item settles, so in-flight work started by a release can still be drained.",
               "descriptionZh": "`pending?`：每个 item 释放完后调用 `pending.drain()` 等待其触发的在途工作排空（典型传 `createPendingTracker()`）。"
+            },
+            {
+              "name": "pending.drain",
+              "type": "() => Promise<void>",
+              "optional": false,
+              "description": "`pending?`：每个 item 释放完后调用 `pending.drain()` 等待其触发的在途工作排空（典型传 `createPendingTracker()`）。",
+              "descriptionEn": "",
+              "descriptionZh": "`pending?`：每个 item 释放完后调用 `pending.drain()` 等待其触发的在途工作排空（典型传 `createPendingTracker()`）。"
             }
           ],
           "fragment": "lifecycle-disposal--createDisposeTransaction"
@@ -7373,6 +8722,7 @@
             "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal() // open → closing；之后不再接受 start()\nif (outcome.cleanupErrors.length > 0) {\n  // 领域层决定 throw、report、firstError 或 AggregateError 投影。\n}\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nawait ledger.whenTerminal()"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createSyncStartedDisposalLedger",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7513,6 +8863,7 @@
             "const errors = await executeReleaseDescriptor(descriptor, {\n  signal: controller.signal,\n  deadlineAt: undefined,\n  report: (e) => console.error(e)\n})"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "executeReleaseDescriptor",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7616,7 +8967,27 @@
           "examples": [
             "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "cleanupErrors",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupErrors: readonly TError[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly TError[]"
+            },
+            {
+              "name": "physicalCompletion",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly physicalCompletion?: Promise<ICleanupResult<TError>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<ICleanupResult<TError>>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ICleanupResult",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7684,7 +9055,27 @@
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "descriptor",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly descriptor: IReleaseDescriptor;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReleaseDescriptor"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IDisposeItem",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7751,7 +9142,33 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: IDisposeTransactionMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IDisposeTransactionMode"
+            },
+            {
+              "name": "run",
+              "kind": "method",
+              "optional": false,
+              "signature": "run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "items",
+                  "type": "readonly IDisposeItem[]",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<readonly ICollectedError[]>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IDisposeTransaction",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7817,7 +9234,27 @@
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof DisposeTransactionKind.order;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof DisposeTransactionKind.order"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: typeof DisposeTransactionKind.plan;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof DisposeTransactionKind.plan"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IDisposeTransactionMode",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7884,7 +9321,72 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "errorPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly errorPolicy?: IErrorPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IErrorPolicy"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`.",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            },
+            {
+              "name": "deadlineAt",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly deadlineAt?: number;",
+              "description": "Absolute deadline shared, unchanged, across every item in this run (L-T32).",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly scheduler?: IScheduler;",
+              "description": "Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract. Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the graceful-phase `boundedWait`.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signal?: IAbortSignal;",
+              "description": "Mirrored into every item's context; run() does not abort the caller-owned input signal.",
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "disposer",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly disposer?: IDisposerContext;",
+              "description": "Owner-bound self-join capability, supplied only by a LifecycleScope owner.",
+              "parameterDetails": [],
+              "returns": "IDisposerContext"
+            },
+            {
+              "name": "pending",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly pending?: { drain(): Promise<void>; };",
+              "description": "Awaited after every item settles, so in-flight work started by a release can still be drained.",
+              "parameterDetails": [],
+              "returns": "{ drain(): Promise<void>; }"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IDisposeTransactionOptions",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -7951,7 +9453,65 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "lifecycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly lifecycle: ILifecycleState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILifecycleState"
+            },
+            {
+              "name": "pending",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pending: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "optional": false,
+              "signature": "start(source: string, callback: () => unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "source",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "callback",
+                  "type": "() => unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "seal",
+              "kind": "method",
+              "optional": false,
+              "signature": "seal(): ISyncStartedDisposalOutcome;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISyncStartedDisposalOutcome"
+            },
+            {
+              "name": "whenTerminal",
+              "kind": "method",
+              "optional": false,
+              "signature": "whenTerminal(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ISyncStartedDisposalLedger",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8018,7 +9578,18 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "physicalCompletion",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly physicalCompletion: Promise<ICleanupResult<ICollectedError>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<ICleanupResult<ICollectedError>>"
+            }
+          ],
+          "composes": ["ICleanupResult"],
           "aliasOf": "ISyncStartedDisposalOutcome",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8094,6 +9665,7 @@
             "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal() // open → closing；之后不再接受 start()\nif (outcome.cleanupErrors.length > 0) {\n  // 领域层决定 throw、report、firstError 或 AggregateError 投影。\n}\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nawait ledger.whenTerminal()"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "mergeCleanupResults",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8220,6 +9792,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for containAsyncRejection.",
           "examples": ["containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))"],
           "members": [],
+          "composes": [],
           "aliasOf": "containAsyncRejection",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -8486,6 +10059,7 @@
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createErrorCollector",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -8761,6 +10335,7 @@
             "throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createLifecycleError",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -8820,7 +10395,32 @@
               "content": "No additional advanced behavior is declared for createLifecycleError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "phase",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "detail",
+              "type": "Readonly<Record<string, unknown>>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "errors",
+              "type": "readonly unknown[]",
+              "optional": true,
+              "description": "`source` value stamped onto every error this package throws. */ export const LIFECYCLE_SOURCE = '@migaia/lifecycle' /** The structural error contract every package in the workspace follows (`docs/contracts/error-codes.md` §2). Attached as properties on a real `Error`, never used to replace it — callers that branch on `instanceof DOMException`/`RangeError`/etc. keep working. / export type ILifecycleError = Error & { readonly source: string readonly code: string readonly phase?: string readonly detail?: Readonly<Record<string, unknown>> readonly cause?: unknown /** Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in occurrence order. Keeps them separate from `cause` so the primary error retains its identity."
+            }
+          ],
           "identity": "packages/lifecycle/dist/errors.d.ts:createLifecycleError:export declare function createLifecycleError(code: string, message: string, options?: { readonly cause?: unknown; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly errors?: readonly unknown[]; }): ILifecycleError;",
           "guidance": [
             {
@@ -9000,7 +10600,40 @@
             }
           ],
           "usageScore": 58,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。",
+              "descriptionEn": "",
+              "descriptionZh": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。"
+            },
+            {
+              "name": "phase",
+              "type": "string",
+              "optional": true,
+              "description": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。",
+              "descriptionEn": "",
+              "descriptionZh": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。"
+            },
+            {
+              "name": "detail",
+              "type": "Readonly<Record<string, unknown>>",
+              "optional": true,
+              "description": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。",
+              "descriptionEn": "",
+              "descriptionZh": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。"
+            },
+            {
+              "name": "errors",
+              "type": "readonly unknown[]",
+              "optional": true,
+              "description": "`code`、`message` 均必填（建议 `code` 取自 `LifecycleErrorCode`）。`options.errors` 非空时会冻结后挂到 `.errors`。",
+              "descriptionEn": "`source` value stamped onto every error this package throws. */ export const LIFECYCLE_SOURCE = '@migaia/lifecycle' /** The structural error contract every package in the workspace follows (`docs/contracts/error-codes.md` §2). Attached as properties on a real `Error`, never used to replace it — callers that branch on `instanceof DOMException`/`RangeError`/etc. keep working. / export type ILifecycleError = Error & { readonly source: string readonly code: string readonly phase?: string readonly detail?: Readonly<Record<string, unknown>> readonly cause?: unknown /** Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in occurrence order. Keeps them separate from `cause` so the primary error retains its identity.",
+              "descriptionZh": "`code`、`message` 均必填（建议 `code` 取自 `LifecycleErrorCode`）。`options.errors` 非空时会冻结后挂到 `.errors`。"
+            }
+          ],
           "fragment": "lifecycle-errors--createLifecycleError"
         },
         {
@@ -9037,6 +10670,7 @@
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createLifecycleFailure",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -9301,6 +10935,7 @@
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createLifecycleTypeError",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -9360,7 +10995,20 @@
               "content": "No additional advanced behavior is declared for createLifecycleTypeError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "detail",
+              "type": "Readonly<Record<string, unknown>>",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/lifecycle/dist/errors.d.ts:createLifecycleTypeError:export declare function createLifecycleTypeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): TypeError;",
           "guidance": [
             {
@@ -9524,7 +11172,24 @@
             }
           ],
           "usageScore": 50,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "`createLifecycleTypeError` 创建保留原生 `TypeError` runtime type 的附码错误，并可携带 `cause`/`detail`。`createLifecycleFailure` 用在捕获边界：可扩展的原生 `Error` 会尽量原位附码并保持 `===` identity；primitive、冻结对象或不可重标记错误会被包装，原始抛出物仍可从 `cause` 到达。两者都不改写原始 `stack`。",
+              "descriptionEn": "",
+              "descriptionZh": "`createLifecycleTypeError` 创建保留原生 `TypeError` runtime type 的附码错误，并可携带 `cause`/`detail`。`createLifecycleFailure` 用在捕获边界：可扩展的原生 `Error` 会尽量原位附码并保持 `===` identity；primitive、冻结对象或不可重标记错误会被包装，原始抛出物仍可从 `cause` 到达。两者都不改写原始 `stack`。"
+            },
+            {
+              "name": "detail",
+              "type": "Readonly<Record<string, unknown>>",
+              "optional": true,
+              "description": "`createLifecycleTypeError` 创建保留原生 `TypeError` runtime type 的附码错误，并可携带 `cause`/`detail`。`createLifecycleFailure` 用在捕获边界：可扩展的原生 `Error` 会尽量原位附码并保持 `===` identity；primitive、冻结对象或不可重标记错误会被包装，原始抛出物仍可从 `cause` 到达。两者都不改写原始 `stack`。",
+              "descriptionEn": "",
+              "descriptionZh": "`createLifecycleTypeError` 创建保留原生 `TypeError` runtime type 的附码错误，并可携带 `cause`/`detail`。`createLifecycleFailure` 用在捕获边界：可扩展的原生 `Error` 会尽量原位附码并保持 `===` identity；primitive、冻结对象或不可重标记错误会被包装，原始抛出物仍可从 `cause` 到达。两者都不改写原始 `stack`。"
+            }
+          ],
           "fragment": "lifecycle-errors--createLifecycleTypeError"
         },
         {
@@ -9545,7 +11210,53 @@
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "policy",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly policy: IErrorPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IErrorPolicy"
+            },
+            {
+              "name": "add",
+              "kind": "method",
+              "optional": false,
+              "signature": "add(source: string, error: unknown): void;",
+              "description": "Records one item's failure. For `report`, this is also where the reporter is invoked.",
+              "parameterDetails": [
+                {
+                  "name": "source",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "finalize",
+              "kind": "method",
+              "optional": false,
+              "signature": "finalize(message: string): readonly ICollectedError[];",
+              "description": "Finalizes collection. `collect`/`report`/`firstError`-with-no-error return the collected list (empty for `report`, since those were already handed to the reporter per `add`); `throw` and `firstError`-with-an-error throw instead of returning.",
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly ICollectedError[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IErrorCollector",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -9650,7 +11361,63 @@
             "function createLifecycleError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown\n    readonly phase?: string\n    readonly detail?: Readonly<Record<string, unknown>>\n    readonly errors?: readonly unknown[]\n  }\n): ILifecycleError // Error & { source, code, phase?, detail?, cause?, errors? }",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nfunction createLifecycleTypeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): TypeError\n\nfunction createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly code: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "phase",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly phase?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "detail",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly detail?: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "cause",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly cause?: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "errors",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly errors?: readonly unknown[];",
+              "description": "Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in occurrence order. Keeps them separate from `cause` so the primary error retains its identity.",
+              "parameterDetails": [],
+              "returns": "readonly unknown[]"
+            }
+          ],
+          "composes": ["Error"],
           "aliasOf": "ILifecycleError",
           "exportPath": "./errors",
           "overloadSignatures": [
@@ -9911,6 +11678,7 @@
             "LIFECYCLE_SOURCE // '@migaia/lifecycle'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "LIFECYCLE_SOURCE",
           "exportPath": "./errors",
           "overloadSignatures": ["export declare const LIFECYCLE_SOURCE = \"@migaia/lifecycle\";"],
@@ -10168,6 +11936,7 @@
             "import { createLifecycleScope, createGenerationController } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst generations = createGenerationController()\n\nasync function loadUser(id: string) {\n  const request = generations.begin({ timeoutMs: 5000 })\n  const user = await fetchUser(id, { signal: request.signal })\n  if (!generations.adopt(request.token, user, (u) => u.dispose?.())) return // 已过期，静默丢弃\n  scope.own(user, { force: () => user.dispose?.() })\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export declare function createGenerationController(options?: IGenerationControllerOptions): IGenerationController;"
@@ -10227,19 +11996,19 @@
               "name": "onSuperseded",
               "type": "(info: ILifecycleError) => void",
               "optional": true,
-              "description": "Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the * release attempt, regardless of whether it succeeds. The value is a * `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is * explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want * to notice the race without treating it as an error."
+              "description": "Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the release attempt, regardless of whether it succeeds. The value is a `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want to notice the race without treating it as an error."
             },
             {
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to * `systemScheduler`."
+              "description": "Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to `systemScheduler`."
             },
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release * failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by * an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. * Without it those failures are dropped."
+              "description": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. Without it those failures are dropped."
             }
           ],
           "identity": "packages/lifecycle/dist/generation-controller.d.ts:createGenerationController:export declare function createGenerationController(options?: IGenerationControllerOptions): IGenerationController;",
@@ -10296,7 +12065,7 @@
               "type": "(info: ILifecycleError) => void",
               "optional": true,
               "description": "`adopt(token, value, release, onReleaseError?)`：`token` 仍是当前代时返回 `true`，`value` 留给调用方；否则调用 `release(value)` 回收并返回 `false`——`release` 本身抛出/reject 只会经 `onReleaseError` 上报，绝不反过来污染\"当前是哪一代\"这一状态（不会抛出、不会重新计入错误策略）。若提供了 `onSuperseded`，在过期路径上先额外触发一次携带 `GENERATION_SUPERSEDED` 码的诊断信息（非失败信号）。",
-              "descriptionEn": "Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the * release attempt, regardless of whether it succeeds. The value is a * `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is * explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want * to notice the race without treating it as an error.",
+              "descriptionEn": "Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the release attempt, regardless of whether it succeeds. The value is a `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want to notice the race without treating it as an error.",
               "descriptionZh": "`adopt(token, value, release, onReleaseError?)`：`token` 仍是当前代时返回 `true`，`value` 留给调用方；否则调用 `release(value)` 回收并返回 `false`——`release` 本身抛出/reject 只会经 `onReleaseError` 上报，绝不反过来污染\"当前是哪一代\"这一状态（不会抛出、不会重新计入错误策略）。若提供了 `onSuperseded`，在过期路径上先额外触发一次携带 `GENERATION_SUPERSEDED` 码的诊断信息（非失败信号）。"
             },
             {
@@ -10304,7 +12073,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
-              "descriptionEn": "Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to * `systemScheduler`.",
+              "descriptionEn": "Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to `systemScheduler`.",
               "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
             },
             {
@@ -10312,7 +12081,7 @@
               "type": "(error: unknown) => void",
               "optional": true,
               "description": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。",
-              "descriptionEn": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release * failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by * an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. * Without it those failures are dropped.",
+              "descriptionEn": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. Without it those failures are dropped.",
               "descriptionZh": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。"
             }
           ],
@@ -10336,7 +12105,132 @@
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generation: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "begin",
+              "kind": "method",
+              "optional": false,
+              "signature": "begin(options?: { readonly timeoutMs?: number; }): IGenerationRequest;",
+              "description": "Starts a new generation, superseding whatever was active. Optionally auto-aborts after `timeoutMs`.",
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "{ readonly timeoutMs?: number; }",
+                  "optional": true
+                }
+              ],
+              "returns": "IGenerationRequest"
+            },
+            {
+              "name": "isCurrent",
+              "kind": "method",
+              "optional": false,
+              "signature": "isCurrent(token: IGenerationToken): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IGenerationToken",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "complete",
+              "kind": "method",
+              "optional": false,
+              "signature": "complete(token: IGenerationToken): boolean;",
+              "description": "Releases the matching current token's timer and parent subscription without aborting its signal. Returns false for stale/disposed tokens; cleanup failures retain cancellation codes and causes after invalidating the token.",
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IGenerationToken",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "supersede",
+              "kind": "method",
+              "optional": false,
+              "signature": "supersede(reason?: unknown): void;",
+              "description": "Invalidates the current generation without disposing the controller — a later `begin()` still works.",
+              "parameterDetails": [
+                {
+                  "name": "reason",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "adopt",
+              "kind": "method",
+              "optional": false,
+              "signature": "adopt<T>(token: IGenerationToken, value: T, release: (value: T) => void | PromiseLike<void>, onReleaseError?: (error: unknown) => void): boolean;",
+              "description": "Adopts `value` under `token`'s generation. Returns `true` and keeps `value` with the caller if that generation is still current. Otherwise releases `value` via `release` and returns `false` (L-T6) — a release failure is funneled to `onReleaseError` (or the controller `report` when omitted) and never mutates controller state, so it cannot poison whichever generation is current now (L-T30).",
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IGenerationToken",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "release",
+                  "type": "(value: T) => void | PromiseLike<void>",
+                  "optional": false
+                },
+                {
+                  "name": "onReleaseError",
+                  "type": "(error: unknown) => void",
+                  "optional": true
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(reason?: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "reason",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export type IGenerationController = { readonly generation: number; readonly disposed: boolean; /** * Starts a new generation, superseding whatever was active. Optionally auto-aborts after * `timeoutMs`. */ begin(options?: { readonly timeoutMs?: number; }): IGenerationRequest; isCurrent(token: IGenerationToken): boolean; /** * Releases the matching current token's timer and parent subscription without aborting its * signal. Returns false for stale/disposed tokens; cleanup failures retain cancellation codes and * causes after invalidating the token. */ complete(token: IGenerationToken): boolean; /** * Invalidates the current generation without disposing the controller — a later `begin()` still * works. */ supersede(reason?: unknown): void; /** * Adopts `value` under `token`'s generation. Returns `true` and keeps `value` with the caller if * that generation is still current. Otherwise releases `value` via `release` and returns `false` * (L-T6) — a release failure is funneled to `onReleaseError` (or the controller `report` when * omitted) and never mutates controller state, so it cannot poison whichever generation is * current now (L-T30). */ adopt<T>(token: IGenerationToken, value: T, release: (value: T) => void | PromiseLike<void>, onReleaseError?: (error: unknown) => void): boolean; dispose(reason?: unknown): void; };"
@@ -10402,7 +12296,45 @@
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "parentSignal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly parentSignal?: IAbortSignal;",
+              "description": "When this aborts, the currently-active generation's `signal` aborts too (L-T31).",
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "onSuperseded",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly onSuperseded?: (info: ILifecycleError) => void;",
+              "description": "Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the release attempt, regardless of whether it succeeds. The value is a `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want to notice the race without treating it as an error.",
+              "parameterDetails": [],
+              "returns": "(info: ILifecycleError) => void"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly scheduler?: IScheduler;",
+              "description": "Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to `systemScheduler`.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. Without it those failures are dropped.",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export type IGenerationControllerOptions = { /** When this aborts, the currently-active generation's `signal` aborts too (L-T31). */ readonly parentSignal?: IAbortSignal; /** * Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the * release attempt, regardless of whether it succeeds. The value is a * `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is * explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want * to notice the race without treating it as an error. */ readonly onSuperseded?: (info: ILifecycleError) => void; /** * Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to * `systemScheduler`. */ readonly scheduler?: IScheduler; /** * Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release * failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by * an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. * Without it those failures are dropped. */ readonly report?: (error: unknown) => void; };"
@@ -10468,7 +12400,36 @@
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generation: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "token",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly token: IGenerationToken;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IGenerationToken"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signal: INativeAbortSignal;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            }
+          ],
+          "composes": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: INativeAbortSignal; };"
@@ -10535,6 +12496,7 @@
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
+          "composes": ["object"],
           "exportPath": "./generation",
           "overloadSignatures": ["export type IGenerationToken = object;"],
           "overloadParameterDetails": [[]],
@@ -10617,6 +12579,7 @@
             "const leases = createObjectLeaseRegistry<object>() // 内部就是 createQuiescenceTracker()"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>;"
@@ -10684,6 +12647,7 @@
             "import { createLifecycleScope, createPendingTracker } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst pending = createPendingTracker()\n\nfunction handle(request: Request): Promise<Response> {\n  return pending.track(route(request))\n}\n\nasync function shutdown() {\n  await pending.drain()\n  return scope.dispose()\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createPendingTracker(): IPendingTracker;"
@@ -10775,6 +12739,7 @@
             "const leases = createObjectLeaseRegistry<object>() // 内部就是 createQuiescenceTracker()"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>;"
@@ -10840,6 +12805,7 @@
             "const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createStringLeaseRegistry(): ILeaseRegistry<string>;"
@@ -10906,6 +12872,7 @@
             "function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>\nfunction createStringLeaseRegistry(): ILeaseRegistry<string>\n// type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>"
           ],
           "members": [],
+          "composes": ["IQuiescenceTracker"],
           "exportPath": "./quiescence",
           "overloadSignatures": ["export type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>;"],
           "overloadParameterDetails": [[]],
@@ -10969,7 +12936,42 @@
             "import {\n  createQuiescenceTracker,\n  createStringLeaseRegistry,\n  createObjectLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
             "function createPendingTracker(): IPendingTracker\n\ntype IPendingTracker = {\n  track<T>(promise: Promise<T>): Promise<T>\n  drain(): Promise<void>\n  readonly size: number\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "track",
+              "kind": "method",
+              "optional": false,
+              "signature": "track<T>(promise: Promise<T>): Promise<T>;",
+              "description": "Registers `promise` as in-flight; auto-releases on settle. Returns `promise` unchanged.",
+              "parameterDetails": [
+                {
+                  "name": "promise",
+                  "type": "Promise<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<T>"
+            },
+            {
+              "name": "drain",
+              "kind": "method",
+              "optional": false,
+              "signature": "drain(): Promise<void>;",
+              "description": "Waits until nothing is in flight, looping via `whenZeroOnce()` so work started while draining is never missed (L-T10).",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly size: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export type IPendingTracker = { /** Registers `promise` as in-flight; auto-releases on settle. Returns `promise` unchanged. */ track<T>(promise: Promise<T>): Promise<T>; /** * Waits until nothing is in flight, looping via `whenZeroOnce()` so work started while draining * is never missed (L-T10). */ drain(): Promise<void>; readonly size: number; };"
@@ -11036,7 +13038,114 @@
             "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringLeaseRegistry(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}",
             "function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>\nfunction createStringLeaseRegistry(): ILeaseRegistry<string>\n// type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "retain",
+              "kind": "method",
+              "optional": false,
+              "signature": "retain(key: TKey): IDisposer;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "count",
+              "kind": "method",
+              "optional": false,
+              "signature": "count(key: TKey): number;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "whenZero",
+              "kind": "method",
+              "optional": false,
+              "signature": "whenZero(key: TKey): Promise<void>;",
+              "description": "Strict, exclusive drain: throws synchronously (not a rejected Promise) unless `isSealed(key)`.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "whenZeroOnce",
+              "kind": "method",
+              "optional": false,
+              "signature": "whenZeroOnce(key: TKey): Promise<void>;",
+              "description": "Non-exclusive: resolves the next time count reaches zero; does not block new `retain()` calls.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "seal",
+              "kind": "method",
+              "optional": false,
+              "signature": "seal(key: TKey): void;",
+              "description": "Blocks further `retain()` calls for `key`. Idempotent.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "isSealed",
+              "kind": "method",
+              "optional": false,
+              "signature": "isSealed(key: TKey): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "forget",
+              "kind": "method",
+              "optional": false,
+              "signature": "forget(key: TKey): boolean;",
+              "description": "Removes a zero-count key and returns whether a state entry was removed.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "TKey",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export type IQuiescenceTracker<TKey> = { retain(key: TKey): IDisposer; count(key: TKey): number; /** Strict, exclusive drain: throws synchronously (not a rejected Promise) unless `isSealed(key)`. */ whenZero(key: TKey): Promise<void>; /** Non-exclusive: resolves the next time count reaches zero; does not block new `retain()` calls. */ whenZeroOnce(key: TKey): Promise<void>; /** Blocks further `retain()` calls for `key`. Idempotent. */ seal(key: TKey): void; isSealed(key: TKey): boolean; /** Removes a zero-count key and returns whether a state entry was removed. */ forget(key: TKey): boolean; };"
@@ -11135,6 +13244,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for addSchedulerTime.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "addSchedulerTime",
           "exportPath": "./scheduler",
           "overloadSignatures": [
@@ -11223,6 +13333,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveScheduler.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "resolveScheduler",
           "exportPath": "./scheduler",
           "overloadSignatures": [
@@ -11325,6 +13436,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveSchedulerOption.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "resolveSchedulerOption",
           "exportPath": "./scheduler",
           "overloadSignatures": [
@@ -11387,7 +13499,14 @@
               "content": "No additional advanced behavior is declared for resolveSchedulerOption."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/lifecycle/dist/scheduler.d.ts:resolveSchedulerOption:export declare function resolveSchedulerOption(options: { readonly scheduler?: unknown; } | null | undefined, fallback: IScheduler): IScheduler;\nexport declare function resolveSchedulerOption(options: { readonly scheduler?: unknown; } | null | undefined): IScheduler | undefined;",
           "guidance": [
             {
@@ -11407,7 +13526,16 @@
             }
           ],
           "usageScore": 48,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "unknown",
+              "optional": true,
+              "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
+              "descriptionEn": "",
+              "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
+            }
+          ],
           "fragment": "lifecycle-scheduler--resolveSchedulerOption"
         },
         {
@@ -11435,6 +13563,7 @@
             "const snap = snapshotScheduler(candidate) // 缺少必要方法时返回 undefined；getter 或已提供的 defer 无效时抛出带码错误"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotScheduler",
           "exportPath": "./scheduler",
           "overloadSignatures": [
@@ -11581,6 +13710,7 @@
             "import { createLifecycleScope, createPendingTracker } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst pending = createPendingTracker()\n\nfunction handle(request: Request): Promise<Response> {\n  return pending.track(route(request))\n}\n\nasync function shutdown() {\n  await pending.drain()\n  return scope.dispose()\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./scope",
           "overloadSignatures": [
             "export declare function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;"
@@ -11640,7 +13770,7 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`."
+              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`."
             },
             {
               "name": "deadlineAt",
@@ -11652,7 +13782,7 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to * `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and * mutation queues, such as those in `plugin-host`, in one clock domain."
+              "description": "Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and mutation queues, such as those in `plugin-host`, in one clock domain."
             }
           ],
           "identity": "packages/lifecycle/dist/lifecycle-scope.d.ts:createLifecycleScope:export declare function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;",
@@ -11707,7 +13837,7 @@
               "type": "(error: unknown) => void",
               "optional": true,
               "description": "`errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'` —— 默认 `'throw'`",
-              "descriptionEn": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`.",
+              "descriptionEn": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`.",
               "descriptionZh": "`errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'` —— 默认 `'throw'`"
             },
             {
@@ -11723,7 +13853,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "`@migaia/lifecycle/scheduler` — snapshot、resolve 与安全时间相加",
-              "descriptionEn": "Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to * `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and * mutation queues, such as those in `plugin-host`, in one clock domain.",
+              "descriptionEn": "Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and mutation queues, such as those in `plugin-host`, in one clock domain.",
               "descriptionZh": "`@migaia/lifecycle/scheduler` — snapshot、resolve 与安全时间相加"
             }
           ],
@@ -11747,7 +13877,80 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "lifecycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly lifecycle: ILifecycleState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILifecycleState"
+            },
+            {
+              "name": "release",
+              "kind": "method",
+              "optional": false,
+              "signature": "release(resource: unknown): boolean;",
+              "description": "Unregisters a resource without releasing it — the caller has already released it independently.",
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": "Synchronous, idempotent, never calls user code (L-T27).",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<readonly ICollectedError[]>;",
+              "description": "Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the collected errors for the `collect` policy (empty for the other three, which throw/report internally instead). Concurrent external calls reuse the same published Promise even while release is in flight. Only a synchronous call from an active disposer callback is rejected as reentrant, preventing that callback from self-awaiting the Promise it is currently helping to settle.",
+              "parameterDetails": [],
+              "returns": "Promise<readonly ICollectedError[]>"
+            },
+            {
+              "name": "[Symbol.asyncDispose]",
+              "kind": "method",
+              "optional": false,
+              "signature": "[Symbol.asyncDispose](): Promise<void>;",
+              "description": "Awaits scope release for `await using`, discarding the collected-error result.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "own",
+              "kind": "method",
+              "optional": false,
+              "signature": "own<T>(resource: T, descriptor: IReleaseDescriptor): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "descriptor",
+                  "type": "IReleaseDescriptor",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "exportPath": "./scope",
           "overloadSignatures": [
             "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; /** Awaits scope release for `await using`, discarding the collected-error result. */ [Symbol.asyncDispose](): Promise<void>; };"
@@ -11848,7 +14051,45 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "errorPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly errorPolicy?: IErrorPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IErrorPolicy"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly report?: (error: unknown) => void;",
+              "description": "Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: 'report'`.",
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            },
+            {
+              "name": "deadlineAt",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly deadlineAt?: number;",
+              "description": "Shared absolute deadline forwarded to every owned resource's release (L-T32).",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly scheduler?: IScheduler;",
+              "description": "Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and mutation queues, such as those in `plugin-host`, in one clock domain.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "exportPath": "./scope",
           "overloadSignatures": [
             "export type ILifecycleScopeOptions = { readonly errorPolicy?: IErrorPolicy; /** * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy` * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field: * 'report'`. */ readonly report?: (error: unknown) => void; /** Shared absolute deadline forwarded to every owned resource's release (L-T32). */ readonly deadlineAt?: number; /** * Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to * `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and * mutation queues, such as those in `plugin-host`, in one clock domain. */ readonly scheduler?: IScheduler; };"

@@ -904,61 +904,150 @@ function declarationConfigurationFields(signature: string, includeMutable = fals
 function configurationFromDeclarations(
   candidate: Readonly<Record<string, unknown>>,
   candidates: readonly Readonly<Record<string, unknown>>[],
-  sourceDescriptions: ReadonlyMap<string, string>
+  sourceDescriptions: ReadonlyMap<string, string>,
+  resolveSurface: (
+    expression: string,
+    file: string
+  ) => { members: Array<Record<string, unknown>>; composes: string[] }
 ) {
   if (candidate.kind === 'type' || candidate.kind === 'interface') return []
-  const includeMutable = /(?:^|[/\\])packages[/\\](?:logger|plugin-host|reactive)[/\\]/.test(
-    String(candidate.source)
-  )
-  const declarationsByName = new Map(
+  /** Foreign-package protocols are linked type nodes, not recursively copied configuration. */
+  const packageOwner = String(candidate.source).match(/^packages\/[^/]+\//)?.[0]
+  /** Type names resolve only in the type namespace; a same-named constant is not its value union. */
+  const declarations = new Map(
     candidates
-      .filter((record) => record.kind === 'type' || record.kind === 'interface')
+      .filter(
+        (record) =>
+          (record.kind === 'type' || record.kind === 'interface') &&
+          (!packageOwner || String(record.source).startsWith(packageOwner))
+      )
       .map((record) => [String(record.name), record])
   )
-  const candidateSignature = String(candidate.signature)
-  const configurationOwnerSignature =
-    candidate.kind === 'class' ? classConstructorSignature(candidateSignature) : candidateSignature
-  const pending = Array.from(
-    new Set(configurationOwnerSignature.match(/\bI[A-Za-z0-9]*(?:Options|Config)\b/g) ?? [])
-  ).map((name) => ({ name, prefix: '' }))
-  const visited = new Set<string>()
+  /** Every callable overload contributes its actual parameters, never names from its return type. */
+  const parameters = [
+    ...(Array.isArray(candidate.parameterDetails) ? candidate.parameterDetails : []),
+    ...(Array.isArray(candidate.overloadParameterDetails)
+      ? candidate.overloadParameterDetails.flat()
+      : []),
+    ...(candidate.kind === 'const' && /:\s*(?:<[^;]*>\s*)?\(/.test(String(candidate.signature))
+      ? declarationParameters(String(candidate.signature))
+      : [])
+  ] as Array<{ name: string; type: string; configurationType?: string }>
+  /** Canonical members, shared with normal API projection instead of another property regex. */
+  const membersOf = (
+    expression: string,
+    seen = new Set<string>()
+  ): Array<Record<string, unknown>> => {
+    const text = expression.trim()
+    if (seen.has(text)) return []
+    const visited = new Set(seen).add(text)
+    /** Indexed access selects only the named property's actual type, not its whole owner. */
+    const indexed = text.match(/^([A-Za-z_$][\w$]*)\[['"]([^'"]+)['"]\]$/)
+    if (indexed) {
+      const member = membersOf(indexed[1], visited).find((value) => value.name === indexed[2])
+      return member ? membersOf(String(member.returns), visited) : []
+    }
+    /** Named declarations carry their own members plus declared compositions. */
+    const declaration = declarations.get(
+      text.match(/^([A-Za-z_$][\w$]*)(?:<[\s\S]*>)?$/)?.[1] ?? ''
+    )
+    const shape = declaration
+      ? {
+          members: (declaration.members as Array<Record<string, unknown>>) ?? [],
+          composes: (declaration.composes as string[]) ?? []
+        }
+      : resolveSurface(text, resolve('..', String(candidate.source)))
+    const members = [...shape.members]
+    for (const base of shape.composes) {
+      /** Respect utility keys before a configuration table can expose any field. */
+      const projection = base.match(/^(Omit|Pick)<([\s\S]*)>$/)
+      if (projection) {
+        const [reference = '', keys = ''] = splitTopLevel(projection[2], ',')
+        const selected = new Set(
+          splitTopLevel(keys, '|').map((key) => key.replace(/^['"]|['"]$/g, ''))
+        )
+        members.push(
+          ...membersOf(reference, visited).filter(
+            (member) => selected.has(String(member.name)) === (projection[1] === 'Pick')
+          )
+        )
+        continue
+      }
+      /** A typeof object is explicit value-namespace access, unlike a bare enum type reference. */
+      const queried = base.match(/^typeof\s+([A-Za-z_$][\w$]*)$/)?.[1]
+      if (queried) {
+        const value = candidates.find(
+          (record) => record.name === queried && record.kind === 'const'
+        )
+        if (value) members.push(...((value.members as Array<Record<string, unknown>>) ?? []))
+      } else members.push(...membersOf(base, visited))
+    }
+    /** Union branches may forbid a field with never; keep the reachable branch's actual type. */
+    const combined = new Map<string, Record<string, unknown>>()
+    for (const member of members) {
+      const name = String(member.name)
+      const previous = combined.get(name)
+      if (!previous) combined.set(name, member)
+      else {
+        const reachable = String(member.returns) === 'never' ? previous : member
+        combined.set(name, {
+          ...reachable,
+          optional: Boolean(previous.optional || member.optional)
+        })
+      }
+    }
+    return [...combined.values()]
+  }
+  /** One stable public field projection, recursively expanded only through object-valued fields. */
   const fields = new Map<
     string,
     { name: string; type: string; optional: boolean; description: string }
   >()
-  while (pending.length > 0) {
-    const next = pending.shift()
-    if (!next) continue
-    const { name, prefix } = next
-    const visitKey = `${prefix}:${name}`
-    if (visited.has(visitKey)) continue
-    visited.add(visitKey)
-    const declaration = declarationsByName.get(name)
-    if (!declaration) continue
-    const signature = String(declaration.signature)
-    for (const field of declarationConfigurationFields(signature, includeMutable)) {
-      const leafName = field.name.split('.').at(-1) ?? field.name
-      const fieldName = prefix ? `${prefix}.${field.name}` : field.name
+  const visit = (expression: string, prefix: string, seen: Set<string>): void => {
+    if (seen.has(expression)) return
+    const visited = new Set(seen).add(expression)
+    for (const member of membersOf(expression)) {
+      const name = String(member.name)
+      const fieldName = prefix ? `${prefix}.${name}` : name
+      const signature = String(member.signature)
+      const method = member.kind === 'method'
+      const type = method
+        ? `(${((member.parameterDetails as Array<{ name: string; type: string; optional: boolean }>) ?? []).map((parameter) => `${parameter.name}${parameter.optional ? '?' : ''}: ${parameter.type}`).join(', ')}) => ${String(member.returns)}`
+        : String(member.returns)
+      const owner = expression.match(/^([A-Za-z_$][\w$]*)/)?.[1] ?? ''
       if (!fields.has(fieldName))
         fields.set(fieldName, {
-          ...field,
           name: fieldName,
+          type,
+          optional: member.optional === true || /^(?:readonly\s+)?[\w$]+\?\s*[:(<]/.test(signature),
           description:
-            field.description ||
-            sourceDescriptions.get(`${name}:${field.name}`) ||
-            sourceDescriptions.get(`${name}:${leafName}`) ||
-            sourceDescriptions.get(leafName) ||
+            String(member.description ?? '') ||
+            sourceDescriptions.get(`${owner}:${name}`) ||
+            sourceDescriptions.get(name) ||
             ''
         })
-      for (const dependency of field.type.match(/\bI[A-Za-z0-9]*(?:Options|Config)\b/g) ?? [])
-        pending.push({ name: dependency, prefix: fieldName })
-    }
-    for (const dependency of signature.match(/\bI[A-Za-z0-9]*(?:Options|Config)\b/g) ?? []) {
-      const referencedByField = declarationConfigurationFields(signature, includeMutable).some(
-        (field) => field.type.includes(dependency)
+      /**
+       * Supplied signals, schedulers and instances retain their own type nodes, not option
+       * defaults.
+       */
+      if (
+        !method &&
+        (/^(?:Readonly<)?\s*\{/.test(type) ||
+          /^I[\w$]*(?:Options|Config)(?:<[\s\S]*>)?$/.test(type) ||
+          /^(?:Omit|Pick)<I[\w$]*(?:Options|Config),/.test(type) ||
+          /^[A-Za-z_$][\w$]*\[['"]\w+['"]\]$/.test(type))
       )
-      if (!referencedByField) pending.push({ name: dependency, prefix })
+        visit(type, fieldName, visited)
     }
+  }
+  for (const parameter of parameters) {
+    /** A factory input or callback that happens to mention an Options type is not the options bag. */
+    if (
+      !/^(?:options|config|props)$/.test(parameter.name) &&
+      !/^I[\w$]*(?:Options|Config|Props)(?:<[\s\S]*>)?$/.test(parameter.type)
+    )
+      continue
+    visit(parameter.configurationType ?? parameter.type, '', new Set())
   }
   return [...fields.values()]
 }
@@ -968,7 +1057,8 @@ function sourceConfigurationDescriptions(directory: string): Map<string, string>
   const sourceRoot = join(directory, 'src')
   if (!existsSync(sourceRoot)) return new Map()
   const candidates = new Map<string, Set<string>>()
-  const includeMutable = /[/\\](?:logger|plugin-host|reactive)$/.test(directory)
+  /** Options may be mutable in any owning package. */
+  const includeMutable = true
   const visit = (current: string) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
       const entryPath = join(current, entry.name)
@@ -1087,9 +1177,25 @@ function classMemberDoc(source: string, offset: number): string | null {
     .join(' ')
 }
 
+/**
+ * Finds the `(` that opens a declaration's parameter list, skipping parentheses inside the generic
+ * parameter list (`once<T extends (...args: never[]) => unknown>(fn: T)`). The `>` of an arrow `=>`
+ * does not close a generic bracket. Returns -1 when there is none.
+ */
+function parameterListStart(signature: string) {
+  let angleDepth = 0
+  for (let index = 0; index < signature.length; index += 1) {
+    const character = signature[index]
+    if (character === '<') angleDepth += 1
+    else if (character === '>' && signature[index - 1] !== '=') angleDepth -= 1
+    else if (character === '(' && angleDepth === 0) return index
+  }
+  return -1
+}
+
 /** Extracts source-backed parameter names, types, and optionality from a declaration signature. */
 function declarationParameters(signature: string) {
-  const open = signature.indexOf('(')
+  const open = parameterListStart(signature)
   if (open < 0) return []
   let depth = 0
   let close = -1
@@ -1106,24 +1212,46 @@ function declarationParameters(signature: string) {
   }
   if (close < 0) return []
   const text = signature.slice(open + 1, close)
-  const values: Array<{ name: string; type: string; optional: boolean }> = []
+  const values: Array<{
+    name: string
+    type: string
+    optional: boolean
+    configurationType?: string
+  }> = []
   let start = 0
   depth = 0
   for (let index = 0; index <= text.length; index += 1) {
     const character = text[index]
     if ('([{<'.includes(character)) depth += 1
     if (')]}'.includes(character)) depth -= 1
-    if (character === '>' && depth > 0) depth -= 1
+    if (character === '>' && depth > 0 && text[index - 1] !== '=') depth -= 1
     if ((character === ',' && depth === 0) || index === text.length) {
       const parameter = text.slice(start, index).trim()
       if (parameter) {
-        const match = parameter.match(/^([A-Za-z_$][\w$]*)(\?)?\s*(?::\s*(.*))?$/)
+        /** Object destructuring has one props bag, not a parameter named after its whole pattern. */
+        const destructured = parameter.match(/^\{[\s\S]*\}\s*:\s*([\s\S]+)$/)
+        if (destructured) {
+          values.push({ name: 'props', type: destructured[1].trim(), optional: false })
+          start = index + 1
+          continue
+        }
+        // A rest parameter (`...plugins: T[]`) is documented under its bare name.
+        const match = parameter.match(/^(?:\.\.\.)?([A-Za-z_$][\w$]*)(\?)?\s*(?::\s*([\s\S]*))?$/)
         const name = match?.[1] ?? parameter
         const type = match?.[3]?.trim() || 'unknown'
         values.push({ name, type, optional: Boolean(match?.[2]) })
       }
       start = index + 1
     }
+  }
+  /** Generic config parameters expose their declared input bound, not only a legacy overload. */
+  const header = signature.slice(0, open)
+  const constraints = [...header.matchAll(/\b([A-Za-z_$][\w$]*)\s+extends\s+([A-Za-z_$][\w$]*)\b/g)]
+  for (const parameter of values) {
+    let projection = parameter.type
+    for (const [, name, bound] of constraints)
+      projection = projection.replace(new RegExp(`\\b${name}\\b`, 'g'), bound)
+    if (projection !== parameter.type) parameter.configurationType = projection
   }
   return values
 }
@@ -1133,16 +1261,6 @@ function classConstructorParameters(signature: string) {
   const constructorStart = signature.search(/\bconstructor\s*\(/)
   if (constructorStart < 0) return []
   return declarationParameters(signature.slice(constructorStart))
-}
-
-/** Returns only the public constructor declaration from a class signature. */
-function classConstructorSignature(signature: string): string {
-  const constructorStart = signature.search(/\bconstructor\s*\(/)
-  if (constructorStart < 0) return ''
-  const constructorSignature = signature.slice(constructorStart)
-  const open = constructorSignature.indexOf('(')
-  const close = closingParenthesis(constructorSignature, open)
-  return close < 0 ? constructorSignature : constructorSignature.slice(0, close + 1)
 }
 
 /** Returns the matching close delimiter for a declaration parameter list. */
@@ -1188,6 +1306,8 @@ function classMembers(declaration: string) {
     if (
       !signature ||
       signature.startsWith('#') ||
+      // `__name` members are type-only phantom slots (installed-plugin tuples), not runtime API.
+      /^(?:readonly\s+)?__/.test(signature) ||
       /^(?:private|protected)\b/.test(signature) ||
       /^(?:public\s+)?constructor\b/.test(signature)
     ) {
@@ -1198,12 +1318,16 @@ function classMembers(declaration: string) {
       ''
     )
     const accessor = normalized.match(/^(get|set)\s+([A-Za-z_$][\w$]*)\s*\(/)
-    const method = normalized.match(/^([A-Za-z_$][\w$]*)\??(?:<[^;]*?>)?\s*\(/)
-    const property = normalized.match(/^([A-Za-z_$][\w$]*)[!?]?\s*:\s*([^;]+);?$/)
+    const method = normalized.match(
+      /^([A-Za-z_$][\w$]*|\[Symbol\.(?:asyncDispose|dispose)\])\??(?:<[^;]*?>)?\s*\(/
+    )
+    // Object-literal property types (`execution: { a: number; b: number }`) contain `;`, so the
+    // type is everything after the colon up to the member's own final semicolon.
+    const property = normalized.match(/^([A-Za-z_$][\w$]*)[!?]?\s*:\s*([\s\S]+?);?$/)
     const name = accessor?.[2] ?? method?.[1] ?? property?.[1]
     if (!name) continue
     const kind = accessor?.[1] ?? (method ? 'method' : 'property')
-    const open = signature.indexOf('(')
+    const open = parameterListStart(signature)
     const close = open < 0 ? -1 : closingParenthesis(signature, open)
     const parameterDetails = method || accessor ? declarationParameters(signature) : []
     const returns = property
@@ -1220,6 +1344,7 @@ function classMembers(declaration: string) {
     members.push({
       name,
       kind,
+      optional: /^[\w$]+\?\s*[:(<]/.test(normalized),
       signature,
       description: classMemberDoc(body, start),
       parameterDetails,
@@ -1227,6 +1352,396 @@ function classMembers(declaration: string) {
     })
   }
   return members
+}
+
+/**
+ * Returns the offsets of one separator (`&`, `|`, `,`, `=`, `{`) that sit at nesting depth zero,
+ * ignoring separators nested in braces, brackets, parentheses, generics, and string literals.
+ */
+function topLevelOffsets(expression: string, separator: string): number[] {
+  /** Comments are prose, so quotes and brackets inside them cannot affect type nesting. */
+  expression = expression.replace(/\/\*[\s\S]*?\*\//g, (comment) => ' '.repeat(comment.length))
+  const offsets: number[] = []
+  let depth = 0
+  let quote: string | null = null
+  for (let index = 0; index < expression.length; index += 1) {
+    const character = expression[index]
+    if (quote) {
+      if (character === '\\') index += 1
+      else if (character === quote) quote = null
+    } else if (depth === 0 && character === separator) offsets.push(index)
+    else if (character === '"' || character === "'" || character === '`') quote = character
+    else if ('{[(<'.includes(character)) depth += 1
+    // `=>` closes no generic, so an arrow inside a function type keeps the depth balanced.
+    else if ('}])'.includes(character) || (character === '>' && expression[index - 1] !== '='))
+      depth = Math.max(0, depth - 1)
+  }
+  return offsets
+}
+
+/** Splits a type expression on one top-level separator into trimmed, non-empty parts. */
+function splitTopLevel(expression: string, separator: string): string[] {
+  /** Part boundaries: each separator plus both ends of the expression. */
+  const bounds = [-1, ...topLevelOffsets(expression, separator), expression.length]
+  return bounds
+    .slice(1)
+    .map((end, index) => expression.slice(bounds[index] + 1, end).trim())
+    .filter(Boolean)
+}
+
+/** Returns the bare name of a named type reference such as `IFoo<T>` or `ns.IFoo`, else null. */
+function namedTypeReference(part: string): string | null {
+  return part.match(/^(?:[A-Za-z_$][\w$]*\.)*([A-Za-z_$][\w$]*)\s*(?:<[\s\S]*>)?$/)?.[1] ?? null
+}
+
+/**
+ * Projects the instance surface of an `interface` or object-shaped `type` declaration so factory
+ * results (channels, runtimes, pipelines) document their methods like classes do.
+ *
+ * `members` holds the declaration's own literal members; `composes` names the types it extends or
+ * intersects, which the site resolves to inherit their members. Object union branches retain their
+ * declared members; conditional and primitive unions have no object surface.
+ */
+function typeMemberShape(declaration: string, kind: 'type' | 'interface') {
+  /** Empty projection for declarations without one object-shaped instance surface. */
+  const none = { members: [] as Array<Record<string, unknown>>, composes: [] as string[] }
+  /** Header text before the body, with the leading `export declare` keywords and name removed. */
+  const header = declaration.replace(
+    /^export\s+(?:declare\s+)?(?:type|interface)\s+[A-Za-z_$][\w$]*/,
+    ''
+  )
+  if (kind === 'interface') {
+    /** Interface body starts at the first brace outside the generic parameter list. */
+    const bodyStart = topLevelOffsets(header, '{')[0] ?? -1
+    if (bodyStart < 0) return none
+    /** `extends A<T>, B` names inherited instance surfaces. */
+    const heritage = header
+      .slice(0, bodyStart)
+      .replace(/^\s*<[\s\S]*?>\s*(?=extends\b|$)/, '')
+      .match(/\bextends\b([\s\S]*)$/)?.[1]
+    return {
+      members: classMembers(header.slice(bodyStart)),
+      composes: heritage
+        ? splitTopLevel(heritage, ',')
+            .map(namedTypeReference)
+            .filter((name): name is string => Boolean(name))
+        : []
+    }
+  }
+  /** The alias target follows the first `=` that is not part of a generic default or arrow. */
+  const assignment = topLevelOffsets(header, '=')[0] ?? -1
+  return typeExpressionShape(
+    assignment < 0
+      ? ''
+      : header
+          .slice(assignment + 1)
+          .replace(/;\s*$/, '')
+          .trim()
+  )
+}
+
+/**
+ * Projects one type expression (an alias target or a `const` value type) into its instance surface.
+ * Constructor types (`new (...) => T`) project the instance type `T` they construct.
+ */
+function typeExpressionShape(expression: string): {
+  members: Array<Record<string, unknown>>
+  composes: string[]
+} {
+  /** Empty projection for expressions without one object-shaped instance surface. */
+  const none = { members: [] as Array<Record<string, unknown>>, composes: [] as string[] }
+  /** A constructor type's instance surface follows its top-level `=>`. */
+  const arrow = /^(?:abstract\s+)?new\b/.test(expression)
+    ? topLevelOffsets(expression, '=').find((offset) => expression[offset + 1] === '>')
+    : undefined
+  /** `Readonly<{ ... }>` wraps the same instance surface, so the wrapper is peeled first. */
+  const peel = (part: string): string => {
+    /** Only remove a wrapper that encloses the entire expression, never two intersected wrappers. */
+    const text = part.trim()
+    if (
+      text.startsWith('Readonly<') &&
+      text.endsWith('>') &&
+      splitTopLevel(text, '&').length === 1 &&
+      splitTopLevel(text, '|').length === 1
+    )
+      return peel(text.replace(/^Readonly<([\s\S]*)>$/, '$1'))
+    if (text.startsWith('(') && closingParenthesis(text, 0) === text.length - 1)
+      return peel(text.slice(1, -1))
+    return text
+  }
+  const target = peel(arrow === undefined ? expression : expression.slice(arrow + 2).trim())
+  if (!target || splitTopLevel(target, '?').length > 1) return none
+  /** A typeof alias exposes the real constant object's fields and methods. */
+  const queried = target.match(/^typeof\s+([A-Za-z_$][\w$]*)$/)?.[1]
+  if (queried) return { members: [], composes: [`typeof ${queried}`] }
+  /** A union of object variants exposes each real member without inventing callable parameters. */
+  const variants = splitTopLevel(target, '|')
+  if (variants.length > 1) {
+    const shapes = variants.map((part) => typeExpressionShape(part))
+    if (shapes.some((shape) => shape.members.length === 0 && shape.composes.length === 0))
+      return none
+    return {
+      members: shapes.flatMap((shape) => shape.members),
+      composes: shapes.flatMap((shape) => shape.composes)
+    }
+  }
+  /** Object literals contribute members; named references are inherited surfaces. */
+  const parts = splitTopLevel(target, '&').map(peel)
+  if (parts.length > 1) {
+    const shapes = parts.map((part) => typeExpressionShape(part))
+    return {
+      members: shapes.flatMap((shape) => shape.members),
+      composes: shapes.flatMap((shape) => shape.composes)
+    }
+  }
+  /** Parse each utility separately: a trailing intersection is not part of its omitted key list. */
+  if (/^(?:Omit|Pick|Partial)</.test(target)) return { members: [], composes: [target] }
+  return {
+    members: parts.filter((part) => part.startsWith('{')).flatMap((part) => classMembers(part)),
+    composes: parts
+      .filter((part) => !part.startsWith('{'))
+      .map(namedTypeReference)
+      .filter((name): name is string => Boolean(name))
+  }
+}
+
+/** Names the base class a class declaration extends, so its inherited members can be shown. */
+function classHeritage(declaration: string): string[] {
+  /** Class header text before its body. */
+  const header = declaration.slice(0, topLevelOffsets(declaration, '{')[0] ?? declaration.length)
+  /** `extends` clause after the generic parameter list, stopping at `implements`. */
+  const base = header
+    .replace(/^export\s+(?:declare\s+)?(?:abstract\s+)?class\s+[A-Za-z_$][\w$]*\s*/, '')
+    .replace(/^<[\s\S]*?>\s*(?=extends\b|implements\b|$)/, '')
+    .match(/^extends\s+([\s\S]*?)(?:\bimplements\b|$)/)?.[1]
+  /** The base reference keeps only its bare name. */
+  const name = base ? namedTypeReference(base.trim()) : null
+  return name ? [name] : []
+}
+
+/**
+ * Inlines members that a public class or type inherits from non-public declarations of the same
+ * package (for example `PluginHost extends RuntimeHost`), so the reader sees the whole instance
+ * surface. Public bases stay in `composes` because the site links and merges them itself.
+ */
+function inlinePrivateSurfaces(directory: string, symbols: Array<Record<string, unknown>>) {
+  /** Public names in this package; these are merged on the site instead of copied here. */
+  const publicNames = new Set(symbols.map((symbol) => String(symbol.name)))
+  /** Only same-entry public bases are available to the route's local symbol pool. */
+  let entryPath = ''
+  /** Declarations per emitted typing file, keyed by local name. */
+  const declarations = new Map<string, Map<string, { kind: string; text: string }>>()
+  /** Import aliases per file (`import { A as B }`), mapping the local name to its real owner. */
+  const imports = new Map<string, Map<string, { file: string; name: string }>>()
+  /** Lists every emitted declaration file under one directory. */
+  const typingFiles = (root: string): string[] =>
+    existsSync(root)
+      ? readdirSync(root, { withFileTypes: true }).flatMap((entry) =>
+          entry.isDirectory()
+            ? typingFiles(join(root, entry.name))
+            : entry.name.endsWith('.d.ts')
+              ? [join(root, entry.name)]
+              : []
+        )
+      : []
+  /** Load only declaration files reached through package imports; never execute the exported code. */
+  const loadDeclarations = (filePath: string): void => {
+    if (declarations.has(filePath) || !existsSync(filePath)) return
+    const source = readFileSync(filePath, 'utf8')
+    /** This file's own declarations. */
+    const local = new Map<string, { kind: string; text: string }>()
+    for (const match of source.matchAll(
+      /^(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(class|type|interface|const|function)\s+([A-Za-z_$][\w$]*)/gm
+    )) {
+      if (local.has(match[2])) continue
+      const start = match.index ?? 0
+      local.set(match[2], {
+        kind: match[1],
+        text: source.slice(start, declarationEnd(source, start, match[1])).trim()
+      })
+    }
+    declarations.set(filePath, local)
+    /** Named imports resolve through the exact workspace export declaration. */
+    const bindings = new Map<string, { file: string; name: string }>()
+    for (const imported of source.matchAll(
+      /^import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]((?:\.|@migaia\/)[^'"]+)['"]/gm
+    )) {
+      const file = declarationImportFiles(filePath, imported[2])[0]
+      if (!file) continue
+      for (const binding of imported[1].split(',')) {
+        const [original, alias = original] = binding
+          .trim()
+          .replace(/^type\s+/, '')
+          .split(/\s+as\s+/)
+        if (original) bindings.set(alias.trim(), { file, name: original.trim() })
+      }
+    }
+    imports.set(filePath, bindings)
+  }
+  for (const filePath of typingFiles(join(directory, 'dist'))) loadDeclarations(filePath)
+  /** Finds where a name used in one file is declared: its own file, an import, or any file. */
+  const locate = (name: string, file: string) => {
+    loadDeclarations(file)
+    const own = declarations.get(file)?.get(name)
+    if (own) return { file, declaration: own }
+    const imported = imports.get(file)?.get(name)
+    if (imported) {
+      loadDeclarations(imported.file)
+      const declaration = declarations.get(imported.file)?.get(imported.name)
+      if (declaration) return { file: imported.file, declaration }
+      /** Public barrels may re-export the declaration from another typing file. */
+      const exported = declarationSymbols(imported.file).find(
+        (record) => record.name === imported.name
+      )
+      if (!exported) return undefined
+      const sourceFile = String(exported.source)
+      loadDeclarations(sourceFile)
+      return {
+        file: sourceFile,
+        declaration: { kind: String(exported.kind), text: String(exported.signature) }
+      }
+    }
+    for (const [candidateFile, local] of declarations) {
+      const declaration = local.get(name)
+      if (declaration) return { file: candidateFile, declaration }
+    }
+    return undefined
+  }
+  /** Resolves one non-public declaration into its members plus any public bases it reaches. */
+  const privateSurface = (
+    name: string,
+    file: string,
+    seen: Set<string>,
+    inlinePublic = false
+  ): { members: Array<Record<string, unknown>>; composes: string[] } => {
+    const found = locate(name, file)
+    if (!found || seen.has(`${found.file}:${name}`)) return { members: [], composes: [] }
+    seen.add(`${found.file}:${name}`)
+    /** Normalized text that the shared projections can read as an exported declaration. */
+    const text = found.declaration.text.replace(/^(?:export\s+)?(?:declare\s+)?/, 'export declare ')
+    const own =
+      found.declaration.kind === 'class'
+        ? { members: classMembers(text), composes: classHeritage(text) }
+        : found.declaration.kind === 'const'
+          ? typeExpressionShape(
+              text.match(/^export declare const [A-Za-z_$][\w$]*\s*:\s*([\s\S]*?);?$/)?.[1] ?? ''
+            )
+          : typeMemberShape(text, found.declaration.kind as 'type' | 'interface')
+    return expand(own, found.file, seen, inlinePublic)
+  }
+  /** Replaces non-public bases with their members, keeping public bases as links. */
+  const expand = (
+    shape: { members: Array<Record<string, unknown>>; composes: string[] },
+    file: string,
+    seen: Set<string>,
+    inlinePublic = false
+  ) => {
+    const members = [...shape.members]
+    const composes: string[] = []
+    for (const base of shape.composes) {
+      /** Partial preserves the selected surface while making each real field optional. */
+      const partial = base.match(/^Partial<([\s\S]*)>$/)?.[1]
+      if (partial) {
+        const projected = expand(typeExpressionShape(partial), file, new Set(seen), true)
+        members.push(...projected.members.map((member) => ({ ...member, optional: true })))
+        composes.push(...projected.composes)
+        continue
+      }
+      /** Typeof selects the value namespace, unlike a same-named enum-like type alias. */
+      const queried = base.match(/^typeof\s+([A-Za-z_$][\w$]*)$/)?.[1]
+      if (queried) {
+        const value = privateSurface(queried, file, new Set(seen), true)
+        members.push(...value.members)
+        composes.push(...value.composes)
+        continue
+      }
+      /** Omit/Pick inherit only the selected fields, never the unfiltered base surface. */
+      const projection = base.match(/^(Omit|Pick)<([\s\S]*)>$/)
+      if (projection) {
+        const [reference = '', keys = ''] = splitTopLevel(projection[2], ',')
+        /** Pool APIs select real methods from an awaited public peer factory result. */
+        const unwrapped = reference.replace(/^Awaited<([\s\S]*)>$/, '$1')
+        const factoryName = unwrapped.match(
+          /^ReturnType<typeof ([A-Za-z_$][\w$]*)(?:<[\s\S]*>)?>$/
+        )?.[1]
+        const factory = factoryName ? locate(factoryName, file) : undefined
+        let projected: { members: Array<Record<string, unknown>>; composes: string[] }
+        if (factory) {
+          const signature = factory.declaration.text
+          const open = parameterListStart(signature)
+          const close = open < 0 ? -1 : closingParenthesis(signature, open)
+          if (close < 0) continue
+          let result = signature
+            .slice(close + 1)
+            .replace(/^\s*:\s*/, '')
+            .replace(/;\s*$/, '')
+            .trim()
+          for (;;) {
+            const value = result.match(/^(?:Awaited|Promise|PromiseLike)<([\s\S]*)>$/)?.[1]
+            if (!value) break
+            result = value
+          }
+          projected = expand(typeExpressionShape(result), factory.file, new Set(seen), true)
+        } else {
+          const name = namedTypeReference(reference)
+          if (!name) continue
+          projected = privateSurface(name, file, new Set(seen), true)
+        }
+        const selected = new Set(
+          splitTopLevel(keys, '|').map((key) =>
+            key.replace(/^["']|["']$/g, '').replace(/^typeof (Symbol\.[\w]+)$/, '[$1]')
+          )
+        )
+        members.push(
+          ...projected.members.filter(
+            (member) => selected.has(String(member.name)) === (projection[1] === 'Pick')
+          )
+        )
+        continue
+      }
+      /** An import alias of a public declaration still names a private local binding. */
+      const target = imports.get(file)?.get(base)?.name ?? base
+      /** Foreign-package base instances stay linked; only explicit field projections inline them. */
+      const located = locate(base, file)
+      if (!inlinePublic && located && !located.file.startsWith(`${directory}/`)) {
+        composes.push(target)
+        continue
+      }
+      if (
+        (!inlinePublic &&
+          publicNames.has(base) &&
+          target === base &&
+          symbols.some((symbol) => symbol.name === base && symbol.exportPath === entryPath)) ||
+        !located
+      ) {
+        composes.push(base)
+        continue
+      }
+      const inherited = privateSurface(base, file, seen, inlinePublic)
+      members.push(...inherited.members)
+      composes.push(...inherited.composes)
+    }
+    return { members, composes: Array.from(new Set(composes)) }
+  }
+  for (const symbol of symbols) {
+    if (!Array.isArray(symbol.composes) || symbol.composes.length === 0) continue
+    entryPath = String(symbol.exportPath)
+    /** Absolute typing file that declares this public symbol. */
+    const file = resolve('..', String(symbol.source))
+    const shape = expand(
+      {
+        members: (symbol.members as Array<Record<string, unknown>>) ?? [],
+        composes: symbol.composes as string[]
+      },
+      file,
+      new Set([`${file}:${String(symbol.name)}`])
+    )
+    symbol.members = shape.members
+    symbol.composes = shape.composes
+  }
+  /** Private parameter aliases use this same canonical projection without manufacturing exports. */
+  return (expression: string, file: string) =>
+    expand(typeExpressionShape(expression), file, new Set(), true)
 }
 
 /** Finds the end of one declaration while respecting nested syntax and comments. */
@@ -1324,17 +1839,9 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
   if (visited.has(filePath)) return []
   visited.add(filePath)
   const source = readFileSync(filePath, 'utf8')
-  /**
-   * Only this RPC migration extends named-import/external chains; other owners retain their
-   * baseline.
-   */
-  const rpcOwner =
-    /(?:^|[\\/])packages[\\/]rpc-(?:contract|core|process|threads|bridge-jsonrpc|browser)[\\/]/.test(
-      filePath
-    )
   const records: Array<Record<string, unknown>> = []
   const declarationPattern =
-    /export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(function|class|const|let|var|type|interface|namespace)\s+([A-Za-z_$][\w$]*)/g
+    /export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(function|class|const|let|var|type|interface|namespace)\s+([A-Za-z_$][\w$]*)/g
   for (const match of source.matchAll(declarationPattern)) {
     const kind = match[1]
     const name = match[2]
@@ -1343,16 +1850,15 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
     const end = declarationEnd(source, declarationStart, kind)
     const rawDeclaration = source.slice(declarationStart, end).trim()
     const signature = rawDeclaration.replace(/\s+/g, ' ')
-    const parameterDetails =
+    let parameterDetails =
       kind === 'function'
         ? declarationParameters(signature)
         : kind === 'class'
           ? classConstructorParameters(signature)
           : []
-    const parameters = parameterDetails.map((parameter) => parameter.name)
     /** A local overloaded callable type can own an exported const's actual call signatures. */
     const valueType =
-      kind === 'const' ? signature.match(/:\s*([A-Za-z_$][\w$]*);$/)?.[1] : undefined
+      kind === 'const' ? signature.match(/:\s*([A-Za-z_$][\w$]*)(?:<[\s\S]*>)?;$/)?.[1] : undefined
     /** Inspect the actual declaration instead of guessing callability from the export name. */
     const valueTypeStart = valueType
       ? source.search(new RegExp(`(?:type|interface)\\s+${valueType}\\b`))
@@ -1363,16 +1869,43 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
       /\{\s*(?:<|\()/.test(
         source.slice(valueTypeStart, declarationEnd(source, valueTypeStart, 'type'))
       )
-    const open = signature.indexOf('(')
+    /** Keep actual overload parameters and returns when a const refers to a local callable alias. */
+    const callResults: string[] = []
+    if (callable) {
+      const declaration = source.slice(
+        valueTypeStart,
+        declarationEnd(source, valueTypeStart, 'type')
+      )
+      const body = declaration.slice(declaration.indexOf('{') + 1, declaration.lastIndexOf('}'))
+      const calls = splitTopLevel(body, ';')
+        .map((call) => call.replace(/\/\*[\s\S]*?\*\//g, '').trim())
+        .filter(Boolean)
+      parameterDetails = calls.flatMap((call) => declarationParameters(call))
+      for (const call of calls) {
+        const open = parameterListStart(call)
+        const close = open < 0 ? -1 : closingParenthesis(call, open)
+        if (close >= 0)
+          callResults.push(
+            call
+              .slice(close + 1)
+              .replace(/^\s*:\s*/, '')
+              .trim()
+          )
+      }
+    }
+    const parameters = parameterDetails.map((parameter) => parameter.name)
+    const open = parameterListStart(signature)
     const close = open < 0 ? -1 : closingParenthesis(signature, open)
     const returnText =
-      kind !== 'function' || close < 0
-        ? ''
-        : signature
-            .slice(close + 1)
-            .replace(/^\s*:\s*/, '')
-            .replace(/;\s*$/, '')
-            .trim()
+      callResults.length > 0
+        ? [...new Set(callResults)].join(' | ')
+        : kind !== 'function' || close < 0
+          ? ''
+          : signature
+              .slice(close + 1)
+              .replace(/^\s*:\s*/, '')
+              .replace(/;\s*$/, '')
+              .trim()
     records.push({
       name,
       kind,
@@ -1389,7 +1922,17 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
       errors: [],
       lifecycleConcurrency: null,
       examples: [],
-      members: kind === 'class' ? classMembers(rawDeclaration) : []
+      ...(kind === 'type' || kind === 'interface'
+        ? typeMemberShape(rawDeclaration, kind)
+        : kind === 'class'
+          ? { members: classMembers(rawDeclaration), composes: classHeritage(rawDeclaration) }
+          : kind === 'const'
+            ? typeExpressionShape(
+                signature.match(
+                  /^export declare const [A-Za-z_$][\w$]*\s*:\s*([\s\S]*?);?$/
+                )?.[1] ?? ''
+              )
+            : { members: [], composes: [] })
     })
   }
   /** Named imports can be publicly re-exported without repeating their original from clause. */
@@ -1422,8 +1965,13 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
     )
   ]
   for (const reexport of reexports) {
-    /** Existing relative from clauses stay general; this task does not expand other owner APIs. */
-    if (!rpcOwner && (!reexport[3] || !reexport[3].startsWith('.'))) continue
+    /**
+     * Relative re-exports are followed for every package, including bare `export { X }` of a
+     * relatively imported binding (`import { X } from './x.js'; export { X }`); otherwise public
+     * names such as an error-code table never reach the site. Bare package specifiers stay excluded
+     * outside ordinary workspace exports.
+     */
+    if (reexport[3] && !reexport[3].startsWith('.') && !reexport[3].startsWith('@migaia/')) continue
     if (reexport[1] === '*') {
       for (const target of declarationImportFiles(filePath, reexport[3]))
         records.push(...declarationSymbols(target, new Set(visited)))
@@ -1448,6 +1996,7 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
       /** The export's from clause or its imported binding names the actual owning entry. */
       const specifier = reexport[3] ?? imported?.specifier
       if (!specifier) continue
+      if (!specifier.startsWith('.') && !specifier.startsWith('@migaia/')) continue
       /** Each target is read through its public declaration artifact and the existing cycle guard. */
       const targetRecords =
         directRecords ??
@@ -1672,11 +2221,6 @@ function buildPublicSymbols(directory: string, manifest: Record<string, any>, ex
     group.push({
       ...candidate,
       ...details,
-      declaredConfiguration: configurationFromDeclarations(
-        candidate,
-        groupedCandidates,
-        sourceDescriptions
-      ),
       identity,
       signature: sanitizePublicText(sourceSignature),
       overloadSignatures: Array.isArray(candidate.overloadSignatures)
@@ -1720,6 +2264,15 @@ function buildPublicSymbols(directory: string, manifest: Record<string, any>, ex
       })
     }
   }
+  const resolveSurface = inlinePrivateSurfaces(directory, symbols)
+  /** Options use the same resolved public/private surfaces that API pages render. */
+  for (const symbol of symbols)
+    symbol.declaredConfiguration = configurationFromDeclarations(
+      symbol,
+      symbols,
+      sourceDescriptions,
+      resolveSurface
+    )
   return {
     symbols: symbols.sort((left, right) =>
       `${String(left.exportPath)}:${String(left.name)}`.localeCompare(

@@ -2812,3 +2812,47 @@ a.journey-item:hover b {
     animation: none;
   }
 }
+
+/* Complete API inventory folded below the curated essentials group. */
+.left-rail-inventory {
+  margin-top: var(--space-3);
+}
+
+.left-rail-inventory > summary {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  gap: var(--space-2);
+  letter-spacing: 0.06em;
+  list-style: none;
+  padding: var(--space-1) 0.625rem;
+  text-transform: uppercase;
+}
+
+.left-rail-inventory > summary::-webkit-details-marker {
+  display: none;
+}
+
+.left-rail-inventory > summary::before {
+  content: '▸';
+  transition: transform var(--motion-quick) var(--motion-ease);
+}
+
+.left-rail-inventory[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.left-rail-inventory > summary small {
+  color: var(--text-faint);
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.left-rail-inventory > summary:hover {
+  background: var(--surface-subtle);
+  color: var(--text-strong);
+}
