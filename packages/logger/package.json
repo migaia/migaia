@@ -38,9 +38,9 @@
   "scripts": {
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "fmt": "oxfmt src test e2e logger.test.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "typecheck:browser": "bun check -p tsconfig.browser.json",
     "lint": "oxlint src test e2e logger.test.ts",
     "test": "pnpm run build && vitest run test logger.test.ts",
     "test:coverage": "pnpm run build && vitest run --coverage test logger.test.ts",

@@ -171,7 +171,10 @@ function main() {
     createdLinks = ensurePackageLinks()
     assertPackageExports()
     for (const project of projects) {
-      runPnpm(['exec', 'tsc', '--noEmit', '-p', `fixtures/consumers/tsconfig.${project}.json`])
+      execFileSync('bun', ['check', '-p', `fixtures/consumers/tsconfig.${project}.json`], {
+        cwd: repositoryRoot,
+        stdio: 'inherit'
+      })
     }
   } finally {
     cleanupPackageLinks(createdLinks)

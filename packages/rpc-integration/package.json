@@ -6,8 +6,8 @@
   "scripts": {
     "fmt": "oxfmt test bench vitest.config.ts vitest.conformance.config.ts vitest.suite-parity.config.ts vitest.family.config.ts",
     "lint": "oxlint test bench vitest.config.ts vitest.conformance.config.ts vitest.suite-parity.config.ts vitest.family.config.ts",
-    "typecheck": "tsc -p tsconfig.test.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "typecheck": "bun check -p tsconfig.test.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
     "test": "vitest run --coverage.enabled=false",
     "test:conformance": "vitest run --config vitest.conformance.config.ts --coverage.enabled=false",
     "test:suite-parity": "vitest run --config vitest.suite-parity.config.ts --coverage.enabled=false",

@@ -120,15 +120,15 @@
   },
   "scripts": {
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
     "fmt": "oxfmt src test vitest.config.ts",
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage",
-    "typecheck:core": "tsc --noEmit -p tsconfig.core.json"
+    "typecheck:core": "bun check -p tsconfig.core.json"
   },
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",

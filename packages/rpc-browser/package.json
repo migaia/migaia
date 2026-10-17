@@ -52,8 +52,8 @@
   },
   "scripts": {
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
@@ -61,7 +61,7 @@
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
-    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json"
+    "typecheck:e2e": "bun check -p tsconfig.e2e.json"
   },
   "dependencies": {
     "@migaia/utils": "workspace:^"

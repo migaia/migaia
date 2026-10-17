@@ -33,8 +33,8 @@
   "scripts": {
     "fmt": "oxfmt src test bench vite.bench.config.ts",
     "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
     "lint": "oxlint src test bench vite.bench.config.ts",
     "test": "(node ../../scripts/dist-stamp.mjs assert || pnpm run build) && vitest run",
     "bench:mutation": "pnpm run build && vitest run --config vite.bench.config.ts",

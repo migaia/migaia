@@ -74,8 +74,8 @@
   "scripts": {
     "fmt": "oxfmt src test",
     "lint": "oxlint src test",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
     "test": "(node ../../scripts/dist-stamp.mjs assert || pnpm run build) && vitest run",
     "test:packed": "pnpm run build && node test/packed-export-smoke.mjs",
     "bench:collector": "pnpm run build && node test/collector-performance.mjs",

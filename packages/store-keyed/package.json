@@ -38,9 +38,9 @@
   "scripts": {
     "fmt": "oxfmt src test e2e",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json",
-    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "typecheck:e2e": "bun check -p tsconfig.e2e.json",
     "lint": "oxlint src test e2e",
     "test": "vitest run test",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",

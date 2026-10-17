@@ -23,8 +23,8 @@
   "scripts": {
     "fmt": "oxfmt src test vitest.config.ts",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run test",
     "bench:ingest": "node --expose-gc bench/ingest.mjs",
