@@ -476,9 +476,17 @@ svg {
 }
 
 .brand-mark {
+  /* Slow turn of the eye; the reduced-motion block below stops it. */
+  animation: brand-mark-spin 24s linear infinite;
   height: 3rem;
   stroke-width: 1.4;
   width: 3rem;
+}
+
+@keyframes brand-mark-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .brand-mark-ring {
