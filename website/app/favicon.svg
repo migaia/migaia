@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+  <!--
+    Brand mark of root.tsx `BrandMark` (dark-theme colours) on a rounded tile, so the tab icon
+    reads on light and dark browser chrome alike; strokes are thickened for 16px tabs.
+  -->
+  <rect width="20" height="20" rx="4.5" fill="#1f2129" />
+  <g transform="translate(10 10) scale(1.08) translate(-10 -10)">
+    <circle cx="10" cy="10" r="4.4" fill="none" stroke="#90aafa" stroke-width="1.9" />
+    <g fill="#90aafa" stroke="#90aafa" stroke-width="0.5" stroke-linejoin="round">
+      <path d="M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.6 10 10Z" />
+      <path d="M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.6 10 10Z" transform="rotate(90 10 10)" />
+      <path d="M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.6 10 10Z" transform="rotate(180 10 10)" />
+      <path d="M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.6 10 10Z" transform="rotate(270 10 10)" />
+    </g>
+    <circle cx="10" cy="10" r="2.6" fill="#e9ebef" />
+  </g>
+</svg>

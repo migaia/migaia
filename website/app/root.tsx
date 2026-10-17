@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
   Links,
+  type LinksFunction as ILinksFunction,
   Meta,
   type MetaFunction as IMetaFunction,
   Outlet,
@@ -15,6 +16,7 @@ import {
 import '@fontsource-variable/inter/wght.css'
 import '@fontsource-variable/jetbrains-mono/wght.css'
 import './app.css'
+import faviconHref from './favicon.svg?url'
 import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { revealRouteContent } from './motion.js'
@@ -38,6 +40,11 @@ const ROOT_DESCRIPTION = 'The path does not map to a current library or document
 export const meta: IMetaFunction = () => [
   { title: 'migaia' },
   { name: 'description', content: ROOT_DESCRIPTION }
+]
+
+/** Tab icon: the brand mark, emitted through Vite so it ships with the hashed assets. */
+export const links: ILinksFunction = () => [
+  { rel: 'icon', type: 'image/svg+xml', href: faviconHref }
 ]
 
 /** Persistent browser key for the reader-selected color mode. */
