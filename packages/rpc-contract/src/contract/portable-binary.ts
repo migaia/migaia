@@ -27,7 +27,7 @@ export function recordRpcPortableSnapshot(value: object): void {
   binarySnapshots.add(value)
 }
 
-/** Resource callers retain the existing module-instance check injected at this declaration. */
+/** Marks a value as a portable binary snapshot for later protocol capture. */
 export function markRpcPortableBinary(value: object): void {
   recordRpcPortableSnapshot(value)
 }

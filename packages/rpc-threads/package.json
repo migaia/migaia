@@ -35,7 +35,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "build": "node ../../scripts/dist-stamp.mjs clean && node ../../scripts/dist-stamp.mjs build-rpc && node ../../scripts/dist-stamp.mjs write",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "release:patch": "pnpm version patch --no-git-tag-version",

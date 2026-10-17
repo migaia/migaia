@@ -9,8 +9,6 @@ const sourceRoots = {
   core: join(import.meta.dirname, '../../../rpc-core/src'),
   browser: join(import.meta.dirname, '../../../rpc-browser/src')
 } as const
-/** Compiler-owned guard uses canonical Core identity and its actual emitted throw-site source map. */
-const compilerSource = join(import.meta.dirname, '../../../../scripts/rpc-instance-emit.mjs')
 /** The core codes removed by BC1 because no supported throw site emits them. */
 const retired = (
   JSON.parse(
@@ -269,10 +267,9 @@ describe('layered error ownership', () => {
   it('A2 removes every dead core code while retaining a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
-    expect(core.size).toBe(34)
+    expect(core.size).toBe(33)
     /** Contract R5 declares this report code before probe-core installs its observation runtime. */
     expect(core.get('probeFailed')).toBe('PROBE_FAILED')
-    expect(core.get('duplicateModuleInstance')).toBe('DUPLICATE_MODULE_INSTANCE')
     for (const value of retired) expect([...core.values()]).not.toContain(value)
     const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))
     const coreThrown = new Set(
@@ -280,43 +277,6 @@ describe('layered error ownership', () => {
         .filter(({ table }) => /^(?:WebRpcErrorCode|RpcCoreErrorCode)$/u.test(table))
         .map(({ key }) => key)
     )
-    /** The virtual Source is true compiler input; do not waive a declared code merely by name. */
-    const compiler = readFileSync(compilerSource, 'utf8')
-    expect(compiler).toContain(
-      "canonicalLiteral(join(coreSource, 'error-code.ts'), 'ERROR_SOURCE')"
-    )
-    expect(compiler).toContain("'RpcCoreErrorCode',\n      'duplicateModuleInstance'")
-    expect(compiler).toContain("'RpcCoreErrorText',\n      'duplicateModuleInstance'")
-    expect(compiler).toContain(
-      'const virtualText = bootstrapSource(manifest.name, manifest.version, identity)'
-    )
-    const guardMap = JSON.parse(
-      readFileSync(join(sourceRoots.core, '../dist/internal/module-instance.js.map'), 'utf8')
-    ) as {
-      sources: string[]
-      sourcesContent: string[]
-    }
-    expect(guardMap.sources).toEqual(['../../src/internal/module-instance.ts'])
-    const guard = guardMap.sourcesContent[0]!
-    const parsedGuard = ts.createSourceFile(
-      'module-instance.ts',
-      guard,
-      ts.ScriptTarget.Latest,
-      true
-    )
-    const declaration = parsedGuard.statements.find(
-      (statement) =>
-        ts.isFunctionDeclaration(statement) && statement.name?.text === 'assertRpcModuleInstance'
-    )
-    expect(declaration && ts.isFunctionDeclaration(declaration)).toBe(true)
-    expect(guard).toContain(
-      'const error = new Error("Duplicate @migaia/rpc module instance detected")'
-    )
-    expect(guard).toContain('source: { value: "@migaia/rpc/core", enumerable: true }')
-    expect(guard).toContain('code: { value: "DUPLICATE_MODULE_INSTANCE", enumerable: true }')
-    expect(guard).toContain('throw error')
-    /** Packed duplicate/version copies prove this exact compiler throw executes before acquisition. */
-    coreThrown.add('duplicateModuleInstance')
     expect([...contract.keys()].filter((key) => !contractThrown.has(key))).toEqual([])
     /** Probe runtime reports through its installed canonical site; no reserved Core code is pending. */
     expect([...core.keys()].filter((key) => !coreThrown.has(key))).toEqual([])

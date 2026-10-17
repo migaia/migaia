@@ -29,10 +29,6 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 
 `@migaia/rpc-contract` 是 peer 依赖，两者版本必须一致（当前 `0.0.9`）。运行时依赖 `@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/event-subscriber`、`@migaia/serialize`、`@migaia/supervision`、`@migaia/utils`，随包安装。
 
-同一个页面或进程里只能加载一份 `@migaia/rpc-core`。依赖解析出两份副本时，第二份在取得任何资源前抛出 `@migaia/rpc/core` / `DUPLICATE_MODULE_INSTANCE`；请修正依赖，让所有 RPC 包解析到同一份。不同 Worker 各自独立，不受影响。
-
-此保证针对 `package.json` 的 `exports` 指向的构建产物；直接复制或导入 `src/` 不包含副本检测。
-
 ## 入口一览
 
 | 入口                                                              | 内容                                                                                                                                                                                           |

@@ -734,7 +734,6 @@ source 均为 `@migaia/rpc/core`。
 | `MIDDLEWARE_DUPLICATED`、`MIDDLEWARE_MISSING`      | 中间件重复或缺失                                    | 修正 Endpoint 组装                                               |
 | `CHUNK_INVALID`                                    | 分片重组失败                                        | 修正分帧或载体                                                   |
 | `PROPERTY_READ_FAILED`、`STRING_CONVERSION_FAILED` | 读取属性的 getter 抛错 / 无法转为字符串             | 修正输入对象                                                     |
-| `DUPLICATE_MODULE_INSTANCE`                        | 同一环境加载了两份 rpc-core                         | 修正依赖解析，然后重新加载                                       |
 | `CALLBACK_FAILED` | 冷 Probe stage listener、中间件安装或诊断 reporter 失败 | 检查原错或 cause；reporter 失败进入既有宿主异常队列 |
 | `INTERNAL`                                         | 内部错误                                            | 按 `cause` 处理，默认不自动重试                                  |
 
@@ -788,10 +787,6 @@ source 均为 `@migaia/rpc/remote`。
 
 **浏览器载体上高频调用被拒绝？**
 非独占载体的重放账本有持续速率上限（第 8 节）。合并调用，或改用原生独占通道。
-
-**两个包各装了一份 rpc-core？**
-会得到 `DUPLICATE_MODULE_INSTANCE`。让所有 `@migaia/rpc-*` 包解析到同一份 `@migaia/rpc-core`。
-这个检测覆盖 `exports` 指向的构建产物；直接复制或导入 `src/` 不包含检测。
 
 **能自己定义新的协议级能力吗？**
 不能。自定义中间件可以做日志、诊断、策略；新的根能力需要在 Core 内实现。

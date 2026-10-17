@@ -50,8 +50,8 @@ describe('error boundary helpers', () => {
 
   it('keeps unique registered codes and a constant source (E-T1/E-T2)', () => {
     const codes = Object.values(RpcCoreErrorCode)
-    /** API audit adds CALLBACK_FAILED to the 33 existing Core semantic codes. */
-    expect(codes).toHaveLength(34)
+    /** API audit adds CALLBACK_FAILED to the 32 Core semantic codes left after the guard removal. */
+    expect(codes).toHaveLength(33)
     expect(new Set(codes).size).toBe(codes.length)
     const samples: ReadonlyArray<{ readonly source: string; readonly code: string }> = [
       new RpcError(RpcCoreErrorCode.internal, 'base'),

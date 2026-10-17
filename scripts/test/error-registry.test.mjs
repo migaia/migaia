@@ -139,8 +139,7 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
     [
       ...frozen.core.filter((code) => !retired.has(code)),
       ...added.core,
-      ...controlAdded.core,
-      'DUPLICATE_MODULE_INSTANCE'
+      ...controlAdded.core
     ].sort()
   )
   assert.equal(codes('@migaia/capability/graph').length, 15)

@@ -24,8 +24,6 @@ export const RpcCoreErrorText = {
   probeMethodsInvalid: 'Probe methods must be an array of strings',
   /** D7 requires an extensible unregistered host with no own probe fields before any attachment. */
   probeHostInvalid: 'Probe host must be an extensible unregistered object without own probe fields',
-  /** BCPS1 retains one stable collision diagnostic for every separately guarded RPC owner. */
-  duplicateModuleInstance: 'Duplicate @migaia/rpc module instance detected',
   /** Original process transfer rejection occurs before getters or first caller admission. */
   runtimeProcessTransferInvalid: 'Runtime process calls do not accept transfer',
   /** A selected binary frame failed the closed manifest grammar before provider publication. */

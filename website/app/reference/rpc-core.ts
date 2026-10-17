@@ -1153,10 +1153,6 @@ function operation(
 }
 /** Core and transport errors preserve native identity and distinct causes. */
 const coreErrors: Record<string, IText> = {
-  duplicateModuleInstance: t(
-    'DUPLICATE_MODULE_INSTANCE: another resolved published Core owner was loaded in this realm; detection covers the exported build, not arbitrary copied src files. Fix dependency deduplication before constructing resources.',
-    '模块重复错误：同执行域载入另一份已发布核心所有者；检测覆盖导出构建，不覆盖任意复制的源码，创建资源前应修正依赖去重。'
-  ),
   providerGenerationMismatch: t(
     'PROVIDER_GENERATION_MISMATCH: accepted caller/provider generation no longer matches the task; select the actual binding again.',
     '提供方世代不匹配：已接受调用方或提供方世代与任务不符，应重新选择实际绑定。'

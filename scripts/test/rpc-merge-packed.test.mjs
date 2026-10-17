@@ -16,7 +16,6 @@ const baseline = JSON.parse(
 const owners = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
 const checks = [
   'five-packed-artifacts',
-  'five-owner-duplicate-instances',
   'runtime-peer-pair',
   'subpath-imports',
   'obsolete-subpaths',

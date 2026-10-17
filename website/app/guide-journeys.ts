@@ -45219,8 +45219,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '分别处理取消、等待到期、已关闭端点和迟到结果；迟到结果不会再次发响应。'
                   ],
                   [
-                    'MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING / INVALID_CONFIG / CAPABILITY_CONFLICT / CAPABILITY_UNSUPPORTED / DUPLICATE_MODULE_INSTANCE',
-                    '修正配置、能力组合或重复加载；重复相同调用不会解决。'
+                    'MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING / INVALID_CONFIG / CAPABILITY_CONFLICT / CAPABILITY_UNSUPPORTED',
+                    '修正配置或能力组合；重复相同调用不会解决。'
                   ],
                   [
                     'PROTOCOL_INVALID / CONTRACT_INVALID / PAYLOAD_INVALID / SCHEMA_INVALID / CHUNK_INVALID / AUTHENTICATION_FAILED',
@@ -45471,7 +45471,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Handle cancellation, deadline expiry, closed endpoints, and expired provider contexts separately; late contexts do not send another result.'
                   ],
                   [
-                    'MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING / INVALID_CONFIG / CAPABILITY_CONFLICT / CAPABILITY_UNSUPPORTED / DUPLICATE_MODULE_INSTANCE',
+                    'MIDDLEWARE_DUPLICATED / MIDDLEWARE_MISSING / INVALID_CONFIG / CAPABILITY_CONFLICT / CAPABILITY_UNSUPPORTED',
                     'Fix configuration, capability composition, or duplicated package loading rather than repeating the call.'
                   ],
                   [

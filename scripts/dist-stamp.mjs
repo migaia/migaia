@@ -202,27 +202,6 @@ export const inputDigests = (directories, root = repositoryRoot) => {
     hash.update(readFileSync(absolute))
     hash.update('\0')
   }
-  /** RPC output includes a private compiler guard whose canonical inputs belong to Core. */
-  for (const directory of directories) {
-    if (
-      !/^@migaia\/rpc-(contract|core|process|threads|bridge-jsonrpc|browser)$/.test(
-        readManifest(directory).name
-      )
-    )
-      continue
-    for (const file of [
-      'scripts/dist-stamp.mjs',
-      'scripts/rpc-instance-emit.mjs',
-      'packages/rpc-core/src/core/error-code.ts',
-      'packages/rpc-core/src/core/error-text.ts'
-    ]) {
-      hashes
-        .get(directory)
-        .update(file + '\0')
-        .update(readFileSync(join(root, file)))
-        .update('\0')
-    }
-  }
   return new Map([...hashes].map(([directory, hash]) => [directory, hash.digest('hex')]))
 }
 
@@ -441,13 +420,6 @@ const main = async (argv) => {
       DistStampErrorCode.usage
     )
   if (verb === 'clean') return cleanDist(directory)
-  if (verb === 'build-rpc') {
-    /** Emit and source maps are created together; failed compiler output is never stamped. */
-    const { emitRpcWithInstanceGuard } = await import('./rpc-instance-emit.mjs')
-    const status = emitRpcWithInstanceGuard(directory)
-    if (status !== 0) process.exitCode = status
-    return
-  }
   if (verb === 'write') return void writeStamp(directory)
   if (verb === 'assert') return assertClosureFresh(directory)
   throw withCode(

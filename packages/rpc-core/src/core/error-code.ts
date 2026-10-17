@@ -19,11 +19,6 @@ export const RpcCoreErrorCode = {
    */
   callbackFailed: 'CALLBACK_FAILED',
   /**
-   * BCPS1 rejects a second resolved owner instance before it constructs resources in this realm.
-   * Fix dependency resolution and reload; the first instance and other realms continue normally.
-   */
-  duplicateModuleInstance: 'DUPLICATE_MODULE_INSTANCE',
-  /**
    * The selected authenticated provider/caller generation no longer matches this task; select
    * again.
    */
