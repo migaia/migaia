@@ -18,6 +18,7 @@ import '@fontsource-variable/jetbrains-mono/wght.css'
 import './app.css'
 import faviconHref from './favicon.svg?url'
 import { BRAND_BLADE_PATH, whirlBrandMark } from './brand-mark.js'
+import { energizeCardEdge, trackCardFocus } from './card-focus.js'
 import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { revealRouteContent } from './motion.js'
@@ -391,6 +392,19 @@ function App() {
   /** Turns true after hydration; gates the client-only ambient background. */
   const [hydrated, setHydrated] = useState(false)
   useEffect(() => setHydrated(true), [])
+  /** Speeds up and flickers the edge light of the card under the pointer. */
+  useEffect(() => {
+    /** Restores the previously focused card's edge light. */
+    let restore = () => {}
+    const stop = trackCardFocus((card) => {
+      restore()
+      restore = card ? energizeCardEdge(card) : () => {}
+    })
+    return () => {
+      stop()
+      restore()
+    }
+  }, [])
   return (
     <>
       {hydrated ? (

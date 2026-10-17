@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigation, useNavigationType } from 'react-router'
 import { prefersReducedMotion } from '../motion.js'
+import { trackCardFocus } from '../card-focus.js'
 
 /**
  * WGSL program for the site-wide background. A slow aurora (domain-warped noise in the brand
@@ -13,7 +14,8 @@ import { prefersReducedMotion } from '../motion.js'
  */
 const AMBIENT_SHADER = /* wgsl */ `
 struct Uniforms {
-  res: vec2f, time: f32, dark: f32, level: f32, flow: f32, drift: vec2f
+  res: vec2f, time: f32, dark: f32, level: f32, flow: f32, drift: vec2f,
+  focus: vec4f, focusLevel: f32
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
@@ -63,6 +65,21 @@ fn fbm(p0: vec2f) -> f32 {
   let particles = dotMask * mix(0.14, 0.2, u.dark) * twinkle * (1.0 - u.level * 0.35);
   let particleColor = mix(indigo, teal, h);
 
+  // Focused card: inside the hovered card's rect the aurora thickens and a second, finer particle
+  // layer appears, so the card reads as a window onto denser light. Soft 24px falloff at the edge.
+  let edge = min(min(pos.x - u.focus.x, u.focus.z - pos.x), min(pos.y - u.focus.y, u.focus.w - pos.y));
+  let inside = smoothstep(-24.0, 16.0, edge) * u.focusLevel;
+  let q2 = p * grid * 2.1 + u.drift * 1.7 + vec2f(13.7, 5.1);
+  let id2 = floor(q2);
+  let h2 = hash(id2);
+  let jitter2 = (vec2f(hash(id2 + 2.9), hash(id2 + 4.4)) - 0.5) * 0.6;
+  let d2 = fract(q2) - 0.5 - jitter2;
+  let radius2 = mix(0.06, 0.12, h2);
+  let dotMask2 = smoothstep(radius2, radius2 * 0.3, length(d2)) * step(0.5, h2);
+  let twinkle2 = 0.5 + 0.5 * sin(u.time * 1.3 + h2 * 50.0);
+  let focusParticles = dotMask2 * mix(0.2, 0.28, u.dark) * twinkle2 * inside;
+  let focusAurora = smoothstep(0.3, 0.8, m) * mix(0.12, 0.18, u.dark) * inside;
+
   // Full-viewport contours: warped topographic lines, kept faint behind the text.
   let c = (pos.xy - 0.5 * u.res) / u.res.y;
   let ct = u.flow * 1.9;
@@ -74,9 +91,10 @@ fn fbm(p0: vec2f) -> f32 {
   let contour = (glow * 0.008 + line * mix(0.065, 0.05, u.dark)) * (1.0 - 0.3 * uv.y);
   let contourColor = mix(indigo, teal, smoothstep(0.35, 0.75, w.x));
 
-  let a = clamp(aurora + particles + contour, 0.0, 1.0);
+  let a = clamp(aurora + particles + contour + focusParticles + focusAurora, 0.0, 1.0);
   let color =
-    (auroraColor * aurora + particleColor * particles + contourColor * contour) / max(a, 0.0001);
+    (auroraColor * (aurora + focusAurora) + particleColor * particles
+      + mix(indigo, teal, h2) * focusParticles + contourColor * contour) / max(a, 0.0001);
   return vec4f(color * a, a);
 }
 `
@@ -120,8 +138,14 @@ const BUFFER_SCALE = 0.75
 /** `GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST`; the DOM lib in use lacks the namespace. */
 const UNIFORM_COPY_DST_USAGE = 0x40 | 0x08
 
-/** Uniform block size in bytes: res, time, dark, level, flow, drift (8 × f32). */
-const UNIFORM_BYTES = 32
+/**
+ * Uniform block size in bytes: res, time, dark, level, flow, drift (8 × f32), the focused card rect
+ * (vec4f at offset 32) and its strength (f32 at 48), padded to the struct's 16-byte alignment.
+ */
+const UNIFORM_BYTES = 64
+
+/** Time constant (seconds) of the ease toward and away from a focused card. */
+const FOCUS_EASE_SECONDS = 0.18
 
 /**
  * Reads React Router's history index for the current entry; Back lowers it, Forward raises it.
@@ -234,6 +258,12 @@ export default function AmbientField() {
       let driftX = 0
       /** Accumulated upward particle drift. */
       let driftY = 0
+      /** Card link under the pointer, or null; set by the card-focus tracker. */
+      let focusCard: HTMLElement | null = null
+      /** Eased focus strength (0 none, 1 full) of the current or last focused card. */
+      let focusLevel = 0
+      /** Last focused card rect in CSS pixels, kept while the focus eases out. */
+      let focusRect = { left: 0, top: 0, right: 0, bottom: 0 }
 
       /** Matches the drawing buffer to the viewport at the reduced buffer scale. */
       const resize = () => {
@@ -261,6 +291,11 @@ export default function AmbientField() {
         flow += dt * (IDLE_SPEED.flow + level * TRANSITION_SPEED.flow)
         driftX += dt * (IDLE_SPEED.driftX + level * TRANSITION_SPEED.driftX * transition.dir)
         driftY += dt * (IDLE_SPEED.driftY + level * TRANSITION_SPEED.driftY)
+        const focusTarget = focusCard ? 1 : 0
+        focusLevel += (focusTarget - focusLevel) * (1 - Math.exp(-dt / FOCUS_EASE_SECONDS))
+        if (focusTarget === 0 && focusLevel < TRANSITION_EPSILON) focusLevel = 0
+        // The card scrolls with the page while the canvas is fixed: read its rect every step.
+        if (focusCard) focusRect = focusCard.getBoundingClientRect()
         canvas.style.filter =
           level > 0
             ? `blur(${(level * TRANSITION_BLUR_PX).toFixed(2)}px) opacity(${(1 - level * (1 - TRANSITION_OPACITY)).toFixed(3)})`
@@ -278,6 +313,13 @@ export default function AmbientField() {
         uniforms[5] = flow
         uniforms[6] = driftX
         uniforms[7] = driftY
+        /** CSS pixels to drawing-buffer pixels. */
+        const scale = canvas.width / Math.max(1, canvas.clientWidth)
+        uniforms[8] = focusRect.left * scale
+        uniforms[9] = focusRect.top * scale
+        uniforms[10] = focusRect.right * scale
+        uniforms[11] = focusRect.bottom * scale
+        uniforms[12] = focusLevel
         gpuDevice.queue.writeBuffer(uniformBuffer, 0, uniforms)
         const encoder = gpuDevice.createCommandEncoder()
         const pass = encoder.beginRenderPass({
@@ -328,7 +370,15 @@ export default function AmbientField() {
       themeObserver.observe(document.documentElement, { attributeFilter: ['data-theme'] })
       document.addEventListener('visibilitychange', resume)
       window.addEventListener('resize', resume)
+      /** Hover focus only animates; the reduced-motion still frame ignores it. */
+      const stopFocus = still
+        ? () => {}
+        : trackCardFocus((card) => {
+            focusCard = card
+            resume()
+          })
       detach = () => {
+        stopFocus()
         themeObserver.disconnect()
         document.removeEventListener('visibilitychange', resume)
         window.removeEventListener('resize', resume)
