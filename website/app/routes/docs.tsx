@@ -37,6 +37,7 @@ import { commentExample, type IExampleCommentaryContext } from '../example-comme
 import { referenceFor } from '../reference/index.js'
 import {
   localizeReference,
+  pageReference,
   type ILocalizedEnhancerDoc,
   type ILocalizedMemberDoc,
   type ILocalizedReference,
@@ -268,7 +269,16 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
         reference: (() => {
           /** Audited libraries render every API sentence from their reference file. */
           const libraryReference = domain === 'docs' ? referenceFor(librarySlug) : undefined
-          return libraryReference ? localizeReference(libraryReference, guideLocale) : undefined
+          return libraryReference
+            ? pageReference(
+                localizeReference(libraryReference, guideLocale),
+                selectedModule,
+                selectedApi?.symbols ?? [],
+                [selectedSymbol?.name, selectedType?.name].filter(
+                  (name): name is string => name !== undefined
+                )
+              )
+            : undefined
         })()
       }
     : null
