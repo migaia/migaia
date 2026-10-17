@@ -84,9 +84,15 @@ const familyOverlapChains = 2
  * alone, and every other conformance file. Each lane keeps the original false/1 config.
  */
 const conformanceLanes = Object.freeze([
-  Object.freeze({ id: 'r', args: Object.freeze(['test/process/conformance-resources.test.ts']) }),
+  /** The clock-bound resource suite starts early, alongside the RPC family capture. */
+  Object.freeze({
+    id: 'r',
+    early: true,
+    args: Object.freeze(['test/process/conformance-resources.test.ts'])
+  }),
   Object.freeze({
     id: 'o',
+    early: false,
     args: Object.freeze(['--exclude', 'test/process/conformance-resources.test.ts'])
   })
 ])
@@ -526,12 +532,13 @@ const captureFamily = async (packages, runtime) => {
  *
  * @param {string[]} names Existing package declaration order.
  * @param {ICiRuntime} runtime Global job budget.
- * @param {() => Promise<void>} [onPoolDrained] Root work started once the ordinary pool drains; it
- *   may overlap the family capture and its package tails.
+ * @param {{ onFamilyReady?: () => void; onPoolDrained?: () => Promise<void> }} [hooks]
+ *   `onFamilyReady` runs synchronously as the family capture starts; `onPoolDrained` is root work
+ *   started once the ordinary pool drains and may overlap the capture and its tails.
  * @returns {Promise<IPackageResult[]>} Complete ordered package results; summaries never precede
  *   deferred tests or the drained-pool callback.
  */
-export const runPackages = async (names, runtime, onPoolDrained = undefined) => {
+export const runPackages = async (names, runtime, hooks = {}) => {
   /** Package maps prevent duplicate selected owners from running a second capture. */
   const results = [...new Set(names)].map((name) => {
     if (!existsSync(join(repositoryRoot, 'packages', name, 'package.json')))
@@ -552,7 +559,10 @@ export const runPackages = async (names, runtime, onPoolDrained = undefined) => 
   const familyReady = Promise.withResolvers()
   /** Capture keeps the original coverage unit, failure ownership and post-capture package tails. */
   const familyCapture = family.length
-    ? familyReady.promise.then(() => captureFamily(family, runtime))
+    ? familyReady.promise.then(() => {
+        hooks.onFamilyReady?.()
+        return captureFamily(family, runtime)
+      })
     : Promise.resolve()
   /** Root work waits for the whole ordinary pool, never for the family capture. */
   const pool = runPool(ordinary, runtime.jobs, async (result) => {
@@ -561,21 +571,19 @@ export const runPackages = async (names, runtime, onPoolDrained = undefined) => 
     else ordinaryRemaining -= 1
     if (familyPrefixesRemaining === 0 && ordinaryRemaining <= familyOverlapChains)
       familyReady.resolve()
-  }).then(() => onPoolDrained?.())
+  }).then(() => hooks.onPoolDrained?.())
   await Promise.all([pool, familyCapture])
   for (const result of results) printSummary(result.gates)
   return results
 }
 
 /**
- * Apply the explicit toolchain admission policy, then run conformance when every peer tool exists.
+ * List conformance peer executables missing from the inherited toolchain PATH.
  *
- * @param {ICiRuntime} runtime Child environment.
- * @returns {Promise<IGateResult>} Conformance result, or a blocking/warning skip row naming the
- *   missing tools.
+ * @returns {Promise<string[]>} Missing tool names; empty when conformance may run.
  */
-const runConformanceAdmitted = async (runtime) => {
-  /** Missing toolchains retain the original explicit blocking/warning skip policy. */
+const missingConformanceTools = async () => {
+  /** Tools whose `command -v` lookup failed, in declaration order. */
   const missing = []
   for (const tool of conformanceTools)
     if (
@@ -587,57 +595,73 @@ const runConformanceAdmitted = async (runtime) => {
       ])) !== 0
     )
       missing.push(tool)
-  if (!missing.length) return runConformance(runtime)
-  return {
-    name: text.missingTools(missing),
-    code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
-    state:
-      process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
-        ? GateState.skipWarning
-        : GateState.skipBlocking,
-    seconds: 0
-  }
+  return missing
 }
 
 /**
- * Run the conformance suite as concurrent whole-file lanes behind one required summary row. Each
+ * Create the conformance gate: concurrent whole-file lanes behind one required summary row. Each
  * lane runs the package's original `test:conformance` script (serial files, one worker) with a
- * private TMPDIR and RPC_H_EVIDENCE, so native peer builds and evidence files never collide. Both
- * lanes always settle; the first nonzero lane exit becomes the row's exit code.
+ * private TMPDIR and RPC_H_EVIDENCE, so native peer builds and evidence files never collide. Early
+ * lanes may start before the rest; every lane starts at most once.
  *
  * @param {ICiRuntime} runtime Child environment.
- * @returns {Promise<IGateResult>} One `rpc/test:conformance` result.
+ * @returns {{ startEarly: () => void; finish: () => Promise<IGateResult> }} `startEarly` launches
+ *   the early lanes; `finish` launches the rest, waits for every lane and returns one
+ *   `rpc/test:conformance` result whose code is the first nonzero lane exit.
  */
-const runConformance = async (runtime) => {
-  console.log(text.gate(GateName.conformance))
-  /** Match Makefile's integer elapsed-second result format. */
-  const started = Math.floor(Date.now() / 1000)
-  /** Native lane exits in declaration order, independent of completion order. */
-  const codes = await Promise.all(
-    conformanceLanes.map(({ id, args }) => {
+const createConformanceGate = (runtime) => {
+  /** Native exit promise of each launched lane, keyed by lane id. */
+  const lanes = new Map()
+  /** Row start in Makefile's integer seconds, set when the first lane launches. */
+  let started = 0
+  /**
+   * Launch one lane unless it is already running.
+   *
+   * @param {(typeof conformanceLanes)[number]} lane Lane definition.
+   * @returns {Promise<number>} The lane's native exit code.
+   */
+  const start = (lane) => {
+    if (!lanes.has(lane.id)) {
+      if (!started) {
+        console.log(text.gate(GateName.conformance))
+        started = Math.floor(Date.now() / 1000)
+      }
       /** Persistent lane root; the native wrappers still decide freshness and rebuilds. */
-      const temporaryDirectory = `${conformanceTemporaryPrefix}-${id}`
+      const temporaryDirectory = `${conformanceTemporaryPrefix}-${lane.id}`
       mkdirSync(temporaryDirectory, { recursive: true })
-      return runCommand(
-        'pnpm',
-        ['--filter', './packages/rpc-integration', 'run', 'test:conformance', ...args],
-        {
-          env: {
-            ...runtime.env,
-            TMPDIR: temporaryDirectory,
-            RPC_H_EVIDENCE: join(temporaryDirectory, 'h-evidence')
+      lanes.set(
+        lane.id,
+        runCommand(
+          'pnpm',
+          ['--filter', './packages/rpc-integration', 'run', 'test:conformance', ...lane.args],
+          {
+            env: {
+              ...runtime.env,
+              TMPDIR: temporaryDirectory,
+              RPC_H_EVIDENCE: join(temporaryDirectory, 'h-evidence')
+            }
           }
-        }
+        )
       )
-    })
-  )
-  /** Any failing lane fails the single required row with its own native code. */
-  const code = codes.find((value) => value !== 0) ?? 0
+    }
+    return lanes.get(lane.id)
+  }
   return {
-    name: GateName.conformance,
-    code,
-    state: code === 0 ? GateState.pass : GateState.fail,
-    seconds: Math.floor(Date.now() / 1000) - started
+    startEarly: () => {
+      for (const lane of conformanceLanes) if (lane.early) start(lane)
+    },
+    finish: async () => {
+      /** Native lane exits in declaration order, independent of completion order. */
+      const codes = await Promise.all(conformanceLanes.map(start))
+      /** Any failing lane fails the single required row with its own native code. */
+      const code = codes.find((value) => value !== 0) ?? 0
+      return {
+        name: GateName.conformance,
+        code,
+        state: code === 0 ? GateState.pass : GateState.fail,
+        seconds: Math.floor(Date.now() / 1000) - started
+      }
+    }
   }
 }
 
@@ -719,65 +743,87 @@ export const runCi = async (
   const parityResults = []
   /** Website rows in their original fmt, lint, typecheck, test order. */
   const websiteResults = []
+  /** Peer tools missing for conformance; an empty list admits the gate. */
+  const missingTools = scope.rpc ? await missingConformanceTools() : []
+  /** Admitted conformance gate; its early lane starts with the RPC family capture. */
+  const conformance = scope.rpc && !missingTools.length ? createConformanceGate(runtime) : undefined
   /** All readers begin only after the one topological workspace build has finished. */
-  const packages = await runPackages([...releasePackages, ...storePackages], runtime, async () => {
-    for (const name of [GateName.registry, GateName.consumers])
-      rootResults.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
-    rootResults.push(
-      await runGate(GateName.docs, 'required', 'node', ['scripts/check-docs-independence.mjs'], {
-        env: runtime.env
-      })
-    )
-    rootResults.push(
-      await runGate(
-        GateName.docsExamples,
-        'required',
-        'make',
-        ['--no-print-directory', 'docs-examples'],
-        {
+  const packages = await runPackages([...releasePackages, ...storePackages], runtime, {
+    onFamilyReady: () => conformance?.startEarly(),
+    onPoolDrained: async () => {
+      for (const name of [GateName.registry, GateName.consumers])
+        rootResults.push(
+          await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env })
+        )
+      rootResults.push(
+        await runGate(GateName.docs, 'required', 'node', ['scripts/check-docs-independence.mjs'], {
           env: runtime.env
-        }
+        })
       )
-    )
-    for (const name of rootTestGates)
-      rootResults.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
-    /** Conformance, suite-parity and the website chain share no inputs, so they overlap. */
-    await Promise.all([
-      scope.rpc &&
-        runConformanceAdmitted(runtime).then((result) => conformanceResults.push(result)),
-      scope.rpc &&
-        runGate(
-          GateName.parity,
+      rootResults.push(
+        await runGate(
+          GateName.docsExamples,
           'required',
-          'pnpm',
-          ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
-          { env: runtime.env }
-        ).then((result) => parityResults.push(result)),
-      scope.website &&
-        (async () => {
-          for (const gate of ['fmt', 'lint', 'typecheck'])
+          'make',
+          ['--no-print-directory', 'docs-examples'],
+          {
+            env: runtime.env
+          }
+        )
+      )
+      for (const name of rootTestGates)
+        rootResults.push(
+          await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env })
+        )
+      /** Conformance, suite-parity and the website chain share no inputs, so they overlap. */
+      await Promise.all([
+        scope.rpc &&
+          (conformance
+            ? conformance.finish()
+            : Promise.resolve({
+                name: text.missingTools(missingTools),
+                code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
+                state:
+                  process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
+                    ? GateState.skipWarning
+                    : GateState.skipBlocking,
+                seconds: 0
+              })
+          ).then((result) => conformanceResults.push(result)),
+        scope.rpc &&
+          runGate(
+            GateName.parity,
+            'required',
+            'pnpm',
+            ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
+            { env: runtime.env }
+          ).then((result) => parityResults.push(result)),
+        scope.website &&
+          (async () => {
+            for (const gate of ['fmt', 'lint', 'typecheck'])
+              websiteResults.push(
+                await runGate(
+                  `website/${gate}`,
+                  'required',
+                  'make',
+                  ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
+                  { env: runtime.env }
+                )
+              )
             websiteResults.push(
               await runGate(
-                `website/${gate}`,
-                'required',
+                'website/test',
+                'warning',
                 'make',
-                ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
-                { env: runtime.env }
+                ['--no-print-directory', 'ci-website-test'],
+                {
+                  env: runtime.env
+                }
               )
             )
-          websiteResults.push(
-            await runGate(
-              'website/test',
-              'warning',
-              'make',
-              ['--no-print-directory', 'ci-website-test'],
-              {
-                env: runtime.env
-              }
-            )
-          )
-        })()
-    ])
+          })()
+      ])
+    }
   })
   if (releasePackages.length) results.push(groupSummary(GateName.ship, releasePackages, packages))
   if (storePackages.length) results.push(groupSummary(GateName.store, storePackages, packages))
