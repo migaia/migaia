@@ -2,7 +2,7 @@
 # Static documentation image served under /migaia. Build context: website/.
 # Every stage is Debian-based; the runtime holds only Caddy and the prerendered files.
 
-ARG BUN_VERSION=1.4.2
+ARG BUN_VERSION=1.4.3
 ARG CADDY_VERSION=2.10.2
 
 # Build: bun is the only JavaScript runtime. `--bun` keeps the Node-shebang CLIs on bun.
