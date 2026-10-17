@@ -13,7 +13,6 @@ import {
 } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import ts from 'typescript'
 
 /**
  * @typedef {{
@@ -350,39 +349,76 @@ function compileExamples(groups, examples, scratch, results) {
     }
   }
   /** NodeNext follows real package exports; DOM covers browser examples without fake globals. */
-  const program = ts.createProgram([...sources.keys()], {
-    target: ts.ScriptTarget.ES2024,
-    module: ts.ModuleKind.NodeNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeNext,
-    // Keep the complete isolated consumer visible when imported declarations resolve dependencies.
-    // This changes only logical location; package.json exports still select actual built declarations.
-    preserveSymlinks: true,
-    strict: true,
-    skipLibCheck: false,
-    types: ['node'],
-    typeRoots: [join(scratch, 'node_modules', '@types')],
-    lib: ['lib.es2024.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts', 'lib.esnext.disposable.d.ts'],
-    jsx: ts.JsxEmit.ReactJSX,
-    rootDir: join(scratch, 'src'),
-    outDir: join(scratch, 'out'),
-    noEmitOnError: false
+  writeFileSync(
+    join(scratch, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        target: 'es2024',
+        module: 'nodenext',
+        moduleResolution: 'nodenext',
+        // Keep the complete isolated consumer visible when imported declarations resolve
+        // dependencies. This changes only logical location; package.json exports still select
+        // actual built declarations.
+        preserveSymlinks: true,
+        strict: true,
+        skipLibCheck: false,
+        types: ['node'],
+        typeRoots: [join(scratch, 'node_modules', '@types')],
+        lib: ['es2024', 'dom', 'dom.iterable', 'esnext.disposable'],
+        jsx: 'react-jsx',
+        rootDir: join(scratch, 'src'),
+        outDir: join(scratch, 'out'),
+        noEmitOnError: false
+      },
+      files: [...sources.keys()]
+    })
+  )
+  /** `bun check` reports type errors; `tsc` only emits the runnable JavaScript beside the sources. */
+  const check = spawnSync('bun', ['check', '-p', scratch, '--no-pretty', '--all'], {
+    cwd: scratch,
+    encoding: 'utf8'
   })
+  spawnSync(join(repositoryRoot, 'node_modules/.bin/tsc'), ['-p', scratch], {
+    cwd: scratch,
+    encoding: 'utf8'
+  })
+  /** One diagnostic per `file(line,col): error TSnnnn: text` line; indented lines continue it. */
+  const diagnostics = []
+  for (const line of `${check.stdout ?? ''}${check.stderr ?? ''}`.split('\n')) {
+    const match = /^(.*?)\((\d+),(\d+)\): error (TS\d+): (.*)$/u.exec(line)
+    if (match)
+      diagnostics.push({
+        file: resolve(scratch, match[1]),
+        line: Number(match[2]) - 1,
+        character: Number(match[3]) - 1,
+        message: `${match[4]}: ${match[5]}`
+      })
+    else if (/^\s+\S/u.test(line) && diagnostics.length > 0)
+      diagnostics.at(-1).message += ` ${line.trim()}`
+    else if (/error TS\d+:/u.test(line))
+      diagnostics.push({ file: undefined, line: 0, character: 0, message: line.trim() })
+  }
+  if (check.status !== 0 && diagnostics.length === 0)
+    diagnostics.push({
+      file: undefined,
+      line: 0,
+      character: 0,
+      message: `bun check failed: ${(check.stderr || check.stdout || '').trim()}`
+    })
   /** Type errors remain visible even when unrelated modules are executable. */
-  const diagnostics = [...ts.getPreEmitDiagnostics(program), ...program.emit().diagnostics]
   const shared = []
   for (const diagnostic of diagnostics) {
-    if (diagnostic.category !== ts.DiagnosticCategory.Error) continue
-    const message = `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`
-    const source = diagnostic.file && sources.get(diagnostic.file.fileName)
+    const message = diagnostic.message
+    const source = diagnostic.file && sources.get(diagnostic.file)
     if (!source) {
       const location = diagnostic.file
-        ? `${relative(repositoryRoot, realpathSync(diagnostic.file.fileName))}:${diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start ?? 0).line + 1}`
+        ? `${relative(repositoryRoot, realpathSync(diagnostic.file))}:${diagnostic.line + 1}`
         : 'compiler'
       shared.push(`${location}: ${message}`)
       continue
     }
     /** A diagnostic in inherited text names that original block rather than a scratch line. */
-    const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start ?? 0)
+    const position = diagnostic
     const segment = source.segments.find(
       (entry) => position.line >= entry.start && position.line < entry.start + entry.length
     )

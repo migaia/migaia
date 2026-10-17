@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor, type ImportDeclaration } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Workspace packages directory scanned by the convergence oracle. */
@@ -40,15 +40,17 @@ function scannedFiles(): string[] {
     })
 }
 
-/** Parses one source file for the storage-web import ownership check. */
-function parse(path: string): ts.SourceFile {
-  return ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
-}
-
-/** Walks every node of a source file. */
-function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
-  visit(node)
-  ts.forEachChild(node, (child) => walk(child, visit))
+/** Imported (not local alias) names of the named specifiers of one import declaration. */
+function importedNames(node: ImportDeclaration): string[] {
+  return node.specifiers.flatMap((specifier) =>
+    specifier.type !== 'ImportSpecifier'
+      ? []
+      : [
+          specifier.imported.type === 'Identifier'
+            ? specifier.imported.name
+            : specifier.imported.value
+        ]
+  )
 }
 
 /** Type names deleted by the convergence; no identifier may keep them alive. */
@@ -109,49 +111,41 @@ describe('A1 single scheduler contract across the workspace', () => {
         file.startsWith('lifecycle/src/') ||
         file === 'utils/src/promise.ts' ||
         file.startsWith('serialize/src/')
-      walk(ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true), (node) => {
-        if (ts.isIdentifier(node) && deletedTypes.has(node.text))
-          deletedHits.push(`${file}:${node.text}`)
-        if (
-          (ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) &&
-          node.name !== undefined &&
-          ts.isIdentifier(node.name) &&
-          declarations.has(node.name.text)
-        )
-          declarations.get(node.name.text)!.push(file)
-        if (
-          ts.isImportDeclaration(node) &&
-          ts.isStringLiteral(node.moduleSpecifier) &&
-          formerOwners.has(node.moduleSpecifier.text)
-        ) {
-          /** Named bindings of this import, if any. */
-          const bindings = node.importClause?.namedBindings
-          if (bindings !== undefined && ts.isNamedImports(bindings))
-            for (const element of bindings.elements) {
-              /** Imported (not local alias) name. */
-              const imported = (element.propertyName ?? element.name).text
+      new Visitor({
+        Identifier(node) {
+          if (deletedTypes.has(node.name)) deletedHits.push(`${file}:${node.name}`)
+        },
+        VariableDeclarator(node) {
+          if (node.id.type === 'Identifier' && declarations.has(node.id.name))
+            declarations.get(node.id.name)!.push(file)
+        },
+        FunctionDeclaration(node) {
+          if (node.id !== null && declarations.has(node.id.name))
+            declarations.get(node.id.name)!.push(file)
+        },
+        ImportDeclaration(node) {
+          if (formerOwners.has(node.source.value))
+            for (const imported of importedNames(node))
               if (movedSymbols.has(imported)) formerImports.push(`${file}:${imported}`)
-            }
+        },
+        TSImportType(node) {
+          if (
+            node.source.type === 'Literal' &&
+            formerOwners.has(String(node.source.value)) &&
+            node.qualifier?.type === 'Identifier' &&
+            movedSymbols.has(node.qualifier.name)
+          )
+            formerImports.push(`${file}:${node.qualifier.name}`)
+        },
+        ExportNamedDeclaration(node) {
+          if (reexportForbidden && node.source?.value === '@migaia/utils/scheduler')
+            reexports.push(file)
+        },
+        ExportAllDeclaration(node) {
+          if (reexportForbidden && node.source.value === '@migaia/utils/scheduler')
+            reexports.push(file)
         }
-        if (
-          ts.isImportTypeNode(node) &&
-          ts.isLiteralTypeNode(node.argument) &&
-          ts.isStringLiteral(node.argument.literal) &&
-          formerOwners.has(node.argument.literal.text) &&
-          node.qualifier !== undefined &&
-          ts.isIdentifier(node.qualifier) &&
-          movedSymbols.has(node.qualifier.text)
-        )
-          formerImports.push(`${file}:${node.qualifier.text}`)
-        if (
-          reexportForbidden &&
-          ts.isExportDeclaration(node) &&
-          node.moduleSpecifier !== undefined &&
-          ts.isStringLiteral(node.moduleSpecifier) &&
-          node.moduleSpecifier.text === '@migaia/utils/scheduler'
-        )
-          reexports.push(file)
-      })
+      }).visit(parseSync(path, source).program)
     }
     expect(deletedHits).toEqual([])
     for (const name of singleImplementations)
@@ -207,19 +201,12 @@ describe('A1 single scheduler contract across the workspace', () => {
     /** Symbols storage-web source imports from the utils scheduler route. */
     const imported = new Set<string>()
     for (const path of listSources(join(packagesRoot, 'storage-web/src')))
-      walk(parse(path), (node) => {
-        if (
-          ts.isImportDeclaration(node) &&
-          ts.isStringLiteral(node.moduleSpecifier) &&
-          node.moduleSpecifier.text === '@migaia/utils/scheduler'
-        ) {
-          /** Named bindings of this import, if any. */
-          const bindings = node.importClause?.namedBindings
-          if (bindings !== undefined && ts.isNamedImports(bindings))
-            for (const element of bindings.elements)
-              imported.add((element.propertyName ?? element.name).text)
+      new Visitor({
+        ImportDeclaration(node) {
+          if (node.source.value === '@migaia/utils/scheduler')
+            for (const name of importedNames(node)) imported.add(name)
         }
-      })
+      }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
     for (const name of imported) expect(schedulerEdge!.symbols).toContain(name)
   })
 })

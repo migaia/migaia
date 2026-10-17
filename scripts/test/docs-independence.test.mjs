@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 
 /** Workspace root used for the tracked-source and manifest checks. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -13,7 +13,9 @@ const SCAN_PREFIXES = ['packages/', 'scripts/', 'fixtures/']
 /** The registry maintainer and its isolated temporary-root test are intentional exceptions. */
 const EXEMPT = new Map([
   ['scripts/error-registry.mjs', 'maintains the local untracked registry'],
-  ['scripts/test/error-registry.test.mjs', 'creates its own temporary registry fixture']
+  ['scripts/test/error-registry.test.mjs', 'creates its own temporary registry fixture'],
+  ['scripts/test/registry-generation.test.mjs', 'exercises the registry writer on temporary roots'],
+  ['scripts/docs-examples.mjs', 'records documentation example evidence in the local tree']
 ])
 /** Source extensions whose string literals can name workspace files. */
 const SOURCE_SUFFIX = /\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/
@@ -51,32 +53,26 @@ function isGuardedSource(path) {
  * comments while retaining precise token positions.
  *
  * @param {string} sourceText JavaScript or TypeScript source text.
+ * @param {string} [filename] Name whose extension selects the parser language.
  * @returns {{ line: number; literal: string }[]} Matching literals and line numbers.
  */
-export function findDocsReads(sourceText) {
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    ts.LanguageVariant.Standard,
-    sourceText
-  )
+export function findDocsReads(sourceText, filename = 'source.ts') {
   const matches = []
-  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-    if (
-      token !== ts.SyntaxKind.StringLiteral &&
-      token !== ts.SyntaxKind.NoSubstitutionTemplateLiteral &&
-      token !== ts.SyntaxKind.TemplateHead &&
-      token !== ts.SyntaxKind.TemplateMiddle &&
-      token !== ts.SyntaxKind.TemplateTail
-    )
-      continue
-    const literal = scanner.getTokenText()
-    const content = scanner.getTokenValue()
-    if (content !== DOCS_NAME && !SOURCE_DOCS_COMPONENT.test(content)) continue
-    const line = sourceText.slice(0, scanner.getTokenPos()).split('\n').length
-    matches.push({ line, literal })
+  /** Records one string or template chunk whose content names the documentation tree. */
+  const record = (start, literal, content) => {
+    if (content !== DOCS_NAME && !SOURCE_DOCS_COMPONENT.test(content)) return
+    matches.push({ line: sourceText.slice(0, start).split('\n').length, literal })
   }
-  return matches
+  new Visitor({
+    Literal(node) {
+      if (typeof node.value === 'string')
+        record(node.start, sourceText.slice(node.start, node.end), node.value)
+    },
+    TemplateElement(node) {
+      record(node.start, node.value.raw, node.value.cooked ?? node.value.raw)
+    }
+  }).visit(parseSync(filename, sourceText).program)
+  return matches.sort((left, right) => left.line - right.line)
 }
 
 /**
@@ -112,7 +108,12 @@ test('TDI A2 recognizes real path literals without treating comments or names as
   ])
   assert.deepEqual(
     [...EXEMPT.keys()],
-    ['scripts/error-registry.mjs', 'scripts/test/error-registry.test.mjs']
+    [
+      'scripts/error-registry.mjs',
+      'scripts/test/error-registry.test.mjs',
+      'scripts/test/registry-generation.test.mjs',
+      'scripts/docs-examples.mjs'
+    ]
   )
 })
 
@@ -123,7 +124,7 @@ test('TDI A1 scans tracked test and script sources', () => {
   const violations = []
   for (const path of sources) {
     if (EXEMPT.has(path)) continue
-    for (const { line } of findDocsReads(readFileSync(join(root, path), 'utf8')))
+    for (const { line } of findDocsReads(readFileSync(join(root, path), 'utf8'), path))
       violations.push(`${path}:${line}`)
   }
   for (const path of paths.filter(

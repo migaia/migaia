@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor, type Expression, type Node, type VisitorObject } from 'oxc-parser'
 import { describe, expect, it, vi } from 'vitest'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -424,54 +424,60 @@ function coreSources(directory: string): string[] {
   })
 }
 
-/** Parses one core source file. */
-function parse(path: string): ts.SourceFile {
-  return ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
-}
-
-/** Walks every node of a source file. */
-function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
-  visit(node)
-  ts.forEachChild(node, (child) => walk(child, visit))
+/** Parses one core source file and runs the visitor over it. */
+function visitFile(path: string, visitor: VisitorObject): void {
+  new Visitor(visitor).visit(parseSync(path, readFileSync(path, 'utf8')).program)
 }
 
 /** Whether an expression is a call whose callee is named `timestamp`. */
-function isTimestampCall(node: ts.Expression): boolean {
-  if (!ts.isCallExpression(node)) return false
-  const callee = node.expression
+function isTimestampCall(node: Node): boolean {
+  if (node.type !== 'CallExpression') return false
+  const callee = node.callee
   return (
-    (ts.isIdentifier(callee) && callee.text === 'timestamp') ||
-    (ts.isPropertyAccessExpression(callee) && callee.name.text === 'timestamp')
+    (callee.type === 'Identifier' && callee.name === 'timestamp') ||
+    (callee.type === 'MemberExpression' &&
+      !callee.computed &&
+      callee.property.type === 'Identifier' &&
+      callee.property.name === 'timestamp')
   )
 }
 
-/** Initializers of every property assignment with the given name in one file. */
-function propertyInitializers(path: string, name: string): ts.Expression[] {
-  const found: ts.Expression[] = []
-  walk(parse(path), (node) => {
-    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === name)
-      found.push(node.initializer)
+/** Initializers of every `name: value` property assignment in one file. */
+function propertyInitializers(path: string, name: string): Expression[] {
+  const found: Expression[] = []
+  visitFile(path, {
+    Property(node) {
+      if (
+        node.kind === 'init' &&
+        !node.method &&
+        !node.shorthand &&
+        !node.computed &&
+        node.key.type === 'Identifier' &&
+        node.key.name === name
+      )
+        found.push(node.value as Expression)
+    }
   })
   return found
 }
 
 /** Arithmetic and comparison operators a wall-clock reading must never feed directly. */
-const arithmeticOrComparison = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.PlusToken,
-  ts.SyntaxKind.MinusToken,
-  ts.SyntaxKind.AsteriskToken,
-  ts.SyntaxKind.SlashToken,
-  ts.SyntaxKind.PercentToken,
-  ts.SyntaxKind.LessThanToken,
-  ts.SyntaxKind.LessThanEqualsToken,
-  ts.SyntaxKind.GreaterThanToken,
-  ts.SyntaxKind.GreaterThanEqualsToken,
-  ts.SyntaxKind.EqualsEqualsToken,
-  ts.SyntaxKind.EqualsEqualsEqualsToken,
-  ts.SyntaxKind.ExclamationEqualsToken,
-  ts.SyntaxKind.ExclamationEqualsEqualsToken,
-  ts.SyntaxKind.PlusEqualsToken,
-  ts.SyntaxKind.MinusEqualsToken
+const arithmeticOrComparison = new Set<string>([
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  '==',
+  '===',
+  '!=',
+  '!==',
+  '+=',
+  '-='
 ])
 
 describe('A8 rpc core timestamp sources', () => {
@@ -505,16 +511,24 @@ describe('A8 rpc core timestamp sources', () => {
     /** Offending locations as `file:line`. */
     const offenders: string[] = []
     for (const path of coreSources(coreRoot)) {
-      const source = parse(path)
-      walk(source, (node) => {
-        if (!ts.isBinaryExpression(node) || !arithmeticOrComparison.has(node.operatorToken.kind))
-          return
-        for (const operand of [node.left, node.right])
+      const source = readFileSync(path, 'utf8')
+      /** Records one operand that reads the wall clock, by file and 1-based line. */
+      const check = (operator: string, operands: readonly Node[]): void => {
+        if (!arithmeticOrComparison.has(operator)) return
+        for (const operand of operands)
           if (isTimestampCall(operand))
             offenders.push(
-              `${relative(coreRoot, path)}:${source.getLineAndCharacterOfPosition(operand.getStart()).line + 1}`
+              `${relative(coreRoot, path)}:${source.slice(0, operand.start).split('\n').length}`
             )
-      })
+      }
+      new Visitor({
+        BinaryExpression(node) {
+          check(node.operator, [node.left, node.right])
+        },
+        AssignmentExpression(node) {
+          check(node.operator, [node.left, node.right])
+        }
+      }).visit(parseSync(path, source).program)
     }
     expect(offenders).toEqual([])
   })
@@ -528,12 +542,13 @@ describe('A8 rpc core timestamp sources', () => {
     let coordinatorTimestamp = 0
     for (const path of coreSources(coreRoot)) {
       const file = relative(coreRoot, path)
-      walk(parse(path), (node) => {
-        if (!ts.isIdentifier(node)) return
-        if (node.text === 'systemWallClock') wallClockOwners.add(file)
-        if (node.text === 'Date') dateOwners.add(file)
-        if (file === 'internal/variation-coordinator.ts' && node.text === 'timestamp')
-          coordinatorTimestamp += 1
+      visitFile(path, {
+        Identifier(node) {
+          if (node.name === 'systemWallClock') wallClockOwners.add(file)
+          if (node.name === 'Date') dateOwners.add(file)
+          if (file === 'internal/variation-coordinator.ts' && node.name === 'timestamp')
+            coordinatorTimestamp += 1
+        }
       })
     }
     expect([...wallClockOwners]).toEqual(['internal/time-port.ts'])

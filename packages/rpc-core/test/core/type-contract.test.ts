@@ -180,32 +180,35 @@ async function assertInferredPipelineEdges(): Promise<void> {
       ReturnType<ReturnType<typeof createStringFramer>['frame']>[number]
     >
   })
-  // @ts-expect-error codec input cannot narrow the inferred protocol envelope.
-  await createEndpoint({
+  const badCodecConfig = {
     id: 'bad-codec',
     middlewares: [],
     protocol: rpcProtocolV1,
     codec: undefined as unknown as ICodec<{ readonly value: string }, string>,
     transport: undefined as never
-  })
-  // @ts-expect-error framer input cannot differ from codec output.
-  await createEndpoint({
+  }
+  // @ts-expect-error codec input cannot narrow the inferred protocol envelope.
+  await createEndpoint(badCodecConfig)
+  const badFramerConfig = {
     id: 'bad-framer',
     middlewares: [],
     protocol: rpcProtocolV1,
     codec: undefined as unknown as ICodec<IRpcEnvelope, string>,
     framer: undefined as unknown as IRpcFramer<Uint8Array, string, string, number>,
     transport: undefined as never
-  })
-  // @ts-expect-error transport input cannot differ from framer output.
-  await createEndpoint({
+  }
+  // @ts-expect-error framer input cannot differ from codec output.
+  await createEndpoint(badFramerConfig)
+  const badTransportConfig = {
     id: 'bad-transport',
     middlewares: [],
     protocol: rpcProtocolV1,
     codec: undefined as unknown as ICodec<IRpcEnvelope, string>,
     framer: undefined as unknown as IRpcFramer<string, string, string, number>,
     transport: undefined as unknown as IRpcTransport<Uint8Array>
-  })
+  }
+  // @ts-expect-error transport input cannot differ from framer output.
+  await createEndpoint(badTransportConfig)
   void createDescriptor
 }
 void assertInferredPipelineEdges
@@ -269,44 +272,45 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   await createClientEndpoint({ id: 'client-default-string', middlewares: [], transport: text })
   // @ts-expect-error provider default semantic envelopes cannot use a string-only sink.
   await createProviderEndpoint({ id: 'provider-default-string', middlewares: [], transport: text })
+  const coreDefaultStringConfig = { id: 'core-default-string', middlewares: [], transport: text }
   // @ts-expect-error core default semantic envelopes cannot use a string-only sink.
-  await createComposedEndpoint(
-    { id: 'core-default-string', middlewares: [], transport: text },
-    createProviderFirstPartyRoots()
-  )
+  await createComposedEndpoint(coreDefaultStringConfig, createProviderFirstPartyRoots())
   await createFullEndpoint<'peer', readonly []>({
     id: 'legacy-string',
     middlewares: [],
     // @ts-expect-error explicit legacy generics cannot reopen a string-only sink.
     transport: text
   })
-  // @ts-expect-error string-framer output includes fragment frames, not only strings.
-  await createEndpoint({
+  const jsonStringOnlyConfig = {
     id: 'json-string-only',
     middlewares: [],
     protocol: rpcProtocolV1,
     codec: json,
     framer: frames,
     transport: text
-  })
-  // @ts-expect-error binary framing cannot consume JSON string codec output.
-  await createClientEndpoint({
+  }
+  // @ts-expect-error string-framer output includes fragment frames, not only strings.
+  await createEndpoint(jsonStringOnlyConfig)
+  const clientBinaryMismatchConfig = {
     id: 'client-binary-mismatch',
     middlewares: [],
     protocol: rpcProtocolV1,
     codec: json,
     framer: createBinaryFramer(),
     transport: opaque
-  })
-  // @ts-expect-error provider cannot reopen the encoded binary mismatch.
-  await createProviderEndpoint({
+  }
+  // @ts-expect-error binary framing cannot consume JSON string codec output.
+  await createClientEndpoint(clientBinaryMismatchConfig)
+  const providerBinaryMismatchConfig = {
     id: 'provider-binary-mismatch',
     middlewares: [],
     protocol: rpcProtocolV1,
     codec: json,
     framer: createBinaryFramer(),
     transport: opaque
-  })
+  }
+  // @ts-expect-error provider cannot reopen the encoded binary mismatch.
+  await createProviderEndpoint(providerBinaryMismatchConfig)
   const badCore = {
     id: 'core-binary-mismatch',
     middlewares: [],
@@ -323,12 +327,13 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
     middlewares: [canonicalProtocol(rpcProtocolV1), codec(json), framer(messageFramerV1)] as const,
     transport: text
   })
-  // @ts-expect-error JSON plus identity framing cannot target a binary sink.
-  await createFullEndpoint({
+  const pluginJsonIdentityBinaryConfig = {
     id: 'plugin-json-identity-binary',
     middlewares: [canonicalProtocol(rpcProtocolV1), codec(json), framer(messageFramerV1)] as const,
     transport: undefined as unknown as IRpcTransport<Uint8Array>
-  })
+  }
+  // @ts-expect-error JSON plus identity framing cannot target a binary sink.
+  await createFullEndpoint(pluginJsonIdentityBinaryConfig)
   await createFullEndpoint({
     id: 'top-level-framer-overrides-plugin-binary',
     protocol: rpcProtocolV1,

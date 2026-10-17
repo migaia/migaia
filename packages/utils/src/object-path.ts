@@ -267,7 +267,7 @@ function probeParsedObjectPath<T, P extends IObjectPathInput<T>>(
 }
 
 /** Parses and probes one path in a single operation. */
-export function probeObjectPath<T, P extends IObjectPathInput<T>>(
+export function probeObjectPath<T, const P extends IObjectPathInput<T>>(
   object: T,
   path: P
 ): IPathProbe<T, P> {
@@ -275,7 +275,7 @@ export function probeObjectPath<T, P extends IObjectPathInput<T>>(
 }
 
 /** Probes an already parsed tuple without reparsing it during delivery. */
-export function probeObjectPathSegments<T, P extends IObjectPathTupleFor<T>>(
+export function probeObjectPathSegments<T, const P extends IObjectPathTupleFor<T>>(
   object: T,
   segments: P
 ): IPathProbe<T, P> {
@@ -283,7 +283,7 @@ export function probeObjectPathSegments<T, P extends IObjectPathTupleFor<T>>(
 }
 
 /** Reads one path; missing/blocked paths yield undefined while getter failures remain observable. */
-export function get<T, P extends IObjectPathInput<T>>(
+export function get<T, const P extends IObjectPathInput<T>>(
   object: T,
   path: P
 ): IObjectPathValue<T, P> | undefined {
@@ -305,7 +305,7 @@ function cloneContainer(value: object, replacedKey: IObjectPathSegment): object 
 }
 
 /** Performs an immutable path update with structural sharing and missing-container creation. */
-export function set<T, P extends IObjectPathInput<T>>(
+export function set<T, const P extends IObjectPathInput<T>>(
   object: T,
   path: P,
   nextValue: IObjectPathWriteValue<T, P>

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import * as contract from '@migaia/rpc-contract'
 import * as core from '@migaia/rpc-core'
@@ -34,44 +34,31 @@ describe('one production wire error format', () => {
     /** Core's held-error operations delegate once to the same Contract walker with its private maps. */
     const delegates: string[] = []
     for (const file of [...sourceFiles(sourceRoot), ...sourceFiles(contractSourceRoot)]) {
-      const parsed = ts.createSourceFile(
-        file,
-        readFileSync(file, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
-      )
+      const text = readFileSync(file, 'utf8')
       /** Record declared serializer names, not imports or calls. */
-      function visit(node: ts.Node): void {
-        if (
-          ts.isFunctionDeclaration(node) &&
-          node.name &&
-          /^(de)?serialize\w*Error$/.test(node.name.text)
-        ) {
+      new Visitor({
+        FunctionDeclaration(node) {
+          if (!node.id || !/^(de)?serialize\w*Error$/.test(node.id.name)) return
+          const name = node.id.name
           const ownerRoot = file.startsWith(contractSourceRoot) ? contractSourceRoot : sourceRoot
           const ownerPath = relative(ownerRoot, file)
           if (ownerPath === 'core/internal/error-wire-metadata.ts') {
-            expect(node.body?.statements).toHaveLength(1)
-            const statement = node.body!.statements[0]!
-            expect(ts.isReturnStatement(statement)).toBe(true)
-            const returned = (statement as ts.ReturnStatement).expression!
-            expect(ts.isCallExpression(returned)).toBe(true)
-            const call = returned as ts.CallExpression
-            expect(call.expression.getText(parsed)).toBe(
-              node.name.text === 'serializeRpcError'
-                ? 'serializeProtocolError'
-                : 'deserializeProtocolError'
+            expect(node.body?.body).toHaveLength(1)
+            const statement = node.body!.body[0]!
+            expect(statement.type).toBe('ReturnStatement')
+            const returned = statement.type === 'ReturnStatement' ? statement.argument : null
+            expect(returned?.type).toBe('CallExpression')
+            if (returned?.type !== 'CallExpression') return
+            expect(text.slice(returned.callee.start, returned.callee.end)).toBe(
+              name === 'serializeRpcError' ? 'serializeProtocolError' : 'deserializeProtocolError'
             )
-            expect(call.arguments.map((argument) => argument.getText(parsed))).toEqual([
-              'value',
-              'options',
-              node.name.text === 'serializeRpcError' ? 'metadata' : 'routes'
-            ])
+            expect(
+              returned.arguments.map((argument) => text.slice(argument.start, argument.end))
+            ).toEqual(['value', 'options', name === 'serializeRpcError' ? 'metadata' : 'routes'])
             delegates.push(ownerPath)
           } else owners.push(ownerPath)
         }
-        ts.forEachChild(node, visit)
-      }
-      visit(parsed)
+      }).visit(parseSync(file, text).program)
     }
     expect(new Set(owners)).toEqual(new Set(['contract/error.ts']))
     expect(delegates).toEqual([

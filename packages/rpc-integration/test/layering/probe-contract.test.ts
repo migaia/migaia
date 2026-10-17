@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Probe definitions remain independent of host and carrier implementations. */
@@ -24,13 +24,17 @@ function sourceFiles(directory: string): string[] {
 /** Read import and re-export edges without depending on runtime module resolution. */
 function imports(path: string): string[] {
   /** The parser distinguishes module specifiers from example strings and comments. */
-  const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
+  const program = parseSync(path, readFileSync(path, 'utf8')).program
   /** Both imports and re-exports must retain the package boundary. */
   const specifiers: string[] = []
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue
-    if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier))
-      specifiers.push(statement.moduleSpecifier.text)
+  for (const statement of program.body) {
+    const specifier =
+      statement.type === 'ImportDeclaration' || statement.type === 'ExportAllDeclaration'
+        ? statement.source.value
+        : statement.type === 'ExportNamedDeclaration'
+          ? statement.source?.value
+          : undefined
+    if (specifier !== undefined) specifiers.push(specifier)
   }
   return specifiers
 }

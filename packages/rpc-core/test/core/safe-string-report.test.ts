@@ -2,7 +2,7 @@ import { createRpcSchemaValidationError } from '../../dist/core/errors.js'
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 import { safeString } from '../../dist/core/transport-kit.js'
 import { createNodeMessagePortTransport } from '../../dist/core/adapters/message-port.js'
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
@@ -289,24 +289,14 @@ describe('[A11] safeString failure reporting', () => {
     ]
     let calls = 0
     for (const path of files) {
-      const source = ts.createSourceFile(
-        path,
-        readFileSync(resolve(root, path), 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
-      )
-      const visit = (node: ts.Node): void => {
-        if (
-          ts.isCallExpression(node) &&
-          ts.isIdentifier(node.expression) &&
-          node.expression.text === 'safeString'
-        ) {
-          calls += 1
-          expect(node.arguments, path).toHaveLength(3)
+      new Visitor({
+        CallExpression(node) {
+          if (node.callee.type === 'Identifier' && node.callee.name === 'safeString') {
+            calls += 1
+            expect(node.arguments, path).toHaveLength(3)
+          }
         }
-        ts.forEachChild(node, visit)
-      }
-      visit(source)
+      }).visit(parseSync(path, readFileSync(resolve(root, path), 'utf8')).program)
     }
     expect(calls).toBe(7)
   })

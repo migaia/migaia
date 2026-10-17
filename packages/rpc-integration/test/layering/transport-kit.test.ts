@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import { createEndpoint, isRpcErrorInstance } from '@migaia/rpc-core'
 import { connect } from '@migaia/rpc-core'
@@ -63,15 +63,9 @@ describe('public transport kit', () => {
     expect(Object.keys(kit).sort()).toEqual(runtimeExports)
     for (const name of readdirSync(adapters).filter((name) => name.endsWith('.ts'))) {
       const path = join(adapters, name)
-      const source = ts.createSourceFile(
-        path,
-        readFileSync(path, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
-      )
-      for (const statement of source.statements) {
-        if (!ts.isImportDeclaration(statement)) continue
-        const specifier = (statement.moduleSpecifier as ts.StringLiteral).text
+      for (const statement of parseSync(path, readFileSync(path, 'utf8')).program.body) {
+        if (statement.type !== 'ImportDeclaration') continue
+        const specifier = statement.source.value
         if (!specifier.startsWith('.')) {
           expect(specifier, path).toMatch(
             /^@migaia\/(?:utils\/|rpc-core(?:\/(?:transport-kit|adapters\/web-worker))?$)/u

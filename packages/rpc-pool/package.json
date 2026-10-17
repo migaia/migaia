@@ -45,7 +45,7 @@
     "@migaia/rpc-process": "workspace:*",
     "@migaia/rpc-threads": "workspace:*",
     "@types/node": "24.13.2",
-    "typescript": "~6.0.2",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
   "peerDependencies": {

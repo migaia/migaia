@@ -238,11 +238,11 @@ async function verifyPackedPipelineMatrix(): Promise<void> {
   await createClientEndpoint({ id: 'packed-client-string', middlewares: [], transport: text })
   // @ts-expect-error provider default semantic envelopes cannot use a string-only sink.
   await createProviderEndpoint({ id: 'packed-provider-string', middlewares: [], transport: text })
+  const packedCoreStringConfig = { id: 'packed-core-string', middlewares: [], transport: text }
   // @ts-expect-error core default semantic envelopes cannot use a string-only sink.
-  await createComposedEndpoint(
-    { id: 'packed-core-string', middlewares: [], transport: text },
-    { packed: defineFeature(() => ({ packed: true as const })) }
-  )
+  await createComposedEndpoint(packedCoreStringConfig, {
+    packed: defineFeature(() => ({ packed: true as const }))
+  })
 
   const json = defineJsonCodec({ version: 1 })
   const stringFrames = createStringFramer()
@@ -267,12 +267,13 @@ async function verifyPackedPipelineMatrix(): Promise<void> {
     middlewares: [canonicalProtocol(rpcProtocol), codec(json), framer(messageFramer)] as const,
     transport: text
   })
-  // @ts-expect-error JSON plus identity framing cannot target a binary sink.
-  await createFullEndpoint({
+  const packedPluginJsonIdentityBinaryConfig = {
     id: 'packed-plugin-json-identity-binary',
     middlewares: [canonicalProtocol(rpcProtocol), codec(json), framer(messageFramer)] as const,
     transport: undefined as unknown as IRpcTransport<Uint8Array>
-  })
+  }
+  // @ts-expect-error JSON plus identity framing cannot target a binary sink.
+  await createFullEndpoint(packedPluginJsonIdentityBinaryConfig)
   await createFullEndpoint({
     id: 'packed-top-level-framer-overrides-plugin-binary',
     protocol: rpcProtocol,
@@ -309,23 +310,25 @@ async function verifyPackedPipelineMatrix(): Promise<void> {
     accept: () => 123,
     close: () => undefined
   })
-  // @ts-expect-error encoded JSON strings cannot enter a binary framer.
-  await createClientEndpoint({
+  const packedEncodedMismatchConfig = {
     id: 'packed-encoded-mismatch',
     middlewares: [],
     protocol: rpcProtocol,
     codec: json,
     framer: createBinaryFramer(),
     transport: opaque
-  })
-  // @ts-expect-error staged inbound data must be accepted by the selected framer.
-  await createFullEndpoint({
+  }
+  // @ts-expect-error encoded JSON strings cannot enter a binary framer.
+  await createClientEndpoint(packedEncodedMismatchConfig)
+  const packedStagedInboundMismatchConfig = {
     id: 'packed-staged-inbound-mismatch',
     middlewares: [],
     protocol: rpcProtocol,
     codec: undefined as unknown as ICodec<IRpcEnvelope, string>,
     framer: customStringFramer,
     transport: stagedInboundMismatch
-  })
+  }
+  // @ts-expect-error staged inbound data must be accepted by the selected framer.
+  await createFullEndpoint(packedStagedInboundMismatchConfig)
 }
 void verifyPackedPipelineMatrix

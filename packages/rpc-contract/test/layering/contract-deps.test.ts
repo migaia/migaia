@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import { createContractError } from '../../dist/contract/contract-error.js'
 import { RpcContractErrorCode } from '@migaia/rpc-contract'
@@ -34,15 +34,9 @@ describe('contract utility ownership', () => {
   it('A4 uses only serialize and canonical utils boundaries and preserves native error identity', () => {
     const bare = new Set<string>()
     for (const path of sourceFiles(contractRoot)) {
-      const source = ts.createSourceFile(
-        path,
-        readFileSync(path, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
-      )
-      for (const statement of source.statements) {
-        if (!ts.isImportDeclaration(statement)) continue
-        const specifier = (statement.moduleSpecifier as ts.StringLiteral).text
+      for (const statement of parseSync(path, readFileSync(path, 'utf8')).program.body) {
+        if (statement.type !== 'ImportDeclaration') continue
+        const specifier = statement.source.value
         if (!specifier.startsWith('.')) bare.add(specifier)
       }
     }

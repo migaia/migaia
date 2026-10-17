@@ -2,9 +2,10 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, globSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import type { Node } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import legacyTitles from '../fixtures/legacy-test-titles.json'
+import { parseSourceTree, type ISourceTree } from '../fixtures/source-tree.ts'
 
 /** Root used by migrated Vitest suite and source-literal scan. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -253,42 +254,64 @@ function testSources(directory: string): string[] {
   })
 }
 
+/** One static string literal with the parsed file that gives it syntactic context. */
+type IStringSite = {
+  /** The `Literal` or substitution-free `TemplateLiteral` node. */
+  readonly node: Node
+  /** Literal content. */
+  readonly text: string
+  /** Parsed file holding the node. */
+  readonly tree: ISourceTree
+}
+
+/** Statement-level nodes stop the search for an enclosing assertion call. */
+function isStatement(node: Node): boolean {
+  return /(?:Statement|Declaration)$/u.test(node.type)
+}
+
 /**
  * Retain each static literal's context so expected-absence data is not mistaken for an active
  * reader.
  */
-function stringsIn(file: string): ts.StringLiteralLike[] {
-  const parsed = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
-  const values: ts.StringLiteralLike[] = []
+function stringsIn(file: string): IStringSite[] {
+  const tree = parseSourceTree(file, readFileSync(file, 'utf8'))
   /** Visit each descendant once and retain literal content, not surrounding syntax. */
-  function visit(node: ts.Node): void {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) values.push(node)
-    ts.forEachChild(node, visit)
-  }
-  visit(parsed)
-  return values
+  return tree.nodes.flatMap<IStringSite>((node) =>
+    node.type === 'Literal' && typeof node.value === 'string'
+      ? [{ node, text: node.value, tree }]
+      : node.type === 'TemplateLiteral' && node.expressions.length === 0
+        ? [{ node, text: node.quasis[0]!.value.cooked ?? '', tree }]
+        : []
+  )
 }
 
 /** These expressions actually resolve a module or filesystem location; comparison tables do not. */
-function isReaderLiteral(node: ts.StringLiteralLike): boolean {
+function isReaderLiteral({ node, tree }: IStringSite): boolean {
   /** Immediate syntax distinguishes a real resolver argument from a historical comparison value. */
-  const parent = node.parent
-  if (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) return true
-  if (ts.isLiteralTypeNode(parent) && ts.isImportTypeNode(parent.parent)) return true
-  if (ts.isNewExpression(parent))
-    return parent.expression.getText() === 'URL' && parent.arguments?.[0] === node
-  if (!ts.isCallExpression(parent) || parent.arguments[0] !== node) return false
+  const parent = tree.parentOf(node)
+  if (!parent) return false
+  if (
+    parent.type === 'ImportDeclaration' ||
+    parent.type === 'ExportNamedDeclaration' ||
+    parent.type === 'ExportAllDeclaration' ||
+    parent.type === 'TSImportType'
+  )
+    return true
+  if (parent.type === 'ImportExpression') return parent.source === node
+  if (parent.type === 'NewExpression')
+    return tree.textOf(parent.callee) === 'URL' && parent.arguments[0] === node
+  if (parent.type !== 'CallExpression' || parent.arguments[0] !== node) return false
   return /^(?:import|require|readFileSync|import\.meta\.glob|vi\.(?:mock|doMock|unmock|doUnmock))$/.test(
-    parent.expression.getText()
+    tree.textOf(parent.callee)
   )
 }
 
 /** Explicit negative export/source assertions retain their historical absent-key inputs. */
-function expectsAbsence(node: ts.StringLiteralLike): boolean {
-  for (let parent: ts.Node | undefined = node.parent; parent; parent = parent.parent) {
-    if (ts.isCallExpression(parent)) {
+function expectsAbsence({ node, tree }: IStringSite): boolean {
+  for (let parent = tree.parentOf(node); parent; parent = tree.parentOf(parent)) {
+    if (parent.type === 'CallExpression') {
       /** Negative assertion syntax keeps its exact absent source/export key meaningful. */
-      const expression = parent.expression.getText()
+      const expression = tree.textOf(parent.callee)
       if (
         expression.includes('.not.') ||
         expression.includes('.rejects.') ||
@@ -296,19 +319,18 @@ function expectsAbsence(node: ts.StringLiteralLike): boolean {
         expression.endsWith('.toBeUndefined')
       )
         return true
+      /** First argument of the assertion call. */
+      const first = parent.arguments[0]
       if (
         /\.(?:toBe|toEqual)$/.test(expression) &&
-        parent.arguments[0]?.kind === ts.SyntaxKind.FalseKeyword
+        first?.type === 'Literal' &&
+        first.value === false
       )
         return true
     }
-    if (ts.isStatement(parent)) {
+    if (isStatement(parent))
       /** A `@ts-expect-error` statement asserts that its specifier no longer resolves. */
-      const text = parent.getSourceFile().getFullText()
-      return (ts.getLeadingCommentRanges(text, parent.getFullStart()) ?? []).some((range) =>
-        text.slice(range.pos, range.end).includes('@ts-expect-error')
-      )
-    }
+      return tree.leadingCommentsOf(parent).includes('@ts-expect-error')
   }
   return false
 }
@@ -431,20 +453,27 @@ describe('A7 migrated suite parity', () => {
            * not.
            */
           let exportKey = false
+          /** Object property whose key is this literal, if any. */
+          const keyOf = node.tree.parentOf(node.node)
           if (
-            ts.isPropertyAssignment(node.parent) &&
-            node.parent.name === node &&
+            keyOf?.type === 'Property' &&
+            !keyOf.shorthand &&
+            keyOf.key === node.node &&
             literal.startsWith('./')
           ) {
-            for (let parent: ts.Node | undefined = node.parent; parent; parent = parent.parent) {
+            for (
+              let parent: Node | undefined = keyOf;
+              parent;
+              parent = node.tree.parentOf(parent)
+            ) {
               if (
-                ts.isCallExpression(parent) &&
-                /\.exports\).*\.(?:toMatchObject|toEqual)$/.test(parent.expression.getText())
+                parent.type === 'CallExpression' &&
+                /\.exports\).*\.(?:toMatchObject|toEqual)$/.test(node.tree.textOf(parent.callee))
               ) {
                 exportKey = true
                 break
               }
-              if (ts.isStatement(parent)) break
+              if (isStatement(parent)) break
             }
           }
           if (

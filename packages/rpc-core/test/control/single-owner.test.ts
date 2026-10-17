@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import * as contract from '@migaia/rpc-contract'
 import * as core from '@migaia/rpc-core'
@@ -16,18 +16,12 @@ function identifiers(root: string): Set<string> {
       const path = join(directory, entry.name)
       if (entry.isDirectory()) walk(path)
       else if (entry.name.endsWith('.ts')) {
-        const source = ts.createSourceFile(
-          path,
-          readFileSync(path, 'utf8'),
-          ts.ScriptTarget.Latest,
-          true
-        )
         /** Capture whole identifier tokens, not substrings of valid replacements. */
-        function visit(node: ts.Node): void {
-          if (ts.isIdentifier(node)) found.add(node.text)
-          ts.forEachChild(node, visit)
-        }
-        visit(source)
+        new Visitor({
+          Identifier(node) {
+            found.add(node.name)
+          }
+        }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
       }
     }
   }

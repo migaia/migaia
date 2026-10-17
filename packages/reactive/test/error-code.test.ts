@@ -18,7 +18,7 @@ import { Scheduler } from '../src/runtime/scheduler.class.js'
 import type { IFlushable } from '../src/runtime/types.js'
 import { ReactiveErrorCode } from '../src/error-code.js'
 import { createReactiveError, REACTIVE_SOURCE } from '../src/errors.js'
-import * as ts from 'typescript'
+import { parseSync, Visitor, type Node } from 'oxc-parser'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 
@@ -311,41 +311,37 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
     for (const file of srcFiles) {
       if (file.endsWith('/error-text.ts') || file.endsWith('/errors.ts')) continue
       const source = readFileSync(file, 'utf8')
-      const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
-      const visit = (node: ts.Node): void => {
-        if (ts.isNewExpression(node)) {
-          const constructorName = node.expression.getText(ast)
+      /** Whether a message argument is an inline string literal or substitution-free template. */
+      const isInlineText = (node: Node | undefined): node is Node =>
+        node !== undefined &&
+        ((node.type === 'Literal' && typeof node.value === 'string') ||
+          (node.type === 'TemplateLiteral' && node.expressions.length === 0))
+      /** Reports one inline message argument by file and 1-based line. */
+      const report = (node: Node): void => {
+        offenders.push(
+          `${relative(srcDir, file)}:${source.slice(0, node.start).split('\n').length}`
+        )
+      }
+      new Visitor({
+        NewExpression(node) {
+          const constructorName = source.slice(node.callee.start, node.callee.end)
           const messageArgument =
-            constructorName === 'AggregateError' ? node.arguments?.[1] : node.arguments?.[0]
+            constructorName === 'AggregateError' ? node.arguments[1] : node.arguments[0]
           if (
             (constructorName === 'Error' ||
               constructorName === 'TypeError' ||
               constructorName === 'RangeError' ||
               constructorName === 'AggregateError') &&
-            messageArgument &&
-            (ts.isStringLiteral(messageArgument) ||
-              ts.isNoSubstitutionTemplateLiteral(messageArgument))
-          ) {
-            offenders.push(
-              `${relative(srcDir, file)}:${source.slice(0, messageArgument.getStart(ast)).split('\n').length}`
-            )
-          }
-        }
-        if (ts.isCallExpression(node) && node.expression.getText(ast) === 'createReactiveError') {
+            isInlineText(messageArgument)
+          )
+            report(messageArgument)
+        },
+        CallExpression(node) {
+          if (source.slice(node.callee.start, node.callee.end) !== 'createReactiveError') return
           const messageArgument = node.arguments[1]
-          if (
-            messageArgument &&
-            (ts.isStringLiteral(messageArgument) ||
-              ts.isNoSubstitutionTemplateLiteral(messageArgument))
-          ) {
-            offenders.push(
-              `${relative(srcDir, file)}:${source.slice(0, messageArgument.getStart(ast)).split('\n').length}`
-            )
-          }
+          if (isInlineText(messageArgument)) report(messageArgument)
         }
-        ts.forEachChild(node, visit)
-      }
-      visit(ast)
+      }).visit(parseSync(file, source).program)
     }
     expect(offenders).toEqual([])
   })

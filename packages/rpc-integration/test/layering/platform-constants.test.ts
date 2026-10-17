@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import { createEndpoint } from '@migaia/rpc-core'
 import { connect } from '@migaia/rpc-core'
@@ -34,21 +34,14 @@ describe('platform constant ownership', () => {
   it('A8 keeps all seven platform literals in transport-constants alone', () => {
     const owners = new Map<string, Set<string>>()
     for (const path of sources(coreRoot)) {
-      const source = ts.createSourceFile(
-        path,
-        readFileSync(path, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
-      )
-      const visit = (node: ts.Node): void => {
-        if (ts.isStringLiteral(node) && labels.has(node.text)) {
-          const paths = owners.get(node.text) ?? new Set<string>()
+      new Visitor({
+        Literal(node) {
+          if (typeof node.value !== 'string' || !labels.has(node.value)) return
+          const paths = owners.get(node.value) ?? new Set<string>()
           paths.add(path.replace(`${coreRoot}/`, ''))
-          owners.set(node.text, paths)
+          owners.set(node.value, paths)
         }
-        ts.forEachChild(node, visit)
-      }
-      visit(source)
+      }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
     }
     for (const label of labels)
       expect([...new Set(owners.get(label))], label).toEqual(['transport-constants.ts'])

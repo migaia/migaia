@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor, type Span } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { RpcError } from '../../dist/core/errors.js'
@@ -11,32 +11,34 @@ import { connect } from '../../dist/core/middleware/connect.js'
 
 /** Find literal error messages within one method, leaving unrelated legacy methods alone. */
 function hasInlineErrorText(file: string, method: string): boolean {
-  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
-  let inline = false
-  /** Inspect only constructors that can emit a package-boundary error. */
-  function visit(node: ts.Node): void {
-    if (ts.isNewExpression(node)) {
-      const name = node.expression.getText(source)
-      if (name === 'TypeError' || name === 'Error' || name === 'RpcError') {
-        const message = node.arguments?.[name === 'RpcError' ? 1 : 0]
-        if (
-          message &&
-          (ts.isStringLiteral(message) ||
-            ts.isNoSubstitutionTemplateLiteral(message) ||
-            ts.isTemplateExpression(message))
-        )
-          inline = true
-      }
+  const source = readFileSync(file, 'utf8')
+  /** Spans of the named owner methods. */
+  const methods: Span[] = []
+  /** Spans of error constructors whose message argument is inline text. */
+  const inlineConstructors: Span[] = []
+  new Visitor({
+    MethodDefinition(node) {
+      if (source.slice(node.key.start, node.key.end) === method) methods.push(node)
+    },
+    Property(node) {
+      if (node.method && source.slice(node.key.start, node.key.end) === method) methods.push(node)
+    },
+    /** Inspect only constructors that can emit a package-boundary error. */
+    NewExpression(node) {
+      const name = source.slice(node.callee.start, node.callee.end)
+      if (name !== 'TypeError' && name !== 'Error' && name !== 'RpcError') return
+      const message = node.arguments[name === 'RpcError' ? 1 : 0]
+      if (
+        message &&
+        ((message.type === 'Literal' && typeof message.value === 'string') ||
+          message.type === 'TemplateLiteral')
+      )
+        inlineConstructors.push(node)
     }
-    ts.forEachChild(node, visit)
-  }
-  /** Locate the named owner method before checking its error constructors. */
-  function find(node: ts.Node): void {
-    if (ts.isMethodDeclaration(node) && node.name.getText(source) === method) visit(node)
-    else ts.forEachChild(node, find)
-  }
-  find(source)
-  return inline
+  }).visit(parseSync(file, source).program)
+  return inlineConstructors.some((constructor) =>
+    methods.some((owner) => owner.start <= constructor.start && constructor.end <= owner.end)
+  )
 }
 
 describe('canonical control registration texts (A14–A15)', () => {

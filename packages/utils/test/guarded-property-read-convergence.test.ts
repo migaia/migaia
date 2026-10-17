@@ -1,41 +1,40 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor, type Node } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Repository root used for the six cross-package migration targets. */
 const repositoryRoot = resolve(new URL('../../../', import.meta.url).pathname)
 
 /** A direct member read is the pattern the shared primitive replaces. */
-function isMemberRead(node: ts.Node | undefined): boolean {
-  return (
-    node !== undefined &&
-    (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-  )
+function isMemberRead(node: Node | null | undefined): boolean {
+  return node?.type === 'MemberExpression'
 }
 
 /** Detect a try block dedicated to one property read, including the old safeRead guard. */
 function hasSingleReadTry(source: string, excludedRead?: string): boolean {
-  const file = ts.createSourceFile('candidate.ts', source, ts.ScriptTarget.Latest, true)
   let found = false
-  const visit = (node: ts.Node): void => {
-    if (ts.isTryStatement(node)) {
-      const statements = node.tryBlock.statements
+  new Visitor({
+    TryStatement(node) {
+      const statements = node.block.body
       const read = statements.at(-1)
-      const leadingGuard = statements.length === 2 && ts.isIfStatement(statements[0]!)
+      const leadingGuard = statements.length === 2 && statements[0]!.type === 'IfStatement'
       if (statements.length === 1 || leadingGuard) {
-        if (read && ts.isReturnStatement(read) && isMemberRead(read.expression)) found = true
-        if (read && ts.isVariableStatement(read) && read.declarationList.declarations.length === 1)
-          found ||= isMemberRead(read.declarationList.declarations[0]?.initializer)
-        if (read && ts.isExpressionStatement(read) && ts.isBinaryExpression(read.expression))
+        if (read?.type === 'ReturnStatement' && isMemberRead(read.argument)) found = true
+        if (read?.type === 'VariableDeclaration' && read.declarations.length === 1)
+          found ||= isMemberRead(read.declarations[0]?.init)
+        if (
+          read?.type === 'ExpressionStatement' &&
+          (read.expression.type === 'AssignmentExpression' ||
+            read.expression.type === 'BinaryExpression' ||
+            read.expression.type === 'LogicalExpression')
+        )
           found ||=
             isMemberRead(read.expression.right) &&
-            read.expression.right.getText(file) !== excludedRead
+            source.slice(read.expression.right.start, read.expression.right.end) !== excludedRead
       }
     }
-    ts.forEachChild(node, visit)
-  }
-  visit(file)
+  }).visit(parseSync('candidate.ts', source).program)
   return found
 }
 

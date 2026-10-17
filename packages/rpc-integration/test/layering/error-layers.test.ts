@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import ts from 'typescript'
+import type { Node, ObjectPropertyKind } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
+import { childNodes, parseSourceTree } from '../fixtures/source-tree.ts'
 
 /** Source root whose error ownership is checked by the layering migration. */
 const sourceRoots = {
@@ -35,95 +36,110 @@ function sourceFiles(directory: string): string[] {
 /** Reads declared code values from a layer's single error-code table. */
 function declaredCodes(layer: 'contract' | 'core'): Map<string, string> {
   const path = join(sourceRoots[layer], layer, 'error-code.ts')
-  const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
+  const { program, textOf } = parseSourceTree(path, readFileSync(path, 'utf8'))
   const codes = new Map<string, string>()
-  for (const statement of source.statements) {
-    if (!ts.isVariableStatement(statement)) continue
-    for (const declaration of statement.declarationList.declarations) {
+  for (const item of program.body) {
+    /** `export const` wraps the variable declaration in an export statement. */
+    const statement =
+      item.type === 'ExportNamedDeclaration' && item.declaration ? item.declaration : item
+    if (statement.type !== 'VariableDeclaration') continue
+    for (const declaration of statement.declarations) {
       /** Scenario reasons refine a code; only the canonical code table declares top-level codes. */
       if (
-        declaration.name.getText(source) !==
-        (layer === 'core' ? 'RpcCoreErrorCode' : 'RpcContractErrorCode')
+        textOf(declaration.id) !== (layer === 'core' ? 'RpcCoreErrorCode' : 'RpcContractErrorCode')
       )
         continue
-      if (!declaration.initializer || !ts.isAsExpression(declaration.initializer)) continue
-      const table = declaration.initializer.expression
-      if (!ts.isObjectLiteralExpression(table)) continue
+      if (declaration.init?.type !== 'TSAsExpression') continue
+      const table = declaration.init.expression
+      if (table.type !== 'ObjectExpression') continue
       for (const property of table.properties) {
-        if (!ts.isPropertyAssignment(property) || !ts.isStringLiteral(property.initializer))
-          continue
-        codes.set(property.name.getText(source), property.initializer.text)
+        const value = assignedValue(property)
+        if (value?.type !== 'Literal' || typeof value.value !== 'string') continue
+        codes.set(textOf((property as { key: Node }).key), value.value)
       }
     }
   }
   return codes
 }
 
+/** Value of a plain `key: value` object property; spreads, shorthands and methods have none. */
+function assignedValue(property: ObjectPropertyKind): Node | undefined {
+  return property.type === 'Property' &&
+    property.kind === 'init' &&
+    !property.method &&
+    !property.shorthand
+    ? property.value
+    : undefined
+}
+
+/** Operators whose result is a boolean predicate rather than an emitted code. */
+const predicateOperators = new Set([
+  '==',
+  '===',
+  '!=',
+  '!==',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  'in',
+  'instanceof'
+])
+
 /** Finds code references only inside the SDD's AST-defined throw sites. */
 function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
-  const source = ts.createSourceFile(filename, sourceText, ts.ScriptTarget.Latest, true)
+  const { program, nodes, parentOf, textOf } = parseSourceTree(filename, sourceText)
   const found: ICodeReference[] = []
   /** Only an ordinary public Contract import can prove the cross-layer wire source. */
   const contractSourceBindings = new Set(
-    source.statements.flatMap((statement) =>
-      ts.isImportDeclaration(statement) &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      /^@migaia\/rpc-contract(?:\/errors)?$/u.test(statement.moduleSpecifier.text) &&
-      statement.importClause?.namedBindings &&
-      ts.isNamedImports(statement.importClause.namedBindings)
-        ? statement.importClause.namedBindings.elements
-            .filter(
-              (element) => (element.propertyName ?? element.name).text === 'RPC_CONTRACT_SOURCE'
-            )
-            .map((element) => element.name.text)
+    program.body.flatMap((statement) =>
+      statement.type === 'ImportDeclaration' &&
+      /^@migaia\/rpc-contract(?:\/errors)?$/u.test(statement.source.value)
+        ? statement.specifiers.flatMap((specifier) =>
+            specifier.type === 'ImportSpecifier' &&
+            textOf(specifier.imported) === 'RPC_CONTRACT_SOURCE'
+              ? [specifier.local.name]
+              : []
+          )
         : []
     )
   )
-  const references = (node: ts.Node, contractWireSource?: true): void => {
+  /** Name of a plain object property, or `undefined` when it is not `key: value`. */
+  const propertyName = (property: ObjectPropertyKind): string | undefined =>
+    assignedValue(property) === undefined ? undefined : textOf((property as { key: Node }).key)
+  const references = (node: Node, contractWireSource?: true): void => {
     /** A predicate chooses a reported code; its compared diagnostics are never emitted codes. */
-    if (ts.isConditionalExpression(node)) {
-      references(node.whenTrue, contractWireSource)
-      references(node.whenFalse, contractWireSource)
+    if (node.type === 'ConditionalExpression') {
+      references(node.consequent, contractWireSource)
+      references(node.alternate, contractWireSource)
       return
     }
     /** Equality/range checks return booleans, including classifier tests nested in error arguments. */
+    if (node.type === 'BinaryExpression' && predicateOperators.has(node.operator)) return
     if (
-      ts.isBinaryExpression(node) &&
-      [
-        ts.SyntaxKind.EqualsEqualsToken,
-        ts.SyntaxKind.EqualsEqualsEqualsToken,
-        ts.SyntaxKind.ExclamationEqualsToken,
-        ts.SyntaxKind.ExclamationEqualsEqualsToken,
-        ts.SyntaxKind.LessThanToken,
-        ts.SyntaxKind.LessThanEqualsToken,
-        ts.SyntaxKind.GreaterThanToken,
-        ts.SyntaxKind.GreaterThanEqualsToken,
-        ts.SyntaxKind.InKeyword,
-        ts.SyntaxKind.InstanceOfKeyword
-      ].includes(node.operatorToken.kind)
-    )
-      return
-    if (
-      ts.isPropertyAccessExpression(node) &&
-      ts.isIdentifier(node.expression) &&
+      node.type === 'MemberExpression' &&
+      !node.computed &&
+      node.object.type === 'Identifier' &&
+      node.property.type === 'Identifier' &&
       /^(?:RpcContractErrorCode|WebRpcErrorCode|RpcCoreErrorCode|RpcWebErrorCode)$/u.test(
-        node.expression.text
+        node.object.name
       )
     ) {
       found.push({
-        table: node.expression.text,
-        key: node.name.text,
+        table: node.object.name,
+        key: node.property.name,
         ...(contractWireSource ? { contractWireSource } : {})
       })
     }
-    ts.forEachChild(node, (child) => references(child, contractWireSource))
+    for (const child of childNodes(node)) references(child, contractWireSource)
   }
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-      const callee = node.expression.getText(source)
+  for (const node of nodes) {
+    if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+      const callee = textOf(node.callee)
       const failureResponse =
-        ts.isPropertyAccessExpression(node.expression) &&
-        node.expression.name.text === 'failureResponse'
+        node.callee.type === 'MemberExpression' &&
+        !node.callee.computed &&
+        textOf(node.callee.property) === 'failureResponse'
       if (
         /^(?:attachErrorIdentity|createContractError|create(?:Web)?Rpc\w*Error|tag(?:Web)?RpcError|(?:Web)?Rpc\w*Error|failureResponse)$/u.test(
           callee
@@ -131,55 +147,42 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
         failureResponse ||
         (callee === 'super' &&
           (() => {
-            let parent: ts.Node | undefined = node.parent
-            while (parent && !ts.isClassDeclaration(parent)) parent = parent.parent
-            return Boolean(parent && parent.name?.text.endsWith('Error'))
+            let parent = parentOf(node)
+            while (parent && parent.type !== 'ClassDeclaration') parent = parentOf(parent)
+            return Boolean(parent?.type === 'ClassDeclaration' && parent.id?.name.endsWith('Error'))
           })())
       ) {
-        for (const [index, argument] of (node.arguments ?? []).entries()) {
+        for (const [index, argument] of node.arguments.entries()) {
           if (
             callee === 'attachErrorIdentity' &&
             index === 1 &&
-            ts.isObjectLiteralExpression(argument)
+            argument.type === 'ObjectExpression'
           ) {
             /** The explicit source and code must belong to this same identity object. */
             const origin = argument.properties.find(
-              (property) =>
-                ts.isPropertyAssignment(property) && property.name.getText(source) === 'source'
+              (property) => propertyName(property) === 'source'
             )
+            const originValue = origin && assignedValue(origin)
             const paired =
-              origin &&
-              ts.isPropertyAssignment(origin) &&
-              ts.isIdentifier(origin.initializer) &&
-              contractSourceBindings.has(origin.initializer.text)
+              originValue?.type === 'Identifier' && contractSourceBindings.has(originValue.name)
             for (const property of argument.properties) {
-              if (
-                paired &&
-                ts.isPropertyAssignment(property) &&
-                property.name.getText(source) === 'code'
-              )
-                references(property.initializer, true)
+              if (paired && propertyName(property) === 'code')
+                references(assignedValue(property)!, true)
               else references(property)
             }
           } else references(argument)
         }
       }
     }
-    if (ts.isObjectLiteralExpression(node)) {
-      const ok = node.properties.find(
-        (property) =>
-          ts.isPropertyAssignment(property) &&
-          property.name.getText(source) === 'ok' &&
-          property.initializer.kind === ts.SyntaxKind.FalseKeyword
-      )
-      const code = node.properties.find(
-        (property) => ts.isPropertyAssignment(property) && property.name.getText(source) === 'code'
-      )
-      if (ok && code && ts.isPropertyAssignment(code)) references(code.initializer)
+    if (node.type === 'ObjectExpression') {
+      const ok = node.properties.find((property) => {
+        const value = assignedValue(property)
+        return propertyName(property) === 'ok' && value?.type === 'Literal' && value.value === false
+      })
+      const code = node.properties.find((property) => propertyName(property) === 'code')
+      if (ok && code) references(assignedValue(code)!)
     }
-    ts.forEachChild(node, visit)
   }
-  visit(source)
   return found
 }
 

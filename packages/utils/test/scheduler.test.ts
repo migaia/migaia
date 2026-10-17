@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import ts from 'typescript'
+import { parseSync, Visitor, type Node } from 'oxc-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { systemScheduler, systemWallClock, type IScheduler } from '../src/scheduler.js'
 import { createManualScheduler } from '../src/testing.js'
@@ -431,7 +431,6 @@ describe('A9 scheduler module stays runtime-neutral', () => {
   it('references no host types, no bare host identifiers and only utils-local imports', () => {
     /** Source text of the scheduler module. */
     const text = readFileSync(new URL('../src/internal/scheduler.ts', import.meta.url), 'utf8')
-    const source = ts.createSourceFile('scheduler.ts', text, ts.ScriptTarget.Latest, true)
     /** Module specifiers of every import declaration. */
     const imports: string[] = []
     /** Forbidden type references found. */
@@ -440,30 +439,38 @@ describe('A9 scheduler module stays runtime-neutral', () => {
     const bareHostIdentifiers: string[] = []
     /** Host globals that must only be reached through the structural host object. */
     const hostNames = new Set(['setTimeout', 'clearTimeout', 'performance'])
-    /** Identifiers that are property names rather than value references. */
-    const isPropertyName = (node: ts.Identifier): boolean => {
-      const parent = node.parent
-      return (
-        (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
-        (ts.isPropertySignature(parent) && parent.name === node) ||
-        (ts.isPropertyAssignment(parent) && parent.name === node) ||
-        (ts.isMethodDeclaration(parent) && parent.name === node)
-      )
-    }
-    const visit = (node: ts.Node): void => {
-      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier))
-        imports.push(node.moduleSpecifier.text)
-      if (ts.isTypeReferenceNode(node)) {
-        const name = node.typeName.getText(source)
+    /** Identifiers that are property names rather than value references; filled by their parent. */
+    const propertyNames = new Set<Node>()
+    /** Source text covered by one node. */
+    const textOf = (node: Node): string => text.slice(node.start, node.end)
+    new Visitor({
+      MemberExpression(node) {
+        if (!node.computed) propertyNames.add(node.property)
+      },
+      TSPropertySignature(node) {
+        if (!node.computed) propertyNames.add(node.key)
+      },
+      Property(node) {
+        if (!node.computed && !node.shorthand) propertyNames.add(node.key)
+      },
+      MethodDefinition(node) {
+        if (!node.computed) propertyNames.add(node.key)
+      },
+      ImportDeclaration(node) {
+        imports.push(node.source.value)
+      },
+      TSTypeReference(node) {
+        const name = textOf(node.typeName)
         if (/^(NodeJS|Timeout|Window)\b/.test(name)) typeReferences.push(name)
+      },
+      TSTypeQuery(node) {
+        if (/setTimeout|clearTimeout/.test(textOf(node))) typeReferences.push(textOf(node))
+      },
+      Identifier(node) {
+        if (hostNames.has(node.name) && !propertyNames.has(node))
+          bareHostIdentifiers.push(node.name)
       }
-      if (ts.isTypeQueryNode(node) && /setTimeout|clearTimeout/.test(node.getText(source)))
-        typeReferences.push(node.getText(source))
-      if (ts.isIdentifier(node) && hostNames.has(node.text) && !isPropertyName(node))
-        bareHostIdentifiers.push(node.text)
-      ts.forEachChild(node, visit)
-    }
-    visit(source)
+    }).visit(parseSync('scheduler.ts', text).program)
     expect(typeReferences).toEqual([])
     expect(bareHostIdentifiers).toEqual([])
     expect(new Set(imports)).toEqual(

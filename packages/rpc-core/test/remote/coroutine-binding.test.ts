@@ -180,11 +180,16 @@ describe('coroutine runtime binding', () => {
         vi.spyOn(native.port1, 'close').mockImplementation(() => {
           throw closeFailure
         })
+        /**
+         * The genuine ports the stubbed constructor hands out; read before the class closes over
+         * them.
+         */
+        const { port1, port2 } = native
         vi.stubGlobal(
           'MessageChannel',
           class {
-            port1 = native.port1
-            port2 = native.port2
+            port1 = port1
+            port2 = port2
           }
         )
       }

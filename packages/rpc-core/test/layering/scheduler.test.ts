@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -330,22 +330,14 @@ describe('endpoint scheduler ownership', () => {
   it('A6 leaves no global Date or old timer owners in core source', () => {
     const systemOwners = new Set<string>()
     for (const path of sources(coreRoot)) {
-      const source = ts.createSourceFile(
-        path,
-        readFileSync(path, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
-      )
-      const visit = (node: ts.Node): void => {
-        if (ts.isIdentifier(node)) {
-          expect(node.text, path).not.toMatch(
+      new Visitor({
+        Identifier(node) {
+          expect(node.name, path).not.toMatch(
             /^(Date|createRuntimeTimer|waitWithSignal|ControlTaskRegistry)$/u
           )
-          if (node.text === 'systemScheduler') systemOwners.add(path.replace(`${coreRoot}/`, ''))
+          if (node.name === 'systemScheduler') systemOwners.add(path.replace(`${coreRoot}/`, ''))
         }
-        ts.forEachChild(node, visit)
-      }
-      visit(source)
+      }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
     }
     // The standalone memory pair owns delivery even when no endpoint exists.
     expect([...systemOwners]).toEqual(['adapters/memory.ts', 'endpoint-kernel.ts'])

@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 type IManifest = {
@@ -38,26 +38,26 @@ const readSources = (directory: string): Record<string, string> => {
 
 /** Extract static, side-effect, re-export, and literal dynamic imports from TypeScript syntax. */
 const bareSpecifiers = (file: string, source: string): string[] => {
-  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const specifiers: string[] = []
-  const visit = (node: ts.Node): void => {
-    if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      specifiers.push(node.moduleSpecifier.text)
-    } else if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments.length === 1 &&
-      ts.isStringLiteral(node.arguments[0]!)
-    ) {
-      specifiers.push(node.arguments[0]!.text)
+  new Visitor({
+    ImportDeclaration(node) {
+      specifiers.push(node.source.value)
+    },
+    ExportNamedDeclaration(node) {
+      if (node.source) specifiers.push(node.source.value)
+    },
+    ExportAllDeclaration(node) {
+      specifiers.push(node.source.value)
+    },
+    ImportExpression(node) {
+      if (
+        node.options === null &&
+        node.source.type === 'Literal' &&
+        typeof node.source.value === 'string'
+      )
+        specifiers.push(node.source.value)
     }
-    ts.forEachChild(node, visit)
-  }
-  visit(parsed)
+  }).visit(parseSync(file, source).program)
   return specifiers.filter((specifier) => !specifier.startsWith('.') && !specifier.startsWith('/'))
 }
 

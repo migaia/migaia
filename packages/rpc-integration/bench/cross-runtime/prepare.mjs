@@ -11,7 +11,7 @@ import {
 import { join, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import ts from 'typescript'
+import { parseSync, visitorKeys } from 'oxc-parser'
 import { execFileSync } from 'node:child_process'
 import { CrossRuntimeErrorText } from '../error-text.mjs'
 
@@ -97,58 +97,73 @@ function foreignFiles(directory) {
  */
 function instrument(path, source) {
   const edits = [],
-    tree = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    tree = parseSync(path, source).program
+  /** Source text of one node. */
+  const textOf = (node) => source.slice(node.start, node.end)
+  /** Class or object-literal method (not accessor/constructor), matching a TS MethodDeclaration. */
+  const isMethod = (node) =>
+    (node.type === 'MethodDefinition' && node.kind === 'method') ||
+    (node.type === 'Property' && node.method)
+  /** Visits every node with its parent and the nearest enclosing method name. */
+  const visit = (node, parent, owner, enter) => {
+    if (isMethod(node)) owner = textOf(node.key)
+    enter(node, parent, owner)
+    for (const key of visitorKeys[node.type] ?? [])
+      for (const child of [node[key]].flat())
+        if (child && typeof child.type === 'string') visit(child, node, owner, enter)
+  }
   if (path === 'core/internal/request-replay-ledger.ts') {
     /** Capacity comes from the existing canonical numeric reader after the actual decision. */
-    const capacity = (node, owner) => {
-      if (ts.isMethodDeclaration(node)) owner = node.name.getText(tree)
+    visit(tree, undefined, undefined, (node, _parent, owner) => {
       if (
         owner === 'admit' &&
-        ts.isReturnStatement(node) &&
-        node.expression?.kind === ts.SyntaxKind.TrueKeyword
+        node.type === 'ReturnStatement' &&
+        node.argument?.type === 'Literal' &&
+        node.argument.value === true
       )
         edits.push({
-          pos: node.getStart(tree),
+          pos: node.start,
           text: 'globalThis.__XRT_LEDGER?.(this,peerKey,this.readCapacity(peerKey),this.#active.size,this.#completed.size,1);'
         })
       if (
         owner === 'reserveMany' &&
-        ts.isReturnStatement(node) &&
-        ts.isCallExpression(node.expression ?? {}) &&
-        node.expression.expression.getText(tree) === 'Object.freeze'
+        node.type === 'ReturnStatement' &&
+        node.argument?.type === 'CallExpression' &&
+        textOf(node.argument.callee) === 'Object.freeze'
       )
         edits.push({
-          pos: node.getStart(tree),
+          pos: node.start,
           text: 'globalThis.__XRT_LEDGER?.(this,peerKey,this.readCapacity(peerKey),this.#active.size,this.#completed.size,keys.length);'
         })
-      if (ts.isMethodDeclaration(node) && owner === 'releaseActive')
+      if (isMethod(node) && owner === 'releaseActive')
         edits.push({
-          pos: node.body.end - 1,
+          pos: node.value.body.end - 1,
           text: 'globalThis.__XRT_LEDGER?.(this,entry.peerKey,this.readCapacity(entry.peerKey),this.#active.size,this.#completed.size,0);'
         })
-      ts.forEachChild(node, (child) => capacity(child, owner))
-    }
-    capacity(tree, undefined)
+    })
   }
 
-  const walk = (node) => {
-    if (
-      node.body &&
-      (ts.isFunctionDeclaration(node) ||
-        ts.isMethodDeclaration(node) ||
-        ts.isArrowFunction(node)) &&
-      ts.isBlock(node.body)
-    ) {
-      const name = node.name?.getText(tree) ?? node.parent?.name?.getText(tree) ?? 'anonymous'
-      const key = path + ':' + name
-      edits.push({
-        pos: node.body.getStart(tree) + 1,
-        text: 'globalThis.__XRT_COUNT(' + JSON.stringify(key) + ');'
-      })
-    }
-    ts.forEachChild(node, walk)
-  }
-  walk(tree)
+  visit(tree, undefined, undefined, (node, parent) => {
+    /** Block body of a function declaration, method or block-bodied arrow. */
+    const body = isMethod(node)
+      ? node.value.body
+      : node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression'
+        ? node.body
+        : undefined
+    if (body?.type !== 'BlockStatement') return
+    /** Declared name, or the name of the binding/property that holds an arrow. */
+    const named = isMethod(node)
+      ? node.key
+      : node.type === 'FunctionDeclaration'
+        ? node.id
+        : (parent?.id ?? parent?.key)
+    const name = named ? textOf(named) : 'anonymous'
+    const key = path + ':' + name
+    edits.push({
+      pos: body.start + 1,
+      text: 'globalThis.__XRT_COUNT(' + JSON.stringify(key) + ');'
+    })
+  })
   for (const e of edits.sort((a, b) => b.pos - a.pos))
     source = source.slice(0, e.pos) + e.text + source.slice(e.pos)
   if (path === 'core/internal/provider-admission.ts') {

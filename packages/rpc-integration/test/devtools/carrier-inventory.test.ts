@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { EventEmitter } from 'node:events'
-import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRpcTransport } from '@migaia/rpc-core'
@@ -354,36 +355,53 @@ const inventory: readonly IInventoryEntry[] = [
   }
 ]
 
-/** Transport shape at this inventory boundary is the public physical send/subscribe/platform port. */
-function isTransport(type: ts.Type): boolean {
-  return (
-    type.getProperty('send') !== undefined &&
-    type.getProperty('subscribe') !== undefined &&
-    type.getProperty('platform') !== undefined
-  )
+/**
+ * Type-level inventory predicate, checked by `bun check` against the public declarations. A
+ * transport declares `send`, `subscribe` and `platform` (an index signature declares no property);
+ * a factory returns (possibly awaited) a transport, a tuple holding one, or a channel whose
+ * `transport` field is one. Up to four overloads are read; any overload returning a transport
+ * counts. `any` is neither callable nor a transport, matching the compiler's own signature and
+ * property lookup on `any`; a return type too deep to instantiate also degrades to `any` and is not
+ * counted.
+ */
+const inventoryPredicate = `
+type IIsAny<T> = 0 extends 1 & T ? true : false
+type IDeclaredKeys<T> = keyof {
+  [K in keyof T as string extends K ? never : number extends K ? never : symbol extends K ? never : K]: 0
 }
-
-/** Unwrap only the public transport, pair, or channel result; no nested factory framework is built. */
-function returnsTransport(checker: ts.TypeChecker, type: ts.Type): boolean {
-  /** Async constructors produce the same transport capability after their real construction. */
-  const result = checker.getAwaitedType(type) ?? type
-  if (result.isUnion()) return result.types.some((member) => returnsTransport(checker, member))
-  if (isTransport(result)) return true
-  if (
-    checker.isTupleType(result) &&
-    checker.getTypeArguments(result as ts.TypeReference).some(isTransport)
-  )
-    return true
-  /** Channel constructors expose their actual transport under the public transport field. */
-  const transport = result.getProperty('transport')
-  if (!transport) return false
-  /** The declaration preserves alias and wrapper types rather than comparing printed type names. */
-  const declaration = transport.valueDeclaration ?? transport.declarations?.[0]
-  return (
-    declaration !== undefined &&
-    isTransport(checker.getTypeOfSymbolAtLocation(transport, declaration))
-  )
+type IIsTransport<T> = IIsAny<T> extends true
+  ? false
+  : T extends unknown
+  ? 'send' | 'subscribe' | 'platform' extends IDeclaredKeys<T> ? true : false
+  : never
+type IHoldsTransport<T> = IIsAny<T> extends true
+  ? false
+  : T extends unknown
+  ? true extends IIsTransport<T>
+    ? true
+    : T extends readonly unknown[]
+      ? true extends IIsTransport<T[number]> ? true : false
+      : 'transport' extends IDeclaredKeys<T>
+        ? true extends IIsTransport<T[keyof T & 'transport']> ? true : false
+        : false
+  : never
+type IReturns<T> = T extends {
+  (...args: infer _A1): infer R1
+  (...args: infer _A2): infer R2
+  (...args: infer _A3): infer R3
+  (...args: infer _A4): infer R4
 }
+  ? R1 | R2 | R3 | R4
+  : T extends (...args: infer _A) => infer R
+    ? R
+    : never
+type IFactoryMark<THolds, TName> = IIsAny<THolds> extends true
+  ? never
+  : true extends THolds
+    ? TName
+    : never
+type IProbe<T> = IIsAny<T> extends true ? never : IFactoryMark<IHoldsTransport<Awaited<IReturns<T>>>, 'factory'>
+`
 
 /** Discover callable constructors from all current public declaration entries to detect omissions. */
 function exportedTransportFactories(): readonly string[] {
@@ -400,42 +418,84 @@ function exportedTransportFactories(): readonly string[] {
         entry: manifest.name + (subpath === '.' ? '' : subpath.slice(1))
       })
   }
-  /** One declaration program resolves public return aliases without executing any factory. */
-  const program = ts.createProgram(
-    entries.map((entry) => entry.path),
-    {
-      module: ts.ModuleKind.NodeNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeNext,
-      strict: true,
-      skipLibCheck: true,
-      noEmit: true
-    }
+  /** Scratch project holding only the generated probes; removed after the check. */
+  const directory = mkdtempSync(join(tmpdir(), 'migaia-carrier-inventory-'))
+  writeFileSync(
+    join(directory, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        module: 'nodenext',
+        moduleResolution: 'nodenext',
+        strict: true,
+        skipLibCheck: true,
+        noEmit: true,
+        noErrorTruncation: true,
+        types: []
+      },
+      files: ['probe.ts']
+    })
   )
-  /** One checker follows reexports to their actual callable return signatures. */
-  const checker = program.getTypeChecker()
-  /** Duplicated declarations do not duplicate a public entry/symbol identity. */
-  const factories = new Set<string>()
-  for (const entry of entries) {
-    /** Missing declaration entries are an inventory failure, never an exclusion. */
-    const source = program.getSourceFile(entry.path)
-    expect(source, entry.entry).toBeDefined()
-    /** Every listed entry must remain a readable external module. */
-    const module = checker.getSymbolAtLocation(source!)
-    expect(module, entry.entry).toBeDefined()
-    for (const exported of checker.getExportsOfModule(module!)) {
-      /** Callable exported aliases retain their independent public entry identity. */
-      const type = checker.getTypeOfSymbolAtLocation(exported, source!)
-      if (
-        type
-          .getCallSignatures()
-          .some((signature) =>
-            returnsTransport(checker, checker.getReturnTypeOfSignature(signature))
-          )
-      )
-        factories.add(`${entry.entry}#${exported.name}`)
+  /**
+   * Checks one generated probe; each `never` assignment that fails prints its value type. Returns
+   * the failing diagnostics as `[line, message]`.
+   */
+  const check = (lines: readonly string[]): Array<[number, string]> => {
+    writeFileSync(join(directory, 'probe.ts'), [inventoryPredicate, ...lines].join('\n'))
+    /** Offset of the first generated line in the probe file. */
+    const offset = inventoryPredicate.split('\n').length
+    let output = ''
+    try {
+      output = execFileSync('bun', ['check', '-p', directory, '--no-pretty'], { encoding: 'utf8' })
+    } catch (error) {
+      output = String((error as { stdout?: unknown }).stdout ?? '')
     }
+    return output.split('\n').flatMap((line) => {
+      const match = /probe\.ts\((\d+),\d+\): error (TS\d+): (.*)$/u.exec(line)
+      if (!match) return []
+      /**
+       * Only the `never` assignments may fail. A return type too deep to instantiate (TS2589)
+       * degrades to `any`, which is not a transport; any other diagnostic is an inventory failure.
+       */
+      expect(['TS2322', 'TS2589'], line).toContain(match[2])
+      return match[2] === 'TS2322'
+        ? [[Number(match[1]) - offset - 1, match[3]!] as [number, string]]
+        : []
+    })
   }
-  return [...factories].sort()
+  /** Import expression of one public declaration entry. */
+  const moduleOf = (path: string): string =>
+    `typeof import(${JSON.stringify(path.replace(/\.d\.ts$/u, '.js'))})`
+  try {
+    /** First pass: every entry's export names, printed as a string-literal union. */
+    const names = new Map<number, string[]>()
+    for (const [line, message] of check(
+      entries.map(
+        ({ path }, index) =>
+          `export const names${index}: never = null as unknown as keyof ${moduleOf(path)} & string`
+      )
+    ))
+      names.set(
+        line,
+        [...message.matchAll(/"([^"]+)"/gu)].map((match) => match[1]!)
+      )
+    /** Second pass: one probe per callable export; a failing line marks a transport factory. */
+    const probes = entries.flatMap(({ path, entry }, index) =>
+      (names.get(index) ?? []).map((name) => ({ path, entry, name }))
+    )
+    /** Duplicated declarations do not duplicate a public entry/symbol identity. */
+    const factories = new Set<string>()
+    for (const [line, message] of check(
+      probes.map(
+        ({ path, name }, index) =>
+          `export const probe${index}: never = null as unknown as IProbe<${moduleOf(path)}[${JSON.stringify(name)}]>`
+      )
+    ))
+      if (message.includes('"factory"'))
+        factories.add(`${probes[line]!.entry}#${probes[line]!.name}`)
+    return [...factories].sort()
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 }
 
 describe('carriers A2: complete public transport inventory', () => {

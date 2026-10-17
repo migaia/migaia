@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import ts from 'typescript'
+import type { Node } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
+import { childNodes, parseSourceTree } from '../fixtures/source-tree.ts'
 
 /** Source tree guarded by the package-owned error text contracts. */
 const packageRoots = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map(
@@ -23,42 +24,54 @@ function sourceFiles(directory: string): string[] {
 
 /** Detects literal error text at constructors, factories, defaults, and message fields. */
 function violations(path: string, text: string): string[] {
-  const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true)
-  const found = new Set<ts.Node>()
-  const addLiteral = (node: ts.Node): void => {
-    if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) {
+  const { nodes, parentOf, textOf } = parseSourceTree(path, text)
+  const found = new Set<Node>()
+  const addLiteral = (node: Node): void => {
+    if (
+      (node.type === 'Literal' && typeof node.value === 'string') ||
+      node.type === 'TemplateLiteral'
+    ) {
       found.add(node)
       return
     }
     // Arguments of a named factory describe data; that factory owns its own text contract.
-    if (ts.isCallExpression(node) || ts.isNewExpression(node)) return
+    if (node.type === 'CallExpression' || node.type === 'NewExpression') return
     // `typeof value === 'string'` is a type discriminator, not response text.
     if (
-      ts.isBinaryExpression(node) &&
-      ts.isTypeOfExpression(node.left) &&
-      ts.isStringLiteral(node.right) &&
-      node.right.text === 'string'
+      node.type === 'BinaryExpression' &&
+      node.left.type === 'UnaryExpression' &&
+      node.left.operator === 'typeof' &&
+      node.right.type === 'Literal' &&
+      node.right.value === 'string'
     )
       return
-    ts.forEachChild(node, addLiteral)
+    for (const child of childNodes(node)) addLiteral(child)
   }
+  /** Return expressions written directly in one function body. */
+  const returnedExpressions = (body: Node | null | undefined): Node[] =>
+    body?.type === 'BlockStatement'
+      ? body.body.flatMap((statement) =>
+          statement.type === 'ReturnStatement' && statement.argument ? [statement.argument] : []
+        )
+      : []
   /** Text factories may live only in an error-text owner, not at an adapter call site. */
   const isTextOwner = /(?:^|\/)error-text\.ts$/u.test(path)
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-      const callee = node.expression
-      const name = ts.isIdentifier(callee)
-        ? callee.text
-        : ts.isPropertyAccessExpression(callee)
-          ? callee.name.text
-          : ''
+  for (const node of nodes) {
+    if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+      const callee = node.callee
+      const name =
+        callee.type === 'Identifier'
+          ? callee.name
+          : callee.type === 'MemberExpression' && !callee.computed
+            ? textOf(callee.property)
+            : ''
       if (/(?:Error|Exception)$/u.test(name) || name === 'tagRpcError') {
-        node.arguments?.forEach((argument, index) => {
+        node.arguments.forEach((argument, index) => {
           if (
             /^(?:DOMException|DomException|domException)$/u.test(name) &&
             index === 1 &&
-            ts.isStringLiteral(argument) &&
-            argument.text === 'AbortError'
+            argument.type === 'Literal' &&
+            argument.value === 'AbortError'
           )
             return
           if (index === 0 || /^(?:DOMException|DomException|domException)$/u.test(name))
@@ -67,86 +80,81 @@ function violations(path: string, text: string): string[] {
       }
     }
     if (
-      ts.isPropertyAssignment(node) &&
-      (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
-      node.name.text === 'message'
+      node.type === 'Property' &&
+      node.kind === 'init' &&
+      !node.method &&
+      !node.shorthand &&
+      !node.computed &&
+      ((node.key.type === 'Identifier' && node.key.name === 'message') ||
+        (node.key.type === 'Literal' && node.key.value === 'message'))
     ) {
+      const object = parentOf(node)
       /** Strip only the canonical constant assertion to find the event object's declaration. */
-      const declaration = ts.isAsExpression(node.parent.parent)
-        ? node.parent.parent.parent
-        : node.parent.parent
+      const holder = object && parentOf(object)
+      const declaration = holder?.type === 'TSAsExpression' ? parentOf(holder) : holder
+      /** Text of the assigned value. */
+      const value = textOf(node.value)
+      /** Declared name of the enclosing object constant, if the object is one. */
+      const declared =
+        object?.type === 'ObjectExpression' && declaration?.type === 'VariableDeclarator'
+          ? textOf(declaration.id)
+          : undefined
       /** These named fields describe wire keys or schema types, not failure text. */
       const nonErrorMessage =
-        (path === 'contract/wire-constants.ts' && node.initializer.getText(file) === "'message'") ||
+        (path === 'contract/wire-constants.ts' && value === "'message'") ||
         ((path === 'threads/constants.ts' || path === 'runtime-adapter/message/constants.ts') &&
-          node.initializer.getText(file) === "'message'" &&
-          ts.isObjectLiteralExpression(node.parent) &&
-          ts.isVariableDeclaration(declaration) &&
-          declaration.name.getText(file) ===
+          value === "'message'" &&
+          declared ===
             (path === 'threads/constants.ts' ? 'ThreadEvent' : 'MessageResourceEvent')) ||
         (path === 'browser/peer-text.ts' &&
-          node.initializer.getText(file) === "'message'" &&
-          ts.isObjectLiteralExpression(node.parent) &&
-          ts.isVariableDeclaration(declaration) &&
-          declaration.name.getText(file) === 'BrowserPeerEvent') ||
-        (path === 'core/internal/contract.ts' && node.initializer.getText(file) === "'string'") ||
-        (path === 'core/internal/discovery-attachment.ts' &&
-          node.initializer.getText(file) === "'discovery'") ||
-        (path === 'core/internal/provider-executor.ts' &&
-          ["'message'", "'string'"].includes(node.initializer.getText(file)))
-      if (!nonErrorMessage) addLiteral(node.initializer)
+          value === "'message'" &&
+          declared === 'BrowserPeerEvent') ||
+        (path === 'core/internal/contract.ts' && value === "'string'") ||
+        (path === 'core/internal/discovery-attachment.ts' && value === "'discovery'") ||
+        (path === 'core/internal/provider-executor.ts' && ["'message'", "'string'"].includes(value))
+      if (!nonErrorMessage) addLiteral(node.value)
     }
-    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
-      const extendsError = node.heritageClauses?.some(
-        (clause) =>
-          clause.token === ts.SyntaxKind.ExtendsKeyword &&
-          clause.types.some((entry) => /(?:Error|Exception)$/u.test(entry.expression.getText(file)))
-      )
-      if (extendsError)
-        for (const member of node.members) {
-          if (!ts.isConstructorDeclaration(member)) continue
-          for (const parameter of member.parameters)
-            if (parameter.initializer) addLiteral(parameter.initializer)
+    if (
+      (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') &&
+      node.superClass &&
+      /(?:Error|Exception)$/u.test(textOf(node.superClass))
+    )
+      for (const member of node.body.body) {
+        if (member.type !== 'MethodDefinition' || member.kind !== 'constructor') continue
+        for (const parameter of member.value.params) {
+          /** Parameter properties wrap the plain parameter. */
+          const plain = parameter.type === 'TSParameterProperty' ? parameter.parameter : parameter
+          if (plain.type === 'AssignmentPattern') addLiteral(plain.right)
         }
+      }
+    if (
+      !isTextOwner &&
+      node.type === 'FunctionDeclaration' &&
+      /(?:Message|Text)$/u.test(node.id?.name ?? '')
+    )
+      for (const expression of returnedExpressions(node.body)) addLiteral(expression)
+    if (
+      !isTextOwner &&
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      /(?:Message|Text)$/u.test(node.id.name) &&
+      (node.init?.type === 'ArrowFunctionExpression' || node.init?.type === 'FunctionExpression')
+    ) {
+      const body = node.init.body
+      if (body?.type === 'BlockStatement')
+        for (const expression of returnedExpressions(body)) addLiteral(expression)
+      else if (body) addLiteral(body)
     }
     if (
       !isTextOwner &&
-      ts.isFunctionDeclaration(node) &&
-      /(?:Message|Text)$/u.test(node.name?.text ?? '')
-    ) {
-      for (const statement of node.body?.statements ?? [])
-        if (ts.isReturnStatement(statement) && statement.expression)
-          addLiteral(statement.expression)
-    }
-    if (
-      !isTextOwner &&
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      /(?:Message|Text)$/u.test(node.name.text) &&
-      node.initializer &&
-      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
-    ) {
-      const body = node.initializer.body
-      if (ts.isBlock(body)) {
-        for (const statement of body.statements)
-          if (ts.isReturnStatement(statement) && statement.expression)
-            addLiteral(statement.expression)
-      } else addLiteral(body)
-    }
-    if (
-      !isTextOwner &&
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === 'onFailure'
-    ) {
+      node.type === 'CallExpression' &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'onFailure'
+    )
       for (const argument of node.arguments) addLiteral(argument)
-    }
-    ts.forEachChild(node, visit)
   }
-  visit(file)
   return [...found].map(
-    (node) =>
-      `${path}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}:${node.getText(file)}`
+    (node) => `${path}:${text.slice(0, node.start).split('\n').length}:${textOf(node)}`
   )
 }
 

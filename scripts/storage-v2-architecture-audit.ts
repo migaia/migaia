@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { relative, resolve, sep } from 'node:path'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import * as ts from 'typescript'
+import { parseSync, Visitor, type Program, type Statement } from 'oxc-parser'
 
 type IManifest = {
   readonly name: string
@@ -326,8 +326,6 @@ const compilerPaths = (
 
 /** Returns static workspace route/symbol edges from one source file. */
 const sourceEdges = (consumer: string, file: string, source: string): readonly IImportEdge[] => {
-  /** Parsed TypeScript syntax used only for module edges, never local value flow. */
-  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   /** Static package route/symbol edges found in this source. */
   const edges: IImportEdge[] = []
   /** Adds one edge only for a workspace-style scoped package route. */
@@ -335,105 +333,158 @@ const sourceEdges = (consumer: string, file: string, source: string): readonly I
     if (packageNameFromRoute(route) !== undefined)
       edges.push({ consumer, file, route, ...(symbol === undefined ? {} : { symbol }), kind })
   }
+  /** Name written by an import/export specifier side. */
+  const nameOf = (node: { type: string; name?: string; value?: unknown }): string =>
+    node.type === 'Identifier' ? node.name! : String(node.value)
   /** Visits only syntax needed to find static import, re-export and import-type edges. */
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
+  new Visitor({
+    ImportDeclaration(node) {
       /** Imported workspace route. */
-      const route = node.moduleSpecifier.text
-      /** Import clause whose bindings become exact route+symbol edges. */
-      const clause = node.importClause
+      const route = node.source.value
       /** Edge count used to preserve side-effect and empty-binding module dependencies. */
       const priorEdgeCount = edges.length
-      if (clause?.name !== undefined) add(route, 'default', 'import')
-      if (clause?.namedBindings !== undefined) {
-        if (ts.isNamespaceImport(clause.namedBindings)) add(route, '*', 'import')
-        else
-          for (const element of clause.namedBindings.elements)
-            add(route, (element.propertyName ?? element.name).text, 'import')
-      }
+      for (const specifier of node.specifiers)
+        if (specifier.type === 'ImportDefaultSpecifier') add(route, 'default', 'import')
+        else if (specifier.type === 'ImportNamespaceSpecifier') add(route, '*', 'import')
+        else add(route, nameOf(specifier.imported), 'import')
       if (edges.length === priorEdgeCount) add(route, undefined, 'import')
-    } else if (
-      ts.isImportEqualsDeclaration(node) &&
-      ts.isExternalModuleReference(node.moduleReference) &&
-      node.moduleReference.expression !== undefined &&
-      ts.isStringLiteralLike(node.moduleReference.expression)
-    ) {
+    },
+    TSImportEqualsDeclaration(node) {
       /** TypeScript import-equals is a static namespace dependency. */
-      add(node.moduleReference.expression.text, undefined, 'import-equals')
-    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined) {
+      if (
+        node.moduleReference.type === 'TSExternalModuleReference' &&
+        typeof node.moduleReference.expression.value === 'string'
+      )
+        add(node.moduleReference.expression.value, undefined, 'import-equals')
+    },
+    ExportAllDeclaration(node) {
+      /** Re-exported workspace route; `export *` and `export * as ns` both re-export everything. */
+      add(node.source.value, '*', 're-export')
+    },
+    ExportNamedDeclaration(node) {
+      if (node.source === null) return
       /** Re-exported workspace route. */
-      const route = (node.moduleSpecifier as ts.StringLiteralLike).text
-      if (node.exportClause === undefined) add(route, '*', 're-export')
-      else if (ts.isNamedExports(node.exportClause))
-        if (node.exportClause.elements.length === 0) add(route, undefined, 're-export')
-        else
-          for (const element of node.exportClause.elements)
-            add(route, (element.propertyName ?? element.name).text, 're-export')
-      else if (ts.isNamespaceExport(node.exportClause)) add(route, '*', 're-export')
-    } else if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments.length === 1 &&
-      ts.isStringLiteralLike(node.arguments[0]!)
-    ) {
+      const route = node.source.value
+      if (node.specifiers.length === 0) add(route, undefined, 're-export')
+      else for (const specifier of node.specifiers) add(route, nameOf(specifier.local), 're-export')
+    },
+    ImportExpression(node) {
       /** Literal dynamic import is a static module dependency without a selected symbol. */
-      add(node.arguments[0]!.text, undefined, 'dynamic-import')
-    } else if (
-      ts.isImportTypeNode(node) &&
-      ts.isLiteralTypeNode(node.argument) &&
-      ts.isStringLiteralLike(node.argument.literal)
-    ) {
-      /** Import-type route resolved by TypeScript. */
-      const route = node.argument.literal.text
+      if (
+        node.options === null &&
+        node.source.type === 'Literal' &&
+        typeof node.source.value === 'string'
+      )
+        add(node.source.value, undefined, 'dynamic-import')
+    },
+    TSImportType(node) {
+      if (node.source.type !== 'Literal' || typeof node.source.value !== 'string') return
       /** First qualifier segment names the imported export; absent qualifiers are namespaces. */
-      const symbol = node.qualifier?.getText(sourceFile).split('.')[0] ?? '*'
-      add(route, symbol, 'import-type')
+      const symbol = node.qualifier
+        ? source.slice(node.qualifier.start, node.qualifier.end).split('.')[0]!
+        : '*'
+      add(node.source.value, symbol, 'import-type')
     }
-    node.forEachChild(visit)
-  }
-  sourceFile.forEachChild(visit)
+  }).visit(parseSync(file, source).program)
   return edges
 }
 
-/** Creates immutable compiler-backed module facts once for cold and warm validation. */
-const buildFacts = (workspace: ReadonlyMap<string, IWorkspacePackage>): IAuditFacts => {
-  /** All workspace source roots included in the compiler Program. */
-  const rootNames = [...workspace.values()].flatMap((entry) => [...entry.source.keys()])
-  /** Manifest-derived paths make TypeScript resolve source exports, not stale dist output. */
-  const paths = compilerPaths(workspace)
-  /** Compiler options matching the repository's bundler-mode ESM contract. */
-  const options: ts.CompilerOptions = {
-    target: ts.ScriptTarget.ES2024,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    baseUrl: repositoryRoot,
-    paths,
-    skipLibCheck: true
+/** TypeScript source extensions whose exports the audit reads. */
+const typeScriptSource = /\.(?:[cm]?tsx?)$/u
+
+/**
+ * Resolves one module specifier from a source file: workspace routes through the manifest-derived
+ * paths, relative specifiers to the `.ts` source (a `.js` spelling names its `.ts` source).
+ * Returns `undefined` for a specifier outside the workspace.
+ */
+const resolveSpecifier = (
+  paths: Readonly<Record<string, string[]>>,
+  fromFile: string,
+  specifier: string
+): string | undefined => {
+  if (!specifier.startsWith('.')) {
+    /** Exact manifest route target, root-relative. */
+    const target = paths[specifier]?.[0]
+    return target === undefined ? undefined : resolve(repositoryRoot, target)
   }
-  /** Immutable TypeScript Program used for route and exported-symbol resolution. */
-  const program = ts.createProgram({ rootNames, options })
-  /** TypeChecker used to resolve each manifest route's actual public symbols. */
-  const checker = program.getTypeChecker()
+  /** Absolute specifier target before extension mapping. */
+  const base = resolve(dirname(fromFile), specifier)
+  return [base, base.replace(/\.js$/u, '.ts'), `${base}.ts`, resolve(base, 'index.ts')].find(
+    (candidate) => existsSync(candidate) && typeScriptSource.test(candidate)
+  )
+}
+
+/**
+ * Collects the public export names of one source module, following `export *` (which never
+ * re-exports `default`) and naming direct and re-exported declarations.
+ */
+const moduleExports = (
+  paths: Readonly<Record<string, string[]>>,
+  file: string,
+  cache: Map<string, ReadonlySet<string>>,
+  active: ReadonlySet<string> = new Set()
+): ReadonlySet<string> => {
+  const cached = cache.get(file)
+  if (cached !== undefined) return cached
+  /** Export names of this module. */
+  const names = new Set<string>()
+  if (active.has(file)) return names
+  /** Program of this module; only its top-level statements export. */
+  const program: Program = parseSync(file, readFileSync(file, 'utf8')).program
+  /** Names one exported declaration introduces. */
+  const declared = (declaration: Statement): string[] => {
+    if (declaration.type === 'VariableDeclaration')
+      return declaration.declarations.flatMap((item) =>
+        item.id.type === 'Identifier' ? [item.id.name] : []
+      )
+    return 'id' in declaration && declaration.id?.type === 'Identifier' ? [declaration.id.name] : []
+  }
+  for (const statement of program.body) {
+    if (statement.type === 'ExportDefaultDeclaration') names.add('default')
+    else if (statement.type === 'ExportNamedDeclaration') {
+      if (statement.declaration) for (const name of declared(statement.declaration)) names.add(name)
+      for (const specifier of statement.specifiers)
+        names.add(
+          specifier.exported.type === 'Identifier'
+            ? specifier.exported.name
+            : String(specifier.exported.value)
+        )
+    } else if (statement.type === 'ExportAllDeclaration') {
+      if (statement.exported) {
+        names.add(
+          statement.exported.type === 'Identifier'
+            ? statement.exported.name
+            : String(statement.exported.value)
+        )
+        continue
+      }
+      /** Re-exported module; a module outside the workspace contributes nothing here. */
+      const target = resolveSpecifier(paths, file, statement.source.value)
+      if (target === undefined) continue
+      for (const name of moduleExports(paths, target, cache, new Set([...active, file])))
+        if (name !== 'default') names.add(name)
+    }
+  }
+  cache.set(file, names)
+  return names
+}
+
+/** Creates immutable module facts once for cold and warm validation. */
+const buildFacts = (workspace: ReadonlyMap<string, IWorkspacePackage>): IAuditFacts => {
+  /** Manifest-derived paths resolve source exports, not stale dist output. */
+  const paths = compilerPaths(workspace)
+  /** Parsed export names per source module, shared across routes. */
+  const cache = new Map<string, ReadonlySet<string>>()
   /** Independently derived route to public symbol set. */
   const exportedSymbols = new Map<string, ReadonlySet<string>>()
   for (const route of Object.keys(paths)) {
     if (route.includes('*')) continue
-    /** Synthetic containing file used for a resolver-only public-route check. */
-    const containingFile = resolve(repositoryRoot, 'scripts/storage-v2-architecture-audit.ts')
-    /** TypeScript's resolved source for the public route. */
-    const resolved = ts.resolveModuleName(route, containingFile, options, ts.sys).resolvedModule
-    if (resolved === undefined) throw new AuditFailure('UNKNOWN_WORKSPACE_ROUTE', route)
-    /** Program source file that owns the resolved public route. */
-    const sourceFile = program.getSourceFile(resolved.resolvedFileName)
-    if (sourceFile === undefined)
-      throw new AuditFailure('UNRESOLVED_EXPORT_SOURCE', `${route} -> ${resolved.resolvedFileName}`)
-    /** Compiler module symbol containing direct and re-exported public symbols. */
-    const moduleSymbol = checker.getSymbolAtLocation(sourceFile)
-    if (moduleSymbol === undefined) throw new AuditFailure('UNRESOLVED_EXPORT_SYMBOL_TABLE', route)
-    exportedSymbols.set(
-      route,
-      new Set(checker.getExportsOfModule(moduleSymbol).map((item) => item.name))
-    )
+    /** Resolved source for the public route. */
+    const resolved = resolve(repositoryRoot, paths[route]![0]!)
+    if (!existsSync(resolved)) throw new AuditFailure('UNKNOWN_WORKSPACE_ROUTE', route)
+    if (!typeScriptSource.test(resolved))
+      throw new AuditFailure('UNRESOLVED_EXPORT_SOURCE', `${route} -> ${resolved}`)
+    exportedSymbols.set(route, moduleExports(paths, resolved, cache))
   }
   /** Static route+symbol edges generated from every workspace source. */
   const imports = [...workspace].flatMap(([consumer, entry]) =>

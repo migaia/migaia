@@ -13,10 +13,10 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from '@playwright/test'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 
 const integrationDirectory = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const repositoryRoot = resolve(integrationDirectory, '../..')
@@ -600,98 +600,226 @@ function assertDefineFeatureDocumentation(packedPackage) {
 }
 
 /**
+ * Parses one source or declaration file for the documentation manifest.
+ *
+ * @param {string} path Absolute `.ts` or `.d.ts` path.
+ * @returns {{
+ *   path: string
+ *   text: string
+ *   program: import('oxc-parser').Program
+ *   comments: import('oxc-parser').Comment[]
+ * }}
+ */
+function parseDocumentationFile(path) {
+  const text = readFileSync(path, 'utf8')
+  const { program, comments } = parseSync(path, text)
+  return { path, text, program, comments }
+}
+
+/**
+ * Resolves one relative module specifier the way the matching tree is laid out: declarations
+ * resolve to `.d.ts` siblings, sources to `.ts` sources.
+ *
+ * @param {string} fromFile Importing file.
+ * @param {string} specifier Relative specifier as written.
+ * @returns {string} Existing target file.
+ * @throws {Error} When the specifier is bare or no matching file exists.
+ */
+function resolveDocumentationModule(fromFile, specifier) {
+  if (!specifier.startsWith('.'))
+    throw new Error(`Feature documentation import is not relative: ${specifier}`)
+  const base = resolve(dirname(fromFile), specifier)
+  const candidates = fromFile.endsWith('.d.ts')
+    ? [base.replace(/\.(?:js|ts)$/u, '.d.ts')]
+    : [base.replace(/\.js$/u, '.ts'), base]
+  const found = candidates.find((candidate) => existsSync(candidate))
+  if (!found) throw new Error(`Feature documentation import is unresolved: ${specifier}`)
+  return found
+}
+
+/** Name written by an import/export specifier side (`Identifier` or string `Literal`). */
+function specifierName(node) {
+  return node.type === 'Identifier' ? node.name : node.value
+}
+
+/** Names declared by one declaration node, for the declaration kinds the manifest reads. */
+function declaredNames(declaration) {
+  if (declaration.type === 'VariableDeclaration')
+    return declaration.declarations.flatMap((item) =>
+      item.id.type === 'Identifier' ? [item.id.name] : []
+    )
+  return declaration.id?.type === 'Identifier' ? [declaration.id.name] : []
+}
+
+/**
+ * Follows the export graph from one file to every declaration of an exported name. Overloads are
+ * separate declarations of the same name.
+ *
+ * @param {string} path File whose export is requested.
+ * @param {string} name Exported name.
+ * @param {Set<string>} [seen] Visited `file#name` pairs; stops `export *` cycles.
+ * @returns {{
+ *       file: ReturnType<typeof parseDocumentationFile>
+ *       declarations: { statement: any; node: any }[]
+ *     }
+ *   | undefined}
+ */
+function findExportedDeclarations(path, name, seen = new Set()) {
+  if (seen.has(`${path}#${name}`)) return undefined
+  seen.add(`${path}#${name}`)
+  const file = parseDocumentationFile(path)
+  /** Finds a same-file declaration or import binding of a locally re-exported name. */
+  const findLocal = (local) => {
+    const declarations = []
+    for (const statement of file.program.body) {
+      const node =
+        statement.type === 'ExportNamedDeclaration' && statement.declaration
+          ? statement.declaration
+          : statement
+      if (node.type === 'ImportDeclaration') {
+        for (const specifier of node.specifiers)
+          if (specifier.local.name === local)
+            return findExportedDeclarations(
+              resolveDocumentationModule(path, node.source.value),
+              specifier.type === 'ImportSpecifier' ? specifierName(specifier.imported) : 'default',
+              seen
+            )
+      } else if (declaredNames(node).includes(local)) declarations.push({ statement, node })
+    }
+    return declarations.length > 0 ? { file, declarations } : undefined
+  }
+  const declarations = []
+  for (const statement of file.program.body) {
+    if (statement.type === 'ExportNamedDeclaration') {
+      if (statement.declaration) {
+        if (declaredNames(statement.declaration).includes(name))
+          declarations.push({ statement, node: statement.declaration })
+        continue
+      }
+      for (const specifier of statement.specifiers) {
+        if (specifierName(specifier.exported) !== name) continue
+        const local = specifierName(specifier.local)
+        return statement.source
+          ? findExportedDeclarations(
+              resolveDocumentationModule(path, statement.source.value),
+              local,
+              seen
+            )
+          : findLocal(local)
+      }
+    }
+    if (statement.type === 'ExportAllDeclaration' && statement.exported === null) {
+      const found = findExportedDeclarations(
+        resolveDocumentationModule(path, statement.source.value),
+        name,
+        seen
+      )
+      if (found) return found
+    }
+  }
+  return declarations.length > 0 ? { file, declarations } : undefined
+}
+
+/**
+ * Reads the JSDoc block written directly before one node: its description and its `@tag` blocks.
+ *
+ * @param {ReturnType<typeof parseDocumentationFile>} file Parsed file holding the node.
+ * @param {{ start: number }} node Statement or member the comment documents.
+ * @returns {{ description: string; tags: { name: string; text: string }[] }}
+ */
+function readJSDoc(file, node) {
+  const comment = file.comments
+    .filter(
+      (candidate) =>
+        candidate.type === 'Block' &&
+        candidate.value.startsWith('*') &&
+        candidate.end <= node.start &&
+        /^\s*$/u.test(file.text.slice(candidate.end, node.start))
+    )
+    .at(-1)
+  if (!comment) return { description: '', tags: [] }
+  const lines = comment.value
+    .slice(1)
+    .split('\n')
+    .map((line) => line.replace(/^\s*\*?\s?/u, ''))
+  const firstTag = lines.findIndex((line) => line.startsWith('@'))
+  const description = (firstTag < 0 ? lines : lines.slice(0, firstTag)).join(' ')
+  const tags = []
+  for (const line of firstTag < 0 ? [] : lines.slice(firstTag)) {
+    const tag = /^@(\w+)\s*(.*)$/u.exec(line)
+    if (tag) tags.push({ name: tag[1], text: tag[2] })
+    else if (tags.length > 0) tags.at(-1).text += ` ${line}`
+  }
+  return {
+    description: normalizeJSDocComment(description),
+    tags: tags.map((tag) => ({ name: tag.name, text: normalizeJSDocComment(tag.text) }))
+  }
+}
+
+/**
  * Extracts a stable public-symbol and overload documentation manifest through the root export
  * graph.
  */
 function readFeatureDocumentationManifest(rootPath) {
-  const program = ts.createProgram([rootPath], {
-    allowJs: false,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    skipLibCheck: true,
-    target: ts.ScriptTarget.ES2023
-  })
-  const checker = program.getTypeChecker()
-  const source = program.getSourceFile(rootPath)
-  if (!source) throw new Error(`Feature documentation root is unreadable: ${rootPath}`)
-  const root = checker.getSymbolAtLocation(source)
-  if (!root) throw new Error(`Feature documentation root has no module symbol: ${rootPath}`)
-  const exports = new Map(
-    checker.getExportsOfModule(root).map((symbol) => [symbol.getName(), symbol])
-  )
+  if (!existsSync(rootPath))
+    throw new Error(`Feature documentation root is unreadable: ${rootPath}`)
   const names = ['defineFeature', 'IRpcFeatureDefinition', 'IRpcFeature', 'IRpcFeatureSurface']
   const manifest = {}
   for (const name of names) {
-    const exported = exports.get(name)
+    const exported = findExportedDeclarations(rootPath, name)
     if (!exported) throw new Error(`Feature documentation root export missing: ${name}`)
-    const symbol =
-      exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported
-    const documentation = ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim()
+    const docs = exported.declarations.map(({ statement }) => readJSDoc(exported.file, statement))
+    const documentation = [...new Set(docs.map((doc) => doc.description).filter(Boolean))].join(' ')
     if (!documentation) throw new Error(`Feature documentation missing for public symbol: ${name}`)
     const tags = Object.fromEntries(
-      symbol
-        .getJsDocTags(checker)
-        .map((tag) => [tag.name, normalizeJSDocComment(tag.text)])
+      docs
+        .flatMap((doc) => doc.tags)
+        .map((tag) => [tag.name, tag.text])
         .sort(([left], [right]) => left.localeCompare(right))
     )
     if (name === 'defineFeature') {
-      const declarationPath = symbol.declarations?.[0]?.getSourceFile().fileName
-      const declarationSource = declarationPath
-        ? ts.createSourceFile(
-            declarationPath,
-            readFileSync(declarationPath, 'utf8'),
-            ts.ScriptTarget.ES2023,
-            true
-          )
-        : undefined
-      const overloads =
-        declarationSource?.statements.filter(
-          (declaration) => ts.isFunctionDeclaration(declaration) && declaration.body === undefined
-        ) ?? []
+      const overloads = exported.declarations.filter(
+        ({ node }) => node.type === 'TSDeclareFunction'
+      )
       if (overloads.length !== 2)
         throw new Error(`defineFeature overload count drifted in ${rootPath}`)
-      const overloadManifest = overloads.map((declaration) => {
-        const documentationNodes = ts.getJSDocCommentsAndTags(declaration).filter(ts.isJSDoc)
-        const overloadDocumentation = normalizeJSDocComment(
-          documentationNodes.map((node) => node.comment ?? '').join(' ')
-        )
-        const documentationTags = documentationNodes.flatMap((node) => node.tags ?? [])
+      const overloadManifest = overloads.map(({ statement, node }) => {
+        const doc = readJSDoc(exported.file, statement)
         const overloadTags = Object.fromEntries(
-          documentationTags
-            .map((tag) => [tag.tagName.text, normalizeJSDocComment(tag.comment)])
+          doc.tags
+            .map((tag) => [tag.name, tag.text])
             .sort(([left], [right]) => left.localeCompare(right))
         )
-        const parameters = documentationTags.filter(ts.isJSDocParameterTag).map((tag) => ({
-          name: tag.name.getText(),
-          documentation: normalizeJSDocComment(tag.comment)
-        }))
-        const typeParameters = documentationTags
-          .filter((tag) => tag.tagName.text === 'typeParam')
-          .map((tag) => {
-            const parsed = normalizeJSDocComment(tag.comment).match(/^([^\s-]+)\s*-\s*(.+)$/u)
-            return {
-              name: parsed?.[1] ?? '',
-              documentation: parsed?.[2] ?? ''
-            }
-          })
-        const expectedParameters = declaration.parameters.map((parameter) =>
-          parameter.name.getText()
+        /** `@param name - text` and `@typeParam name - text` both split on the first word. */
+        const named = (tagName) =>
+          doc.tags
+            .filter((tag) => tag.name === tagName)
+            .map((tag) => {
+              const parsed = tag.text.match(/^([^\s-]+)\s*-?\s*(.*)$/u)
+              return { name: parsed?.[1] ?? '', documentation: parsed?.[2] ?? '' }
+            })
+        const parameters = named('param')
+        const typeParameters = named('typeParam')
+        const expectedParameters = node.params.map((parameter) =>
+          exported.file.text
+            .slice(parameter.start, parameter.typeAnnotation?.start ?? parameter.end)
+            .replace(/\??\s*$/u, '')
         )
         if (
-          !overloadDocumentation ||
+          !doc.description ||
           JSON.stringify(parameters.map((parameter) => parameter.name)) !==
             JSON.stringify(expectedParameters) ||
           parameters.some((parameter) => !parameter.documentation) ||
           JSON.stringify(typeParameters.map((parameter) => parameter.name)) !==
             JSON.stringify(
-              declaration.typeParameters?.map((parameter) => parameter.name.text) ?? []
+              node.typeParameters?.params.map((parameter) => parameter.name.name) ?? []
             ) ||
           typeParameters.some((parameter) => !parameter.documentation) ||
           !['remarks', 'returns', 'throws'].every((tag) => overloadTags[tag])
         )
           throw new Error(`defineFeature overload documentation is incomplete in ${rootPath}`)
         return {
-          documentation: overloadDocumentation,
+          documentation: doc.description,
           parameters,
           tags: overloadTags,
           typeParameters
@@ -702,32 +830,26 @@ function readFeatureDocumentationManifest(rootPath) {
       manifest[name] = { documentation, tags }
     }
   }
-  const configExport = exports.get('IRpcFactoryConfig')
-  if (!configExport) throw new Error('Feature documentation root export missing: IRpcFactoryConfig')
-  const config =
-    configExport.flags & ts.SymbolFlags.Alias
-      ? checker.getAliasedSymbol(configExport)
-      : configExport
-  const declaration = config.declarations?.find(ts.isTypeAliasDeclaration)
-  const property = declaration?.type.members?.find(
-    (member) => ts.isPropertySignature(member) && member.name.getText() === 'features'
+  const config = findExportedDeclarations(rootPath, 'IRpcFactoryConfig')
+  if (!config) throw new Error('Feature documentation root export missing: IRpcFactoryConfig')
+  const declaration = config.declarations.find(({ node }) => node.type === 'TSTypeAliasDeclaration')
+  const property = declaration?.node.typeAnnotation.members?.find(
+    (member) =>
+      member.type === 'TSPropertySignature' &&
+      config.file.text.slice(member.key.start, member.key.end) === 'features'
   )
-  const configurationDocumentation = property
-    ? ts
-        .displayPartsToString(
-          ts
-            .getJSDocCommentsAndTags(property)
-            .flatMap((node) =>
-              ts.isJSDoc(node) ? [{ text: node.comment ?? '', kind: 'text' }] : []
-            )
-        )
-        .trim()
+  const configurationDocumentation = property ? readJSDoc(config.file, property).description : ''
+  const propertyType = property?.typeAnnotation
+    ? config.file.text.slice(
+        property.typeAnnotation.typeAnnotation.start,
+        property.typeAnnotation.typeAnnotation.end
+      )
     : ''
-  if (!property || !configurationDocumentation || !property.type?.getText().includes('TFeatures'))
+  if (!property || !configurationDocumentation || !propertyType.includes('TFeatures'))
     throw new Error(`Feature configuration documentation is incomplete in ${rootPath}`)
   manifest.IRpcFactoryConfig = {
     documentation: configurationDocumentation,
-    type: property.type.getText()
+    type: propertyType
   }
   return manifest
 }
@@ -743,13 +865,9 @@ function expectFeatureDocumentationFailure(rootPath, label, expectedMessage) {
   throw new Error(`Feature documentation validator accepted ${label}`)
 }
 
-/** Normalizes TypeScript's string-or-display-part JSDoc representation for manifest comparison. */
+/** Collapses JSDoc whitespace so source and emitted declarations compare equal. */
 function normalizeJSDocComment(comment) {
-  if (typeof comment === 'string') return comment.replace(/\s+/gu, ' ').trim()
-  return ts
-    .displayPartsToString(comment ?? [])
-    .replace(/\s+/gu, ' ')
-    .trim()
+  return comment.replace(/\s+/gu, ' ').trim()
 }
 
 /** Rejects packed declaration or export-map leakage of package-test identity observers. */
@@ -975,10 +1093,7 @@ function assertPackedOwnerManifests(packedPackages) {
       if (peer.startsWith('@migaia/rpc-') && version !== manifest.version)
         throw new Error(`Packed peer is not exact lockstep: ${owner} ${peer}=${version}`)
     for (const [subpath, entry] of Object.entries(manifest.exports)) {
-      if (
-        subpath.includes('/internal/') ||
-        subpath.includes('spi')
-      )
+      if (subpath.includes('/internal/') || subpath.includes('spi'))
         throw new Error(`Packed owner exposes a private entry: ${owner}${subpath}`)
       /** The public JSON schema resolves its own JSON type; every code entry has a declaration. */
       const targetFields =
@@ -986,10 +1101,7 @@ function assertPackedOwnerManifests(packedPackages) {
           ? ['default']
           : ['types', 'default']
       for (const field of targetFields)
-        if (
-          typeof entry[field] !== 'string' ||
-          !existsSync(join(directory, entry[field]))
-        )
+        if (typeof entry[field] !== 'string' || !existsSync(join(directory, entry[field])))
           throw new Error(`Missing packed ${field} target: ${owner}${subpath}`)
     }
   }

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 
 /** Public surface and retained packed checks frozen by rpc-merge A11. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -45,22 +45,18 @@ const obsolete = [
 
 /** Read the packed script's literal obsolete-subpath probe instead of matching comments. */
 function obsoleteProbe(script) {
-  const parsed = ts.createSourceFile(
-    'packed-export-smoke.mjs',
-    script,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.JS
-  )
-  for (const statement of parsed.statements) {
-    if (!ts.isVariableStatement(statement)) continue
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'obsoleteSubpaths')
+  for (const statement of parseSync('packed-export-smoke.mjs', script).program.body) {
+    if (statement.type !== 'VariableDeclaration') continue
+    for (const declaration of statement.declarations) {
+      if (declaration.id.type !== 'Identifier' || declaration.id.name !== 'obsoleteSubpaths')
         continue
-      assert.ok(declaration.initializer && ts.isArrayLiteralExpression(declaration.initializer))
-      return declaration.initializer.elements.map((element) => {
-        assert.ok(ts.isStringLiteral(element), 'obsoleteSubpaths must contain literal names')
-        return element.text
+      assert.ok(declaration.init?.type === 'ArrayExpression')
+      return declaration.init.elements.map((element) => {
+        assert.ok(
+          element?.type === 'Literal' && typeof element.value === 'string',
+          'obsoleteSubpaths must contain literal names'
+        )
+        return element.value
       })
     }
   }

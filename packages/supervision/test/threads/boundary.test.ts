@@ -1,9 +1,17 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor, type Statement } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Finds the complete thread source surface for architectural assertions. */
+/** Module specifier of a top-level import or re-export statement, if it has one. */
+function moduleSpecifier(statement: Statement): string | undefined {
+  if (statement.type === 'ImportDeclaration' || statement.type === 'ExportAllDeclaration')
+    return statement.source.value
+  if (statement.type === 'ExportNamedDeclaration') return statement.source?.value
+  return undefined
+}
+
 function sources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name)
@@ -43,24 +51,25 @@ describe('A1 thread boundary', () => {
       const source = readFileSync(path, 'utf8')
       expect(source, path).not.toMatch(/host|plugin|rpc/i)
       expect(source, path).not.toMatch(/Reflect\.apply|\.call\(|\.apply\(|\.bind\(/)
-      const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
-      const inspect = (node: ts.Node): void => {
-        if (ts.isIdentifier(node)) expect(forbiddenIdentifiers.has(node.text), path).toBe(false)
-        if (ts.isStringLiteral(node)) expect(node.text.startsWith('THREAD_'), path).toBe(false)
-        ts.forEachChild(node, inspect)
-      }
-      inspect(file)
-      for (const statement of file.statements) {
-        if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue
-        const module = statement.moduleSpecifier
-        if (!module || !ts.isStringLiteral(module)) continue
-        const name = module.text
+      const program = parseSync(path, source).program
+      new Visitor({
+        Identifier(node) {
+          expect(forbiddenIdentifiers.has(node.name), path).toBe(false)
+        },
+        Literal(node) {
+          if (typeof node.value === 'string')
+            expect(node.value.startsWith('THREAD_'), path).toBe(false)
+        }
+      }).visit(program)
+      for (const statement of program.body) {
+        const name = moduleSpecifier(statement)
+        if (name === undefined) continue
         if (name.startsWith('../')) expect(['../index.js', '../errors.js'], path).toContain(name)
         else if (name.startsWith('./')) expect(name, path).toMatch(/^\.\/[^/]+\.js$/)
         else {
           expect(name, path).toBe('@migaia/lifecycle')
           expect(
-            ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly,
+            statement.type === 'ImportDeclaration' && statement.importKind === 'type',
             path
           ).toBe(true)
         }

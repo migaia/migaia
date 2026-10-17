@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import { parseSync, Visitor, type Statement } from 'oxc-parser'
 
 /** Reads the new profile's source graph, independent of the core boundary oracle. */
+/** Module specifier of a top-level import or re-export statement, if it has one. */
+function moduleSpecifier(statement: Statement): string | undefined {
+  if (statement.type === 'ImportDeclaration' || statement.type === 'ExportAllDeclaration')
+    return statement.source.value
+  if (statement.type === 'ExportNamedDeclaration') return statement.source?.value
+  return undefined
+}
+
 function processSources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name)
@@ -44,17 +52,15 @@ describe('A1 process profile boundary', () => {
       expect(text, path).not.toMatch(
         /\b(?:NodeJS|Buffer|Window|Worker|Deno|Bun)\b|\bnode:|Reflect\.apply|\.call\(|\.apply\(|\.bind\(/
       )
-      const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true)
-      const checkIdentifiers = (node: ts.Node): void => {
-        if (ts.isIdentifier(node)) expect(node.text, path).not.toBe('process')
-        ts.forEachChild(node, checkIdentifiers)
-      }
-      checkIdentifiers(file)
-      for (const statement of file.statements) {
-        if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue
-        const value = statement.moduleSpecifier
-        if (!value || !ts.isStringLiteral(value)) continue
-        const specifier = value.text
+      const program = parseSync(path, text).program
+      new Visitor({
+        Identifier(node) {
+          expect(node.name, path).not.toBe('process')
+        }
+      }).visit(program)
+      for (const statement of program.body) {
+        const specifier = moduleSpecifier(statement)
+        if (specifier === undefined) continue
         if (specifier.startsWith('../')) expect(allowedParent, path).toContain(specifier)
         else if (specifier.startsWith('./')) expect(specifier, path).toMatch(/\.js$/)
         else expect(allowedExternal, path).toContain(specifier)

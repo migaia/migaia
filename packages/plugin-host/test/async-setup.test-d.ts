@@ -54,9 +54,9 @@ definePlugin({
   // @ts-expect-error A two-argument install requires a declared setup.
   install: (_core, _out: number) => ({})
 })
-// @ts-expect-error A two-argument featureExpose requires a declared setup.
 definePlugin({
   name: 'bad-expose',
+  // @ts-expect-error A two-argument featureExpose requires a declared setup.
   featureExpose: (_core: unknown, _out: { k: string }) => ({ k: () => 1 }),
   install: () => ({})
 })

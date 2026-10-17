@@ -5,7 +5,8 @@
   "description": "Root-owned strict provenance and bundle acceptance tools for storage-v2 C2-R4.",
   "type": "module",
   "dependencies": {
-    "typescript": "6.0.2",
+    "oxc-parser": "^0.154.0",
+    "typescript": "^7.0.2",
     "yaml": "2.9.0"
   },
   "engines": {

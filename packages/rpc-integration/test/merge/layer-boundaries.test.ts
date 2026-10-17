@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Source root whose dependency direction is enforced by A2. */
@@ -56,14 +56,18 @@ const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/index.ts'])
 
 /** Return each import or re-export that violates the contract/core/browser direction. */
 function layerViolations(file: string, source: string): string[] {
-  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  const parsed = parseSync(file, source).program
   const owner = logicalPath(file).split('/')[0]
   const physicalOwner = ownerRoots.find(({ root }) => file.startsWith(root + sep))
   const failures: string[] = []
-  for (const statement of parsed.statements) {
-    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue
-    if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue
-    const specifier = statement.moduleSpecifier.text
+  for (const statement of parsed.body) {
+    const specifier =
+      statement.type === 'ImportDeclaration' || statement.type === 'ExportAllDeclaration'
+        ? statement.source.value
+        : statement.type === 'ExportNamedDeclaration'
+          ? statement.source?.value
+          : undefined
+    if (specifier === undefined) continue
     const isRelative = specifier.startsWith('.')
     const resolved = isRelative ? resolve(dirname(file), specifier.replace(/\.js$/, '.ts')) : ''
     const target = isRelative ? logicalPath(resolved) : ''
@@ -134,12 +138,9 @@ describe('A2 layer dependency direction', () => {
       join(import.meta.dirname, '../../../rpc-core/src/remote/retry.ts'),
       'utf8'
     )
-    const parsed = ts.createSourceFile('retry.ts', source, ts.ScriptTarget.Latest, true)
-    const imports = parsed.statements
-      .filter(ts.isImportDeclaration)
-      .map((statement) =>
-        ts.isStringLiteral(statement.moduleSpecifier) ? statement.moduleSpecifier.text : ''
-      )
+    const imports = parseSync('retry.ts', source).program.body.flatMap((statement) =>
+      statement.type === 'ImportDeclaration' ? [statement.source.value] : []
+    )
     expect(imports.some((specifier) => /(?:process|threads|coroutine)/.test(specifier))).toBe(false)
   })
 

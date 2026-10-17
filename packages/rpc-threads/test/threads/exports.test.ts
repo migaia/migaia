@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Runtime exports must resolve from built files as an ordinary ESM consumer sees them. */
@@ -10,15 +10,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 function importClosure(file: string, visited = new Set<string>()): string[] {
   if (visited.has(file)) return []
   visited.add(file)
-  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
-  return source.statements.flatMap((statement) => {
-    if (
-      (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) ||
-      !statement.moduleSpecifier ||
-      !ts.isStringLiteral(statement.moduleSpecifier)
-    )
-      return []
-    const specifier = statement.moduleSpecifier.text
+  return parseSync(file, readFileSync(file, 'utf8')).program.body.flatMap((statement) => {
+    const specifier =
+      statement.type === 'ImportDeclaration' || statement.type === 'ExportAllDeclaration'
+        ? statement.source.value
+        : statement.type === 'ExportNamedDeclaration'
+          ? statement.source?.value
+          : undefined
+    if (specifier === undefined) return []
     if (!specifier.startsWith('.')) return [specifier]
     const target = resolve(dirname(file), specifier.replace(/\.js$/, '.ts'))
     return [target, ...importClosure(target, visited)]

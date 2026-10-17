@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import { parseSync } from 'oxc-parser'
 
 /** Repository root and retired names are fixed by rpc-merge A6. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -42,18 +42,22 @@ function filesUnder(directory) {
 function scanText(file) {
   const source = readFileSync(file, 'utf8')
   if (relative(root, file) !== 'scripts/test/error-registry.test.mjs') return source
-  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  const statements = parseSync(file, source).program.body
   let result = source
-  for (const statement of [...parsed.statements].reverse()) {
-    if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) continue
+  for (let index = statements.length - 1; index >= 0; index--) {
+    const statement = statements[index]
+    if (statement.type !== 'ExpressionStatement' || statement.expression.type !== 'CallExpression')
+      continue
     const call = statement.expression
-    if (call.expression.getText(parsed) !== 'test') continue
+    if (source.slice(call.callee.start, call.callee.end) !== 'test') continue
     const title = call.arguments[0]
-    if (!title || !ts.isStringLiteral(title)) continue
-    if (!permittedA5Titles.has(title.text)) continue
+    if (title?.type !== 'Literal' || typeof title.value !== 'string') continue
+    if (!permittedA5Titles.has(title.value)) continue
+    /** Blank from the previous statement's end, so leading comments go with the test block. */
+    const start = index > 0 ? statements[index - 1].end : 0
     result =
-      result.slice(0, statement.pos) +
-      source.slice(statement.pos, statement.end).replace(/[^\n]/g, ' ') +
+      result.slice(0, start) +
+      source.slice(start, statement.end).replace(/[^\n]/g, ' ') +
       result.slice(statement.end)
   }
   return result

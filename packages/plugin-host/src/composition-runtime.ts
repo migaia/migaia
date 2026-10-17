@@ -311,7 +311,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       })
       return Object.freeze({
         ok: detail.cleanupErrors.length === 0 && !detail.physicalCompletion,
-        committed: true,
+        committed: true as const,
         snapshot,
         leaves: Object.freeze(leaves),
         cleanupComplete: detail.cleanupErrors.length === 0 && !detail.physicalCompletion,
@@ -322,7 +322,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     const physicalCompletion = mergeCleanupResults([physicalTask])
     return Object.freeze({
       ok: false,
-      committed: true,
+      committed: true as const,
       snapshot,
       leaves: Object.freeze(
         state.registrations.map((registration) =>
