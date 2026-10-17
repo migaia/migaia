@@ -49,6 +49,8 @@
   --kind-error: oklch(0.53 0.17 25);
 
   --code-canvas: oklch(0.255 0.018 270);
+  /* Code frame cover over the field: high on the light page so code keeps its dark canvas. */
+  --code-glass: 82%;
   --code-toolbar: oklch(0.228 0.018 270);
   --code-border: oklch(0.335 0.02 270);
   --code-text: oklch(0.905 0.01 270);
@@ -158,6 +160,7 @@
   --kind-error: oklch(0.75 0.13 25);
 
   --code-canvas: oklch(0.205 0.012 270);
+  --code-glass: 52%;
   --code-toolbar: oklch(0.188 0.012 270);
   --code-border: oklch(0.3 0.014 270);
   --output-canvas: oklch(0.225 0.014 270);
@@ -2131,8 +2134,16 @@ table.option-reference .option-behavior p:last-child {
 }
 
 .code-frame {
-  background: var(--code-canvas);
-  border: 1px solid var(--code-border);
+  /*
+   * Frosted glass that still shows the field moving behind it. The field's particles are about
+   * 2px, so a light blur keeps them as soft drifting specks; a 16px blur at 80% cover erased them.
+   * Cover strength is per theme (`--code-glass`) because the light theme keeps a dark code canvas.
+   */
+  -webkit-backdrop-filter: blur(2.5px) saturate(1.3);
+  backdrop-filter: blur(2.5px) saturate(1.3);
+  background: color-mix(in oklab, var(--code-canvas) var(--code-glass), transparent);
+  /* No outline: the glass edge alone separates the frame; transparent keeps the box size. */
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   margin: 0;
   overflow: hidden;
@@ -2140,8 +2151,8 @@ table.option-reference .option-behavior p:last-child {
 
 .code-toolbar {
   align-items: center;
-  background: var(--code-toolbar);
-  border-bottom: 1px solid var(--code-border);
+  background: color-mix(in oklab, var(--code-toolbar) 45%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--code-border) 70%, transparent);
   color: var(--code-muted);
   display: flex;
   font-family: var(--font-mono);
@@ -2189,7 +2200,8 @@ table.option-reference .option-behavior p:last-child {
 }
 
 [data-output='true'] .code-frame {
-  background: var(--output-canvas);
+  /* Same frosted glass as `.code-frame`, tinted with the output canvas. */
+  background: color-mix(in oklab, var(--output-canvas) var(--code-glass), transparent);
   box-shadow: inset 3px 0 0 var(--accent-default);
 }
 
