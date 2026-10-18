@@ -1,3 +1,7 @@
+[run]
+# Node-shebang CLIs (react-router, vite, pagefind) run on bun; the website needs no Node runtime.
+bun = true
+
 [install]
 backend = "bun"
 
