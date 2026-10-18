@@ -7,7 +7,7 @@
 1. [导入与前置条件](#1-导入与前置条件)
 2. [`SharedInt32Signal` / `sharedInt32` 完整参考](#2-sharedint32signal--sharedint32-完整参考)
 3. [`SharedInt32Array` / `sharedInt32Array` 完整参考](#3-sharedint32array--sharedint32array-完整参考)
-4. [`SharedWaitMode` 完整参考](#4-sharedwaitmode-完整参考)
+4. [等待策略](#4-等待策略)
 5. [错误身份：`StoreSharedErrorCode` / `STORE_SHARED_SOURCE` / `createStoreSharedError` / `createStoreSharedRangeError`](#5-错误身份)
 6. [Seqlock：并发读写的正确性保证](#6-seqlock并发读写的正确性保证)
 7. [跨线程同步：`sync()` 与 `watch()`](#7-跨线程同步sync-与-watch)
@@ -29,8 +29,6 @@ import {
   SharedInt32Signal,
   sharedInt32Array,
   SharedInt32Array,
-  SharedWaitMode,
-  type ISharedWaitMode,
   StoreSharedErrorCode,
   type IStoreSharedErrorCode,
   STORE_SHARED_SOURCE,
@@ -41,7 +39,7 @@ import {
 
 包只有一个导出入口（`.`），没有子路径划分。`sharedInt32`/`sharedInt32Array` 是推荐的创建方式；`SharedInt32Signal`/`SharedInt32Array` 类本身也导出，供需要 `instanceof` 判断或类型标注的场景使用。
 
-使用前必须先有一个 `@migaia/reactive` 的 `Runtime`（`createRuntime()` 的返回值）——每个共享对象构造时都会向传入的 `Runtime` 登记归属（`claimOwnership`），且构造过程会读取该 `Runtime` 的内部版本时钟（`internalsOf(runtime).clock.next()`）。
+使用前先创建 Runtime；信号与私有数组 cell 通过公开 reactive/extension 的 createSourceBinding 建立图源，数组整体通过 claimOwnership 登记同实例归属。
 
 **运行环境要求**：`SharedArrayBuffer` 在浏览器里通常需要页面处于[跨源隔离](https://developer.mozilla.org/en-US/docs/Web/API/crossOriginIsolated)状态（`COOP`/`COEP` 响应头）才可用；Node.js/Bun/Deno 默认可用。`.watch()` 额外要求 `Atomics.waitAsync` 存在，见 [§7](#7-跨线程同步sync-与-watch)。
 
@@ -73,8 +71,8 @@ class SharedInt32Signal implements IObservable, IDisposable {
 
 边界行为：
 
-- `buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `TypeError`（`code: 'INVALID_OPTION'`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。
-- 未传 `buffer` 时新建一个大小为 `2 * Int32Array.BYTES_PER_ELEMENT`（8 字节）的 `SharedArrayBuffer`，并把校验过的 `initialValue` 写入其中；传入的 `buffer` 小于这 8 字节 → 抛 `RangeError`（`code: 'BUFFER_TOO_SMALL'`，消息 `[store] shared signal buffer is too small`）。
+- `buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `RangeError`（`code: 'INVALID_OPTION'`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。
+- 未传 `buffer` 时新建一个大小为 32 字节（含版本化 header、int32 value 与对齐 int64 seq）的 `SharedArrayBuffer`，并把校验过的 `initialValue` 写入其中；传入的 `buffer` 小于这 32 字节 → 抛 `RangeError`（`code: 'BUFFER_TOO_SMALL'`，消息 `[store] shared signal buffer is too small`）。
 - `initialValue` 不是整数或超出 `[-2147483648, 2147483647]` → 抛 `RangeError`（`code: 'INVALID_OPTION'`，消息 `[store] shared signal value must be an int32, received <value>`）。
 
 ### 2.2 实例成员
@@ -103,14 +101,14 @@ class SharedInt32Signal implements IObservable, IDisposable {
 - **`subs`** —— 当前观察本节点的 `IObserver` 集合（只读视图），由 `@migaia/reactive` 的追踪系统维护，一般不需要直接读取。
 - **`version`**（getter）—— 该节点在所属 `Runtime` 响应式图里的版本号（`readVersion(this, initialVersion)`）。**不是**共享内存里的 seq，是包了一层图内版本记账之后的值,用于响应式系统内部判断"是否需要重新计算",业务代码通常不需要直接读它。
 - **`disposed`**（getter）—— 是否已 `dispose()`。
-- **`value`**（getter）—— 执行顺序：`#assertActive()` → 一致读一次（不含在 getter 里独立暴露，但 `sync()` 内部会做）→ `sync()`（若共享内存版本号与本地记录不同,更新记录并通知本 `Runtime` 的观察者）→ 向当前 `Runtime` 的依赖追踪器登记依赖（`tracker.track(this)`）→ 返回最新一致读到的 `value`。**在 `Effect`/`Computed` 里读 `.value` 会自动追踪,并且会顺带把远端最新写入拉进来**,不需要额外调用 `.sync()`。已释放时抛 `Error`（`signalDisposed`）。
-- **`value`**（setter）—— `#assertActive()` → `asInt32(next, 'shared signal value')` 校验（不合法抛 `RangeError`,`invalidOption`）→ 以无条件写方式 `writeLocked`；若返回 `undefined`（新值与当前值经 `Atomics` 比较相同,未变）则直接返回,不推进版本号、不通知、不唤醒;若返回新版本,则更新本地 `#observedSharedVersion`、调用 `internalsOf(runtime).notify(this)` 通知本地观察者、并 `Atomics.notify` 唤醒可能正在 `watch()` 挂起的其他线程。已释放时抛 `Error`（`signalDisposed`）。
-- **`peek(): number`** —— `#assertActive()` → 直接一致读并返回 `value`,**不**调用 `sync()`（不主动拉取远端更新,只读本地视图截至上次已知状态）、**不**登记依赖追踪。适合诊断/日志等不希望产生响应式依赖或触发通知的读取场景。
-- **`sync(): boolean`** —— `#assertActive()` → 一致读当前共享内存的 `version`;若与本地记录的 `#observedSharedVersion` 相同返回 `false`（无变化）;否则更新本地记录、调用 `internalsOf(runtime).notify(this)` 通知观察者,返回 `true`。这是"手动拉取远端写入"的入口,`watch()` 内部也是靠调它完成同步。
+- **`value`**（getter）—— 执行顺序：`#assertActive()` → 一致读一次（不含在 getter 里独立暴露，但 `sync()` 内部会做）→ `sync()`（若共享内存版本号与本地记录不同,更新记录并通知本 `Runtime` 的观察者）→ 向当前 `Runtime` 的依赖追踪器登记依赖（`#binding.source.track()`）→ 返回最新一致读到的 `value`。**在 `Effect`/`Computed` 里读 `.value` 会自动追踪,并且会顺带把远端最新写入拉进来**,不需要额外调用 `.sync()`。已释放时抛 `Error`（`signalDisposed`）。
+- **`value`**（setter）—— `#assertActive()` → `asInt32(next, 'shared signal value')` 校验（不合法抛 `RangeError`,`invalidOption`）→ 以无条件写方式 `writeLocked`；若返回 `undefined`（新值与当前值经 `Atomics` 比较相同,未变）则直接返回,不推进版本号、不通知、不唤醒;若返回新版本,则更新本地 `#observedSharedVersion`、调用 `#binding.source.notify()` 通知本地观察者、并 `Atomics.notify` 唤醒可能正在 `watch()` 挂起的其他线程。已释放时抛 `Error`（`signalDisposed`）。
+- **peek(): number** —— 一致读当前 SAB 值，不追踪、不推进已观察游标、不通知；所以 peek 可读到远端新值而 isStale 仍为 true。
+- **`sync(): boolean`** —— `#assertActive()` → 一致读当前共享内存的 `version`;若与本地记录的 `#observedSharedVersion` 相同返回 `false`（无变化）;否则更新本地记录、调用 `#binding.source.notify()` 通知观察者,返回 `true`。这是"手动拉取远端写入"的入口,`watch()` 内部也是靠调它完成同步。
 - **`watch(scheduler?: IScheduler): IDisposer`** —— `#assertActive()` → 若已经在 watch,直接返回同一个停止函数(不会叠加第二条回路);否则在 seq slot 上起一条 `Atomics.waitAsync` 唤醒回路:每次被唤醒就调用 `sync()`（如果此时未 disposed）,唤醒回调抛错会经 `reportSharedWatchFailure` 上报（只经 `runtime.reportError`，宿主诊断由该 Runtime 的 adapter 负责）。环境不支持 `Atomics.waitAsync` → 抛 `Error`（`envUnsupported`）。返回的停止函数调用时会 `Atomics.notify` 唤醒挂起中的 `waitAsync`,让它尽快 settle 并释放对共享内存视图的引用,而不是一直等到下一次真正的远端写入。`dispose()` 也会自动调用这个停止函数。
 - **`onObserved()` / `onUnobserved()`** —— `IObservable` 接口要求的钩子,本类实现为空操作(信号本身没有"被观察/不再被观察"时需要额外处理的资源)。
 - **`isStale(): boolean`** —— 直接比较一致读到的 `version` 与本地记录的 `#observedSharedVersion` 是否不同,**不**做 `#assertActive()` 校验（即使已经 `dispose()` 之后调用也不会抛错,因为它只读取底层视图,不依赖响应式追踪状态）。
-- **`dispose(): void`** —— 幂等；置位 `#disposed`、停止 `watch()` 回路（若存在）、从所属 `Runtime` 的追踪器断开（`tracker.disconnectObservable(this, 'dispose')`）。释放之后再调用 `value`/`sync()`/`watch()`/`peek()` 会抛 `Error`（`signalDisposed`）；`isStale()`/`buffer`/`runtime` 字段仍可安全访问。
+- **`dispose(): void`** —— 幂等；置位 `#disposed`、停止 `watch()` 回路（若存在）、从所属 `Runtime` 的追踪器断开（`#binding.source.dispose()`）。释放之后再调用 `value`/`sync()`/`watch()`/`peek()` 会抛 `Error`（`signalDisposed`）；`isStale()`/`buffer`/`runtime` 字段仍可安全访问。
 
 ```ts
 const runtime = createRuntime()
@@ -158,7 +156,7 @@ class SharedInt32Array implements IDisposable {
 
 1. `options` 不是 `undefined`（会取默认值 `{}`）也不是对象（例如显式传 `null`）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array options must be an object`）。
 2. 读取 `options.buffer`/`options.initialValues` 时若访问器抛错（例如恶意/异常的 getter）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array options could not be read safely`，`cause` 为原始错误）。
-3. `buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `TypeError`（`invalidOption`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。
+3. `buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `RangeError`（`invalidOption`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。
 4. `length` 不是整数或小于 `0` → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array length must be a non-negative integer`）。
 5. 未传 `buffer` 且提供了 `initialValues`：遍历该 iterable，逐个用 `asInt32` 校验并收集，达到 `length` 个就停止；遍历或校验中途抛错 → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array initialValues could not be materialized safely`，`cause` 为原始错误）。
 6. ABI v2：header 与 generation 占 32 bytes，后接 `length` 个 int32 value，按 8 bytes 对齐后接 `length` 个 int64 seq。所需字节数 `requiredBytes = align8(32 + length * 4) + length * 8`；容量溢出抛 `RangeError`（`invalidOption`）。
@@ -182,18 +180,18 @@ class SharedInt32Array implements IDisposable {
   snapshot(): Int32Array
   dispose(): void
   assertActive(): void
-  readCell(index: number): { readonly value: number; readonly version: number }
+  readCell(index: number): { readonly value: number; readonly version: bigint }
   writeCell(index: number, value: number, expected?: number): bigint | undefined
   notifyWaiters(): void
-  recordObservedVersion(index: number, version: number): void
+  recordObservedVersion(index: number, version: bigint): void
 }
 ```
 
 - **`runtime` / `buffer` / `length`** —— 只读字段，含义同构造参数；`length` 构造后不可变。
 - **`disposed`**（getter）—— 是否已 `dispose()`。
-- **`get(index: number): number`** —— 先做下标校验（见下）。若当前不处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为假），走轻量直读路径：直接 `readCell(index).value`，不物化任何 `SharedInt32ArrayCell`、不产生依赖，即使数组有百万元素，一次性读取开销也是 `O(1)`。若处于追踪上下文（`Effect`/`Computed` 内部），惰性创建（或复用已存在的）该下标对应的响应式 cell 并调用其 `read()`——这会触发该 cell 自己的 `sync()`（只拉取这一格的远端变化）与依赖登记。
+- **`get(index: number): number`** —— 先做下标校验（见下）。若当前不处于依赖追踪上下文（`isRuntimeTracking(runtime)` 为假），走轻量直读路径：直接 `readCell(index).value`，不物化任何 `SharedInt32ArrayCell`、不产生依赖，即使数组有百万元素，一次性读取开销也是 `O(1)`。若处于追踪上下文（`Effect`/`Computed` 内部），惰性创建（或复用已存在的）该下标对应的响应式 cell 并调用其 `read()`——这会触发该 cell 自己的 `sync()`（只拉取这一格的远端变化）与依赖登记。
 - **`set(index, value): void`** —— 下标与值校验后：若该下标已有物化的 cell，委托给 `cell.write(value)`（会带上依赖通知与远端唤醒）；否则直接调用底层 `writeCell(index, asInt32(value))`，写入成功（版本非 `undefined`）时更新数组级"已观察版本"记账并调用 `notifyWaiters()` 推进 epoch、唤醒可能的远端 `watch()`。值与当前值相同时静默跳过，不推进版本、不通知。
-- **`update(index, updater): number`** —— `updater` 必须是函数，否则抛 `TypeError`（`invalidOption`，消息 `[store] shared array update callback must be a function`）。执行顺序（详见 [§6.2](#62-写占锁--写值--放锁)）：一致读当前值 → **锁外**调用 `updater(current)` → 校验结果为合法 `int32` → 若与当前值相同直接返回（不写入）→ 否则以 CAS（期望值 = 读到的 `current`）尝试写入，失败则从头重来，最多重试 `1 << 16`（65536）次；超限抛 `Error`（`contentionLimit`，消息 `[store] shared array update at <index> kept losing the race; another writer never settled`）。写入成功后同步更新本地记账、若下标已物化 cell 则调用其 `commitWrite`，否则直接 `notifyWaiters()`。**`updater` 必须是纯函数、可安全重复调用**——冲突时会被重跑，不要在里面产生不可逆副作用；`updater` 抛错会原样向上抛出，且不会留下任何脏锁状态（回调在锁外执行）。
+- **`update(index, updater): number`** —— `updater` 必须是函数，否则抛 `RangeError`（`invalidOption`，消息 `[store] shared array update callback must be a function`）。执行顺序（详见 [§6.2](#62-写占锁--写值--放锁)）：一致读当前值 → **锁外**调用 `updater(current)` → 校验结果为合法 `int32` → 若与当前值相同直接返回（不写入）→ 否则以 CAS（期望值 = 读到的 `current`）尝试写入，失败则从头重来，最多重试 `1 << 16`（65536）次；超限抛 `Error`（`contentionLimit`，消息 `[store] shared array update at <index> kept losing the race; another writer never settled`）。写入成功后同步更新本地记账、若下标已物化 cell 则调用其 `commitWrite`，否则直接 `notifyWaiters()`。**`updater` 必须是纯函数、可安全重复调用**——冲突时会被重跑，不要在里面产生不可逆副作用；updater 未编码 native Error 原位附 UPDATE_FAILED，foreign identity 保留，冻结值以 cause 追溯，且不会留下任何脏锁状态（回调在锁外执行）。
 - **`sync(index?): number`**
   - 传 `index`：先做下标校验；比较该下标的一致读版本号与本地记录，未变返回 `0`；变了则更新记录、若已物化 cell 则调用其 `sync()`（触发通知），返回 `1`。
   - 不传：先比较 64 位 generation；未变返回 0，变化后在一次 `runtime.batch()` 内扫描全部格的 seqlock。每个读者使用独立版本游标，统计所有变化下标（含无观察者格），只通知已物化 cell。
@@ -204,7 +202,7 @@ class SharedInt32Array implements IDisposable {
 - **`readCell(index): { value; version }`** —— 一致读某一格的原始 value/version（复用 seqlock 读协议），**不做下标范围校验、不检查是否已释放**，是最底层的读原语；`get()`/`sync()` 等内部都基于它实现，调用方若直接使用需自行保证 `index` 合法。
 - **`writeCell(index, value, expected?): bigint | undefined`** —— 最底层的写原语（`set`/`update` 都基于它），语义见 [§6.2](#62-写占锁--写值--放锁)：`expected` 省略即无条件写；提供则是 CAS；成功返回新 64 位版本，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。
 - **`notifyWaiters(): void`** —— 把头部 epoch 原子 `+1` 并 `Atomics.notify`，用于在绕开 `set`/`update` 自行调用 `writeCell` 之后手动唤醒 `watch()` 回路。
-- **`recordObservedVersion(index, version): void`** —— 更新数组级"已观察版本"记账（`#observedVersions[index]`），供自行组合 `readCell`/`writeCell` 实现自定义写入路径时，保持与内建 `sync()`/`get()` 的记账一致，避免下一次 `sync()` 误判该下标"仍未变化"或重复上报。
+- **recordObservedVersion(index, version: bigint)** —— 只复制数组级游标，不通知已物化 cell。常规底层写完成后调用 notifyWaiters() → sync(index)，让现有同步路径同时更新游标并发布；不要在 sync 前手动抄版本来跳过发布。
 
 `get`/`set`/`update`/`sync(index)` 的下标校验规则一致：先 `assertActive()`，再要求 `Number.isInteger(index) && index >= 0 && index < length`，否则抛 `RangeError`（`indexOutOfRange`，消息 `[store] shared array index out of range: <index>`）。
 
@@ -221,22 +219,9 @@ grid.get(0) // 抛 Error（code: 'ARRAY_DISPOSED'）
 
 ---
 
-## 4. `SharedWaitMode` 完整参考
+## 4. 等待策略
 
-```ts
-const SharedWaitMode: { readonly async: 'async' }
-type ISharedWaitMode = 'async'
-```
-
-一个稳定的等待模式标识常量（当前只有 `async` 一个取值），来源注释为"Shared-state wait modes used when Atomics.waitAsync is available"。它**不是**任何导出函数/方法的参数或返回值——`watch()` 内部固定使用基于 `Atomics.waitAsync` 的唤醒策略，不需要也不接受调用方传入 `SharedWaitMode` 来选择模式。它的作用是给调用方在自己的类型标注、日志、诊断代码里提供一个稳定、不会打字错误的字符串引用，为将来可能新增的等待模式预留扩展空间。
-
-```ts
-import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared'
-
-const currentMode: ISharedWaitMode = SharedWaitMode.async
-```
-
----
+watch 固定使用原生 Atomics.waitAsync；不提供模式选择参数。无 waitAsync 时由调用方 pump sync，库不静默降级。
 
 ## 5. 错误身份
 
@@ -261,11 +246,12 @@ const StoreSharedErrorCode: {
   readonly contentionLimit: 'CONTENTION_LIMIT'
   readonly envUnsupported: 'ENV_UNSUPPORTED'
   readonly invalidOption: 'INVALID_OPTION'
+  readonly updateFailed: 'UPDATE_FAILED'
 }
 type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode]
 ```
 
-错误由 `(source, code)` 二元组唯一定位，`source` 恒为 `@migaia/store-shared`（即 `STORE_SHARED_SOURCE`）。码值是公开 API 的一部分，本包内部所有抛出点都引用这张表，不内联字面量；触发条件与调用方建议见 [README 的对应小节](./README.md#错误身份)与本文 [§10 错误一览表](#10-错误一览表)。
+错误由 `(source, code)` 二元组唯一定位，本包构造错误的 `source` 为 `@migaia/store-shared`（即 `STORE_SHARED_SOURCE`）。码值是公开 API 的一部分，本包内部所有抛出点都引用这张表，不内联字面量；触发条件与调用方建议见 [README 的对应小节](./README.md#错误身份)与本文 [§10 错误一览表](#10-错误一览表)。
 
 ### 5.2 `STORE_SHARED_SOURCE`
 
@@ -273,7 +259,7 @@ type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSha
 const STORE_SHARED_SOURCE: '@migaia/store-shared'
 ```
 
-字符串常量，本包所有错误统一携带的 `source` 字段值。通过 `@migaia/utils` 的 `attachErrorIdentity` 挂到每个抛出的 `Error`/`RangeError` 上。
+字符串常量，本包构造错误携带的 source。通过 utils/error 的 attachErrorIdentity 赋予 native Error/RangeError 身份；已有完整 foreign source/code 保留原 owner。
 
 ### 5.3 `createStoreSharedError` / `createStoreSharedRangeError`
 
@@ -306,7 +292,7 @@ throw createStoreSharedRangeError(
 
 ## 6. Seqlock：并发读写的正确性保证
 
-每个共享整数格在内存里占用两个 `int32` slot：`[value, seq]`。`seq` 同时充当版本号与写锁：
+当前 ABI 使用 int32 value 与对齐的 int64 seq；信号总计 32 字节，数组还包含 header/generation。`seq` 同时充当版本号与写锁：
 
 - **偶数** = 空闲，值稳定，`value` 有效
 - **奇数** = 有写者正在写，此刻 `value` 可能处于半写状态，不能读
@@ -349,12 +335,12 @@ seq 推进为 seq+2（committed）
 
 ## 7. 跨线程同步：`sync()` 与 `watch()`
 
-**本地写入永远即时通知本地 `Runtime`**——`.value = x`、`.set()`、`.update()` 内部在写入成功后会立刻调用 `internalsOf(runtime).notify(...)`，这一步和共享内存、跨线程无关。
+**高层本地写入发布物化图源**：value/set/update 成功后通过 canonical binding.source.notify() 通知本地观察者，并发布共享 generation/唤醒远端；底层 writeCell 的组合责任见 §3。
 
 **跨 `Runtime`（通常也是跨线程）的写入不会自动出现在另一端**，因为另一端的 `Runtime` 完全不知道这块内存被改过，必须主动检测：
 
 - **手动拉取**：调用 `.sync()`（`SharedInt32Signal.sync()`、`SharedInt32Array.sync()` 或 `sync(index)`）。返回值表示是否发生了变化（数组版返回变化的下标数）。适合已经有自己的消息循环、可以定期 pump 的场景，或者不支持 `Atomics.waitAsync` 的环境。
-- **自动推送**：调用 `.watch()`。内部对 seq（`SharedInt32Signal`）或 epoch（`SharedInt32Array`）发起 `Atomics.waitAsync` 循环——一旦对应 slot 被写者 `Atomics.notify()` 唤醒，就自动跑一次 `sync()`，然后立刻重新挂起等待下一次唤醒。返回一个停止函数；重复调用 `.watch()` 会返回同一个停止函数，不会叠加多条回路；`.dispose()` 会自动停止它。
+- **自动推送**：watch(scheduler?) 使用原生 waitAsync。唤醒后 sync，并通过 scheduler 让出后重挂；重挂前先捕获等待版本再 sync 窗口内变化，期间再写会返回 not-equal，不把遗漏写当新基线。重复 watch 保留首次 scheduler 与 stop identity。
 
 `Atomics.wait`（同步版本）不能在主线程使用（会阻塞事件循环），所以 `watch()` 固定走 `waitAsync`。**环境不支持 `Atomics.waitAsync` 时 `watch()` 直接抛错**（`envUnsupported`，消息 `[store] Atomics.waitAsync is unavailable; pump sync() from your own message loop instead`），而不是静默退化成轮询——静默降级会让调用方误以为自己确实拿到了推送能力。
 
@@ -364,7 +350,7 @@ seq 推进为 seq+2（committed）
 
 ## 8. 每读者独立的完整同步
 
-ABI v2 包含版本化 header、一个 64 位 generation，以及每格 value/seq。写者完成一次提交后递增 generation 并唤醒 waiter；每个 JS array 实例保留自己的 generation 和每格已读版本。
+当前 ABI（header revision=1）包含版本化 header、一个 64 位 generation，以及每格 value/seq。写者完成一次提交后递增 generation 并唤醒 waiter；每个 JS array 实例保留自己的 generation 和每格已读版本。
 
 `sync()` 先比较 generation；未变化直接返回 0。变化后扫描全部 `length` 个 seqlock，与本实例的版本游标逐格比较，返回所有变化下标数（包括没有观察者的下标），在一次 `runtime.batch()` 中通知本地观察者。`sync(index)` 只比较指定格。完整扫描为 O(length)，当前没有共享清位的 dirty bitmap；一个读者不会消费另一个读者的变化。
 
@@ -372,9 +358,9 @@ ABI v2 包含版本化 header、一个 64 位 generation，以及每格 value/se
 
 ## 9. 响应式集成细节
 
-- **两者都是 `IObservable`**：通过 `@migaia/reactive/extension` 的 `createSourceBinding` 绑定原节点身份与只读版本/订阅者元数据，用受控source操作接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。
+- **信号与私有数组 cell 实现 IObservable**：canonical createSourceBinding 维护图源身份与版本；数组整体只实现 IDisposable，按下标物化图源，不提供整体 isStale。
 - **单一归属**：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。**这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身**——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。
-- **`SharedInt32Array` 的按需物化**：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。
+- **`SharedInt32Array` 的按需物化**：`get(index)` 只有在检测到当前处于依赖追踪上下文（`isRuntimeTracking(runtime)` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。
 - **cell 的自动回收**：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次"投机读"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在所属 Runtime 的 idle 清理阶段检查（默认微任务）是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。
 
 ---
@@ -385,13 +371,14 @@ ABI v2 包含版本化 header、一个 64 位 generation，以及每格 value/se
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `SIGNAL_DISPOSED`    | `SharedInt32Signal` 已 `dispose()` 后继续访问 `value`/`sync()`/`watch()`/`peek()`                                                                                                                     | `Error`                                  |
 | `ARRAY_DISPOSED`     | `SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`assertActive`                                                                                            | `Error`                                  |
-| `BUFFER_TOO_SMALL`   | 传入的 `buffer` 小于 `SharedInt32Signal`（8 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小                                                                                                | `RangeError`，构造时                     |
+| `BUFFER_TOO_SMALL`   | 传入的 `buffer` 小于 `SharedInt32Signal`（32 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小                                                                                                | `RangeError`，构造时                     |
 | `INDEX_OUT_OF_RANGE` | `SharedInt32Array` 的 `get`/`set`/`update`/`sync(index)` 下标越界或非整数                                                                                                                             | `RangeError`，调用时                     |
 | `CONTENTION_LIMIT`   | 一致读持续约 1 秒未 settle，或获取写锁持续约 1 秒未成功（两者均按轮自旋并退避），或 `update()` 的 CAS 重试自旋 65536 次仍未写入                                                                       | `Error`                                  |
 | `ENV_UNSUPPORTED`    | 当前运行环境不支持 `Atomics.waitAsync`，却调用了 `.watch()`                                                                                                                                           | `Error`，`watch()` 调用时                |
-| `INVALID_OPTION`     | 构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数 | `TypeError` 或 `RangeError`，构造/调用时 |
+| `UPDATE_FAILED` | updater 抛错；锁外执行，后续写仍可用 | native 原位附码；冻结/非 Error cause；foreign owner 保留 |
+| `INVALID_OPTION`     | 构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数 | `RangeError`，构造/调用时 |
 
-所有错误都携带 `source: '@migaia/store-shared'` 与上表对应的 `code`（通过 `attachErrorIdentity` 挂载），可用 `error.code === StoreSharedErrorCode.xxx` 分支处理，见 README 的 [错误身份](./README.md#错误身份) 小节。`CONTENTION_LIMIT` 系列几乎总是意味着**另一个持锁的写者异常终止**（线程被强制终止、页面崩溃）而没有走到释放锁那一步——共享内存里的 seq 会永远停在奇数。这类错误没有应用层可以自动恢复的办法，通常需要重新创建一块 buffer 并放弃旧的那份共享状态。
+本包构造的错误携带自身 source/code；完整 foreign updater identity 保留原 owner，未编码 native 原位附 UPDATE_FAILED，冻结错误以 cause 保留（通过 `attachErrorIdentity` 挂载），可用 `error.code === StoreSharedErrorCode.xxx` 分支处理，见 README 的 [错误身份](./README.md#错误身份) 小节。`CONTENTION_LIMIT` 系列几乎总是意味着**另一个持锁的写者异常终止**（线程被强制终止、页面崩溃）而没有走到释放锁那一步——共享内存里的 seq 会永远停在奇数。这类错误没有应用层可以自动恢复的办法，通常需要重新创建一块 buffer 并放弃旧的那份共享状态。
 
 ---
 
@@ -455,7 +442,7 @@ setInterval(() => {
 ## 12. 常见问题排查
 
 **Q：另一个线程明明写了值，我这边读到的还是旧的。**
-检查是否调用过 `.watch()` 或定期 `.sync()`——跨 `Runtime` 的写入不会自动出现，本地只有主动拉取或订阅了唤醒回路才能看到远端变化。`.peek()` 也不会主动拉取远端更新，只有 `.value`/`.get()`（在追踪上下文中）或显式 `.sync()` 会。
+检查是否 watch 或 sync 来发布远端变化。peek/get 的共享字节直读可以已见新值，但这不等于观察游标推进或图观察者得到通知；peek 不追踪也不发布。
 
 **Q：`watch()` 抛出 `Atomics.waitAsync is unavailable`。**
 当前运行环境不支持该 API（常见于旧版本或某些沙箱环境），错误码是 `ENV_UNSUPPORTED`。改用定时调用 `.sync()`/`.sync(index)` 轮询，见 [§11](#11-生产环境完整示例) 最后一个例子。
@@ -475,11 +462,8 @@ setInterval(() => {
 **Q：能不能用这个包存对象、字符串这些复杂数据？**
 不能。它只支持定长的 `int32` 布局，这是刻意的设计边界——`SharedArrayBuffer` 本身就是定长的原始内存，塞对象图需要自己实现序列化协议，超出了这个包的职责范围。
 
-**Q：`SharedWaitMode` 该怎么用？**
-它不是任何函数的参数，只是一个稳定的字符串常量/类型，供调用方在自己的日志、诊断代码里引用"当前使用的是基于 `Atomics.waitAsync` 的等待模式"这一事实，不需要也无法传给 `watch()` 来切换策略。
-
 **Q：`readCell`/`writeCell`/`notifyWaiters`/`recordObservedVersion` 什么时候需要直接用？**
-绝大多数场景用 `get`/`set`/`update`/`sync` 就够了。只有在自行组合底层原语（例如实现一个不经过响应式 cell 的批量写入路径、或包装一层自定义脏页策略）时才需要直接调用这些低级方法，且要自行保证下标合法、调用 `writeCell` 成功后同步调用 `recordObservedVersion`/`notifyWaiters` 以保持与内建 `get`/`sync()` 的记账一致。
+绝大多数场景用 get/set/update/sync。底层扩展须自行保证下标和值合法；writeCell 成功后先 notifyWaiters()，再 sync(index) 发布已有本地 cell。sync 已管理版本游标，不需重复 recordObservedVersion；先记录再同步会漏通知。
 
 ---
 
@@ -494,3 +478,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 `watch(scheduler?: IScheduler)` captures an injected scheduler on the first watch call; it defaults to `systemScheduler`. The scheduler owns zero-delay yielding and cancellation between waitAsync wakeups. Repeated calls return the active stop handle and retain its scheduler. Errors are reported only through the owning Runtime. Abandoned cells use that Runtime idle channel (default microtasks).
 
 Import `IScheduler` or `systemScheduler` from `@migaia/utils/scheduler` when supplying the optional watch timer owner.
+
+同步契约修复：本地 publish 不再提前承认整代已扫描；watch 每次重挂先对账窗口内写入。initialValues 只取所需前缀并沿原生 IteratorClose 结束，length=0 不拉取。移除无公共协议消费的 SharedWaitMode/ISharedWaitMode；watch 固定策略及两类/两工厂保持，外部旧 import 需 breaking 迁移，无 alias。

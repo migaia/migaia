@@ -3,7 +3,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreSharedErrorCode, type IStoreSharedErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/** Identity for package-owned errors; complete foreign callback identities keep their own source. */
 export const STORE_SHARED_SOURCE = '@migaia/store-shared'
 
 function tagStoreSharedError<E extends Error>(error: E, code: IStoreSharedErrorCode): E {

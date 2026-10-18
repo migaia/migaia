@@ -15,7 +15,12 @@ import {
   type IObservable,
   type IObserver
 } from '@migaia/reactive/extension'
-import { createStoreSharedError, createStoreSharedRangeError } from './errors.js'
+import {
+  createStoreSharedError,
+  createStoreSharedRangeError,
+  STORE_SHARED_SOURCE
+} from './errors.js'
+import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 import { StoreSharedErrorCode } from './error-code.js'
 import { StoreSharedErrorText } from './error-text.js'
 import {
@@ -28,7 +33,8 @@ import {
 /**
  * SharedArrayBuffer 支撑的跨线程状态。
  *
- * 布局是 **seqlock**：每格两个 slot `[value, seq]`，`seq` 同时充当版本号与写锁—— 奇数表示「有人正在写」，每次完成的写入把它推进 2。
+ * 布局包含 ABI header、int32 value 与对齐的 int64 seq；signal 共 32 字节。`seq`
+ * 同时充当版本号与写锁——奇数表示「有人正在写」，每次完成的写入把它推进 2。
  *
  * 之前是 `[value, version]`，写入为 `Atomics.exchange(value)` 后 `Atomics.add(version)`
  * 两步，中间没有任何互斥。后果是并发写者能让读者观察到「新值配旧版本」：读者据版本 判断自己不脏，于是**漏掉一次通知**，而值已经变了。跨线程共享状态里这种漏通知几乎
@@ -261,7 +267,7 @@ function watchSlot(
   onWake: () => void,
   onError: (error: unknown) => void,
   schedulerOption?: IScheduler
-): IDisposer {
+): { readonly start: () => void; readonly stop: IDisposer } {
   if (!hasWaitAsync()) {
     throw createStoreSharedError(
       StoreSharedErrorCode.envUnsupported,
@@ -300,7 +306,15 @@ function watchSlot(
     if (stopped) return
     let result: IWaitAsyncResult
     try {
-      result = waitAsync(view as never, slot, Atomics.load(view, slot))
+      /**
+       * Capture before reconciliation so a write during publication cannot become an unseen
+       * baseline.
+       */
+      const expected = Atomics.load(view, slot)
+      // The yielding task has no native waiter. Pull its missed writes before waiting again.
+      onWake()
+      if (stopped) return
+      result = waitAsync(view as never, slot, expected)
     } catch (error) {
       onError(error)
       return
@@ -333,8 +347,8 @@ function watchSlot(
     )
   }
 
-  loop()
-  return () => {
+  /** Stop is published by the owner before start can synchronously publish graph changes. */
+  const stop = (): void => {
     if (stopped) return
     stopped = true
     if (timer !== undefined) {
@@ -351,6 +365,7 @@ function watchSlot(
       // view unavailable, so disposal must remain best-effort and idempotent.
     }
   }
+  return { start: loop, stop }
 }
 
 export class SharedInt32Signal implements IObservable, IDisposable {
@@ -470,7 +485,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     this.#assertActive()
     if (this.#stopWatching) return this.#stopWatching
     let disposer: IDisposer | undefined
-    const stop = watchSlot(
+    const watch = watchSlot(
       this.#versionView,
       0,
       () => {
@@ -483,10 +498,11 @@ export class SharedInt32Signal implements IObservable, IDisposable {
       scheduler
     )
     disposer = () => {
-      stop()
+      watch.stop()
       if (this.#stopWatching === disposer) this.#stopWatching = undefined
     }
     this.#stopWatching = disposer
+    watch.start()
     return disposer
   }
 
@@ -526,6 +542,44 @@ export const sharedInt32 = (
   initialValue = 0,
   buffer?: SharedArrayBuffer
 ): SharedInt32Signal => new SharedInt32Signal(runtime, initialValue, buffer)
+
+/** Runs the public updater outside the lock and preserves its original failure identity or cause. */
+function runSharedUpdate(update: (current: number) => number, current: number): number {
+  try {
+    return update(current)
+  } catch (error) {
+    if (isNativeErrorValue(error)) {
+      /** Classified native errors keep their class, stack and exact identity. */
+      let identified: Error | undefined
+      try {
+        /** Do not invoke application-owned metadata accessors during error classification. */
+        const source = Object.getOwnPropertyDescriptor(error, 'source')
+        /** Complete existing identities continue to refer to their actual owner. */
+        const code = Object.getOwnPropertyDescriptor(error, 'code')
+        if (typeof source?.value === 'string' && typeof code?.value === 'string') identified = error
+        else if (!source && !code && Object.isExtensible(error)) {
+          identified = attachErrorIdentity(error, {
+            source: STORE_SHARED_SOURCE,
+            code: StoreSharedErrorCode.updateFailed
+          })
+        }
+      } catch (metadataError) {
+        throw attachErrorIdentity(
+          new AggregateError([error, metadataError], StoreSharedErrorText.updateFailed),
+          { source: STORE_SHARED_SOURCE, code: StoreSharedErrorCode.updateFailed }
+        )
+      }
+      if (identified) throw identified
+    }
+    throw createStoreSharedError(
+      StoreSharedErrorCode.updateFailed,
+      StoreSharedErrorText.updateFailed,
+      {
+        cause: error
+      }
+    )
+  }
+}
 
 /**
  * 数组布局：ABI header、一个 64 位 generation cursor、所有值以及每格 64 位 seqlock。 每个 Runtime 保留自己的 generation/cell
@@ -628,6 +682,7 @@ export class SharedInt32Array implements IDisposable {
   #generationView: BigInt64Array
   #cells = new Map<number, SharedInt32ArrayCell>()
   #observedVersions: BigInt64Array
+  /** Generation last completely scanned by this reader, never acknowledged by local publication. */
   #observedGeneration: bigint
   #disposed = false
   #stopWatching?: IDisposer
@@ -671,12 +726,12 @@ export class SharedInt32Array implements IDisposable {
       )
     }
     let preparedInitialValues: number[] | undefined
-    if (!buffer && initialValues) {
+    if (!buffer && initialValues && length > 0) {
       try {
         preparedInitialValues = []
         for (const value of initialValues) {
-          if (preparedInitialValues.length >= length) break
           preparedInitialValues.push(asInt32(value, 'shared cell value'))
+          if (preparedInitialValues.length >= length) break
         }
       } catch (error) {
         throw createStoreSharedRangeError(
@@ -786,7 +841,7 @@ export class SharedInt32Array implements IDisposable {
     for (let spins = 0; spins < SPIN_LIMIT; spins++) {
       this.assertActive()
       const { value: current } = this.readCell(index)
-      const next = asInt32(update(current), 'shared cell value')
+      const next = asInt32(runSharedUpdate(update, current), 'shared cell value')
       if (current === next) return current
       const version = this.writeCell(index, next, current)
       if (version !== undefined) {
@@ -850,7 +905,7 @@ export class SharedInt32Array implements IDisposable {
     this.assertActive()
     if (this.#stopWatching) return this.#stopWatching
     let disposer: IDisposer | undefined
-    const stop = watchSlot(
+    const watch = watchSlot(
       this.#generationView,
       0,
       () => {
@@ -863,10 +918,11 @@ export class SharedInt32Array implements IDisposable {
       scheduler
     )
     disposer = () => {
-      stop()
+      watch.stop()
       if (this.#stopWatching === disposer) this.#stopWatching = undefined
     }
     this.#stopWatching = disposer
+    watch.start()
     return disposer
   }
 
@@ -923,7 +979,8 @@ export class SharedInt32Array implements IDisposable {
 
   /** Advance the shared 64-bit generation and wake every independent reader cursor. */
   notifyWaiters(): void {
-    this.#observedGeneration = Atomics.add(this.#generationView, 0, 1n) + 1n
+    // Publishing this write does not mean this reader scanned other remote cells in the generation.
+    Atomics.add(this.#generationView, 0, 1n)
     Atomics.notify(this.#generationView as never, 0)
   }
 

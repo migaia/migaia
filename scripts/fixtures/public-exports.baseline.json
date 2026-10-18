@@ -1275,7 +1275,6 @@
         "STORE_SHARED_SOURCE",
         "SharedInt32Array",
         "SharedInt32Signal",
-        "SharedWaitMode",
         "StoreSharedErrorCode",
         "createStoreSharedError",
         "createStoreSharedRangeError",

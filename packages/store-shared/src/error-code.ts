@@ -10,6 +10,12 @@
  */
 export const StoreSharedErrorCode = {
   /**
+   * The public array updater throws before lock acquisition. Unclassified native errors receive
+   * this identity; complete foreign identities remain with their owner and frozen values remain
+   * reachable through cause. Correct the callback; the shared cell remains usable.
+   */
+  updateFailed: 'UPDATE_FAILED',
+  /**
    * `SharedInt32Array` is read or written after `dispose()`.
    *
    * Create a new array instead of reusing the disposed instance.

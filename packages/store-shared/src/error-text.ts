@@ -1,5 +1,7 @@
 /** Stable public diagnostics owned by `@migaia/store-shared`. */
 export const StoreSharedErrorText = {
+  /** Identifies the public updater boundary when the original failure cannot receive metadata. */
+  updateFailed: '[store] shared array update callback failed',
   cellUnsettled:
     '[store] shared cell did not settle before the contention limit; a writer may still be active or may have abandoned the seqlock',
   lockUnacquired:
