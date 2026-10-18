@@ -165,6 +165,227 @@ await host.dispose()`
 export const completionApiGuides: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>
 > = {
+  'rpc-core:full:createFullOneWayEndpoint': guide({
+    purposeEn:
+      'Creates the full RPC endpoint with sendOneWay in addition to ordinary calls, local providers, discovery and connection control. Use it when one connection needs both calls with results and notifications without replies. In this memory-channel example, the service doubles a value before the client sends a notification. Completion of sendOneWay means the message was handed to the underlying channel; it does not confirm that the remote handler finished successfully.',
+    purposeZh:
+      '创建完整 RPC 端点，除普通调用、本地处理函数、发现与连接控制外，还提供 sendOneWay。连接同时需要有返回值的调用和不等待回复的通知时使用。下面通过内存通道先让服务计算两倍值，再发送通知。sendOneWay 完成只表示消息已交给底层通道，不代表远端处理函数已经执行成功。',
+    quickStart: `import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+
+const [clientTransport, serviceTransport] = createMemoryTransportPair()
+/** The service owns handlers for this side of the memory channel. */
+const service = await createEndpoint({
+  id: 'service', transport: serviceTransport,
+  middlewares: [connect({ transport: serviceTransport })] as const
+})
+service.provide('double', (context) => context.success(Number(context.data) * 2))
+service.provide('note', (context) => { console.log(context.data); return context.success() })
+/** This client keeps ordinary calls and adds one-way sending on the same connection. */
+const client = await createFullOneWayEndpoint({
+  id: 'client', transport: clientTransport,
+  middlewares: [connect({ transport: clientTransport })] as const
+})
+try {
+  console.log(await client.send<number>('service', 'double', 21))
+  await client.sendOneWay('service', 'note', 'calculation completed')
+} finally {
+  await Promise.all([client.dispose(), service.dispose()])
+}`,
+    scenariosEn: [
+      'The ordinary send call prints 42, proving that request and response still work alongside one-way sending.',
+      'A notification reports local progress and does not need a remote return value.'
+    ],
+    scenariosZh: [
+      '普通 send 调用输出 42，说明单向发送与原有的请求回复可以同时使用。',
+      '用通知报告本地进度，不需要远端返回结果。'
+    ],
+    avoidEn: [
+      'Use createFullEndpoint when every operation must wait for a remote response.',
+      'Do not use sendOneWay as evidence that a remote write succeeded; use a call with an explicit result when confirmation matters.'
+    ],
+    avoidZh: [
+      '所有操作都需要等待远端回复时，使用 createFullEndpoint。',
+      '不能用 sendOneWay 完成证明远端写入成功；需要确认时，使用带明确结果的普通调用。'
+    ]
+  }),
+  'rpc-core:transport-kit:identifyRpcBoundaryFailure': guide({
+    purposeEn:
+      'Classifies a failure caught at an adapter I/O boundary with a Core error code. A mutable native Error keeps its identity, type and stack. An error already carrying a package source and string code is returned unchanged. The example classifies a TypeError; both console values are true. Non-error values and errors that cannot be tagged are wrapped with the original value on cause.',
+    purposeZh:
+      '为适配器读写边界捕获的失败补上 Core 错误码。可以修改的原生 Error 保留同一个实例、类型和堆栈；已经带包来源与字符串错误码的错误直接返回。示例为 TypeError 分类，两个输出都是 true。非错误值或无法附加属性的错误会被包装，原值保留在 cause 上。',
+    quickStart: `import { RpcCoreErrorCode } from '@migaia/rpc-core'
+import { identifyRpcBoundaryFailure } from '@migaia/rpc-core/transport-kit'
+
+/** A native failure that an adapter would receive from its host. */
+const originalFailure = new TypeError('Port is closed')
+/** Classification keeps this mutable native Error instance intact. */
+const classifiedFailure = identifyRpcBoundaryFailure(
+  originalFailure, RpcCoreErrorCode.transport, 'Transport operation failed'
+)
+console.log(classifiedFailure === originalFailure)
+console.log(classifiedFailure instanceof TypeError)`,
+    scenariosEn: [
+      'An adapter catches a host send failure and must attach the public transport classification without erasing the native error.',
+      'A non-error thrown value needs an Error wrapper while remaining reachable through cause.'
+    ],
+    scenariosZh: [
+      '适配器捕获宿主发送失败，需要附上公开传输分类，同时保留原生错误。',
+      '捕获到非错误值，需要包装成 Error，并仍可沿 cause 找到原值。'
+    ],
+    avoidEn: [
+      'Do not reclassify an error that already has another package semantic identity; this helper deliberately preserves it.',
+      'Ordinary business code should handle the rejected RPC call rather than constructing adapter transport failures.'
+    ],
+    avoidZh: [
+      '不要借此重写已有其他包语义身份的错误；函数会有意保留该身份。',
+      '普通业务代码应处理 RPC 调用失败，不应自行制造适配器传输错误。'
+    ]
+  }),
+  'rpc-threads:adapters-node:createNodeThreadLauncher': guide({
+    purposeEn:
+      'Creates the Node Worker launcher used by a manager responsible for starting, restarting and closing Workers. Construction starts no Worker; launch does that later with the supplied specification and cancellation context. The example disables inherited runtime flags and prints enforced termination and exit-observation capabilities. Use createThreadPeer for ordinary application calls instead of assembling a launcher yourself.',
+    purposeZh:
+      '创建供 Worker 管理器使用的 Node 启动器；该管理器负责启动、重启和关闭 Worker。构造时不会启动 Worker，之后的 launch 才根据启动规格与取消上下文创建线程。示例禁用继承的运行时参数，并输出具备实际保证的终止和退出观察能力。普通业务调用使用 createThreadPeer，无需自行装配启动器。',
+    quickStart: `import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
+
+/** Preparation exposes capabilities without starting a Worker. */
+const launcher = createNodeThreadLauncher({ execArgv: [] })
+console.log(launcher.capabilities.termination)
+console.log(launcher.capabilities['exit-observation'])`,
+    scenariosEn: [
+      'A supervision integration needs to create Node Workers and observe their actual exit before releasing capacity.',
+      'The output is enforced for both fields; no Worker is created by inspecting the launcher.'
+    ],
+    scenariosZh: [
+      '接入监督器时，需要创建 Node Worker，并在归还容量前观察其实际退出。',
+      '两项输出均为 enforced；只创建并检查启动器不会创建 Worker。'
+    ],
+    avoidEn: [
+      'Use createThreadPeer when the application needs request, notify or stream methods over an owned Worker.',
+      'Do not use the Node adapter inside a browser Worker; select a web launcher for that host.'
+    ],
+    avoidZh: [
+      '应用需要在自有 Worker 上使用 request、notify 或 stream 时，使用 createThreadPeer。',
+      '不要在浏览器 Worker 中使用 Node 适配器，该宿主应使用网页启动器。'
+    ]
+  }),
+  'rpc-threads:adapters-node:createNodeThreadChannelFactory': guide({
+    purposeEn:
+      'Creates a channel factory for Worker handles held by a manager responsible for starting, restarting and closing Node Workers. Pass the scheduler shared with that manager. Construction opens no channel; open(handle, signal) later opens a separate remote connection for the supplied handle. The example prints function, showing that the factory is prepared without starting a Worker.',
+    purposeZh:
+      '为 Node Worker 管理器已经持有的句柄创建通道工厂；该管理器负责启动、重启和关闭 Worker。应传入与管理器共用的时钟。构造不会打开通道，之后调用 open(handle, signal) 才为给定句柄打开独立远程连接。示例输出 function，表示工厂已准备好，同时没有启动 Worker。',
+    quickStart: `import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+/** The channel factory shares the supervision owner clock. */
+const channels = createNodeThreadChannelFactory({ scheduler: systemScheduler })
+console.log(typeof channels.open)`,
+    scenariosEn: [
+      'A custom supervision owner already has a Worker handle and needs to acquire its message channel.',
+      'Several opened channels must use the same scheduler for their connection timing.'
+    ],
+    scenariosZh: [
+      '自定义监督器已持有 Worker 句柄，需要取得该线程的消息通道。',
+      '打开的多条通道需要使用同一时钟管理连接计时。'
+    ],
+    avoidEn: [
+      'Use createThreadPeer when the library should start and connect the Worker for ordinary application RPC.',
+      'Do not fabricate a Worker handle from copied properties; pass the handle acquired by the launcher owner.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 希望由库负责启动并连接 Worker 时，使用 createThreadPeer。',
+      '不要复制属性伪造 Worker 句柄，应传入启动器所有者取得的句柄。'
+    ]
+  }),
+  'rpc-threads:adapters-electron-main:createElectronMainThreadLauncher': guide({
+    purposeEn:
+      'Creates a worker_threads launcher for Electron main, for a manager responsible for starting, restarting and closing Workers. It declares termination, exit observation and heap limits as unsupported, so applications cannot rely on this adapter to guarantee those operations. The example prints unsupported. Construction starts no Worker and never launches an Electron utilityProcess.',
+    purposeZh:
+      '为 Electron 主进程中的 Worker 管理器创建 worker_threads 启动器；该管理器负责启动、重启和关闭 Worker。此适配器把终止、退出观察和堆限制声明为 unsupported，因此应用不能据它承诺这些操作有保证。示例输出 unsupported；构造不会启动 Worker，也不会启动 Electron utilityProcess。',
+    quickStart: `import { createElectronMainThreadLauncher } from '@migaia/rpc-threads/adapters/electron-main'
+
+/** Electron main explicitly advertises its unsupported guarantees. */
+const launcher = createElectronMainThreadLauncher()
+console.log(launcher.capabilities.termination)`,
+    scenariosEn: [
+      'An Electron main supervision integration explicitly accepts the adapter unsupported capability declarations.',
+      'The application needs Worker threads inside Electron main rather than a separate utility process.'
+    ],
+    scenariosZh: [
+      'Electron 主进程接入监督器，并明确接受适配器声明的不受保证能力。',
+      '应用需要 Electron 主进程内的 Worker 线程，而不是独立工具进程。'
+    ],
+    avoidEn: [
+      'A policy requires enforced termination, actual-exit observation or heap-limit guarantees from this adapter.',
+      'Code runs in an Electron renderer or browser page; this adapter belongs to the main process.'
+    ],
+    avoidZh: [
+      '规则要求该适配器保证强制终止、实际退出观察或堆限制时，不应选择它。',
+      '代码运行于 Electron 渲染进程或浏览器页面时，不应使用属于主进程的此适配器。'
+    ]
+  }),
+  'rpc-threads:adapters-electron-main:createElectronMainThreadChannelFactory': guide({
+    purposeEn:
+      'Creates the Worker channel factory for Electron main by using the Node thread channel implementation. Supply the scheduler used by the manager responsible for starting, restarting and closing Workers. The factory opens a channel only when open receives a real Worker handle and cancellation signal; creating it does not start or terminate a Worker. The example prints function for the prepared open operation.',
+    purposeZh:
+      '复用 Node 线程通道实现，为 Electron 主进程创建 Worker 通道工厂。应传入 Worker 管理器已使用的时钟；该管理器负责启动、重启和关闭 Worker。只有 open 收到真实 Worker 句柄和取消信号后才打开通道；创建工厂不会启动或终止 Worker。示例对准备好的 open 操作输出 function。',
+    quickStart: `import { createElectronMainThreadChannelFactory } from '@migaia/rpc-threads/adapters/electron-main'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+/** Preparing the factory does not open or terminate a Worker. */
+const channels = createElectronMainThreadChannelFactory({ scheduler: systemScheduler })
+console.log(typeof channels.open)`,
+    scenariosEn: [
+      'An Electron main supervision owner has an existing Worker handle and needs its RPC channel.',
+      'Connection setup must share the owner scheduler instead of introducing a separate clock.'
+    ],
+    scenariosZh: [
+      'Electron 主进程监督器持有已有 Worker 句柄，需要取得其 RPC 通道。',
+      '连接初始化需要共用所有者的时钟，不能另起一套计时。'
+    ],
+    avoidEn: [
+      'Do not infer Electron termination or exit-observation guarantees from this Node-based channel implementation.',
+      'Use the browser or web Worker integration for renderer-side code instead of this main-process adapter.'
+    ],
+    avoidZh: [
+      '不能从通道复用 Node 实现推断 Electron 的终止或退出观察保证。',
+      '渲染侧代码应使用浏览器或网页 Worker 接入，不使用此主进程适配器。'
+    ]
+  }),
+  'wasm:index:__wbg_init': guide({
+    purposeEn:
+      'The package default initializer loads and instantiates the WebAssembly module before its allocation and conversion functions are used. Import it as a default value, not as a named __wbg_init export. In a browser build that includes the package WASM asset, await init before the example allocates one byte. With memory available, its capacity output is 8 because allocations round up to eight bytes. Finally, dealloc_bytes releases the allocation. Native WebAssembly loading failures reject initialization.',
+    purposeZh:
+      '此包的默认初始化函数负责加载并实例化 WebAssembly，必须先完成，再调用分配和转换函数。应使用默认导入，不是名为 __wbg_init 的命名导入。在包含此包 WASM 文件的浏览器构建中，先 await init，再执行示例的一字节分配。内存足够时容量输出为 8，因为分配会向上取整到八字节。最后由 dealloc_bytes 释放分配。原生 WebAssembly 加载失败会使初始化被拒绝。',
+    quickStart: `import init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'
+
+await init()
+/** The allocation id owns at least one byte and must be released. */
+const allocation = alloc_bytes(1)
+try {
+  console.log(byte_len_of(allocation))
+} finally {
+  dealloc_bytes(allocation)
+}`,
+    scenariosEn: [
+      'A browser application loads the packaged WASM asset before directly calling its exported functions.',
+      'The application has custom loading and passes bytes, a Response or a compiled WebAssembly.Module through module_or_path.'
+    ],
+    scenariosZh: [
+      '浏览器应用直接调用导出函数前，先加载包内的 WASM 文件。',
+      '应用自行加载文件，再通过 module_or_path 提供字节、Response 或已编译的 WebAssembly.Module。'
+    ],
+    avoidEn: [
+      'Do not call allocation or conversion functions before the initialization Promise resolves.',
+      'Use initSync only when bytes or a compiled module are already available and synchronous initialization is intended.'
+    ],
+    avoidZh: [
+      '初始化 Promise 完成前，不要调用分配或转换函数。',
+      '只有已经取得字节或已编译模块，并明确需要同步初始化时，才使用 initSync。'
+    ]
+  }),
   'utils:scheduler:deferTask': schedulerDeferGuide,
   'rpc-core:index:createRpcIdempotencyStore': guide({
     purposeEn:
