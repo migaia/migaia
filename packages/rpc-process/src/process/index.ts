@@ -1,4 +1,4 @@
-export { createProcessTransport, createAdapterChannel } from './handshake.js'
+export { createProcessTransport } from './handshake.js'
 export { createProcessChannelClosedError } from './error.js'
 export { openProcessObjectChannel } from './object-channel.js'
 export { createProcessPeer } from './peer.js'
@@ -9,7 +9,6 @@ export type {
   IProcessShortSourceOptions
 } from './adapters/short-source.js'
 export { createNativeProcessOffer } from './offer.js'
-export type { IProcessHostRegistrationApproval, IProcessHostRegistrations } from './host/types.js'
 export {
   RpcProcessErrorCode,
   ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE,
@@ -104,7 +103,6 @@ export {
 /** Preserve all user-level configuration types moved from the former Core Process entry. */
 export type * from './resilience/types.js'
 export type * from './plugin/types.js'
-export type * from './host/types.js'
 
 /** Process owns byte-channel presentation; Contract owns framing and error constants. */
 export {

@@ -59,14 +59,18 @@ describe('Web byte stream adapter', () => {
     expect(physicalCloses).toBe(1)
   })
 
-  it('[A8] reports original physical cleanup failure through the close cause', async () => {
+  it('[A8] retains original physical cleanup failure through native AggregateError cause/errors', async () => {
     const failure = new Error('physical close failed')
     const port = streams(() => {
       throw failure
     })
-    await expect(port.channel.close()).rejects.toMatchObject({
+    const closing = port.channel.close()
+    await expect(closing).rejects.toBeInstanceOf(AggregateError)
+    await expect(closing).rejects.toMatchObject({
+      source: '@migaia/rpc/process',
       code: 'PROCESS_CHANNEL_CLOSED',
-      cause: expect.objectContaining({ errors: [failure] })
+      cause: failure,
+      errors: [failure]
     })
   })
 

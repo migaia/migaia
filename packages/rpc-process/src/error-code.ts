@@ -13,7 +13,10 @@ export const RpcProcessErrorCode = {
   handshakeTimeout: 'PROCESS_HANDSHAKE_TIMEOUT',
   /** Peer authorization failed; caller must not retry without valid credentials. */
   authRejected: 'PROCESS_CHANNEL_AUTH_REJECTED',
-  /** A closed process channel rejected further work; caller must reconnect. */
+  /**
+   * A closed channel rejected work or its close observer/resource cleanup failed; inspect
+   * cause/errors.
+   */
   channelClosed: 'PROCESS_CHANNEL_CLOSED',
   /** Dial or launch could not establish a channel; caller may inspect the original cause. */
   connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED',

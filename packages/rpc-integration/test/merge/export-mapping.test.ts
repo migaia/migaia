@@ -537,7 +537,6 @@ describe('A1 merged public exports', () => {
         'ProcessPluginWire',
         'RPC_PROCESS_ERROR_SOURCE',
         'RpcProcessErrorCode',
-        'createAdapterChannel',
         'createAdapterProcessLaunch',
         'createAdapterProcessPeer',
         'createAdapterProcessPlugin',

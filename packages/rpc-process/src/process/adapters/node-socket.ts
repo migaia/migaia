@@ -8,6 +8,7 @@ import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import { RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'
+import { tagNativeProcessError } from '../error.js'
 import { createProcessTransport } from '../handshake.js'
 import type {
   IListenProcessByteChannel,
@@ -305,13 +306,20 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
       )
   })
   /** Listener errors after bind are diagnostic; they never close ready channels. */
-  server.on('error', (error) => reportSafely(options.report, error))
+  server.on('error', (error) =>
+    reportSafely(options.report, tagNativeProcessError(error, RpcProcessErrorCode.listenFailed))
+  )
   const managedPath =
     address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\') && options.serviceId
       ? address.path
       : undefined
-  if (managedPath) await prepareUnixSocketPath(managedPath, options.serviceId!)
-  else if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
+  if (managedPath) {
+    try {
+      await prepareUnixSocketPath(managedPath, options.serviceId!)
+    } catch (error) {
+      throw tagNativeProcessError(error as Error, RpcProcessErrorCode.listenFailed)
+    }
+  } else if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
     /** Existing paths are never removed or claimed as this listener's own. */
     let occupied = false
     try {
@@ -401,7 +409,7 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
     address.kind === 'tcp' && bound && typeof bound !== 'string'
       ? `tcp://${address.host === '::1' ? '[::1]' : address.host}:${bound.port}`
       : options.address
-  const close = async (): Promise<void> => {
+  const close = (): Promise<void> => {
     if (closePromise) return closePromise
     closed = true
     closeReason = attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {

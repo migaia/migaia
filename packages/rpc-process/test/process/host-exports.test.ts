@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import {
-  createProcessPeer,
-  createProcessPlugin,
-  type IProcessHostRegistrations
-} from '../../src/process/index.js'
+import { createProcessPeer, createProcessPlugin } from '../../src/process/index.js'
 
 describe('process Host public root', () => {
   it('[A8] exposes factories and types through process without adding a Host deep path', async () => {
@@ -20,10 +16,8 @@ describe('process Host public root', () => {
     type IPluginOptions = Parameters<typeof createProcessPlugin>[0]
     const client: (options: IPeerOptions) => Promise<object> = createProcessPeer
     const service: (options: IPluginOptions) => object = createProcessPlugin
-    const registrations: IProcessHostRegistrations | undefined = undefined
     expect(client).toBe(createProcessPeer)
     expect(service).toBe(createProcessPlugin)
-    expect(registrations).toBeUndefined()
     /** Only the established root and adapters are published; private assembly remains hidden. */
     const manifest = JSON.parse(
       readFileSync(new URL('../../package.json', import.meta.url), 'utf8')

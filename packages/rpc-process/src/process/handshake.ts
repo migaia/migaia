@@ -75,6 +75,3 @@ export function createProcessTransport(
     return Promise.reject(error)
   }
 }
-
-/** The moved former Core operation uses this same Process-owned implementation. */
-export { createProcessTransport as createAdapterChannel }

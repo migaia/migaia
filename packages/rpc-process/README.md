@@ -25,7 +25,7 @@
 pnpm add @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract
 ```
 
-`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
+`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.9`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
 
 两个可选 peer，只在用到对应子路径时才需要：
 
@@ -230,7 +230,7 @@ await createProcessPeer({
 
 Process carrier 观察尚未实现：`createProcessTransport(...).transport.observe` 当前不存在。计划中的字节事件包含 `detail.frameBytes`（含 4 字节长度前缀的完整物理帧字节数）与 `detail.drainMs`（物理写入发生回压后等待 drain 的毫秒数），内容捕获仅在 `probe.capturing` 为 true 时启用，并保留原字节引用。Node/Bun/Deno stdio 与 socket 的帧编码、解码和 transport 由 Core 的统一字节通道持有；当前接口未暴露帧观察与真实回压等待。Electron utility process 实际使用 whole-message 通道，仍需确定其 detail 语义。完成这些接口前，不应将逻辑 send 耗时当作 `drainMs`，也不能声称 Process carrier 已支持观察。
 
-所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本：
+本包登记的通道、启动与监听错误带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本。同步 spawn、Unix listener 准备和 bind 诊断保留原生对象、类型及 stack，并把原生 errno code 归入本包语义码；操作系统其它字段仍保留：
 
 - 本包错误：`source === '@migaia/rpc/process'`，`code` 取自 `RpcProcessErrorCode`，例如 `PROCESS_CHANNEL_AUTH_REJECTED`、`PROCESS_HANDSHAKE_TIMEOUT`。
 - 调用层错误来自 `@migaia/rpc/core`，例如超时 `DEADLINE_EXCEEDED`（`TimeoutError`）、取消 `CANCELLED`（`AbortError`）、过载 `OVERLOADED`。

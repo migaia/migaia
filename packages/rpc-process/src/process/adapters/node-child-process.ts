@@ -1,5 +1,6 @@
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
+import { tagNativeProcessError } from '../error.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -91,17 +92,22 @@ export function createNodeProcessLauncher(
       Object.assign(env, spec.env.set)
       if (runtimeBootstrap) env[PROCESS_RUNTIME_API_ENV] = PROCESS_RUNTIME_API_ENV_VERSION
       /** Only the selected channel/drain streams are opened as pipes. */
-      const child = spawn(spec.command, [...spec.args], {
-        cwd: spec.cwd,
-        env,
-        shell: false,
-        detached: process.platform !== 'win32',
-        stdio: [
-          spec.stdio.stdin === 'channel' ? 'pipe' : 'ignore',
-          spec.stdio.stdout === 'ignore' ? 'ignore' : 'pipe',
-          spec.stdio.stderr === 'ignore' ? 'ignore' : 'pipe'
-        ]
-      })
+      let child: ReturnType<typeof spawn>
+      try {
+        child = spawn(spec.command, [...spec.args], {
+          cwd: spec.cwd,
+          env,
+          shell: false,
+          detached: process.platform !== 'win32',
+          stdio: [
+            spec.stdio.stdin === 'channel' ? 'pipe' : 'ignore',
+            spec.stdio.stdout === 'ignore' ? 'ignore' : 'pipe',
+            spec.stdio.stderr === 'ignore' ? 'ignore' : 'pipe'
+          ]
+        })
+      } catch (error) {
+        throw tagNativeProcessError(error as Error, RpcProcessErrorCode.connectFailed)
+      }
       /** Node emits EPIPE on stdin independently of the bootstrap write callback. */
       let stdinFailure: Error | undefined
       /** A pending bootstrap must reject when the child closes stdin early. */

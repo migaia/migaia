@@ -207,7 +207,7 @@ try {
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `kind: 'spawn'`                          | 固定值，表示对象形式的 spawn 来源。                                                                                               |
 | `channelKind`                            | `'byte'`（stdio / socket 字节流）或 `'message'`（Electron utility process 等消息通道）。                                          |
-| `wire`                                   | `'native'`（默认，本库协议）或 `'jsonrpc'`（对端是 JSON-RPC 实现，见本手册 JSON-RPC 章节）。                                      |
+| `wire`                                   | 完整 `channelKind: 'byte'` spawn 必须显式选 `'native'` 或 `'jsonrpc'`；message spawn 必须省略 wire。只有短来源会补 native 默认值。                                      |
 | `token`                                  | 会话凭据。经 bootstrap 交给子进程，握手时双方用它认证。每次部署随机生成，不要打印或写入日志。                                     |
 | `supervision.id`                         | 该执行单元在监督与查询中的标识。                                                                                                  |
 | `supervision.launcher`                   | 平台 launcher。`rawChannel` 读取本次启动实际返回的 handle。                                                                       |
@@ -513,7 +513,9 @@ if (isProcessChild()) {
 
 ### 错误的形状
 
-所有错误都是原生 `Error`（或其子类），并附带 `source` 与 `code` 属性。原始原因保留在 `cause` 链上。请按 `(source, code)` 分支，不要匹配 `message` 文本。
+本包登记的通道、启动和监听错误使用原生 `Error`（或其子类）及 `source`、`code`。原生同步 spawn、Unix listener 准备和 bind 诊断在原对象上附包身份，原生 errno code 改为语义码，类型、其它字段和 stack 保持；已有包装器保留原始 cause。请按 `(source, code)` 分支，不要匹配 `message` 文本。
+
+Web Streams byte I/O 的 close 在回调前发布同一个完成 Promise；回调抛错仍通知其它观察者并执行 reader.cancel、writer.abort 与物理关闭。失败统一以原生 AggregateError/PROCESS_CHANNEL_CLOSED 拒绝，首错在 cause、全部原错在 errors，重复 close 加入同一结果。构造时 writer 获取失败会释放已取得的 reader 锁，调用方仍持有自己的原 writer；原生获取失败保留 TypeError 并附 PROCESS_CHANNEL_CONNECT_FAILED。socket listener 重复 close 同样返回缓存的同一 Promise。
 
 ```ts doc-test=check
 import type { IRuntimeTypedPeer } from '@migaia/rpc-process'

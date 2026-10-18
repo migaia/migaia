@@ -1,5 +1,7 @@
-import { createProcessError } from './error.js'
-import { RpcProcessErrorCode } from './error-code.js'
+import { createProcessError, tagNativeProcessError } from './error.js'
+import { ERROR_SOURCE, RpcProcessErrorCode } from './error-code.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { deferred } from '@migaia/utils/promise'
 
 import { RpcProcessErrorText } from './error-text.js'
 import type { IProcessByteChannel } from './types.js'
@@ -10,9 +12,19 @@ export function webByteStream(
   writable: WritableStream<Uint8Array>,
   closePhysical: () => void | Promise<void>
 ): IProcessByteChannel {
-  /** One reader and writer own this physical connection. */
-  const reader = readable.getReader()
-  const writer = writable.getWriter()
+  /** Retain only successfully acquired native resources until construction can commit. */
+  let acquiredReader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  /** Failed writer acquisition returns the already-acquired native reader to its caller. */
+  let writer: WritableStreamDefaultWriter<Uint8Array>
+  try {
+    acquiredReader = readable.getReader()
+    writer = writable.getWriter()
+  } catch (error) {
+    acquiredReader?.releaseLock()
+    throw tagNativeProcessError(error as Error, RpcProcessErrorCode.connectFailed)
+  }
+  /** The successful acquisition branch owns this stable reader for the connection lifetime. */
+  const reader = acquiredReader
   /** Listener sets never retain frames after the port closes. */
   const dataListeners = new Set<(chunk: Uint8Array) => void>()
   const closeListeners = new Set<(reason?: unknown) => void>()
@@ -25,26 +37,44 @@ export function webByteStream(
   /** End the one physical port and replay the first reason to late listeners. */
   const end = (reason?: unknown): Promise<void> => {
     if (closing) return closing
+    /** Publish completion before notifying any callback that can synchronously reenter close. */
+    const completion = deferred<void>()
+    closing = completion.promise
     closed = true
     terminal = reason ?? createProcessError(RpcProcessErrorCode.channelClosed)
     wakeReader?.()
-    for (const listener of closeListeners) listener(terminal)
+    /** Retire the exact current observers before invoking arbitrary application callbacks. */
+    const listeners = [...closeListeners]
     dataListeners.clear()
     closeListeners.clear()
-    closing = Promise.allSettled([
+    /** Observer failures precede cleanup failures and never prevent physical cleanup. */
+    const errors: unknown[] = []
+    for (const listener of listeners) {
+      try {
+        listener(terminal)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    void Promise.allSettled([
       reader.cancel(),
       writer.abort(terminal),
       Promise.resolve().then(closePhysical)
     ]).then((results) => {
       /** A failed reader may reject cancel with its already-reported terminal reason. */
-      const errors = results.flatMap((result) =>
-        result.status === 'rejected' && result.reason !== terminal ? [result.reason] : []
+      errors.push(
+        ...results.flatMap((result) =>
+          result.status === 'rejected' && result.reason !== terminal ? [result.reason] : []
+        )
       )
       if (errors.length)
-        throw createProcessError(
-          RpcProcessErrorCode.channelClosed,
-          new AggregateError(errors, RpcProcessErrorText.channelClosed)
+        completion.reject(
+          attachErrorIdentity(
+            new AggregateError(errors, RpcProcessErrorText.channelClosed, { cause: errors[0] }),
+            { source: ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
+          )
         )
+      else completion.resolve()
     })
     return closing
   }

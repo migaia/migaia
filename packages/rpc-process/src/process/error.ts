@@ -40,6 +40,30 @@ export function createProcessError(
   return attachErrorIdentity(error, { source: ERROR_SOURCE, code, ...(detail ? { detail } : {}) })
 }
 
+/**
+ * Tag a fresh native platform exception at its owned Process boundary. Native errno `code` is
+ * replaced by the registered semantic code; the same Error, native family, fields and stack
+ * survive. This operation is for native API exceptions, not arbitrary foreign package diagnostics.
+ */
+export function tagNativeProcessError<T extends Error>(error: T, code: IRpcProcessErrorCode): T {
+  return attachErrorIdentity(
+    error,
+    { source: ERROR_SOURCE, code },
+    {
+      /** Utils delegates this owned native errno conflict; the original Error is retained. */
+      onConflict({ target, key, incoming }) {
+        Object.defineProperty(target, key, {
+          value: incoming,
+          enumerable: true,
+          configurable: false,
+          writable: false
+        })
+        return target
+      }
+    }
+  )
+}
+
 /** Bridge and native channels retain the same closed-channel native error and original cause. */
 export function createProcessChannelClosedError(cause?: unknown): Error {
   return createProcessError(RpcProcessErrorCode.channelClosed, cause)

@@ -26,7 +26,6 @@ import {
 import { RpcPlatform, RpcTransportEncoding } from '@migaia/rpc-core/transport-constants'
 import {
   createProcessTransport,
-  createAdapterChannel,
   createNativeProcessOffer,
   createProcessChannelClosedError,
   openProcessObjectChannel
@@ -268,11 +267,6 @@ const inventory: readonly IInventoryEntry[] = [
     entry: '@migaia/rpc-process',
     symbol: 'createProcessTransport',
     open: () => byteInstance(createProcessTransport)
-  },
-  {
-    entry: '@migaia/rpc-process',
-    symbol: 'createAdapterChannel',
-    open: () => byteInstance(createAdapterChannel)
   },
   {
     entry: '@migaia/rpc-process',
