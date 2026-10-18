@@ -544,6 +544,11 @@ function DocsLibrary({
     ? (instanceGuideFor(reference, api!.module, selectedTypeSymbol.name)?.summary ??
       localizedSymbolPurpose(locale, selectedTypeSymbol))
     : undefined
+  /** A subpath article leads with its maintained explanation; the library root keeps its own lede. */
+  const moduleLede =
+    !selectedPageSymbol && api && api.module !== 'index'
+      ? reference?.modules[api.module]?.summary
+      : undefined
   /** Public label keeps repository entry filenames out of reader-facing copy. */
   const visibleModuleName = readerFacingModuleName(locale, moduleName)
   /** Exact section inventory shared by the desktop and mobile tables of contents. */
@@ -598,6 +603,13 @@ function DocsLibrary({
                 text={typeLede}
               />
             ) : null
+          ) : moduleLede ? (
+            <ReferenceParagraphs
+              className="lede"
+              library={library.slug}
+              locale={locale}
+              text={moduleLede}
+            />
           ) : !selectedSymbol ? (
             <p className="lede">
               {openingSentence(libraryReferenceDescription(locale, library.slug))}
@@ -1213,7 +1225,8 @@ function moduleReferenceSections(
 ): readonly string[] {
   return [
     ...(reference
-      ? reference.modules[api.module]
+      ? reference.modules[api.module] &&
+        (api.module === 'index' || reference.modules[api.module]!.example)
         ? ['module-overview']
         : []
       : packageLearningSections(documentation, api).map(({ kind }) => `learning-${kind}`)),
@@ -1434,13 +1447,16 @@ function ModuleOverview({
   return (
     <>
       {reference ? (
-        reference.modules[api.module] ? (
+        reference.modules[api.module] &&
+        (api.module === 'index' || reference.modules[api.module]!.example) ? (
           <section className="section-block compact module-reference" id="module-overview">
-            <ReferenceParagraphs
-              library={api.library}
-              locale={locale}
-              text={reference.modules[api.module]!.summary}
-            />
+            {api.module === 'index' ? (
+              <ReferenceParagraphs
+                library={api.library}
+                locale={locale}
+                text={reference.modules[api.module]!.summary}
+              />
+            ) : null}
             {reference.modules[api.module]!.example ? (
               <CodeBlock
                 code={reference.modules[api.module]!.example!}
