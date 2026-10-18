@@ -26867,7 +26867,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function loggerMiddleware<S>(\n  sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void\n): IStoreMiddlewarePlugin<S>;"
+                  "code": "function loggerMiddleware<S = any>(\n  sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void\n): IStoreMiddlewarePlugin<S>;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "日志插件只把状态当作 `unknown` 交给 `sink`，不依赖状态结构，所以 `S` 默认是 `any`：不写类型参数也能安装到任意状态类型的 Host；需要把插件固定到某个 Host 的状态类型时再显式传 `S`。"
                 },
                 {
                   "type": "paragraph",

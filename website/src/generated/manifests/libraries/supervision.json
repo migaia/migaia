@@ -3919,9 +3919,9 @@
           "signature": "export type IUnitLease = { release(): void; };",
           "declarationLine": 60,
           "source": "packages/supervision/dist/types.d.ts",
-          "purpose": "Budget-owned occupied slot transferred to the unit owner until actual exit.",
+          "purpose": "Proof that a process, thread or coroutine occupies one slot of a budget. The budget hands it to whoever owns that unit, and the owner keeps it until the unit has actually exited.",
           "core": "release: Returns this occupied slot and any parent slot exactly once; repeated calls do nothing.\nThe budget can admit a waiting unit if otherwise eligible.",
-          "advanced": "Release capacity once actual native or cooperative work has ended.",
+          "advanced": "Call release after the process, thread or coroutine has really stopped, so the budget can admit the next one.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -3945,13 +3945,13 @@
           "overloadSignatures": ["export type IUnitLease = { release(): void; };"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Release capacity once actual native or cooperative work has ended.",
+          "whenToUse": "Call release after the process, thread or coroutine has really stopped, so the budget can admit the next one.",
           "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Budget-owned occupied slot transferred to the unit owner until actual exit."
+              "content": "Proof that a process, thread or coroutine occupies one slot of a budget. The budget hands it to whoever owns that unit, and the owner keeps it until the unit has actually exited."
             },
             {
               "id": "getting-started",
@@ -3976,7 +3976,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "Release capacity once actual native or cooperative work has ended."
+              "content": "Call release after the process, thread or coroutine has really stopped, so the budget can admit the next one."
             }
           ],
           "declaredConfiguration": [],
