@@ -61,11 +61,20 @@ export const StoreKeyedErrorCode = {
   crossRuntime: 'CROSS_RUNTIME',
 
   /**
-   * The host lacks `WeakRef` or `FinalizationRegistry` required by the family definition cache.
+   * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for
+   * independent primitive templates in AtomStore.
    *
    * Enable these capabilities in the host sandbox. This is a deployment issue.
    */
   envUnsupported: 'ENV_UNSUPPORTED',
+
+  /**
+   * An application accessor or proxy fails while an optic reads or immutably copies its input.
+   * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on
+   * cause. Inspect the application accessor rather than treating this as a missing path or target
+   * key.
+   */
+  opticAccessFailed: 'OPTIC_ACCESS_FAILED',
 
   /**
    * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus

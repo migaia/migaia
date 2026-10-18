@@ -1,8 +1,8 @@
 /**
  * 定义化 optics：在 Definition 层做投影 / 聚焦 / 拆分。
  *
- * 实例层已有 selectAtom / focusAtom / splitAtom（吃活的 atom 对象）。 这里产出的是纯 def token，由 AtomStore /
- * useAtomDefinition 实例化—— 同一份蓝图可在多个 Provider / SSR 请求下各有一份状态。
+ * 这里产出纯 def token，由 AtomStore / useAtomDefinition 实例化；同一份蓝图可在多个 Provider / SSR 请求下各有一份状态，不依赖已删除的实例式
+ * optics 构造器。
  */
 
 import {

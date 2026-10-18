@@ -1114,13 +1114,10 @@
     "@migaia/store-keyed": {
       ".": [
         "AtomKind",
-        "KeyedSplitCache",
         "STORE_KEYED_SOURCE",
         "StoreKeyedErrorCode",
-        "assertNotThenable",
         "atomDef",
         "atomDefFactory",
-        "computeUniqueKeys",
         "createAtomStore",
         "createStoreKeyedAggregateError",
         "createStoreKeyedError",
@@ -1130,21 +1127,13 @@
         "derivedDef",
         "derivedFamilyDef",
         "familyDef",
-        "filterOutKey",
-        "findKeyIndex",
         "focusDef",
         "isAtomDefinition",
         "opticDef",
         "previewSafeAtomDefFactory",
-        "readOpticPath",
-        "replaceAtIndex",
-        "requireKeyIndex",
         "selectDef",
-        "shallowArrayEquals",
-        "spliceInsert",
         "splitDef",
-        "writableDef",
-        "writeOpticPath"
+        "writableDef"
       ],
       "./atom/store": [
         "createAtomStore",
@@ -1162,6 +1151,18 @@
       "./reactive/atom": [
         "atomGetter",
         "atomSetter"
+      ],
+      "./optics": [
+        "KeyedSplitCache",
+        "computeUniqueKeys",
+        "filterOutKey",
+        "findKeyIndex",
+        "readOpticPath",
+        "replaceAtIndex",
+        "requireKeyIndex",
+        "shallowArrayEquals",
+        "spliceInsert",
+        "writeOpticPath"
       ]
     },
     "@migaia/store-light": {

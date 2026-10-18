@@ -1,23 +1,72 @@
-/** Shared immutable path operations for instance and definition optics. */
-import { createStoreKeyedError, createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js'
+/** Shared immutable path operations for definition optics and public custom optics. */
+import {
+  createStoreKeyedError,
+  createStoreKeyedTypeError,
+  createStoreKeyedAggregateError,
+  STORE_KEYED_SOURCE,
+  StoreKeyedErrorCode
+} from '../errors.js'
 import { StoreKeyedErrorText } from '../error-text.js'
+
+import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
+
+/**
+ * Identifies this pure optic boundary without replacing a native error or another package's
+ * identity.
+ */
+function identifyOpticAccessFailure(error: unknown): Error {
+  if (isNativeErrorValue(error)) {
+    try {
+      /** Own descriptors avoid invoking application metadata accessors while classifying a failure. */
+      const source = Object.getOwnPropertyDescriptor(error, 'source')
+      /** Existing complete identities continue to name their actual package owner. */
+      const code = Object.getOwnPropertyDescriptor(error, 'code')
+      if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
+      if (!source && !code && Object.isExtensible(error))
+        return attachErrorIdentity(error, {
+          source: STORE_KEYED_SOURCE,
+          code: StoreKeyedErrorCode.opticAccessFailed
+        })
+    } catch (metadataError) {
+      return createStoreKeyedAggregateError(
+        StoreKeyedErrorCode.opticAccessFailed,
+        [error, metadataError],
+        StoreKeyedErrorText.opticAccessFailed
+      )
+    }
+  }
+  return createStoreKeyedError(
+    StoreKeyedErrorCode.opticAccessFailed,
+    StoreKeyedErrorText.opticAccessFailed,
+    { cause: error }
+  )
+}
+
+/** Map and Set use SameValueZero: signed zeros share a key and NaN equals itself. */
+function keysEqual<Key>(left: Key, right: Key): boolean {
+  return left === right || Object.is(left, right)
+}
 
 export function readOpticPath(
   value: unknown,
   path: readonly PropertyKey[],
   label: string
 ): unknown {
-  let current = value
-  for (const key of path) {
-    if (current === null || typeof current !== 'object') {
-      throw createStoreKeyedTypeError(
-        StoreKeyedErrorCode.invalidOption,
-        StoreKeyedErrorText.opticRead(label, key)
-      )
+  try {
+    let current = value
+    for (const key of path) {
+      if (current === null || typeof current !== 'object') {
+        throw createStoreKeyedTypeError(
+          StoreKeyedErrorCode.invalidOption,
+          StoreKeyedErrorText.opticRead(label, key)
+        )
+      }
+      current = Reflect.get(current, key)
     }
-    current = Reflect.get(current, key)
+    return current
+  } catch (error) {
+    throw identifyOpticAccessFailure(error)
   }
-  return current
 }
 
 export function writeOpticPath(
@@ -26,49 +75,49 @@ export function writeOpticPath(
   next: unknown,
   label: string
 ): unknown {
-  const [key, ...rest] = path
-  if (value === null || typeof value !== 'object') {
-    throw createStoreKeyedTypeError(
-      StoreKeyedErrorCode.invalidOption,
-      StoreKeyedErrorText.opticWrite(label, key)
-    )
+  try {
+    const [key, ...rest] = path
+    if (value === null || typeof value !== 'object') {
+      throw createStoreKeyedTypeError(
+        StoreKeyedErrorCode.invalidOption,
+        StoreKeyedErrorText.opticWrite(label, key)
+      )
+    }
+    const clone: Record<PropertyKey, unknown> | unknown[] = Array.isArray(value)
+      ? [...value]
+      : { ...value }
+    const childSource = Reflect.get(value, key)
+    if (rest.length > 0 && (childSource === null || typeof childSource !== 'object')) {
+      throw createStoreKeyedTypeError(
+        StoreKeyedErrorCode.invalidOption,
+        StoreKeyedErrorText.opticWrite(label, rest[0])
+      )
+    }
+    const child = rest.length === 0 ? next : writeOpticPath(childSource, rest, next, label)
+    if (key === '__proto__') {
+      Object.defineProperty(clone, key, {
+        value: child,
+        enumerable: true,
+        writable: true,
+        configurable: true
+      })
+    } else {
+      Reflect.set(clone, key, child)
+    }
+    return clone
+  } catch (error) {
+    throw identifyOpticAccessFailure(error)
   }
-  const clone: Record<PropertyKey, unknown> | unknown[] = Array.isArray(value)
-    ? [...value]
-    : { ...value }
-  const childSource = Reflect.get(value, key)
-  if (rest.length > 0 && (childSource === null || typeof childSource !== 'object')) {
-    throw createStoreKeyedTypeError(
-      StoreKeyedErrorCode.invalidOption,
-      StoreKeyedErrorText.opticWrite(label, rest[0])
-    )
-  }
-  const child = rest.length === 0 ? next : writeOpticPath(childSource, rest, next, label)
-  if (key === '__proto__') {
-    Object.defineProperty(clone, key, {
-      value: child,
-      enumerable: true,
-      writable: true,
-      configurable: true
-    })
-  } else {
-    Reflect.set(clone, key, child)
-  }
-  return clone
 }
 
-/**
- * Shared keyed-split primitives. Instance (`SplitAtom`) and definition (`splitDef`) split kernels
- * both need "which index does this key currently point at" and "did the visible key list actually
- * change" — identical logic that had drifted into two copy-pasted implementations.
- */
+/** Finds a public split key using the same SameValueZero relation as its Map cache and Set keys. */
 export function findKeyIndex<T, Key>(
   items: readonly T[],
   keyOf: (item: T, index: number) => Key,
   key: Key
 ): number {
   for (let index = 0; index < items.length; index++) {
-    if (Object.is(keyOf(items[index], index), key)) return index
+    if (keysEqual(keyOf(items[index], index), key)) return index
   }
   return -1
 }
@@ -79,13 +128,7 @@ export function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): 
   )
 }
 
-/**
- * KeyedSplitKernel — the rest of what `SplitAtom` (instance) and `splitDef` (definition) both need
- * on top of `findKeyIndex`: computing the unique key list, resolving "this key must still exist"
- * reads/writes, and the insert/remove list transforms. Same logic, two copy-pasted implementations
- * before this; one implementation now, with each caller still owning its own item construction and
- * disposal policy (an atom needs `.dispose()`, a def token does not).
- */
+/** Rejects duplicate SameValueZero keys before split definitions create or reuse item tokens. */
 export function computeUniqueKeys<T, Key>(
   items: readonly T[],
   keyOf: (item: T, index: number) => Key,
@@ -136,7 +179,7 @@ export function filterOutKey<T, Key>(
 ): { readonly removed: boolean; readonly next: readonly T[] } {
   let removed = false
   const next = list.filter((item, index) => {
-    const keep = !Object.is(keyOf(item, index), key)
+    const keep = !keysEqual(keyOf(item, index), key)
     removed ||= !keep
     return keep
   })

@@ -152,8 +152,8 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
    * 释放实例需要遍历它们（断开依赖边、dispose Computed），而 WeakMap 不可遍历。 之前的注释宣称「定义不再被引用时实例可回收」，但同时又用一个数组强引着全部
    * 实例——两者矛盾，实际一个都回收不了。
    *
-   * 所以改成诚实的做法：**store 强引它建出来的实例，随 store.dispose() 一起释放**。 生命周期的单位是 store，不是单个定义。要提前释放某个键，用 family 的
-   * forget 或直接丢弃整个 store。
+   * 所以改成诚实的做法：**store 强引它建出来的实例，随 store.dispose() 一起释放**。 生命周期的单位是 store，不是单个定义。要提前释放某个键，调用
+   * store.release(definition)；family.forget 仅管理 token 缓存。
    */
   const instances = new Map<IAtomDefinition<unknown>, IInstance<unknown>>()
   // Instance ownership is orthogonal to atom routing: releasing a definition
@@ -570,6 +570,8 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     dispose: () => {
       if (disposed) return
       disposed = true
+      // Idle cleanup deliberately skips terminal stores, so disposal must release speculative values.
+      previews.clear()
       overrides.clear()
       const activeSubscriptions = [...subscriptions]
       subscriptions.clear()

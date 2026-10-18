@@ -6,9 +6,8 @@ import { StoreKeyedErrorText } from '../error-text.js'
 /**
  * Defines the atom protocol and cross-runtime validation without an atom implementation.
  *
- * `PrimitiveAtom` and `DerivedAtom` live in `atom/legacy.ts` as facades over definitions and
- * `AtomStore`. Async, family, and React extensions use this protocol without depending on the
- * instantiation layer.
+ * Concrete state is instantiated from definitions by `AtomStore`. React and other adapters use this
+ * protocol without depending on private instance classes or a legacy facade module.
  */
 
 export type IReadableAtom<T> = IDisposable & {
@@ -46,7 +45,7 @@ export type IAtomWrite<Args extends readonly unknown[], Result> = (
   ...args: Args
 ) => Result
 
-export type IAtomUpdate<T> = T | ((previous: T) => T)
+export type { IAtomUpdate } from '../atom/definition.js'
 
 function assertSameRuntime(runtime: IRuntime, atom: IReadableAtom<unknown>): void {
   if (atom.runtime !== runtime) {

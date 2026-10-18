@@ -14,7 +14,7 @@
 pnpm add @migaia/store-keyed @migaia/reactive
 ```
 
-`@migaia/reactive` 是唯一的运行时依赖，`AtomStore` 必须绑定一个 `IRuntime`（`createRuntime()` 或 `defaultRuntime`）。
+运行时依赖为 `@migaia/reactive`、`@migaia/lifecycle` 和 `@migaia/utils`，`AtomStore` 必须绑定一个 `IRuntime`（`createRuntime()` 或 `defaultRuntime`）。
 
 ## 目录
 
@@ -38,16 +38,8 @@ pnpm add @migaia/store-keyed @migaia/reactive
 ## Definition 层
 
 ```ts
-import {
-  atomDef,
-  atomDefFactory,
-  previewSafeAtomDefFactory,
-  derivedDef,
-  writableDef,
-  isAtomDefinition,
-  assertNotThenable,
-  AtomKind
-} from '@migaia/store-keyed'
+import { atomDef, atomDefFactory, previewSafeAtomDefFactory, derivedDef, writableDef, isAtomDefinition, AtomKind } from '@migaia/store-keyed'
+import { assertNotThenable } from '@migaia/store-keyed/atom/definition'
 ```
 
 纯定义层：所有构造器都返回 `Object.freeze` 过的对象，不 import 任何运行时内核，模块顶层建一次即可到处复用。
@@ -219,7 +211,7 @@ store.isObserved(doubled) // 是否已建实例且有活跃订阅者
 store.release(count) // 返回是否确实释放了什么
 ```
 
-单参数同上，无其他选项。会依次尝试"override 解析后的目标"与"传入的原始定义"两个 key。
+单参数同上，无其他选项。先释放 override 解析后的目标；只有前者未释放任何实例时，才回退到传入的原始定义。
 
 **`store.size`｜3 秒上手** —— 只读 getter，当前已实例化的定义数量：
 
@@ -294,7 +286,7 @@ const item = todosSplit.of('t1')
 - `items`——`derivedDef`，值是当前源数组每一项对应的 `of(key)` 定义组成的冻结数组，用 `shallowArrayEquals` 比较，重排数组时未变化的元素仍是同一订阅目标
 - `of(key: Key)`——返回该 key 对应的可写 item 定义，token 用内部 `Map` 缓存；读/写时该 key 已不在源数组里分别抛 `Error('[store] split def item was removed')` / `Error('[store] cannot write a removed split def item')`
 - `insert(store: IAtomStore, item: T, index?: number)`——`index` 默认 `+Infinity`（追加到末尾），越界会被夹到 `[0, length]`
-- `remove(store: IAtomStore, key: Key): boolean`——过滤掉源数组里第一个匹配元素，返回是否确实删除
+- `remove(store: IAtomStore, key: Key): boolean`——过滤掉源数组里全部 SameValueZero 匹配元素，返回是否确实删除
 - `prune(store: IAtomStore): number`——只清理 `splitDef` 自己的 key→token 缓存，不释放 `AtomStore` 里已实例化的节点
 
 源数组里出现重复 key 会在 `items` 求值时抛 `Error('[store] splitDef keys must be unique')`。
@@ -306,21 +298,10 @@ const item = todosSplit.of('t1')
 ## Optics 底层工具函数
 
 ```ts
-import {
-  readOpticPath,
-  writeOpticPath,
-  findKeyIndex,
-  requireKeyIndex,
-  shallowArrayEquals,
-  computeUniqueKeys,
-  spliceInsert,
-  filterOutKey,
-  replaceAtIndex,
-  KeyedSplitCache
-} from '@migaia/store-keyed'
+import { readOpticPath, writeOpticPath, findKeyIndex, requireKeyIndex, shallowArrayEquals, computeUniqueKeys, spliceInsert, filterOutKey, replaceAtIndex, KeyedSplitCache } from '@migaia/store-keyed/optics'
 ```
 
-`focusDef`/`splitDef` 内部依赖的纯函数原语，随主入口一并导出，供需要手写自定义 optics（而不是用 `opticDef`/`splitDef` 现成实现）的调用方复用。
+`focusDef`/`splitDef` 内部依赖的纯函数原语，由 `@migaia/store-keyed/optics` 窄入口导出，供需要手写自定义 optics（而不是用 `opticDef`/`splitDef` 现成实现）的调用方复用。
 
 **`readOpticPath` / `writeOpticPath`｜5 秒上手** —— 不可变路径读写，是 `focusDef` 的底层实现：
 
@@ -394,7 +375,7 @@ const cache = new KeyedSplitCache<string, MyToken>()
 const token = cache.of('k1', () => makeToken('k1'))
 ```
 
-构造无参数。方法：`get(key)`（读缓存，不创建）、`of(key, create)`（缓存未命中时调用 `create()` 并存入）、`prune(isLive, shouldEvict?, onEvict?)`——`isLive: (key) => boolean`（必填）判断 key 是否仍存在，`shouldEvict?: (item) => boolean`（可选，默认 `() => true`）按项决定是否真的淘汰，`onEvict?: (item) => void`（可选，删除前回调，用于自行释放被淘汰的项）；只读 `size`；`keys()`/`values()` 迭代器；`clear()` 清空全部。
+构造无参数。方法：`get(key)`（读缓存，不创建）、`of(key, create)`（仅缓存中已有 truthy 值时直接返回；缺失或 falsy 值会调用 `create()` 并覆盖存入）、`prune(isLive, shouldEvict?, onEvict?)`——`isLive: (key) => boolean`（必填）判断 key 是否仍存在，`shouldEvict?: (item) => boolean`（可选，默认 `() => true`）按项决定是否真的淘汰，`onEvict?: (item) => void`（可选，删除前回调，用于自行释放被淘汰的项）；只读 `size`；`keys()`/`values()` 迭代器；`clear()` 清空全部。
 
 ---
 
@@ -438,7 +419,7 @@ const doneCountByChat = derivedFamilyDef(
 - `family.forget(key: K): boolean` —— 显式打破该 key 的 canonical identity；已建 `AtomStore` 实例不受影响，同 key 之后再查会得到新 token
 - `family.clear(): void` —— 清空全部缓存条目
 
-超出 `maxSize` 时按最久未取用降级为弱引用（`WeakMap<Key, WeakRef<Definition>>`）：只要 token 仍被强引用着（例如已被某个 `AtomStore` 实例化），后续同 key 查找仍能命中同一个 token；真正被 GC 后同 key 才会创建新 token。这套机制需要宿主支持 `WeakRef`/`FinalizationRegistry`，缺失时 `familyDef(...)`/`derivedFamilyDef(...)` 调用本身直接抛 `Error('[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox')`。`IFamilyKey = string | number | symbol`。
+超出 `maxSize` 时按最久未取用降级为弱引用（`Map<Key, WeakRef<Definition>>`（强键、弱值））：只要 token 仍被强引用着（例如已被某个 `AtomStore` 实例化），后续同 key 查找仍能命中同一个 token；真正被 GC 后同 key 才会创建新 token。这套机制需要宿主支持 `WeakRef`/`FinalizationRegistry`，缺失时 `familyDef(...)`/`derivedFamilyDef(...)` 调用本身直接抛 `Error('[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox')`。`IFamilyKey = string | number | symbol`。
 
 ---
 
@@ -551,7 +532,7 @@ import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed/atom/stor
 import { atomDef, derivedDef, writableDef } from '@migaia/store-keyed/atom/definition'
 ```
 
-分别是 [AtomStore](#atomstore) 与 [Definition 层](#definition-层) 的窄导出——内容与主入口对应导出完全相同，仅在只想引入这两层、不想连带引入 optics/family 时使用，不引入新 API。
+分别是 [AtomStore](#atomstore) 与 [Definition 层](#definition-层) 的窄导出——store 窄入口与根对应导出相同；definition 窄入口另保留高级 guard `assertNotThenable`，根不再导出该 guard。
 
 ---
 
@@ -578,9 +559,10 @@ type ISessionState = { user: { name: string }; todos: readonly ITodo[] }
 
 const sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })
 const userNameDef = focusDef(sessionDef, 'user', 'name')
-const todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)
+const todosDef = focusDef(sessionDef, 'todos')
+const todosSplit = splitDef(todosDef, (todo) => todo.id)
 const doneCountDef = derivedDef(
-  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length
+  (get) => get(todosDef).filter((todo) => todo.done).length
 )
 
 const runtime = createRuntime()
@@ -630,7 +612,7 @@ undo() // 撤销后状态原样保留
 ### 4. 用底层 optics 工具函数手写自定义拆分逻辑
 
 ```ts
-import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'
+import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed/optics'
 
 const todos = [{ id: 't1', done: false }]
 const index = findKeyIndex(todos, (t) => t.id, 't1')
@@ -671,3 +653,5 @@ pnpm run typecheck:e2e && pnpm run test:e2e
 未发布的实例式 family 源码已移除。按 key 管理状态使用公开的 `familyDef`/`derivedFamilyDef` 和 `createAtomStore` 组合；`StoreKeyedErrorCode.familyDisposed`、`.evictionFailed` 及对应 union 值随无触发路径删除，调用方应移除这两种无效检查。
 
 Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created.
+
+API convergence: advanced optic primitives move from the root to `@migaia/store-keyed/optics`; `assertNotThenable` remains only at `@migaia/store-keyed/atom/definition`. Import paths require a breaking release; the implementations and advanced capabilities remain. The two public `IAtomUpdate` paths now share the definition-owned declaration; the two distinct `IAtomRead` contracts remain separate.

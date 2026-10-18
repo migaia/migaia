@@ -35,13 +35,13 @@ errors.ts / error-code.ts / error-text.ts —— 包边界错误的构造器、�
 reactive/atom.ts       —— "实例式" atom 协议类型，只有类型和跨 Runtime 校验，无实现
 ```
 
-主入口 `@migaia/store-keyed` 一次性导出前六个文件（`atom/definition.ts`、`atom/kind-constants.ts` 的 `AtomKind`/`IAtomKind`、`atom/store.ts`、`atom/def-optics.ts`、`atom/optics-path.ts`、`family/definition.ts`、`errors.ts`）的全部公开成员——包括 `readOpticPath`/`writeOpticPath`/`KeyedSplitCache` 这类底层工具函数，它们随主入口一起发布，不是内部私有实现。额外发布的子路径是 `@migaia/store-keyed/reactive/atom`（独立协议类型），以及两个窄导出别名 `@migaia/store-keyed/atom/store`、`@migaia/store-keyed/atom/definition`。未发布的 `createFamily`/`computedFamily` 内部实现已删除；family 由 definition 与 AtomStore 组合管理。
+主入口发布 definition/store、定义 optics、family 与错误工具；`assertNotThenable` 仅从 `@migaia/store-keyed/atom/definition` 发布。十个高级纯 optics 原语由 `@migaia/store-keyed/optics` 发布，其映射直接指向原 `atom/optics-path` owner，无 wrapper 或根兼容别名。原有 atom/store、atom/definition、reactive/atom 窄入口保留。
 
 ---
 
 ## 2. Definition 层完整参考
 
-源文件：`src/atom/definition.ts`、`src/atom/kind-constants.ts`。所有构造器返回 `Object.freeze` 过的纯对象，内部用 `Symbol.for('morning-watch.store.atom-definition')` 打标（`Symbol.for` 使用全局注册表，因此同一个包的两份拷贝——比如应用主包和 worker 各自打包了一份——仍能互认对方产出的定义）。
+源文件：`src/atom/definition.ts`、`src/atom/kind-constants.ts`。所有构造器返回 `Object.freeze` 过的纯对象，内部用 `Symbol.for('morning-watch.store.atom-definition')` 打标（`Symbol.for` 使用全局注册表，因此同一个包的两份拷贝——比如同一 realm 的应用主包和 devtools 各自打包了一份——仍能互认对方产出的定义；跨 worker/realm 的传输不属于此品牌协议）。
 
 | 构造器                      | 签名                                                                                                                             | 参数类型                                                                                                            | 同步/异步 | `kind`                | 说明                                                                                                                                                                                                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -237,7 +237,7 @@ function splitDef<T, Key = number>(
 | `of(key)`                     | `key: Key`                                       | 同步      | 返回该 key 对应的可写 item 定义；token 用内部 `Map` 缓存，同一个 key 永远拿到同一个对象引用，跨 store 也一样（因为这是 definition 层，不是实例）。读取时按 `keyOf` 在当前源数组里定位下标；找不到抛 `Error('[store] split def item was removed')`。写入同理，找不到抛 `Error('[store] cannot write a removed split def item')`。 |
 | `items`                       | —（`derivedDef` 属性，非函数调用）               | —         | 一个 `derivedDef`，值是"当前源数组每一项对应的 `of(key)` 定义"组成的冻结数组；用自定义 `equals`（`shallowArrayEquals`：长度相同且逐项 `Object.is`）比较——重排/新增/删除之外的更新不会让这个数组本身触发下游重跑，数组顺序不变时各项 identity 也保持稳定。                                                                        |
 | `insert(store, item, index?)` | `store: IAtomStore`；`item: T`；`index?: number` | 同步      | 等价于 `store.set(source, (previous) => spliceInsert(previous, item, index))`；`index` 默认 `+Infinity`（追加到末尾），越界会被夹到 `[0, length]` 区间。                                                                                                                                                                         |
-| `remove(store, key)`          | `store: IAtomStore`；`key: Key`                  | 同步      | 按 `keyOf` 过滤掉源数组里第一个匹配的元素，返回是否确实删除了。                                                                                                                                                                                                                                                                  |
+| `remove(store, key)`          | `store: IAtomStore`；`key: Key`                  | 同步      | 按 `keyOf` 过滤掉源数组里全部 SameValueZero 匹配元素，返回是否确实删除了。                                                                                                                                                                                                                                                                  |
 | `prune(store)`                | `store: IAtomStore`                              | 同步      | **只清理 `splitDef` 自己的 key → 定义 token 缓存**，不释放 `AtomStore` 里已经实例化的对应节点——那部分要么自己 `store.release(itemDef)`，要么整体 `store.dispose()`。返回本次清理掉的 key 数量。                                                                                                                                  |
 
 源数组里出现重复 key（`keyOf` 算出同一个值）会在 `items` 求值时抛 `Error('[store] splitDef keys must be unique')`。
@@ -246,7 +246,7 @@ function splitDef<T, Key = number>(
 
 ## 5. Optics 底层工具函数完整参考
 
-源文件：`src/atom/optics-path.ts`。`focusDef`/`splitDef` 内部依赖这些纯函数原语，主入口 `export * from './atom/optics-path.js'` 把它们随同一并导出——面向需要在 `opticDef`/`splitDef` 现成实现之外手写自定义 optics/split 逻辑的调用方，不是纯内部私有实现。
+源文件：`src/atom/optics-path.ts`。`focusDef`/`splitDef` 内部依赖这些纯函数原语，公开窄入口 `@migaia/store-keyed/optics` 直接发布该文件——面向需要在 `opticDef`/`splitDef` 现成实现之外手写自定义 optics/split 逻辑的调用方，不是纯内部私有实现。
 
 ```ts
 function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown
@@ -268,7 +268,7 @@ function findKeyIndex<T, Key>(
 ): number
 ```
 
-线性查找第一个 `Object.is(keyOf(item, index), key)` 为真的下标；找不到返回 `-1`，不抛错。
+线性查找第一个 `keyOf(item, index)` 与 `key` 满足 SameValueZero 的下标（与 Map/Set 一致，`-0` 与 `+0` 相等，`NaN` 与自身相等）；找不到返回 `-1`，不抛错。
 
 ```ts
 function requireKeyIndex<T, Key>(
@@ -279,7 +279,7 @@ function requireKeyIndex<T, Key>(
 ): number
 ```
 
-`findKeyIndex` 的严格版本：找不到时抛 `Error('[store] ${label}')`（`label` 直接就是完整消息文案，不再拼接前缀）。`splitDef(...).of(key)` 内部用它，`label` 分别传 `'split def item was removed'`（读）和 `'cannot write a removed split def item'`（写）。
+`findKeyIndex` 的严格版本：找不到时抛 `Error('[store] ${label}')`（实现会添加 `[store] ` 前缀，`label` 不要重复包含它）。`splitDef(...).of(key)` 内部用它，`label` 分别传 `'split def item was removed'`（读）和 `'cannot write a removed split def item'`（写）。
 
 ```ts
 function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean
@@ -311,7 +311,7 @@ function filterOutKey<T, Key>(
 ): { readonly removed: boolean; readonly next: readonly T[] }
 ```
 
-不可变删除：过滤掉第一个（也是唯一一个，因为 key 应当唯一）匹配 `key` 的元素。`removed: false` 时 `next` 直接是入参 `list` 的原始引用（不做无意义拷贝）；`removed: true` 时 `next` 是新的冻结数组。
+不可变删除：过滤掉全部 SameValueZero 匹配 `key` 的元素。`removed: false` 时 `next` 直接是入参 `list` 的原始引用（不做无意义拷贝）；`removed: true` 时 `next` 是新的冻结数组。
 
 ```ts
 function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[]
@@ -335,7 +335,7 @@ class KeyedSplitCache<Key, Item> {
 }
 ```
 
-`splitDef` 内部用来缓存 `key → item definition` token 的可复用键控缓存。构造无参数（内部是一个空 `Map`）。`of(key, create)`：缓存命中直接返回，未命中调用 `create()` 并存入。`prune(isLive, shouldEvict?, onEvict?)`：对每个当前缓存的 `key`，`isLive(key)` 返回 `false` 且 `shouldEvict(item)`（默认恒 `true`）也返回 `false` 之外的组合都会被删除——即 `!isLive(key) && shouldEvict(item)` 才真正淘汰；淘汰前调用 `onEvict?.(item)` 供调用方自行释放该项持有的资源（例如 dispose 一个实例）；返回本次淘汰的条目数。`splitDef(...).prune(store)` 内部就是用 `isLive = (key) => activeKeysInSourceArray.has(key)` 调用它，不传 `shouldEvict`/`onEvict`（definition token 本身不持有需要 dispose 的资源）。
+`splitDef` 内部用来缓存 `key → item definition` token 的可复用键控缓存。构造无参数（内部是一个空 `Map`）。`of(key, create)`：缓存已有 truthy 值时直接返回；缺失或已有 falsy 值时调用 `create()` 并覆盖存入。`prune(isLive, shouldEvict?, onEvict?)`：对每个当前缓存的 `key`，只有 `isLive(key)` 为 `false` 且 `shouldEvict(item)`（默认恒 `true`）为 `true` 才删除，即 `!isLive(key) && shouldEvict(item)` 才真正淘汰；淘汰前调用 `onEvict?.(item)` 供调用方自行释放该项持有的资源（例如 dispose 一个实例）；返回本次淘汰的条目数。`splitDef(...).prune(store)` 内部就是用 `isLive = (key) => activeKeysInSourceArray.has(key)` 调用它，不传 `shouldEvict`/`onEvict`（definition token 本身不持有需要 dispose 的资源）。
 
 ---
 
@@ -377,7 +377,7 @@ function derivedFamilyDef<K extends IFamilyKey, T>(
 
 ### 6.1 LRU + 弱引用兜底
 
-强缓存是一个按访问顺序重排的 `Map`（`maxSize` 条），超出上限时淘汰最久未访问的一条——但**淘汰只是从强缓存移除**，同时会把它登记进一张 `WeakMap<Key, WeakRef<Definition>>` 当"canonical"记录：只要这个 token 还被别处强引用着（比如某个 `AtomStore` 已经实例化过它，或者调用方自己存了一个变量），后续同 key 查找会通过 `WeakRef.deref()` 命中同一个 token 并把它重新提升回强缓存；只有当 token 真正被 GC 回收之后，同 key 才会创建一个全新 token。这套机制依赖宿主支持 `WeakRef` 和 `FinalizationRegistry`——缺失时 `familyDef(...)`/`derivedFamilyDef(...)` 调用本身就会直接抛 `Error('[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox')`，不会静默降级成"每次都创建新 token"。
+强缓存是一个按访问顺序重排的 `Map`（`maxSize` 条），超出上限时淘汰最久未访问的一条——但**淘汰只是从强缓存移除**，同时会把它登记进一张 `Map<Key, WeakRef<Definition>>`（强键、弱值） 当"canonical"记录：只要这个 token 还被别处强引用着（比如某个 `AtomStore` 已经实例化过它，或者调用方自己存了一个变量），后续同 key 查找会通过 `WeakRef.deref()` 命中同一个 token 并把它重新提升回强缓存；只有当 token 真正被 GC 回收之后，同 key 才会创建一个全新 token。这套机制依赖宿主支持 `WeakRef` 和 `FinalizationRegistry`——缺失时 `familyDef(...)`/`derivedFamilyDef(...)` 调用本身就会直接抛 `Error('[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox')`，不会静默降级成"每次都创建新 token"。
 
 `maxSize` 必须是正整数，否则抛 `RangeError('[store] family maxSize must be a positive integer')`。
 
@@ -385,7 +385,7 @@ function derivedFamilyDef<K extends IFamilyKey, T>(
 
 ## 7. 错误工具完整参考
 
-源文件：`src/errors.ts`、`src/error-code.ts`、`src/error-text.ts`。每个包边界错误保留原生 `Error`/`TypeError`/`RangeError`/`AggregateError` 类型，并带 `source: '@migaia/store-keyed'` 与稳定 `code`。按 `code` 处理（而非 message）。
+源文件：`src/errors.ts`、`src/error-code.ts`、`src/error-text.ts`。本包创建的错误带 `source: '@migaia/store-keyed'` 与稳定 `code`；Reactive 或其它已有编码错误保留实际 owner。纯 optic 属性访问失败使用 `OPTIC_ACCESS_FAILED`：可扩展原生错误在原对象附码，保留类型、message、stack；frozen/非 Error 主值经 coded fallback 的 cause 可达。任意值品牌守卫读取失败返回 false。按 source/code 处理（而非 message）。
 
 ### 7.1 构造器
 
@@ -421,7 +421,7 @@ function createStoreKeyedAggregateError(
 const STORE_KEYED_SOURCE = '@migaia/store-keyed'
 ```
 
-字符串常量，无参数；等价于任意本包抛出错误上的 `error.source`。
+字符串常量，无参数；用于本包创建的错误身份；透传的其它包错误保留原 source。
 
 ### 7.2 `StoreKeyedErrorCode` 与触发条件
 
@@ -435,6 +435,7 @@ const StoreKeyedErrorCode = {
   previewUnsafe: 'PREVIEW_UNSAFE',
   crossRuntime: 'CROSS_RUNTIME',
   envUnsupported: 'ENV_UNSUPPORTED',
+  opticAccessFailed: 'OPTIC_ACCESS_FAILED',
   invalidOption: 'INVALID_OPTION'
 } as const
 type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]
@@ -461,7 +462,7 @@ type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyed
 | `atomDef({...})` 初值克隆（宿主不支持 `structuredClone`） | `Error`          | `ENV_UNSUPPORTED`     | `primitive initial values require structuredClone support`                                                                 | 宿主缺少 `structuredClone`。                                                                                                          |
 | `atomDef({...})` 初值克隆失败（`structuredClone` 抛错）   | `Error`          | `INVALID_OPTION`      | `primitive initial value cannot be cloned independently`                                                                   | 值本身不可结构化克隆，原异常在 `cause`。                                                                                              |
 | `atomGetter(runtime)` / `atomSetter(runtime)`             | `Error`          | `CROSS_RUNTIME`       | `cross-runtime atom access is not allowed`                                                                                 | 实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。                                                                              |
-| `AtomStore.dispose()`（多项失败）                         | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed` / `family disposal failed for multiple entries`                                               | 释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。                                                                          |
+| `AtomStore.dispose()`（多项失败）                         | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed`                                               | 释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。                                                                          |
 | `AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）   | `Error`          | —                     | `this node is already owned by another Runtime`                                                                            | 同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。 |
 
 ---
@@ -512,7 +513,7 @@ store.dispose()
 
 ### 9.3 release() vs dispose()
 
-- `store.release(def)`：只摘一个实例。摘除时会依次尝试"当前 override 解析到的目标"和"传入的原始定义"两个 key，因此即便这个定义后来被 override 过，也能正确摘掉在 override 生效前就建好的旧实例。
+- `store.release(def)`：只摘一个实例。摘除时先尝试当前 override 目标，仅未释放任何实例时才回退到原始定义，因此即便这个定义后来被 override 过，也能正确摘掉在 override 生效前就建好的旧实例。
 - `store.dispose()`：摘整个作用域。
 
 `splitDef(...).prune(store)`、`familyDef(...).forget/clear` 这类"family/split 自己的 key→token 缓存清理"都**不会**连带调用 `store.release()`——token 缓存和 store 的实例表是两张独立的表，各自负责各自的生命周期。
@@ -539,7 +540,7 @@ store.dispose()
 
 7. **`familyDef`/`derivedFamilyDef` 需要宿主支持 `WeakRef` 和 `FinalizationRegistry`**，缺失时在调用构造函数那一刻就直接抛出说明性错误，而不是静默降级成"每次都创建新 token / 永不回收"——后者会制造一个悄悄变慢或悄悄泄漏内存的包，比显式报错更难排查。少数嵌入式 JS 引擎或裁剪过的小程序沙箱可能缺这两个全局能力，需要确认目标运行环境或引入等价的 polyfill。
 
-8. **`readOpticPath`/`writeOpticPath`/`KeyedSplitCache` 等 optics 底层工具函数是公开导出，不是内部私有实现**——它们随主入口的 `export *` 一并发布，是 `focusDef`/`splitDef` 的实现基础，也可以被调用方直接复用来手写自定义 optics/split 逻辑（见 README 的[高阶组合示例](./README.md#高阶组合示例)）。但它们是纯函数原语，不做 `AtomStore`/依赖追踪相关的任何事——`readOpticPath`/`writeOpticPath` 纯粹是对象路径读写，`KeyedSplitCache` 纯粹是一个键控缓存，都不认识 `IAtomDefinition`。
+8. **`readOpticPath`/`writeOpticPath`/`KeyedSplitCache` 等 optics 底层工具函数是公开导出，不是内部私有实现**——它们通过 `@migaia/store-keyed/optics` 发布，是 `focusDef`/`splitDef` 的实现基础，也可以被调用方直接复用来手写自定义 optics/split 逻辑（见 README 的[高阶组合示例](./README.md#高阶组合示例)）。但它们是纯函数原语，不做 `AtomStore`/依赖追踪相关的任何事——`readOpticPath`/`writeOpticPath` 纯粹是对象路径读写，`KeyedSplitCache` 纯粹是一个键控缓存，都不认识 `IAtomDefinition`。
 
 ---
 
@@ -568,9 +569,10 @@ const sessionDef = atomDef<ISessionState>({
   todos: []
 })
 const userNameDef = focusDef(sessionDef, 'user', 'name')
-const todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)
+const todosDef = focusDef(sessionDef, 'todos')
+const todosSplit = splitDef(todosDef, (todo) => todo.id)
 const doneCountDef = derivedDef(
-  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length
+  (get) => get(todosDef).filter((todo) => todo.done).length
 )
 
 // 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,
@@ -668,3 +670,7 @@ pnpm --filter @migaia/store-keyed test:e2e
 ```
 
 Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created.
+
+所有 split 键查找、唯一性、缓存和删除采用 SameValueZero，与 Map/Set 一致；因此 `-0` 与 `+0` 是同一键，`NaN` 与自身相等。`shallowArrayEquals` 仍使用逐项 `Object.is` 比较一般值。Store dispose 会清除未提交 preview 缓存；即使调用方保留已 dispose 的 Store，也不再由该缓存持有 speculative 值。Family 的 canonical Map 使用强键和弱值，不是 WeakMap；forget 不释放已有 Store 实例。
+
+Breaking migration: move the ten advanced optic imports from the root to `/optics`, and the root `assertNotThenable` import to `/atom/definition`. `IAtomUpdate` is declared once in definition and type-re-exported by reactive/atom; both supported type import paths remain, as do the two distinct reader contracts. External usage is unknown; no root compatibility alias is retained.

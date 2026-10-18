@@ -16,6 +16,8 @@ export const StoreKeyedErrorText = {
   previewUnsafe: '[store] atom factory is not marked preview-safe',
   readonlyOverride: '[store] atom override resolved to a read-only definition',
   atomDisposalFailed: '[store] atom store disposal failed',
+  /** Fallback text for failed application property access; mutable native errors keep their message. */
+  opticAccessFailed: '[store] optic property access failed',
   opticRead: (label: string, key: PropertyKey): string =>
     `[store] ${label} cannot read path segment ${String(key)}`,
   opticWrite: (label: string, key: PropertyKey): string =>

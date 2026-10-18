@@ -29,6 +29,10 @@
     "./reactive/atom": {
       "types": "./dist/reactive/atom.d.ts",
       "default": "./dist/reactive/atom.js"
+    },
+    "./optics": {
+      "types": "./dist/atom/optics-path.d.ts",
+      "default": "./dist/atom/optics-path.js"
     }
   },
   "scripts": {

@@ -3,7 +3,10 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreKeyedErrorCode, type IStoreKeyedErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/**
+ * `source` assigned by this package’s factories; errors owned by another package retain their
+ * owner.
+ */
 export const STORE_KEYED_SOURCE = '@migaia/store-keyed'
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
@@ -19,7 +22,7 @@ export function createStoreKeyedError(
 ): Error {
   const error = new Error(
     message,
-    options?.cause !== undefined ? { cause: options.cause } : undefined
+    options !== undefined && Object.hasOwn(options, 'cause') ? { cause: options.cause } : undefined
   )
   return tagStoreKeyedError(error, code)
 }

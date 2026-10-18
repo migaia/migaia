@@ -15,7 +15,7 @@ import { AtomKind } from './kind-constants.js'
 import { StoreKeyedErrorText } from '../error-text.js'
 
 // Symbol.for keeps definitions recognizable when two copies of the package
-// coexist in one Realm (for example an app bundle plus a worker/devtools copy).
+// coexist in one Realm (for example an app bundle plus a same-realm devtools copy).
 const DEFINITION = Symbol.for('morning-watch.store.atom-definition')
 
 /** Reads another definition's current value within a store. */
@@ -110,10 +110,18 @@ export type IWritableAtomDefinition<
   | IPrimitiveFactoryDefinition<T>
   | IWritableDerivedDefinition<T, Args, Result>
 
-export const isAtomDefinition = (value: unknown): value is IAtomDefinition<unknown> =>
-  typeof value === 'object' &&
-  value !== null &&
-  (value as Record<PropertyKey, unknown>)[DEFINITION] === true
+/** Unknown-value predicate: a brand that cannot be read is not admitted. */
+export const isAtomDefinition = (value: unknown): value is IAtomDefinition<unknown> => {
+  try {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      (value as Record<PropertyKey, unknown>)[DEFINITION] === true
+    )
+  } catch {
+    return false
+  }
+}
 
 /**
  * Rejects thenables: async initial values are not supported here, and a silently-stored unresolved
