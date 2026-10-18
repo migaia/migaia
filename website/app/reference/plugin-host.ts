@@ -674,8 +674,8 @@ console.log(hello.extensions.hi())`
     },
     composition: {
       summary: t(
-        'Protocol for one owner that composes hosts (such as `@migaia/tray`): batched install with prepare/commit, exact registration receipts, ordering slots and extension-only views. Ordinary applications keep using `use()` / `unUse()` and do not need this entry point.',
-        '供组合宿主的唯一所有者（如 `@migaia/tray`）使用的协议：先准备再提交的批量安装、精确的注册凭证、排序槽位以及只含扩展的视图。普通应用继续使用 `use()` / `unUse()`，不需要这个入口。'
+        'Use this entry when building a manager that coordinates plugin installation and removal across a host. Import `@migaia/plugin-host/composition` for that integration protocol; ordinary applications can keep using the root host’s `use()` and `unUse()`.\n\n`isManagedHost()` checks whether the value is a host constructed by this package; `openComposition()` obtains its batch preparation and commit operations. Preparation and commit let the manager coordinate a group of changes before publishing them; the entry does not create a host.',
+        '需要编写管理器，协调宿主中的插件安装与移除时，使用此入口。从 `@migaia/plugin-host/composition` 导入组合协议；普通应用直接使用根入口宿主的 `use()` 与 `unUse()` 即可。\n\n`isManagedHost()` 检查值是否为本包构造的宿主；`openComposition()` 取得它的批次准备与提交操作。准备和提交让管理器在发布前协调一组变更；此入口不负责创建宿主。'
       ),
       example: `import { isManagedHost, openComposition } from '@migaia/plugin-host/composition'
 

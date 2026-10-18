@@ -536,8 +536,8 @@ export const capabilityGraphReference: ILibraryReference = {
   modules: {
     graph: {
       summary: t(
-        'Static required-dependency graphs with startup rollback. Start with createCapabilityGraph, register every node, await ready and dispose when the owner ends.',
-        '具备启动回滚的静态必需依赖图入口；从 `createCapabilityGraph()` 开始，登记全部节点后等待就绪，并在拥有者结束时释放。'
+        'Use this entry when services must start after their dependencies and stop in the opposite order. Import `@migaia/capability/graph` for dependency ordering; the root capability host manages feature switches rather than ordering services.\n\n`createCapabilityGraph()` creates the graph: register every service and its required dependencies before awaiting `ready()`, which starts them and rolls back startup failures. The first `ready()` freezes registration; choose `@migaia/capability/graph/dynamic` if services must be added or replaced while running.',
+        '服务必须等待依赖就绪后启动，并在关闭时反向释放，需要使用此入口。从 `@migaia/capability/graph` 导入来管理依赖顺序；根入口的能力容器管理功能开关，不负责安排服务顺序。\n\n`createCapabilityGraph()` 创建依赖图，先登记全部服务及其必需依赖，再等待 `ready()` 启动；启动失败时会回滚已启动的资源。首次调用 `ready()` 后不能继续登记；需要运行中增加或替换服务时，应使用 `@migaia/capability/graph/dynamic`。'
       ),
       example: `${setup}\nawait graph.ready()\nawait graph.dispose()`
     },

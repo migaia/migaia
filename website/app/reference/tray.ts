@@ -746,22 +746,22 @@ export const trayReference: ILibraryReference = {
     },
     host: {
       summary: t(
-        'Managed PluginHost: `createHost({ create, plugins, ... })` wraps one host and installs plugins through a dependency graph, so a plugin whose required provider is missing stays `blocked` instead of failing, and `use` / `unUse` / `replace` return results with exact types.',
-        '托管的 PluginHost：`createHost({ create, plugins, ... })` 包装一个宿主，并通过依赖图安装插件；缺少必需提供方的插件保持 `blocked` 而不是失败，`use` / `unUse` / `replace` 返回带精确类型的结果。'
+        'Use this entry to manage the plugins inside one PluginHost while respecting their dependencies. Import `@migaia/tray/host` for this single-host manager; the root entry manages static graphs and complete host instances.\n\n`createHost()` creates the managed host and installs its initial plugins; its `use()` method adds a plugin and returns the resulting view. A plugin whose required provider is absent stays blocked, meaning registered but unable to run, rather than being installed without that provider.',
+        '需要管理一个 `PluginHost` 内的插件，并遵守插件间的依赖时，使用此入口。从 `@migaia/tray/host` 导入单宿主管理器；根入口管理静态依赖图和完整宿主实例。\n\n`createHost()` 创建托管宿主并安装初始插件；它的 `use()` 方法添加插件并返回操作后的视图。缺少必需提供者的插件会保持阻塞，也就是已登记但不能运行，不会在依赖缺失时强行安装。'
       ),
       example: managedExample
     },
     loader: {
       summary: t(
-        'Dynamic plugin loading: `defineLoader()` turns a source into an artifact with a release, and `loadIntoHost()` runs load → adapt → use/replace as one transaction that rolls back on failure.',
-        '动态加载插件：`defineLoader()` 把来源转换为带释放函数的产物，`loadIntoHost()` 把“加载 → 适配 → use/replace”作为一个事务执行，失败时回滚。'
+        'Use this entry when plugins arrive from a source that must be loaded and converted before installation. Import `@migaia/tray/loader` for that workflow rather than the root entry’s graph and host-instance APIs.\n\n`defineLoader()` pairs your loading function with the loaded artifact’s release instructions; `loadIntoHost()` loads, adapts, then installs or replaces a plugin on a managed host. If the operation fails before installation commits, it releases the acquired artifact; the adapter entry owns conversion, not loading.',
+        '插件来自需要先加载、再转换的来源时，使用此入口。从 `@migaia/tray/loader` 导入这套流程，不必从根入口的依赖图与宿主实例接口开始。\n\n`defineLoader()` 描述如何加载产物及其释放方式；`loadIntoHost()` 依次加载、转换，再在托管宿主上安装或替换插件。安装提交前失败时，会释放已取得的产物；产物转换由适配器入口负责，不是加载器的职责。'
       ),
       example: loaderExample
     },
     adapter: {
       summary: t(
-        'Artifact conversion: `defineAdapter({ adapt })` describes how a loaded artifact becomes a plugin definition; it owns no host, graph or cleanup.',
-        '产物转换：`defineAdapter({ adapt })` 描述如何把已加载的产物转换为插件定义；它不拥有宿主、依赖图或清理职责。'
+        'Use this entry when a loaded artifact must be converted into a plugin definition before installation. Import `@migaia/tray/adapter` for that conversion contract rather than the root entry’s graphs and host instances.\n\n`defineAdapter({ adapt })` captures your conversion function and returns an adapter that `loadIntoHost()` can use. The adapter only converts the artifact; loading it, installing the plugin, and releasing resources belong to the loader and managed host.',
+        '加载得到的产物需要先转换成插件定义才能安装时，使用此入口。从 `@migaia/tray/adapter` 导入转换接口；根入口的依赖图与宿主实例并不负责这一步转换。\n\n`defineAdapter({ adapt })` 保存你提供的转换函数，返回可交给 `loadIntoHost()` 的适配器。适配器只转换产物，加载产物、安装插件与释放资源由加载器和托管宿主负责。'
       ),
       example: `import { defineAdapter } from '@migaia/tray/adapter'
 
@@ -769,8 +769,8 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
     },
     runtime: {
       summary: t(
-        'Plugin-scoped execution: `createRuntime(host)` runs callbacks against one ready plugin while holding its generation, with cancellation, deadlines and self-removal tickets.',
-        '按插件执行任务：`createRuntime(host)` 在占用某个就绪插件当前一代的同时运行回调，支持取消、截止时间以及自我移除的票据。'
+        'Use this entry to run work against one ready plugin while keeping the exact plugin version available for the callback. Import `@migaia/tray/runtime` for plugin-scoped execution rather than the root entry’s graphs and complete host instances.\n\n`createRuntime()` accepts a managed host view; its `run()` method supplies the selected plugin’s extensions and a cancellation signal to your callback. It supports deadlines and defers requested self-removal until the callback settles; disposing the runtime does not dispose the host.',
+        '需要针对某个就绪插件执行工作，并在回调期间保留该插件的确切版本时，使用此入口。从 `@migaia/tray/runtime` 导入插件执行工具；根入口的依赖图与完整宿主实例属于另一层管理。\n\n`createRuntime()` 接收托管宿主视图，其 `run()` 方法把选定插件的扩展和取消信号交给回调。它支持截止时间，并把回调请求的自身卸载推迟到回调结束后；释放运行器不会释放宿主。'
       ),
       example: runtimeExample
     }

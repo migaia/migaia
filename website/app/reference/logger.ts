@@ -759,8 +759,8 @@ export const loggerReference: ILibraryReference = {
     },
     plugins: {
       summary: t(
-        'Built-in plugins: `level()` adds `info()` / `warn()` / ... and filters; `color()` prints to the console; `batch()` groups entries for other plugins; `http()` uploads; `process()` flushes on exit; `reasoning()` streams model output; `uuid()` labels entries. Create a new plugin object for each logger.',
-        '内置插件：`level()` 增加 `info()` / `warn()` 等方法与过滤器；`color()` 输出到控制台；`batch()` 为其它插件提供攒批；`http()` 上报；`process()` 在退出前刷新；`reasoning()` 流式输出模型内容；`uuid()` 给条目编号。每个 logger 都要创建新的插件对象。'
+        'Use this entry to add logging methods and output behavior to a `Logger` created from the root entry. Import built-in plugin factories from `@migaia/logger/plugins`; the root exports the logger itself rather than these factories.\n\nStart with `level()` for methods such as `info()` and level filtering, then `color()` for console output. Create a fresh plugin instance for each logger; file output has its own `@migaia/logger/plugins/file` entry.',
+        '需要给根入口创建的 `Logger` 增加日志方法与输出方式时，使用此入口。内置插件工厂从 `@migaia/logger/plugins` 导入；根入口导出日志器本身，不导出这些工厂。\n\n先用 `level()` 添加 `info()` 等方法与级别筛选，再用 `color()` 输出到控制台。每个日志器都应创建新的插件实例；文件输出使用独立的 `@migaia/logger/plugins/file` 入口。'
       ),
       example: `import { Logger } from '@migaia/logger'
 import { batch, color, http, level } from '@migaia/logger/plugins'
@@ -771,8 +771,8 @@ ${create}
     },
     'plugins/file': {
       summary: t(
-        'The `file()` plugin, imported only from this subpath. It appends entries as JSON lines to a file through batches. In Node it uses `node:fs/promises`; elsewhere `runtimeManager.fs` must be injected.',
-        '`file()` 插件，只能从这个子路径导入。它按批把日志条目以 JSON 行的形式追加到文件。在 Node 中使用 `node:fs/promises`；其它环境必须注入 `runtimeManager.fs`。'
+        'Use this entry when logs must be appended to a file as one JSON object per line. The `file()` factory is exported only from `@migaia/logger/plugins/file`, separately from both the root logger and the general plugin entry.\n\nInstall `file({ path })` on your logger to write to that path. The host-aware export uses `node:fs/promises` as a fallback in Node-compatible runtimes; browser delivery requires an injected `runtimeManager.fs` append implementation.',
+        '日志需要追加到文件，并让每行保存一个 `JSON` 对象时，使用此入口。`file()` 工厂只从 `@migaia/logger/plugins/file` 导出，独立于根入口的日志器和通用插件入口。\n\n给日志器安装 `file({ path })`，即可向指定路径追加日志。非浏览器版本优先使用注入的文件接口，未注入时使用 `node:fs/promises`；浏览器版本必须注入实现追加写入的 `runtimeManager.fs`。'
       ),
       example: `import { Logger } from '@migaia/logger'
 import { file } from '@migaia/logger/plugins/file'

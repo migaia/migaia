@@ -368,8 +368,8 @@ stop()`
     },
     subscriber: {
       summary: t(
-        'Subscription helpers that work with any object offering `subscribe(listener, options)`: `subscribeOnce` (one delivery), `subscribeUntil` (released by an AbortSignal) and `subscribeSubscriber` (an object with `handle(event)`). They return a plain unsubscribe function without style aliases.',
-        '订阅辅助函数，适用于任何提供 `subscribe(listener, options)` 的对象：`subscribeOnce`（只收一次）、`subscribeUntil`（随 AbortSignal 自动退订）、`subscribeSubscriber`（用带 `handle(event)` 的对象订阅）。它们返回普通的退订函数，不带风格别名。'
+        'Use this entry when you already have an event source and need to limit how long a listener stays subscribed. Choose `@migaia/event-subscriber/subscriber` for subscription helpers rather than the root entry’s channel and hub creation APIs.\n\n`subscribeOnce()` listens for one delivery; `subscribeUntil()` keeps a listener until a cancellation signal aborts. The source only needs to implement `subscribe(listener, options)`, and the returned function lets you unsubscribe yourself; these helpers do not create an event source.',
+        '已经有事件来源，需要限制监听持续时间时，使用此入口。从 `@migaia/event-subscriber/subscriber` 导入订阅辅助函数；需要创建事件通道或事件中心时才使用根入口。\n\n`subscribeOnce()` 只接收一次事件；`subscribeUntil()` 在取消信号中止时退订。来源只需实现 `subscribe(listener, options)`，返回的函数也允许你主动退订；这些辅助函数本身不创建事件来源。'
       ),
       example: `import { subscribeOnce } from '@migaia/event-subscriber/subscriber'
 

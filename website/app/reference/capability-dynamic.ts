@@ -479,8 +479,8 @@ export const capabilityDynamicReference: ILibraryReference = {
   modules: {
     'graph/dynamic': {
       summary: t(
-        'Serialized dynamic graphs for composition owners. Start with createDynamicCapabilityGraph and provide both physical batch owners; register, ready, lease, replace and finally dispose.',
-        '面向组合拥有者的串行动态图入口；从 `createDynamicCapabilityGraph()` 开始并提供两类物理批次回调，然后登记、就绪、获取租约、替换并最终释放。'
+        'Use this entry when a running service graph must accept additions, removals, or replacements. Import `@migaia/capability/graph/dynamic` for changing dependencies; the root host manages feature switches, and the static graph freezes registration at startup.\n\n`createDynamicCapabilityGraph()` creates a graph that processes changes one at a time and reconciles affected dependencies. Provide `startBatch` and `releaseBatch` callbacks for the actual resource work; `acquireBinding()` keeps a particular version available until its consumer releases it.',
+        '服务已经运行，仍需增加、移除或替换服务时，使用此入口。从 `@migaia/capability/graph/dynamic` 导入管理可变依赖；根入口管理功能开关，静态依赖图则在启动时冻结登记。\n\n`createDynamicCapabilityGraph()` 创建逐个处理变更并协调受影响依赖的图。实际启动与释放资源的工作由你提供的 `startBatch` 和 `releaseBatch` 回调负责；`acquireBinding()` 让使用方保留某个版本，直到它主动归还。'
       ),
       example: `${setup}\nawait graph.ready()\nawait graph.dispose()`
     }

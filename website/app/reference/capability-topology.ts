@@ -918,15 +918,15 @@ export const capabilityTopologyReference: ILibraryReference = {
   modules: {
     'graph/topology': {
       summary: t(
-        'Pure topology admission and incremental indices. Start with createTopologyIndex for updates, or buildCapabilityTopology for a static immutable projection with caller-owned error construction.',
-        '纯拓扑接纳与增量索引入口；增量修改从 `createTopologyIndex()` 开始，静态不可变投影使用 `buildCapabilityTopology()`，错误构造归调用方负责。'
+        'Use this entry to check dependencies and calculate service order without starting or releasing services. Import `@migaia/capability/graph/topology` for these structural operations rather than the root capability host’s feature switches.\n\n`createTopologyIndex()` maintains the record of who depends on whom as nodes change; `buildCapabilityTopology()` creates an immutable snapshot with dependency order. Supply the callbacks that turn invalid input or cycles into your own errors; choose the graph entry when you also need service startup and cleanup.',
+        '只需检查依赖并计算服务顺序，不需要启动或释放服务时，使用此入口。从 `@migaia/capability/graph/topology` 导入处理依赖结构；根入口的能力容器处理的是功能开关。\n\n`createTopologyIndex()` 随节点变更维护“谁依赖谁”的记录；`buildCapabilityTopology()` 生成包含依赖顺序的不可变快照。输入不合法或出现循环依赖时，如何构造错误由你提供的回调决定；还需要启动与清理服务时，应使用依赖图入口。'
       ),
       example: setup
     },
     'graph/dependency': {
       summary: t(
-        'Read-only dependency planners over a canonical topology index. Start with planDependencyMutation for removal policy, or planTeardown for complete release ordering; the composition owner executes returned actions.',
-        '在规范拓扑索引上运行的只读依赖规划器入口；移除策略从 `planDependencyMutation()` 开始，整体释放用 `planTeardown()`，返回动作由组合拥有者执行。'
+        'Use this entry when your own service manager needs to decide which dependents are affected by removing or changing a service. Import `@migaia/capability/graph/dependency` for planning; the root capability host does not calculate these dependency actions.\n\n`planDependencyMutation()` plans rejection, removal, or suspension according to your policy; `planTeardown()` orders a complete release with dependents before providers. Both read a topology index, the record of who depends on whom, without changing it; your manager must execute the returned actions.',
+        '自行编写服务管理器，需要判断移除或变更服务会影响哪些依赖者时，使用此入口。从 `@migaia/capability/graph/dependency` 导入规划函数；根入口的能力容器不计算这些依赖动作。\n\n`planDependencyMutation()` 按策略规划拒绝变更、连带移除或暂停；`planTeardown()` 安排整体释放，让使用服务的一方先于提供服务的一方退出。它们只读取记录“谁依赖谁”的拓扑索引，不修改索引；返回的动作仍需管理器执行。'
       ),
       example: planExample(
         'planDependencyMutation',

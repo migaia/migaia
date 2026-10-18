@@ -776,22 +776,22 @@ export const lifecycleReference: ILibraryReference = {
     },
     abort: {
       summary: t(
-        'Native cancellation construction and observed subscription ownership. Start with `createAbortController()` and register through `observeAbortSubscription()` when callback or listener-cleanup failures need an explicit sink.',
-        '提供原生取消控制器与受观察的订阅所有权。从 `createAbortController()` 开始；需要明确接收回调或监听清理错误时，通过 `observeAbortSubscription()` 登记。'
+        'Use this entry to send a cancellation signal and explicitly handle failures from cancellation listeners. Import `@migaia/lifecycle/abort` when you need cancellation without the root entry’s resource scopes and other lifecycle tools.\n\n`createAbortController()` creates a native controller; `observeAbortSubscription()` registers a listener and routes callback or listener-cleanup failures to your failure handler. Cancelling the signal asks cooperating work to stop; it does not release resources owned by a scope.',
+        '需要发送取消信号，并明确处理取消监听中的失败时，使用此入口。只需要取消工具、不需要根入口中的资源作用域等功能时，可从 `@migaia/lifecycle/abort` 导入。\n\n`createAbortController()` 创建原生取消控制器；`observeAbortSubscription()` 登记监听，并把回调或移除监听时的失败交给你提供的处理函数。信号取消只是通知会响应它的工作停止，不会代替作用域释放资源。'
       ),
       example: abortExample
     },
     disposal: {
       summary: t(
-        'Explicit release execution, ordered transactions and synchronous-start ledgers. Start with `createDisposeTransaction()` for sequential release, or `createSyncStartedDisposalLedger()` when all callbacks must start immediately.',
-        '提供显式释放执行、顺序事务与同步启动账本。顺序释放从 `createDisposeTransaction()` 开始；所有回调必须立即启动时使用 `createSyncStartedDisposalLedger()`。'
+        'Use this entry when you already have cleanup callbacks and need to control how they run. Import `@migaia/lifecycle/disposal` for release execution rather than the root collection of lifecycle tools.\n\n`createDisposeTransaction()` runs a release plan in sequence; `createSyncStartedDisposalLedger()` starts each registered callback immediately and tracks its later completion. Unlike a scope, these tools execute caller-supplied cleanup work rather than collecting resources throughout their lifetime.',
+        '已经有清理回调，需要控制它们如何执行时，使用此入口。专门执行释放流程时，可从 `@migaia/lifecycle/disposal` 导入，不必从汇集多类生命周期工具的根入口选择。\n\n`createDisposeTransaction()` 按顺序执行释放计划；`createSyncStartedDisposalLedger()` 立即启动每个登记的回调，并跟踪其后续完成情况。这些工具执行你提供的清理工作；若要在整个使用期间陆续登记资源，应使用作用域入口。'
       ),
       example: transactionExample
     },
     errors: {
       summary: t(
-        'Release error collection and public diagnostics. Start with `createErrorCollector()` to apply a release policy; unclassified failures receive lifecycle identity while existing external identities remain intact.',
-        '提供释放错误收集与公开诊断。从 `createErrorCollector()` 开始应用释放策略；未分类失败附本包身份，已有外部身份保持不变。'
+        'Use this entry when several cleanup failures need one consistent return, throw, or reporting policy. Import `@migaia/lifecycle/errors` for lifecycle error handling rather than the root collection of ownership and timing tools.\n\n`createErrorCollector()` creates a collector whose `add()` records failures and whose `finalize()` applies the chosen policy. It preserves existing package error identities; collecting failures does not execute the cleanup callbacks themselves.',
+        '多个清理步骤失败后，需要统一决定返回、抛出还是报告错误时，使用此入口。专门处理生命周期错误时，可从 `@migaia/lifecycle/errors` 导入，不必从根入口选择资源管理与计时工具。\n\n`createErrorCollector()` 创建收集器，通过 `add()` 记录失败，再由 `finalize()` 应用选定策略。已有的包级错误标识会被保留；收集错误本身不会执行清理回调。'
       ),
       example: `import { createErrorCollector } from '@migaia/lifecycle/errors'
 const collector = createErrorCollector('collect', undefined)
@@ -800,22 +800,22 @@ console.log(collector.finalize('cleanup failed'))`
     },
     generation: {
       summary: t(
-        'One active asynchronous result generation with token identity, cancellation and optional timeout. Start with `createGenerationController()`, retain each `begin()` request, and use its token before committing a result.',
-        '提供单个有效异步结果世代，包含令牌身份、取消与可选超时。从 `createGenerationController()` 开始，保留每次 `begin()` 返回的请求，提交结果前检查其令牌。'
+        'Use this entry when a newer asynchronous request must prevent an older result from taking its place. Import `@migaia/lifecycle/generation` for this latest-request rule rather than the root collection of resource and cleanup tools.\n\n`createGenerationController()` manages one current request; its `begin()` returns a token, an object that identifies that request, and a cancellation signal. Before accepting a result, pass its token to `adopt()`: it keeps a current result or calls your release function for a stale result. The controller decides which result is current; your code still performs the request and responds to cancellation.',
+        '异步请求可能先发后至，旧结果不应覆盖新请求的结果时，使用此入口。只需要这条“以最新请求为准”的规则时，可从 `@migaia/lifecycle/generation` 导入，不必从根入口选择资源与清理工具。\n\n`createGenerationController()` 管理当前请求，调用其 `begin()` 会得到标记该请求的令牌对象与取消信号。接收结果前把令牌交给 `adopt()`：结果仍属当前请求就保留，否则调用你提供的函数释放旧结果。控制器只判断结果是否仍有效，请求执行和响应取消仍由你的代码负责。'
       ),
       example: generationExample
     },
     quiescence: {
       summary: t(
-        'Lease counting and pending-promise draining. Start with `createQuiescenceTracker()` for object identities, `createStringLeaseRegistry()` for string keys, or `createPendingTracker()` when callers should only track promises.',
-        '提供租约计数和未完成异步工作的排空。对象身份从 `createQuiescenceTracker()` 开始，字符串键用 `createStringLeaseRegistry()`；调用方只需登记异步任务时用 `createPendingTracker()`。'
+        'Use this entry to wait until all users of a resource have finished before releasing it. Choose `@migaia/lifecycle/quiescence` for usage counting rather than the root collection of lifecycle tools.\n\n`createQuiescenceTracker()` tracks a count for each object: `retain()` adds a user and returns the function that releases that count. Seal the object against new users before awaiting `whenZero()`; use `createPendingTracker()` when you only need to track and drain Promises. Reaching zero does not release the underlying resource for you.',
+        '释放资源前，需要等所有使用者结束时，使用此入口。专门统计使用情况时，可从 `@migaia/lifecycle/quiescence` 导入，不必从汇集多类生命周期工具的根入口选择。\n\n`createQuiescenceTracker()` 为每个对象计数：`retain()` 增加一个使用者，并返回归还这次计数的函数。先用 `seal()` 拒绝新使用者，再等待 `whenZero()`；若只需跟踪和等待异步任务结束，可用 `createPendingTracker()`。计数归零不会替你释放底层资源。'
       ),
       example: leaseExample
     },
     scheduler: {
       summary: t(
-        'Admits scheduler injection while preserving lifecycle error identity. Start with `resolveScheduler()` for a required scheduler or `resolveSchedulerOption()` for an optional option; scheduler implementation remains owned by `@migaia/utils/scheduler`.',
-        '接纳注入调度器并保留本包错误身份。必填调度器从 `resolveScheduler()` 开始，可选字段使用 `resolveSchedulerOption()`；调度器实现仍由 `@migaia/utils/scheduler` 持有。'
+        'Use this entry when accepting a caller-supplied clock and timer implementation into lifecycle code. Import `@migaia/lifecycle/scheduler` for this validation boundary rather than the root collection of lifecycle tools.\n\n`resolveScheduler()` validates and captures the supplied scheduler’s methods; `resolveSchedulerOption()` handles an optional scheduler. These functions keep lifecycle failures identifiable; normal timer implementations come from `@migaia/utils/scheduler`, and manual time controls come from `@migaia/utils/testing`.',
+        '生命周期代码需要接收调用方提供的时钟和定时器实现时，使用此入口。专门检查并接入调度器时，可从 `@migaia/lifecycle/scheduler` 导入，不必从根入口选择其他生命周期工具。\n\n`resolveScheduler()` 检查并保存所提供调度器的方法；`resolveSchedulerOption()` 处理可省略的调度器选项。这些函数让相关失败保留生命周期错误标识；正常计时器实现来自 `@migaia/utils/scheduler`，手动时间控制来自 `@migaia/utils/testing`。'
       ),
       example: `import { resolveScheduler } from '@migaia/lifecycle/scheduler'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -824,8 +824,8 @@ console.log(scheduler.now())`
     },
     scope: {
       summary: t(
-        'Asynchronous ownership with separate close and disposal phases. Start with `createLifecycleScope()`, register resources using explicit descriptors, and await `dispose()` to finish release and reach terminal state.',
-        '提供关闭与释放分离的异步所有权。从 `createLifecycleScope()` 开始，以显式描述器登记资源；等待 `dispose()` 完成释放并进入终止状态。'
+        'Use this entry when several resources belong to one owner and must be released when that owner ends. Choose `@migaia/lifecycle/scope` for asynchronous resource ownership rather than the root collection of lifecycle tools.\n\n`createLifecycleScope()` creates the owner; register each resource with `own()` and an explicit release callback. `close()` stops new registrations, while awaiting `dispose()` performs cleanup; closing alone does not release anything. For directly executing an existing cleanup plan, use the disposal entry.',
+        '多个资源属于同一个使用方，需要随它结束而统一释放时，使用此入口。专门管理异步资源所有权时，可从 `@migaia/lifecycle/scope` 导入，不必从根入口选择其他生命周期工具。\n\n`createLifecycleScope()` 创建资源所有者，用 `own()` 登记资源及明确的释放回调。`close()` 只停止新登记，等待 `dispose()` 才会执行清理，单独关闭不会释放资源。如果已经有完整清理计划、只需直接执行，应使用释放入口。'
       ),
       example: scopeExample
     }

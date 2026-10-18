@@ -1211,22 +1211,22 @@ export const reference: ILibraryReference = {
     },
     coroutine: {
       summary: t(
-        'Cooperative Promise or async-iterator tasks on the shared event loop; start with createCoroutineSupervisor and a coroutine budget.',
-        '共享事件循环上的协作承诺或异步迭代任务；从 `createCoroutineSupervisor` 和协程预算开始。'
+        'Use this entry to supervise a Promise-based task or asynchronous iterator that shares your application’s event loop. Import `@migaia/supervision/coroutine` for this ready-made task profile rather than assembling the root supervisor’s profile and launcher yourself.\n\n`createCoroutineSupervisor()` takes a task and a coroutine budget, then provides startup, restart, and disposal through the shared supervisor. Stopping asks the task to cooperate through its signal; use a thread or process when work needs a separate execution environment.',
+        '需要监督返回 `Promise` 的任务或异步迭代器，且任务与应用共用事件循环时，使用此入口。从 `@migaia/supervision/coroutine` 导入现成的任务适配，不必自行组装根入口监督器所需的任务规则与启动器。\n\n`createCoroutineSupervisor()` 接收任务和协程数量预算，复用通用监督器完成启动、重启与释放。停止时通过信号请求任务配合退出；工作需要独立执行环境时，应选择线程或进程入口。'
       ),
       example: coroutineExample
     },
     process: {
       summary: t(
-        'Native process profile, prewarming and fingerprint recovery; supply a runtime launcher to createProcessSupervisor.',
-        '原生进程策略、预热及指纹恢复；向 `createProcessSupervisor` 提供运行时启动器。'
+        'Use this entry to supervise a native child process and observe its output and exit. Import `@migaia/supervision/process` for process-specific behavior rather than assembling a process profile around the generic root supervisor.\n\n`createProcessSupervisor()` combines your process specification, launcher, and process budget with the shared restart and disposal rules. You supply the runtime launcher that actually starts and terminates processes; this entry does not provide a platform process launcher.',
+        '需要监督原生子进程并观察其输出与退出时，使用此入口。从 `@migaia/supervision/process` 导入进程专用行为，不必围绕根入口的通用监督器自行组装进程规则。\n\n`createProcessSupervisor()` 把进程说明、启动器和进程数量预算接入通用的重启与释放规则。实际启动和终止进程的运行环境启动器由你提供；此入口不提供平台进程启动器。'
       ),
       example: processExample
     },
     threads: {
       summary: t(
-        'Native worker supervision with declared isolation guarantees; supply a runtime launcher to createThreadSupervisor.',
-        '带明确隔离保证的原生工作线程监督；向 `createThreadSupervisor` 提供运行时启动器。'
+        'Use this entry to supervise a worker running in a separate execution environment. Import `@migaia/supervision/threads` for worker-specific rules rather than assembling a thread profile around the generic root supervisor.\n\n`createThreadSupervisor()` accepts your worker entry, launcher, and thread budget and reuses the shared startup, restart, and disposal rules. The launcher must declare the isolation and termination capabilities it actually supplies; this entry does not create a platform worker launcher for you.',
+        '需要监督在独立执行环境中运行的工作线程时，使用此入口。从 `@migaia/supervision/threads` 导入线程专用规则，不必围绕根入口的通用监督器自行组装线程适配。\n\n`createThreadSupervisor()` 接收线程入口、启动器和线程数量预算，复用通用的启动、重启与释放规则。启动器必须声明实际提供的隔离与终止能力；此入口不会替你创建平台线程启动器。'
       ),
       example: threadExample
     }

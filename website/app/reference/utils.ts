@@ -254,8 +254,8 @@ console.log(readUrlHref(new URL('https://example.com/a'))) // https://example.co
     },
     bytes: {
       summary: t(
-        'Bytes and text: brand checks for `Uint8Array` / `ArrayBuffer`, strict RFC 4648 Base64 (also in chunks), and UTF-8 length, encoding, decoding and splitting without cutting a code point.',
-        '字节与文本处理：`Uint8Array` / `ArrayBuffer` 的类型判断、严格的 RFC 4648 Base64（也支持分块），以及 UTF-8 的长度计算、编码、解码和不切断字符的分段。'
+        'Use this entry when text must become bytes for storage or transport, or bytes must be represented as Base64 text. Import `@migaia/utils/bytes` when that conversion is your task, rather than selecting it from the general root utilities.\n\nStart with `encodeUtf8()` to turn text into a new byte array, or `bytesToBase64()` to turn bytes into Base64, a text representation of binary data. These helpers convert data; they do not read files or send messages.',
+        '需要把文本转成字节以便保存或传输，或把字节表示成 `Base64` 文本时，使用此入口；`Base64` 是用文本表示二进制数据的编码方式。只处理这些转换时，可从 `@migaia/utils/bytes` 导入所需函数，不必从汇集多类工具的根入口选择。\n\n从 `encodeUtf8()` 开始把文本转成新的字节数组，或用 `bytesToBase64()` 把字节转成文本。这些函数只转换数据，不负责读取文件或发送消息。'
       ),
       example: `import { bytesToBase64, encodeUtf8 } from '@migaia/utils/bytes'
 
@@ -263,8 +263,8 @@ bytesToBase64(encodeUtf8('你好')) // '5L2g5aW9'`
     },
     config: {
       summary: t(
-        'Owned configuration: `ownConfig()` validates and copies caller options once at the boundary; `readonlyConfig()` exposes a read-only view; `patchConfig()` and `combineConfig()` derive new configurations without mutating old ones; `readConfigPath()` reads nested values.',
-        '带所有权的配置：`ownConfig()` 在接收边界一次性校验并复制调用方传入的配置；`readonlyConfig()` 提供只读视图；`patchConfig()` 与 `combineConfig()` 派生新配置而不修改旧配置；`readConfigPath()` 读取嵌套值。'
+        'Use this entry to keep caller changes from altering configuration your component has already accepted. Choose `@migaia/utils/config` for configuration ownership and updates, rather than the root collection of general utilities.\n\n`ownConfig()` validates and copies the input so your component has its own configuration; `patchConfig()` derives an updated configuration without mutating the previous one. For reading or updating arbitrary nested application data without configuration ownership, use `@migaia/utils/object-path`.',
+        '组件接收配置后，如果不希望调用方后续修改影响它，可使用此入口。需要接管配置并派生新版本时，从 `@migaia/utils/config` 导入，比从汇集多类工具的根入口选择更能表明用途。\n\n`ownConfig()` 检查并复制输入，让组件持有自己的配置；`patchConfig()` 生成更新后的配置，不修改旧版本。若只是读写普通业务对象的嵌套字段，不需要接管配置，应使用 `@migaia/utils/object-path`。'
       ),
       example: `import { ownConfig, patchConfig } from '@migaia/utils/config'
 
@@ -273,8 +273,8 @@ const next = patchConfig(base, { retries: 3 })`
     },
     error: {
       summary: t(
-        'Error identity and cause chains: attach `source` / `code` to existing errors, normalise thrown values, walk and combine causes, the package error classes, and a bounded serialise / deserialise of whole error trees for transport across workers and processes.',
-        '错误身份与因果链：为已有错误附加 `source` / `code`、规整任意抛出值、遍历与合并原因链、本包的错误类，以及在 worker 与进程之间传输整棵错误树时使用的有界序列化与反序列化。'
+        'Use this entry when failures need a stable identity or several failures must remain traceable together. Import `@migaia/utils/error` for error handling rather than the root collection of unrelated helpers.\n\n`attachErrorIdentity()` adds `source` and `code` to an existing error object; `attachSecondaryErrors()` keeps cleanup failures alongside the primary error. If the primary cannot accept those extra failures, the latter returns an `AggregateError` with the primary first, so keep its return value.',
+        '需要给错误标明来源，或同时保留主要失败与清理失败时，使用此入口。专门处理错误时，从 `@migaia/utils/error` 导入即可，不必从汇集其他工具的根入口选择。\n\n`attachErrorIdentity()` 给已有错误对象添加 `source` 与 `code`；`attachSecondaryErrors()` 把清理失败附在主要错误旁边。主要错误无法接收这些附加信息时，后者返回以主要错误为首项的 `AggregateError`，因此要使用它的返回值。'
       ),
       example: `import { attachErrorIdentity } from '@migaia/utils/error'
 
@@ -282,8 +282,8 @@ throw attachErrorIdentity(new Error('请求失败'), { source: 'my-app', code: '
     },
     function: {
       summary: t(
-        'Function helpers: `noop`, `once` / `onceAsync` for one-time initialisation, and thenable probes that read `.then` exactly once for libraries that accept user callbacks.',
-        '函数工具：`noop`、用于一次性初始化的 `once` / `onceAsync`，以及只读取一次 `.then` 的 thenable 探测函数，供接受用户回调的类库使用。'
+        'Use this entry when several callers must share one initialization instead of running it repeatedly. Import `@migaia/utils/function` when you need reusable function behavior rather than the root collection of general helpers.\n\n`once()` remembers the first synchronous result, including a thrown failure; `onceAsync()` invokes an asynchronous function once and returns the same Promise on later calls. These helpers do not retry failed initialization; use the promise entry when retry is the intended behavior.',
+        '多个调用方需要共用一次初始化结果，而不是重复执行时，可使用此入口。需要这类函数行为时，从 `@migaia/utils/function` 导入，不必从汇集多类工具的根入口选择。\n\n`once()` 记住首次同步调用的结果，包括抛出的错误；`onceAsync()` 只发起一次异步调用，后续调用返回同一个 `Promise`。它们不会在初始化失败后重试；需要重试时应使用 `@migaia/utils/promise`。'
       ),
       example: `import { once } from '@migaia/utils/function'
 
@@ -291,8 +291,8 @@ const getRegistry = once(() => buildRegistry())`
     },
     number: {
       summary: t(
-        'Locale-aware number formatting on top of `Intl.NumberFormat` with a bounded formatter cache: plain numbers, currency, percent, integers and compact notation.',
-        '基于 `Intl.NumberFormat` 的本地化数字格式化，内部有容量受限的格式器缓存：普通数字、货币、百分比、整数与紧凑记数。'
+        'Use this entry to display numbers in a chosen locale, including money and percentages. Choose `@migaia/utils/number` when formatting is the task, rather than the root collection of general utilities.\n\n`formatCurrency()` formats a value with the currency you specify; `createNumberFormatter()` creates a formatter you can reuse across many values. The functions use `Intl.NumberFormat`, the platform number formatter, and leave currency and precision choices to you; they do not parse numeric text.',
+        '需要按指定地区的习惯显示数字、金额或百分比时，使用此入口。专门处理数字展示时，可从 `@migaia/utils/number` 导入，不必从汇集多类工具的根入口选择。\n\n`formatCurrency()` 按你指定的货币格式化数值；`createNumberFormatter()` 创建可反复处理多个数值的格式器。它们使用平台提供的数字格式器 `Intl.NumberFormat`，货币和精度仍由你决定，也不负责把文本解析成数字。'
       ),
       example: `import { formatCurrency } from '@migaia/utils/number'
 
@@ -300,8 +300,8 @@ formatCurrency(1234.5, 'CNY', { locales: 'zh-CN' }) // '¥1,234.50'`
     },
     object: {
       summary: t(
-        'Object utilities: plain-object checks, single-read property probes, snapshots (full clone, best-effort clone with diagnostics, identity), safe dictionaries, own-descriptor capture, plus the object-path functions.',
-        '对象工具：普通对象判断、只读一次的属性探测、快照（完整克隆、带诊断的尽力克隆、原样引用）、安全字典、自有属性描述符捕获，以及对象路径相关函数。'
+        'Use this entry to inspect object properties or copy supported data without hiding a failing property read. Choose `@migaia/utils/object` for these object operations rather than the root collection of general utilities.\n\n`probeProperty()` reads one property once and reports whether it returned a value or threw; `immutableSnapshot()` creates an independent immutable snapshot of supported plain data. If your task is specifically to follow a nested path, use the narrower `@migaia/utils/object-path` entry.',
+        '需要检查对象属性，或复制支持的数据，同时明确处理属性读取失败时，使用此入口。专门进行对象操作时，从 `@migaia/utils/object` 导入，不必从汇集多类工具的根入口选择。\n\n`probeProperty()` 只读取一次指定属性，并区分读到值与读取时抛错；`immutableSnapshot()` 为支持的普通数据创建独立且不可修改的快照。如果只需要沿嵌套路径读写字段，可使用范围更集中的 `@migaia/utils/object-path`。'
       ),
       example: `import { probeProperty } from '@migaia/utils/object'
 
@@ -310,8 +310,8 @@ if (read.kind === 'value') console.log(read.value)`
     },
     'object-path': {
       summary: t(
-        'Dot-path reading and immutable writing of nested objects (`get`, `set`, `createPathAccessor`) and explicit path probes that tell missing, blocked and failing segments apart.',
-        '嵌套对象的点路径读取与不可变写入（`get`、`set`、`createPathAccessor`），以及能区分路径缺失、中途被阻断、读取出错的显式探测函数。'
+        'Use this entry when a field sits inside nested objects or arrays and you want to address it by a path. Import `@migaia/utils/object-path` for path operations rather than the root utilities or the broader object entry.\n\n`get()` reads a path and returns `undefined` for a missing or blocked segment; `set()` returns an updated object without mutating the original. A blocked segment means the path cannot continue through the value at that point; getter failures remain observable rather than becoming a missing value.',
+        '字段位于嵌套对象或数组中，需要按路径访问时，使用此入口。专门读写路径时，从 `@migaia/utils/object-path` 导入，比从根入口或功能更多的对象入口选择更直接。\n\n`get()` 读取路径，遇到字段缺失或无法继续访问的中间值时返回 `undefined`；`set()` 返回更新后的对象，不修改原对象。路径受阻是指中间的值无法继续访问下一段；属性读取自身抛出的错误仍会显式暴露，不会当成字段缺失。'
       ),
       example: `import { get, set } from '@migaia/utils/object-path'
 
@@ -320,8 +320,8 @@ get(next, 'user.name') // 'Grace'`
     },
     promise: {
       summary: t(
-        'Time and cancellation for async work: abortable `sleep`, `withTimeout`, `raceWithAbort`, `retry`, a concurrency limiter, deferred Promises and signal composition. All cancellation is cooperative: operations stop only if they read the given `signal`.',
-        '异步工作的时间与取消控制：可中止的 `sleep`、`withTimeout`、`raceWithAbort`、`retry`、并发限制器、外部结算的 Promise 以及信号组合。所有取消都是协作式的：只有读取了传入 `signal` 的操作才会真正停止。'
+        'Use this entry when asynchronous work needs a deadline, cancellation, or a retry policy. Choose `@migaia/utils/promise` for those operations rather than the root collection of general helpers.\n\n`withTimeout()` starts an operation and limits how long its caller waits; `retry()` runs attempts within the configured retry and deadline rules. Cancellation is cooperative: pass the supplied `signal` to work that observes it, because ending the wait alone cannot stop that work.',
+        '异步工作需要截止时间、取消或重试策略时，使用此入口。专门控制异步操作时，从 `@migaia/utils/promise` 导入，不必从汇集多类工具的根入口选择。\n\n`withTimeout()` 发起操作并限制调用方等待的时间；`retry()` 按配置的重试规则和截止时间执行多次尝试。取消需要操作配合：把收到的 `signal` 传给会响应它的工作，仅结束等待并不能让工作停止。'
       ),
       example: `import { withTimeout } from '@migaia/utils/promise'
 
@@ -329,8 +329,8 @@ await withTimeout(({ signal }) => fetch('/api', { signal }), { timeoutMs: 2000 }
     },
     scheduler: {
       summary: t(
-        'Scheduler contract and implementations: `systemScheduler` (native timers, monotonic clock), `systemWallClock` (epoch timestamps), `deferTask()`. Deterministic test support lives at `@migaia/utils/testing`.',
-        '调度器约定及其实现：`systemScheduler`（原生计时器与单调时钟）、`systemWallClock`（纪元时间戳）、以及 `deferTask()`。确定性测试支持位于 `@migaia/utils/testing`。'
+        'Use this entry when code must read elapsed time or schedule a callback through a shared clock and timer interface. Import `@migaia/utils/scheduler` for that contract and its normal implementation rather than the root collection of utilities.\n\n`systemScheduler.schedule()` arranges a callback and returns a handle that can cancel it; `systemWallClock.timestamp()` supplies a calendar timestamp. Scheduler time measures intervals, while calendar timestamps describe dates; use `@migaia/utils/testing` when you need to advance time manually.',
+        '代码需要通过统一的时钟和定时器接口计算耗时或安排回调时，使用此入口。需要这套接口及其正常运行实现时，从 `@migaia/utils/scheduler` 导入，不必从汇集多类工具的根入口选择。\n\n`systemScheduler.schedule()` 安排回调并返回可取消它的句柄；`systemWallClock.timestamp()` 提供日历时间戳。调度器时间用于计算间隔，日历时间戳用于表示日期；需要手动推进时间时，使用 `@migaia/utils/testing`。'
       ),
       example: `import { systemScheduler } from '@migaia/utils/scheduler'
 
@@ -339,8 +339,8 @@ task.cancel()`
     },
     testing: {
       summary: t(
-        'Deterministic test support separated from normal scheduling. Import `createManualScheduler()` and `IManualScheduler` here; virtual time advances only through explicit calls.',
-        '与正常调度分离的确定性测试支持。从此入口导入 `createManualScheduler()` 与 `IManualScheduler`，虚拟时间只随显式调用推进。'
+        'Use this entry to check timer-driven behavior without waiting for real time to pass. Manual time controls are exported from `@migaia/utils/testing`, separately from the root and normal scheduler entries.\n\n`createManualScheduler()` creates a clock whose `advance(ms)` moves time forward and runs due callbacks synchronously. Pass that scheduler to the code under examination; use `systemScheduler` from `@migaia/utils/scheduler` for normal host timers.',
+        '需要检查由定时器触发的行为，却不想等待真实时间流逝时，使用此入口。手动时间控制由 `@migaia/utils/testing` 单独导出，不在根入口或正常调度器入口中。\n\n`createManualScheduler()` 创建可手动控制的时钟，调用 `advance(ms)` 会推进时间，并同步执行已到期的回调。把它传给要检查的代码；正常使用宿主定时器时，应选 `@migaia/utils/scheduler` 中的 `systemScheduler`。'
       ),
       example: `import { createManualScheduler } from '@migaia/utils/testing'
 
@@ -350,8 +350,8 @@ scheduler.advance(100)`
     },
     string: {
       summary: t(
-        'String helpers: `format()` fills `{path}` placeholders from a values object, and `tryString()` converts a value to text without throwing.',
-        '字符串工具：`format()` 用值对象填充 `{path}` 占位符，`tryString()` 把任意值转换为文本且不抛错。'
+        'Use this entry to fill a text template from data or to handle a value whose conversion to text may fail. Choose `@migaia/utils/string` for these text operations rather than the root collection of general utilities.\n\n`format()` fills placeholders such as `{user.name}` from nested values; missing placeholders remain visible by default. `tryString()` attempts conversion once and returns either text or the original thrown value, leaving fallback and reporting to you.',
+        '需要用数据填充文本模板，或处理可能在转成文本时失败的值，可使用此入口。专门处理文本时，从 `@migaia/utils/string` 导入，不必从汇集多类工具的根入口选择。\n\n`format()` 按嵌套字段填充 `{user.name}` 这样的占位符，默认保留找不到值的占位符。`tryString()` 尝试转换一次，返回文本或转换时抛出的原值；后备文本与错误报告由调用方决定。'
       ),
       example: `import { format } from '@migaia/utils/string'
 
@@ -359,8 +359,8 @@ format('你好，{user.name}', { user: { name: 'Ada' } }) // '你好，Ada'`
     },
     typing: {
       summary: t(
-        "Import types with `import type { ... } from '@migaia/utils/typing'`; this import is removed from emitted code and loads no runtime module. This entry contains grouping helpers for event or message variants, plus shared types re-exported from runtime entries. The example groups events by kind; see the [type utilities guide](/en/docs/utils/type-utilities) for uses and boundaries.",
-        "用 `import type { ... } from '@migaia/utils/typing'` 导入类型；生成代码时会移除这条导入，不会加载运行时模块。此入口包含两组类型：整理事件或消息不同形态的分组工具，以及从运行时入口重新导出的共享类型。下面按事件种类分组；使用场景与边界见[类型工具指南](/zh/docs/utils/type-utilities)。"
+        'Use this entry when an event or message union needs a type for each distinct variant, such as created and deleted events. Import with `import type` from `@migaia/utils/typing` for these grouping helpers and shared types; the root entry does not export the grouping helpers.\n\n`IDiscriminatedByField` groups variants by a top-level field, while `IDiscriminatedByPath` uses a nested path. Both produce types for the compiler, not runtime validation; the [type utilities guide](/en/docs/utils/type-utilities) explains their uses and limits.',
+        '事件或消息有多种形态，需要分别得到每种形态的类型时，可使用此入口，例如分别取出创建事件和删除事件的类型。通过 `import type` 从 `@migaia/utils/typing` 导入这些分组工具或共享类型；根入口不导出这两个分组工具。\n\n`IDiscriminatedByField` 按顶层字段的值分组，`IDiscriminatedByPath` 按嵌套路径的值分组。它们只为编译器生成类型，不在运行时检查数据；具体用法与边界见[类型工具指南](/zh/docs/utils/type-utilities)。'
       ),
       example: `import type { IDiscriminatedByField } from '@migaia/utils/typing'
 
@@ -373,8 +373,8 @@ type IByKind = IDiscriminatedByField<'kind', IEvent>
     },
     value: {
       summary: t(
-        'Value checks that do not coerce: `isNullish`, `isBlankString`, `isEmptyValue` (keeps `0` and `false`), `isPrimitive`, `isSafeIntegerValue`.',
-        '不做类型转换的值判断：`isNullish`、`isBlankString`、`isEmptyValue`（保留 `0` 与 `false`）、`isPrimitive`、`isSafeIntegerValue`。适合校验表单输入与配置选项，避免把零和假值误判为空。'
+        'Use this entry when form or configuration checks must distinguish missing input from valid values such as zero and false. Import `@migaia/utils/value` for value checks rather than the root collection of general utilities.\n\n`isNullish()` recognizes only `null` and `undefined`; `isEmptyValue()` also recognizes blank strings while keeping `0`, `0n`, and `false` as real values. These checks do not convert input types or decide whether arrays and objects count as empty.',
+        '表单或配置校验需要区分缺失输入与零、假值等有效数据时，使用此入口。专门判断值时，可从 `@migaia/utils/value` 导入，不必从汇集多类工具的根入口选择。\n\n`isNullish()` 只识别 `null` 与 `undefined`；`isEmptyValue()` 还识别空字符串和纯空白字符串，同时保留 `0`、`0n` 与 `false`。这些判断不转换输入类型，也不替你决定数组和对象是否算空。'
       ),
       example: `import { isEmptyValue } from '@migaia/utils/value'
 
