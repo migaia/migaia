@@ -122,7 +122,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "两端都启动工厂后，Core 完成握手与方法目录交换。无需手写 Endpoint、中间件、目标 id 或 `context.success`。`peer.on('ready', listener)` 订阅后续 ready 事件；第一次连接的 ready 已由工厂完成表示。`peerSymbol.asyncDispose` 等同于 `close()`。"
+                "text": "两端都启动工厂后，Core 完成握手与方法目录交换。无需手写 Endpoint、中间件、目标 id 或 `context.success`。`peer.on('ready', listener)` 订阅后续 ready 事件；第一次连接的 ready 已由工厂完成表示。`peer[Symbol.asyncDispose]()` 等同于 `close()`。"
               }
             ]
           },
@@ -141,7 +141,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "SharedWorker 模块为每个 `connect` 事件接纳一个独立 Peer："
+                "text": "SharedWorker 模块为每个 `connect` 事件中的端口分别接纳独立 Peer："
               },
               {
                 "type": "code",
@@ -160,11 +160,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "六个 transport 均支持 `transport.observe(probe)`：每次物理发送和通过 `sourceProof` 的接收各报告一次事件，`carrier` 为 `window`、`shared-worker`、`service-worker`、`broadcast-channel`、`rtc-data-channel` 或 `web-transport`。`detail` 复用同一个对象，含 `origin`（未知时为空字符串）、`transfers`（本次发送 transfer 列表长度，接收时因原生事件不提供发送方 transfer 选择而为 -1）与 `rejectedSource`（自上次有效接收后的来源拒绝数，仅附在下一次有效接收）。字符串与直接字节载荷提供准确的 `sizeBytes`，其他对象为 `-1`。默认只报告元数据；`probe."
-              },
-              {
-                "type": "paragraph",
-                "text": "capturing` 为 `true` 时内容保留引用，可受调用方后续修改影响；直接字节载荷的 buffer 列入本次 transfer 时，发送前仅复制这些将被 detach 的字节。保留事件时应立即读取 detail。返回的 disposer 可重复调用，旧 disposer 不影响后续注册，即使复用了同一个 probe；RTC 终止与 WebTransport 关闭均释放观察者。探针异常沿现有 listener 错误通道报告 `TRANSPORT`，原异常保留在 `cause`，发送与接收继续。"
+                "text": "六个 transport 均支持 `transport.observe(probe)`：每次物理发送和通过 `sourceProof` 的接收各报告一次事件，`carrier` 为 `window`、`shared-worker`、`service-worker`、`broadcast-channel`、`rtc-data-channel` 或 `web-transport`。`detail` 复用同一个对象，含 `origin`（未知时为空字符串）、`transfers`（本次发送 transfer 列表长度，接收时因原生事件不提供发送方 transfer 选择而为 -1）与 `rejectedSource`（自上次有效接收后的来源拒绝数，仅附在下一次有效接收）。直接字节载荷提供准确的 `sizeBytes`，字符串与其他对象为 `-1`。默认只报告元数据；`probe.capturing` 为 `true` 时内容保留引用，可受调用方后续修改影响；直接字节载荷的 buffer 列入本次 transfer 时，发送前仅复制这些将被 detach 的字节。保留事件时应立即读取 detail。返回的 disposer 可重复调用，旧 disposer 不影响后续注册，即使复用了同一个 probe；RTC 终止与 WebTransport 关闭均释放观察者。探针异常沿现有 listener 错误通道报告 `TRANSPORT`，原异常保留在 `cause`，发送与接收继续。"
               },
               {
                 "type": "paragraph",
@@ -307,7 +303,7 @@
                   ["`describe(options?)`", "本地查询身份、已接纳连接与方法目录。"],
                   ["`on('ready', listener)`", "订阅后续 ready；连接工厂完成已表示首次握手就绪。"],
                   [
-                    "`close()` / `Symbol.asyncDispose`",
+                    "`close()` / `[Symbol.asyncDispose]()`",
                     "幂等关闭逻辑连接，释放本端监听器；借用的原生资源仍由调用方关闭。"
                   ]
                 ]
@@ -491,7 +487,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "消息 source 必须是 target 本身，或其 id 等于 peerId；其它页面会被忽略。Worker 的空闲终止通常只能由调用超时发现。"
+                "text": "原始 transport 的 subscribe 保留消息记录；connect 中间件或 Peer 投影根据 sourceProof 接纳 target 本身或 id 等于 peerId 的来源，忽略其它页面。直接 raw 订阅者负责来源过滤。Worker 的空闲终止通常只能由调用超时发现。"
               }
             ]
           },
@@ -596,7 +592,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。"
+                "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。已有完整外部语义身份的 I/O Error 保持原身份；未分类的可变原生 Error/DOMException 原位附 Core `TRANSPORT`，不可附加身份的值保留在 cause。RTC 错误事件的原 error 保留在 cause。WebTransport send 返回处理写入拒绝后的 Promise，不保证与 native writer.write 的 Promise 引用相同。不要把远端传回的 source/code 当成本地控制权限。"
               },
               {
                 "type": "paragraph",
@@ -657,9 +653,9 @@
           "signature": "export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
           "declarationLine": 4,
           "source": "packages/rpc-browser/dist/browser/peer.d.ts",
-          "purpose": "A declared remote surface retains the same method, payload and generator typing as other Peers. Preserve the same dynamic factory signature used by the canonical Runtime Peer constructor.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserPeer.",
-          "advanced": "No additional advanced behavior is declared for createBrowserPeer.",
+          "purpose": "Creates a browser Runtime Peer. Connect resolves after the real handshake/directory exchange; listen returns an accept facade, and each incoming SharedWorker port has its own handshake. Supply exactly one supported source and pair both sides with `createBrowserPeer`.",
+          "core": "options: See `IRuntimeBrowserPeerOptions`. Besides `connect` / `listen` / `signal` it accepts the Core Peer options: `provide` (methods this side offers), `defaultTimeoutMs`, `report`, `probe`, `providerLimits`, `authentication`, `contract`, `self`.\nAn `IRuntimePeer` from `@migaia/rpc-core`: `request` / `notify` / `stream` / `group` / `outcome` call the other side, `on(\"ready\")` observes reconnection, `describe()` reads the directory, `close()` (or `await using`) ends the logical connection without closing the carrier. Typed by `TRemote` when given.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply.",
+          "advanced": "A shop page calls functions inside a payment iframe from another origin.\nOne SharedWorker serves the same cache or socket to every open tab.\nTwo browsers call each other over a WebRTC DataChannel.\nDedicated Workers created by the library: use `@migaia/rpc-threads`.\nService Worker and BroadcastChannel use paired Endpoint transports. WebTransport uses raw byte transport with an external application protocol; this package ships no ready-made compatible Endpoint/framer recipe.",
           "parameters": ["options: IRuntimeBrowserPeerOptions"],
           "parameterDetails": [
             {
@@ -669,8 +665,8 @@
             }
           ],
           "returns": "Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>> | Promise<IRuntimePeer>",
-          "errors": ["No documented errors are declared for createBrowserPeer."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBrowserPeer.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** iframe 已提供这些业务方法；流方法返回逐项结果。 */\ntype IActionApi = {\n  double(value: number): number\n  note(value: string): void\n  count(limit: number): AsyncIterableIterator<number>\n}\n\n/** 在实际 iframe 上演示 request、notify、stream、group 与资源释放。 */\nexport async function useFrame(iframe: HTMLIFrameElement) {\n  /** origin 必须来自应用固定的对端契约。 */\n  const peer = await createBrowserPeer<IActionApi>({\n    connect: { window: iframe.contentWindow!, origin: 'https://billing.example' },\n    defaultTimeoutMs: 5000\n  })\n  try {\n    console.log(await peer.request('double', 21)) // 42\n    await peer.notify('note', 'hello')\n    for await (const value of peer.stream('count', 3)) console.log(value)\n    console.log(\n      await peer.group([\n        { method: 'double', payload: 1 },\n        { method: 'double', payload: 2 }\n      ])\n    )\n    console.log(await peer.describe())\n  } finally {\n    await peer.close()\n  }\n}",
             "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 页面实际持有的 iframe；对端提供 calculateTotal。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\n/** 远端契约决定输入与返回值类型。 */\ntype IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }\n/** 只借用指定窗口；Core 在该载体上完成握手。 */\nconst billing = await createBrowserPeer<IBillingApi>({\n  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }\n})\nconsole.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 }))\nawait billing.close()",
@@ -710,13 +706,13 @@
             "Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>",
             "Promise<IRuntimePeer>"
           ],
-          "whenToUse": "Use createBrowserPeer when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createBrowserPeer does not match the required inputs or return contract.",
+          "whenToUse": "A shop page calls functions inside a payment iframe from another origin.\nOne SharedWorker serves the same cache or socket to every open tab.\nTwo browsers call each other over a WebRTC DataChannel.",
+          "notUse": "Dedicated Workers created by the library: use `@migaia/rpc-threads`.\nService Worker and BroadcastChannel use paired Endpoint transports. WebTransport uses raw byte transport with an external application protocol; this package ships no ready-made compatible Endpoint/framer recipe.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "A declared remote surface retains the same method, payload and generator typing as other Peers. Preserve the same dynamic factory signature used by the canonical Runtime Peer constructor."
+              "content": "Creates a browser Runtime Peer. Connect resolves after the real handshake/directory exchange; listen returns an accept facade, and each incoming SharedWorker port has its own handshake. Supply exactly one supported source and pair both sides with `createBrowserPeer`."
             },
             {
               "id": "getting-started",
@@ -736,12 +732,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserPeer."
+              "content": "options: See `IRuntimeBrowserPeerOptions`. Besides `connect` / `listen` / `signal` it accepts the Core Peer options: `provide` (methods this side offers), `defaultTimeoutMs`, `report`, `probe`, `providerLimits`, `authentication`, `contract`, `self`.\nAn `IRuntimePeer` from `@migaia/rpc-core`: `request` / `notify` / `stream` / `group` / `outcome` call the other side, `on(\"ready\")` observes reconnection, `describe()` reads the directory, `close()` (or `await using`) ends the logical connection without closing the carrier. Typed by `TRemote` when given.\nendpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createBrowserPeer."
+              "content": "A shop page calls functions inside a payment iframe from another origin.\nOne SharedWorker serves the same cache or socket to every open tab.\nTwo browsers call each other over a WebRTC DataChannel.\nDedicated Workers created by the library: use `@migaia/rpc-threads`.\nService Worker and BroadcastChannel use paired Endpoint transports. WebTransport uses raw byte transport with an external application protocol; this package ships no ready-made compatible Endpoint/framer recipe."
             }
           ],
           "declaredConfiguration": [
@@ -955,14 +951,14 @@
           "signature": "export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode];",
           "declarationLine": 28,
           "source": "packages/rpc-browser/dist/error-code.d.ts",
-          "purpose": "IRpcBrowserErrorCode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBrowserErrorCode.",
-          "advanced": "No additional advanced behavior is declared for IRpcBrowserErrorCode.",
+          "purpose": "Union of `RpcBrowserErrorCode` values.",
+          "core": "Union of `RpcBrowserErrorCode` values.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRpcBrowserErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcBrowserErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -973,13 +969,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRpcBrowserErrorCode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRpcBrowserErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IRpcBrowserErrorCode is part of this module's public type contract."
+              "content": "Union of `RpcBrowserErrorCode` values."
             },
             {
               "id": "getting-started",
@@ -999,12 +995,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBrowserErrorCode."
+              "content": "Union of `RpcBrowserErrorCode` values."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRpcBrowserErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1020,14 +1016,14 @@
           "signature": "export type IRuntimeBrowserConnect = IRuntimeBrowserWindowConnect | IRuntimeBrowserSharedWorkerConnect | IRuntimeBrowserRtcConnect;",
           "declarationLine": 33,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "Only one-to-one ordered reliable carriers can supply a Browser Runtime Peer connection.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnect.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserConnect.",
+          "purpose": "Union of the three connect sources: window, SharedWorker, RTC channel.",
+          "core": "Union of the three connect sources: window, SharedWorker, RTC channel.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserConnect."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserConnect.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [
@@ -1042,13 +1038,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserConnect when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserConnect does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Only one-to-one ordered reliable carriers can supply a Browser Runtime Peer connection."
+              "content": "Union of the three connect sources: window, SharedWorker, RTC channel."
             },
             {
               "id": "getting-started",
@@ -1068,12 +1064,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnect."
+              "content": "Union of the three connect sources: window, SharedWorker, RTC channel."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserConnect."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1089,14 +1085,14 @@
           "signature": "export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;",
           "declarationLine": 35,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "SharedWorker connection events supply actual native ports, never a preaccepted Peer or identity.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnectEvent.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserConnectEvent.",
+          "purpose": "`connect` event of a SharedWorker scope.",
+          "core": "ports: Actual native ports from this connect event; the listener accepts each port independently.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserConnectEvent."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserConnectEvent.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1117,13 +1113,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserConnectEvent when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserConnectEvent does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "SharedWorker connection events supply actual native ports, never a preaccepted Peer or identity."
+              "content": "`connect` event of a SharedWorker scope."
             },
             {
               "id": "getting-started",
@@ -1143,12 +1139,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnectEvent."
+              "content": "ports: Actual native ports from this connect event; the listener accepts each port independently."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserConnectEvent."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1164,14 +1160,14 @@
           "signature": "export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
           "declarationLine": 39,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "A worker-side connect scope owns accept notification while each accepted port remains borrowed.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserListen.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserListen.",
+          "purpose": "SharedWorker scope accepted by `listen`.",
+          "core": "addEventListener: Registers a `connect` listener on the SharedWorker scope; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: connect.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: connect.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserListen."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserListen.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块运行于真实 SharedWorker；文档编译器以公开 connect scope 形状声明宿主 self。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** 逐项生产计数，供每个页面的 stream 消费。 */\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\n/** 借用 SharedWorkerGlobalScope 的 connect 事件，不接管其原生生命周期。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong', note: (value: string) => console.log(value), count },\n  report: (error) => console.error(error)\n})\nserver.on('ready', (event) => console.log(event.instanceId))",
             "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块由真实 SharedWorker 宿主加载；声明其 connect 事件形状供 DOM 文档编译器检查。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** Worker 的连接监听器；调用 close() 时停止接纳并关闭已接纳的逻辑 Peer。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong' },\n  report: (error) => console.error(error)\n})"
@@ -1226,13 +1222,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserListen when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserListen does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "A worker-side connect scope owns accept notification while each accepted port remains borrowed."
+              "content": "SharedWorker scope accepted by `listen`."
             },
             {
               "id": "getting-started",
@@ -1252,12 +1248,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserListen."
+              "content": "addEventListener: Registers a `connect` listener on the SharedWorker scope; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: connect.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: connect.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserListen."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1273,14 +1269,14 @@
           "signature": "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
           "declarationLine": 44,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "Browser physical sources share the original Runtime Peer provider, timeout and error contracts.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserPeerOptions.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserPeerOptions.",
+          "purpose": "Options of `createBrowserPeer()`: the browser source plus the Core Peer options.",
+          "core": "endpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserPeerOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserPeerOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1435,13 +1431,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserPeerOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserPeerOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Browser physical sources share the original Runtime Peer provider, timeout and error contracts."
+              "content": "Options of `createBrowserPeer()`: the browser source plus the Core Peer options."
             },
             {
               "id": "getting-started",
@@ -1461,12 +1457,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserPeerOptions."
+              "content": "endpointFactory: Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.\nendpointFactory.channel: IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.\nendpointFactory.signal: Native construction cancellation signal supplied by the peer owner.\nPromise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.\nOmitted: the canonical runtime endpoint is assembled from the acquired channel and common options.\nself: Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.\nOmitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.\nprovide: Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.\nOmitted: this side publishes no application methods.\nproviderLimits: Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.\nOmitted: the original endpoint or listener admission owner supplies its standard provider limits.\nauthentication: Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.\nOmitted: no authentication middleware is added by these options.\nprobe: One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.\nOmitted: no observer is added by this field.\ndefaultTimeoutMs: Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.\n30000 ms for request and stream in the original timeout scope.\ncontract: Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.\nOmitted: provided method definitions supply the normal inferred runtime directory.\nreport: Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.\nreport.error: Original background or secondary failure supplied by the runtime owner.\nNo result is used; reporter errors are contained by the reporting boundary.\nOmitted: defaultRpcReporter reports to console.error.\nkeyFactory: Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRuntimePeer assembly does not read this inherited field itself.\nOmitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.\nretryPort: Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRuntimePeer assembly does not read it itself.\nOmitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.\nconnect: Carrier to connect over: `{ window, origin }`, `{ sharedWorker }` or `{ rtcDataChannel }`.\nNot set: then `listen` is required.\nlisten: SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.\nNot set: then `connect` is required.\nsignal: Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.\nAbsent: no caller cancellation signal; existing Core deadlines still apply."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserPeerOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1482,14 +1478,14 @@
           "signature": "export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
           "declarationLine": 29,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "The caller establishes and owns the already-open RTC channel.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcConnect.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserRtcConnect.",
+          "purpose": "`connect` source for an open WebRTC DataChannel.",
+          "core": "rtcDataChannel: The channel; it must be ordered and reliable (no `maxRetransmits` / `maxPacketLifeTime`), otherwise `RTC_CHANNEL_UNRELIABLE`.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserRtcConnect."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserRtcConnect.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1510,13 +1506,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserRtcConnect when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserRtcConnect does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The caller establishes and owns the already-open RTC channel."
+              "content": "`connect` source for an open WebRTC DataChannel."
             },
             {
               "id": "getting-started",
@@ -1536,12 +1532,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcConnect."
+              "content": "rtcDataChannel: The channel; it must be ordered and reliable (no `maxRetransmits` / `maxPacketLifeTime`), otherwise `RTC_CHANNEL_UNRELIABLE`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserRtcConnect."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1557,14 +1553,14 @@
           "signature": "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;",
           "declarationLine": 23,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "Native RTC settings must expose the ordered reliable configuration required by a Runtime Peer.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcDataChannel.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserRtcDataChannel.",
+          "purpose": "The RTC channel settings a Peer checks before connecting.",
+          "core": "send: Sends one message as a JSON string.\nsend.data: The encoded message.\nNothing; the message is queued.\nreadyState: Must be `open` or `closed` when the transport is created.\naddEventListener: Registers a `message / closing / close / error` listener on the channel; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / closing / close / error.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / closing / close / error.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.\nordered: Must be `true`: messages arrive in order.\nmaxRetransmits: Must be `null` (unlimited retransmits).\nmaxPacketLifeTime: Must be `null` (no lifetime limit).",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserRtcDataChannel."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserRtcDataChannel.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1667,13 +1663,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserRtcDataChannel when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserRtcDataChannel does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Native RTC settings must expose the ordered reliable configuration required by a Runtime Peer."
+              "content": "The RTC channel settings a Peer checks before connecting."
             },
             {
               "id": "getting-started",
@@ -1693,12 +1689,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcDataChannel."
+              "content": "send: Sends one message as a JSON string.\nsend.data: The encoded message.\nNothing; the message is queued.\nreadyState: Must be `open` or `closed` when the transport is created.\naddEventListener: Registers a `message / closing / close / error` listener on the channel; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / closing / close / error.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / closing / close / error.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.\nordered: Must be `true`: messages arrive in order.\nmaxRetransmits: Must be `null` (unlimited retransmits).\nmaxPacketLifeTime: Must be `null` (no lifetime limit)."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserRtcDataChannel."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1714,14 +1710,14 @@
           "signature": "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
           "declarationLine": 17,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "The caller owns the SharedWorker and its concrete page-side messaging port.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserSharedWorkerConnect.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserSharedWorkerConnect.",
+          "purpose": "`connect` source for a SharedWorker created by the page.",
+          "core": "sharedWorker: The `SharedWorker` (any object with `port`); the page keeps owning it.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserSharedWorkerConnect."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserSharedWorkerConnect.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1742,13 +1738,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserSharedWorkerConnect when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserSharedWorkerConnect does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The caller owns the SharedWorker and its concrete page-side messaging port."
+              "content": "`connect` source for a SharedWorker created by the page."
             },
             {
               "id": "getting-started",
@@ -1768,12 +1764,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserSharedWorkerConnect."
+              "content": "sharedWorker: The `SharedWorker` (any object with `port`); the page keeps owning it."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserSharedWorkerConnect."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1789,14 +1785,14 @@
           "signature": "export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;",
           "declarationLine": 10,
           "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
-          "purpose": "Borrowed Window delivery requires an explicit origin and retains the transport's sole wildcard escape.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserWindowConnect.",
-          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserWindowConnect.",
+          "purpose": "`connect` source for an iframe or popup window.",
+          "core": "window: The other window, such as `iframe.contentWindow` or `window.parent`.\norigin: Exact origin of the other window, required (no same-origin default); missing throws `WINDOW_ORIGIN_REQUIRED`.\nreceiver: Object that receives `message` events.\nThe current global `window`.\nallowUnsafeTargetOrigin: Allows `origin: \"*\"`; the source window is still checked on receive.\n`false`: `*` is rejected.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRuntimeBrowserWindowConnect."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserWindowConnect.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1844,13 +1840,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRuntimeBrowserWindowConnect when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRuntimeBrowserWindowConnect does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrowed Window delivery requires an explicit origin and retains the transport's sole wildcard escape."
+              "content": "`connect` source for an iframe or popup window."
             },
             {
               "id": "getting-started",
@@ -1870,12 +1866,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserWindowConnect."
+              "content": "window: The other window, such as `iframe.contentWindow` or `window.parent`.\norigin: Exact origin of the other window, required (no same-origin default); missing throws `WINDOW_ORIGIN_REQUIRED`.\nreceiver: Object that receives `message` events.\nThe current global `window`.\nallowUnsafeTargetOrigin: Allows `origin: \"*\"`; the source window is still checked on receive.\n`false`: `*` is rejected."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRuntimeBrowserWindowConnect."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1891,14 +1887,14 @@
           "signature": "export declare const RPC_BROWSER_ERROR_SOURCE = \"@migaia/rpc/browser\";",
           "declarationLine": 5,
           "source": "packages/rpc-browser/dist/error-code.d.ts",
-          "purpose": "Browser Peer admission and RTC decoding are owned by this module; wire errors retain Core identity.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_BROWSER_ERROR_SOURCE.",
-          "advanced": "No additional advanced behavior is declared for RPC_BROWSER_ERROR_SOURCE.",
+          "purpose": "The `source` value (`@migaia/rpc/browser`) of Peer configuration and decoding errors of this package; compare it before branching on `code`.",
+          "core": "The `source` value (`@migaia/rpc/browser`) of Peer configuration and decoding errors of this package; compare it before branching on `code`.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for RPC_BROWSER_ERROR_SOURCE."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_BROWSER_ERROR_SOURCE.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1909,13 +1905,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use RPC_BROWSER_ERROR_SOURCE when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when RPC_BROWSER_ERROR_SOURCE does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Browser Peer admission and RTC decoding are owned by this module; wire errors retain Core identity."
+              "content": "The `source` value (`@migaia/rpc/browser`) of Peer configuration and decoding errors of this package; compare it before branching on `code`."
             },
             {
               "id": "getting-started",
@@ -1935,12 +1931,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_BROWSER_ERROR_SOURCE."
+              "content": "The `source` value (`@migaia/rpc/browser`) of Peer configuration and decoding errors of this package; compare it before branching on `code`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for RPC_BROWSER_ERROR_SOURCE."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1982,7 +1978,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。"
+                  "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。已有完整外部语义身份的 I/O Error 保持原身份；未分类的可变原生 Error/DOMException 原位附 Core `TRANSPORT`，不可附加身份的值保留在 cause。RTC 错误事件的原 error 保留在 cause。WebTransport send 返回处理写入拒绝后的 Promise，不保证与 native writer.write 的 Promise 引用相同。不要把远端传回的 source/code 当成本地控制权限。"
                 },
                 {
                   "type": "paragraph",
@@ -2023,14 +2019,14 @@
           "signature": "export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: \"WINDOW_ORIGIN_REQUIRED\"; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: \"RTC_CHANNEL_UNRELIABLE\"; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: \"LISTENER_ALREADY_BOUND\"; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: \"INVALID_PEER_SOURCE\"; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: \"MESSAGE_DECODE_FAILED\"; };",
           "declarationLine": 10,
           "source": "packages/rpc-browser/dist/error-code.d.ts",
-          "purpose": "Browser Peer configuration failures have stable semantic identities independent from Core control.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcBrowserErrorCode.",
-          "advanced": "No additional advanced behavior is declared for RpcBrowserErrorCode.",
+          "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
+          "core": "windowOriginRequired: `WINDOW_ORIGIN_REQUIRED`: a window Peer needs a non-empty `origin`.\nrtcChannelUnreliable: `RTC_CHANNEL_UNRELIABLE`: the RTC channel is unordered or has retransmit limits.\nlistenerAlreadyBound: `LISTENER_ALREADY_BOUND`: the SharedWorker scope already has a listener; close it first.\ninvalidPeerSource: `INVALID_PEER_SOURCE`: give exactly one supported `connect` or `listen`.\nmessageDecodeFailed: `MESSAGE_DECODE_FAILED`: an RTC message is not valid JSON; see `cause`.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for RpcBrowserErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcBrowserErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -2087,13 +2083,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use RpcBrowserErrorCode when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when RpcBrowserErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Browser Peer configuration failures have stable semantic identities independent from Core control."
+              "content": "Table of the stable error codes of this package; values are the strings on `error.code`."
             },
             {
               "id": "getting-started",
@@ -2113,12 +2109,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcBrowserErrorCode."
+              "content": "windowOriginRequired: `WINDOW_ORIGIN_REQUIRED`: a window Peer needs a non-empty `origin`.\nrtcChannelUnreliable: `RTC_CHANNEL_UNRELIABLE`: the RTC channel is unordered or has retransmit limits.\nlistenerAlreadyBound: `LISTENER_ALREADY_BOUND`: the SharedWorker scope already has a listener; close it first.\ninvalidPeerSource: `INVALID_PEER_SOURCE`: give exactly one supported `connect` or `listen`.\nmessageDecodeFailed: `MESSAGE_DECODE_FAILED`: an RTC message is not valid JSON; see `cause`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for RpcBrowserErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2160,7 +2156,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。"
+                  "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。已有完整外部语义身份的 I/O Error 保持原身份；未分类的可变原生 Error/DOMException 原位附 Core `TRANSPORT`，不可附加身份的值保留在 cause。RTC 错误事件的原 error 保留在 cause。WebTransport send 返回处理写入拒绝后的 Promise，不保证与 native writer.write 的 Promise 引用相同。不要把远端传回的 source/code 当成本地控制权限。"
                 },
                 {
                   "type": "paragraph",
@@ -2220,9 +2216,9 @@
           "signature": "export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/broadcast-channel.d.ts",
-          "purpose": "Adapts BroadcastChannel for tab-to-tab and storage-backed coordination.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBroadcastChannelTransport.",
-          "advanced": "No additional advanced behavior is declared for createBroadcastChannelTransport.",
+          "purpose": "Creates a transport over a `BroadcastChannel`; every same-origin context on the channel receives the messages.",
+          "core": "channel: An open `BroadcastChannel` owned by the caller.\nAn `IRpcTransport`; the caller still closes the channel.\nAfter installation the Endpoint broadcasts to every same-origin context on the channel.",
+          "advanced": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nEvery tab sees every message; do not send private data. A native send failure keeps its type, stack and object identity when mutable; Core attaches `TRANSPORT` unless a full external semantic identity already exists. Unattachable values remain on `cause`.\nKeep a shopping cart in sync across tabs.",
           "parameters": ["channel: BroadcastChannel"],
           "parameterDetails": [
             {
@@ -2232,8 +2228,8 @@
             }
           ],
           "returns": "IRpcTransport",
-          "errors": ["No documented errors are declared for createBroadcastChannelTransport."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBroadcastChannelTransport.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 尚未交给 Endpoint 的借用频道，由创建者关闭。 */\nconst channel = new BroadcastChannel('cart')\n/** adapter 注册监听器时仍沿用既有来源边界。 */\nconst transport = createBroadcastChannelTransport(channel)\nchannel.close()",
             "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 两个同源上下文使用同一频道名；创建者负责关闭频道。 */\nconst channelA = new BroadcastChannel('cart')\n/** 第二个逻辑标签页的独立频道实例。 */\nconst channelB = new BroadcastChannel('cart')\n/** 只借用第一个频道。 */\nconst tabATransport = createBroadcastChannelTransport(channelA)\n/** 只借用第二个频道。 */\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n/** 提供方法的 Endpoint，由示例负责 dispose。 */\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n/** 调用端固定目标 id，transport 仍为同源广播。 */\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  channelA.close()\n  channelB.close()\n}"
@@ -2254,13 +2250,13 @@
             ]
           ],
           "overloadReturns": ["IRpcTransport"],
-          "whenToUse": "Use createBroadcastChannelTransport when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createBroadcastChannelTransport does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Adapts BroadcastChannel for tab-to-tab and storage-backed coordination."
+              "content": "Creates a transport over a `BroadcastChannel`; every same-origin context on the channel receives the messages."
             },
             {
               "id": "getting-started",
@@ -2280,12 +2276,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBroadcastChannelTransport."
+              "content": "channel: An open `BroadcastChannel` owned by the caller.\nAn `IRpcTransport`; the caller still closes the channel.\nAfter installation the Endpoint broadcasts to every same-origin context on the channel."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createBroadcastChannelTransport."
+              "content": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nEvery tab sees every message; do not send private data. A native send failure keeps its type, stack and object identity when mutable; Core attaches `TRANSPORT` unless a full external semantic identity already exists. Unattachable values remain on `cause`.\nKeep a shopping cart in sync across tabs."
             }
           ],
           "declaredConfiguration": [],
@@ -2320,9 +2316,9 @@
           "signature": "export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;",
           "declarationLine": 10,
           "source": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts",
-          "purpose": "Uses the reliable ordered data channel as a string-message transport.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRtcDataChannelTransport.",
-          "advanced": "No additional advanced behavior is declared for createRtcDataChannelTransport.",
+          "purpose": "Creates a raw RTC carrier in open or already-terminal closed state; non-string sends are JSON-stringified, while received data is not parsed. MESSAGE_DECODE_FAILED belongs to the Browser Peer projection, not this raw transport.",
+          "core": "channel: An `RTCDataChannel` created by the caller, usually from `peerConnection.createDataChannel()`.\nAn `IRpcTransport`; other channel states throw `INVALID_CONFIG`.\nThe application exchanges raw JSON strings through the same real RTC carrier; decoding remains explicit in the paired application protocol.",
+          "advanced": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nClosing the channel terminates the transport and releases observers. An RTC error event retains its original `error` as `cause` under Core `TRANSPORT`.\nPeer-to-peer calls between two browsers without a server relay.",
           "parameters": ["channel: IRTCDataChannel"],
           "parameterDetails": [
             {
@@ -2332,8 +2328,8 @@
             }
           ],
           "returns": "IRpcTransport",
-          "errors": ["No documented errors are declared for createRtcDataChannelTransport."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRtcDataChannelTransport.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2351,13 +2347,13 @@
             ]
           ],
           "overloadReturns": ["IRpcTransport"],
-          "whenToUse": "Use createRtcDataChannelTransport when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createRtcDataChannelTransport does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Uses the reliable ordered data channel as a string-message transport."
+              "content": "Creates a raw RTC carrier in open or already-terminal closed state; non-string sends are JSON-stringified, while received data is not parsed. MESSAGE_DECODE_FAILED belongs to the Browser Peer projection, not this raw transport."
             },
             {
               "id": "getting-started",
@@ -2377,12 +2373,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRtcDataChannelTransport."
+              "content": "channel: An `RTCDataChannel` created by the caller, usually from `peerConnection.createDataChannel()`.\nAn `IRpcTransport`; other channel states throw `INVALID_CONFIG`.\nThe application exchanges raw JSON strings through the same real RTC carrier; decoding remains explicit in the paired application protocol."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createRtcDataChannelTransport."
+              "content": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nClosing the channel terminates the transport and releases observers. An RTC error event retains its original `error` as `cause` under Core `TRANSPORT`.\nPeer-to-peer calls between two browsers without a server relay."
             }
           ],
           "declaredConfiguration": [],
@@ -2398,14 +2394,14 @@
           "signature": "export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts",
-          "purpose": "Minimal RTCDataChannel surface accepted by the adapter.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRTCDataChannel.",
-          "advanced": "No additional advanced behavior is declared for IRTCDataChannel.",
+          "purpose": "The parts of `RTCDataChannel` the transport uses.",
+          "core": "send: Sends one message as a JSON string.\nsend.data: The encoded message.\nNothing; the message is queued.\nreadyState: Must be `open` or `closed` when the transport is created.\naddEventListener: Registers a `message / closing / close / error` listener on the channel; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / closing / close / error.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / closing / close / error.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRTCDataChannel."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRTCDataChannel.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -2480,13 +2476,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IRTCDataChannel when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRTCDataChannel does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Minimal RTCDataChannel surface accepted by the adapter."
+              "content": "The parts of `RTCDataChannel` the transport uses."
             },
             {
               "id": "getting-started",
@@ -2506,12 +2502,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRTCDataChannel."
+              "content": "send: Sends one message as a JSON string.\nsend.data: The encoded message.\nNothing; the message is queued.\nreadyState: Must be `open` or `closed` when the transport is created.\naddEventListener: Registers a `message / closing / close / error` listener on the channel; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / closing / close / error.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / closing / close / error.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRTCDataChannel."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2546,9 +2542,9 @@
           "signature": "export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
           "declarationLine": 21,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
-          "purpose": "Wraps distinct ServiceWorker send and receive owners.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createServiceWorkerTransport.",
-          "advanced": "No additional advanced behavior is declared for createServiceWorkerTransport.",
+          "purpose": "Creates a page/ServiceWorker carrier whose sourceProof accepts its exact target or actual matching Client id. Raw subscribe retains records; pair `connect` with this transport for Endpoint admission.",
+          "core": "An `IRpcTransport` for `createEndpoint()`.\ntarget: ServiceWorker or Client that receives outgoing messages.\nreceiver: Owner of `message` events: `navigator.serviceWorker` in a page, `self` in the worker.\npeerId: Id of the expected remote Client, taken from `client.id` in the worker.\n`target.id` when available.\nAfter installation the Endpoint talks between a page and its Service Worker.",
+          "advanced": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nEndpoint `connect` checks `sourceProof` to ignore other clients; raw subscriptions retain their records.\nAsk the Service Worker to prefetch or clear caches.",
           "parameters": ["options: IServiceWorkerTransportOptions"],
           "parameterDetails": [
             {
@@ -2558,8 +2554,8 @@
             }
           ],
           "returns": "IRpcTransport<unknown, Transferable>",
-          "errors": ["No documented errors are declared for createServiceWorkerTransport."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createServiceWorkerTransport.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 等待浏览器确认当前注册可用，不由 RPC 创建注册。 */\nconst registration = await navigator.serviceWorker.ready\n/** 发送与接收主体分开；adapter 借用两者。 */\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})",
             "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
@@ -2580,13 +2576,13 @@
             ]
           ],
           "overloadReturns": ["IRpcTransport<unknown, Transferable>"],
-          "whenToUse": "Use createServiceWorkerTransport when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createServiceWorkerTransport does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Wraps distinct ServiceWorker send and receive owners."
+              "content": "Creates a page/ServiceWorker carrier whose sourceProof accepts its exact target or actual matching Client id. Raw subscribe retains records; pair `connect` with this transport for Endpoint admission."
             },
             {
               "id": "getting-started",
@@ -2606,12 +2602,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createServiceWorkerTransport."
+              "content": "An `IRpcTransport` for `createEndpoint()`.\ntarget: ServiceWorker or Client that receives outgoing messages.\nreceiver: Owner of `message` events: `navigator.serviceWorker` in a page, `self` in the worker.\npeerId: Id of the expected remote Client, taken from `client.id` in the worker.\n`target.id` when available.\nAfter installation the Endpoint talks between a page and its Service Worker."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createServiceWorkerTransport."
+              "content": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nEndpoint `connect` checks `sourceProof` to ignore other clients; raw subscriptions retain their records.\nAsk the Service Worker to prefetch or clear caches."
             }
           ],
           "declaredConfiguration": [
@@ -2671,14 +2667,14 @@
           "signature": "export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
           "declarationLine": 8,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
-          "purpose": "Inbound page or ServiceWorkerGlobalScope event target.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageReceiver.",
-          "advanced": "No additional advanced behavior is declared for IServiceWorkerMessageReceiver.",
+          "purpose": "Owner of Service Worker `message` events.",
+          "core": "addEventListener: Registers a `message` listener on the Service Worker container; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IServiceWorkerMessageReceiver."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerMessageReceiver.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
           ],
@@ -2731,13 +2727,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IServiceWorkerMessageReceiver when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IServiceWorkerMessageReceiver does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Inbound page or ServiceWorkerGlobalScope event target."
+              "content": "Owner of Service Worker `message` events."
             },
             {
               "id": "getting-started",
@@ -2757,12 +2753,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageReceiver."
+              "content": "addEventListener: Registers a `message` listener on the Service Worker container; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IServiceWorkerMessageReceiver."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2778,14 +2774,14 @@
           "signature": "export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
-          "purpose": "Outbound ServiceWorker or Client target.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageTarget.",
-          "advanced": "No additional advanced behavior is declared for IServiceWorkerMessageTarget.",
+          "purpose": "ServiceWorker or Client messages are posted to.",
+          "core": "postMessage: Posts one message to the ServiceWorker or Client.\npostMessage.message: The encoded RPC message.\npostMessage.transfer: Transferable objects.\nNothing; the message is posted.\nid: Client id, generated by the browser; used to accept replies.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IServiceWorkerMessageTarget."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerMessageTarget.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
           ],
@@ -2827,13 +2823,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IServiceWorkerMessageTarget when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IServiceWorkerMessageTarget does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Outbound ServiceWorker or Client target."
+              "content": "ServiceWorker or Client messages are posted to."
             },
             {
               "id": "getting-started",
@@ -2853,12 +2849,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageTarget."
+              "content": "postMessage: Posts one message to the ServiceWorker or Client.\npostMessage.message: The encoded RPC message.\npostMessage.transfer: Transferable objects.\nNothing; the message is posted.\nid: Client id, generated by the browser; used to accept replies."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IServiceWorkerMessageTarget."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2874,14 +2870,14 @@
           "signature": "export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */ readonly target: IServiceWorkerMessageTarget; /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */ readonly receiver: IServiceWorkerMessageReceiver; /** Expected remote Client identity; defaults to target.id when that identity is available. */ readonly peerId?: string; };",
           "declarationLine": 12,
           "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
-          "purpose": "IServiceWorkerTransportOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerTransportOptions.",
-          "advanced": "No additional advanced behavior is declared for IServiceWorkerTransportOptions.",
+          "purpose": "Options of `createServiceWorkerTransport()`.",
+          "core": "target: ServiceWorker or Client that receives outgoing messages.\nreceiver: Owner of `message` events: `navigator.serviceWorker` in a page, `self` in the worker.\npeerId: Id of the expected remote Client, taken from `client.id` in the worker.\n`target.id` when available.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IServiceWorkerTransportOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerTransportOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -2919,13 +2915,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IServiceWorkerTransportOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IServiceWorkerTransportOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IServiceWorkerTransportOptions is part of this module's public type contract."
+              "content": "Options of `createServiceWorkerTransport()`."
             },
             {
               "id": "getting-started",
@@ -2945,12 +2941,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerTransportOptions."
+              "content": "target: ServiceWorker or Client that receives outgoing messages.\nreceiver: Owner of `message` events: `navigator.serviceWorker` in a page, `self` in the worker.\npeerId: Id of the expected remote Client, taken from `client.id` in the worker.\n`target.id` when available."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IServiceWorkerTransportOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2985,9 +2981,9 @@
           "signature": "export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
           "declarationLine": 10,
           "source": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts",
-          "purpose": "Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSharedWorkerTransport.",
-          "advanced": "No additional advanced behavior is declared for createSharedWorkerTransport.",
+          "purpose": "Creates a transport over one SharedWorker `MessagePort` and starts the port when listening begins.",
+          "core": "port: Page side: `sharedWorker.port`; worker side: a port from the `connect` event.\nAn `IRpcTransport`; the port is borrowed and must be closed by its owner.\nAfter installation the Endpoint talks over one SharedWorker port.",
+          "advanced": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nThe port is started when listening begins and is never closed by the transport.\nA custom Endpoint per tab connected to one SharedWorker.",
           "parameters": ["port: ISharedWorkerPort"],
           "parameterDetails": [
             {
@@ -2997,8 +2993,8 @@
             }
           ],
           "returns": "IRpcTransport<unknown, Transferable>",
-          "errors": ["No documented errors are declared for createSharedWorkerTransport."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSharedWorkerTransport.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -3016,13 +3012,13 @@
             ]
           ],
           "overloadReturns": ["IRpcTransport<unknown, Transferable>"],
-          "whenToUse": "Use createSharedWorkerTransport when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createSharedWorkerTransport does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime."
+              "content": "Creates a transport over one SharedWorker `MessagePort` and starts the port when listening begins."
             },
             {
               "id": "getting-started",
@@ -3042,12 +3038,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSharedWorkerTransport."
+              "content": "port: Page side: `sharedWorker.port`; worker side: a port from the `connect` event.\nAn `IRpcTransport`; the port is borrowed and must be closed by its owner.\nAfter installation the Endpoint talks over one SharedWorker port."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createSharedWorkerTransport."
+              "content": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nThe port is started when listening begins and is never closed by the transport.\nA custom Endpoint per tab connected to one SharedWorker."
             }
           ],
           "declaredConfiguration": [],
@@ -3063,14 +3059,14 @@
           "signature": "export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts",
-          "purpose": "Minimal SharedWorker port surface accepted by the adapter.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISharedWorkerPort.",
-          "advanced": "No additional advanced behavior is declared for ISharedWorkerPort.",
+          "purpose": "The `MessagePort` of a SharedWorker connection.",
+          "core": "postMessage: Posts a message to the other side.\npostMessage.message: The encoded RPC message.\npostMessage.transfer: Transferable objects.\nNothing; the message is posted.\nstart: Optional; called when listening begins so queued messages are delivered.\nNothing; the port delivers messages.\naddEventListener: Registers a `message / messageerror` listener on the port; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / messageerror.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / messageerror.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ISharedWorkerPort."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISharedWorkerPort.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -3150,13 +3146,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use ISharedWorkerPort when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ISharedWorkerPort does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Minimal SharedWorker port surface accepted by the adapter."
+              "content": "The `MessagePort` of a SharedWorker connection."
             },
             {
               "id": "getting-started",
@@ -3176,12 +3172,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISharedWorkerPort."
+              "content": "postMessage: Posts a message to the other side.\npostMessage.message: The encoded RPC message.\npostMessage.transfer: Transferable objects.\nNothing; the message is posted.\nstart: Optional; called when listening begins so queued messages are delivered.\nNothing; the port delivers messages.\naddEventListener: Registers a `message / messageerror` listener on the port; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message / messageerror.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message / messageerror.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ISharedWorkerPort."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -3216,9 +3212,9 @@
           "signature": "export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;",
           "declarationLine": 8,
           "source": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts",
-          "purpose": "Wraps WebTransport datagrams; protocol middleware owns encoding and decoding.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebTransportDatagramTransport.",
-          "advanced": "No additional advanced behavior is declared for createWebTransportDatagramTransport.",
+          "purpose": "Creates a byte transport over WebTransport datagrams; it takes the datagram writer and reader and closes the writer when the transport closes.",
+          "core": "datagrams: `session.datagrams` of a `WebTransport` session created by the caller.\nAn `IRpcTransport<Uint8Array>`; the session itself is closed by the caller.\nThe application exchanges actual Uint8Array datagrams with its external server protocol; no Runtime Peer or ready-made compatible Endpoint framing is installed.",
+          "advanced": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nDatagrams may be lost or reordered. Read and write failures use the Core transport boundary: mutable native errors retain type, stack and identity; immutable failures remain on `cause`. The send Promise handles writer rejection and need not equal the native write Promise.\nLow-latency game or telemetry updates where a lost update is acceptable.",
           "parameters": ["datagrams: IWebTransportDatagrams"],
           "parameterDetails": [
             {
@@ -3228,8 +3224,8 @@
             }
           ],
           "returns": "IRpcTransport<Uint8Array>",
-          "errors": ["No documented errors are declared for createWebTransportDatagramTransport."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebTransportDatagramTransport.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\n/** 应用创建并持有服务器会话。 */\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\n/** transport 取得 datagram 写入端，但不接管整个会话。 */\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
           ],
@@ -3249,13 +3245,13 @@
             ]
           ],
           "overloadReturns": ["IRpcTransport<Uint8Array>"],
-          "whenToUse": "Use createWebTransportDatagramTransport when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createWebTransportDatagramTransport does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Wraps WebTransport datagrams; protocol middleware owns encoding and decoding."
+              "content": "Creates a byte transport over WebTransport datagrams; it takes the datagram writer and reader and closes the writer when the transport closes."
             },
             {
               "id": "getting-started",
@@ -3275,12 +3271,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebTransportDatagramTransport."
+              "content": "datagrams: `session.datagrams` of a `WebTransport` session created by the caller.\nAn `IRpcTransport<Uint8Array>`; the session itself is closed by the caller.\nThe application exchanges actual Uint8Array datagrams with its external server protocol; no Runtime Peer or ready-made compatible Endpoint framing is installed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createWebTransportDatagramTransport."
+              "content": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\nDatagrams may be lost or reordered. Read and write failures use the Core transport boundary: mutable native errors retain type, stack and identity; immutable failures remain on `cause`. The send Promise handles writer rejection and need not equal the native write Promise.\nLow-latency game or telemetry updates where a lost update is acceptable."
             }
           ],
           "declaredConfiguration": [],
@@ -3296,14 +3292,14 @@
           "signature": "export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts",
-          "purpose": "Minimal datagram surface accepted by the WebTransport adapter.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebTransportDatagrams.",
-          "advanced": "No additional advanced behavior is declared for IWebTransportDatagrams.",
+          "purpose": "`session.datagrams` of a WebTransport session.",
+          "core": "writable: Datagram writer; the transport locks and later closes it.\nreadable: Datagram reader; the transport reads it until closed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IWebTransportDatagrams."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebTransportDatagrams.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -3332,13 +3328,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IWebTransportDatagrams when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IWebTransportDatagrams does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Minimal datagram surface accepted by the WebTransport adapter."
+              "content": "`session.datagrams` of a WebTransport session."
             },
             {
               "id": "getting-started",
@@ -3358,12 +3354,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebTransportDatagrams."
+              "content": "writable: Datagram writer; the transport locks and later closes it.\nreadable: Datagram reader; the transport reads it until closed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IWebTransportDatagrams."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -3398,9 +3394,9 @@
           "signature": "export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;",
           "declarationLine": 20,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
-          "purpose": "Adapts distinct outbound and inbound Window owners without weakening source proof.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWindowMessageTransport.",
-          "advanced": "No additional advanced behavior is declared for createWindowMessageTransport.",
+          "purpose": "Creates a Window postMessage carrier with exact target/origin sourceProof. Raw subscribe preserves all event records; pair it with `connect` for Endpoint admission or use the Browser Peer projection.",
+          "core": "An `IRpcTransport` for `createEndpoint()`; `*` as origin without `allowUnsafeTargetOrigin` throws `INVALID_CONFIG`.\ntarget: Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.\nreceiver: Object that receives `message` events.\nThe global scope when it has `addEventListener`.\ntargetOrigin: Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.\n`window.location.origin` when available (same origin).\nallowUnsafeTargetOrigin: Allows `targetOrigin: \"*\"`; the source window is still checked.\n`false`.\nAfter installation the Endpoint exchanges messages with one window over `postMessage`, accepting only that window and origin.",
+          "advanced": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\n`endpoint.dispose()` removes the `message` listener; the window is not closed.\nAn Endpoint with custom middlewares between a page and an iframe.",
           "parameters": ["options: IWindowMessageTransportOptions"],
           "parameterDetails": [
             {
@@ -3410,8 +3406,8 @@
             }
           ],
           "returns": "IRpcTransport<unknown, Transferable>",
-          "errors": ["No documented errors are declared for createWindowMessageTransport."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWindowMessageTransport.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })",
             "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) =>\n  iframe.addEventListener('load', () => resolve(), { once: true })\n)\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
@@ -3432,13 +3428,13 @@
             ]
           ],
           "overloadReturns": ["IRpcTransport<unknown, Transferable>"],
-          "whenToUse": "Use createWindowMessageTransport when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createWindowMessageTransport does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Adapts distinct outbound and inbound Window owners without weakening source proof."
+              "content": "Creates a Window postMessage carrier with exact target/origin sourceProof. Raw subscribe preserves all event records; pair it with `connect` for Endpoint admission or use the Browser Peer projection."
             },
             {
               "id": "getting-started",
@@ -3458,12 +3454,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWindowMessageTransport."
+              "content": "An `IRpcTransport` for `createEndpoint()`; `*` as origin without `allowUnsafeTargetOrigin` throws `INVALID_CONFIG`.\ntarget: Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.\nreceiver: Object that receives `message` events.\nThe global scope when it has `addEventListener`.\ntargetOrigin: Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.\n`window.location.origin` when available (same origin).\nallowUnsafeTargetOrigin: Allows `targetOrigin: \"*\"`; the source window is still checked.\n`false`.\nAfter installation the Endpoint exchanges messages with one window over `postMessage`, accepting only that window and origin."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createWindowMessageTransport."
+              "content": "`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.\n`endpoint.dispose()` removes the `message` listener; the window is not closed.\nAn Endpoint with custom middlewares between a page and an iframe."
             }
           ],
           "declaredConfiguration": [
@@ -3537,14 +3533,14 @@
           "signature": "export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
           "declarationLine": 7,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
-          "purpose": "Inbound realm that owns message listener registration.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageReceiver.",
-          "advanced": "No additional advanced behavior is declared for IWindowMessageReceiver.",
+          "purpose": "Object whose `message` events are read.",
+          "core": "addEventListener: Registers a `message` listener on the receiving window; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IWindowMessageReceiver."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageReceiver.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -3595,13 +3591,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IWindowMessageReceiver when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IWindowMessageReceiver does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Inbound realm that owns message listener registration."
+              "content": "Object whose `message` events are read."
             },
             {
               "id": "getting-started",
@@ -3621,12 +3617,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageReceiver."
+              "content": "addEventListener: Registers a `message` listener on the receiving window; listening installs it; raw transports wait for the first subscription or error observer.\naddEventListener.type: Event name: message.\naddEventListener.listener: Listener the transport installs.\nNothing; the listener is registered.\nremoveEventListener: Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.\nremoveEventListener.type: Event name: message.\nremoveEventListener.listener: The same listener installed before.\nNothing; the listener is removed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IWindowMessageReceiver."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -3642,14 +3638,14 @@
           "signature": "export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
           "declarationLine": 3,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
-          "purpose": "Outbound Window-like target that owns postMessage delivery.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTarget.",
-          "advanced": "No additional advanced behavior is declared for IWindowMessageTarget.",
+          "purpose": "Window-like object messages are posted to.",
+          "core": "postMessage: Posts a message with a target origin.\npostMessage.message: The encoded RPC message.\npostMessage.targetOrigin: `targetOrigin` / `origin` from the options.\npostMessage.transfer: Transferable objects of this message.\nNothing; the message is posted.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IWindowMessageTarget."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageTarget.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -3685,13 +3681,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IWindowMessageTarget when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IWindowMessageTarget does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Outbound Window-like target that owns postMessage delivery."
+              "content": "Window-like object messages are posted to."
             },
             {
               "id": "getting-started",
@@ -3711,12 +3707,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTarget."
+              "content": "postMessage: Posts a message with a target origin.\npostMessage.message: The encoded RPC message.\npostMessage.targetOrigin: `targetOrigin` / `origin` from the options.\npostMessage.transfer: Transferable objects of this message.\nNothing; the message is posted."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IWindowMessageTarget."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -3732,14 +3728,14 @@
           "signature": "export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
           "declarationLine": 11,
           "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
-          "purpose": "IWindowMessageTransportOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTransportOptions.",
-          "advanced": "No additional advanced behavior is declared for IWindowMessageTransportOptions.",
+          "purpose": "Options of `createWindowMessageTransport()`.",
+          "core": "target: Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.\nreceiver: Object that receives `message` events.\nThe global scope when it has `addEventListener`.\ntargetOrigin: Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.\n`window.location.origin` when available (same origin).\nallowUnsafeTargetOrigin: Allows `targetOrigin: \"*\"`; the source window is still checked.\n`false`.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IWindowMessageTransportOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageTransportOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -3786,13 +3782,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IWindowMessageTransportOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IWindowMessageTransportOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IWindowMessageTransportOptions is part of this module's public type contract."
+              "content": "Options of `createWindowMessageTransport()`."
             },
             {
               "id": "getting-started",
@@ -3812,12 +3808,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTransportOptions."
+              "content": "target: Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.\nreceiver: Object that receives `message` events.\nThe global scope when it has `addEventListener`.\ntargetOrigin: Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.\n`window.location.origin` when available (same origin).\nallowUnsafeTargetOrigin: Allows `targetOrigin: \"*\"`; the source window is still checked.\n`false`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IWindowMessageTransportOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],

@@ -160,15 +160,7 @@
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
       "version": "0.0.9",
-      "exports": [
-        ".",
-        "./adapters/browser",
-        "./adapters/bun",
-        "./adapters/deno",
-        "./adapters/electron-main",
-        "./adapters/electron-renderer",
-        "./adapters/node"
-      ]
+      "exports": [".", "./adapters/electron-main", "./adapters/node"]
     },
     {
       "slug": "serialize",
@@ -178,7 +170,6 @@
         ".",
         "./codec",
         "./codecs/cbor",
-        "./codecs/identity",
         "./codecs/identity/v1",
         "./codecs/json",
         "./codecs/message-pack",
@@ -239,7 +230,7 @@
       "slug": "store-keyed",
       "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
       "version": "0.0.2",
-      "exports": [".", "./atom/definition", "./atom/store", "./reactive/atom"]
+      "exports": [".", "./atom/definition", "./atom/store", "./optics", "./reactive/atom"]
     },
     {
       "slug": "store-light",
@@ -287,7 +278,7 @@
       "slug": "store-worker",
       "description": "Worker adapters and worker-backed Resource/serialization integrations.",
       "version": "0.0.2",
-      "exports": [".", "./serialize/*"]
+      "exports": [".", "./serialize/worker"]
     },
     {
       "slug": "supervision",
@@ -317,6 +308,7 @@
         "./promise",
         "./scheduler",
         "./string",
+        "./testing",
         "./typing",
         "./value"
       ]

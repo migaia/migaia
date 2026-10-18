@@ -146,7 +146,7 @@
                 "type": "list",
                 "items": [
                   "`run()` 的 `control.signal` 优先于构造时的 `signal`。",
-                  "已取消的 signal 会保留原始 reason 与原生 AbortError 语义。",
+                  "Error reason 尽量保留原生类型/对象；未分类 Error 附 ABORTED，已有外部 source/code 不改写；primitive/undefined reason 用普通 Error/ABORTED 的 cause 保留，未必是原生 AbortError。",
                   "四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及 `done` 前检查 signal；generator 类还会在每次迭代后检查。",
                   "已开始的 stage 不会被强制打断；它可以从 `context.signal` 读取本次运行实际采用的 signal 并协作退出。",
                   "用户代码已经抛出普通失败时，该失败保持为主错误，之后观察到的取消不会替换它；async stage 与下游分别失败时仍按组合器或 `EXECUTION_FAILED` 处理。",
@@ -168,6 +168,18 @@
               {
                 "type": "paragraph",
                 "text": "完整契约和更多示例见 USEGUIDE.md。"
+              },
+              {
+                "type": "paragraph",
+                "text": "自定义 generator 控制集也用于 sync lift 的 halt/continue，控制 symbol 不作为 payload 送到 done。公开 IGeneratorMiddlewareStage/IAsyncGeneratorMiddlewareStage 与 IMiddlewarePipeline/IMiddlewarePipelineStage 的 TSignals 参数将控制域与 TValue 分开；提供自定义 signals 的工厂重载接受该控制集，number payload 仍为 number。默认控制集保留精确 unique symbol 类型，GENERATOR_UNDEFINED 仍要求 TValue 包含 undefined。"
+              },
+              {
+                "type": "paragraph",
+                "text": "async 洋葱返回时每个外层 stage 都复核取消/host active，包括 done 已执行的情况；这不会撤销已发生的 done。await next 传播的同一个对象失败只保留一次（相等的 primitive 值仍可能代表独立失败，保持组合），不制造两个相同 entries 的 AggregateError。独立 stage/downstream 失败才组合；combiner 自身抛错时，其原错误尽量作为 primary，两已发生错误在 errors/cause 链可达。成功返回的自定义组合结果仍需由调用方履行 cause 可达合同。"
+              },
+              {
+                "type": "paragraph",
+                "text": "IMiddlewarePipelineSyncMode 仅是 Done/RunResult 的包内条件类型中间项，已从根入口撤回。消费者使用公开 IMiddlewarePipelineDone/IMiddlewarePipelineRunResult，无兼容 alias。"
               }
             ]
           }
@@ -211,7 +223,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "选项会被读取并冻结。无效模式、无效回调、无效 sentinel 集或不支持的提升方向都会产生原生 `TypeError`；错误附带："
+                "text": "选项字段只读取一次并冻结，mode 以同一个已验证值发布；字段 getter 失败抛 TypeError/INVALID_OPTION，cause 保留原错。无效模式、无效回调、无效 sentinel 集或不支持的提升方向都会产生原生 `TypeError`；错误附带："
               },
               {
                 "type": "code",
@@ -373,7 +385,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`assertActive` 抛出的错误原样传播。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。"
+                "text": "`assertActive`、stage、done 的 Error 在可附码时保留原对象/原生类型/stack；没有 semantic source/code 时附 EXECUTION_FAILED，已有外部身份不改写。不可修改错误或非 Error 值保留在包错误的 cause；abort reason 使用 ABORTED。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。"
               }
             ]
           },
@@ -412,7 +424,7 @@
                 "items": [
                   "`createPipeline` 与 `ICreatePipelineOptions`。",
                   "`IMiddlewarePipeline`、`IMiddlewarePipelineStage`、`IMiddlewarePipelineDone`、`IMiddlewarePipelineRunResult`、`IMiddlewarePipelineLiftSource`。",
-                  "四种 stage 类型，以及 context、control、abort-signal 类型。",
+                  "四种 stage 类型，以及 context、control 类型；IAbortSignal 从 canonical @migaia/utils/promise 导入，本包不再声称导出它。",
                   "`MiddlewarePipelineMode`、`MiddlewarePipelineViolation`、`MiddlewarePipelineGeneratorSignals` 和三个 generator sentinel。",
                   "`MiddlewarePipelineErrorCode`、`IMiddlewarePipelineErrorCode`、`MIDDLEWARE_PIPELINE_SOURCE`。"
                 ]
@@ -420,6 +432,18 @@
               {
                 "type": "paragraph",
                 "text": "具体执行器与适配器仅供包内调度，根入口不导出。消费者应通过 `createPipeline()` 切换模式和提升 stage。"
+              },
+              {
+                "type": "paragraph",
+                "text": "自定义 generator 控制集也用于 sync lift 的 halt/continue，控制 symbol 不作为 payload 送到 done。公开 IGeneratorMiddlewareStage/IAsyncGeneratorMiddlewareStage 与 IMiddlewarePipeline/IMiddlewarePipelineStage 的 TSignals 参数将控制域与 TValue 分开；提供自定义 signals 的工厂重载接受该控制集，number payload 仍为 number。默认控制集保留精确 unique symbol 类型，GENERATOR_UNDEFINED 仍要求 TValue 包含 undefined。"
+              },
+              {
+                "type": "paragraph",
+                "text": "async 洋葱返回时每个外层 stage 都复核取消/host active，包括 done 已执行的情况；这不会撤销已发生的 done。await next 传播的同一个对象失败只保留一次（相等的 primitive 值仍可能代表独立失败，保持组合），不制造两个相同 entries 的 AggregateError。独立 stage/downstream 失败才组合；combiner 自身抛错时，其原错误尽量作为 primary，两已发生错误在 errors/cause 链可达。成功返回的自定义组合结果仍需由调用方履行 cause 可达合同。"
+              },
+              {
+                "type": "paragraph",
+                "text": "IMiddlewarePipelineSyncMode 仅是 Done/RunResult 的包内条件类型中间项，已从根入口撤回。消费者使用公开 IMiddlewarePipelineDone/IMiddlewarePipelineRunResult，无兼容 alias。"
               }
             ]
           }
@@ -447,15 +471,21 @@
         {
           "name": "createPipeline",
           "kind": "function",
-          "signature": "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue>;",
+          "signature": "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }): IMiddlewarePipeline<TMode, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;",
           "declarationLine": 52,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Creates a stateless sync pipeline with a value type chosen by its caller. Creates a stateless async pipeline with a value type chosen by its caller. Creates a stateless generator pipeline with a value type chosen by its caller. Creates a stateless async-generator pipeline with a value type chosen by its caller. Creates a stateless runner whose mode controls stage, terminal, lift, and result types.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPipeline.",
-          "advanced": "No additional advanced behavior is declared for createPipeline.",
+          "purpose": "Creates a reusable, stateless middleware runner for one execution mode. The runner owns no stage list: each `run()` receives the stages, the input value and a final callback, so one pipeline can serve many hosts and concurrent runs. A sync/async stage continues by calling `next(value)`. Generator stages must return a payload, the configured continue signal (using the last yield), or the explicit undefined signal; yielding alone followed by an implicit undefined return halts without calling done.",
+          "core": "An `IMiddlewarePipeline` for the chosen mode and TSignals control domain, separate from TValue. Options are read once and frozen; invalid values or throwing option getters produce TypeError/INVALID_OPTION with the original getter failure on cause.\nmode: Execution mode of every run. Stages must be written for this mode or converted with `lift()`.\nonViolation: Receives `duplicate` or `late` when a stage misuses `next()`. The misuse never starts a second downstream run.\nNot set: misuse is ignored silently.\nassertActive: Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.\nNot set: no lifecycle check.\nsignal: Default cancellation signal for every run; checked on entry, before and after each stage and before `done`. A run-level `signal` overrides it.\nNot set: runs cannot be cancelled unless `run()` passes a signal.\nsignals: Replacement generator control signals `{ undefined, halt, continue }` for hosts with their own sentinels; three distinct symbols, read once at creation.\n`MiddlewarePipelineGeneratorSignals` (the exported `GENERATOR_*` symbols).\ncombineStageAndDownstreamError: Only in async onion mode, combines independent stage and downstream failures. The same object propagated through await next is thrown once without calling the combiner; equal primitive values can still be independent failures. A successful custom result must retain both errors through cause/errors. If the combiner throws, its failure stays primary with both originals reachable.\nNot set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors.",
+          "advanced": "A logger runs filter, enrich and format stages before writing one entry.\nA request client wraps each request in async onion middleware for auth, retry and timing.\nA plugin host collects stages from installed plugins and runs them through one pipeline.\nEvery handler gets the same value and nobody transforms it: use `@migaia/event-subscriber`.",
           "parameters": [
             "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>",
             "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>",
+            "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }",
+            "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }",
+            "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }",
+            "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }",
+            "options: ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }",
+            "options: ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }",
             "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>",
             "options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>",
             "options: ICreatePipelineOptions<TMode>"
@@ -473,6 +503,36 @@
             },
             {
               "name": "options",
+              "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }",
+              "optional": false
+            },
+            {
+              "name": "options",
               "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>",
               "optional": false
             },
@@ -484,13 +544,12 @@
             {
               "name": "options",
               "type": "ICreatePipelineOptions<TMode>",
-              "optional": false,
-              "configurationType": "ICreatePipelineOptions<IMiddlewarePipelineMode>"
+              "optional": false
             }
           ],
-          "returns": "IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue> | IMiddlewarePipeline<TMode, TValue>",
-          "errors": ["No documented errors are declared for createPipeline."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createPipeline.",
+          "returns": "IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue> | IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue> | IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals> | IMiddlewarePipeline<TMode, TValue>",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ICreatePipelineOptions,\n  type IMiddlewarePipeline\n} from '@migaia/middleware-pipeline'\n\nconst options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async> = {\n  mode: MiddlewarePipelineMode.async,\n  onViolation: (kind) => console.warn(kind)\n}\n\nconst pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string> =\n  createPipeline<string>(options)",
             "const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\n\npipeline.run(\n  [\n    (value, next) => next(value + 1),\n    (value, next) => next(value * 3)\n  ],\n  2,\n  (value) => console.log(value) // 9\n)",
@@ -513,9 +572,15 @@
           "overloadSignatures": [
             "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;",
             "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;",
-            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;",
-            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;",
-            "export declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue>;"
+            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;",
+            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;",
+            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;",
+            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;",
+            "export declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;",
+            "export declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }): IMiddlewarePipeline<TMode, TValue>;",
+            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;",
+            "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;",
+            "export declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;"
           ],
           "overloadParameterDetails": [
             [
@@ -529,6 +594,48 @@
               {
                 "name": "options",
                 "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }",
                 "optional": false
               }
             ],
@@ -550,25 +657,27 @@
               {
                 "name": "options",
                 "type": "ICreatePipelineOptions<TMode>",
-                "optional": false,
-                "configurationType": "ICreatePipelineOptions<IMiddlewarePipelineMode>"
+                "optional": false
               }
             ]
           ],
           "overloadReturns": [
             "IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>",
             "IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>",
+            "IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>",
+            "IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>",
             "IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>",
             "IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>",
+            "IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>",
             "IMiddlewarePipeline<TMode, TValue>"
           ],
-          "whenToUse": "Use createPipeline when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createPipeline does not match the required inputs or return contract.",
+          "whenToUse": "A logger runs filter, enrich and format stages before writing one entry.\nA request client wraps each request in async onion middleware for auth, retry and timing.\nA plugin host collects stages from installed plugins and runs them through one pipeline.",
+          "notUse": "Every handler gets the same value and nobody transforms it: use `@migaia/event-subscriber`.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Creates a stateless sync pipeline with a value type chosen by its caller. Creates a stateless async pipeline with a value type chosen by its caller. Creates a stateless generator pipeline with a value type chosen by its caller. Creates a stateless async-generator pipeline with a value type chosen by its caller. Creates a stateless runner whose mode controls stage, terminal, lift, and result types."
+              "content": "Creates a reusable, stateless middleware runner for one execution mode. The runner owns no stage list: each `run()` receives the stages, the input value and a final callback, so one pipeline can serve many hosts and concurrent runs. A sync/async stage continues by calling `next(value)`. Generator stages must return a payload, the configured continue signal (using the last yield), or the explicit undefined signal; yielding alone followed by an implicit undefined return halts without calling done."
             },
             {
               "id": "getting-started",
@@ -588,12 +697,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPipeline."
+              "content": "An `IMiddlewarePipeline` for the chosen mode and TSignals control domain, separate from TValue. Options are read once and frozen; invalid values or throwing option getters produce TypeError/INVALID_OPTION with the original getter failure on cause.\nmode: Execution mode of every run. Stages must be written for this mode or converted with `lift()`.\nonViolation: Receives `duplicate` or `late` when a stage misuses `next()`. The misuse never starts a second downstream run.\nNot set: misuse is ignored silently.\nassertActive: Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.\nNot set: no lifecycle check.\nsignal: Default cancellation signal for every run; checked on entry, before and after each stage and before `done`. A run-level `signal` overrides it.\nNot set: runs cannot be cancelled unless `run()` passes a signal.\nsignals: Replacement generator control signals `{ undefined, halt, continue }` for hosts with their own sentinels; three distinct symbols, read once at creation.\n`MiddlewarePipelineGeneratorSignals` (the exported `GENERATOR_*` symbols).\ncombineStageAndDownstreamError: Only in async onion mode, combines independent stage and downstream failures. The same object propagated through await next is thrown once without calling the combiner; equal primitive values can still be independent failures. A successful custom result must retain both errors through cause/errors. If the combiner throws, its failure stays primary with both originals reachable.\nNot set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createPipeline."
+              "content": "A logger runs filter, enrich and format stages before writing one entry.\nA request client wraps each request in async onion middleware for auth, retry and timing.\nA plugin host collects stages from installed plugins and runs them through one pipeline.\nEvery handler gets the same value and nobody transforms it: use `@migaia/event-subscriber`."
             }
           ],
           "declaredConfiguration": [
@@ -634,7 +743,7 @@
               "description": "Combines simultaneous asynchronous stage and downstream failures while retaining both originals."
             }
           ],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:createPipeline:export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue>;",
+          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:createPipeline:export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }): IMiddlewarePipeline<TMode, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;",
           "guidance": [
             {
               "id": "4-取消与-host-生命周期",
@@ -659,7 +768,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`assertActive` 抛出的错误原样传播。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。"
+                  "text": "`assertActive`、stage、done 的 Error 在可附码时保留原对象/原生类型/stack；没有 semantic source/code 时附 EXECUTION_FAILED，已有外部身份不改写。不可修改错误或非 Error 值保留在包错误的 cause；abort reason 使用 ABORTED。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。"
                 }
               ]
             },
@@ -676,7 +785,7 @@
                   "type": "list",
                   "items": [
                     "`run()` 的 `control.signal` 优先于构造时的 `signal`。",
-                    "已取消的 signal 会保留原始 reason 与原生 AbortError 语义。",
+                    "Error reason 尽量保留原生类型/对象；未分类 Error 附 ABORTED，已有外部 source/code 不改写；primitive/undefined reason 用普通 Error/ABORTED 的 cause 保留，未必是原生 AbortError。",
                     "四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及 `done` 前检查 signal；generator 类还会在每次迭代后检查。",
                     "已开始的 stage 不会被强制打断；它可以从 `context.signal` 读取本次运行实际采用的 signal 并协作退出。",
                     "用户代码已经抛出普通失败时，该失败保持为主错误，之后观察到的取消不会替换它；async stage 与下游分别失败时仍按组合器或 `EXECUTION_FAILED` 处理。",
@@ -747,14 +856,14 @@
           "signature": "export declare const GENERATOR_CONTINUE: unique symbol;",
           "declarationLine": 33,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Provides the public generator control signal that a stage returns to continue with its last yielded value.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_CONTINUE.",
-          "advanced": "No additional advanced behavior is declared for GENERATOR_CONTINUE.",
+          "purpose": "Return it from a generator stage to continue with the last value that stage yielded.",
+          "core": "Return it from a generator stage to continue with the last value that stage yielded.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for GENERATOR_CONTINUE."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GENERATOR_CONTINUE.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { GENERATOR_CONTINUE, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\n\npipeline.run(\n  [\n    function* (value) {\n      yield value + 1\n      yield value + 2\n      return GENERATOR_CONTINUE\n    },\n    function* (value) {\n      if (value > 10) return GENERATOR_HALT\n      return value * 2\n    }\n  ],\n  1,\n  (value) => console.log(value) // 6\n)",
             "const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.asyncGenerator })\n\nawait pipeline.run(\n  [\n    async function* (value) {\n      yield value + 1\n      await Promise.resolve()\n      return GENERATOR_CONTINUE\n    }\n  ],\n  1,\n  async (value) => console.log(value) // 2\n)",
@@ -768,13 +877,13 @@
           "overloadSignatures": ["export declare const GENERATOR_CONTINUE: unique symbol;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use GENERATOR_CONTINUE when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when GENERATOR_CONTINUE does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Provides the public generator control signal that a stage returns to continue with its last yielded value."
+              "content": "Return it from a generator stage to continue with the last value that stage yielded."
             },
             {
               "id": "getting-started",
@@ -794,12 +903,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_CONTINUE."
+              "content": "Return it from a generator stage to continue with the last value that stage yielded."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for GENERATOR_CONTINUE."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -815,14 +924,14 @@
           "signature": "export declare const GENERATOR_HALT: unique symbol;",
           "declarationLine": 28,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Provides the public generator control signal that a stage returns to halt the entire pipeline.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_HALT.",
-          "advanced": "No additional advanced behavior is declared for GENERATOR_HALT.",
+          "purpose": "Return it from a generator stage to stop the whole pipeline; later stages and the final callback do not run.",
+          "core": "Return it from a generator stage to stop the whole pipeline; later stages and the final callback do not run.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for GENERATOR_HALT."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GENERATOR_HALT.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { GENERATOR_CONTINUE, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\n\npipeline.run(\n  [\n    function* (value) {\n      yield value + 1\n      yield value + 2\n      return GENERATOR_CONTINUE\n    },\n    function* (value) {\n      if (value > 10) return GENERATOR_HALT\n      return value * 2\n    }\n  ],\n  1,\n  (value) => console.log(value) // 6\n)",
             "import {\n  createPipeline,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  MiddlewarePipelineMode\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\n\npipeline.run(\n  [\n    function* (value) {\n      yield value + 1\n      return GENERATOR_CONTINUE\n    },\n    function* () {\n      return GENERATOR_HALT\n    }\n  ],\n  1,\n  () => {\n    throw new Error('halt 后不会到达 done')\n  }\n)"
@@ -834,13 +943,13 @@
           "overloadSignatures": ["export declare const GENERATOR_HALT: unique symbol;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use GENERATOR_HALT when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when GENERATOR_HALT does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Provides the public generator control signal that a stage returns to halt the entire pipeline."
+              "content": "Return it from a generator stage to stop the whole pipeline; later stages and the final callback do not run."
             },
             {
               "id": "getting-started",
@@ -860,12 +969,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_HALT."
+              "content": "Return it from a generator stage to stop the whole pipeline; later stages and the final callback do not run."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for GENERATOR_HALT."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -881,14 +990,14 @@
           "signature": "export declare const GENERATOR_UNDEFINED: unique symbol;",
           "declarationLine": 26,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Provides the public generator control signal for an undefined result. Compatibility layers and consumers return it.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_UNDEFINED.",
-          "advanced": "No additional advanced behavior is declared for GENERATOR_UNDEFINED.",
+          "purpose": "Return it from a generator stage when `undefined` itself is the intended final value (a plain `return undefined` cannot be told apart from returning nothing).",
+          "core": "Return it from a generator stage when `undefined` itself is the intended final value (a plain `return undefined` cannot be told apart from returning nothing).",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for GENERATOR_UNDEFINED."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GENERATOR_UNDEFINED.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -897,13 +1006,13 @@
           "overloadSignatures": ["export declare const GENERATOR_UNDEFINED: unique symbol;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use GENERATOR_UNDEFINED when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when GENERATOR_UNDEFINED does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Provides the public generator control signal for an undefined result. Compatibility layers and consumers return it."
+              "content": "Return it from a generator stage when `undefined` itself is the intended final value (a plain `return undefined` cannot be told apart from returning nothing)."
             },
             {
               "id": "getting-started",
@@ -923,52 +1032,52 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_UNDEFINED."
+              "content": "Return it from a generator stage when `undefined` itself is the intended final value (a plain `return undefined` cannot be told apart from returning nothing)."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for GENERATOR_UNDEFINED."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:GENERATOR_UNDEFINED:export declare const GENERATOR_UNDEFINED: unique symbol;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "middleware-pipeline-index--GENERATOR_UNDEFINED"
         },
         {
           "name": "IAsyncGeneratorMiddlewareStage",
           "kind": "type",
-          "signature": "export type IAsyncGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
+          "signature": "export type IAsyncGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
           "declarationLine": 14,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "IAsyncGeneratorMiddlewareStage is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncGeneratorMiddlewareStage.",
-          "advanced": "No additional advanced behavior is declared for IAsyncGeneratorMiddlewareStage.",
+          "purpose": "Async generator stage (value, context?) with the same TValue/TSignals separation and return-signal protocol as the synchronous generator; it belongs to async-generator mode.",
+          "core": "Async generator stage (value, context?) with the same TValue/TSignals separation and return-signal protocol as the synchronous generator; it belongs to async-generator mode.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IAsyncGeneratorMiddlewareStage."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncGeneratorMiddlewareStage.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
           "aliasOf": "IAsyncGeneratorMiddlewareStage",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IAsyncGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;"
+            "export type IAsyncGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IAsyncGeneratorMiddlewareStage when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IAsyncGeneratorMiddlewareStage does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IAsyncGeneratorMiddlewareStage is part of this module's public type contract."
+              "content": "Async generator stage (value, context?) with the same TValue/TSignals separation and return-signal protocol as the synchronous generator; it belongs to async-generator mode."
             },
             {
               "id": "getting-started",
@@ -988,18 +1097,18 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncGeneratorMiddlewareStage."
+              "content": "Async generator stage (value, context?) with the same TValue/TSignals separation and return-signal protocol as the synchronous generator; it belongs to async-generator mode."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IAsyncGeneratorMiddlewareStage."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IAsyncGeneratorMiddlewareStage:export type IAsyncGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
+          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IAsyncGeneratorMiddlewareStage:export type IAsyncGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "middleware-pipeline-index--IAsyncGeneratorMiddlewareStage"
         },
@@ -1009,14 +1118,14 @@
           "signature": "export type IAsyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => Promise<void>, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
           "declarationLine": 12,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "IAsyncMiddlewareStage is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncMiddlewareStage.",
-          "advanced": "No additional advanced behavior is declared for IAsyncMiddlewareStage.",
+          "purpose": "An async stage `(value, next, context?)`. `next(value)` starts downstream and returns its Promise, so code after `await next()` runs afterwards.",
+          "core": "An async stage `(value, next, context?)`. `next(value)` starts downstream and returns its Promise, so code after `await next()` runs afterwards.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IAsyncMiddlewareStage."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncMiddlewareStage.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1027,13 +1136,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IAsyncMiddlewareStage when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IAsyncMiddlewareStage does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IAsyncMiddlewareStage is part of this module's public type contract."
+              "content": "An async stage `(value, next, context?)`. `next(value)` starts downstream and returns its Promise, so code after `await next()` runs afterwards."
             },
             {
               "id": "getting-started",
@@ -1053,12 +1162,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncMiddlewareStage."
+              "content": "An async stage `(value, next, context?)`. `next(value)` starts downstream and returns its Promise, so code after `await next()` runs afterwards."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IAsyncMiddlewareStage."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1074,14 +1183,14 @@
           "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
           "declarationLine": 25,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Shared construction options for every middleware mode.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreatePipelineOptions.",
-          "advanced": "No additional advanced behavior is declared for ICreatePipelineOptions.",
+          "purpose": "Options of createPipeline(); mode is required. Every public option and control getter is read once for its snapshot; getter failure becomes TypeError/INVALID_OPTION with cause. The validated mode is the value published by the runner.",
+          "core": "mode: Execution mode of every run. Stages must be written for this mode or converted with `lift()`.\nonViolation: Receives `duplicate` or `late` when a stage misuses `next()`. The misuse never starts a second downstream run.\nNot set: misuse is ignored silently.\nassertActive: Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.\nNot set: no lifecycle check.\nsignal: Default cancellation signal for every run; checked on entry, before and after each stage and before `done`. A run-level `signal` overrides it.\nNot set: runs cannot be cancelled unless `run()` passes a signal.\nsignals: Replacement generator control signals `{ undefined, halt, continue }` for hosts with their own sentinels; three distinct symbols, read once at creation.\n`MiddlewarePipelineGeneratorSignals` (the exported `GENERATOR_*` symbols).\ncombineStageAndDownstreamError: Only in async onion mode, combines independent stage and downstream failures. The same object propagated through await next is thrown once without calling the combiner; equal primitive values can still be independent failures. A successful custom result must retain both errors through cause/errors. If the combiner throws, its failure stays primary with both originals reachable.\nNot set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ICreatePipelineOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICreatePipelineOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ICreatePipelineOptions,\n  type IMiddlewarePipeline\n} from '@migaia/middleware-pipeline'\n\nconst options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async> = {\n  mode: MiddlewarePipelineMode.async,\n  onViolation: (kind) => console.warn(kind)\n}\n\nconst pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string> =\n  createPipeline<string>(options)"
           ],
@@ -1149,13 +1258,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use ICreatePipelineOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ICreatePipelineOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Shared construction options for every middleware mode."
+              "content": "Options of createPipeline(); mode is required. Every public option and control getter is read once for its snapshot; getter failure becomes TypeError/INVALID_OPTION with cause. The validated mode is the value published by the runner."
             },
             {
               "id": "getting-started",
@@ -1175,12 +1284,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreatePipelineOptions."
+              "content": "mode: Execution mode of every run. Stages must be written for this mode or converted with `lift()`.\nonViolation: Receives `duplicate` or `late` when a stage misuses `next()`. The misuse never starts a second downstream run.\nNot set: misuse is ignored silently.\nassertActive: Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.\nNot set: no lifecycle check.\nsignal: Default cancellation signal for every run; checked on entry, before and after each stage and before `done`. A run-level `signal` overrides it.\nNot set: runs cannot be cancelled unless `run()` passes a signal.\nsignals: Replacement generator control signals `{ undefined, halt, continue }` for hosts with their own sentinels; three distinct symbols, read once at creation.\n`MiddlewarePipelineGeneratorSignals` (the exported `GENERATOR_*` symbols).\ncombineStageAndDownstreamError: Only in async onion mode, combines independent stage and downstream failures. The same object propagated through await next is thrown once without calling the combiner; equal primitive values can still be independent failures. A successful custom result must retain both errors through cause/errors. If the combiner throws, its failure stays primary with both originals reachable.\nNot set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ICreatePipelineOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1196,14 +1305,14 @@
           "signature": "export type IGeneratorMiddlewareSignals = { readonly undefined: symbol; readonly halt: symbol; readonly continue: symbol; };",
           "declarationLine": 35,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Runtime sentinel identities used by a generator runner; compatibility hosts may inject theirs.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareSignals.",
-          "advanced": "No additional advanced behavior is declared for IGeneratorMiddlewareSignals.",
+          "purpose": "A set of three generator control symbols.",
+          "core": "undefined: Symbol meaning \"the final value is `undefined`\".\nhalt: Symbol meaning \"stop the whole pipeline\".\ncontinue: Symbol meaning \"continue with the last yielded value\".",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IGeneratorMiddlewareSignals."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGeneratorMiddlewareSignals.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1242,13 +1351,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IGeneratorMiddlewareSignals when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IGeneratorMiddlewareSignals does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Runtime sentinel identities used by a generator runner; compatibility hosts may inject theirs."
+              "content": "A set of three generator control symbols."
             },
             {
               "id": "getting-started",
@@ -1268,12 +1377,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareSignals."
+              "content": "undefined: Symbol meaning \"the final value is `undefined`\".\nhalt: Symbol meaning \"stop the whole pipeline\".\ncontinue: Symbol meaning \"continue with the last yielded value\"."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IGeneratorMiddlewareSignals."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1286,34 +1395,34 @@
         {
           "name": "IGeneratorMiddlewareStage",
           "kind": "type",
-          "signature": "export type IGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
+          "signature": "export type IGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
           "declarationLine": 13,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "IGeneratorMiddlewareStage is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareStage.",
-          "advanced": "No additional advanced behavior is declared for IGeneratorMiddlewareStage.",
+          "purpose": "Generator stage function* (value, context?). TSignals selects the control symbols without widening TValue; yield stores a candidate, while return chooses payload, continue, halt or explicit undefined. Default GENERATOR_UNDEFINED requires TValue to include undefined.",
+          "core": "Generator stage function* (value, context?). TSignals selects the control symbols without widening TValue; yield stores a candidate, while return chooses payload, continue, halt or explicit undefined. Default GENERATOR_UNDEFINED requires TValue to include undefined.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IGeneratorMiddlewareStage."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGeneratorMiddlewareStage.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
           "aliasOf": "IGeneratorMiddlewareStage",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;"
+            "export type IGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IGeneratorMiddlewareStage when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IGeneratorMiddlewareStage does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IGeneratorMiddlewareStage is part of this module's public type contract."
+              "content": "Generator stage function* (value, context?). TSignals selects the control symbols without widening TValue; yield stores a candidate, while return chooses payload, continue, halt or explicit undefined. Default GENERATOR_UNDEFINED requires TValue to include undefined."
             },
             {
               "id": "getting-started",
@@ -1333,35 +1442,35 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareStage."
+              "content": "Generator stage function* (value, context?). TSignals selects the control symbols without widening TValue; yield stores a candidate, while return chooses payload, continue, halt or explicit undefined. Default GENERATOR_UNDEFINED requires TValue to include undefined."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IGeneratorMiddlewareStage."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IGeneratorMiddlewareStage:export type IGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
+          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IGeneratorMiddlewareStage:export type IGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "middleware-pipeline-index--IGeneratorMiddlewareStage"
         },
         {
           "name": "IMiddlewarePipeline",
           "kind": "type",
-          "signature": "export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;",
+          "signature": "export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue, TSignals>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;",
           "declarationLine": 46,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Stateless runner returned by `createPipeline`.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipeline.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipeline.",
+          "purpose": "The stateless runner returned by `createPipeline()`. It keeps only the mode and options; stages and values are supplied per run, so runs are isolated from each other.",
+          "core": "mode: The execution mode chosen at creation (`sync`, `async`, `generator`, `async-generator`); it never changes.\nlift: Converts a stage written for another mode into this pipeline mode, in lossless directions only: sync into any mode, generator into async-generator. A lifted sync stage keeps its behaviour: code after `next()` still runs before downstream.\nlift.stage: The stage to convert.\nlift.from: Mode the stage was written for (`MiddlewarePipelineMode.*`).\nA stage of this pipeline mode; same-mode lift preserves the stage. Sync-to-generator adapters use the configured runner halt/continue symbols, so no control symbol reaches done as payload and halt never calls done. Unsupported directions throw INVALID_OPTION.\nReuse simple sync stages (trim, validate, tag) in async or generator pipelines.\nrun: Runs `stages` in order on `value`. Each stage continues by calling `next(value)`; a stage that does not continue stops the run. After the last stage, `done(value)` receives the final value. In `sync` mode `next()` only hands the value over and downstream starts after the stage returns; in `async` mode `next()` starts downstream immediately and returns its Promise (onion model).\nrun.stages: Stages of this mode (lift others first); read only for this run.\nrun.value: Input value of the first stage.\nrun.done: Final callback; not called when a stage stops or a generator returns `GENERATOR_HALT`.\nrun.control: `signal` for this run; it overrides the creation-time signal and is visible to stages as `context.signal`.\n`void` in sync/generator and Promise<void> in async/async-generator. Error cancellation reasons retain native identity when writable; unclassified reasons receive ABORTED, foreign identities stay unchanged, and primitive or undefined reasons use ordinary Error with cause. Every async outer stage checks activity after returning, even after done; rejection does not undo done.",
+          "advanced": "A logger runs filter, enrich and format stages before writing one entry.\nA request client wraps each request in async onion middleware for auth, retry and timing.\nA plugin host collects stages from installed plugins and runs them through one pipeline.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipeline."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipeline.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ICreatePipelineOptions,\n  type IMiddlewarePipeline\n} from '@migaia/middleware-pipeline'\n\nconst options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async> = {\n  mode: MiddlewarePipelineMode.async,\n  onViolation: (kind) => console.warn(kind)\n}\n\nconst pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string> =\n  createPipeline<string>(options)"
           ],
@@ -1379,34 +1488,33 @@
               "name": "lift",
               "kind": "method",
               "optional": false,
-              "signature": "lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue>;",
+              "signature": "lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue, TSignals>;",
               "description": null,
               "parameterDetails": [
                 {
                   "name": "stage",
-                  "type": "IMiddlewarePipelineStage<TFrom, TValue>",
-                  "optional": false,
-                  "configurationType": "IMiddlewarePipelineStage<IMiddlewarePipelineLiftSource, TValue>"
+                  "type": "IMiddlewarePipelineStage<TFrom, TValue, TSignals>",
+                  "optional": false
                 },
                 {
                   "name": "from",
                   "type": "TFrom",
                   "optional": false,
-                  "configurationType": "IMiddlewarePipelineLiftSource"
+                  "configurationType": "IMiddlewarePipelineLiftSource<TMode>"
                 }
               ],
-              "returns": "IMiddlewarePipelineStage<TMode, TValue>"
+              "returns": "IMiddlewarePipelineStage<TMode, TValue, TSignals>"
             },
             {
               "name": "run",
               "kind": "method",
               "optional": false,
-              "signature": "run(stages: readonly IMiddlewarePipelineStage<TMode, TValue>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>;",
+              "signature": "run(stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>;",
               "description": null,
               "parameterDetails": [
                 {
                   "name": "stages",
-                  "type": "readonly IMiddlewarePipelineStage<TMode, TValue>[]",
+                  "type": "readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[]",
                   "optional": false
                 },
                 {
@@ -1432,17 +1540,17 @@
           "aliasOf": "IMiddlewarePipeline",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;"
+            "export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue, TSignals>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipeline when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipeline does not match the required inputs or return contract.",
+          "whenToUse": "A logger runs filter, enrich and format stages before writing one entry.\nA request client wraps each request in async onion middleware for auth, retry and timing.\nA plugin host collects stages from installed plugins and runs them through one pipeline.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stateless runner returned by `createPipeline`."
+              "content": "The stateless runner returned by `createPipeline()`. It keeps only the mode and options; stages and values are supplied per run, so runs are isolated from each other."
             },
             {
               "id": "getting-started",
@@ -1462,18 +1570,18 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipeline."
+              "content": "mode: The execution mode chosen at creation (`sync`, `async`, `generator`, `async-generator`); it never changes.\nlift: Converts a stage written for another mode into this pipeline mode, in lossless directions only: sync into any mode, generator into async-generator. A lifted sync stage keeps its behaviour: code after `next()` still runs before downstream.\nlift.stage: The stage to convert.\nlift.from: Mode the stage was written for (`MiddlewarePipelineMode.*`).\nA stage of this pipeline mode; same-mode lift preserves the stage. Sync-to-generator adapters use the configured runner halt/continue symbols, so no control symbol reaches done as payload and halt never calls done. Unsupported directions throw INVALID_OPTION.\nReuse simple sync stages (trim, validate, tag) in async or generator pipelines.\nrun: Runs `stages` in order on `value`. Each stage continues by calling `next(value)`; a stage that does not continue stops the run. After the last stage, `done(value)` receives the final value. In `sync` mode `next()` only hands the value over and downstream starts after the stage returns; in `async` mode `next()` starts downstream immediately and returns its Promise (onion model).\nrun.stages: Stages of this mode (lift others first); read only for this run.\nrun.value: Input value of the first stage.\nrun.done: Final callback; not called when a stage stops or a generator returns `GENERATOR_HALT`.\nrun.control: `signal` for this run; it overrides the creation-time signal and is visible to stages as `context.signal`.\n`void` in sync/generator and Promise<void> in async/async-generator. Error cancellation reasons retain native identity when writable; unclassified reasons receive ABORTED, foreign identities stay unchanged, and primitive or undefined reasons use ordinary Error with cause. Every async outer stage checks activity after returning, even after done; rejection does not undo done."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipeline."
+              "content": "A logger runs filter, enrich and format stages before writing one entry.\nA request client wraps each request in async onion middleware for auth, retry and timing.\nA plugin host collects stages from installed plugins and runs them through one pipeline."
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipeline:export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;",
+          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipeline:export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue, TSignals>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "middleware-pipeline-index--IMiddlewarePipeline"
         },
@@ -1483,14 +1591,14 @@
           "signature": "export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal; };",
           "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "IMiddlewarePipelineContext is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineContext.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineContext.",
+          "purpose": "Optional run context: third argument of sync/async stages, second argument of generator/async-generator stages and done. It is supplied only when an effective signal exists.",
+          "core": "signal: The signal this run actually uses (run-level first, then creation-time); pass it to your own I/O to stop early.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineContext."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineContext.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": ["type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }"],
           "members": [
             {
@@ -1511,13 +1619,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineContext when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineContext does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IMiddlewarePipelineContext is part of this module's public type contract."
+              "content": "Optional run context: third argument of sync/async stages, second argument of generator/async-generator stages and done. It is supplied only when an effective signal exists."
             },
             {
               "id": "getting-started",
@@ -1537,12 +1645,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineContext."
+              "content": "signal: The signal this run actually uses (run-level first, then creation-time); pass it to your own I/O to stop early."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineContext."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1558,14 +1666,14 @@
           "signature": "export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal; };",
           "declarationLine": 8,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "IMiddlewarePipelineControlOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineControlOptions.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineControlOptions.",
+          "purpose": "Fourth argument of `run()`: per-run controls.",
+          "core": "signal: Cancellation signal for this run only; overrides the creation-time signal.\nNot set: the creation-time `signal` is used, if any.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineControlOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineControlOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1586,13 +1694,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineControlOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineControlOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IMiddlewarePipelineControlOptions is part of this module's public type contract."
+              "content": "Fourth argument of `run()`: per-run controls."
             },
             {
               "id": "getting-started",
@@ -1612,12 +1720,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineControlOptions."
+              "content": "signal: Cancellation signal for this run only; overrides the creation-time signal.\nNot set: the creation-time `signal` is used, if any."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineControlOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1633,14 +1741,14 @@
           "signature": "export type IMiddlewarePipelineDone<TMode extends IMiddlewarePipelineMode, TValue> = TMode extends IMiddlewarePipelineSyncMode ? (value: TValue, context?: IMiddlewarePipelineContext) => void : (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
           "declarationLine": 14,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Terminal callback selected by one concrete middleware mode.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineDone.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineDone.",
+          "purpose": "Final callback of `run()`; may return a Promise in async modes.",
+          "core": "Final callback of `run()`; may return a Promise in async modes.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineDone."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineDone.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1651,13 +1759,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineDone when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineDone does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Terminal callback selected by one concrete middleware mode."
+              "content": "Final callback of `run()`; may return a Promise in async modes."
             },
             {
               "id": "getting-started",
@@ -1677,18 +1785,18 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineDone."
+              "content": "Final callback of `run()`; may return a Promise in async modes."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineDone."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipelineDone:export type IMiddlewarePipelineDone<TMode extends IMiddlewarePipelineMode, TValue> = TMode extends IMiddlewarePipelineSyncMode ? (value: TValue, context?: IMiddlewarePipelineContext) => void : (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "middleware-pipeline-index--IMiddlewarePipelineDone"
         },
@@ -1696,16 +1804,16 @@
           "name": "IMiddlewarePipelineErrorCode",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineErrorCode = (typeof MiddlewarePipelineErrorCode)[keyof typeof MiddlewarePipelineErrorCode];",
-          "declarationLine": 24,
+          "declarationLine": 29,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
-          "purpose": "IMiddlewarePipelineErrorCode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineErrorCode.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineErrorCode.",
+          "purpose": "Union of `MiddlewarePipelineErrorCode` values.",
+          "core": "Union of `MiddlewarePipelineErrorCode` values.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1716,13 +1824,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineErrorCode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IMiddlewarePipelineErrorCode is part of this module's public type contract."
+              "content": "Union of `MiddlewarePipelineErrorCode` values."
             },
             {
               "id": "getting-started",
@@ -1742,12 +1850,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineErrorCode."
+              "content": "Union of `MiddlewarePipelineErrorCode` values."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1763,14 +1871,14 @@
           "signature": "export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode> = { readonly sync: 'sync'; readonly async: 'sync' | 'async'; readonly generator: 'sync' | 'generator'; readonly 'async-generator': 'sync' | 'generator' | 'async-generator'; }[TMode];",
           "declarationLine": 18,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Source modes that can be lifted into one target middleware mode.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineLiftSource.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineLiftSource.",
+          "purpose": "Modes that `lift()` accepts as the source for each target mode.",
+          "core": "sync: Target `sync`: only `sync` stages can be used.\nasync: Target `async`: `sync` or `async` stages.\nLifted; keeps sync ordering.\nUsed as is.\ngenerator: Target `generator`: `sync` or `generator` stages.\nLifted into a generator stage.\nasync-generator: Target async-generator supports sync, generator and async-generator stages; async onion stages cannot be lifted into it.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineLiftSource."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineLiftSource.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -1809,13 +1917,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineLiftSource when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineLiftSource does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Source modes that can be lifted into one target middleware mode."
+              "content": "Modes that `lift()` accepts as the source for each target mode."
             },
             {
               "id": "getting-started",
@@ -1835,12 +1943,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineLiftSource."
+              "content": "sync: Target `sync`: only `sync` stages can be used.\nasync: Target `async`: `sync` or `async` stages.\nLifted; keeps sync ordering.\nUsed as is.\ngenerator: Target `generator`: `sync` or `generator` stages.\nLifted into a generator stage.\nasync-generator: Target async-generator supports sync, generator and async-generator stages; async onion stages cannot be lifted into it."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineLiftSource."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1856,14 +1964,14 @@
           "signature": "export type IMiddlewarePipelineMode = (typeof MiddlewarePipelineMode)[keyof typeof MiddlewarePipelineMode];",
           "declarationLine": 11,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "IMiddlewarePipelineMode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineMode.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineMode.",
+          "purpose": "Union of `MiddlewarePipelineMode` values.",
+          "core": "Union of `MiddlewarePipelineMode` values.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineMode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineMode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1874,13 +1982,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineMode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineMode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IMiddlewarePipelineMode is part of this module's public type contract."
+              "content": "Union of `MiddlewarePipelineMode` values."
             },
             {
               "id": "getting-started",
@@ -1900,12 +2008,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineMode."
+              "content": "Union of `MiddlewarePipelineMode` values."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineMode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1921,14 +2029,14 @@
           "signature": "export type IMiddlewarePipelineRunResult<TMode extends IMiddlewarePipelineMode> = TMode extends IMiddlewarePipelineSyncMode ? void : Promise<void>;",
           "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Execution result selected by one concrete middleware mode.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineRunResult.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineRunResult.",
+          "purpose": "Return type of `run()`: `void` in sync modes, `Promise<void>` in async modes.",
+          "core": "Return type of `run()`: `void` in sync modes, `Promise<void>` in async modes.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineRunResult."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineRunResult.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1939,13 +2047,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineRunResult when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineRunResult does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Execution result selected by one concrete middleware mode."
+              "content": "Return type of `run()`: `void` in sync modes, `Promise<void>` in async modes."
             },
             {
               "id": "getting-started",
@@ -1965,35 +2073,35 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineRunResult."
+              "content": "Return type of `run()`: `void` in sync modes, `Promise<void>` in async modes."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineRunResult."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipelineRunResult:export type IMiddlewarePipelineRunResult<TMode extends IMiddlewarePipelineMode> = TMode extends IMiddlewarePipelineSyncMode ? void : Promise<void>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "middleware-pipeline-index--IMiddlewarePipelineRunResult"
         },
         {
           "name": "IMiddlewarePipelineStage",
           "kind": "type",
-          "signature": "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue>; }[TMode];",
+          "signature": "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue, TSignals>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue, TSignals>; }[TMode];",
           "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Stage selected by one concrete middleware mode.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineStage.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineStage.",
+          "purpose": "The stage type selected from all four mode mappings; TSignals keeps generator controls separate from TValue and defaults to the exported unique-symbol signal set.",
+          "core": "sync: Stage type of `sync` mode: `ISyncMiddlewareStage`.\nasync: Stage type of `async` mode: `IAsyncMiddlewareStage`.\ngenerator: Stage type of `generator` mode: `IGeneratorMiddlewareStage`.\nasync-generator: The async-generator mapping selects IAsyncGeneratorMiddlewareStage<TValue, TSignals>, preserving the custom control domain.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineStage."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineStage.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -2018,27 +2126,27 @@
               "name": "generator",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generator: IGeneratorMiddlewareStage<TValue>;",
+              "signature": "readonly generator: IGeneratorMiddlewareStage<TValue, TSignals>;",
               "description": null,
               "parameterDetails": [],
-              "returns": "IGeneratorMiddlewareStage<TValue>"
+              "returns": "IGeneratorMiddlewareStage<TValue, TSignals>"
             }
           ],
           "composes": [],
           "aliasOf": "IMiddlewarePipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue>; }[TMode];"
+            "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue, TSignals>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue, TSignals>; }[TMode];"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineStage when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineStage does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stage selected by one concrete middleware mode."
+              "content": "The stage type selected from all four mode mappings; TSignals keeps generator controls separate from TValue and defaults to the exported unique-symbol signal set."
             },
             {
               "id": "getting-started",
@@ -2058,85 +2166,20 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineStage."
+              "content": "sync: Stage type of `sync` mode: `ISyncMiddlewareStage`.\nasync: Stage type of `async` mode: `IAsyncMiddlewareStage`.\ngenerator: Stage type of `generator` mode: `IGeneratorMiddlewareStage`.\nasync-generator: The async-generator mapping selects IAsyncGeneratorMiddlewareStage<TValue, TSignals>, preserving the custom control domain."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineStage."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipelineStage:export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue>; }[TMode];",
+          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipelineStage:export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue, TSignals>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue, TSignals>; }[TMode];",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "middleware-pipeline-index--IMiddlewarePipelineStage"
-        },
-        {
-          "name": "IMiddlewarePipelineSyncMode",
-          "kind": "type",
-          "signature": "export type IMiddlewarePipelineSyncMode = typeof MiddlewarePipelineMode.sync | typeof MiddlewarePipelineMode.generator;",
-          "declarationLine": 12,
-          "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
-          "purpose": "Modes whose execution completes before `run` returns.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineSyncMode.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineSyncMode.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineSyncMode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineSyncMode.",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "IMiddlewarePipelineSyncMode",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IMiddlewarePipelineSyncMode = typeof MiddlewarePipelineMode.sync | typeof MiddlewarePipelineMode.generator;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineSyncMode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineSyncMode does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Modes whose execution completes before `run` returns."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IMiddlewarePipelineSyncMode from @migaia/middleware-pipeline, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IMiddlewarePipelineSyncMode when its type contract and declared inputs match the result you need. Choose a different public symbol when IMiddlewarePipelineSyncMode does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineSyncMode."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineSyncMode."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:IMiddlewarePipelineSyncMode:export type IMiddlewarePipelineSyncMode = typeof MiddlewarePipelineMode.sync | typeof MiddlewarePipelineMode.generator;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "middleware-pipeline-index--IMiddlewarePipelineSyncMode"
         },
         {
           "name": "IMiddlewarePipelineViolation",
@@ -2144,14 +2187,14 @@
           "signature": "export type IMiddlewarePipelineViolation = (typeof MiddlewarePipelineViolation)[keyof typeof MiddlewarePipelineViolation];",
           "declarationLine": 20,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "IMiddlewarePipelineViolation is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineViolation.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineViolation.",
+          "purpose": "Union of `MiddlewarePipelineViolation` values.",
+          "core": "Union of `MiddlewarePipelineViolation` values.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineViolation."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineViolation.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2162,13 +2205,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineViolation when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineViolation does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IMiddlewarePipelineViolation is part of this module's public type contract."
+              "content": "Union of `MiddlewarePipelineViolation` values."
             },
             {
               "id": "getting-started",
@@ -2188,12 +2231,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineViolation."
+              "content": "Union of `MiddlewarePipelineViolation` values."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineViolation."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2209,14 +2252,14 @@
           "signature": "export type IMiddlewarePipelineViolationHandler = (kind: IMiddlewarePipelineViolation) => void;",
           "declarationLine": 21,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "IMiddlewarePipelineViolationHandler is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineViolationHandler.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineViolationHandler.",
+          "purpose": "Type of the `onViolation` callback.",
+          "core": "Type of the `onViolation` callback.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineViolationHandler."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineViolationHandler.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2227,13 +2270,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineViolationHandler when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineViolationHandler does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IMiddlewarePipelineViolationHandler is part of this module's public type contract."
+              "content": "Type of the `onViolation` callback."
             },
             {
               "id": "getting-started",
@@ -2253,12 +2296,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineViolationHandler."
+              "content": "Type of the `onViolation` callback."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineViolationHandler."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2274,14 +2317,14 @@
           "signature": "export type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;",
           "declarationLine": 11,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "ISyncMiddlewareStage is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncMiddlewareStage.",
-          "advanced": "No additional advanced behavior is declared for ISyncMiddlewareStage.",
+          "purpose": "A sync stage `(value, next, context?) => void`. `next(value)` hands the value over; downstream starts after the stage returns.",
+          "core": "A sync stage `(value, next, context?) => void`. `next(value)` hands the value over; downstream starts after the stage returns.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ISyncMiddlewareStage."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncMiddlewareStage.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2292,13 +2335,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use ISyncMiddlewareStage when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ISyncMiddlewareStage does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "ISyncMiddlewareStage is part of this module's public type contract."
+              "content": "A sync stage `(value, next, context?) => void`. `next(value)` hands the value over; downstream starts after the stage returns."
             },
             {
               "id": "getting-started",
@@ -2318,12 +2361,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncMiddlewareStage."
+              "content": "A sync stage `(value, next, context?) => void`. `next(value)` hands the value over; downstream starts after the stage returns."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ISyncMiddlewareStage."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2339,14 +2382,14 @@
           "signature": "export declare const MIDDLEWARE_PIPELINE_SOURCE = \"@migaia/middleware-pipeline\";",
           "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
-          "purpose": "Defines the stable `source` shared by the default dual-failure factory in `errors.ts` and the error-code registry.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MIDDLEWARE_PIPELINE_SOURCE.",
-          "advanced": "No additional advanced behavior is declared for MIDDLEWARE_PIPELINE_SOURCE.",
+          "purpose": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`.",
+          "core": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for MIDDLEWARE_PIPELINE_SOURCE."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MIDDLEWARE_PIPELINE_SOURCE.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2357,13 +2400,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use MIDDLEWARE_PIPELINE_SOURCE when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when MIDDLEWARE_PIPELINE_SOURCE does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Defines the stable `source` shared by the default dual-failure factory in `errors.ts` and the error-code registry."
+              "content": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`."
             },
             {
               "id": "getting-started",
@@ -2383,12 +2426,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MIDDLEWARE_PIPELINE_SOURCE."
+              "content": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for MIDDLEWARE_PIPELINE_SOURCE."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2401,17 +2444,17 @@
         {
           "name": "MiddlewarePipelineErrorCode",
           "kind": "const",
-          "signature": "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
+          "signature": "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
           "declarationLine": 7,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
-          "purpose": "Owns the module-boundary error-code declarations for `@migaia/middleware-pipeline`.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineErrorCode.",
-          "advanced": "No additional advanced behavior is declared for MiddlewarePipelineErrorCode.",
+          "purpose": "Every error code of this package. Errors keep their native type (`TypeError`, `AggregateError`, `AbortError`) and carry `source` and `code`.",
+          "core": "executionFailed: EXECUTION_FAILED classifies unowned stage, done, host-active and violation callback failures. Writable native errors retain identity; foreign identities stay unchanged, immutable/primitive values remain on cause. Independent async onion failures form AggregateError without a combiner. A late next callback failure after run completion escapes on the caller stack; report there.\ninvalidOption: `INVALID_OPTION`: an invalid mode, callback, signal, control object, signal set or `lift` direction. Fix the input; retrying will fail again.\naborted: ABORTED classifies an unowned cancellation reason. Native Error reasons can retain their exact object and type; primitive/undefined reasons use ordinary Error with cause. Existing foreign source/code remain unchanged; AbortError is not guaranteed.\nabortCleanupFailed: `ABORT_CLEANUP_FAILED`: cancelling the run and its cleanup both failed; inspect `errors` in order.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for MiddlewarePipelineErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewarePipelineErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "error.source === '@migaia/middleware-pipeline'\nerror.code === MiddlewarePipelineErrorCode.invalidOption"
           ],
@@ -2421,7 +2464,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly executionFailed: \"EXECUTION_FAILED\";",
-              "description": "Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors.",
+              "description": "Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors.",
               "parameterDetails": [],
               "returns": "\"EXECUTION_FAILED\""
             },
@@ -2439,7 +2482,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly aborted: \"ABORTED\";",
-              "description": "Cooperative abort observed with primitive or undefined reason; caller should inspect cause.",
+              "description": "Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause.",
               "parameterDetails": [],
               "returns": "\"ABORTED\""
             },
@@ -2457,17 +2500,17 @@
           "aliasOf": "MiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };"
+            "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use MiddlewarePipelineErrorCode when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when MiddlewarePipelineErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Owns the module-boundary error-code declarations for `@migaia/middleware-pipeline`."
+              "content": "Every error code of this package. Errors keep their native type (`TypeError`, `AggregateError`, `AbortError`) and carry `source` and `code`."
             },
             {
               "id": "getting-started",
@@ -2487,16 +2530,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineErrorCode."
+              "content": "executionFailed: EXECUTION_FAILED classifies unowned stage, done, host-active and violation callback failures. Writable native errors retain identity; foreign identities stay unchanged, immutable/primitive values remain on cause. Independent async onion failures form AggregateError without a combiner. A late next callback failure after run completion escapes on the caller stack; report there.\ninvalidOption: `INVALID_OPTION`: an invalid mode, callback, signal, control object, signal set or `lift` direction. Fix the input; retrying will fail again.\naborted: ABORTED classifies an unowned cancellation reason. Native Error reasons can retain their exact object and type; primitive/undefined reasons use ordinary Error with cause. Existing foreign source/code remain unchanged; AbortError is not guaranteed.\nabortCleanupFailed: `ABORT_CLEANUP_FAILED`: cancelling the run and its cleanup both failed; inspect `errors` in order."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for MiddlewarePipelineErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MiddlewarePipelineErrorCode:export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
+          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MiddlewarePipelineErrorCode:export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -2505,34 +2548,62 @@
         {
           "name": "MiddlewarePipelineGeneratorSignals",
           "kind": "const",
-          "signature": "export declare const MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals;",
+          "signature": "export declare const MiddlewarePipelineGeneratorSignals: Readonly<{ readonly undefined: typeof GENERATOR_UNDEFINED; readonly halt: typeof GENERATOR_HALT; readonly continue: typeof GENERATOR_CONTINUE; }>;",
           "declarationLine": 41,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Default sentinel set paired with this module's public generator constants.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineGeneratorSignals.",
-          "advanced": "No additional advanced behavior is declared for MiddlewarePipelineGeneratorSignals.",
+          "purpose": "The default set of the three generator control signals (`undefined`, `halt`, `continue`) used when the `signals` option is not given.",
+          "core": "The default set of the three generator control signals (`undefined`, `halt`, `continue`) used when the `signals` option is not given.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for MiddlewarePipelineGeneratorSignals."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewarePipelineGeneratorSignals.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
-          "members": [],
-          "composes": ["IGeneratorMiddlewareSignals"],
+          "members": [
+            {
+              "name": "undefined",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly undefined: typeof GENERATOR_UNDEFINED;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof GENERATOR_UNDEFINED"
+            },
+            {
+              "name": "halt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly halt: typeof GENERATOR_HALT;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof GENERATOR_HALT"
+            },
+            {
+              "name": "continue",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly continue: typeof GENERATOR_CONTINUE;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof GENERATOR_CONTINUE"
+            }
+          ],
+          "composes": [],
           "aliasOf": "MiddlewarePipelineGeneratorSignals",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals;"
+            "export declare const MiddlewarePipelineGeneratorSignals: Readonly<{ readonly undefined: typeof GENERATOR_UNDEFINED; readonly halt: typeof GENERATOR_HALT; readonly continue: typeof GENERATOR_CONTINUE; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use MiddlewarePipelineGeneratorSignals when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when MiddlewarePipelineGeneratorSignals does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Default sentinel set paired with this module's public generator constants."
+              "content": "The default set of the three generator control signals (`undefined`, `halt`, `continue`) used when the `signals` option is not given."
             },
             {
               "id": "getting-started",
@@ -2552,16 +2623,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineGeneratorSignals."
+              "content": "The default set of the three generator control signals (`undefined`, `halt`, `continue`) used when the `signals` option is not given."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for MiddlewarePipelineGeneratorSignals."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineGeneratorSignals:export declare const MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals;",
+          "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineGeneratorSignals:export declare const MiddlewarePipelineGeneratorSignals: Readonly<{ readonly undefined: typeof GENERATOR_UNDEFINED; readonly halt: typeof GENERATOR_HALT; readonly continue: typeof GENERATOR_CONTINUE; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -2573,14 +2644,14 @@
           "signature": "export declare const MiddlewarePipelineMode: { readonly sync: \"sync\"; readonly async: \"async\"; readonly generator: \"generator\"; readonly asyncGenerator: \"async-generator\"; };",
           "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Defines four stable execution modes for public runners and types. These values do not represent host lifecycle states.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineMode.",
-          "advanced": "No additional advanced behavior is declared for MiddlewarePipelineMode.",
+          "purpose": "The four execution modes accepted by `createPipeline({ mode })`. The mode fixes the stage shape, whether `run()` returns a Promise, and when downstream starts.",
+          "core": "sync: `sync`: stages are `(value, next) => void`; downstream starts after a stage returns; `run()` returns `void`.\nasync: `async`: stages may be async; `next()` starts downstream at once and returns its Promise (onion); `run()` returns a Promise.\ngenerator: `generator`: stages are generator functions; downstream starts after a stage finishes; `run()` returns `void`.\nasyncGenerator: `async-generator`: stages are async generator functions; `run()` returns a Promise.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for MiddlewarePipelineMode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewarePipelineMode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ICreatePipelineOptions,\n  type IMiddlewarePipeline\n} from '@migaia/middleware-pipeline'\n\nconst options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async> = {\n  mode: MiddlewarePipelineMode.async,\n  onViolation: (kind) => console.warn(kind)\n}\n\nconst pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string> =\n  createPipeline<string>(options)",
             "const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\n\npipeline.run(\n  [\n    (value, next) => next(value + 1),\n    (value, next) => next(value * 3)\n  ],\n  2,\n  (value) => console.log(value) // 9\n)",
@@ -2642,13 +2713,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use MiddlewarePipelineMode when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when MiddlewarePipelineMode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Defines four stable execution modes for public runners and types. These values do not represent host lifecycle states."
+              "content": "The four execution modes accepted by `createPipeline({ mode })`. The mode fixes the stage shape, whether `run()` returns a Promise, and when downstream starts."
             },
             {
               "id": "getting-started",
@@ -2668,12 +2739,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineMode."
+              "content": "sync: `sync`: stages are `(value, next) => void`; downstream starts after a stage returns; `run()` returns `void`.\nasync: `async`: stages may be async; `next()` starts downstream at once and returns its Promise (onion); `run()` returns a Promise.\ngenerator: `generator`: stages are generator functions; downstream starts after a stage finishes; `run()` returns `void`.\nasyncGenerator: `async-generator`: stages are async generator functions; `run()` returns a Promise."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for MiddlewarePipelineMode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2702,7 +2773,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`assertActive` 抛出的错误原样传播。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。"
+                  "text": "`assertActive`、stage、done 的 Error 在可附码时保留原对象/原生类型/stack；没有 semantic source/code 时附 EXECUTION_FAILED，已有外部身份不改写。不可修改错误或非 Error 值保留在包错误的 cause；abort reason 使用 ABORTED。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。"
                 }
               ]
             },
@@ -2719,7 +2790,7 @@
                   "type": "list",
                   "items": [
                     "`run()` 的 `control.signal` 优先于构造时的 `signal`。",
-                    "已取消的 signal 会保留原始 reason 与原生 AbortError 语义。",
+                    "Error reason 尽量保留原生类型/对象；未分类 Error 附 ABORTED，已有外部 source/code 不改写；primitive/undefined reason 用普通 Error/ABORTED 的 cause 保留，未必是原生 AbortError。",
                     "四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及 `done` 前检查 signal；generator 类还会在每次迭代后检查。",
                     "已开始的 stage 不会被强制打断；它可以从 `context.signal` 读取本次运行实际采用的 signal 并协作退出。",
                     "用户代码已经抛出普通失败时，该失败保持为主错误，之后观察到的取消不会替换它；async stage 与下游分别失败时仍按组合器或 `EXECUTION_FAILED` 处理。",
@@ -2741,14 +2812,14 @@
           "signature": "export declare const MiddlewarePipelineViolation: { readonly late: \"late\"; readonly duplicate: \"duplicate\"; };",
           "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Defines stable `next()` violations emitted by every runner. Hosts convert these values into diagnostics or domain errors.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineViolation.",
-          "advanced": "No additional advanced behavior is declared for MiddlewarePipelineViolation.",
+          "purpose": "Kinds of `next()` misuse passed to `onViolation`: calling it twice in one stage, or after the stage already finished.",
+          "core": "late: `late`: `next()` was called after the stage had already returned.\nduplicate: `duplicate`: `next()` was called more than once in one stage.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for MiddlewarePipelineViolation."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewarePipelineViolation.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -2778,13 +2849,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use MiddlewarePipelineViolation when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when MiddlewarePipelineViolation does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Defines stable `next()` violations emitted by every runner. Hosts convert these values into diagnostics or domain errors."
+              "content": "Kinds of `next()` misuse passed to `onViolation`: calling it twice in one stage, or after the stage already finished."
             },
             {
               "id": "getting-started",
@@ -2804,12 +2875,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineViolation."
+              "content": "late: `late`: `next()` was called after the stage had already returned.\nduplicate: `duplicate`: `next()` was called more than once in one stage."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for MiddlewarePipelineViolation."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],

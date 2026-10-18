@@ -111,19 +111,7 @@
       "library": "capability"
     },
     {
-      "path": "/en/docs/capability/api/ICapabilityStateValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
       "path": "/en/docs/capability/api/IGraphReadinessSnapshot",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/api/IGraphReadinessState",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -430,12 +418,6 @@
     },
     {
       "path": "/en/docs/capability/api/graph/dynamic/IGraphBindingReleaseEntry",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/api/graph/dynamic/IGraphBindingReleaseReason",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -825,12 +807,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/api/defineEventApiStyle",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/en/docs/event-subscriber/api/invokeEachLive",
       "locale": "en",
       "domain": "docs",
@@ -1041,12 +1017,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/ILifecycleErrorPolicy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/ILifecycleErrorText",
       "locale": "en",
       "domain": "docs",
@@ -1060,18 +1030,6 @@
     },
     {
       "path": "/en/docs/lifecycle/api/ILifecycleState",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/ILifecycleStateValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/ILifecycleUnitStateValue",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -1137,12 +1095,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/IUnitState",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/LifecycleErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -1162,12 +1114,6 @@
     },
     {
       "path": "/en/docs/lifecycle/api/LifecycleState",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/LifecycleUnitState",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -1353,24 +1299,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/errors/createLifecycleError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/errors/createLifecycleFailure",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/errors/createLifecycleTypeError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/generation",
       "locale": "en",
       "domain": "docs",
@@ -1456,12 +1384,6 @@
     },
     {
       "path": "/en/docs/lifecycle/api/scheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/scheduler/addSchedulerTime",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -1660,12 +1582,6 @@
     },
     {
       "path": "/en/docs/logger/api/ILoggerCore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "logger"
-    },
-    {
-      "path": "/en/docs/logger/api/ILoggerDomainCore",
       "locale": "en",
       "domain": "docs",
       "library": "logger"
@@ -1875,12 +1791,6 @@
       "library": "logger"
     },
     {
-      "path": "/en/docs/logger/api/plugins/IColorMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "logger"
-    },
-    {
       "path": "/en/docs/logger/api/plugins/IColorPluginConfig",
       "locale": "en",
       "domain": "docs",
@@ -1906,12 +1816,6 @@
     },
     {
       "path": "/en/docs/logger/api/plugins/ILevelPluginExt",
-      "locale": "en",
-      "domain": "docs",
-      "library": "logger"
-    },
-    {
-      "path": "/en/docs/logger/api/plugins/ILogLevel",
       "locale": "en",
       "domain": "docs",
       "library": "logger"
@@ -2211,12 +2115,6 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/en/docs/middleware-pipeline/api/IMiddlewarePipelineSyncMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "middleware-pipeline"
-    },
-    {
       "path": "/en/docs/middleware-pipeline/api/IMiddlewarePipelineViolation",
       "locale": "en",
       "domain": "docs",
@@ -2308,6 +2206,12 @@
     },
     {
       "path": "/en/docs/plugin-host/api",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/ERROR_TEXT",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -2751,12 +2655,6 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/api/IPluginRegistrationReceipt",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/en/docs/plugin-host/api/IPluginRemoval",
       "locale": "en",
       "domain": "docs",
@@ -2877,12 +2775,6 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/api/composition/buildManagedPort",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/en/docs/plugin-host/api/composition/createView",
       "locale": "en",
       "domain": "docs",
@@ -2902,18 +2794,6 @@
     },
     {
       "path": "/en/docs/plugin-host/api/composition/openComposition",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/api/composition/registerManagedHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/api/createRegistrationView",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -3112,12 +2992,6 @@
     },
     {
       "path": "/en/docs/reactive/api/REACTIVE_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/ReactiveDependencyKind",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
@@ -4161,12 +4035,6 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/api/framing/IRpcReassembler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
       "path": "/en/docs/rpc-contract/api/framing/assertRpcPhysicalFrameSize",
       "locale": "en",
       "domain": "docs",
@@ -4180,12 +4048,6 @@
     },
     {
       "path": "/en/docs/rpc-contract/api/framing/createBinaryFramer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/en/docs/rpc-contract/api/framing/createReassembler",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -4258,12 +4120,6 @@
     },
     {
       "path": "/en/docs/rpc-contract/api/framing/messageFramerV1",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/en/docs/rpc-contract/api/framing/processStringFramer",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -4803,6 +4659,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/api/schema/wire-error/default",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/api/stream",
       "locale": "en",
       "domain": "docs",
@@ -5211,18 +5073,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/api/IFactoryDiscoveryMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/api/IFactoryPingCapability",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/en/docs/rpc-core/api/IRpcAbortCapability",
       "locale": "en",
       "domain": "docs",
@@ -5499,12 +5349,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/api/IRpcPlatform",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/en/docs/rpc-core/api/IRpcPlugin",
       "locale": "en",
       "domain": "docs",
@@ -5571,12 +5415,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/api/IRpcPublicError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/en/docs/rpc-core/api/IRpcReplayCapacityDetail",
       "locale": "en",
       "domain": "docs",
@@ -5626,12 +5464,6 @@
     },
     {
       "path": "/en/docs/rpc-core/api/IRpcTimeoutConfig",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/api/IRpcTransportTopology",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -5949,25 +5781,7 @@
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/api/composed/IRecursiveProvideSurface",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/en/docs/rpc-core/api/composed/IRpcCoreConfig",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/api/composed/IRpcKernelSurface",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/api/composed/IRpcRootProjection",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -5986,12 +5800,6 @@
     },
     {
       "path": "/en/docs/rpc-core/api/contract",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/api/createAuthenticationNonce",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -7227,6 +7035,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/docs/rpc-core/api/transport-kit/identifyRpcBoundaryFailure",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/en/docs/rpc-core/api/transport-kit/observeListener",
       "locale": "en",
       "domain": "docs",
@@ -7816,18 +7630,6 @@
     },
     {
       "path": "/en/docs/rpc-process/api/IProcessDependencyHostPort",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-process"
-    },
-    {
-      "path": "/en/docs/rpc-process/api/IProcessHostRegistrationApproval",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-process"
-    },
-    {
-      "path": "/en/docs/rpc-process/api/IProcessHostRegistrations",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-process"
@@ -8517,6 +8319,12 @@
       "library": "rpc-threads"
     },
     {
+      "path": "/en/docs/rpc-threads/api/INodeThreadHandle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
       "path": "/en/docs/rpc-threads/api/IRpcThreadErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -8679,6 +8487,18 @@
       "library": "rpc-threads"
     },
     {
+      "path": "/en/docs/rpc-threads/api/IWebThreadHandle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/api/IWebThreadLauncherOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
       "path": "/en/docs/rpc-threads/api/IWebThreadWorker",
       "locale": "en",
       "domain": "docs",
@@ -8703,79 +8523,7 @@
       "library": "rpc-threads"
     },
     {
-      "path": "/en/docs/rpc-threads/api/adapters/browser",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/browser/IWebThreadHandle",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/browser/IWebThreadLauncherOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/browser/createBrowserThreadChannelFactory",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/browser/createBrowserThreadLauncher",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/bun",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/bun/createBunThreadChannelFactory",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/bun/createBunThreadLauncher",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/deno",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/deno/createDenoThreadChannelFactory",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/deno/createDenoThreadLauncher",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
       "path": "/en/docs/rpc-threads/api/adapters/electron-main",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/electron-main/INodeThreadHandle",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-threads"
@@ -8788,24 +8536,6 @@
     },
     {
       "path": "/en/docs/rpc-threads/api/adapters/electron-main/createElectronMainThreadLauncher",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/electron-renderer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadLauncher",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-threads"
@@ -8955,12 +8685,6 @@
       "library": "serialize"
     },
     {
-      "path": "/en/docs/serialize/api/ISerializeChunkKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
       "path": "/en/docs/serialize/api/ISerializeCleanupKind",
       "locale": "en",
       "domain": "docs",
@@ -9081,19 +8805,7 @@
       "library": "serialize"
     },
     {
-      "path": "/en/docs/serialize/api/codec/assertCodecVersion",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
       "path": "/en/docs/serialize/api/codec/assertPortableValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/en/docs/serialize/api/codec/createCodecError",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -9135,25 +8847,13 @@
       "library": "serialize"
     },
     {
-      "path": "/en/docs/serialize/api/codecs/identity",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/en/docs/serialize/api/codecs/identity/identityCodec",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/en/docs/serialize/api/codecs/identity/identityCodecV1",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
       "path": "/en/docs/serialize/api/codecs/identity/v1",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/api/codecs/identity/v1/identityCodec",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -9249,7 +8949,7 @@
       "library": "serialize"
     },
     {
-      "path": "/en/docs/serialize/api/core/ISerializeChunkType",
+      "path": "/en/docs/serialize/api/core/ISerializeChunkKind",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -9705,12 +9405,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/IStorageContractConflictPolicy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/IStorageContractErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -9772,12 +9466,6 @@
     },
     {
       "path": "/en/docs/storage-contract/api/STORAGE_CONTRACT_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/StorageContractConflictPolicy",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -9867,12 +9555,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/isArrayBuffer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/isChangeFeedStore",
       "locale": "en",
       "domain": "docs",
@@ -9904,12 +9586,6 @@
     },
     {
       "path": "/en/docs/storage-contract/api/isStorageContractError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/isUint8Array",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -10359,12 +10035,6 @@
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/api/host/STORAGE_LIVE_QUERY_SERVICE_NAME",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
       "path": "/en/docs/storage-web/api/host/StorageHostFacade",
       "locale": "en",
       "domain": "docs",
@@ -10390,24 +10060,6 @@
     },
     {
       "path": "/en/docs/storage-web/api/host/definePlugin",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/docs/storage-web/api/host/pluginNameFromBackendId",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/docs/storage-web/api/host/reactiveAdapterNameFromBackendId",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/en/docs/storage-web/api/host/readStorageNativePluginMetadata",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
@@ -10833,12 +10485,6 @@
       "library": "store-devtools"
     },
     {
-      "path": "/en/docs/store-devtools/api/IStoreDevtoolsCommand",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-devtools"
-    },
-    {
       "path": "/en/docs/store-devtools/api/IStoreDevtoolsErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -10852,12 +10498,6 @@
     },
     {
       "path": "/en/docs/store-devtools/api/STORE_DEVTOOLS_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-devtools"
-    },
-    {
-      "path": "/en/docs/store-devtools/api/StoreDevtoolsCommand",
       "locale": "en",
       "domain": "docs",
       "library": "store-devtools"
@@ -10989,25 +10629,25 @@
       "library": "store-indexed"
     },
     {
-      "path": "/en/docs/store-indexed/api/ObservableArray-class",
+      "path": "/en/docs/store-indexed/api/ObservableArray",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
     },
     {
-      "path": "/en/docs/store-indexed/api/ObservableMap-class",
+      "path": "/en/docs/store-indexed/api/ObservableMap",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
     },
     {
-      "path": "/en/docs/store-indexed/api/ObservableObject-class",
+      "path": "/en/docs/store-indexed/api/ObservableObject",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
     },
     {
-      "path": "/en/docs/store-indexed/api/ObservableSet-class",
+      "path": "/en/docs/store-indexed/api/ObservableSet",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
@@ -11038,30 +10678,6 @@
     },
     {
       "path": "/en/docs/store-indexed/api/createStoreIndexedTypeError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/en/docs/store-indexed/api/observableArray-function",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/en/docs/store-indexed/api/observableMap-function",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/en/docs/store-indexed/api/observableObject-function",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/en/docs/store-indexed/api/observableSet-function",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
@@ -11182,12 +10798,6 @@
     },
     {
       "path": "/en/docs/store-keyed/api/IStoreKeyedErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/KeyedSplitCache",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -11343,12 +10953,6 @@
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/api/computeUniqueKeys",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/en/docs/store-keyed/api/createStoreKeyedAggregateError",
       "locale": "en",
       "domain": "docs",
@@ -11385,18 +10989,6 @@
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/api/filterOutKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/findKeyIndex",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/en/docs/store-keyed/api/focusDef",
       "locale": "en",
       "domain": "docs",
@@ -11404,6 +10996,72 @@
     },
     {
       "path": "/en/docs/store-keyed/api/opticDef",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/KeyedSplitCache",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/computeUniqueKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/filterOutKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/findKeyIndex",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/readOpticPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/replaceAtIndex",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/requireKeyIndex",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/shallowArrayEquals",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/spliceInsert",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/optics/writeOpticPath",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -11428,12 +11086,6 @@
     },
     {
       "path": "/en/docs/store-keyed/api/reactive/atom/IAtomSetter",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/reactive/atom/IAtomUpdate",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -11469,49 +11121,13 @@
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/api/readOpticPath",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/replaceAtIndex",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/requireKeyIndex",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/en/docs/store-keyed/api/selectDef",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/api/shallowArrayEquals",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/spliceInsert",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/en/docs/store-keyed/api/splitDef",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/en/docs/store-keyed/api/writeOpticPath",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -11619,12 +11235,6 @@
       "library": "store-light"
     },
     {
-      "path": "/en/docs/store-light/api/ILegacyFieldBuilder",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/en/docs/store-light/api/IMutationGuard",
       "locale": "en",
       "domain": "docs",
@@ -11703,12 +11313,6 @@
       "library": "store-light"
     },
     {
-      "path": "/en/docs/store-light/api/IStoreResourceKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/en/docs/store-light/api/IStoreResourceLoadContext",
       "locale": "en",
       "domain": "docs",
@@ -11764,12 +11368,6 @@
     },
     {
       "path": "/en/docs/store-light/api/StoreLightErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
-      "path": "/en/docs/store-light/api/StoreResourceKind",
       "locale": "en",
       "domain": "docs",
       "library": "store-light"
@@ -11937,12 +11535,6 @@
       "library": "store-middleware"
     },
     {
-      "path": "/en/docs/store-middleware/api/IMiddlewareContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
       "path": "/en/docs/store-middleware/api/IMiddlewareErrorEvent",
       "locale": "en",
       "domain": "docs",
@@ -11973,19 +11565,13 @@
       "library": "store-middleware"
     },
     {
-      "path": "/en/docs/store-middleware/api/IMutationGuard",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/en/docs/store-middleware/api/IMutationPolicy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
       "path": "/en/docs/store-middleware/api/IMutationPolicyMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/api/IReduxDevToolsCommand",
       "locale": "en",
       "domain": "docs",
       "library": "store-middleware"
@@ -11998,12 +11584,6 @@
     },
     {
       "path": "/en/docs/store-middleware/api/IReduxDevToolsMessage",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/en/docs/store-middleware/api/IStoreMiddleware",
       "locale": "en",
       "domain": "docs",
       "library": "store-middleware"
@@ -12075,6 +11655,12 @@
       "library": "store-middleware"
     },
     {
+      "path": "/en/docs/store-middleware/api/ReduxDevToolsCommand",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/en/docs/store-middleware/api/STORE_MIDDLEWARE_SOURCE",
       "locale": "en",
       "domain": "docs",
@@ -12129,12 +11715,6 @@
       "library": "store-middleware"
     },
     {
-      "path": "/en/docs/store-middleware/api/middlewarePlugin",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
       "path": "/en/docs/store-middleware/api/tolerant-clone",
       "locale": "en",
       "domain": "docs",
@@ -12166,12 +11746,6 @@
     },
     {
       "path": "/en/docs/store-middleware/api/tolerant-clone/opaqueReferenceClone",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/en/docs/store-middleware/api/tolerant-clone/tolerantClone",
       "locale": "en",
       "domain": "docs",
       "library": "store-middleware"
@@ -12244,12 +11818,6 @@
     },
     {
       "path": "/en/docs/store-persist/api/IHydrationStatus",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-persist"
-    },
-    {
-      "path": "/en/docs/store-persist/api/IPersistCodecOutput",
       "locale": "en",
       "domain": "docs",
       "library": "store-persist"
@@ -12873,12 +12441,6 @@
       "library": "store-shared"
     },
     {
-      "path": "/en/docs/store-shared/api/ISharedWaitMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-shared"
-    },
-    {
       "path": "/en/docs/store-shared/api/IStoreSharedErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -12898,12 +12460,6 @@
     },
     {
       "path": "/en/docs/store-shared/api/SharedInt32Signal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-shared"
-    },
-    {
-      "path": "/en/docs/store-shared/api/SharedWaitMode",
       "locale": "en",
       "domain": "docs",
       "library": "store-shared"
@@ -13101,12 +12657,6 @@
       "library": "store-ssr"
     },
     {
-      "path": "/en/docs/store-ssr/api/ISsrWorkOutcome",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-ssr"
-    },
-    {
       "path": "/en/docs/store-ssr/api/IStoreSsrErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -13132,12 +12682,6 @@
     },
     {
       "path": "/en/docs/store-ssr/api/SsrWireType",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-ssr"
-    },
-    {
-      "path": "/en/docs/store-ssr/api/SsrWorkOutcome",
       "locale": "en",
       "domain": "docs",
       "library": "store-ssr"
@@ -13305,12 +12849,6 @@
       "library": "store-wasm"
     },
     {
-      "path": "/en/docs/store-wasm/api/IWasmFieldMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-wasm"
-    },
-    {
       "path": "/en/docs/store-wasm/api/IWasmReservedKey",
       "locale": "en",
       "domain": "docs",
@@ -13324,12 +12862,6 @@
     },
     {
       "path": "/en/docs/store-wasm/api/StoreWasmErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-wasm"
-    },
-    {
-      "path": "/en/docs/store-wasm/api/WasmFieldMode",
       "locale": "en",
       "domain": "docs",
       "library": "store-wasm"
@@ -13563,61 +13095,43 @@
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize",
+      "path": "/en/docs/store-worker/api/serialize/worker",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize/IWorkerFailureEvent",
+      "path": "/en/docs/store-worker/api/serialize/worker/IWorkerFailureEvent",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize/IWorkerLike",
+      "path": "/en/docs/store-worker/api/serialize/worker/IWorkerLike",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize/IWorkerPluginOptions",
+      "path": "/en/docs/store-worker/api/serialize/worker/IWorkerPluginOptions",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize/createSerializeWorkerHandler",
+      "path": "/en/docs/store-worker/api/serialize/worker/createSerializeWorkerHandler",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize/decodeWorkerValue",
+      "path": "/en/docs/store-worker/api/serialize/worker/workerParser",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/en/docs/store-worker/api/serialize/encodeWorkerValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-worker"
-    },
-    {
-      "path": "/en/docs/store-worker/api/serialize/transferablesOf",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-worker"
-    },
-    {
-      "path": "/en/docs/store-worker/api/serialize/workerParser",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-worker"
-    },
-    {
-      "path": "/en/docs/store-worker/api/serialize/workerPlugin",
+      "path": "/en/docs/store-worker/api/serialize/worker/workerPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
@@ -14637,25 +14151,13 @@
       "library": "tray"
     },
     {
-      "path": "/en/docs/tray/api/TrayInstanceEvent-const",
+      "path": "/en/docs/tray/api/TrayInstanceEvent",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
     },
     {
-      "path": "/en/docs/tray/api/TrayInstanceEvent-type",
-      "locale": "en",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/en/docs/tray/api/TrayInstanceState-const",
-      "locale": "en",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/en/docs/tray/api/TrayInstanceState-type",
+      "path": "/en/docs/tray/api/TrayInstanceState",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -14721,31 +14223,7 @@
       "library": "tray"
     },
     {
-      "path": "/en/docs/tray/api/host/ICanResolveReadyDefinitions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
       "path": "/en/docs/tray/api/host/ICreateHostOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/en/docs/tray/api/host/IHostBaselinePlugins",
-      "locale": "en",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/en/docs/tray/api/host/IPluginWithSynchronousShared",
-      "locale": "en",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/en/docs/tray/api/host/IResolveReadyTrayPlugins",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -15082,12 +14560,6 @@
     },
     {
       "path": "/en/docs/utils/api/ICollector",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/ICollectorActions",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -15483,12 +14955,6 @@
       "library": "utils"
     },
     {
-      "path": "/en/docs/utils/api/function/IThenableProbeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/en/docs/utils/api/function/MAX_NATIVE_RECURSION_DEPTH",
       "locale": "en",
       "domain": "docs",
@@ -15831,12 +15297,6 @@
       "library": "utils"
     },
     {
-      "path": "/en/docs/utils/api/promise/IAbortControllerLike",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/en/docs/utils/api/promise/IAbortOperation",
       "locale": "en",
       "domain": "docs",
@@ -15999,12 +15459,6 @@
       "library": "utils"
     },
     {
-      "path": "/en/docs/utils/api/scheduler/IManualScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/en/docs/utils/api/scheduler/IScheduledTask",
       "locale": "en",
       "domain": "docs",
@@ -16018,12 +15472,6 @@
     },
     {
       "path": "/en/docs/utils/api/scheduler/IWallClock",
-      "locale": "en",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/en/docs/utils/api/scheduler/createManualScheduler",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -16078,6 +15526,24 @@
     },
     {
       "path": "/en/docs/utils/api/string/tryString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing/IManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/testing/createManualScheduler",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -16443,19 +15909,7 @@
       "library": "capability"
     },
     {
-      "path": "/zh/docs/capability/api/ICapabilityStateValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
       "path": "/zh/docs/capability/api/IGraphReadinessSnapshot",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/api/IGraphReadinessState",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
@@ -16762,12 +16216,6 @@
     },
     {
       "path": "/zh/docs/capability/api/graph/dynamic/IGraphBindingReleaseEntry",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/api/graph/dynamic/IGraphBindingReleaseReason",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
@@ -17157,12 +16605,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/api/defineEventApiStyle",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/zh/docs/event-subscriber/api/invokeEachLive",
       "locale": "zh",
       "domain": "docs",
@@ -17373,12 +16815,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/ILifecycleErrorPolicy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/ILifecycleErrorText",
       "locale": "zh",
       "domain": "docs",
@@ -17392,18 +16828,6 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/ILifecycleState",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/ILifecycleStateValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/ILifecycleUnitStateValue",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -17469,12 +16893,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/IUnitState",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/LifecycleErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -17494,12 +16912,6 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/LifecycleState",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/LifecycleUnitState",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -17685,24 +17097,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/errors/createLifecycleError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/errors/createLifecycleFailure",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/errors/createLifecycleTypeError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/generation",
       "locale": "zh",
       "domain": "docs",
@@ -17788,12 +17182,6 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/scheduler",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/scheduler/addSchedulerTime",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -17992,12 +17380,6 @@
     },
     {
       "path": "/zh/docs/logger/api/ILoggerCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "logger"
-    },
-    {
-      "path": "/zh/docs/logger/api/ILoggerDomainCore",
       "locale": "zh",
       "domain": "docs",
       "library": "logger"
@@ -18207,12 +17589,6 @@
       "library": "logger"
     },
     {
-      "path": "/zh/docs/logger/api/plugins/IColorMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "logger"
-    },
-    {
       "path": "/zh/docs/logger/api/plugins/IColorPluginConfig",
       "locale": "zh",
       "domain": "docs",
@@ -18238,12 +17614,6 @@
     },
     {
       "path": "/zh/docs/logger/api/plugins/ILevelPluginExt",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "logger"
-    },
-    {
-      "path": "/zh/docs/logger/api/plugins/ILogLevel",
       "locale": "zh",
       "domain": "docs",
       "library": "logger"
@@ -18543,12 +17913,6 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/zh/docs/middleware-pipeline/api/IMiddlewarePipelineSyncMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "middleware-pipeline"
-    },
-    {
       "path": "/zh/docs/middleware-pipeline/api/IMiddlewarePipelineViolation",
       "locale": "zh",
       "domain": "docs",
@@ -18640,6 +18004,12 @@
     },
     {
       "path": "/zh/docs/plugin-host/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/ERROR_TEXT",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -19083,12 +18453,6 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/api/IPluginRegistrationReceipt",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/zh/docs/plugin-host/api/IPluginRemoval",
       "locale": "zh",
       "domain": "docs",
@@ -19209,12 +18573,6 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/api/composition/buildManagedPort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/zh/docs/plugin-host/api/composition/createView",
       "locale": "zh",
       "domain": "docs",
@@ -19234,18 +18592,6 @@
     },
     {
       "path": "/zh/docs/plugin-host/api/composition/openComposition",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/api/composition/registerManagedHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/api/createRegistrationView",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -19444,12 +18790,6 @@
     },
     {
       "path": "/zh/docs/reactive/api/REACTIVE_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/ReactiveDependencyKind",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
@@ -20493,12 +19833,6 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/api/framing/IRpcReassembler",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
       "path": "/zh/docs/rpc-contract/api/framing/assertRpcPhysicalFrameSize",
       "locale": "zh",
       "domain": "docs",
@@ -20512,12 +19846,6 @@
     },
     {
       "path": "/zh/docs/rpc-contract/api/framing/createBinaryFramer",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/zh/docs/rpc-contract/api/framing/createReassembler",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -20590,12 +19918,6 @@
     },
     {
       "path": "/zh/docs/rpc-contract/api/framing/messageFramerV1",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-contract"
-    },
-    {
-      "path": "/zh/docs/rpc-contract/api/framing/processStringFramer",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -21135,6 +20457,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/api/schema/wire-error/default",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/api/stream",
       "locale": "zh",
       "domain": "docs",
@@ -21543,18 +20871,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/api/IFactoryDiscoveryMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/api/IFactoryPingCapability",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/zh/docs/rpc-core/api/IRpcAbortCapability",
       "locale": "zh",
       "domain": "docs",
@@ -21831,12 +21147,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/api/IRpcPlatform",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/zh/docs/rpc-core/api/IRpcPlugin",
       "locale": "zh",
       "domain": "docs",
@@ -21903,12 +21213,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/api/IRpcPublicError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/zh/docs/rpc-core/api/IRpcReplayCapacityDetail",
       "locale": "zh",
       "domain": "docs",
@@ -21958,12 +21262,6 @@
     },
     {
       "path": "/zh/docs/rpc-core/api/IRpcTimeoutConfig",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/api/IRpcTransportTopology",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -22281,25 +21579,7 @@
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/api/composed/IRecursiveProvideSurface",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/zh/docs/rpc-core/api/composed/IRpcCoreConfig",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/api/composed/IRpcKernelSurface",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/api/composed/IRpcRootProjection",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -22318,12 +21598,6 @@
     },
     {
       "path": "/zh/docs/rpc-core/api/contract",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/api/createAuthenticationNonce",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -23559,6 +22833,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/zh/docs/rpc-core/api/transport-kit/identifyRpcBoundaryFailure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/zh/docs/rpc-core/api/transport-kit/observeListener",
       "locale": "zh",
       "domain": "docs",
@@ -24148,18 +23428,6 @@
     },
     {
       "path": "/zh/docs/rpc-process/api/IProcessDependencyHostPort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-process"
-    },
-    {
-      "path": "/zh/docs/rpc-process/api/IProcessHostRegistrationApproval",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-process"
-    },
-    {
-      "path": "/zh/docs/rpc-process/api/IProcessHostRegistrations",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-process"
@@ -24849,6 +24117,12 @@
       "library": "rpc-threads"
     },
     {
+      "path": "/zh/docs/rpc-threads/api/INodeThreadHandle",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
       "path": "/zh/docs/rpc-threads/api/IRpcThreadErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -25011,6 +24285,18 @@
       "library": "rpc-threads"
     },
     {
+      "path": "/zh/docs/rpc-threads/api/IWebThreadHandle",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/api/IWebThreadLauncherOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
       "path": "/zh/docs/rpc-threads/api/IWebThreadWorker",
       "locale": "zh",
       "domain": "docs",
@@ -25035,79 +24321,7 @@
       "library": "rpc-threads"
     },
     {
-      "path": "/zh/docs/rpc-threads/api/adapters/browser",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/browser/IWebThreadHandle",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/browser/IWebThreadLauncherOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/browser/createBrowserThreadChannelFactory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/browser/createBrowserThreadLauncher",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/bun",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/bun/createBunThreadChannelFactory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/bun/createBunThreadLauncher",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/deno",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/deno/createDenoThreadChannelFactory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/deno/createDenoThreadLauncher",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
       "path": "/zh/docs/rpc-threads/api/adapters/electron-main",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/electron-main/INodeThreadHandle",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-threads"
@@ -25120,24 +24334,6 @@
     },
     {
       "path": "/zh/docs/rpc-threads/api/adapters/electron-main/createElectronMainThreadLauncher",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/electron-renderer",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadLauncher",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-threads"
@@ -25287,12 +24483,6 @@
       "library": "serialize"
     },
     {
-      "path": "/zh/docs/serialize/api/ISerializeChunkKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
       "path": "/zh/docs/serialize/api/ISerializeCleanupKind",
       "locale": "zh",
       "domain": "docs",
@@ -25413,19 +24603,7 @@
       "library": "serialize"
     },
     {
-      "path": "/zh/docs/serialize/api/codec/assertCodecVersion",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
       "path": "/zh/docs/serialize/api/codec/assertPortableValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/zh/docs/serialize/api/codec/createCodecError",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -25467,25 +24645,13 @@
       "library": "serialize"
     },
     {
-      "path": "/zh/docs/serialize/api/codecs/identity",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/zh/docs/serialize/api/codecs/identity/identityCodec",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/zh/docs/serialize/api/codecs/identity/identityCodecV1",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
       "path": "/zh/docs/serialize/api/codecs/identity/v1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/api/codecs/identity/v1/identityCodec",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -25581,7 +24747,7 @@
       "library": "serialize"
     },
     {
-      "path": "/zh/docs/serialize/api/core/ISerializeChunkType",
+      "path": "/zh/docs/serialize/api/core/ISerializeChunkKind",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -26037,12 +25203,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/IStorageContractConflictPolicy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/IStorageContractErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -26104,12 +25264,6 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/STORAGE_CONTRACT_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/StorageContractConflictPolicy",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -26199,12 +25353,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/isArrayBuffer",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/isChangeFeedStore",
       "locale": "zh",
       "domain": "docs",
@@ -26236,12 +25384,6 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/isStorageContractError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/isUint8Array",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -26691,12 +25833,6 @@
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/api/host/STORAGE_LIVE_QUERY_SERVICE_NAME",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
       "path": "/zh/docs/storage-web/api/host/StorageHostFacade",
       "locale": "zh",
       "domain": "docs",
@@ -26722,24 +25858,6 @@
     },
     {
       "path": "/zh/docs/storage-web/api/host/definePlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/docs/storage-web/api/host/pluginNameFromBackendId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/docs/storage-web/api/host/reactiveAdapterNameFromBackendId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-web"
-    },
-    {
-      "path": "/zh/docs/storage-web/api/host/readStorageNativePluginMetadata",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
@@ -27165,12 +26283,6 @@
       "library": "store-devtools"
     },
     {
-      "path": "/zh/docs/store-devtools/api/IStoreDevtoolsCommand",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-devtools"
-    },
-    {
       "path": "/zh/docs/store-devtools/api/IStoreDevtoolsErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -27184,12 +26296,6 @@
     },
     {
       "path": "/zh/docs/store-devtools/api/STORE_DEVTOOLS_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-devtools"
-    },
-    {
-      "path": "/zh/docs/store-devtools/api/StoreDevtoolsCommand",
       "locale": "zh",
       "domain": "docs",
       "library": "store-devtools"
@@ -27321,25 +26427,25 @@
       "library": "store-indexed"
     },
     {
-      "path": "/zh/docs/store-indexed/api/ObservableArray-class",
+      "path": "/zh/docs/store-indexed/api/ObservableArray",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
     },
     {
-      "path": "/zh/docs/store-indexed/api/ObservableMap-class",
+      "path": "/zh/docs/store-indexed/api/ObservableMap",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
     },
     {
-      "path": "/zh/docs/store-indexed/api/ObservableObject-class",
+      "path": "/zh/docs/store-indexed/api/ObservableObject",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
     },
     {
-      "path": "/zh/docs/store-indexed/api/ObservableSet-class",
+      "path": "/zh/docs/store-indexed/api/ObservableSet",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
@@ -27370,30 +26476,6 @@
     },
     {
       "path": "/zh/docs/store-indexed/api/createStoreIndexedTypeError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/zh/docs/store-indexed/api/observableArray-function",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/zh/docs/store-indexed/api/observableMap-function",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/zh/docs/store-indexed/api/observableObject-function",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-indexed"
-    },
-    {
-      "path": "/zh/docs/store-indexed/api/observableSet-function",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
@@ -27514,12 +26596,6 @@
     },
     {
       "path": "/zh/docs/store-keyed/api/IStoreKeyedErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/KeyedSplitCache",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -27675,12 +26751,6 @@
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/api/computeUniqueKeys",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/zh/docs/store-keyed/api/createStoreKeyedAggregateError",
       "locale": "zh",
       "domain": "docs",
@@ -27717,18 +26787,6 @@
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/api/filterOutKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/findKeyIndex",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/zh/docs/store-keyed/api/focusDef",
       "locale": "zh",
       "domain": "docs",
@@ -27736,6 +26794,72 @@
     },
     {
       "path": "/zh/docs/store-keyed/api/opticDef",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/KeyedSplitCache",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/computeUniqueKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/filterOutKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/findKeyIndex",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/readOpticPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/replaceAtIndex",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/requireKeyIndex",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/shallowArrayEquals",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/spliceInsert",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/optics/writeOpticPath",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -27760,12 +26884,6 @@
     },
     {
       "path": "/zh/docs/store-keyed/api/reactive/atom/IAtomSetter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/reactive/atom/IAtomUpdate",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -27801,49 +26919,13 @@
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/api/readOpticPath",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/replaceAtIndex",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/requireKeyIndex",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/zh/docs/store-keyed/api/selectDef",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/api/shallowArrayEquals",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/spliceInsert",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
       "path": "/zh/docs/store-keyed/api/splitDef",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-keyed"
-    },
-    {
-      "path": "/zh/docs/store-keyed/api/writeOpticPath",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -27951,12 +27033,6 @@
       "library": "store-light"
     },
     {
-      "path": "/zh/docs/store-light/api/ILegacyFieldBuilder",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/zh/docs/store-light/api/IMutationGuard",
       "locale": "zh",
       "domain": "docs",
@@ -28035,12 +27111,6 @@
       "library": "store-light"
     },
     {
-      "path": "/zh/docs/store-light/api/IStoreResourceKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/zh/docs/store-light/api/IStoreResourceLoadContext",
       "locale": "zh",
       "domain": "docs",
@@ -28096,12 +27166,6 @@
     },
     {
       "path": "/zh/docs/store-light/api/StoreLightErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
-      "path": "/zh/docs/store-light/api/StoreResourceKind",
       "locale": "zh",
       "domain": "docs",
       "library": "store-light"
@@ -28269,12 +27333,6 @@
       "library": "store-middleware"
     },
     {
-      "path": "/zh/docs/store-middleware/api/IMiddlewareContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
       "path": "/zh/docs/store-middleware/api/IMiddlewareErrorEvent",
       "locale": "zh",
       "domain": "docs",
@@ -28305,19 +27363,13 @@
       "library": "store-middleware"
     },
     {
-      "path": "/zh/docs/store-middleware/api/IMutationGuard",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/zh/docs/store-middleware/api/IMutationPolicy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
       "path": "/zh/docs/store-middleware/api/IMutationPolicyMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/api/IReduxDevToolsCommand",
       "locale": "zh",
       "domain": "docs",
       "library": "store-middleware"
@@ -28330,12 +27382,6 @@
     },
     {
       "path": "/zh/docs/store-middleware/api/IReduxDevToolsMessage",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/zh/docs/store-middleware/api/IStoreMiddleware",
       "locale": "zh",
       "domain": "docs",
       "library": "store-middleware"
@@ -28407,6 +27453,12 @@
       "library": "store-middleware"
     },
     {
+      "path": "/zh/docs/store-middleware/api/ReduxDevToolsCommand",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/zh/docs/store-middleware/api/STORE_MIDDLEWARE_SOURCE",
       "locale": "zh",
       "domain": "docs",
@@ -28461,12 +27513,6 @@
       "library": "store-middleware"
     },
     {
-      "path": "/zh/docs/store-middleware/api/middlewarePlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
       "path": "/zh/docs/store-middleware/api/tolerant-clone",
       "locale": "zh",
       "domain": "docs",
@@ -28498,12 +27544,6 @@
     },
     {
       "path": "/zh/docs/store-middleware/api/tolerant-clone/opaqueReferenceClone",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-middleware"
-    },
-    {
-      "path": "/zh/docs/store-middleware/api/tolerant-clone/tolerantClone",
       "locale": "zh",
       "domain": "docs",
       "library": "store-middleware"
@@ -28576,12 +27616,6 @@
     },
     {
       "path": "/zh/docs/store-persist/api/IHydrationStatus",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-persist"
-    },
-    {
-      "path": "/zh/docs/store-persist/api/IPersistCodecOutput",
       "locale": "zh",
       "domain": "docs",
       "library": "store-persist"
@@ -29205,12 +28239,6 @@
       "library": "store-shared"
     },
     {
-      "path": "/zh/docs/store-shared/api/ISharedWaitMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-shared"
-    },
-    {
       "path": "/zh/docs/store-shared/api/IStoreSharedErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -29230,12 +28258,6 @@
     },
     {
       "path": "/zh/docs/store-shared/api/SharedInt32Signal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-shared"
-    },
-    {
-      "path": "/zh/docs/store-shared/api/SharedWaitMode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-shared"
@@ -29433,12 +28455,6 @@
       "library": "store-ssr"
     },
     {
-      "path": "/zh/docs/store-ssr/api/ISsrWorkOutcome",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-ssr"
-    },
-    {
       "path": "/zh/docs/store-ssr/api/IStoreSsrErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -29464,12 +28480,6 @@
     },
     {
       "path": "/zh/docs/store-ssr/api/SsrWireType",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-ssr"
-    },
-    {
-      "path": "/zh/docs/store-ssr/api/SsrWorkOutcome",
       "locale": "zh",
       "domain": "docs",
       "library": "store-ssr"
@@ -29637,12 +28647,6 @@
       "library": "store-wasm"
     },
     {
-      "path": "/zh/docs/store-wasm/api/IWasmFieldMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-wasm"
-    },
-    {
       "path": "/zh/docs/store-wasm/api/IWasmReservedKey",
       "locale": "zh",
       "domain": "docs",
@@ -29656,12 +28660,6 @@
     },
     {
       "path": "/zh/docs/store-wasm/api/StoreWasmErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-wasm"
-    },
-    {
-      "path": "/zh/docs/store-wasm/api/WasmFieldMode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-wasm"
@@ -29895,61 +28893,43 @@
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize",
+      "path": "/zh/docs/store-worker/api/serialize/worker",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize/IWorkerFailureEvent",
+      "path": "/zh/docs/store-worker/api/serialize/worker/IWorkerFailureEvent",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize/IWorkerLike",
+      "path": "/zh/docs/store-worker/api/serialize/worker/IWorkerLike",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize/IWorkerPluginOptions",
+      "path": "/zh/docs/store-worker/api/serialize/worker/IWorkerPluginOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize/createSerializeWorkerHandler",
+      "path": "/zh/docs/store-worker/api/serialize/worker/createSerializeWorkerHandler",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize/decodeWorkerValue",
+      "path": "/zh/docs/store-worker/api/serialize/worker/workerParser",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
     },
     {
-      "path": "/zh/docs/store-worker/api/serialize/encodeWorkerValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-worker"
-    },
-    {
-      "path": "/zh/docs/store-worker/api/serialize/transferablesOf",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-worker"
-    },
-    {
-      "path": "/zh/docs/store-worker/api/serialize/workerParser",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-worker"
-    },
-    {
-      "path": "/zh/docs/store-worker/api/serialize/workerPlugin",
+      "path": "/zh/docs/store-worker/api/serialize/worker/workerPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
@@ -30969,25 +29949,13 @@
       "library": "tray"
     },
     {
-      "path": "/zh/docs/tray/api/TrayInstanceEvent-const",
+      "path": "/zh/docs/tray/api/TrayInstanceEvent",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
     },
     {
-      "path": "/zh/docs/tray/api/TrayInstanceEvent-type",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/zh/docs/tray/api/TrayInstanceState-const",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/zh/docs/tray/api/TrayInstanceState-type",
+      "path": "/zh/docs/tray/api/TrayInstanceState",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -31053,31 +30021,7 @@
       "library": "tray"
     },
     {
-      "path": "/zh/docs/tray/api/host/ICanResolveReadyDefinitions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
       "path": "/zh/docs/tray/api/host/ICreateHostOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/zh/docs/tray/api/host/IHostBaselinePlugins",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/zh/docs/tray/api/host/IPluginWithSynchronousShared",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "tray"
-    },
-    {
-      "path": "/zh/docs/tray/api/host/IResolveReadyTrayPlugins",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -31414,12 +30358,6 @@
     },
     {
       "path": "/zh/docs/utils/api/ICollector",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/zh/docs/utils/api/ICollectorActions",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -31815,12 +30753,6 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/utils/api/function/IThenableProbeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/zh/docs/utils/api/function/MAX_NATIVE_RECURSION_DEPTH",
       "locale": "zh",
       "domain": "docs",
@@ -32163,12 +31095,6 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/utils/api/promise/IAbortControllerLike",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/zh/docs/utils/api/promise/IAbortOperation",
       "locale": "zh",
       "domain": "docs",
@@ -32331,12 +31257,6 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/utils/api/scheduler/IManualScheduler",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
       "path": "/zh/docs/utils/api/scheduler/IScheduledTask",
       "locale": "zh",
       "domain": "docs",
@@ -32350,12 +31270,6 @@
     },
     {
       "path": "/zh/docs/utils/api/scheduler/IWallClock",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "utils"
-    },
-    {
-      "path": "/zh/docs/utils/api/scheduler/createManualScheduler",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -32410,6 +31324,24 @@
     },
     {
       "path": "/zh/docs/utils/api/string/tryString",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/testing",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/testing/IManualScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/testing/createManualScheduler",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

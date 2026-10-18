@@ -55,7 +55,7 @@
                   ["需要失败重试", "`retry`/`retryDelay` 支持固定次数或自定义判断/退避策略"],
                   [
                     "需要 SSR/持久化快照恢复",
-                    "`dehydrate()`/`hydrate()`/`initialSnapshot` 把成功值序列化后原样恢复，不用重新请求一次"
+                    "`dehydrate()`/`hydrate()`/`initialSnapshot` 传递成功数据及剩余 TTL，在接收端恢复本地有效期"
                   ],
                   [
                     "需要在 Worker/RPC 场景复用同一套状态机",
@@ -82,7 +82,7 @@
                   "取消语义分层：`cancel()` 只中止当前请求且资源仍可复用，`dispose()` 彻底终结资源、清理依赖和订阅。",
                   "缓存与后台刷新：`ttl` 控制过期时间，`staleWhileRevalidate: true` 时刷新期间继续展示旧成功值，通过 `refreshing` 区分是否在后台刷新。",
                   "重试与退避策略可配置：`retry` 接受固定次数或 `(failureCount, error) => boolean` 判断函数，`retryDelay` 同理支持固定值或按失败次数计算的函数。",
-                  "SSR/持久化快照：`dehydrate()` 导出 JSON 安全的成功快照，`hydrate()`/`initialSnapshot` 在另一端原样恢复，不需要重新发起请求。"
+                  "SSR/持久化快照：`dehydrate()` 导出 v2 成功快照（`data`、`ageMs`、`remainingTtlMs`）；在另一端按本地单调时钟恢复剩余 TTL。`data` 不复制、不编码，调用方保证其可序列化，并扣除已知传输/存储耗时；新鲜快照不立即请求。"
                 ]
               }
             ]
@@ -98,7 +98,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "构造函数默认 `autoStart: true`，因此 `new Resource(.)` 会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。"
+                "text": "构造函数默认 `autoStart: true`，没有新鲜 `initialSnapshot` 时会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`；新鲜初始快照保留 `success`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。"
               },
               {
                 "type": "paragraph",
@@ -106,7 +106,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，但释放后再读 `state`、调用 `refetch()` 或其他公开操作都会抛出 `RESOURCE_DISPOSED`；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。"
+                "text": "`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`，诊断 getter 与幂等清理入口仍可调用；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。"
               },
               {
                 "type": "paragraph",
@@ -123,7 +123,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`selectUser('2')` 后，Reactive 会把同一批次内对 `userId` 的多次写入合并，再通过 idle/microtask 通道通知 Resource。Resource 创建新的 request generation，并 abort 被取代 generation 的 `signal`；`fetchUser('2', .)` 的 pending/success/error 状态写入内部 Signal，观察 `user.state` 的 Effect 随之重跑。即使旧请求不支持 AbortSignal 并在稍后返回，generation 校验也会丢弃旧结果。"
+                "text": "`selectUser('2')` 后，Reactive 会把同一批次内对 `userId` 的多次写入合并，再通过 idle/microtask 通道通知 Resource。Resource 创建新的 request generation，并 abort 被取代 generation 的 `signal`；`fetchUser('2', ...)` 的 pending/success/error 状态写入内部 Signal，观察 `user.state` 的 Effect 随之重跑。即使旧请求不支持 AbortSignal 并在稍后返回，generation 校验也会丢弃旧结果。"
               },
               {
                 "type": "paragraph",
@@ -158,7 +158,7 @@
                   ],
                   [
                     "TTL / 过期",
-                    "成功值的新鲜时长；过期后下一次读取会触发新请求（除非正在 pending）"
+                    "正有限值控制新鲜时长；`0` 和 `Infinity` 不因时间流逝过期，仍响应依赖变化与显式刷新"
                   ],
                   [
                     "Suspense 读取",
@@ -189,11 +189,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4."
-              },
-              {
-                "type": "paragraph",
-                "text": "不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；`dispose()` 之后所有方法调用都会抛错。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（清理依赖登记、让缓存过期），下次被观察时会重新发起请求；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
+                "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4. 不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 与再次 `dispose()` 是安全空操作。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（断开上游边、保留依赖版本与缓存），下次读取先核对依赖；依赖未变且缓存新鲜时复用原值和 Promise，依赖已变则重拉；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
               },
               {
                 "type": "paragraph",
@@ -215,11 +211,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`peekState()` inspects the state union without starting work or tracking. `reset()` cancels the current request and clears the cache to reusable idle state; the old shared Promise immediately rejects with Resource `REQUEST_ABORTED`/native `AbortError`. `IResourceFetchContext` carries readonly signal/generation/token from lifecycle; retries share identity, resets/replacements advance generation."
+                "text": "`peekState()` inspects the state union without starting work or tracking. `reset()` cancels the current request and clears the cache to reusable idle state; the old shared Promise immediately rejects with Resource `REQUEST_ABORTED`/native `AbortError`. `IResourceFetchContext` carries readonly signal/generation/token from lifecycle; retries share identity, resets/replacements advance generation. Loaded-value disposal and rendered-version leases remain adapter responsibilities. See USEGUIDE for the complete reset example."
               },
               {
                 "type": "paragraph",
-                "text": "Loaded-value disposal and rendered-version leases remain adapter responsibilities. See USEGUIDE for the complete reset example."
+                "text": "公开类型还包括 `IResourceOptions<T>`、`IResourceState<T>`、`IResourceFetcher<T>`、`IResourceFetchContext`、`IResourceCacheSnapshot<T>`、`IResourceRetryPolicy`、`IResourceError`、`IResourceErrorCode`；`RESOURCE_SOURCE` 标识 Resource 自己产生的错误。已有完整 source/code 的外部错误保持原身份；未分类 fetch 失败最终贴 `FETCH_FAILED`，不可修改的错误保留在 cause 链。重试策略失败贴 `INVALID_OPTION`，触发它的 fetch 错误仍可达。"
               }
             ]
           }
@@ -250,7 +246,7 @@
                   "`IResourceFetcher` 与依赖追踪",
                   "快照类型 `IResourceCacheSnapshot`",
                   "底层依赖：lifecycle 原语的使用方式",
-                  "错误码：`ResourceErrorCode`（8 个码）逐条语义",
+                  "错误码：`ResourceErrorCode`（9 个码）逐条语义",
                   "高阶组合示例",
                   "排查与构建门禁"
                 ]
@@ -309,8 +305,8 @@
                 "type": "list",
                 "items": [
                   "`state: IResourceState<T>` —— 响应式状态机快照（读取会建立依赖，并顺带触发 `#ensureFresh()`：过期的 `success` 值或 `idle` 状态会自动发起新请求）。已释放时抛 `RESOURCE_DISPOSED`。",
-                  "`promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise（内部状态机异常）时抛 `NO_ACTIVE_PROMISE`。",
-                  "`disposed: boolean` —— 是否已 `dispose()`；这是唯一在已释放后仍可安全读取、不抛错的成员。",
+                  "`promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise 时抛 `NO_ACTIVE_PROMISE`。",
+                  "`disposed: boolean` —— 是否已 `dispose()`；释放后仍可安全读取；`refreshing`、`observed` 也可读。",
                   "`refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。",
                   "`fetchStatus: ResourceFetchStatus` —— 传输层状态，独立于可见的 data/error：`'fetching'` 或 `'idle'`。",
                   "`isStale: boolean` —— 当前缓存的成功值是否已超过 TTL；非 `success` 状态恒为 `false`。",
@@ -330,7 +326,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`read()` 按 React Suspense 期望的形状工作：成功返回缓存数据；`pending`/`idle` 抛出当前 `promise`；`error`/`cancelled` 抛出对应的错误对象。`peek()` 是它的非追踪版本，用于 `getSnapshot` 一类\"读当前快照但不想加入别人追踪窗口\"的场景，且不会顺手启动请求。"
+                "text": "`read()` 按 React Suspense 期望的形状工作：成功返回缓存数据；`pending`/`idle` 抛出当前 `promise`；`error`/`cancelled` 抛出对应的错误对象。`peek()` 是它的非追踪版本，用于 `getSnapshot` 一类\"读当前快照但不想加入别人追踪窗口\"的场景，且不会顺手启动请求。合法的 `autoStart: false` 初始 idle 状态尚无 Promise，直接 `peek()` 会抛 `NO_ACTIVE_PROMISE`；用 `peekState()` 检查状态或显式启动请求。"
               }
             ]
           },
@@ -360,7 +356,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "只中止当前活跃的一代请求，资源本身仍可复用；取消后被动读取保持 cancelled，显式 `refetch()` 可重启。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留\"正在刷新但没有实际请求\"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。"
+                "text": "只中止当前活跃的一代请求，资源本身仍可复用；没有活跃请求时为空操作；取消活跃请求后暂停被动重启，pending 的可见状态保持 cancelled，显式 `refetch()` 可重启。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留\"正在刷新但没有实际请求\"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。"
               }
             ]
           },
@@ -375,11 +371,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "`dehydrate()`：当前状态非 `success` 时返回 `undefined`；否则返回 JSON 安全的快照（`expiresAt` 为 `Infinity` 时序列化为 `null`）。"
+                "text": "`dehydrate()`：非 `success` 时返回 `undefined`；否则原样保留业务 `data`，同时捕获非负时长 `ageMs` 与 `remainingTtlMs`。后者为 `null` 表示无时间过期（`ttl: 0` 或无限 TTL）。任意 `T` 不保证 JSON 可序列化，BigInt/循环对象仍由调用方处理。"
               },
               {
                 "type": "paragraph",
-                "text": "`hydrate(snapshot)`：把快照原样恢复为一个 `success` 状态，不发起请求；会先作废当前活跃的请求代（`supersede()`）并清空依赖登记。快照结构非法（`version !== 1`，或 `updatedAt`/`expiresAt` 不是有限数字）抛 `INVALID_SNAPSHOT`——读取快照字段本身失败（hostile getter）时错误的 `cause` 挂原始异常。"
+                "text": "`hydrate(snapshot)`：先验证 v2，再按接收端 scheduler.now() 重建内部时间戳，作废当前请求并清空依赖，恢复 `success`。剩余寿命从 hydration 继续计时；调用方若需计入传输/存储耗时，应把已知耗时加到 `ageMs`，并从有限的 `remainingTtlMs` 扣除（最低为 0）。两端无需共享单调时钟原点。格式不是 v2、时长为负/非有限（仅 remaining 允许 null），或重建时间戳溢出时抛 `INVALID_SNAPSHOT`；getter 失败保留 cause。旧 v1 绝对时间格式明确拒绝，应在知道旧时钟基准的地方转换，接收端不能猜测。"
               }
             ]
           },
@@ -394,7 +390,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放之后调用任何其它方法（除 `disposed` 本身）一律抛 `RESOURCE_DISPOSED`。"
+                "text": "彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放后数据读取/请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 不抛错。"
               }
             ]
           },
@@ -414,12 +410,12 @@
               {
                 "type": "list",
                 "items": [
-                  "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
+                  "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`0` 与 `Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
                   "`autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。",
                   "`staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。",
                   "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。",
-                  "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
-                  "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+                  "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。",
+                  "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。",
                   "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
                   "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                 ]
@@ -433,7 +429,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
+                "code": "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
               },
               {
                 "type": "paragraph",
@@ -471,11 +467,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IResourceCacheSnapshot<T> = {\n  readonly version: 1\n  readonly data: T\n  readonly updatedAt: number\n  readonly expiresAt: number | null // null 表示无限生命周期的 JSON 安全形式\n}"
+                "code": "type IResourceCacheSnapshot<T> = {\n  readonly version: 2\n  readonly data: T\n  readonly ageMs: number\n  readonly remainingTtlMs: number | null\n}"
               },
               {
                 "type": "paragraph",
-                "text": "`dehydrate()`/`hydrate()`/`initialSnapshot` 共用的 JSON 安全快照结构。`version` 恒为 `1`（预留未来格式演进）；`expiresAt` 为 `null` 对应内部的 `Infinity`（`ttl: Infinity` 场景）。`hydrate()`/构造期 `initialSnapshot` 校验：`version !== 1`，或 `updatedAt`/非 `null` 的 `expiresAt` 不是有限数字，一律抛 `INVALID_SNAPSHOT`。"
+                "text": "快照只携带时长，不携带发送端绝对时间。`remainingTtlMs: null` 表示无时间过期；仅时间元数据可直接 JSON 编码，业务 `data` 由调用方保证可序列化。详见 hydrate() 的传输耗时责任和 v1 迁移说明。"
               }
             ]
           },
@@ -510,7 +506,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "稳定错误码表，8 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
               },
               {
                 "type": "table",
@@ -524,7 +520,7 @@
                   [
                     "`requestAborted`",
                     "`REQUEST_ABORTED`",
-                    "请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段）"
+                    "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
                   ],
                   [
                     "`requestCancelled`",
@@ -544,7 +540,7 @@
                   [
                     "`invalidSnapshot`",
                     "`INVALID_SNAPSHOT`",
-                    "`hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字"
+                    "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
                   ],
                   [
                     "`invalidOption`",
@@ -555,6 +551,11 @@
                     "`suspenseProbeFailed`",
                     "`SUSPENSE_PROBE_FAILED`",
                     "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                  ],
+                  [
+                    "`fetchFailed`",
+                    "`FETCH_FAILED`",
+                    "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
                   ]
                 ]
               },
@@ -582,7 +583,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
+                "code": "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 2, data, ageMs, remainingTtlMs }\n// 通过安全的 JSON 传输通道发送；若内嵌 HTML，必须采用适合 HTML 上下文的编码。\n// 根据已知传输/存储耗时调整 ageMs/remainingTtlMs。\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
               }
             ]
           },
@@ -615,7 +616,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "await resource.invalidate() // 立即视为过期并重新请求\nresource.cancel() // 只中止当前请求，资源仍可复用；下次读取会重新发起"
+                "code": "await resource.invalidate() // 立即视为过期并重新请求\nresource.cancel() // 只中止当前请求，资源仍可复用；被动读取保持暂停，显式 refetch() 重启"
               }
             ]
           },
@@ -630,9 +631,9 @@
                   "`cancel()`/依赖变化后底层请求似乎仍在跑：`fetcher` 没有把 `ctx.signal` 转交给真正可取消的 I/O；`cancel()` 只是让 `Resource` 忽略这次结果，不会代为中止未接收 `signal` 的请求。",
                   "重复读 `state`/`promise` 却拿不到最新数据：被动读取只在过期或 `idle` 时才发起请求，重复读不会强制刷新；需要强制刷新用 `refetch()` 或 `invalidate()`。",
                   "读取抛 `RESOURCE_DISPOSED`：`Resource` 已被 `dispose()`；停止持有该引用，创建新的 `Resource` 实例。",
-                  "读取抛 `NO_ACTIVE_PROMISE`：状态机进入了不一致的中间态，通常意味着绕过了 `refetch()`/`invalidate()`/正常构造流程直接摆弄内部状态；检查调用路径。",
-                  "`hydrate()`/`initialSnapshot` 抛 `INVALID_SNAPSHOT`：快照通常来自 SSR 序列化或持久化存储，格式漂移应在装载时就失败；检查快照的产出/序列化路径，确认 `version === 1` 且 `updatedAt`/`expiresAt` 是有限数字。",
-                  "长时间不用后再次读取，依赖似乎\"断了\"重新算了一遍：`keepAlive` 默认 `false`，无人观察时会自动休眠（清依赖、令缓存过期）；需要\"没人看也保持热数据\"时显式传 `keepAlive: true`。",
+                  "读取抛 `NO_ACTIVE_PROMISE`：合法的 `autoStart: false` idle 上直接 `peek()` 也会触发；用 `peekState()` 检查状态，或用 `promise`/`refetch()` 启动工作。",
+                  "`hydrate()`/`initialSnapshot` 抛 `INVALID_SNAPSHOT`：快照通常来自 SSR 序列化或持久化存储，格式漂移应在装载时就失败；检查快照的产出/序列化路径，确认 `version === 2`、`ageMs` 为有限非负数、`remainingTtlMs` 为有限非负数或 null。",
+                  "长时间不用后再次读取，依赖似乎\"断了\"重新算了一遍：`keepAlive` 默认 `false`，无人观察时会断开上游边但保留版本与缓存，下一次读取先核对依赖，未变且新鲜时不重拉；需要\"没人看也保持热数据\"时显式传 `keepAlive: true`。",
                   "`fetcher` 里的 Suspense 抛出没有被正确识别：若抛出值的 `.then` getter 本身抛错，会得到 `SUSPENSE_PROBE_FAILED` 而不是被当作普通 fetch 失败静默重试；检查该值为什么带有会抛错的 hostile getter。"
                 ]
               },
@@ -657,19 +658,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than materializing/throwing the value. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable."
+                "text": "`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than materializing/throwing the value. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation/token."
               },
               {
                 "type": "paragraph",
-                "text": "The old pending Promise rejects immediately with native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation/token."
-              },
-              {
-                "type": "paragraph",
-                "text": "`IResourceFetchContext` is the readonly lifecycle request identity (`signal`, monotonic `generation`, opaque `token`). Retries retain that identity; replacement requests receive a new one. Keep request identity separate from observation/suspension generations. Loaded-value ownership and render/version leases belong to adapters, not Resource's dependency graph."
-              },
-              {
-                "type": "paragraph",
-                "text": "StoreLight uses these capabilities with one Resource instance, preserving the original T and shared request Promise."
+                "text": "`IResourceFetchContext` is the readonly lifecycle request identity (`signal`, monotonic `generation`, opaque `token`). Retries retain that identity; replacement requests receive a new one. Keep request identity separate from observation/suspension generations. Loaded-value ownership and render/version leases belong to adapters, not Resource's dependency graph. StoreLight uses these capabilities with one Resource instance, preserving the original T and shared request Promise."
               },
               {
                 "type": "code",
@@ -702,32 +695,32 @@
         {
           "name": "IResourceCacheSnapshot",
           "kind": "type",
-          "signature": "export type IResourceCacheSnapshot<T> = { readonly version: 1; readonly data: T; readonly updatedAt: number; /** `null` represents an infinite lifetime in JSON-safe form. */ readonly expiresAt: number | null; };",
-          "declarationLine": 32,
+          "signature": "export type IResourceCacheSnapshot<T> = { readonly version: 2; readonly data: T; /** Elapsed cache age at capture; independent of the sending scheduler's origin. */ readonly ageMs: number; /** Remaining lifetime resumes at hydration; `null` means no time-based expiration. */ readonly remainingTtlMs: number | null; };",
+          "declarationLine": 33,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "IResourceCacheSnapshot is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceCacheSnapshot.",
-          "advanced": "No additional advanced behavior is declared for IResourceCacheSnapshot.",
+          "purpose": "Portable v2 success snapshot from `dehydrate()`, accepted by `hydrate()` and `initialSnapshot`. Durations use the receiving clock; data is neither copied, serialized nor HTML-escaped. The caller owns data encoding and transport elapsed time.",
+          "core": "version: Snapshot format version; always `2`. The old absolute-time v1 format is rejected.\ndata: The success data that was cached.\nageMs: Finite non-negative cache age in milliseconds at capture. Add known transport/storage elapsed time before hydration.\nremainingTtlMs: Finite non-negative remaining lifetime in milliseconds, or `null` for no time expiration (`ttl: 0` or `Infinity`). Subtract known transport/storage time, clamping to zero.",
+          "advanced": "Pass server-rendered data to the browser without a second request.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceCacheSnapshot."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceCacheSnapshot.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
             "dehydrate(): IResourceCacheSnapshot<T> | undefined;\nhydrate(snapshot: IResourceCacheSnapshot<T>): void;",
             "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)",
-            "type IResourceCacheSnapshot<T> = {\n  readonly version: 1\n  readonly data: T\n  readonly updatedAt: number\n  readonly expiresAt: number | null // null 表示无限生命周期的 JSON 安全形式\n}"
+            "type IResourceCacheSnapshot<T> = {\n  readonly version: 2\n  readonly data: T\n  readonly ageMs: number\n  readonly remainingTtlMs: number | null\n}"
           ],
           "members": [
             {
               "name": "version",
               "kind": "property",
               "optional": false,
-              "signature": "readonly version: 1;",
+              "signature": "readonly version: 2;",
               "description": null,
               "parameterDetails": [],
-              "returns": "1"
+              "returns": "2"
             },
             {
               "name": "data",
@@ -739,20 +732,20 @@
               "returns": "T"
             },
             {
-              "name": "updatedAt",
+              "name": "ageMs",
               "kind": "property",
               "optional": false,
-              "signature": "readonly updatedAt: number;",
-              "description": null,
+              "signature": "readonly ageMs: number;",
+              "description": "Elapsed cache age at capture; independent of the sending scheduler's origin.",
               "parameterDetails": [],
               "returns": "number"
             },
             {
-              "name": "expiresAt",
+              "name": "remainingTtlMs",
               "kind": "property",
               "optional": false,
-              "signature": "readonly expiresAt: number | null;",
-              "description": "`null` represents an infinite lifetime in JSON-safe form.",
+              "signature": "readonly remainingTtlMs: number | null;",
+              "description": "Remaining lifetime resumes at hydration; `null` means no time-based expiration.",
               "parameterDetails": [],
               "returns": "number | null"
             }
@@ -761,17 +754,17 @@
           "aliasOf": "IResourceCacheSnapshot",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IResourceCacheSnapshot<T> = { readonly version: 1; readonly data: T; readonly updatedAt: number; /** `null` represents an infinite lifetime in JSON-safe form. */ readonly expiresAt: number | null; };"
+            "export type IResourceCacheSnapshot<T> = { readonly version: 2; readonly data: T; /** Elapsed cache age at capture; independent of the sending scheduler's origin. */ readonly ageMs: number; /** Remaining lifetime resumes at hydration; `null` means no time-based expiration. */ readonly remainingTtlMs: number | null; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceCacheSnapshot when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceCacheSnapshot does not match the required inputs or return contract.",
+          "whenToUse": "Pass server-rendered data to the browser without a second request.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IResourceCacheSnapshot is part of this module's public type contract."
+              "content": "Portable v2 success snapshot from `dehydrate()`, accepted by `hydrate()` and `initialSnapshot`. Durations use the receiving clock; data is neither copied, serialized nor HTML-escaped. The caller owns data encoding and transport elapsed time."
             },
             {
               "id": "getting-started",
@@ -791,16 +784,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceCacheSnapshot."
+              "content": "version: Snapshot format version; always `2`. The old absolute-time v1 format is rejected.\ndata: The success data that was cached.\nageMs: Finite non-negative cache age in milliseconds at capture. Add known transport/storage elapsed time before hydration.\nremainingTtlMs: Finite non-negative remaining lifetime in milliseconds, or `null` for no time expiration (`ttl: 0` or `Infinity`). Subtract known transport/storage time, clamping to zero."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceCacheSnapshot."
+              "content": "Pass server-rendered data to the browser without a second request."
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/resource.class.d.ts:IResourceCacheSnapshot:export type IResourceCacheSnapshot<T> = { readonly version: 1; readonly data: T; readonly updatedAt: number; /** `null` represents an infinite lifetime in JSON-safe form. */ readonly expiresAt: number | null; };",
+          "identity": "packages/resource/dist/resource.class.d.ts:IResourceCacheSnapshot:export type IResourceCacheSnapshot<T> = { readonly version: 2; readonly data: T; /** Elapsed cache age at capture; independent of the sending scheduler's origin. */ readonly ageMs: number; /** Remaining lifetime resumes at hydration; `null` means no time-based expiration. */ readonly remainingTtlMs: number | null; };",
           "guidance": [
             {
               "id": "配置项-iresourceoptions",
@@ -818,12 +811,12 @@
                 {
                   "type": "list",
                   "items": [
-                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
+                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`0` 与 `Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
                     "`autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。",
                     "`staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。",
                     "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。",
-                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
-                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。",
+                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
                     "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
@@ -831,7 +824,7 @@
               ]
             }
           ],
-          "usageScore": 68,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "resource-index--IResourceCacheSnapshot"
         },
@@ -839,16 +832,16 @@
           "name": "IResourceError",
           "kind": "type",
           "signature": "export type IResourceError = Error & { readonly source: string; readonly code: string; };",
-          "declarationLine": 8,
+          "declarationLine": 11,
           "source": "packages/resource/dist/errors.d.ts",
-          "purpose": "Defines the workspace structural error contract (`docs/contracts/error-codes.md` §2). `source` and `code` attach as properties without replacing the error. Callers retain native type checks such as `instanceof DOMException` and `instanceof RangeError`.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceError.",
-          "advanced": "No additional advanced behavior is declared for IResourceError.",
+          "purpose": "Shape of Resource-owned failures: native errors retain their type with `source` and `code` attached where possible; immutable or primitive failures remain on `cause`. Already classified foreign failures keep their original identity.",
+          "core": "source: Always `@migaia/resource` (`RESOURCE_SOURCE`).\ncode: One of the `ResourceErrorCode` values.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [
             {
@@ -878,13 +871,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceError when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Defines the workspace structural error contract (`docs/contracts/error-codes.md` §2). `source` and `code` attach as properties without replacing the error. Callers retain native type checks such as `instanceof DOMException` and `instanceof RangeError`."
+              "content": "Shape of Resource-owned failures: native errors retain their type with `source` and `code` attached where possible; immutable or primitive failures remain on `cause`. Already classified foreign failures keep their original identity."
             },
             {
               "id": "getting-started",
@@ -904,12 +897,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceError."
+              "content": "source: Always `@migaia/resource` (`RESOURCE_SOURCE`).\ncode: One of the `ResourceErrorCode` values."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -926,7 +919,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，8 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -940,7 +933,7 @@
                     [
                       "`requestAborted`",
                       "`REQUEST_ABORTED`",
-                      "请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段）"
+                      "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
                     ],
                     [
                       "`requestCancelled`",
@@ -960,7 +953,7 @@
                     [
                       "`invalidSnapshot`",
                       "`INVALID_SNAPSHOT`",
-                      "`hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字"
+                      "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
                     ],
                     [
                       "`invalidOption`",
@@ -971,6 +964,11 @@
                       "`suspenseProbeFailed`",
                       "`SUSPENSE_PROBE_FAILED`",
                       "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                    ],
+                    [
+                      "`fetchFailed`",
+                      "`FETCH_FAILED`",
+                      "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
                     ]
                   ]
                 },
@@ -981,7 +979,7 @@
               ]
             }
           ],
-          "usageScore": 0,
+          "usageScore": 2,
           "configuration": [],
           "fragment": "resource-index--IResourceError"
         },
@@ -989,16 +987,16 @@
           "name": "IResourceErrorCode",
           "kind": "type",
           "signature": "export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode];",
-          "declarationLine": 66,
+          "declarationLine": 71,
           "source": "packages/resource/dist/error-code.d.ts",
-          "purpose": "IResourceErrorCode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceErrorCode.",
-          "advanced": "No additional advanced behavior is declared for IResourceErrorCode.",
+          "purpose": "Union of the `ResourceErrorCode` values.",
+          "core": "Union of the `ResourceErrorCode` values.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
           ],
@@ -1011,13 +1009,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceErrorCode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IResourceErrorCode is part of this module's public type contract."
+              "content": "Union of the `ResourceErrorCode` values."
             },
             {
               "id": "getting-started",
@@ -1037,12 +1035,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceErrorCode."
+              "content": "Union of the `ResourceErrorCode` values."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1059,7 +1057,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，8 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -1073,7 +1071,7 @@
                     [
                       "`requestAborted`",
                       "`REQUEST_ABORTED`",
-                      "请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段）"
+                      "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
                     ],
                     [
                       "`requestCancelled`",
@@ -1093,7 +1091,7 @@
                     [
                       "`invalidSnapshot`",
                       "`INVALID_SNAPSHOT`",
-                      "`hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字"
+                      "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
                     ],
                     [
                       "`invalidOption`",
@@ -1104,6 +1102,11 @@
                       "`suspenseProbeFailed`",
                       "`SUSPENSE_PROBE_FAILED`",
                       "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                    ],
+                    [
+                      "`fetchFailed`",
+                      "`FETCH_FAILED`",
+                      "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
                     ]
                   ]
                 },
@@ -1114,7 +1117,7 @@
               ]
             }
           ],
-          "usageScore": 10,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "resource-index--IResourceErrorCode"
         },
@@ -1124,14 +1127,14 @@
           "signature": "export type IResourceFetchContext = IGenerationRequest;",
           "declarationLine": 30,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "Readonly canonical lifecycle request: signal aborts on replacement/reset/disposal, generation advances monotonically, and the opaque token is retained across retry attempts.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceFetchContext.",
-          "advanced": "No additional advanced behavior is declared for IResourceFetchContext.",
+          "purpose": "Argument the resource passes to `fetcher` on each request: `{ signal, generation, token }`.",
+          "core": "signal: Aborts when this request is replaced, reset, cancelled or the resource is disposed; pass it to `fetch` or other cancellable I/O.\ngeneration: Request number, increasing with every new request.\ntoken: Opaque identity of this request, unchanged across its retries; compare tokens to tell requests apart.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceFetchContext."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceFetchContext.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>"
           ],
@@ -1142,13 +1145,13 @@
           "overloadSignatures": ["export type IResourceFetchContext = IGenerationRequest;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceFetchContext when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceFetchContext does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Readonly canonical lifecycle request: signal aborts on replacement/reset/disposal, generation advances monotonically, and the opaque token is retained across retry attempts."
+              "content": "Argument the resource passes to `fetcher` on each request: `{ signal, generation, token }`."
             },
             {
               "id": "getting-started",
@@ -1168,18 +1171,18 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceFetchContext."
+              "content": "signal: Aborts when this request is replaced, reset, cancelled or the resource is disposed; pass it to `fetch` or other cancellable I/O.\ngeneration: Request number, increasing with every new request.\ntoken: Opaque identity of this request, unchanged across its retries; compare tokens to tell requests apart."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceFetchContext."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/resource/dist/resource.class.d.ts:IResourceFetchContext:export type IResourceFetchContext = IGenerationRequest;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 18,
           "configuration": [],
           "fragment": "resource-index--IResourceFetchContext"
         },
@@ -1189,14 +1192,14 @@
           "signature": "export type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>;",
           "declarationLine": 31,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "IResourceFetcher is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceFetcher.",
-          "advanced": "No additional advanced behavior is declared for IResourceFetcher.",
+          "purpose": "Type of the `fetcher` passed to `new Resource()`: `(context: IResourceFetchContext) => value | PromiseLike`.",
+          "core": "Type of the `fetcher` passed to `new Resource()`: `(context: IResourceFetchContext) => value | PromiseLike`.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceFetcher."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceFetcher.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
             "type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>"
@@ -1210,13 +1213,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceFetcher when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceFetcher does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IResourceFetcher is part of this module's public type contract."
+              "content": "Type of the `fetcher` passed to `new Resource()`: `(context: IResourceFetchContext) => value | PromiseLike`."
             },
             {
               "id": "getting-started",
@@ -1236,35 +1239,35 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceFetcher."
+              "content": "Type of the `fetcher` passed to `new Resource()`: `(context: IResourceFetchContext) => value | PromiseLike`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceFetcher."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/resource/dist/resource.class.d.ts:IResourceFetcher:export type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>;",
           "guidance": [],
-          "usageScore": 40,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "resource-index--IResourceFetcher"
         },
         {
           "name": "IResourceOptions",
           "kind": "type",
-          "signature": "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing * host capabilities fail immediately instead of silently falling back to microtasks. */ scheduler?: IScheduler; };",
-          "declarationLine": 40,
+          "signature": "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh * until a dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. * Missing host capabilities fail immediately instead of silently falling back to microtasks. */ scheduler?: IScheduler; };",
+          "declarationLine": 42,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "IResourceOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceOptions.",
-          "advanced": "No additional advanced behavior is declared for IResourceOptions.",
+          "purpose": "Options of `new Resource()`: caching, retries, start-up and snapshots.",
+          "core": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.\n`0`: no retry.\nretryDelay: Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.\n`0`: retry immediately.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: Clock and timers for `ttl`, `updatedAt`, `expiresAt` and retry delays; inject a manual scheduler in tests.\n`systemScheduler` from `@migaia/utils/scheduler`.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
             "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)"
@@ -1284,7 +1287,7 @@
               "kind": "property",
               "optional": true,
               "signature": "ttl?: number;",
-              "description": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a dependency changes or `refetch()` is called.",
+              "description": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh until a dependency changes or `refetch()` is called.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -1347,7 +1350,7 @@
               "kind": "property",
               "optional": true,
               "signature": "scheduler?: IScheduler;",
-              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks.",
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks.",
               "parameterDetails": [],
               "returns": "IScheduler"
             }
@@ -1356,17 +1359,17 @@
           "aliasOf": "IResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing * host capabilities fail immediately instead of silently falling back to microtasks. */ scheduler?: IScheduler; };"
+            "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh * until a dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. * Missing host capabilities fail immediately instead of silently falling back to microtasks. */ scheduler?: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IResourceOptions is part of this module's public type contract."
+              "content": "Options of `new Resource()`: caching, retries, start-up and snapshots."
             },
             {
               "id": "getting-started",
@@ -1386,16 +1389,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceOptions."
+              "content": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.\n`0`: no retry.\nretryDelay: Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.\n`0`: retry immediately.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: Clock and timers for `ttl`, `updatedAt`, `expiresAt` and retry delays; inject a manual scheduler in tests.\n`systemScheduler` from `@migaia/utils/scheduler`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/resource.class.d.ts:IResourceOptions:export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing * host capabilities fail immediately instead of silently falling back to microtasks. */ scheduler?: IScheduler; };",
+          "identity": "packages/resource/dist/resource.class.d.ts:IResourceOptions:export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh * until a dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. * Missing host capabilities fail immediately instead of silently falling back to microtasks. */ scheduler?: IScheduler; };",
           "guidance": [
             {
               "id": "配置项-iresourceoptions",
@@ -1413,12 +1416,12 @@
                 {
                   "type": "list",
                   "items": [
-                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
+                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`0` 与 `Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
                     "`autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。",
                     "`staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。",
                     "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。",
-                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
-                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。",
+                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
                     "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
@@ -1426,7 +1429,7 @@
               ]
             }
           ],
-          "usageScore": 44,
+          "usageScore": 46,
           "configuration": [],
           "fragment": "resource-index--IResourceOptions"
         },
@@ -1434,16 +1437,16 @@
           "name": "IResourceRetryPolicy",
           "kind": "type",
           "signature": "export type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);",
-          "declarationLine": 39,
+          "declarationLine": 41,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "IResourceRetryPolicy is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceRetryPolicy.",
-          "advanced": "No additional advanced behavior is declared for IResourceRetryPolicy.",
+          "purpose": "Type of the `retry` option: a number of extra attempts or `(failureCount, error) => boolean`.",
+          "core": "Type of the `retry` option: a number of extra attempts or `(failureCount, error) => boolean`.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceRetryPolicy."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceRetryPolicy.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)"
           ],
@@ -1456,13 +1459,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceRetryPolicy when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceRetryPolicy does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IResourceRetryPolicy is part of this module's public type contract."
+              "content": "Type of the `retry` option: a number of extra attempts or `(failureCount, error) => boolean`."
             },
             {
               "id": "getting-started",
@@ -1482,12 +1485,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceRetryPolicy."
+              "content": "Type of the `retry` option: a number of extra attempts or `(failureCount, error) => boolean`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceRetryPolicy."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1509,12 +1512,12 @@
                 {
                   "type": "list",
                   "items": [
-                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
+                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`0` 与 `Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
                     "`autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。",
                     "`staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。",
                     "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。",
-                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
-                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。",
+                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
                     "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
@@ -1522,7 +1525,7 @@
               ]
             }
           ],
-          "usageScore": 14,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "resource-index--IResourceRetryPolicy"
         },
@@ -1532,17 +1535,17 @@
           "signature": "export type IResourceState<T> = { status: typeof ResourceStatus.idle; } | { status: typeof ResourceStatus.pending; } | { status: typeof ResourceStatus.success; data: T; refreshing?: boolean; } | { status: typeof ResourceStatus.error; error: unknown; } /** * `error` is a native `DOMException` at runtime; typed as `Error` so declarations need no DOM * types. */ | { status: typeof ResourceStatus.cancelled; error: Error; };",
           "declarationLine": 6,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "IResourceState is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceState.",
-          "advanced": "No additional advanced behavior is declared for IResourceState.",
+          "purpose": "State of the data state machine read from `state` and `peekState()`; branch on `status`.",
+          "core": "status: Current state name; see `ResourceStatus`.\ndata: The loaded value; present only in `success`.\nrefreshing: In `success`: `true` while a background refresh runs.\nerror: In `error`: the classified fetch or policy failure; original failures stay reachable through cause/errors. In `cancelled`: an AbortError with `REQUEST_CANCELLED`.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IResourceState."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceState.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
-            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
+            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
           ],
           "members": [
             {
@@ -1635,13 +1638,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IResourceState when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IResourceState does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IResourceState is part of this module's public type contract."
+              "content": "State of the data state machine read from `state` and `peekState()`; branch on `status`."
             },
             {
               "id": "getting-started",
@@ -1661,30 +1664,30 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceState."
+              "content": "status: Current state name; see `ResourceStatus`.\ndata: The loaded value; present only in `success`.\nrefreshing: In `success`: `true` while a background refresh runs.\nerror: In `error`: the classified fetch or policy failure; original failures stay reachable through cause/errors. In `cancelled`: an AbortError with `REQUEST_CANCELLED`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IResourceState."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/resource/dist/resource.class.d.ts:IResourceState:export type IResourceState<T> = { status: typeof ResourceStatus.idle; } | { status: typeof ResourceStatus.pending; } | { status: typeof ResourceStatus.success; data: T; refreshing?: boolean; } | { status: typeof ResourceStatus.error; error: unknown; } /** * `error` is a native `DOMException` at runtime; typed as `Error` so declarations need no DOM * types. */ | { status: typeof ResourceStatus.cancelled; error: Error; };",
           "guidance": [],
-          "usageScore": 40,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "resource-index--IResourceState"
         },
         {
           "name": "Resource",
           "kind": "class",
-          "signature": "export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; dehydrate(): IResourceCacheSnapshot<T> | undefined; hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }",
-          "declarationLine": 74,
+          "signature": "export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; /** Captures duration metadata without serializing or copying the caller-owned data. */ dehydrate(): IResourceCacheSnapshot<T> | undefined; /** Rebases captured durations into this scheduler; transport/storage elapsed time is caller-owned. */ hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }",
+          "declarationLine": 76,
           "source": "packages/resource/dist/resource.class.d.ts",
-          "purpose": "Cancellable async derivation. Reactive values read synchronously by the fetcher (including an async function's work before its first await) become dependencies. A dependency change coalesces into one fresh request. Reads after an await cannot be tracked by JavaScript's synchronous dependency context and should be moved into a Computed read before awaiting.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for Resource.",
-          "advanced": "No additional advanced behavior is declared for Resource.",
+          "purpose": "Creates one async data source bound to a reactive runtime. Every request gets a generation; only the result of the newest generation is written to `state`, and replaced requests receive an aborted `signal`. With `autoStart` (default) the first request starts in the constructor unless `initialSnapshot` is fresh.",
+          "core": "fetcher: Function `(context) => value | Promise` that loads the data. `context` comes from the resource for each request: `signal` aborts when the request is replaced, reset, cancelled or disposed; `generation` is the request number; `token` stays the same across retries of one request. Reactive values read synchronously (before the first `await`) become dependencies. Final unclassified fetch failures receive `FETCH_FAILED`; existing external error identity stays intact, and immutable errors or primitive failures remain reachable through `cause`.\nruntime: Reactive runtime returned by `createRuntime()` from `@migaia/reactive`; the same runtime must own the signals the fetcher reads and the effects that read `state`. `dispose()` does not dispose it.\nA `Resource` instance; invalid options throw `INVALID_OPTION`, an invalid `initialSnapshot` throws `INVALID_SNAPSHOT`.\ndeps: Reactive values the last request read synchronously; a change in any of them schedules a new request. Read-only, for diagnostics.\ndepVersions: Version of each dependency seen by the last request, used by the reactive runtime to skip refreshes when nothing really changed.\nruntime: The runtime passed to the constructor; the resource registers itself there as an observer.\ndebugName: Label given by the `debugName` option, shown in reactive diagnostics and request error context.\nstate: Current state as a reactive read: an effect that reads it reruns when the state changes. Reading an expired success value starts a revalidation. Throws `RESOURCE_DISPOSED` after `dispose()`.\npromise: Promise of the current request, or a resolved Promise of a fresh cached value. Readers share the latest published request Promise; a reentrant fetcher cannot overwrite a Promise of a newer request. Reading it starts work only when idle or stale.\ndisposed: `true` after `dispose()`; still readable afterwards, unlike most members.\nrefreshing: `true` while a background refresh runs and the previous success data stays visible (`staleWhileRevalidate`).\nfetchStatus: `fetching` while any request runs, otherwise `idle`; separate from `state.status`.\nisStale: `true` when the cached success value is older than `ttl`; `false` for any other state.\nobserved: `true` while some effect or computed currently reads `state`; without observers and without `keepAlive` the resource drops its upstream dependencies.\nread: Suspense-style read with tracking: returns the data on success, throws the pending Promise while loading, and throws the error after failure or cancellation.\nThe data of the current success state.\npeek: Materializes the current state without tracking, starting work or revalidating TTL. Pending throws its Promise; normal `autoStart: false` idle with no Promise throws `NO_ACTIVE_PROMISE`. Inspect `peekState()` or explicitly start work first.\npeekState: Returns the state without tracking, without starting work and without checking `ttl`.\nAn `IResourceState` snapshot: branch on `status` (`idle`, `pending`, `success` with `data`, `error` / `cancelled` with `error`).\nreset: Cancels the running request, drops cached data and returns to `idle`; the next read starts again.\nNothing; the state is now `idle`.\nrefetch: Starts a new request even if the cache is fresh, aborting the running one.\nPromise of the new request result.\ninvalidate: Marks the cached data as expired and starts a replacement request at once.\nPromise of the replacement request result.\ncancel: With an active request, aborts it and pauses passive restarts. Pending becomes `cancelled` (`REQUEST_CANCELLED`); a stale-while-revalidate refresh keeps its success data. Without active work this is a no-op; explicit `refetch()` resumes work.\nNothing; active work is cancelled while cached success data may remain.\ndehydrate: Captures a v2 success snapshot with portable durations and unchanged caller-owned data. Only time metadata is directly JSON-encodable: BigInt or cyclic data needs caller serialization. Use safe transport or HTML-context encoding; never insert raw JSON into a script element.\nAn `IResourceCacheSnapshot`, or `undefined` when the state is not `success`.\nhydrate: Replaces the state with a success snapshot produced by `dehydrate()`, cancelling any running request. An expired snapshot is revalidated on the next read. Durations are rebased to the receiving scheduler; callers add known transport/storage time to `ageMs` and subtract it from finite `remainingTtlMs` (minimum zero). Old v1 snapshots are rejected.\nhydrate.snapshot: Snapshot returned by `dehydrate()` (often on the server); malformed snapshots throw `INVALID_SNAPSHOT`.\nNothing; the state is now `success`.\nmarkDirty: Called by the reactive runtime when a dependency changed; schedules one refresh for a batch of changes. Application code does not call it.\nNothing; a refresh is scheduled.\nonDependencyDisconnected: Called by the reactive runtime when a dependency was disposed; forces a re-run so the failure becomes visible. Application code does not call it.\nNothing; a forced refresh is scheduled.\ndispose: Ends the resource: cancels the request, removes dependencies and subscriptions. Calling it again does nothing; afterwards data reads and operations throw `RESOURCE_DISPOSED`, while `disposed`, `refreshing` and `observed` stay readable. The runtime is not disposed.\nNothing; the resource is terminal.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.\n`0`: no retry.\nretryDelay: Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.\n`0`: retry immediately.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: Clock and timers for `ttl`, `updatedAt`, `expiresAt` and retry delays; inject a manual scheduler in tests.\n`systemScheduler` from `@migaia/utils/scheduler`.",
+          "advanced": "Load data that depends on reactive inputs (user id, filters): changing an input cancels the old request and starts a new one, and an old answer can never overwrite the new state.\nFeed React Suspense and error boundaries through `read()`.\nCache with a lifetime (`ttl`), keep showing old data while refreshing (`staleWhileRevalidate`), and restore server-rendered data with `dehydrate()` / `hydrate()`.\nOne-off loads without inputs, cancellation, retry or expiry (for example static config at startup): a plain `await` is simpler.",
           "parameters": [
             "fetcher: IResourceFetcher<T>",
             "runtime: IRuntime",
@@ -1708,11 +1711,11 @@
             }
           ],
           "returns": "No explicit return annotation is declared for this class.",
-          "errors": ["No documented errors are declared for Resource."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for Resource.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n})\n\nuserId.value = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}",
-            "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})",
+            "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 2, data, ageMs, remainingTtlMs }\n// 通过安全的 JSON 传输通道发送；若内嵌 HTML，必须采用适合 HTML 上下文的编码。\n// 根据已知传输/存储耗时调整 ageMs/remainingTtlMs。\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})",
             "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n})\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标",
             "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n})",
             "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle: no loader was invoked\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle: same owner, no cached data\nconsole.log(await value.promise) // a later generation\nvalue.dispose()",
@@ -1887,7 +1890,7 @@
               "kind": "method",
               "optional": false,
               "signature": "dehydrate(): IResourceCacheSnapshot<T> | undefined;",
-              "description": null,
+              "description": "Captures duration metadata without serializing or copying the caller-owned data.",
               "parameterDetails": [],
               "returns": "IResourceCacheSnapshot<T> | undefined"
             },
@@ -1896,7 +1899,7 @@
               "kind": "method",
               "optional": false,
               "signature": "hydrate(snapshot: IResourceCacheSnapshot<T>): void;",
-              "description": null,
+              "description": "Rebases captured durations into this scheduler; transport/storage elapsed time is caller-owned.",
               "parameterDetails": [
                 {
                   "name": "snapshot",
@@ -1938,7 +1941,7 @@
           "aliasOf": "Resource",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; dehydrate(): IResourceCacheSnapshot<T> | undefined; hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }"
+            "export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; /** Captures duration metadata without serializing or copying the caller-owned data. */ dehydrate(): IResourceCacheSnapshot<T> | undefined; /** Rebases captured durations into this scheduler; transport/storage elapsed time is caller-owned. */ hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -1960,13 +1963,13 @@
             ]
           ],
           "overloadReturns": [],
-          "whenToUse": "Use Resource when its class contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when Resource does not match the required inputs or return contract.",
+          "whenToUse": "Load data that depends on reactive inputs (user id, filters): changing an input cancels the old request and starts a new one, and an old answer can never overwrite the new state.\nFeed React Suspense and error boundaries through `read()`.\nCache with a lifetime (`ttl`), keep showing old data while refreshing (`staleWhileRevalidate`), and restore server-rendered data with `dehydrate()` / `hydrate()`.",
+          "notUse": "One-off loads without inputs, cancellation, retry or expiry (for example static config at startup): a plain `await` is simpler.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Cancellable async derivation. Reactive values read synchronously by the fetcher (including an async function's work before its first await) become dependencies. A dependency change coalesces into one fresh request. Reads after an await cannot be tracked by JavaScript's synchronous dependency context and should be moved into a Computed read before awaiting."
+              "content": "Creates one async data source bound to a reactive runtime. Every request gets a generation; only the result of the newest generation is written to `state`, and replaced requests receive an aborted `signal`. With `autoStart` (default) the first request starts in the constructor unless `initialSnapshot` is fresh."
             },
             {
               "id": "getting-started",
@@ -1986,12 +1989,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for Resource."
+              "content": "fetcher: Function `(context) => value | Promise` that loads the data. `context` comes from the resource for each request: `signal` aborts when the request is replaced, reset, cancelled or disposed; `generation` is the request number; `token` stays the same across retries of one request. Reactive values read synchronously (before the first `await`) become dependencies. Final unclassified fetch failures receive `FETCH_FAILED`; existing external error identity stays intact, and immutable errors or primitive failures remain reachable through `cause`.\nruntime: Reactive runtime returned by `createRuntime()` from `@migaia/reactive`; the same runtime must own the signals the fetcher reads and the effects that read `state`. `dispose()` does not dispose it.\nA `Resource` instance; invalid options throw `INVALID_OPTION`, an invalid `initialSnapshot` throws `INVALID_SNAPSHOT`.\ndeps: Reactive values the last request read synchronously; a change in any of them schedules a new request. Read-only, for diagnostics.\ndepVersions: Version of each dependency seen by the last request, used by the reactive runtime to skip refreshes when nothing really changed.\nruntime: The runtime passed to the constructor; the resource registers itself there as an observer.\ndebugName: Label given by the `debugName` option, shown in reactive diagnostics and request error context.\nstate: Current state as a reactive read: an effect that reads it reruns when the state changes. Reading an expired success value starts a revalidation. Throws `RESOURCE_DISPOSED` after `dispose()`.\npromise: Promise of the current request, or a resolved Promise of a fresh cached value. Readers share the latest published request Promise; a reentrant fetcher cannot overwrite a Promise of a newer request. Reading it starts work only when idle or stale.\ndisposed: `true` after `dispose()`; still readable afterwards, unlike most members.\nrefreshing: `true` while a background refresh runs and the previous success data stays visible (`staleWhileRevalidate`).\nfetchStatus: `fetching` while any request runs, otherwise `idle`; separate from `state.status`.\nisStale: `true` when the cached success value is older than `ttl`; `false` for any other state.\nobserved: `true` while some effect or computed currently reads `state`; without observers and without `keepAlive` the resource drops its upstream dependencies.\nread: Suspense-style read with tracking: returns the data on success, throws the pending Promise while loading, and throws the error after failure or cancellation.\nThe data of the current success state.\npeek: Materializes the current state without tracking, starting work or revalidating TTL. Pending throws its Promise; normal `autoStart: false` idle with no Promise throws `NO_ACTIVE_PROMISE`. Inspect `peekState()` or explicitly start work first.\npeekState: Returns the state without tracking, without starting work and without checking `ttl`.\nAn `IResourceState` snapshot: branch on `status` (`idle`, `pending`, `success` with `data`, `error` / `cancelled` with `error`).\nreset: Cancels the running request, drops cached data and returns to `idle`; the next read starts again.\nNothing; the state is now `idle`.\nrefetch: Starts a new request even if the cache is fresh, aborting the running one.\nPromise of the new request result.\ninvalidate: Marks the cached data as expired and starts a replacement request at once.\nPromise of the replacement request result.\ncancel: With an active request, aborts it and pauses passive restarts. Pending becomes `cancelled` (`REQUEST_CANCELLED`); a stale-while-revalidate refresh keeps its success data. Without active work this is a no-op; explicit `refetch()` resumes work.\nNothing; active work is cancelled while cached success data may remain.\ndehydrate: Captures a v2 success snapshot with portable durations and unchanged caller-owned data. Only time metadata is directly JSON-encodable: BigInt or cyclic data needs caller serialization. Use safe transport or HTML-context encoding; never insert raw JSON into a script element.\nAn `IResourceCacheSnapshot`, or `undefined` when the state is not `success`.\nhydrate: Replaces the state with a success snapshot produced by `dehydrate()`, cancelling any running request. An expired snapshot is revalidated on the next read. Durations are rebased to the receiving scheduler; callers add known transport/storage time to `ageMs` and subtract it from finite `remainingTtlMs` (minimum zero). Old v1 snapshots are rejected.\nhydrate.snapshot: Snapshot returned by `dehydrate()` (often on the server); malformed snapshots throw `INVALID_SNAPSHOT`.\nNothing; the state is now `success`.\nmarkDirty: Called by the reactive runtime when a dependency changed; schedules one refresh for a batch of changes. Application code does not call it.\nNothing; a refresh is scheduled.\nonDependencyDisconnected: Called by the reactive runtime when a dependency was disposed; forces a re-run so the failure becomes visible. Application code does not call it.\nNothing; a forced refresh is scheduled.\ndispose: Ends the resource: cancels the request, removes dependencies and subscriptions. Calling it again does nothing; afterwards data reads and operations throw `RESOURCE_DISPOSED`, while `disposed`, `refreshing` and `observed` stay readable. The runtime is not disposed.\nNothing; the resource is terminal.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.\n`0`: no retry.\nretryDelay: Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.\n`0`: retry immediately.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: Clock and timers for `ttl`, `updatedAt`, `expiresAt` and retry delays; inject a manual scheduler in tests.\n`systemScheduler` from `@migaia/utils/scheduler`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for Resource."
+              "content": "Load data that depends on reactive inputs (user id, filters): changing an input cancels the old request and starts a new one, and an old answer can never overwrite the new state.\nFeed React Suspense and error boundaries through `read()`.\nCache with a lifetime (`ttl`), keep showing old data while refreshing (`staleWhileRevalidate`), and restore server-rendered data with `dehydrate()` / `hydrate()`.\nOne-off loads without inputs, cancellation, retry or expiry (for example static config at startup): a plain `await` is simpler."
             }
           ],
           "declaredConfiguration": [
@@ -2005,7 +2008,7 @@
               "name": "ttl",
               "type": "number",
               "optional": true,
-              "description": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a dependency changes or `refetch()` is called."
+              "description": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh until a dependency changes or `refetch()` is called."
             },
             {
               "name": "autoStart",
@@ -2047,10 +2050,10 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks."
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks."
             }
           ],
-          "identity": "packages/resource/dist/resource.class.d.ts:Resource:export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; dehydrate(): IResourceCacheSnapshot<T> | undefined; hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }",
+          "identity": "packages/resource/dist/resource.class.d.ts:Resource:export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): ResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * Reads without tracking, with the same result semantics as `read()`. Success returns data, * pending throws a Promise, and failure throws the error. It creates no dependency edges and does * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics * can inspect current state without entering another consumer's tracking window. */ peek(): T; /** Inspects the canonical state without tracking, starting work or revalidating TTL. */ peekState(): IResourceState<T>; /** Cancels this generation and drops its cache; the same Resource can start again from idle. */ reset(): void; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; /** Captures duration metadata without serializing or copying the caller-owned data. */ dehydrate(): IResourceCacheSnapshot<T> | undefined; /** Rebases captured durations into this scheduler; transport/storage elapsed time is caller-owned. */ hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }",
           "guidance": [
             {
               "id": "配置项-iresourceoptions",
@@ -2068,12 +2071,12 @@
                 {
                   "type": "list",
                   "items": [
-                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
+                    "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`0` 与 `Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
                     "`autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。",
                     "`staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。",
                     "`retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；Suspense 抛出的 thenable 值不计入失败次数（`fetcher` 内部同步抛出一个 thenable 是被当作\"需要等待后重跑\"处理的，不是一次真实失败）。",
-                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
-                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+                    "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。",
+                    "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
                     "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
@@ -2111,7 +2114,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，8 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -2125,7 +2128,7 @@
                     [
                       "`requestAborted`",
                       "`REQUEST_ABORTED`",
-                      "请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段）"
+                      "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
                     ],
                     [
                       "`requestCancelled`",
@@ -2145,7 +2148,7 @@
                     [
                       "`invalidSnapshot`",
                       "`INVALID_SNAPSHOT`",
-                      "`hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字"
+                      "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
                     ],
                     [
                       "`invalidOption`",
@@ -2156,6 +2159,11 @@
                       "`suspenseProbeFailed`",
                       "`SUSPENSE_PROBE_FAILED`",
                       "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                    ],
+                    [
+                      "`fetchFailed`",
+                      "`FETCH_FAILED`",
+                      "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
                     ]
                   ]
                 },
@@ -2182,11 +2190,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；`dispose()` 之后所有方法调用都会抛错。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（清理依赖登记、让缓存过期），下次被观察时会重新发起请求；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
+                  "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4. 不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 与再次 `dispose()` 是安全空操作。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（断开上游边、保留依赖版本与缓存），下次读取先核对依赖；依赖未变且缓存新鲜时复用原值和 Promise，依赖已变则重拉；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
                 },
                 {
                   "type": "paragraph",
@@ -2203,7 +2207,7 @@
               ]
             }
           ],
-          "usageScore": 232,
+          "usageScore": 236,
           "configuration": [
             {
               "name": "debugName",
@@ -2217,9 +2221,9 @@
               "name": "ttl",
               "type": "number",
               "optional": true,
-              "description": "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。",
-              "descriptionEn": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a dependency changes or `refetch()` is called.",
-              "descriptionZh": "`ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。"
+              "description": "`dehydrate()`：非 `success` 时返回 `undefined`；否则原样保留业务 `data`，同时捕获非负时长 `ageMs` 与 `remainingTtlMs`。后者为 `null` 表示无时间过期（`ttl: 0` 或无限 TTL）。任意 `T` 不保证 JSON 可序列化，BigInt/循环对象仍由调用方处理。",
+              "descriptionEn": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh until a dependency changes or `refetch()` is called.",
+              "descriptionZh": "`dehydrate()`：非 `success` 时返回 `undefined`；否则原样保留业务 `data`，同时捕获非负时长 `ageMs` 与 `remainingTtlMs`。后者为 `null` 表示无时间过期（`ttl: 0` 或无限 TTL）。任意 `T` 不保证 JSON 可序列化，BigInt/循环对象仍由调用方处理。"
             },
             {
               "name": "autoStart",
@@ -2249,17 +2253,17 @@
               "name": "retryDelay",
               "type": "number | ((failureCount: number, error: unknown) => number)",
               "optional": true,
-              "description": "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
+              "description": "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。",
               "descriptionEn": "",
-              "descriptionZh": "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。"
+              "descriptionZh": "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。"
             },
             {
               "name": "keepAlive",
               "type": "boolean",
               "optional": true,
-              "description": "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
+              "description": "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。",
               "descriptionEn": "Keep upstream reactive edges while no state consumer exists.",
-              "descriptionZh": "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。"
+              "descriptionZh": "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。"
             },
             {
               "name": "initialSnapshot",
@@ -2273,9 +2277,9 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。",
-              "descriptionEn": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks.",
-              "descriptionZh": "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+              "description": "`hydrate(snapshot)`：先验证 v2，再按接收端 scheduler.now() 重建内部时间戳，作废当前请求并清空依赖，恢复 `success`。剩余寿命从 hydration 继续计时；调用方若需计入传输/存储耗时，应把已知耗时加到 `ageMs`，并从有限的 `remainingTtlMs` 扣除（最低为 0）。两端无需共享单调时钟原点。格式不是 v2、时长为负/非有限（仅 remaining 允许 null），或重建时间戳溢出时抛 `INVALID_SNAPSHOT`；getter 失败保留 cause。旧 v1 绝对时间格式明确拒绝，应在知道旧时钟基准的地方转换，接收端不能猜测。",
+              "descriptionEn": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of silently falling back to microtasks.",
+              "descriptionZh": "`hydrate(snapshot)`：先验证 v2，再按接收端 scheduler.now() 重建内部时间戳，作废当前请求并清空依赖，恢复 `success`。剩余寿命从 hydration 继续计时；调用方若需计入传输/存储耗时，应把已知耗时加到 `ageMs`，并从有限的 `remainingTtlMs` 扣除（最低为 0）。两端无需共享单调时钟原点。格式不是 v2、时长为负/非有限（仅 remaining 允许 null），或重建时间戳溢出时抛 `INVALID_SNAPSHOT`；getter 失败保留 cause。旧 v1 绝对时间格式明确拒绝，应在知道旧时钟基准的地方转换，接收端不能猜测。"
             }
           ],
           "fragment": "resource-index--Resource"
@@ -2284,16 +2288,16 @@
           "name": "RESOURCE_SOURCE",
           "kind": "const",
           "signature": "export declare const RESOURCE_SOURCE = \"@migaia/resource\";",
-          "declarationLine": 2,
+          "declarationLine": 5,
           "source": "packages/resource/dist/errors.d.ts",
-          "purpose": "`source` value stamped onto every error this module throws.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RESOURCE_SOURCE.",
-          "advanced": "No additional advanced behavior is declared for RESOURCE_SOURCE.",
+          "purpose": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.",
+          "core": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for RESOURCE_SOURCE."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RESOURCE_SOURCE.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
           ],
@@ -2304,13 +2308,13 @@
           "overloadSignatures": ["export declare const RESOURCE_SOURCE = \"@migaia/resource\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use RESOURCE_SOURCE when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when RESOURCE_SOURCE does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`source` value stamped onto every error this module throws."
+              "content": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`."
             },
             {
               "id": "getting-started",
@@ -2330,12 +2334,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RESOURCE_SOURCE."
+              "content": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for RESOURCE_SOURCE."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2352,7 +2356,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，8 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -2366,7 +2370,7 @@
                     [
                       "`requestAborted`",
                       "`REQUEST_ABORTED`",
-                      "请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段）"
+                      "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
                     ],
                     [
                       "`requestCancelled`",
@@ -2386,7 +2390,7 @@
                     [
                       "`invalidSnapshot`",
                       "`INVALID_SNAPSHOT`",
-                      "`hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字"
+                      "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
                     ],
                     [
                       "`invalidOption`",
@@ -2397,6 +2401,11 @@
                       "`suspenseProbeFailed`",
                       "`SUSPENSE_PROBE_FAILED`",
                       "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                    ],
+                    [
+                      "`fetchFailed`",
+                      "`FETCH_FAILED`",
+                      "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
                     ]
                   ]
                 },
@@ -2407,24 +2416,24 @@
               ]
             }
           ],
-          "usageScore": 14,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "resource-index--RESOURCE_SOURCE"
         },
         {
           "name": "ResourceErrorCode",
           "kind": "const",
-          "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the `DOMException` used to abort a request and notify the `fetcher` through its * signal. Preserves `DOMException` with the `AbortError` name and attaches the semantic code as a * property. Callers usually recognize `error.name === 'AbortError'` and handle cancellation * quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies the request-abort signal reason, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a `hydrate()` snapshot whose `version` is not `1`, whose `updatedAt` is nonfinite, or * whose `expiresAt` is neither `null` nor finite. Also reports a snapshot accessor that throws. * `null` represents an unbounded expiration. Snapshots commonly come from SSR serialization or * persistence. Invalid formats fail at load rather than leaving the resource with a corrupt * expiration. Check the snapshot creation and serialization path. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; };",
+          "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: \"FETCH_FAILED\"; };",
           "declarationLine": 10,
           "source": "packages/resource/dist/error-code.d.ts",
-          "purpose": "ResourceErrorCode is part of this module's public const contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ResourceErrorCode.",
-          "advanced": "No additional advanced behavior is declared for ResourceErrorCode.",
+          "purpose": "Table of the stable error codes of this package. Each key names one failure; the values are the strings found on `error.code`.",
+          "core": "resourceDisposed: `RESOURCE_DISPOSED`: a member was used after `dispose()`; create a new resource.\nrequestAborted: `REQUEST_ABORTED`: Resource-initiated cancellation uses the same native AbortError as its signal reason and rejection. Lifecycle replacement can supply a different signal reason, retained on the `cause` of the Resource AbortError.\nrequestCancelled: `REQUEST_CANCELLED`: the `AbortError` stored in the `cancelled` state after `cancel()`.\ncancellationCleanupFailed: `CANCELLATION_CLEANUP_FAILED`: a timer or listener could not be cleaned after cancellation; the resource still counts as cancelled.\nnoActivePromise: `NO_ACTIVE_PROMISE`: no request Promise is available, including a valid `autoStart: false` idle `peek()`; inspect `peekState()` or explicitly start a request.\ninvalidSnapshot: `INVALID_SNAPSHOT`: snapshot version is not `2`, durations are negative/non-finite (only remaining lifetime permits `null`), or rebased local timestamps overflow. Getter failures retain their cause.\ninvalidOption: `INVALID_OPTION`: an option such as `ttl`, `retry` or `retryDelay` is invalid; fix the options.\nfetchFailed: `FETCH_FAILED`: final unclassified fetch failure after retries. Native errors keep identity when writable; immutable errors and primitive values stay reachable through `cause`. Existing foreign source/code is preserved.\nsuspenseProbeFailed: `SUSPENSE_PROBE_FAILED`: a value thrown by the fetcher has a throwing `then` getter; both errors are kept in `errors`.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for ResourceErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ResourceErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
           ],
@@ -2443,7 +2452,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly requestAborted: \"REQUEST_ABORTED\";",
-              "description": "Identifies the `DOMException` used to abort a request and notify the `fetcher` through its * signal. Preserves `DOMException` with the `AbortError` name and attaches the semantic code as a * property. Callers usually recognize `error.name === 'AbortError'` and handle cancellation * quietly.",
+              "description": "Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly.",
               "parameterDetails": [],
               "returns": "\"REQUEST_ABORTED\""
             },
@@ -2452,7 +2461,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly requestCancelled: \"REQUEST_CANCELLED\";",
-              "description": "Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies the request-abort signal reason, this code identifies explicit cancellation state.",
+              "description": "Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state.",
               "parameterDetails": [],
               "returns": "\"REQUEST_CANCELLED\""
             },
@@ -2479,7 +2488,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidSnapshot: \"INVALID_SNAPSHOT\";",
-              "description": "Rejects a `hydrate()` snapshot whose `version` is not `1`, whose `updatedAt` is nonfinite, or * whose `expiresAt` is neither `null` nor finite. Also reports a snapshot accessor that throws. * `null` represents an unbounded expiration. Snapshots commonly come from SSR serialization or * persistence. Invalid formats fail at load rather than leaving the resource with a corrupt * expiration. Check the snapshot creation and serialization path.",
+              "description": "Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver.",
               "parameterDetails": [],
               "returns": "\"INVALID_SNAPSHOT\""
             },
@@ -2488,7 +2497,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidOption: \"INVALID_OPTION\";",
-              "description": "Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options.",
+              "description": "Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain.",
               "parameterDetails": [],
               "returns": "\"INVALID_OPTION\""
             },
@@ -2500,23 +2509,32 @@
               "description": "Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure.",
               "parameterDetails": [],
               "returns": "\"SUSPENSE_PROBE_FAILED\""
+            },
+            {
+              "name": "fetchFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fetchFailed: \"FETCH_FAILED\";",
+              "description": "A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option.",
+              "parameterDetails": [],
+              "returns": "\"FETCH_FAILED\""
             }
           ],
           "composes": [],
           "aliasOf": "ResourceErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the `DOMException` used to abort a request and notify the `fetcher` through its * signal. Preserves `DOMException` with the `AbortError` name and attaches the semantic code as a * property. Callers usually recognize `error.name === 'AbortError'` and handle cancellation * quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies the request-abort signal reason, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a `hydrate()` snapshot whose `version` is not `1`, whose `updatedAt` is nonfinite, or * whose `expiresAt` is neither `null` nor finite. Also reports a snapshot accessor that throws. * `null` represents an unbounded expiration. Snapshots commonly come from SSR serialization or * persistence. Invalid formats fail at load rather than leaving the resource with a corrupt * expiration. Check the snapshot creation and serialization path. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; };"
+            "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: \"FETCH_FAILED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use ResourceErrorCode when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ResourceErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "ResourceErrorCode is part of this module's public const contract."
+              "content": "Table of the stable error codes of this package. Each key names one failure; the values are the strings found on `error.code`."
             },
             {
               "id": "getting-started",
@@ -2536,16 +2554,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ResourceErrorCode."
+              "content": "resourceDisposed: `RESOURCE_DISPOSED`: a member was used after `dispose()`; create a new resource.\nrequestAborted: `REQUEST_ABORTED`: Resource-initiated cancellation uses the same native AbortError as its signal reason and rejection. Lifecycle replacement can supply a different signal reason, retained on the `cause` of the Resource AbortError.\nrequestCancelled: `REQUEST_CANCELLED`: the `AbortError` stored in the `cancelled` state after `cancel()`.\ncancellationCleanupFailed: `CANCELLATION_CLEANUP_FAILED`: a timer or listener could not be cleaned after cancellation; the resource still counts as cancelled.\nnoActivePromise: `NO_ACTIVE_PROMISE`: no request Promise is available, including a valid `autoStart: false` idle `peek()`; inspect `peekState()` or explicitly start a request.\ninvalidSnapshot: `INVALID_SNAPSHOT`: snapshot version is not `2`, durations are negative/non-finite (only remaining lifetime permits `null`), or rebased local timestamps overflow. Getter failures retain their cause.\ninvalidOption: `INVALID_OPTION`: an option such as `ttl`, `retry` or `retryDelay` is invalid; fix the options.\nfetchFailed: `FETCH_FAILED`: final unclassified fetch failure after retries. Native errors keep identity when writable; immutable errors and primitive values stay reachable through `cause`. Existing foreign source/code is preserved.\nsuspenseProbeFailed: `SUSPENSE_PROBE_FAILED`: a value thrown by the fetcher has a throwing `then` getter; both errors are kept in `errors`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ResourceErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/error-code.d.ts:ResourceErrorCode:export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the `DOMException` used to abort a request and notify the `fetcher` through its * signal. Preserves `DOMException` with the `AbortError` name and attaches the semantic code as a * property. Callers usually recognize `error.name === 'AbortError'` and handle cancellation * quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies the request-abort signal reason, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a `hydrate()` snapshot whose `version` is not `1`, whose `updatedAt` is nonfinite, or * whose `expiresAt` is neither `null` nor finite. Also reports a snapshot accessor that throws. * `null` represents an unbounded expiration. Snapshots commonly come from SSR serialization or * persistence. Invalid formats fail at load rather than leaving the resource with a corrupt * expiration. Check the snapshot creation and serialization path. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; };",
+          "identity": "packages/resource/dist/error-code.d.ts:ResourceErrorCode:export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: \"FETCH_FAILED\"; };",
           "guidance": [
             {
               "id": "错误码",
@@ -2558,7 +2576,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，8 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -2572,7 +2590,7 @@
                     [
                       "`requestAborted`",
                       "`REQUEST_ABORTED`",
-                      "请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段）"
+                      "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
                     ],
                     [
                       "`requestCancelled`",
@@ -2592,7 +2610,7 @@
                     [
                       "`invalidSnapshot`",
                       "`INVALID_SNAPSHOT`",
-                      "`hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字"
+                      "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
                     ],
                     [
                       "`invalidOption`",
@@ -2603,6 +2621,11 @@
                       "`suspenseProbeFailed`",
                       "`SUSPENSE_PROBE_FAILED`",
                       "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                    ],
+                    [
+                      "`fetchFailed`",
+                      "`FETCH_FAILED`",
+                      "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
                     ]
                   ]
                 },
@@ -2623,17 +2646,17 @@
           "signature": "export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: \"idle\"; /** A request is running, with or without cached data. */ readonly fetching: \"fetching\"; };\nexport type ResourceFetchStatus = keyof typeof ResourceFetchStatus;",
           "declarationLine": 16,
           "source": "packages/resource/dist/state-constants.d.ts",
-          "purpose": "Transport activity is independent from cached data status during background refresh.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ResourceFetchStatus.",
-          "advanced": "No additional advanced behavior is declared for ResourceFetchStatus.",
+          "purpose": "Values of `resource.fetchStatus`: whether a request is running right now, independent of the data shown (a success state can be refreshing in the background).",
+          "core": "idle: `idle`: no request is running.\nfetching: `fetching`: a request runs, with or without cached data.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for ResourceFetchStatus."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ResourceFetchStatus.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}",
-            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
+            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
           ],
           "members": [
             {
@@ -2664,13 +2687,13 @@
           ],
           "overloadParameterDetails": [[], []],
           "overloadReturns": [],
-          "whenToUse": "Use ResourceFetchStatus when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ResourceFetchStatus does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Transport activity is independent from cached data status during background refresh."
+              "content": "Values of `resource.fetchStatus`: whether a request is running right now, independent of the data shown (a success state can be refreshing in the background)."
             },
             {
               "id": "getting-started",
@@ -2690,12 +2713,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ResourceFetchStatus."
+              "content": "idle: `idle`: no request is running.\nfetching: `fetching`: a request runs, with or without cached data."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ResourceFetchStatus."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2707,11 +2730,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；`dispose()` 之后所有方法调用都会抛错。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（清理依赖登记、让缓存过期），下次被观察时会重新发起请求；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
+                  "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4. 不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 与再次 `dispose()` 是安全空操作。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（断开上游边、保留依赖版本与缓存），下次读取先核对依赖；依赖未变且缓存新鲜时复用原值和 Promise，依赖已变则重拉；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
                 },
                 {
                   "type": "paragraph",
@@ -2738,17 +2757,17 @@
           "signature": "export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: \"idle\"; /** Initial data is still being requested. */ readonly pending: \"pending\"; /** Cached data is available, including during background refresh. */ readonly success: \"success\"; /** The most recent request failed. */ readonly error: \"error\"; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: \"cancelled\"; };\nexport type ResourceStatus = keyof typeof ResourceStatus;",
           "declarationLine": 2,
           "source": "packages/resource/dist/state-constants.d.ts",
-          "purpose": "Data/cache state exposed by Resource.state and Resource.read().",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ResourceStatus.",
-          "advanced": "No additional advanced behavior is declared for ResourceStatus.",
+          "purpose": "Values of `state.status`: the five states of the data state machine (`idle`, `pending`, `success`, `error`, `cancelled`).",
+          "core": "idle: `idle`: nothing requested yet, or after `reset()`.\npending: `pending`: the first data is loading; show a loading view.\nsuccess: `success`: `data` is available, maybe refreshing in the background.\nerror: `error`: the last request failed; the reason is in `error`.\ncancelled: `cancelled`: `cancel()` stopped the request; `error` is an `AbortError`.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for ResourceStatus."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ResourceStatus.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n})\n\nuserId.value = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}",
-            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'",
+            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'",
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED'\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`)\n  }\n}\n\nconst runtime = createRuntime()\n\nconst user = new Resource<IUser>(async ({ signal }) => {\n  const response = await fetch('/api/user', { signal })\n  if (!response.ok) throw new UserRequestError(response.status)\n  return (await response.json()) as IUser\n}, runtime)\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...')\n    break\n  case ResourceStatus.success:\n    console.log(user.state.data)\n    break\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error)\n    break\n}\n\ntry {\n  const freshUser = await user.refetch()\n  console.log('refetched user', freshUser)\n} finally {\n  user.dispose()\n}",
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n  if (state.status === ResourceStatus.error) console.error(state.error)\n})\n\nexport function selectUser(id: string): void {\n  userId.value = id\n}\n\nselectUser('2') // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}"
           ],
@@ -2808,13 +2827,13 @@
           ],
           "overloadParameterDetails": [[], []],
           "overloadReturns": [],
-          "whenToUse": "Use ResourceStatus when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ResourceStatus does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Data/cache state exposed by Resource.state and Resource.read()."
+              "content": "Values of `state.status`: the five states of the data state machine (`idle`, `pending`, `success`, `error`, `cancelled`)."
             },
             {
               "id": "getting-started",
@@ -2834,12 +2853,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ResourceStatus."
+              "content": "idle: `idle`: nothing requested yet, or after `reset()`.\npending: `pending`: the first data is loading; show a loading view.\nsuccess: `success`: `data` is available, maybe refreshing in the background.\nerror: `error`: the last request failed; the reason is in `error`.\ncancelled: `cancelled`: `cancel()` stopped the request; `error` is an `AbortError`."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ResourceStatus."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2851,11 +2870,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；`dispose()` 之后所有方法调用都会抛错。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（清理依赖登记、让缓存过期），下次被观察时会重新发起请求；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
+                  "text": "1. 依赖追踪只认\"首次 `await` 之前的同步读取\"。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。 2. `fetcher` 必须把 `signal` 交给真正可取消的 I/O（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。 3. `refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。 4. 不再使用必须 `dispose()`，否则订阅、在途请求和依赖登记会一直存在；释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 与再次 `dispose()` 是安全空操作。 5. 默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠（断开上游边、保留依赖版本与缓存），下次读取先核对依赖；依赖未变且缓存新鲜时复用原值和 Promise，依赖已变则重拉；需要\"没人看也保持热数据\"就显式传 `keepAlive: true`。"
                 },
                 {
                   "type": "paragraph",

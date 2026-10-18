@@ -43,7 +43,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`IReactiveSignal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。"
+                "text": "module metadata 声明普通 dependencies：`@migaia/reactive`、`@migaia/utils`、`@migaia/store-light`（此处仅导入 `IMutationGuard` 类型）；未声明 peerDependencies。"
               }
             ]
           },
@@ -74,7 +74,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
+                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
@@ -173,28 +173,12 @@
               },
               {
                 "type": "paragraph",
-                "text": "`observableObject`/`observableArray`/`observableMap`/`observableSet`｜5 秒上手 —— 类的工厂函数版本，参数顺序与类构造函数不同："
+                "text": "创建入口统一为四个类构造函数：`new ObservableObject/ObservableArray/ObservableMap/ObservableSet(initial, runtime?, options?)`。四个薄工厂已移除；从旧 `(initial, options, runtime)` 调用迁移时，交换后两参数。外部用户需破坏版本迁移，无工厂别名或兼容 wrapper。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { observableArray } from '@migaia/store-indexed'\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime)"
-              },
-              {
-                "type": "paragraph",
-                "text": "全部参数（注意顺序是 `(initial, options, runtime)`，类构造函数是 `(initial, runtime, options)`）："
-              },
-              {
-                "type": "list",
-                "items": [
-                  "`initial`（`observableObject` 必填，其余可选，默认 `[]`）—— 同对应类构造函数的 `initial`",
-                  "`options?: IObservableCollectionOptions` —— 默认 `{}`",
-                  "`runtime?: IRuntime` —— 默认 `defaultRuntime`"
-                ]
-              },
-              {
-                "type": "paragraph",
-                "text": "混用两套参数顺序会把 `options` 当成 `runtime` 传（或反过来）；`options`/`runtime` 结构不同，TypeScript 通常会在传入具体值时拦住，但都省略或用 `undefined` 传递时编译期不一定能拦住，务必按各自签名顺序传参。"
+                "code": "const rows = new ObservableArray([{ id: 'a' }], myRuntime, {})"
               }
             ]
           },
@@ -242,11 +226,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
               },
               {
                 "type": "paragraph",
-                "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
               },
               {
                 "type": "code",
@@ -356,6 +340,10 @@
               {
                 "type": "paragraph",
                 "text": "Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle."
+              },
+              {
+                "type": "paragraph",
+                "text": "Map/Set replace 的插入顺序属于可观察结果；成员和值相同但重新排序，也会使结构/迭代读失效。Array.set 在一次 Runtime batch 内同时提交 cell 和 revision，同步调度器不会看到新元素配旧 snapshot。dispose 通过集合现有 owner 同时释放 Signal 与 pool 引用；不再保留仅由 pool 捕获的缺失对象键。backing data 和已有 snapshot 未被本次扩大清空，不承诺销毁集合中全部应用数据。"
               }
             ]
           }
@@ -381,7 +369,7 @@
                 "type": "list",
                 "items": [
                   "设计动机与核心机制",
-                  "集合类型与工厂函数模块",
+                  "集合类型与构造模块",
                   "操作常量模块",
                   "错误模块",
                   "生命周期与资源释放",
@@ -414,7 +402,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 现在为 'u1' 创建了 cell"
+                "code": "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 普通同步读取 backing Map，不创建 cell；effect/computed 内追踪才物化"
               },
               {
                 "type": "paragraph",
@@ -493,13 +481,13 @@
             ]
           },
           {
-            "id": "集合类型与工厂函数模块",
-            "heading": "集合类型与工厂函数模块",
+            "id": "集合类型与构造模块",
+            "heading": "集合类型与构造模块",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
+                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
               }
             ]
           },
@@ -614,14 +602,14 @@
                     "无",
                     "冻结的、`Object.create(null)` 起始的浅拷贝对象",
                     "追踪读（依赖修订信号），非追踪上下文不建依赖",
-                    "无。使用空原型对象是为了让来自外部数据的 `proto` 之类 key 被当成普通数据 key，不触发 `Object.prototype` 的 setter"
+                    "无。使用空原型对象是为了让来自外部数据的 `__proto__` 之类 key 被当成普通数据 key，不触发 `Object.prototype` 的 setter"
                   ],
                   [
                     "`replace(next)`",
                     "`next: T`",
                     "`void`",
                     "写",
-                    "计算出多余的 key 先逐个 `delete`，再对 `next` 的每个 key 调 `set`；整体在一次 `batch()` 内完成"
+                    "先物化输入，随后一次 batch 内调用内部 delete/set 提交；不调用公开方法，guard 只在 replace 入口调用一次"
                   ],
                   [
                     "`prune()`",
@@ -641,7 +629,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "写操作前都会先调用 `assertMutation(operation)`（含 `assertActive()` 与 `mutationGuard?assertMutationAllowed()`），已 dispose 的集合或未通过 guard 校验的写操作会在这里抛错。`key` 非字符串会抛出 `TypeError`（`INVALID_OPTION`）。"
+                "text": "写操作前都会先调用 `assertMutation(operation)`（含 `assertActive()` 与 `mutationGuard?.assertMutationAllowed()`），已 dispose 的集合或未通过 guard 校验的写操作会在这里抛错。`key` 非字符串会抛出 `TypeError`（`INVALID_OPTION`）。"
               }
             ]
           },
@@ -710,7 +698,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`#replaceInternal`（`replace`/`splice`/`clear` 共用）的精确行为：只遍历已经物化的 cell（而不是全部索引）逐个更新值——未物化的索引没有任何订阅者需要通知，等真的被读到时会直接从新数组里取值；只有当新旧长度不同，或存在任意一处值变化（`Object.is` 逐项比较）时才触发修订信号；只有长度变化才触发结构信号。这个设计避免了\"replace 一个十万项数组，只有 5 个索引被订阅\"时做十万次无意义的 diff。"
+                "text": "`#replaceInternal`（`replace`/`splice`/`clear` 共用）的精确行为：只遍历已经物化的 cell（而不是全部索引）逐个更新值——未物化的索引没有任何订阅者需要通知，等真的被读到时会直接从新数组里取值；只有当新旧长度不同，或存在任意一处值变化（`Object.is` 逐项比较）时才触发修订信号；只有长度变化才触发结构信号。这减少的是已物化 cell 的通知遍历；等长数组仍可能逐项比较全部十万值，并非仅比较 5 项。"
               }
             ]
           },
@@ -764,7 +752,7 @@
                     "Iterable<readonly [K, V]>`",
                     "`void`",
                     "写",
-                    "完整物化并验证后原子替换；失败保持旧 Map；整次替换最多各触发一次结构/迭代通知，内容相同则不通知"
+                    "完整物化并验证后原子替换；失败保持旧 Map；整次替换最多各触发一次结构/迭代通知，key、value 及插入顺序相同才不通知"
                   ],
                   ["`keys()`", "无", "当前 key 数组", "追踪读（依赖结构信号）", "无"],
                   ["`valuesArray()`", "无", "冻结的值数组", "追踪读（依赖迭代信号）", "无"],
@@ -832,14 +820,14 @@
                     "无",
                     "`void`",
                     "写",
-                    "空集合直接跳过；否则对当前每个成员调用一次 `delete()`（走同一个 `batch()`）"
+                    "空集合直接跳过；否则一次 batch 清 backing Set、更新已物化 cell 并提升一次结构信号；不逐项调用公开 delete"
                   ],
                   [
                     "`replace(next)`",
                     "`Iterable<T>`",
                     "`void`",
                     "写",
-                    "完整物化后原子替换；失败保持旧 Set；整次替换最多触发一次结构通知，成员集合相同则不通知"
+                    "完整物化后原子替换；失败保持旧 Set；整次替换最多触发一次结构通知，成员及迭代顺序相同则不通知"
                   ],
                   ["`valuesArray()`", "无", "冻结的成员数组", "追踪读（依赖结构信号）", "无"],
                   ["`snapshot()`", "无", "新建的原生 `Set` 副本", "追踪读（依赖结构信号）", "无"],
@@ -860,26 +848,17 @@
             ]
           },
           {
-            "id": "工厂函数参考",
-            "heading": "工厂函数参考",
+            "id": "单一构造入口与迁移",
+            "heading": "单一构造入口与迁移",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>"
-              },
-              {
                 "type": "paragraph",
-                "text": "参数顺序是 `(initial, options, runtime)`，而对应的类构造函数是 `(initial, runtime, options)`——两者故意不一致，混着用最容易踩坑："
+                "text": "四个类构造是唯一创建入口，统一参数顺序 `(initial, runtime?, options?)`。旧薄工厂已移除；从原 `(initial, options, runtime)` 调用迁移时交换后两参数，不保留工厂别名。默认初值与 options 不变。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)"
-              },
-              {
-                "type": "paragraph",
-                "text": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
+                "code": "new ObservableObject({ count: 1 }, myRuntime, { debugName: 'counter' })\nnew ObservableArray([1, 2, 3], myRuntime, {})\nnew ObservableMap([['key', 1]], myRuntime, {})\nnew ObservableSet(['value'], myRuntime, {})"
               }
             ]
           },
@@ -915,11 +894,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
-                "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
               },
               {
                 "type": "code",
@@ -928,11 +907,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-              },
-              {
-                "type": "paragraph",
-                "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
               }
             ]
           },
@@ -942,7 +917,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带 `source: '@migaia/store-indexed'` 与稳定 `code`。调用方应按 `code` 判断语义，不应依赖消息文本。"
+                "text": "本包创建的错误带 `source: '@migaia/store-indexed'` 与稳定 `code`。Reactive 与其它已编码错误保留实际 owner。未编码 guard/updater 失败归 `CALLBACK_FAILED`：可扩展原生错误保留对象/类型/message/stack，frozen 或非 Error 原值通过 cause/errors 可达。调用方应按 `code` 判断语义，不应依赖消息文本。"
               },
               {
                 "type": "table",
@@ -1092,7 +1067,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "Q：`new ObservableArray(x, y)` 和 `observableArray(x, y)` 里的 `y` 含义一样吗？ 不一样。类构造函数第二个参数是 `runtime`，工厂函数第二个参数是 `options`。混用会把值传错位置，参见工厂函数参考。"
+                "text": "Q：如何迁移旧集合工厂调用？ 改用对应的类构造，参数顺序为 `(initial, runtime, options)`；原工厂的第二个 options 参数移到第三位，原第三个 runtime 移到第二位。"
               },
               {
                 "type": "paragraph",
@@ -1104,7 +1079,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Q：`keys()` 为什么在某个 key 的值变化后没有重新触发，而 `snapshot()` 触发了？ `keys()`（以及 `ObservableMap.size`）只依赖结构信号，只关心 key 集合本身是否变化；`snapshot()` 依赖修订/迭代信号，任意值变化都会触发。这是刻意的追踪粒度拆分，见设计动机与核心机制。"
+                "text": "Q：`keys()` 为什么在某个 key 的值变化后没有重新触发，而 `snapshot()` 触发了？ `keys()`（以及 `ObservableMap.size`）只依赖结构信号，关心 key 集合及其迭代顺序是否变化；`snapshot()` 依赖修订/迭代信号，任意值变化都会触发。这是刻意的追踪粒度拆分，见设计动机与核心机制。"
               },
               {
                 "type": "paragraph",
@@ -1112,7 +1087,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Q：`mutationGuard` 抛出的错误会不会被本包吞掉？ 不会。`assertMutation()` 直接调用 `mutationGuard.assertMutationAllowed(operation)`，抛出的错误原样从 `set`/`push`/`delete` 等调用里冒出来，调用方按普通异常处理即可。"
+                "text": "Q：`mutationGuard` 抛出的错误会不会被本包吞掉？ 不会。guard/updater 失败在写入前传播；已有外包 source/code 保留，未编码原生错误附 CALLBACK_FAILED，不能附码的值经 cause/errors 保留。只保证外层提交未执行，不回滚回调自己的副作用。"
               },
               {
                 "type": "paragraph",
@@ -1135,6 +1110,10 @@
               {
                 "type": "paragraph",
                 "text": "Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle."
+              },
+              {
+                "type": "paragraph",
+                "text": "Map/Set replace 的插入顺序属于可观察结果；成员和值相同但重新排序，也会使结构/迭代读失效。Array.set 在一次 Runtime batch 内同时提交 cell 和 revision，同步调度器不会看到新元素配旧 snapshot。dispose 通过集合现有 owner 同时释放 Signal 与 pool 引用；不再保留仅由 pool 捕获的缺失对象键。backing data 和已有 snapshot 未被本次扩大清空，不承诺销毁集合中全部应用数据。"
               }
             ]
           }
@@ -1165,9 +1144,9 @@
           "signature": "export declare function createStoreIndexedError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "declarationLine": 6,
           "source": "packages/store-indexed/dist/errors.d.ts",
-          "purpose": "Builds a `(source, code)`-tagged `Error` without touching `stack`.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreIndexedError.",
-          "advanced": "No additional advanced behavior is declared for createStoreIndexedError.",
+          "purpose": "Constructs a native Error with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.",
+          "core": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged Error; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied.",
+          "advanced": "",
           "parameters": [
             "code: IStoreIndexedErrorCode",
             "message: string",
@@ -1191,8 +1170,8 @@
             }
           ],
           "returns": "Error",
-          "errors": ["No documented errors are declared for createStoreIndexedError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreIndexedError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    )\n  }\n}"
           ],
@@ -1222,13 +1201,13 @@
             ]
           ],
           "overloadReturns": ["Error"],
-          "whenToUse": "Use createStoreIndexedError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreIndexedError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds a `(source, code)`-tagged `Error` without touching `stack`."
+              "content": "Constructs a native Error with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error."
             },
             {
               "id": "getting-started",
@@ -1248,12 +1227,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreIndexedError."
+              "content": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged Error; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreIndexedError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -1278,11 +1257,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
                 },
                 {
                   "type": "code",
@@ -1291,11 +1270,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
                 }
               ]
             },
@@ -1319,11 +1294,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
                 },
                 {
                   "type": "code",
@@ -1375,9 +1350,9 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。",
+              "description": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。",
               "descriptionEn": "",
-              "descriptionZh": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
+              "descriptionZh": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
             }
           ],
           "fragment": "store-indexed-index--createStoreIndexedError"
@@ -1388,9 +1363,9 @@
           "signature": "export declare function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;",
           "declarationLine": 10,
           "source": "packages/store-indexed/dist/errors.d.ts",
-          "purpose": "Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreIndexedRangeError.",
-          "advanced": "No additional advanced behavior is declared for createStoreIndexedRangeError.",
+          "purpose": "Constructs a native RangeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.",
+          "core": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged RangeError; instanceof and the native stack remain intact.",
+          "advanced": "",
           "parameters": ["code: IStoreIndexedErrorCode", "message: string"],
           "parameterDetails": [
             {
@@ -1405,8 +1380,8 @@
             }
           ],
           "returns": "RangeError",
-          "errors": ["No documented errors are declared for createStoreIndexedRangeError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreIndexedRangeError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1429,13 +1404,13 @@
             ]
           ],
           "overloadReturns": ["RangeError"],
-          "whenToUse": "Use createStoreIndexedRangeError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreIndexedRangeError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type."
+              "content": "Constructs a native RangeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error."
             },
             {
               "id": "getting-started",
@@ -1455,12 +1430,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreIndexedRangeError."
+              "content": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged RangeError; instanceof and the native stack remain intact."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreIndexedRangeError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1478,11 +1453,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
                 },
                 {
                   "type": "code",
@@ -1491,11 +1466,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
                 }
               ]
             },
@@ -1519,11 +1490,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
                 },
                 {
                   "type": "code",
@@ -1568,9 +1539,9 @@
           "signature": "export declare function createStoreIndexedTypeError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
           "declarationLine": 12,
           "source": "packages/store-indexed/dist/errors.d.ts",
-          "purpose": "Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreIndexedTypeError.",
-          "advanced": "No additional advanced behavior is declared for createStoreIndexedTypeError.",
+          "purpose": "Constructs a native TypeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.",
+          "core": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged TypeError; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied.",
+          "advanced": "",
           "parameters": [
             "code: IStoreIndexedErrorCode",
             "message: string",
@@ -1594,8 +1565,8 @@
             }
           ],
           "returns": "TypeError",
-          "errors": ["No documented errors are declared for createStoreIndexedTypeError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreIndexedTypeError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
           ],
@@ -1625,13 +1596,13 @@
             ]
           ],
           "overloadReturns": ["TypeError"],
-          "whenToUse": "Use createStoreIndexedTypeError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreIndexedTypeError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type."
+              "content": "Constructs a native TypeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error."
             },
             {
               "id": "getting-started",
@@ -1651,12 +1622,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreIndexedTypeError."
+              "content": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged TypeError; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreIndexedTypeError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -1681,11 +1652,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
                 },
                 {
                   "type": "code",
@@ -1694,11 +1665,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
                 }
               ]
             },
@@ -1722,11 +1689,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
                 },
                 {
                   "type": "code",
@@ -1767,9 +1734,9 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。",
+              "description": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。",
               "descriptionEn": "",
-              "descriptionZh": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
+              "descriptionZh": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
             }
           ],
           "fragment": "store-indexed-index--createStoreIndexedTypeError"
@@ -1780,14 +1747,14 @@
           "signature": "export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];",
           "declarationLine": 7,
           "source": "packages/store-indexed/dist/indexed-constants.d.ts",
-          "purpose": "IIndexedOperation is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IIndexedOperation.",
-          "advanced": "No additional advanced behavior is declared for IIndexedOperation.",
+          "purpose": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events.",
+          "core": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IIndexedOperation."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IIndexedOperation.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'",
             "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]",
@@ -1802,13 +1769,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IIndexedOperation when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IIndexedOperation does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IIndexedOperation is part of this module's public type contract."
+              "content": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events."
             },
             {
               "id": "getting-started",
@@ -1828,12 +1795,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IIndexedOperation."
+              "content": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IIndexedOperation."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1849,14 +1816,14 @@
           "signature": "export declare const IndexedOperation: { readonly read: \"read\"; readonly write: \"write\"; readonly delete: \"delete\"; };",
           "declarationLine": 2,
           "source": "packages/store-indexed/dist/indexed-constants.d.ts",
-          "purpose": "Indexed store collection operation names used by diagnostics and registries.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IndexedOperation.",
-          "advanced": "No additional advanced behavior is declared for IndexedOperation.",
+          "purpose": "Public read/write/delete vocabulary for consumer diagnostics. Collection mutation guards receive concrete operation labels instead of these constants.",
+          "core": "read: Classify an operation that observes data without changing it.\nwrite: Classify an insertion or value replacement operation.\ndelete: Classify an operation removing a key or member.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for IndexedOperation."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IndexedOperation.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'",
             "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]",
@@ -1899,13 +1866,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IndexedOperation when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IndexedOperation does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Indexed store collection operation names used by diagnostics and registries."
+              "content": "Public read/write/delete vocabulary for consumer diagnostics. Collection mutation guards receive concrete operation labels instead of these constants."
             },
             {
               "id": "getting-started",
@@ -1925,12 +1892,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IndexedOperation."
+              "content": "read: Classify an operation that observes data without changing it.\nwrite: Classify an insertion or value replacement operation.\ndelete: Classify an operation removing a key or member."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IndexedOperation."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1946,19 +1913,18 @@
           "signature": "export type IObservableCollectionOptions = { readonly mutationGuard?: IMutationGuard; readonly debugName?: string; };",
           "declarationLine": 4,
           "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "IObservableCollectionOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObservableCollectionOptions.",
-          "advanced": "No additional advanced behavior is declared for IObservableCollectionOptions.",
+          "purpose": "Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission.",
+          "core": "mutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IObservableCollectionOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IObservableCollectionOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'",
+            "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'",
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard // 来自 @migaia/store-light\n  readonly debugName?: string\n}",
-            "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>"
+            "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard // 来自 @migaia/store-light\n  readonly debugName?: string\n}"
           ],
           "members": [
             {
@@ -1987,13 +1953,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IObservableCollectionOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IObservableCollectionOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IObservableCollectionOptions is part of this module's public type contract."
+              "content": "Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission."
             },
             {
               "id": "getting-started",
@@ -2013,18 +1979,18 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObservableCollectionOptions."
+              "content": "mutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IObservableCollectionOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
           "identity": "packages/store-indexed/dist/collections.d.ts:IObservableCollectionOptions:export type IObservableCollectionOptions = { readonly mutationGuard?: IMutationGuard; readonly debugName?: string; };",
           "guidance": [],
-          "usageScore": 84,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "store-indexed-index--IObservableCollectionOptions"
         },
@@ -2032,19 +1998,19 @@
           "name": "IStoreIndexedErrorCode",
           "kind": "type",
           "signature": "export type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];",
-          "declarationLine": 32,
+          "declarationLine": 42,
           "source": "packages/store-indexed/dist/error-code.d.ts",
-          "purpose": "IStoreIndexedErrorCode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreIndexedErrorCode.",
-          "advanced": "No additional advanced behavior is declared for IStoreIndexedErrorCode.",
+          "purpose": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors.",
+          "core": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreIndexedErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreIndexedErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'",
-            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
+            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
             "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
           ],
           "members": [],
@@ -2056,13 +2022,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IStoreIndexedErrorCode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreIndexedErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IStoreIndexedErrorCode is part of this module's public type contract."
+              "content": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors."
             },
             {
               "id": "getting-started",
@@ -2082,12 +2048,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreIndexedErrorCode."
+              "content": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreIndexedErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2105,11 +2071,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
                 },
                 {
                   "type": "code",
@@ -2118,11 +2084,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
                 }
               ]
             },
@@ -2146,11 +2108,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
                 },
                 {
                   "type": "code",
@@ -2190,149 +2152,14 @@
           "fragment": "store-indexed-index--IStoreIndexedErrorCode"
         },
         {
-          "name": "observableArray",
-          "kind": "function",
-          "signature": "export declare function observableArray<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableArray<T>;",
-          "declarationLine": 102,
-          "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "observableArray is part of this module's public function contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableArray.",
-          "advanced": "No additional advanced behavior is declared for observableArray.",
-          "parameters": [
-            "initial: Iterable<T> (optional)",
-            "options: IObservableCollectionOptions (optional)",
-            "runtime: IRuntime (optional)"
-          ],
-          "parameterDetails": [
-            {
-              "name": "initial",
-              "type": "Iterable<T>",
-              "optional": true
-            },
-            {
-              "name": "options",
-              "type": "IObservableCollectionOptions",
-              "optional": true
-            },
-            {
-              "name": "runtime",
-              "type": "IRuntime",
-              "optional": true
-            }
-          ],
-          "returns": "ObservableArray<T>",
-          "errors": ["No documented errors are declared for observableArray."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableArray.",
-          "examples": [
-            "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)",
-            "import { observableArray } from '@migaia/store-indexed'\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime)"
-          ],
-          "members": [],
-          "composes": [],
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function observableArray<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableArray<T>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "initial",
-                "type": "Iterable<T>",
-                "optional": true
-              },
-              {
-                "name": "options",
-                "type": "IObservableCollectionOptions",
-                "optional": true
-              },
-              {
-                "name": "runtime",
-                "type": "IRuntime",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["ObservableArray<T>"],
-          "whenToUse": "Use observableArray when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when observableArray does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "observableArray is part of this module's public function contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import observableArray from @migaia/store-indexed, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use observableArray when its function contract and declared inputs match the result you need. Choose a different public symbol when observableArray does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableArray."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for observableArray."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/store-indexed/dist/collections.d.ts:observableArray:export declare function observableArray<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableArray<T>;",
-          "guidance": [],
-          "usageScore": 46,
-          "configuration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            }
-          ],
-          "fragment": "store-indexed-index--observableArray-function"
-        },
-        {
           "name": "ObservableArray",
           "kind": "class",
           "signature": "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; }",
           "declarationLine": 43,
           "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "Explicit array with index-level dependencies and separate length tracking.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableArray.",
-          "advanced": "No additional advanced behavior is declared for ObservableArray.",
+          "purpose": "Creates an explicit reactive index-based array with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options.",
+          "core": "initial: Initial iterable or omitted for an empty array; strings are accepted.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableArray; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nlength: Current array length, tracked through the structure signal rather than individual index cells.\nat: Reads one integer index; negative indexes are relative to the current end and also observe structure.\nat.index: Integer position, accepting negative positions from the end; nonintegers throw INVALID_INDEX.\nElement or undefined outside bounds; owning Runtime tracking observes that index.\nsnapshot: Reads the revision and caches a shallow-frozen array until length or element values change.\nReadonly shallow array snapshot; nested values retain identity.\npeek: Makes a fresh shallow-frozen array copy without any dependency tracking.\nUntracked readonly shallow copy, independent of snapshot caching.\nset: Replaces an existing nonnegative index after guard admission; changed cell and revision commit in one Runtime batch, including synchronous schedulers. Object.is-equal values do not notify.\nset.index: Integer within [0, length); nonintegers throw INVALID_INDEX and other positions INDEX_OUT_OF_RANGE.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; the selected cell and revision update when the value changes.\npush: Appends values in one batch; an empty argument list leaves revisions unchanged.\npush.values: Application values to append in argument order.\nNew array length after the append operation.\npop: Removes the final element, marks any observed index absent and updates structure in one batch.\nRemoved final value, or undefined when already empty.\nsplice: Applies native splice positioning and integer coercion to a copied array, then commits changed indexes in one batch.\nsplice.start: Native splice start position; negative positions count from the end.\nsplice.deleteCount: Omitted removes through the end; explicitly undefined means zero removals.\nsplice.items: Application values inserted at the selected position.\nShallow-frozen array of removed elements; inserted values keep identity.\nreplace: Materializes the entire iterable before replacing data, then updates only materialized index cells in one batch. Equal-length inputs still require a full value comparison; this is not a constant-time replacement.\nreplace.values: Complete replacement iterable; strings are accepted as characters.\nNothing; values and changed length/revision are committed.\nclear: Replaces the array with an empty array through the same guarded replacement path.\nNothing; the array is empty and affected observations are invalidated.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet.",
+          "advanced": "Observe a small visible subset of a large positional list.",
           "parameters": [
             "initial: Iterable<T> (optional)",
             "runtime: IRuntime (optional)",
@@ -2356,14 +2183,15 @@
             }
           ],
           "returns": "No explicit return annotation is declared for this class.",
-          "errors": ["No documented errors are declared for ObservableArray."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableArray.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)",
+            "new ObservableObject({ count: 1 }, myRuntime, { debugName: 'counter' })\nnew ObservableArray([1, 2, 3], myRuntime, {})\nnew ObservableMap([['key', 1]], myRuntime, {})\nnew ObservableSet(['value'], myRuntime, {})",
             "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst rows = new ObservableArray([1, 2, 3], runtime)",
             "import { ObservableArray } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n)\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)))\n\nguard.runInAction(() => {\n  rows.splice(0, 1) // 删除首行，触发结构信号与修订信号\n})\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\neffect.dispose()\nrows.dispose()",
             "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }])\nrows.at(1) // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }) // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }) // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose()",
+            "const rows = new ObservableArray([{ id: 'a' }], myRuntime, {})",
             "import { ObservableArray } from '@migaia/store-indexed'\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n)\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map((index) =>\n  rows.runtime.effect(() => render(index, rows.at(index)))\n)\n\nrows.splice(0, 1) // 索引语义整体后移一位\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\nfor (const effect of watched) effect.dispose()\nrows.dispose()"
           ],
           "members": [
@@ -2555,13 +2383,13 @@
             ]
           ],
           "overloadReturns": [],
-          "whenToUse": "Use ObservableArray when its class contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ObservableArray does not match the required inputs or return contract.",
+          "whenToUse": "Observe a small visible subset of a large positional list.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Explicit array with index-level dependencies and separate length tracking."
+              "content": "Creates an explicit reactive index-based array with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options."
             },
             {
               "id": "getting-started",
@@ -2581,12 +2409,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableArray."
+              "content": "initial: Initial iterable or omitted for an empty array; strings are accepted.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableArray; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nlength: Current array length, tracked through the structure signal rather than individual index cells.\nat: Reads one integer index; negative indexes are relative to the current end and also observe structure.\nat.index: Integer position, accepting negative positions from the end; nonintegers throw INVALID_INDEX.\nElement or undefined outside bounds; owning Runtime tracking observes that index.\nsnapshot: Reads the revision and caches a shallow-frozen array until length or element values change.\nReadonly shallow array snapshot; nested values retain identity.\npeek: Makes a fresh shallow-frozen array copy without any dependency tracking.\nUntracked readonly shallow copy, independent of snapshot caching.\nset: Replaces an existing nonnegative index after guard admission; changed cell and revision commit in one Runtime batch, including synchronous schedulers. Object.is-equal values do not notify.\nset.index: Integer within [0, length); nonintegers throw INVALID_INDEX and other positions INDEX_OUT_OF_RANGE.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; the selected cell and revision update when the value changes.\npush: Appends values in one batch; an empty argument list leaves revisions unchanged.\npush.values: Application values to append in argument order.\nNew array length after the append operation.\npop: Removes the final element, marks any observed index absent and updates structure in one batch.\nRemoved final value, or undefined when already empty.\nsplice: Applies native splice positioning and integer coercion to a copied array, then commits changed indexes in one batch.\nsplice.start: Native splice start position; negative positions count from the end.\nsplice.deleteCount: Omitted removes through the end; explicitly undefined means zero removals.\nsplice.items: Application values inserted at the selected position.\nShallow-frozen array of removed elements; inserted values keep identity.\nreplace: Materializes the entire iterable before replacing data, then updates only materialized index cells in one batch. Equal-length inputs still require a full value comparison; this is not a constant-time replacement.\nreplace.values: Complete replacement iterable; strings are accepted as characters.\nNothing; values and changed length/revision are committed.\nclear: Replaces the array with an empty array through the same guarded replacement path.\nNothing; the array is empty and affected observations are invalidated.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ObservableArray."
+              "content": "Observe a small visible subset of a large positional list."
             }
           ],
           "declaredConfiguration": [
@@ -2611,7 +2439,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带 `source: '@migaia/store-indexed'` 与稳定 `code`。调用方应按 `code` 判断语义，不应依赖消息文本。"
+                  "text": "本包创建的错误带 `source: '@migaia/store-indexed'` 与稳定 `code`。Reactive 与其它已编码错误保留实际 owner。未编码 guard/updater 失败归 `CALLBACK_FAILED`：可扩展原生错误保留对象/类型/message/stack，frozen 或非 Error 原值通过 cause/errors 可达。调用方应按 `code` 判断语义，不应依赖消息文本。"
                 },
                 {
                   "type": "table",
@@ -2671,7 +2499,7 @@
               ]
             }
           ],
-          "usageScore": 154,
+          "usageScore": 150,
           "configuration": [
             {
               "name": "mutationGuard",
@@ -2690,139 +2518,7 @@
               "descriptionZh": "`options.debugName` — `string` — 可选 — 类名（如 `'ObservableArray'`） — 内部各 Signal 的调试名前缀，用于诊断/追踪工具"
             }
           ],
-          "fragment": "store-indexed-index--ObservableArray-class"
-        },
-        {
-          "name": "observableMap",
-          "kind": "function",
-          "signature": "export declare function observableMap<K, V>(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableMap<K, V>;",
-          "declarationLine": 103,
-          "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "observableMap is part of this module's public function contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableMap.",
-          "advanced": "No additional advanced behavior is declared for observableMap.",
-          "parameters": [
-            "initial: ReadonlyMap<K, V> | Iterable<readonly [K, V]> (optional)",
-            "options: IObservableCollectionOptions (optional)",
-            "runtime: IRuntime (optional)"
-          ],
-          "parameterDetails": [
-            {
-              "name": "initial",
-              "type": "ReadonlyMap<K, V> | Iterable<readonly [K, V]>",
-              "optional": true
-            },
-            {
-              "name": "options",
-              "type": "IObservableCollectionOptions",
-              "optional": true
-            },
-            {
-              "name": "runtime",
-              "type": "IRuntime",
-              "optional": true
-            }
-          ],
-          "returns": "ObservableMap<K, V>",
-          "errors": ["No documented errors are declared for observableMap."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableMap.",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function observableMap<K, V>(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableMap<K, V>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "initial",
-                "type": "ReadonlyMap<K, V> | Iterable<readonly [K, V]>",
-                "optional": true
-              },
-              {
-                "name": "options",
-                "type": "IObservableCollectionOptions",
-                "optional": true
-              },
-              {
-                "name": "runtime",
-                "type": "IRuntime",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["ObservableMap<K, V>"],
-          "whenToUse": "Use observableMap when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when observableMap does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "observableMap is part of this module's public function contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import observableMap from @migaia/store-indexed, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use observableMap when its function contract and declared inputs match the result you need. Choose a different public symbol when observableMap does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableMap."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for observableMap."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/store-indexed/dist/collections.d.ts:observableMap:export declare function observableMap<K, V>(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableMap<K, V>;",
-          "guidance": [],
-          "usageScore": 30,
-          "configuration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            }
-          ],
-          "fragment": "store-indexed-index--observableMap-function"
+          "fragment": "store-indexed-index--ObservableArray"
         },
         {
           "name": "ObservableMap",
@@ -2830,9 +2526,9 @@
           "signature": "export declare class ObservableMap<K, V> extends ObservableCollectionBase { #private; constructor(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, runtime?: IRuntime, options?: IObservableCollectionOptions); get size(): number; get(key: K): V | undefined; peek(key: K): V | undefined; has(key: K): boolean; set(key: K, value: V): this; delete(key: K): boolean; clear(): void; /** * Atomically swap the whole map for `next`. Fires at most one structural (`#structure`) and one * iteration (`#iteration`) notification for the entire swap, unlike `clear()` + per-entry `set()` * which would fire one per key. */ replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void; keys(): readonly K[]; valuesArray(): readonly V[]; entries(): readonly (readonly [K, V])[]; snapshot(): ReadonlyMap<K, V>; /** Release cells for deleted keys that no observer still references. */ prune(): number; }",
           "declarationLine": 58,
           "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "Per-key lookup tracking plus a separate dependency for iteration and size.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableMap.",
-          "advanced": "No additional advanced behavior is declared for ObservableMap.",
+          "purpose": "Creates an explicit reactive key/value map with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options.",
+          "core": "initial: Initial map or entry iterable, omitted for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw INVALID_OPTION and preserve the old collection.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableMap; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current entry count; tracks structure and ignores updates that preserve key membership.\nget: Reads a key value and lazily tracks that key only in the owning Runtime context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value or undefined for an absent key.\npeek: Reads the backing Map directly without tracking or creating any key cell.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent stored value or undefined without dependency admission.\nhas: Tracks the selected key cell for membership; updates to unrelated keys do not invalidate this observation.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nTrue when the backing Map contains this key, even if its value is undefined.\nset: Writes a key after admission; an unchanged existing value is a no-op, while insertion updates structure and iteration.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nThis same ObservableMap for chaining; values retain original identity.\ndelete: Removes one key in a batch and retains its missing cell while still observed.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue if an entry was removed; false when the key was absent.\nclear: Clears stored entries and invalidates materialized cells, with one structure and iteration update.\nNothing; all entries are removed while observed tombstones survive.\nreplace: Materializes all entries before a batched swap; key membership or insertion-order changes update structure and iteration, and value changes update iteration. Only identical entries in identical order avoid notification.\nreplace.next: Complete map or entry iterable to replace existing entries.\nNothing; the replacement is committed atomically after input preparation.\nkeys: Returns insertion-ordered keys while tracking membership structure only.\nFresh key array; readonly typing does not freeze the array.\nvaluesArray: Reads value iteration and returns a shallow-frozen values array.\nFrozen top-level values in current Map iteration order.\nentries: Reads value iteration and returns a frozen array of frozen entry pairs.\nReadonly key/value pairs; nested keys and values keep identity.\nsnapshot: Reads value iteration and creates a new independent native Map copy on each call.\nReadonlyMap-typed shallow copy; the native Map itself is not frozen and changes to it do not mutate the collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet.",
+          "advanced": "Track selected lookup keys while independently rendering the whole value list.",
           "parameters": [
             "initial: ReadonlyMap<K, V> | Iterable<readonly [K, V]> (optional)",
             "runtime: IRuntime (optional)",
@@ -2856,11 +2552,12 @@
             }
           ],
           "returns": "No explicit return annotation is declared for this class.",
-          "errors": ["No documented errors are declared for ObservableMap."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableMap.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
-            "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 现在为 'u1' 创建了 cell",
+            "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 普通同步读取 backing Map，不创建 cell；effect/computed 内追踪才物化",
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
+            "new ObservableObject({ count: 1 }, myRuntime, { debugName: 'counter' })\nnew ObservableArray([1, 2, 3], myRuntime, {})\nnew ObservableMap([['key', 1]], myRuntime, {})\nnew ObservableSet(['value'], myRuntime, {})",
             "import { MutationPolicy } from '@migaia/store-middleware'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\nusers.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功",
             "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' }) // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1') // 追踪读，惰性建 'u1' 的 cell\nusers.dispose()",
             "import { ObservableMap } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\ntry {\n  users.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功\n}"
@@ -3077,13 +2774,13 @@
             ]
           ],
           "overloadReturns": [],
-          "whenToUse": "Use ObservableMap when its class contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ObservableMap does not match the required inputs or return contract.",
+          "whenToUse": "Track selected lookup keys while independently rendering the whole value list.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Per-key lookup tracking plus a separate dependency for iteration and size."
+              "content": "Creates an explicit reactive key/value map with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options."
             },
             {
               "id": "getting-started",
@@ -3103,12 +2800,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableMap."
+              "content": "initial: Initial map or entry iterable, omitted for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw INVALID_OPTION and preserve the old collection.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableMap; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current entry count; tracks structure and ignores updates that preserve key membership.\nget: Reads a key value and lazily tracks that key only in the owning Runtime context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value or undefined for an absent key.\npeek: Reads the backing Map directly without tracking or creating any key cell.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent stored value or undefined without dependency admission.\nhas: Tracks the selected key cell for membership; updates to unrelated keys do not invalidate this observation.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nTrue when the backing Map contains this key, even if its value is undefined.\nset: Writes a key after admission; an unchanged existing value is a no-op, while insertion updates structure and iteration.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nThis same ObservableMap for chaining; values retain original identity.\ndelete: Removes one key in a batch and retains its missing cell while still observed.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue if an entry was removed; false when the key was absent.\nclear: Clears stored entries and invalidates materialized cells, with one structure and iteration update.\nNothing; all entries are removed while observed tombstones survive.\nreplace: Materializes all entries before a batched swap; key membership or insertion-order changes update structure and iteration, and value changes update iteration. Only identical entries in identical order avoid notification.\nreplace.next: Complete map or entry iterable to replace existing entries.\nNothing; the replacement is committed atomically after input preparation.\nkeys: Returns insertion-ordered keys while tracking membership structure only.\nFresh key array; readonly typing does not freeze the array.\nvaluesArray: Reads value iteration and returns a shallow-frozen values array.\nFrozen top-level values in current Map iteration order.\nentries: Reads value iteration and returns a frozen array of frozen entry pairs.\nReadonly key/value pairs; nested keys and values keep identity.\nsnapshot: Reads value iteration and creates a new independent native Map copy on each call.\nReadonlyMap-typed shallow copy; the native Map itself is not frozen and changes to it do not mutate the collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ObservableMap."
+              "content": "Track selected lookup keys while independently rendering the whole value list."
             }
           ],
           "declaredConfiguration": [
@@ -3133,7 +2830,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带 `source: '@migaia/store-indexed'` 与稳定 `code`。调用方应按 `code` 判断语义，不应依赖消息文本。"
+                  "text": "本包创建的错误带 `source: '@migaia/store-indexed'` 与稳定 `code`。Reactive 与其它已编码错误保留实际 owner。未编码 guard/updater 失败归 `CALLBACK_FAILED`：可扩展原生错误保留对象/类型/message/stack，frozen 或非 Error 原值通过 cause/errors 可达。调用方应按 `code` 判断语义，不应依赖消息文本。"
                 },
                 {
                   "type": "table",
@@ -3193,7 +2890,7 @@
               ]
             }
           ],
-          "usageScore": 122,
+          "usageScore": 124,
           "configuration": [
             {
               "name": "mutationGuard",
@@ -3212,141 +2909,7 @@
               "descriptionZh": "`options.debugName` — `string` — 可选 — 类名（如 `'ObservableArray'`） — 内部各 Signal 的调试名前缀，用于诊断/追踪工具"
             }
           ],
-          "fragment": "store-indexed-index--ObservableMap-class"
-        },
-        {
-          "name": "observableObject",
-          "kind": "function",
-          "signature": "export declare function observableObject<T extends Record<string, unknown>>(initial: T, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableObject<T>;",
-          "declarationLine": 101,
-          "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "observableObject is part of this module's public function contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableObject.",
-          "advanced": "No additional advanced behavior is declared for observableObject.",
-          "parameters": [
-            "initial: T",
-            "options: IObservableCollectionOptions (optional)",
-            "runtime: IRuntime (optional)"
-          ],
-          "parameterDetails": [
-            {
-              "name": "initial",
-              "type": "T",
-              "optional": false,
-              "configurationType": "Record"
-            },
-            {
-              "name": "options",
-              "type": "IObservableCollectionOptions",
-              "optional": true
-            },
-            {
-              "name": "runtime",
-              "type": "IRuntime",
-              "optional": true
-            }
-          ],
-          "returns": "ObservableObject<T>",
-          "errors": ["No documented errors are declared for observableObject."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableObject.",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function observableObject<T extends Record<string, unknown>>(initial: T, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableObject<T>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "initial",
-                "type": "T",
-                "optional": false,
-                "configurationType": "Record"
-              },
-              {
-                "name": "options",
-                "type": "IObservableCollectionOptions",
-                "optional": true
-              },
-              {
-                "name": "runtime",
-                "type": "IRuntime",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["ObservableObject<T>"],
-          "whenToUse": "Use observableObject when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when observableObject does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "observableObject is part of this module's public function contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import observableObject from @migaia/store-indexed, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use observableObject when its function contract and declared inputs match the result you need. Choose a different public symbol when observableObject does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableObject."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for observableObject."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/store-indexed/dist/collections.d.ts:observableObject:export declare function observableObject<T extends Record<string, unknown>>(initial: T, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableObject<T>;",
-          "guidance": [],
-          "usageScore": 32,
-          "configuration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            }
-          ],
-          "fragment": "store-indexed-index--observableObject-function"
+          "fragment": "store-indexed-index--ObservableMap"
         },
         {
           "name": "ObservableObject",
@@ -3354,9 +2917,9 @@
           "signature": "export declare class ObservableObject<T extends Record<string, unknown>> extends ObservableCollectionBase { #private; constructor(initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions); get<K extends keyof T & string>(key: K): T[K]; peek<K extends keyof T & string>(key: K): T[K]; has(key: keyof T & string): boolean; set<K extends keyof T & string>(key: K, value: T[K]): void; update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void; delete(key: keyof T & string): boolean; keys(): readonly (keyof T & string)[]; snapshot(): Readonly<T>; replace(next: T): void; /** Release cells for deleted keys that no observer still references. */ prune(): number; }",
           "declarationLine": 27,
           "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "Fine-grained keyed object with explicit accessors and structural key tracking.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableObject.",
-          "advanced": "No additional advanced behavior is declared for ObservableObject.",
+          "purpose": "Creates an explicit reactive string-keyed object with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options.",
+          "core": "initial: Required initial object; key types are inferred from its declared shape.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableObject; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nget: Reads one key and lazily tracks its cell only inside the owning Runtime tracking context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nStored value, or undefined for an absent key; cross-runtime tracked value reads reject.\npeek: Reads one key without tracking or allocating a reactive cell, even during an active effect.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value, or undefined when absent, without creating a dependency.\nhas: Reads key existence through the shared structure signal; changing only a value does not invalidate it.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nWhether the object currently contains the string key.\nset: Runs the mutation guard, then assigns one key in a Runtime batch; Object.is-equal existing values do not bump the snapshot revision.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; value observers update and insertion also updates structure.\nupdate: After mutation admission, synchronously calls updater with the untracked current value and commits its result. A thrown updater leaves this outer assignment unapplied.\nupdate.key: Application-selected key from the initial data or a key the application has inserted.\nupdate.updater: Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited. Existing error identity is preserved; otherwise CALLBACK_FAILED is attached to the original native error or retains the original through cause/errors.\nNothing; the returned replacement value has been committed in a Runtime batch.\ndelete: Removes one admitted key and updates value, structure and revision signals; observed deleted cells retain an absent tombstone.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue only when a stored key was removed; false if already absent.\nkeys: Enumerates current string keys and tracks only the object structure.\nFresh key array in insertion order; its readonly type does not freeze the returned array.\nsnapshot: Returns a shallow-frozen null-prototype object snapshot, cached until actual membership or value changes.\nReadonly top-level copy; nested values retain identity and tracked reads depend on all revisions.\nreplace: Reads all enumerable own entries before mutation and replaces keys in one batch; failed input getters leave existing data unchanged. The guard runs once at replace admission; internal deletion/insertion does not call public delete/set per key.\nreplace.next: Caller-authored complete replacement object; omitted keys are deleted.\nNothing; deleted, inserted and changed keys are committed together.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet.",
+          "advanced": "Edit a large object while subscribing to only selected properties.",
           "parameters": [
             "initial: T",
             "runtime: IRuntime (optional)",
@@ -3380,10 +2943,11 @@
             }
           ],
           "returns": "No explicit return annotation is declared for this class.",
-          "errors": ["No documented errors are declared for ObservableObject."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableObject.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
+            "new ObservableObject({ count: 1 }, myRuntime, { debugName: 'counter' })\nnew ObservableArray([1, 2, 3], myRuntime, {})\nnew ObservableMap([['key', 1]], myRuntime, {})\nnew ObservableSet(['value'], myRuntime, {})",
             "const user = new ObservableObject({ name: 'Ada', age: 30 })\nuser.get('name') // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31) // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot() // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose() // 用完必须释放，级联 dispose 全部内部 Signal",
             "import { ObservableObject } from '@migaia/store-indexed'\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n)\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0\nfor (const key of bigTable.keys()) sum += bigTable.peek(key)\nbigTable.dispose()"
           ],
@@ -3398,8 +2962,7 @@
                 {
                   "name": "key",
                   "type": "K",
-                  "optional": false,
-                  "configurationType": "keyof"
+                  "optional": false
                 }
               ],
               "returns": "T[K]"
@@ -3414,8 +2977,7 @@
                 {
                   "name": "key",
                   "type": "K",
-                  "optional": false,
-                  "configurationType": "keyof"
+                  "optional": false
                 }
               ],
               "returns": "T[K]"
@@ -3445,14 +3007,12 @@
                 {
                   "name": "key",
                   "type": "K",
-                  "optional": false,
-                  "configurationType": "keyof"
+                  "optional": false
                 },
                 {
                   "name": "value",
                   "type": "T[K]",
-                  "optional": false,
-                  "configurationType": "T[keyof]"
+                  "optional": false
                 }
               ],
               "returns": "void"
@@ -3467,14 +3027,12 @@
                 {
                   "name": "key",
                   "type": "K",
-                  "optional": false,
-                  "configurationType": "keyof"
+                  "optional": false
                 },
                 {
                   "name": "updater",
                   "type": "(value: T[K]) => T[K]",
-                  "optional": false,
-                  "configurationType": "(value: T[keyof]) => T[keyof]"
+                  "optional": false
                 }
               ],
               "returns": "void"
@@ -3589,13 +3147,13 @@
             ]
           ],
           "overloadReturns": [],
-          "whenToUse": "Use ObservableObject when its class contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ObservableObject does not match the required inputs or return contract.",
+          "whenToUse": "Edit a large object while subscribing to only selected properties.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Fine-grained keyed object with explicit accessors and structural key tracking."
+              "content": "Creates an explicit reactive string-keyed object with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options."
             },
             {
               "id": "getting-started",
@@ -3615,12 +3173,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableObject."
+              "content": "initial: Required initial object; key types are inferred from its declared shape.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableObject; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nget: Reads one key and lazily tracks its cell only inside the owning Runtime tracking context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nStored value, or undefined for an absent key; cross-runtime tracked value reads reject.\npeek: Reads one key without tracking or allocating a reactive cell, even during an active effect.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value, or undefined when absent, without creating a dependency.\nhas: Reads key existence through the shared structure signal; changing only a value does not invalidate it.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nWhether the object currently contains the string key.\nset: Runs the mutation guard, then assigns one key in a Runtime batch; Object.is-equal existing values do not bump the snapshot revision.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; value observers update and insertion also updates structure.\nupdate: After mutation admission, synchronously calls updater with the untracked current value and commits its result. A thrown updater leaves this outer assignment unapplied.\nupdate.key: Application-selected key from the initial data or a key the application has inserted.\nupdate.updater: Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited. Existing error identity is preserved; otherwise CALLBACK_FAILED is attached to the original native error or retains the original through cause/errors.\nNothing; the returned replacement value has been committed in a Runtime batch.\ndelete: Removes one admitted key and updates value, structure and revision signals; observed deleted cells retain an absent tombstone.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue only when a stored key was removed; false if already absent.\nkeys: Enumerates current string keys and tracks only the object structure.\nFresh key array in insertion order; its readonly type does not freeze the returned array.\nsnapshot: Returns a shallow-frozen null-prototype object snapshot, cached until actual membership or value changes.\nReadonly top-level copy; nested values retain identity and tracked reads depend on all revisions.\nreplace: Reads all enumerable own entries before mutation and replaces keys in one batch; failed input getters leave existing data unchanged. The guard runs once at replace admission; internal deletion/insertion does not call public delete/set per key.\nreplace.next: Caller-authored complete replacement object; omitted keys are deleted.\nNothing; deleted, inserted and changed keys are committed together.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ObservableObject."
+              "content": "Edit a large object while subscribing to only selected properties."
             }
           ],
           "declaredConfiguration": [
@@ -3645,7 +3203,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带 `source: '@migaia/store-indexed'` 与稳定 `code`。调用方应按 `code` 判断语义，不应依赖消息文本。"
+                  "text": "本包创建的错误带 `source: '@migaia/store-indexed'` 与稳定 `code`。Reactive 与其它已编码错误保留实际 owner。未编码 guard/updater 失败归 `CALLBACK_FAILED`：可扩展原生错误保留对象/类型/message/stack，frozen 或非 Error 原值通过 cause/errors 可达。调用方应按 `code` 判断语义，不应依赖消息文本。"
                 },
                 {
                   "type": "table",
@@ -3705,7 +3263,7 @@
               ]
             }
           ],
-          "usageScore": 118,
+          "usageScore": 120,
           "configuration": [
             {
               "name": "mutationGuard",
@@ -3724,139 +3282,7 @@
               "descriptionZh": "`options.debugName` — `string` — 可选 — 类名（如 `'ObservableArray'`） — 内部各 Signal 的调试名前缀，用于诊断/追踪工具"
             }
           ],
-          "fragment": "store-indexed-index--ObservableObject-class"
-        },
-        {
-          "name": "observableSet",
-          "kind": "function",
-          "signature": "export declare function observableSet<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableSet<T>;",
-          "declarationLine": 104,
-          "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "observableSet is part of this module's public function contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableSet.",
-          "advanced": "No additional advanced behavior is declared for observableSet.",
-          "parameters": [
-            "initial: Iterable<T> (optional)",
-            "options: IObservableCollectionOptions (optional)",
-            "runtime: IRuntime (optional)"
-          ],
-          "parameterDetails": [
-            {
-              "name": "initial",
-              "type": "Iterable<T>",
-              "optional": true
-            },
-            {
-              "name": "options",
-              "type": "IObservableCollectionOptions",
-              "optional": true
-            },
-            {
-              "name": "runtime",
-              "type": "IRuntime",
-              "optional": true
-            }
-          ],
-          "returns": "ObservableSet<T>",
-          "errors": ["No documented errors are declared for observableSet."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableSet.",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function observableSet<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableSet<T>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "initial",
-                "type": "Iterable<T>",
-                "optional": true
-              },
-              {
-                "name": "options",
-                "type": "IObservableCollectionOptions",
-                "optional": true
-              },
-              {
-                "name": "runtime",
-                "type": "IRuntime",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["ObservableSet<T>"],
-          "whenToUse": "Use observableSet when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when observableSet does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "observableSet is part of this module's public function contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import observableSet from @migaia/store-indexed, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use observableSet when its function contract and declared inputs match the result you need. Choose a different public symbol when observableSet does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableSet."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for observableSet."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/store-indexed/dist/collections.d.ts:observableSet:export declare function observableSet<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableSet<T>;",
-          "guidance": [],
-          "usageScore": 30,
-          "configuration": [
-            {
-              "name": "mutationGuard",
-              "type": "IMutationGuard",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            },
-            {
-              "name": "debugName",
-              "type": "string",
-              "optional": true,
-              "description": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。",
-              "descriptionEn": "",
-              "descriptionZh": "`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。"
-            }
-          ],
-          "fragment": "store-indexed-index--observableSet-function"
+          "fragment": "store-indexed-index--ObservableObject"
         },
         {
           "name": "ObservableSet",
@@ -3864,9 +3290,9 @@
           "signature": "export declare class ObservableSet<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get size(): number; has(value: T): boolean; add(value: T): this; delete(value: T): boolean; clear(): void; /** * Atomically swap the whole set for `next`. Fires at most one structural (`#structure`) * notification for the entire swap, unlike `clear()` + per-value `add()` which would fire one per * value. */ replace(next: Iterable<T>): void; valuesArray(): readonly T[]; snapshot(): ReadonlySet<T>; /** Release cells for deleted values that no observer still references. */ prune(): number; }",
           "declarationLine": 82,
           "source": "packages/store-indexed/dist/collections.d.ts",
-          "purpose": "Set counterpart of ObservableMap with per-value membership tracking.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableSet.",
-          "advanced": "No additional advanced behavior is declared for ObservableSet.",
+          "purpose": "Creates an explicit reactive membership set with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options.",
+          "core": "initial: Initial iterable or omitted for an empty membership set.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableSet; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current unique member count, read through the structure dependency.\nhas: Reads one membership and lazily creates its boolean cell only while the owning Runtime tracks.\nhas.value: Application value to store; nested objects retain their original identity.\nWhether native Set semantics find the selected member.\nadd: Adds an admitted member and notifies its cell and structure; existing membership is unchanged.\nadd.value: Application value to store; nested objects retain their original identity.\nThis same ObservableSet for chaining.\ndelete: Removes an admitted member, updates structure and retains observed missing-membership cells.\ndelete.value: Application value to store; nested objects retain their original identity.\nTrue only when the member existed before removal.\nclear: Removes all members in one batch and updates materialized membership cells plus structure.\nNothing; membership is empty and affected observations are invalidated.\nreplace: Materializes the iterable before swapping membership in one batch; only identical membership in identical iteration order avoids a structure update.\nreplace.next: Complete replacement iterable; duplicate values collapse using native Set semantics.\nNothing; replacement membership is committed after input preparation.\nvaluesArray: Reads structure and returns a shallow-frozen array in Set iteration order.\nFrozen top-level member list; nested objects retain identity.\nsnapshot: Reads structure and creates a fresh independent native Set copy.\nReadonlySet-typed shallow copy; the native Set is not frozen, and mutating it does not affect the source collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet.",
+          "advanced": "Observe independent selection flags without subscribing to every selected item.",
           "parameters": [
             "initial: Iterable<T> (optional)",
             "runtime: IRuntime (optional)",
@@ -3890,10 +3316,11 @@
             }
           ],
           "returns": "No explicit return annotation is declared for this class.",
-          "errors": ["No documented errors are declared for ObservableSet."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableSet.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
+            "new ObservableObject({ count: 1 }, myRuntime, { debugName: 'counter' })\nnew ObservableArray([1, 2, 3], myRuntime, {})\nnew ObservableMap([['key', 1]], myRuntime, {})\nnew ObservableSet(['value'], myRuntime, {})",
             "const tags = new ObservableSet(['a', 'b'])\ntags.has('a') // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c') // 触发结构信号\ntags.dispose()",
             "import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nconst runtimeA = createRuntime()\nconst runtimeB = createRuntime()\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA)\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a') // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n})"
           ],
@@ -4056,13 +3483,13 @@
             ]
           ],
           "overloadReturns": [],
-          "whenToUse": "Use ObservableSet when its class contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ObservableSet does not match the required inputs or return contract.",
+          "whenToUse": "Observe independent selection flags without subscribing to every selected item.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Set counterpart of ObservableMap with per-value membership tracking."
+              "content": "Creates an explicit reactive membership set with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options."
             },
             {
               "id": "getting-started",
@@ -4082,12 +3509,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableSet."
+              "content": "initial: Initial iterable or omitted for an empty membership set.\nruntime: IRuntime from @migaia/reactive; omitted uses defaultRuntime. Use its graph for observing this collection.\nCaller-owned ObservableSet; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current unique member count, read through the structure dependency.\nhas: Reads one membership and lazily creates its boolean cell only while the owning Runtime tracks.\nhas.value: Application value to store; nested objects retain their original identity.\nWhether native Set semantics find the selected member.\nadd: Adds an admitted member and notifies its cell and structure; existing membership is unchanged.\nadd.value: Application value to store; nested objects retain their original identity.\nThis same ObservableSet for chaining.\ndelete: Removes an admitted member, updates structure and retains observed missing-membership cells.\ndelete.value: Application value to store; nested objects retain their original identity.\nTrue only when the member existed before removal.\nclear: Removes all members in one batch and updates materialized membership cells plus structure.\nNothing; membership is empty and affected observations are invalidated.\nreplace: Materializes the iterable before swapping membership in one batch; only identical membership in identical iteration order avoids a structure update.\nreplace.next: Complete replacement iterable; duplicate values collapse using native Set semantics.\nNothing; replacement membership is committed after input preparation.\nvaluesArray: Reads structure and returns a shallow-frozen array in Set iteration order.\nFrozen top-level member list; nested objects retain identity.\nsnapshot: Reads structure and creates a fresh independent native Set copy.\nReadonlySet-typed shallow copy; the native Set is not frozen, and mutating it does not affect the source collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\nOmitted: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: ObservableObject, ObservableArray, ObservableMap or ObservableSet."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ObservableSet."
+              "content": "Observe independent selection flags without subscribing to every selected item."
             }
           ],
           "declaredConfiguration": [
@@ -4112,7 +3539,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带 `source: '@migaia/store-indexed'` 与稳定 `code`。调用方应按 `code` 判断语义，不应依赖消息文本。"
+                  "text": "本包创建的错误带 `source: '@migaia/store-indexed'` 与稳定 `code`。Reactive 与其它已编码错误保留实际 owner。未编码 guard/updater 失败归 `CALLBACK_FAILED`：可扩展原生错误保留对象/类型/message/stack，frozen 或非 Error 原值通过 cause/errors 可达。调用方应按 `code` 判断语义，不应依赖消息文本。"
                 },
                 {
                   "type": "table",
@@ -4172,7 +3599,7 @@
               ]
             }
           ],
-          "usageScore": 98,
+          "usageScore": 100,
           "configuration": [
             {
               "name": "mutationGuard",
@@ -4191,7 +3618,7 @@
               "descriptionZh": "`options.debugName` — `string` — 可选 — 类名（如 `'ObservableArray'`） — 内部各 Signal 的调试名前缀，用于诊断/追踪工具"
             }
           ],
-          "fragment": "store-indexed-index--ObservableSet-class"
+          "fragment": "store-indexed-index--ObservableSet"
         },
         {
           "name": "STORE_INDEXED_SOURCE",
@@ -4199,17 +3626,17 @@
           "signature": "export declare const STORE_INDEXED_SOURCE = \"@migaia/store-indexed\";",
           "declarationLine": 4,
           "source": "packages/store-indexed/dist/errors.d.ts",
-          "purpose": "`source` value stamped onto every error this module throws.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORE_INDEXED_SOURCE.",
-          "advanced": "No additional advanced behavior is declared for STORE_INDEXED_SOURCE.",
+          "purpose": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
+          "core": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for STORE_INDEXED_SOURCE."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_INDEXED_SOURCE.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'",
-            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
+            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
             "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
           ],
           "members": [],
@@ -4220,13 +3647,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use STORE_INDEXED_SOURCE when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when STORE_INDEXED_SOURCE does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`source` value stamped onto every error this module throws."
+              "content": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
             },
             {
               "id": "getting-started",
@@ -4246,12 +3673,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORE_INDEXED_SOURCE."
+              "content": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for STORE_INDEXED_SOURCE."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -4269,11 +3696,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
                 },
                 {
                   "type": "code",
@@ -4282,11 +3709,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
                 }
               ]
             },
@@ -4310,11 +3733,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
                 },
                 {
                   "type": "code",
@@ -4356,20 +3779,20 @@
         {
           "name": "StoreIndexedErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreIndexedErrorCode: { /** Collection constructor options were not an object at the JavaScript boundary. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };",
+          "signature": "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };",
           "declarationLine": 8,
           "source": "packages/store-indexed/dist/error-code.d.ts",
-          "purpose": "Owns the error-code declarations for `@migaia/store-indexed`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-indexed'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`error-code-rollout.sdd.md` §1.2).",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreIndexedErrorCode.",
-          "advanced": "No additional advanced behavior is declared for StoreIndexedErrorCode.",
+          "purpose": "Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs.",
+          "core": "invalidOption: Invalid constructor options, input/iterator shape, debugName, object key or updater; fix the supplied value.\ncollectionDisposed: Data access after terminal collection disposal; create a new collection.\ncallbackFailed: An unclassified synchronous mutation guard or updater fails; existing foreign identities stay unchanged, and original values remain reachable. The outer mutation is not committed.\nindexOutOfRange: Array set index falls outside existing nonnegative positions.\ninvalidIndex: Array at or set received a noninteger index.\ncrossRuntime: A tracked value read attempts to connect another Runtime graph.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for StoreIndexedErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreIndexedErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'",
-            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
+            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
             "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}",
             "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)",
             "import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nconst runtimeA = createRuntime()\nconst runtimeB = createRuntime()\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA)\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a') // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n})",
@@ -4381,7 +3804,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidOption: \"INVALID_OPTION\";",
-              "description": "Collection constructor options were not an object at the JavaScript boundary.",
+              "description": "Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed.",
               "parameterDetails": [],
               "returns": "\"INVALID_OPTION\""
             },
@@ -4393,6 +3816,15 @@
               "description": "Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance.",
               "parameterDetails": [],
               "returns": "\"COLLECTION_DISPOSED\""
+            },
+            {
+              "name": "callbackFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly callbackFailed: \"CALLBACK_FAILED\";",
+              "description": "A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back.",
+              "parameterDetails": [],
+              "returns": "\"CALLBACK_FAILED\""
             },
             {
               "name": "indexOutOfRange",
@@ -4426,17 +3858,17 @@
           "aliasOf": "StoreIndexedErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreIndexedErrorCode: { /** Collection constructor options were not an object at the JavaScript boundary. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };"
+            "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use StoreIndexedErrorCode when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when StoreIndexedErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Owns the error-code declarations for `@migaia/store-indexed`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-indexed'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`error-code-rollout.sdd.md` §1.2)."
+              "content": "Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs."
             },
             {
               "id": "getting-started",
@@ -4456,16 +3888,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreIndexedErrorCode."
+              "content": "invalidOption: Invalid constructor options, input/iterator shape, debugName, object key or updater; fix the supplied value.\ncollectionDisposed: Data access after terminal collection disposal; create a new collection.\ncallbackFailed: An unclassified synchronous mutation guard or updater fails; existing foreign identities stay unchanged, and original values remain reachable. The outer mutation is not committed.\nindexOutOfRange: Array set index falls outside existing nonnegative positions.\ninvalidIndex: Array at or set received a noninteger index.\ncrossRuntime: A tracked value read attempts to connect another Runtime graph."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for StoreIndexedErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-indexed/dist/error-code.d.ts:StoreIndexedErrorCode:export declare const StoreIndexedErrorCode: { /** Collection constructor options were not an object at the JavaScript boundary. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };",
+          "identity": "packages/store-indexed/dist/error-code.d.ts:StoreIndexedErrorCode:export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };",
           "guidance": [
             {
               "id": "错误模块",
@@ -4479,11 +3911,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  callbackFailed: 'CALLBACK_FAILED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。"
+                  "text": "码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。"
                 },
                 {
                   "type": "code",
@@ -4492,11 +3924,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
+                  "text": "三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别\"这是一个 store-indexed 语义错误\"。"
                 }
               ]
             },
@@ -4520,11 +3948,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包所有边界错误的 `source` 字段固定值，无调用参数："
+                  "text": "`STORE_INDEXED_SOURCE`｜3 秒上手 —— 本包创建错误的 `source` 字段固定值，无调用参数："
                 },
                 {
                   "type": "code",

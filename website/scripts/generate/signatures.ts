@@ -5,6 +5,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { spawnSync } from 'node:child_process'
 import { join, relative, resolve } from 'node:path'
 import { format } from 'oxfmt'
+import { referenceFor } from '../../app/reference/index.ts'
+import type { IMemberDoc } from '../../app/reference/contract.ts'
 
 const PACKAGES = [
   'utils',
@@ -493,44 +495,22 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
 
 /** Converts maintained Markdown prose into safe website text without repository-only wording. */
 function markdownText(value: string): string {
-  return sanitizePublicText(value)
+  /** Opaque code spans survive Markdown link/emphasis removal, including bracket calls and names. */
+  const codeSpans: string[] = []
+  /** Private-use markers keep Markdown transformations outside each original code span. */
+  const prose = value.replace(/`+[^`]*`+/g, (code) => {
+    codeSpans.push(code)
+    return `\uE000${codeSpans.length - 1}\uE001`
+  })
+  return sanitizePublicText(prose)
     .replace(/<a\s+[^>]*><\/a>/gi, '')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/__([^_]+)__/g, '$1')
     .replace(/^>\s?/, '')
+    .replace(/\uE000(\d+)\uE001/g, (_, index) => codeSpans[Number(index)])
     .trim()
-}
-
-/** Splits dense maintained prose at sentence boundaries for a readable scanning rhythm. */
-function proseParagraphs(value: string, maximumLength = 420): string[] {
-  const rawSentences = value.match(/[^。！？.!?]+[。！？.!?]?/g) ?? [value]
-  const sentences = rawSentences.flatMap((sentence) => {
-    if (sentence.length <= maximumLength) return [sentence]
-    const clauses = sentence.match(/[^，、；;,]+[，、；;,]?/g) ?? [sentence]
-    const chunks: string[] = []
-    let chunk = ''
-    for (const clause of clauses) {
-      if (chunk && `${chunk}${clause}`.length > maximumLength) {
-        chunks.push(chunk)
-        chunk = clause
-      } else chunk += clause
-    }
-    if (chunk) chunks.push(chunk)
-    return chunks
-  })
-  const paragraphs: string[] = []
-  let current = ''
-  for (const sentence of sentences) {
-    const next = `${current}${sentence}`.trim()
-    if (current && next.length > maximumLength) {
-      paragraphs.push(current)
-      current = sentence.trim()
-    } else current = next
-  }
-  if (current) paragraphs.push(current)
-  return paragraphs
 }
 
 type IMaintainedBlock =
@@ -566,8 +546,8 @@ function maintainedDocument(filePath: string) {
   const flush = () => {
     if (paragraph.length > 0) {
       const text = markdownText(paragraph.join(' '))
-      for (const readableParagraph of proseParagraphs(text))
-        section.blocks.push({ type: 'paragraph', text: readableParagraph })
+      // Source paragraphs already own their boundaries; punctuation inside code is not a delimiter.
+      section.blocks.push({ type: 'paragraph', text })
       paragraph = []
     }
     if (list.length > 0) {
@@ -1246,11 +1226,24 @@ function declarationParameters(signature: string) {
   }
   /** Generic config parameters expose their declared input bound, not only a legacy overload. */
   const header = signature.slice(0, open)
-  const constraints = [...header.matchAll(/\b([A-Za-z_$][\w$]*)\s+extends\s+([A-Za-z_$][\w$]*)\b/g)]
+  /** Only complete named bounds can project configuration; keyof/readonly fragments are not types. */
+  const genericStart = header.indexOf('<')
+  const constraints =
+    genericStart < 0
+      ? []
+      : splitTopLevel(header.slice(genericStart + 1, header.lastIndexOf('>')), ',').flatMap(
+          (parameter) => {
+            const match = parameter.match(/^(?:const\s+)?([A-Za-z_$][\w$]*)\s+extends\s+([\s\S]+)$/)
+            if (!match) return []
+            /** A generic default is separate from its constraint, even when either contains commas. */
+            const assignment = topLevelOffsets(match[2], '=')[0]
+            const bound = match[2].slice(0, assignment ?? match[2].length).trim()
+            return namedTypeReference(bound) ? [[match[1], bound]] : []
+          }
+        )
   for (const parameter of values) {
     let projection = parameter.type
-    for (const [, name, bound] of constraints)
-      projection = projection.replace(new RegExp(`\\b${name}\\b`, 'g'), bound)
+    for (const [name, bound] of constraints) if (projection === name) projection = bound
     if (projection !== parameter.type) parameter.configurationType = projection
   }
   return values
@@ -1495,7 +1488,8 @@ function typeExpressionShape(expression: string): {
     }
   }
   /** Parse each utility separately: a trailing intersection is not part of its omitted key list. */
-  if (/^(?:Omit|Pick|Partial)</.test(target)) return { members: [], composes: [target] }
+  if (/^(?:Omit|Pick|Partial|Required|Extract)</.test(target) || /\[['"][^'"]+['"]\]$/.test(target))
+    return { members: [], composes: [target] }
   return {
     members: parts.filter((part) => part.startsWith('{')).flatMap((part) => classMembers(part)),
     composes: parts
@@ -1533,6 +1527,8 @@ function inlinePrivateSurfaces(directory: string, symbols: Array<Record<string, 
   const declarations = new Map<string, Map<string, { kind: string; text: string }>>()
   /** Import aliases per file (`import { A as B }`), mapping the local name to its real owner. */
   const imports = new Map<string, Map<string, { file: string; name: string }>>()
+  /** Indexed fields resolve their named types in the declaring file, never a namesake elsewhere. */
+  const memberOrigins = new WeakMap<Record<string, unknown>, string>()
   /** Lists every emitted declaration file under one directory. */
   const typingFiles = (root: string): string[] =>
     existsSync(root)
@@ -1629,6 +1625,69 @@ function inlinePrivateSurfaces(directory: string, symbols: Array<Record<string, 
           : typeMemberShape(text, found.declaration.kind as 'type' | 'interface')
     return expand(own, found.file, seen, inlinePublic)
   }
+  /**
+   * Keeps declared union branches separate while resolving an Extract projection. Flattening the
+   * envelope first would incorrectly mix fields from unrelated protocol variants.
+   */
+  const variantsOf = (
+    expression: string,
+    file: string,
+    seen: Set<string>
+  ): Array<{ members: Array<Record<string, unknown>>; composes: string[] }> => {
+    /** Transparent grouping around the actual variant expression. */
+    let target = expression.trim()
+    for (;;) {
+      if (target.startsWith('(') && closingParenthesis(target, 0) === target.length - 1)
+        target = target.slice(1, -1).trim()
+      else if (
+        target.startsWith('Readonly<') &&
+        splitTopLevel(target, '&').length === 1 &&
+        splitTopLevel(target, '|').length === 1
+      )
+        target = target.slice('Readonly<'.length, -1).trim()
+      else break
+    }
+    /** A named alias may contain the union selected by Extract. */
+    const name = namedTypeReference(target)
+    const found = name ? locate(name, file) : undefined
+    if (name && found?.declaration.kind === 'type') {
+      /** File-qualified recursion guard permits the same name in unrelated packages. */
+      const key = `${found.file}:${name}`
+      if (seen.has(key)) return []
+      /** Alias header excludes generic defaults when locating the target assignment. */
+      const header = found.declaration.text.replace(
+        /^(?:export\s+)?(?:declare\s+)?type\s+[A-Za-z_$][\w$]*/,
+        ''
+      )
+      const assignment = topLevelOffsets(header, '=')[0]
+      if (assignment === undefined) return []
+      return variantsOf(
+        header.slice(assignment + 1).replace(/;\s*$/, ''),
+        found.file,
+        new Set(seen).add(key)
+      )
+    }
+    /** Union alternatives remain separate; intersections contribute to each alternative. */
+    const alternatives = splitTopLevel(target, '|')
+    if (alternatives.length > 1)
+      return alternatives.flatMap((part) => variantsOf(part, file, new Set(seen)))
+    const intersections = splitTopLevel(target, '&')
+    if (intersections.length > 1)
+      return intersections.reduce(
+        (combined, part) =>
+          combined.flatMap((left) =>
+            variantsOf(part, file, new Set(seen)).map((right) => ({
+              members: [...left.members, ...right.members],
+              composes: [...left.composes, ...right.composes]
+            }))
+          ),
+        [{ members: [], composes: [] }] as Array<{
+          members: Array<Record<string, unknown>>
+          composes: string[]
+        }>
+      )
+    return [expand(typeExpressionShape(target), file, new Set(seen), true)]
+  }
   /** Replaces non-public bases with their members, keeping public bases as links. */
   const expand = (
     shape: { members: Array<Record<string, unknown>>; composes: string[] },
@@ -1637,14 +1696,61 @@ function inlinePrivateSurfaces(directory: string, symbols: Array<Record<string, 
     inlinePublic = false
   ) => {
     const members = [...shape.members]
+    for (const member of members) if (!memberOrigins.has(member)) memberOrigins.set(member, file)
     const composes: string[] = []
     for (const base of shape.composes) {
-      /** Partial preserves the selected surface while making each real field optional. */
-      const partial = base.match(/^Partial<([\s\S]*)>$/)?.[1]
-      if (partial) {
-        const projected = expand(typeExpressionShape(partial), file, new Set(seen), true)
-        members.push(...projected.members.map((member) => ({ ...member, optional: true })))
+      /** Partial/Required change optionality on the selected real fields, not type identity. */
+      const optionality = base.match(/^(Partial|Required)<([\s\S]*)>$/)
+      if (optionality) {
+        const projected = expand(typeExpressionShape(optionality[2]), file, new Set(seen), true)
+        members.push(
+          ...projected.members.map((member) => ({
+            ...member,
+            optional: optionality[1] === 'Partial',
+            signature: String(member.signature).replace(
+              /^(\s*(?:readonly\s+)?[\w$]+)\??(?=\s*[:(<])/,
+              `$1${optionality[1] === 'Partial' ? '?' : ''}`
+            )
+          }))
+        )
         composes.push(...projected.composes)
+        continue
+      }
+      /** Indexed access projects the declared object field, for example runtime-call options. */
+      const indexed = base.match(/^([\s\S]+)\[['"]([^'"]+)['"]\]$/)
+      if (indexed) {
+        const container = expand(typeExpressionShape(indexed[1]), file, new Set(seen), true)
+        for (const field of container.members.filter((member) => member.name === indexed[2])) {
+          const projected = expand(
+            typeExpressionShape(String(field.returns)),
+            memberOrigins.get(field) ?? file,
+            new Set(seen),
+            true
+          )
+          members.push(...projected.members)
+          composes.push(...projected.composes)
+        }
+        continue
+      }
+      /** Extract selects only branches whose real discriminant literals satisfy the filter. */
+      const extracted = base.match(/^Extract<([\s\S]*)>$/)?.[1]
+      if (extracted) {
+        const [reference = '', filter = ''] = splitTopLevel(extracted, ',')
+        const constraints = classMembers(filter)
+        if (constraints.length === 0) continue
+        for (const variant of variantsOf(reference, file, new Set(seen))) {
+          const matches = constraints.every((constraint) => {
+            const field = variant.members.find((member) => member.name === constraint.name)
+            if (!field) return false
+            /** Literal equality follows declaration text; no approximate assignability solver. */
+            const allowed = new Set(splitTopLevel(String(constraint.returns), '|'))
+            return splitTopLevel(String(field.returns), '|').every((value) => allowed.has(value))
+          })
+          if (matches) {
+            members.push(...variant.members)
+            composes.push(...variant.composes)
+          }
+        }
         continue
       }
       /** Typeof selects the value namespace, unlike a same-named enum-like type alias. */
@@ -1683,9 +1789,7 @@ function inlinePrivateSurfaces(directory: string, symbols: Array<Record<string, 
           }
           projected = expand(typeExpressionShape(result), factory.file, new Set(seen), true)
         } else {
-          const name = namedTypeReference(reference)
-          if (!name) continue
-          projected = privateSurface(name, file, new Set(seen), true)
+          projected = expand(typeExpressionShape(reference), file, new Set(seen), true)
         }
         const selected = new Set(
           splitTopLevel(keys, '|').map((key) =>
@@ -1840,15 +1944,26 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
   visited.add(filePath)
   const source = readFileSync(filePath, 'utf8')
   const records: Array<Record<string, unknown>> = []
+  /** A default export can name a local declaration without making every private declaration public. */
+  const defaultBindings = new Set(
+    [...source.matchAll(/^export\s+default\s+([A-Za-z_$][\w$]*)\s*;/gm)].map((match) => match[1])
+  )
+  /** Comment prose cannot introduce phantom declarations; offsets still refer to the real file. */
+  const declarationText = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (comment) =>
+    comment.replace(/[^\r\n]/g, ' ')
+  )
   const declarationPattern =
-    /export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(function|class|const|let|var|type|interface|namespace)\s+([A-Za-z_$][\w$]*)/g
-  for (const match of source.matchAll(declarationPattern)) {
+    /^(?:export\s+(?:default\s+)?(?:declare\s+)?|declare\s+)(?:abstract\s+)?(?:async\s+)?(function|class|const|let|var|type|interface|namespace)\s+([A-Za-z_$][\w$]*)/gm
+  for (const match of declarationText.matchAll(declarationPattern)) {
     const kind = match[1]
     const name = match[2]
+    /** Only an explicit default binding exposes a declaration lacking the export modifier. */
+    const localDefault = !match[0].startsWith('export') && defaultBindings.has(name)
+    if (!match[0].startsWith('export') && !localDefault) continue
     const declarationStart = match.index ?? 0
     const lineStart = source.lastIndexOf('\n', declarationStart) + 1
     const end = declarationEnd(source, declarationStart, kind)
-    const rawDeclaration = source.slice(declarationStart, end).trim()
+    const rawDeclaration = `${localDefault ? 'export ' : ''}${source.slice(declarationStart, end).trim()}`
     const signature = rawDeclaration.replace(/\s+/g, ' ')
     let parameterDetails =
       kind === 'function'
@@ -1907,7 +2022,7 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
               .replace(/;\s*$/, '')
               .trim()
     records.push({
-      name,
+      name: localDefault ? 'default' : name,
       kind,
       ...(callable ? { callable: true } : {}),
       signature,
@@ -1974,7 +2089,11 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
     if (reexport[3] && !reexport[3].startsWith('.') && !reexport[3].startsWith('@migaia/')) continue
     if (reexport[1] === '*') {
       for (const target of declarationImportFiles(filePath, reexport[3]))
-        records.push(...declarationSymbols(target, new Set(visited)))
+        records.push(
+          ...declarationSymbols(target, new Set(visited)).filter(
+            (record) => record.name !== 'default'
+          )
+        )
       continue
     }
     const bindings = (reexport[2] ?? '').split(',').map((binding) => {
@@ -2003,22 +2122,41 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
         declarationImportFiles(filePath, specifier).flatMap((target) =>
           declarationSymbols(target, new Set(visited))
         )
-      for (const record of targetRecords.filter(
+      /** A dual value/type export contributes only its type declaration through export type. */
+      const matchingRecords = targetRecords.filter(
         (candidate) => String(candidate.name) === (imported?.imported ?? binding.imported)
+      )
+      const typeOnly = binding.typeOnly || imported?.typeOnly
+      const hasTypeDeclaration = matchingRecords.some(
+        (record) => record.kind === 'type' || record.kind === 'interface'
+      )
+      for (const record of matchingRecords.filter(
+        (candidate) =>
+          !typeOnly ||
+          !hasTypeDeclaration ||
+          candidate.kind === 'type' ||
+          candidate.kind === 'interface'
       )) {
+        /** A named default re-export renames its actual local declaration, not the word default. */
+        const declarationName =
+          binding.imported === 'default'
+            ? String(record.signature).match(
+                /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:function|class|const|let|var)\s+([A-Za-z_$][\w$]*)/
+              )?.[1]
+            : undefined
         /** Preserve the public type declaration instead of advertising a private class value. */
-        const typeOnlyClass = (binding.typeOnly || imported?.typeOnly) && record.kind === 'class'
-        const signature = typeOnlyClass
+        const typeOnlyValue = typeOnly && record.kind !== 'type' && record.kind !== 'interface'
+        const signature = typeOnlyValue
           ? `export type { ${binding.imported}${binding.imported === binding.exported ? '' : ` as ${binding.exported}`} }${reexport[3] ? ` from '${specifier}'` : ''};`
           : String(record.signature).replace(
-              new RegExp(`\\b${imported?.imported ?? binding.imported}\\b`),
+              new RegExp(`\\b${declarationName ?? imported?.imported ?? binding.imported}\\b`),
               binding.exported
             )
         records.push({
           ...record,
           name: binding.exported,
           signature,
-          ...(typeOnlyClass
+          ...(typeOnlyValue
             ? { kind: 'type', core: signature, parameters: [], parameterDetails: [], returns: null }
             : {}),
           aliasOf: binding.imported
@@ -2127,6 +2265,99 @@ function buildSymbolSections(
   }
 }
 
+/**
+ * Audited reference prose owns generated semantic metadata too. Declaration parsing still owns
+ * signatures and types; this projection reuses authored facts without inferring error guarantees or
+ * creating a second independently maintained explanation of the same API.
+ */
+function authoredSymbolMetadata(
+  library: string,
+  module: string,
+  symbol: Record<string, unknown>
+): Record<string, unknown> {
+  /** Audited documentation keyed by the exact public module before its shared-name fallback. */
+  const reference = referenceFor(library)
+  if (!reference) return symbol
+  /** Module-qualified entries distinguish unrelated public APIs with the same spelling. */
+  const key = `${module}:${String(symbol.name)}`
+  /** Runtime, type and constant documentation describe their own public boundary. */
+  const runtime = reference.symbols[key] ?? reference.symbols[String(symbol.name)]
+  const type = reference.types[key] ?? reference.types[String(symbol.name)]
+  const enumeration = reference.enums[key] ?? reference.enums[String(symbol.name)]
+  const enhancer = reference.enhancers[key] ?? reference.enhancers[String(symbol.name)]
+  /** Preserve the complete authored introduction rather than truncating source comments. */
+  const purpose = runtime?.purpose.en ?? type?.summary.en ?? enumeration?.summary.en
+  if (!purpose) return symbol
+  /** One member's existing contract facts; labels preserve which field the prose describes. */
+  const memberFacts = (name: string, member: IMemberDoc): string[] => [
+    `${name}: ${member.summary.en}`,
+    ...Object.entries(member.params ?? {}).map(
+      ([parameter, text]) => `${name}.${parameter}: ${text.en}`
+    ),
+    ...(member.returns ? [member.returns.en] : []),
+    ...(member.default ? [member.default.en] : []),
+    ...Object.values(member.values ?? {}).flatMap((value) =>
+      typeof value === 'string' ? [] : [value.en]
+    ),
+    ...(member.whenToUse ? [member.whenToUse.en] : [])
+  ]
+  /** Options may use a named reference type instead of an anonymous options table. */
+  const options = runtime?.options
+    ? (reference.types[`${module}:${runtime.options}`] ?? reference.types[runtime.options])
+    : undefined
+  /** Core facts remain prose; the original structured declaration fields are untouched. */
+  const core =
+    Array.from(
+      new Set([
+        ...Object.entries(runtime?.params ?? {}).map(([name, text]) => `${name}: ${text.en}`),
+        ...(runtime?.returns ? [runtime.returns.en] : []),
+        ...Object.entries(type?.members ?? {}).flatMap(([name, member]) =>
+          memberFacts(name, member)
+        ),
+        ...Object.entries(runtime?.optionDocs ?? options?.members ?? {}).flatMap(([name, member]) =>
+          memberFacts(name, member)
+        ),
+        ...Object.entries(enumeration?.values ?? {}).map(([name, text]) => `${name}: ${text.en}`),
+        ...(enhancer ? [enhancer.summary.en] : [])
+      ])
+    ).join('\n') || purpose
+  /** Scenarios and cautions are authored advanced guidance, never an absence template. */
+  const advanced = Array.from(
+    new Set([
+      ...(runtime?.scenarios ?? []).map((text) => text.en),
+      ...(runtime?.avoid ?? []).map((text) => text.en),
+      ...(type?.scenarios ?? []).map((text) => text.en),
+      ...(enhancer?.behaviors ?? []).map((text) => text.en),
+      ...(enhancer?.scenarios ?? []).map((text) => text.en)
+    ])
+  ).join('\n')
+  return {
+    ...symbol,
+    purpose,
+    core,
+    advanced,
+    // Failure/lifecycle facts stay in authored contract prose. An empty category asserts nothing;
+    // do not turn missing machine-readable classification into "no documented errors" claims.
+    errors: [],
+    lifecycleConcurrency: '',
+    whenToUse: (runtime?.scenarios ?? type?.scenarios ?? []).map((text) => text.en).join('\n'),
+    notUse: (runtime?.avoid ?? []).map((text) => text.en).join('\n'),
+    sections: Array.isArray(symbol.sections)
+      ? symbol.sections.map((section: { id: string; content: string }) => ({
+          ...section,
+          content:
+            section.id === 'introduction'
+              ? purpose
+              : section.id === 'core-usage'
+                ? core
+                : section.id === 'advanced-usage'
+                  ? advanced
+                  : section.content
+        }))
+      : symbol.sections
+  }
+}
+
 /** Resolves an exports.types target, including declaration wildcard entries. */
 function declarationFiles(directory: string, typeTarget: unknown): string[] {
   if (typeof typeTarget !== 'string') return []
@@ -2153,6 +2384,31 @@ function buildPublicSymbols(directory: string, manifest: Record<string, any>, ex
   for (const exportPath of exports) {
     const target = manifest.exports?.[exportPath]
     const types = typeof target === 'string' ? target : target?.types
+    /** JSON exports are public data values, even when they have no declaration artifact. */
+    const dataTarget = typeof target === 'string' ? target : target?.default
+    if (typeof dataTarget === 'string' && dataTarget.endsWith('.json')) {
+      /** Read the published artifact itself; no fabricated callable or TypeScript type is needed. */
+      const filePath = resolve(directory, dataTarget)
+      const data = JSON.parse(readFileSync(filePath, 'utf8'))
+      const signature = JSON.stringify(data, null, 2)
+      candidates.push({
+        name: 'default',
+        kind: 'const',
+        signature,
+        declarationLine: 1,
+        source: relative(resolve('..'), filePath).split('\\').join('/'),
+        exportPath,
+        isExplicitLeaf: true,
+        purpose: typeof data.description === 'string' ? data.description : null,
+        parameters: [],
+        parameterDetails: [],
+        returns: null,
+        errors: [],
+        members: [],
+        composes: []
+      })
+      continue
+    }
     for (const filePath of declarationFiles(directory, types)) {
       for (const record of declarationSymbols(filePath)) {
         const source = relative(resolve('..'), String(record.source)).split('\\').join('/')
@@ -2222,7 +2478,9 @@ function buildPublicSymbols(directory: string, manifest: Record<string, any>, ex
       ...candidate,
       ...details,
       identity,
-      signature: sanitizePublicText(sourceSignature),
+      signature: String(candidate.source).endsWith('.json')
+        ? sourceSignature
+        : sanitizePublicText(sourceSignature),
       overloadSignatures: Array.isArray(candidate.overloadSignatures)
         ? candidate.overloadSignatures.map((signature) => sanitizePublicText(String(signature)))
         : undefined
@@ -2467,7 +2725,7 @@ async function generateManifests() {
           String(symbol.kind)
         )
         return {
-          ...publicSymbol,
+          ...authoredSymbolMetadata(library.slug, slug, publicSymbol),
           identity,
           guidance,
           examples: maintainedExamples,
@@ -2774,17 +3032,22 @@ async function generateManifests() {
     module: string
     symbols: Array<{
       name: string
+      source: string
       signature: string
       sections: Array<{ example?: string }>
     }>
   }>
   for (const api of formattableApis) {
     for (const symbol of api.symbols) {
-      const formattedSignature = await format(`${symbol.name}.d.ts`, symbol.signature, {
-        printWidth: 88,
-        semi: true,
-        singleQuote: true
-      })
+      const formattedSignature = await format(
+        `${symbol.name}${symbol.source.endsWith('.json') ? '.json' : '.d.ts'}`,
+        symbol.signature,
+        {
+          printWidth: 88,
+          semi: true,
+          singleQuote: true
+        }
+      )
       if (formattedSignature.errors.length > 0) {
         throw new Error(`Unable to format ${api.library}/${api.module}#${symbol.name}`)
       }

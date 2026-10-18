@@ -28,7 +28,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "不适用：不要把它当作浏览器 DevTools 扩展协议的实现——那是 `@migaia/store-middleware` 的 `connectDevTools()`，本包不接入该协议（`StoreDevtoolsCommand` 只是与该协议同名的命令字符串表，供调用方自己搭桥时复用，本包内部不消费它）。也不要把它当作生产环境状态审计或持久化层：`history` 只在内存里，进程重启即丢失；`jumpTo()` 不是事务回滚，无法撤销已经发出的网络请求或其他副作用。"
+                "text": "不适用：不要把它当作浏览器 DevTools 扩展协议的实现——那是 `@migaia/store-middleware` 的 `connectDevTools()`，本包不接入该协议；其协议词表由同包 `ReduxDevToolsCommand` / `IReduxDevToolsCommand` 维护。也不要把它当作生产环境状态审计或持久化层：`history` 只在内存里，进程重启即丢失；`jumpTo()` 不是事务回滚，无法撤销已经发出的网络请求或其他副作用。"
               }
             ]
           },
@@ -56,7 +56,7 @@
                 "items": [
                   "诊断会话：`createStoreDevTools`",
                   "依赖树：`getDependencyTree` / `getObserverTree`",
-                  "命令常量：`StoreDevtoolsCommand`",
+                  "扩展协议迁移",
                   "错误：`StoreDevtoolsErrorCode` 与错误工厂",
                   "高阶组合示例",
                   "构建门禁"
@@ -93,8 +93,8 @@
               {
                 "type": "list",
                 "items": [
-                  "`maxHistory?: number` —— 默认 `100`；`history` 和 `actions` 两个队列共用它做上限（`actions` 没有独立的 `maxActions`）；必须是 `>= 1` 的安全整数，否则构造时抛错（不会被静默夹到 `1`）",
-                  "`maxTrace?: number` —— 默认 `1000`；仅约束 `trace` 队列；同样必须是 `>= 1` 的安全整数，否则抛错",
+                  "`maxHistory?: number` —— 默认 `100`；仅约束 `history` 队列；必须是 `>= 1` 的安全整数，否则构造时抛错（不会被静默夹到 `1`）",
+                  "`maxTrace?: number` —— 默认 `1000`；分别约束 `actions` 和 `trace` 的独立队列（没有独立 `maxActions`）；同样必须是 `>= 1` 的安全整数，否则抛错",
                   "`captureRuntimeTrace?: boolean` —— 默认 `true`；传 `false` 时完全不订阅 runtime trace，`trace` 永远为空数组，`actions` 也不再被自动填充（只能靠手动 `recordAction()`）",
                   "`now?: () => number` —— 默认 `Date.now`；时间戳来源，传非函数值抛错",
                   "`clone?: (state: Record<string, unknown>) => Record<string, unknown>` —— 默认 `ClonePolicy.diagnostic`（来自 `@migaia/store-middleware/tolerant-clone`，尽力克隆、遇到不可克隆值不抛错）；传非函数值抛错"
@@ -164,26 +164,21 @@
             ]
           },
           {
-            "id": "命令常量-storedevtoolscommand",
-            "heading": "命令常量：StoreDevtoolsCommand",
+            "id": "扩展协议迁移",
+            "heading": "扩展协议迁移",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';"
-              },
-              {
                 "type": "paragraph",
-                "text": "`StoreDevtoolsCommand`｜3 秒上手 —— 一张与 Redux DevTools 扩展协议同名的命令字符串表，本包内部任何函数都不消费它；只有自己搭桥接入该扩展协议时才用得上："
+                "text": "本地诊断入口不再导出 `StoreDevtoolsCommand` / `IStoreDevtoolsCommand`。自建扩展桥接应改用实际协议所有者："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "StoreDevtoolsCommand.jumpToState; // 'JUMP_TO_STATE'"
+                "code": "import { ReduxDevToolsCommand, type IReduxDevToolsCommand } from '@migaia/store-middleware';\nReduxDevToolsCommand.jumpToState; // 'JUMP_TO_STATE'"
               },
               {
                 "type": "paragraph",
-                "text": "无调用参数，是常量对象；全部取值：`dispatch`(`'DISPATCH'`)、`commit`(`'COMMIT'`)、`jumpToState`(`'JUMP_TO_STATE'`)、`jumpToAction`(`'JUMP_TO_ACTION'`)、`rollback`(`'ROLLBACK'`)、`reset`(`'RESET'`)。"
+                "text": "这是一项破坏性导入迁移；六个协议字符串保持不变。开箱即用的连接继续使用 Store Middleware 的 `createReduxDevToolsAdapter` / `connectDevTools()`。"
               }
             ]
           },
@@ -207,7 +202,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
               },
               {
                 "type": "paragraph",
@@ -239,7 +234,7 @@
                 "type": "list",
                 "items": [
                   "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                  "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                  "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                   "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                 ]
               }
@@ -308,6 +303,10 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              },
+              {
+                "type": "paragraph",
+                "text": "诊断准备阶段的 clock、clone 或 action getter 失败按 `CALLBACK_FAILED` 分类：可注记原生错误保留同一对象、类型和 stack，已有完整外包身份保留；不可注记值通过 cause 保留。手动调用抛出，自动监听走 Runtime reporter。准备期间释放会话则以 `SESSION_DISPOSED` 拒绝发布；队列与下一个 history id 不变。"
               }
             ]
           }
@@ -358,7 +357,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+                "code": "type IStoreDevToolsOptions = {\n  maxHistory?: number;\n  maxTrace?: number;\n  captureRuntimeTrace?: boolean;\n  now?: () => number;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  id: number;\n  timestamp: number;\n  label: string;\n  state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  timestamp: number;\n  name: string;\n  payload?: unknown;\n  durationMs?: number;\n  error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
               }
             ]
           },
@@ -372,11 +371,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `?` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number."
-              },
-              {
-                "type": "paragraph",
-                "text": "isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
+                "text": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
               },
               {
                 "type": "paragraph",
@@ -429,11 +424,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "1. 找不到时抛出 `RangeError('[store] unknown history entry: ${id}')`，`code: 'UNKNOWN_HISTORY_ENTRY'`。 2. 找到后，把内部\"回放深度\"计数器加一，调用 `store.$hydrate(clone(entry.state))` 把状态写回该快照（这里的 `clone` 就是构造时传入或默认的克隆函数，防止历史条目的引用在 `$hydrate` 过程中被业务代码污染），`finally` 里把计数器减一。 3. `$hydrate()` 是\"宽松写回\"：只写已知的 signal 字段，未知/派生/WASM 键静默跳过（`@migaia/store-light` 的默认行为），因此 `jumpTo()` 不会恢复 computed 值本身（它们会随依赖的 signal 变化自动重新计算），也不会恢复 WASM 字段或外部资源的状态。 4."
-              },
-              {
-                "type": "paragraph",
-                "text": "`$hydrate()` 触发的 Store 通知会重新走一遍 `$subscribe` 监听器，但由于回放深度计数器 `> 0`，这次通知不会被当成新的用户操作再记一条历史，避免每次 `jumpTo()` 都在历史末尾追加一条\"跳转产生的历史\"。用计数器而不是布尔值是为了处理嵌套回放：某个 `$subscribe` 监听器若在回放期间又触发了另一次 `jumpTo()`，内层结束时不能提前解除外层的回放屏蔽，否则外层剩余的通知会被误记。"
+                "text": "1. 找不到时抛出 `RangeError('[store] unknown history entry: ${id}')`，`code: 'UNKNOWN_HISTORY_ENTRY'`。 2. 找到后，把内部\"回放深度\"计数器加一，调用 `store.$hydrate(clone(entry.state))` 把状态写回该快照（这里的 `clone` 就是构造时传入或默认的克隆函数，防止历史条目的引用在 `$hydrate` 过程中被业务代码污染），`finally` 里把计数器减一。 3. `$hydrate()` 是\"宽松写回\"：只写已知的 signal 字段，未知/派生/WASM 键静默跳过（`@migaia/store-light` 的默认行为），因此 `jumpTo()` 不会恢复 computed 值本身（它们会随依赖的 signal 变化自动重新计算），也不会恢复 WASM 字段或外部资源的状态。 4. `$hydrate()` 触发的 Store 通知会重新走一遍 `$subscribe` 监听器，但由于回放深度计数器 `> 0`，这次通知不会被当成新的用户操作再记一条历史，避免每次 `jumpTo()` 都在历史末尾追加一条\"跳转产生的历史\"。用计数器而不是布尔值是为了处理嵌套回放：某个 `$subscribe` 监听器若在回放期间又触发了另一次 `jumpTo()`，内层结束时不能提前解除外层的回放屏蔽，否则外层剩余的通知会被误记。"
               },
               {
                 "type": "paragraph",
@@ -496,7 +487,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "四种事件都携带只读的节点描述符（`id`/`kind`/`debugName?`），不是可变的图节点本身——在事件里长期持有引用不会阻止对应 Signal/Computed/Effect 被回收。`trace.length` 超过 `maxTrace` 时从头部裁掉最旧条目。`captureRuntimeTrace: false` 完全跳过这条订阅，`trace` 永远是空数组。"
+                "text": "前三种事件按具体事件类型携带节点描述符；action 仅携带 name/durationMs/error，没有通用节点描述符。事件联合由 `@migaia/reactive` 维护，本包不转换事件。`trace.length` 超过 `maxTrace` 时从头部裁掉最旧条目。`captureRuntimeTrace: false` 完全跳过这条订阅，`trace` 永远是空数组。"
               }
             ]
           },
@@ -516,7 +507,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`options.clone` 默认是 `ClonePolicy.diagnostic`（`@migaia/store-middleware/tolerant-clone`）：优先用 `structuredClone`；遇到不可克隆的值（函数、DOM 句柄、Class 实例等）不抛错，而是递归遍历普通对象/数组，只在真正不可克隆的那个值上退化为引用共享，其余可克隆部分仍是独立拷贝。如果状态里包含敏感字段（token、密码等），默认克隆策略不会做任何脱敏——要么不让这些字段进入 `store.$plain()`（不用 signal 承载），要么传一个自行脱敏的 `clone` 函数替换默认值（见 README 的高阶组合示例 5）。"
+                "text": "`options.clone` 默认是 `ClonePolicy.diagnostic`（`@migaia/store-middleware/tolerant-clone`）：优先用 `structuredClone`；成功时使用其克隆结果，普通自定义 Class 可能被转成普通对象；失败时递归遍历普通对象/数组，在无法继续克隆的值上退化为引用共享。这是尽力诊断策略，不保证保留原型或完全隔离。如果状态里包含敏感字段（token、密码等），默认克隆策略不会做任何脱敏——要么不让这些字段进入 `store.$plain()`（不用 signal 承载），要么传一个自行脱敏的 `clone` 函数替换默认值（见 README 的高阶组合示例 5）。"
               }
             ]
           },
@@ -616,22 +607,21 @@
             ]
           },
           {
-            "id": "命令常量模块",
-            "heading": "命令常量模块",
+            "id": "扩展协议迁移",
+            "heading": "扩展协议迁移",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';"
+                "type": "paragraph",
+                "text": "`StoreDevtoolsCommand` / `IStoreDevtoolsCommand` 已从本地诊断入口移除。自建桥接改为："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreDevtoolsCommand: {\n  readonly dispatch: 'DISPATCH';\n  readonly commit: 'COMMIT';\n  readonly jumpToState: 'JUMP_TO_STATE';\n  readonly jumpToAction: 'JUMP_TO_ACTION';\n  readonly rollback: 'ROLLBACK';\n  readonly reset: 'RESET';\n};\ntype IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];"
+                "code": "import { ReduxDevToolsCommand, type IReduxDevToolsCommand } from '@migaia/store-middleware';"
               },
               {
                 "type": "paragraph",
-                "text": "一张与 Redux DevTools 浏览器扩展协议同名的命令字符串常量表。本包内部没有任何函数消费这张表——`createStoreDevTools`/`getDependencyTree`/`getObserverTree` 都不引用它。它的存在是为了给调用方自己搭建\"把 `history`/`jumpTo` 桥接到浏览器扩展协议\"的适配层时，复用一套与协议同名的稳定字符串，避免各自拼写字面量。如果需要开箱即用地接入该协议，应使用 `@migaia/store-middleware` 的 `connectDevTools()`，本包不实现该协议本身。"
+                "text": "六个值保持 `DISPATCH` / `COMMIT` / `JUMP_TO_STATE` / `JUMP_TO_ACTION` / `ROLLBACK` / `RESET`。实际消费者 `createReduxDevToolsAdapter` 也使用这份词表；本包不新增扩展桥接层。"
               }
             ]
           },
@@ -646,7 +636,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
               },
               {
                 "type": "code",
@@ -662,7 +652,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
+                "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
               },
               {
                 "type": "table",
@@ -680,12 +670,17 @@
                   ],
                   [
                     "`INVALID_OPTION`",
-                    "`createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数",
+                    "`createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数",
                     "`Error`（options 校验）或 `RangeError`（`maxDepth` 校验）"
                   ],
                   [
+                    "`CALLBACK_FAILED`",
+                    "未分类的 clock、clone 或 action 属性读取失败",
+                    "原生错误同一实例；不可注记值保留在 cause"
+                  ],
+                  [
                     "`CLEANUP_FAILED`",
-                    "`dispose()` 或构造期回滚清理时，多个订阅清理同时失败",
+                    "多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败",
                     "`AggregateError`，`errors` 保留每个原始失败"
                   ]
                 ]
@@ -764,6 +759,10 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              },
+              {
+                "type": "paragraph",
+                "text": "准备快照或 action 后、发布前再次检查终态；若 clock/clone/getter 在准备中释放会话，抛 `SESSION_DISPOSED`，不追加队列或消耗 history id。history 条目和 state 为浅冻结，actions 仅返回数组冻结，公开字段类型本身没有额外 readonly 修饰。"
               }
             ]
           }
@@ -794,16 +793,15 @@
           "signature": "export declare function createStoreDevTools<S extends Record<string, unknown>>(store: IReactiveStore<S>, options?: IStoreDevToolsOptions): IStoreDevTools;",
           "declarationLine": 46,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "createStoreDevTools is part of this module's public function contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevTools.",
-          "advanced": "No additional advanced behavior is declared for createStoreDevTools.",
+          "purpose": "Subscribes to an existing reactive store to collect bounded state history, completed actions and optional runtime trace. Replay hydrates local state and never reverses business side effects; dispose the session after inspection.",
+          "core": "store: Live IReactiveStore returned by @migaia/store-light createStore(); the caller keeps ownership and must dispose the diagnostic session before releasing it.\nCaller-owned IStoreDevTools. Construction snapshots options and initial state; invalid options throw Error/INVALID_OPTION, while unclassified initial clock or clone failures carry CALLBACK_FAILED. Existing foreign identities remain unchanged.\nmaxHistory: Safe integer at least one limiting retained state-history entries; old entries are evicted chronologically.\n100 history entries; it does not bound the action queue.\nmaxTrace: Safe integer at least one bounding both runtime trace and action queues independently.\n1000 entries per queue for actions and runtime trace.\ncaptureRuntimeTrace: False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.\ntrue: capture runtime events and completed action outcomes.\nnow: Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.\nDate.now supplies ordinary wall-clock timestamps.\nclone: Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot preparation classifies unowned failures as CALLBACK_FAILED; automatic capture reports them without failing business writes. Replay propagates clone failures. Apply redaction here.\nClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed.",
+          "advanced": "",
           "parameters": ["store: IReactiveStore<S>", "options: IStoreDevToolsOptions (optional)"],
           "parameterDetails": [
             {
               "name": "store",
               "type": "IReactiveStore<S>",
-              "optional": false,
-              "configurationType": "IReactiveStore<Record>"
+              "optional": false
             },
             {
               "name": "options",
@@ -812,8 +810,8 @@
             }
           ],
           "returns": "IStoreDevTools",
-          "errors": ["No documented errors are declared for createStoreDevTools."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreDevTools.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { createStoreDevTools } from '@migaia/store-devtools';\n\nconst tools = createStoreDevTools(store);\nstore.recompute();\n\nconst observerRuns = tools.trace.filter((event) => event.type === 'observer-run');\nconsole.log(observerRuns.map((event) => [event.observer.debugName, event.phase, event.durationMs]));",
             "const tools = createStoreDevTools(store, { maxHistory: 200 });\n\nstore.increment(); // Store 自己定义的方法，被 runtime 自动追踪为一次 action\n\ntools.history; // [{ id: 1, label: 'initial', ... }, { id: 2, label: 'state change', ... }]\ntools.actions; // [{ name: 'myStore.increment', durationMs, ... }]\n\ntools.jumpTo(tools.history[0].id); // 用该快照调用 store.$hydrate()，状态退回初始值\ntools.dispose(); // 用完必须调用，取消对 Store 的订阅",
@@ -833,8 +831,7 @@
               {
                 "name": "store",
                 "type": "IReactiveStore<S>",
-                "optional": false,
-                "configurationType": "IReactiveStore<Record>"
+                "optional": false
               },
               {
                 "name": "options",
@@ -844,13 +841,13 @@
             ]
           ],
           "overloadReturns": ["IStoreDevTools"],
-          "whenToUse": "Use createStoreDevTools when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreDevTools does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "createStoreDevTools is part of this module's public function contract."
+              "content": "Subscribes to an existing reactive store to collect bounded state history, completed actions and optional runtime trace. Replay hydrates local state and never reverses business side effects; dispose the session after inspection."
             },
             {
               "id": "getting-started",
@@ -870,12 +867,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevTools."
+              "content": "store: Live IReactiveStore returned by @migaia/store-light createStore(); the caller keeps ownership and must dispose the diagnostic session before releasing it.\nCaller-owned IStoreDevTools. Construction snapshots options and initial state; invalid options throw Error/INVALID_OPTION, while unclassified initial clock or clone failures carry CALLBACK_FAILED. Existing foreign identities remain unchanged.\nmaxHistory: Safe integer at least one limiting retained state-history entries; old entries are evicted chronologically.\n100 history entries; it does not bound the action queue.\nmaxTrace: Safe integer at least one bounding both runtime trace and action queues independently.\n1000 entries per queue for actions and runtime trace.\ncaptureRuntimeTrace: False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.\ntrue: capture runtime events and completed action outcomes.\nnow: Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.\nDate.now supplies ordinary wall-clock timestamps.\nclone: Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot preparation classifies unowned failures as CALLBACK_FAILED; automatic capture reports them without failing business writes. Replay propagates clone failures. Apply redaction here.\nClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreDevTools."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -919,7 +916,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
+                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
                 },
                 {
                   "type": "table",
@@ -937,12 +934,17 @@
                     ],
                     [
                       "`INVALID_OPTION`",
-                      "`createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数",
+                      "`createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数",
                       "`Error`（options 校验）或 `RangeError`（`maxDepth` 校验）"
                     ],
                     [
+                      "`CALLBACK_FAILED`",
+                      "未分类的 clock、clone 或 action 属性读取失败",
+                      "原生错误同一实例；不可注记值保留在 cause"
+                    ],
+                    [
                       "`CLEANUP_FAILED`",
-                      "`dispose()` 或构造期回滚清理时，多个订阅清理同时失败",
+                      "多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败",
                       "`AggregateError`，`errors` 保留每个原始失败"
                     ]
                   ]
@@ -954,23 +956,23 @@
               ]
             }
           ],
-          "usageScore": 120,
+          "usageScore": 116,
           "configuration": [
             {
               "name": "maxHistory",
               "type": "number",
               "optional": true,
-              "description": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `?` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.",
+              "description": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。",
               "descriptionEn": "",
-              "descriptionZh": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `?` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number."
+              "descriptionZh": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
             },
             {
               "name": "maxTrace",
               "type": "number",
               "optional": true,
-              "description": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `?` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.",
+              "description": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。",
               "descriptionEn": "",
-              "descriptionZh": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `?` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number."
+              "descriptionZh": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
             },
             {
               "name": "captureRuntimeTrace",
@@ -984,17 +986,17 @@
               "name": "now",
               "type": "() => number",
               "optional": true,
-              "description": "isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。",
+              "description": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。",
               "descriptionEn": "",
-              "descriptionZh": "isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
+              "descriptionZh": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
             },
             {
               "name": "clone",
               "type": "(state: Record<string, unknown>) => Record<string, unknown>",
               "optional": true,
-              "description": "isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。",
+              "description": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。",
               "descriptionEn": "",
-              "descriptionZh": "isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
+              "descriptionZh": "1. `options` 不是 `null` 且必须是 `object`——否则抛 `Error('[store] DevTools options must be an object')`，`code: 'INVALID_OPTION'`。 2. 读取 `options` 的属性描述符（`Object.getOwnPropertyDescriptors`）失败（例如某个 getter 抛错）时，抛 `Error`，`code: 'INVALID_OPTION'`，`cause` 是原始错误。 3. `maxHistory`/`maxTrace` 经 `??` 落到各自默认值（`100`/`1000`）后，必须是 `>= 1` 的安全整数（`Number.isSafeInteger`），否则抛 `Error('[store] DevTools ${name} must be a positive safe integer')`，`code: 'INVALID_OPTION'`。非正数或非整数不会被静默夹到 1，而是直接抛错构造失败。 4. `now`（若提供）必须是函数，否则抛 `Error('[store] DevTools now must be a function')`，`code: 'INVALID_OPTION'`。 5. `clone`（若提供）必须是函数，否则同上（`code: 'INVALID_OPTION'`，消息里的字段名换成 `clone`）。"
             }
           ],
           "fragment": "store-devtools-index--createStoreDevTools"
@@ -1005,9 +1007,9 @@
           "signature": "export declare function createStoreDevtoolsAggregateError(code: IStoreDevtoolsErrorCode, errors: readonly unknown[], message: string): AggregateError;",
           "declarationLine": 10,
           "source": "packages/store-devtools/dist/errors.d.ts",
-          "purpose": "Builds a tagged AggregateError while retaining every subscription failure.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevtoolsAggregateError.",
-          "advanced": "No additional advanced behavior is declared for createStoreDevtoolsAggregateError.",
+          "purpose": "Builds a tagged native AggregateError retaining every supplied cleanup failure in errors. Use it when several subscription releases fail, rather than discarding the original failures.",
+          "core": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nerrors: Application-collected original failures in the desired order; every value remains reachable through errors.\nNew AggregateError whose errors list retains original failure identities.",
+          "advanced": "",
           "parameters": [
             "code: IStoreDevtoolsErrorCode",
             "errors: readonly unknown[]",
@@ -1031,13 +1033,14 @@
             }
           ],
           "returns": "AggregateError",
-          "errors": ["No documented errors are declared for createStoreDevtoolsAggregateError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreDevtoolsAggregateError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "throw createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsAggregateError(\n  StoreDevtoolsErrorCode.cleanupFailed,\n  [err1, err2],\n  'cleanup failed'\n);"
           ],
           "members": [],
           "composes": [],
+          "aliasOf": "createStoreDevtoolsAggregateError",
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevtoolsAggregateError(code: IStoreDevtoolsErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1062,13 +1065,13 @@
             ]
           ],
           "overloadReturns": ["AggregateError"],
-          "whenToUse": "Use createStoreDevtoolsAggregateError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreDevtoolsAggregateError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds a tagged AggregateError while retaining every subscription failure."
+              "content": "Builds a tagged native AggregateError retaining every supplied cleanup failure in errors. Use it when several subscription releases fail, rather than discarding the original failures."
             },
             {
               "id": "getting-started",
@@ -1088,12 +1091,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevtoolsAggregateError."
+              "content": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nerrors: Application-collected original failures in the desired order; every value remains reachable through errors.\nNew AggregateError whose errors list retains original failure identities."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreDevtoolsAggregateError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1110,7 +1113,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                  "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
                 },
                 {
                   "type": "code",
@@ -1167,7 +1170,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
                 },
                 {
                   "type": "paragraph",
@@ -1199,7 +1202,7 @@
                   "type": "list",
                   "items": [
                     "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                     "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                   ]
                 }
@@ -1216,9 +1219,9 @@
           "signature": "export declare function createStoreDevtoolsError(code: IStoreDevtoolsErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "declarationLine": 6,
           "source": "packages/store-devtools/dist/errors.d.ts",
-          "purpose": "Builds a `(source, code)`-tagged `Error` without touching `stack`.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevtoolsError.",
-          "advanced": "No additional advanced behavior is declared for createStoreDevtoolsError.",
+          "purpose": "Builds a native Error tagged with this package source and selected semantic code. The message remains application supplied; an optional original cause is retained without rewriting stack or changing native type.",
+          "core": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nNew native Error with source and code properties; the original cause remains reachable.\ncause: Original application failure preserved by identity on Error.cause when supplied and not undefined.\nOmitted or undefined: no cause property is installed by the constructor.",
+          "advanced": "",
           "parameters": [
             "code: IStoreDevtoolsErrorCode",
             "message: string",
@@ -1242,14 +1245,15 @@
             }
           ],
           "returns": "Error",
-          "errors": ["No documented errors are declared for createStoreDevtoolsError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreDevtoolsError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option', {\n  cause: originalError\n});\nerror.message; // 'bad option'\n(error as { code?: string }).code; // 'INVALID_OPTION'\n(error as { source?: string }).source; // '@migaia/store-devtools'",
             "throw createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsAggregateError(\n  StoreDevtoolsErrorCode.cleanupFailed,\n  [err1, err2],\n  'cleanup failed'\n);"
           ],
           "members": [],
           "composes": [],
+          "aliasOf": "createStoreDevtoolsError",
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevtoolsError(code: IStoreDevtoolsErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1274,13 +1278,13 @@
             ]
           ],
           "overloadReturns": ["Error"],
-          "whenToUse": "Use createStoreDevtoolsError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreDevtoolsError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds a `(source, code)`-tagged `Error` without touching `stack`."
+              "content": "Builds a native Error tagged with this package source and selected semantic code. The message remains application supplied; an optional original cause is retained without rewriting stack or changing native type."
             },
             {
               "id": "getting-started",
@@ -1300,12 +1304,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevtoolsError."
+              "content": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nNew native Error with source and code properties; the original cause remains reachable.\ncause: Original application failure preserved by identity on Error.cause when supplied and not undefined.\nOmitted or undefined: no cause property is installed by the constructor."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreDevtoolsError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -1329,7 +1333,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                  "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
                 },
                 {
                   "type": "code",
@@ -1386,7 +1390,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
                 },
                 {
                   "type": "paragraph",
@@ -1418,7 +1422,7 @@
                   "type": "list",
                   "items": [
                     "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                     "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                   ]
                 }
@@ -1444,9 +1448,9 @@
           "signature": "export declare function createStoreDevtoolsRangeError(code: IStoreDevtoolsErrorCode, message: string): RangeError;",
           "declarationLine": 15,
           "source": "packages/store-devtools/dist/errors.d.ts",
-          "purpose": "Builds a `(source, code)`-tagged `RangeError`. The error type matters to callers that branch on `instanceof RangeError`, so this preserves it instead of producing a plain `Error`.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevtoolsRangeError.",
-          "advanced": "No additional advanced behavior is declared for createStoreDevtoolsRangeError.",
+          "purpose": "Builds a source-and-code tagged native RangeError. Built-in paths use it for invalid tree depth or a missing history selection; queue limit validation uses ordinary Error/INVALID_OPTION.",
+          "core": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nNew RangeError with unchanged native stack and tagged source/code.",
+          "advanced": "",
           "parameters": ["code: IStoreDevtoolsErrorCode", "message: string"],
           "parameterDetails": [
             {
@@ -1461,13 +1465,14 @@
             }
           ],
           "returns": "RangeError",
-          "errors": ["No documented errors are declared for createStoreDevtoolsRangeError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreDevtoolsRangeError.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "throw createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsAggregateError(\n  StoreDevtoolsErrorCode.cleanupFailed,\n  [err1, err2],\n  'cleanup failed'\n);"
           ],
           "members": [],
           "composes": [],
+          "aliasOf": "createStoreDevtoolsRangeError",
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevtoolsRangeError(code: IStoreDevtoolsErrorCode, message: string): RangeError;"
@@ -1487,13 +1492,13 @@
             ]
           ],
           "overloadReturns": ["RangeError"],
-          "whenToUse": "Use createStoreDevtoolsRangeError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreDevtoolsRangeError does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds a `(source, code)`-tagged `RangeError`. The error type matters to callers that branch on `instanceof RangeError`, so this preserves it instead of producing a plain `Error`."
+              "content": "Builds a source-and-code tagged native RangeError. Built-in paths use it for invalid tree depth or a missing history selection; queue limit validation uses ordinary Error/INVALID_OPTION."
             },
             {
               "id": "getting-started",
@@ -1513,12 +1518,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevtoolsRangeError."
+              "content": "code: Value selected from StoreDevtoolsErrorCode for the scenario being reported.\nmessage: Application-supplied explanatory message; callers classify by source and code rather than this text.\nNew RangeError with unchanged native stack and tagged source/code."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreDevtoolsRangeError."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1535,7 +1540,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                  "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
                 },
                 {
                   "type": "code",
@@ -1592,7 +1597,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
                 },
                 {
                   "type": "paragraph",
@@ -1624,7 +1629,7 @@
                   "type": "list",
                   "items": [
                     "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                     "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                   ]
                 }
@@ -1641,9 +1646,9 @@
           "signature": "export declare function getDependencyTree(root: IObserver | IReactiveEffect | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
           "declarationLine": 43,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "Traverses dependencies of runtime-created public handles or extension graph observers.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getDependencyTree.",
-          "advanced": "No additional advanced behavior is declared for getDependencyTree.",
+          "purpose": "Traverses upstream dependencies from a runtime effect or computed handle, without requiring a store session. Current-path cycle detection marks recursion loops while allowing shared diamond nodes to appear on each branch.",
+          "core": "root: Public effect or computed handle returned by the same reactive runtime, or an extension IObserver node.\nmaxDepth: Optional safe nonnegative integer, default 20; zero returns only the root and no direct edges.\nIDependencyTreeNode snapshot. Invalid depth throws RangeError tagged INVALID_OPTION; no resource or subscription is created.",
+          "advanced": "",
           "parameters": [
             "root: IObserver | IReactiveEffect | IReactiveComputed<unknown>",
             "maxDepth: number (optional)"
@@ -1661,8 +1666,8 @@
             }
           ],
           "returns": "IDependencyTreeNode",
-          "errors": ["No documented errors are declared for getDependencyTree."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for getDependencyTree.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "getDependencyTree(someEffect, 5);\n// {\n//   kind: 'observer', label: 'someEffect',\n//   children: [\n//     { kind: 'observable', label: 'count', version: 3, children: [] }\n//   ]\n// }",
             "getDependencyTree(someEffect);\n// { kind: 'observer', label: 'someEffect', children: [{ kind: 'observable', label: 'count', version: 3, children: [] }] }",
@@ -1689,13 +1694,13 @@
             ]
           ],
           "overloadReturns": ["IDependencyTreeNode"],
-          "whenToUse": "Use getDependencyTree when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when getDependencyTree does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Traverses dependencies of runtime-created public handles or extension graph observers."
+              "content": "Traverses upstream dependencies from a runtime effect or computed handle, without requiring a store session. Current-path cycle detection marks recursion loops while allowing shared diamond nodes to appear on each branch."
             },
             {
               "id": "getting-started",
@@ -1715,12 +1720,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getDependencyTree."
+              "content": "root: Public effect or computed handle returned by the same reactive runtime, or an extension IObserver node.\nmaxDepth: Optional safe nonnegative integer, default 20; zero returns only the root and no direct edges.\nIDependencyTreeNode snapshot. Invalid depth throws RangeError tagged INVALID_OPTION; no resource or subscription is created."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for getDependencyTree."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1733,7 +1738,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
+                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
                 },
                 {
                   "type": "table",
@@ -1751,12 +1756,17 @@
                     ],
                     [
                       "`INVALID_OPTION`",
-                      "`createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数",
+                      "`createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数",
                       "`Error`（options 校验）或 `RangeError`（`maxDepth` 校验）"
                     ],
                     [
+                      "`CALLBACK_FAILED`",
+                      "未分类的 clock、clone 或 action 属性读取失败",
+                      "原生错误同一实例；不可注记值保留在 cause"
+                    ],
+                    [
                       "`CLEANUP_FAILED`",
-                      "`dispose()` 或构造期回滚清理时，多个订阅清理同时失败",
+                      "多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败",
                       "`AggregateError`，`errors` 保留每个原始失败"
                     ]
                   ]
@@ -1768,7 +1778,7 @@
               ]
             }
           ],
-          "usageScore": 86,
+          "usageScore": 82,
           "configuration": [],
           "fragment": "store-devtools-index--getDependencyTree"
         },
@@ -1778,9 +1788,9 @@
           "signature": "export declare function getObserverTree(root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
           "declarationLine": 45,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "Traverses subscribers of runtime-created public handles or extension graph observables.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getObserverTree.",
-          "advanced": "No additional advanced behavior is declared for getObserverTree.",
+          "purpose": "Traverses downstream subscribers from a runtime signal or computed handle, without a store session. Depth bounds and current-path cycle flags describe an instantaneous graph view, not a live subscription.",
+          "core": "root: Public signal or computed handle from createRuntime(), or an extension IObservable graph node.\nmaxDepth: Optional safe nonnegative integer, default 20; zero omits all subscriber edges.\nIDependencyTreeNode snapshot; invalid depth throws RangeError tagged INVALID_OPTION, without creating a subscription.",
+          "advanced": "",
           "parameters": [
             "root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>",
             "maxDepth: number (optional)"
@@ -1798,8 +1808,8 @@
             }
           ],
           "returns": "IDependencyTreeNode",
-          "errors": ["No documented errors are declared for getObserverTree."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for getObserverTree.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "getObserverTree(someSignal);\n// { kind: 'observable', label: 'count', version: 3, children: [{ kind: 'observer', label: 'someEffect', children: [] }] }",
             "import { getDependencyTree, getObserverTree } from '@migaia/store-devtools';\n\nconsole.log(JSON.stringify(getDependencyTree(someEffect, 5), null, 2));\nconsole.log(JSON.stringify(getObserverTree(someSignal, 5), null, 2));"
@@ -1825,13 +1835,13 @@
             ]
           ],
           "overloadReturns": ["IDependencyTreeNode"],
-          "whenToUse": "Use getObserverTree when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when getObserverTree does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Traverses subscribers of runtime-created public handles or extension graph observables."
+              "content": "Traverses downstream subscribers from a runtime signal or computed handle, without a store session. Depth bounds and current-path cycle flags describe an instantaneous graph view, not a live subscription."
             },
             {
               "id": "getting-started",
@@ -1851,12 +1861,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getObserverTree."
+              "content": "root: Public signal or computed handle from createRuntime(), or an extension IObservable graph node.\nmaxDepth: Optional safe nonnegative integer, default 20; zero omits all subscriber edges.\nIDependencyTreeNode snapshot; invalid depth throws RangeError tagged INVALID_OPTION, without creating a subscription."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for getObserverTree."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1869,7 +1879,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
+                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
                 },
                 {
                   "type": "table",
@@ -1887,12 +1897,17 @@
                     ],
                     [
                       "`INVALID_OPTION`",
-                      "`createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数",
+                      "`createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数",
                       "`Error`（options 校验）或 `RangeError`（`maxDepth` 校验）"
                     ],
                     [
+                      "`CALLBACK_FAILED`",
+                      "未分类的 clock、clone 或 action 属性读取失败",
+                      "原生错误同一实例；不可注记值保留在 cause"
+                    ],
+                    [
                       "`CLEANUP_FAILED`",
-                      "`dispose()` 或构造期回滚清理时，多个订阅清理同时失败",
+                      "多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败",
                       "`AggregateError`，`errors` 保留每个原始失败"
                     ]
                   ]
@@ -1904,7 +1919,7 @@
               ]
             }
           ],
-          "usageScore": 76,
+          "usageScore": 72,
           "configuration": [],
           "fragment": "store-devtools-index--getObserverTree"
         },
@@ -1914,17 +1929,17 @@
           "signature": "export type IActionTrace = { timestamp: number; name: string; payload?: unknown; durationMs?: number; error?: unknown; };",
           "declarationLine": 18,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "IActionTrace is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IActionTrace.",
-          "advanced": "No additional advanced behavior is declared for IActionTrace.",
+          "purpose": "Manual action metadata or a completed runtime action outcome; payload and errors retain their supplied identity.",
+          "core": "timestamp: Timestamp assigned by the session clock when recordAction appends the entry.\nname: Application action name or the original name from a completed runtime trace event.\npayload: Optional application-supplied payload kept as-is without implicit cloning or redaction.\nOmitted: no payload is stored on the action entry.\ndurationMs: Optional application duration or the elapsed duration of the completed runtime action.\nOmitted: elapsed duration is not specified.\nerror: Optional original failure; automatic capture includes it only for runtime action error events.\nOmitted: no failure is recorded for this action.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IActionTrace."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IActionTrace.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
+            "type IStoreDevToolsOptions = {\n  maxHistory?: number;\n  maxTrace?: number;\n  captureRuntimeTrace?: boolean;\n  now?: () => number;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  id: number;\n  timestamp: number;\n  label: string;\n  state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  timestamp: number;\n  name: string;\n  payload?: unknown;\n  durationMs?: number;\n  error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
             "recordAction(trace: Omit<IActionTrace, 'timestamp'>): void"
           ],
           "members": [
@@ -1981,13 +1996,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IActionTrace when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IActionTrace does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IActionTrace is part of this module's public type contract."
+              "content": "Manual action metadata or a completed runtime action outcome; payload and errors retain their supplied identity."
             },
             {
               "id": "getting-started",
@@ -2007,12 +2022,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IActionTrace."
+              "content": "timestamp: Timestamp assigned by the session clock when recordAction appends the entry.\nname: Application action name or the original name from a completed runtime trace event.\npayload: Optional application-supplied payload kept as-is without implicit cloning or redaction.\nOmitted: no payload is stored on the action entry.\ndurationMs: Optional application duration or the elapsed duration of the completed runtime action.\nOmitted: elapsed duration is not specified.\nerror: Optional original failure; automatic capture includes it only for runtime action error events.\nOmitted: no failure is recorded for this action."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IActionTrace."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2028,14 +2043,14 @@
           "signature": "export type IDependencyTreeNode = { kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; label: string; version?: number; children: IDependencyTreeNode[]; circular?: boolean; };",
           "declarationLine": 5,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "IDependencyTreeNode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDependencyTreeNode.",
-          "advanced": "No additional advanced behavior is declared for IDependencyTreeNode.",
+          "purpose": "Snapshot tree node from dependency or observer traversal, with current-path cycle detection rather than global deduplication.",
+          "core": "kind: Observable nodes provide values; observer nodes subscribe to dependencies.\nA signal or computed value observed by downstream nodes.\nAn effect or computed observer depending on upstream nodes.\nlabel: Node debugName, otherwise constructor name, otherwise AnonymousReactiveNode.\nversion: Observable version at traversal time; observer-only nodes omit this field.\nchildren: Dependencies for dependency traversal, subscribers for observer traversal; truncated at maxDepth.\ncircular: True only when this node already exists on the current recursion path; shared diamonds are not cycles.",
+          "advanced": "Inspect runtime graph connections without creating a store diagnostic session.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IDependencyTreeNode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyTreeNode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  getDependencyTree,\n  getObserverTree,\n  type IDependencyTreeNode\n} from '@migaia/store-devtools';",
             "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(\n  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;\nfunction getObserverTree(\n  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;"
@@ -2094,13 +2109,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IDependencyTreeNode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IDependencyTreeNode does not match the required inputs or return contract.",
+          "whenToUse": "Inspect runtime graph connections without creating a store diagnostic session.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IDependencyTreeNode is part of this module's public type contract."
+              "content": "Snapshot tree node from dependency or observer traversal, with current-path cycle detection rather than global deduplication."
             },
             {
               "id": "getting-started",
@@ -2120,12 +2135,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDependencyTreeNode."
+              "content": "kind: Observable nodes provide values; observer nodes subscribe to dependencies.\nA signal or computed value observed by downstream nodes.\nAn effect or computed observer depending on upstream nodes.\nlabel: Node debugName, otherwise constructor name, otherwise AnonymousReactiveNode.\nversion: Observable version at traversal time; observer-only nodes omit this field.\nchildren: Dependencies for dependency traversal, subscribers for observer traversal; truncated at maxDepth.\ncircular: True only when this node already exists on the current recursion path; shared diamonds are not cycles."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IDependencyTreeNode."
+              "content": "Inspect runtime graph connections without creating a store diagnostic session."
             }
           ],
           "declaredConfiguration": [],
@@ -2141,17 +2156,17 @@
           "signature": "export type IStoreDevTools = { readonly history: readonly IStoreHistoryEntry[]; readonly actions: readonly IActionTrace[]; readonly trace: readonly IRuntimeTraceEvent[]; record(label?: string): IStoreHistoryEntry; recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; jumpTo(id: number): void; clear(): void; dispose(): void; };",
           "declarationLine": 32,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "IStoreDevTools is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevTools.",
-          "advanced": "No additional advanced behavior is declared for IStoreDevTools.",
+          "purpose": "Caller-owned local diagnostic session subscribed to an existing reactive store, with bounded history and runtime traces.",
+          "core": "history: Frozen chronological array snapshot of retained IStoreHistoryEntry entries, bounded by maxHistory. Entry state is shallow-frozen after cloning.\nactions: Frozen chronological array of manual and completed runtime action traces, bounded by maxTrace rather than maxHistory.\ntrace: Frozen chronological array of original runtime events, bounded by maxTrace; empty when runtime capture is disabled.\nrecord: Prepares the clock and cloned store snapshot, checks that the session is still active, then publishes one history entry. Callback failure or disposal during preparation leaves queues and the next history ID unchanged.\nrecord.label: Optional application label; omitted defaults to state change. Initial construction and clear use initial.\nFrozen IStoreHistoryEntry with a new monotonic ID. Unclassified clock or clone failures become CALLBACK_FAILED; writable native errors retain identity, foreign identities remain unchanged, and immutable errors or primitive values remain on cause.\nrecordAction: Prepares an application action record and session timestamp, then checks session activity before publishing. Disposal from a getter or clock prevents publication; payload and errors retain their supplied identity.\nrecordAction.trace: Application-created action name, optional payload, durationMs and error; omit timestamp because the session supplies it.\nNo return value; the operation is complete. After disposal it throws SESSION_DISPOSED.\njumpTo: Clones a retained history state into store.$hydrate(), suppressing replay-generated history; business side effects are not undone.\njumpTo.id: ID returned by tools.record() or read from tools.history; an entry trimmed by maxHistory is no longer available.\nNo return value; unknown IDs throw native RangeError tagged UNKNOWN_HISTORY_ENTRY. Hydration or clone failures propagate and replay suppression is restored.\nclear: Prepares one current initial snapshot and rechecks session activity before clearing all three queues. A preparation failure or disposal leaves queues and history ID unchanged; success retains only the new entry without resetting IDs.\ndispose: Idempotently closes the session and cancels store and runtime subscriptions; it neither disposes the store nor clears diagnostic queues.\nNo value. One cleanup failure propagates unchanged; several produce CLEANUP_FAILED AggregateError. The session remains terminal even after cleanup failure.",
+          "advanced": "Investigate field changes, inspect completed actions and replay retained local snapshots.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreDevTools."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDevTools.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+            "type IStoreDevToolsOptions = {\n  maxHistory?: number;\n  maxTrace?: number;\n  captureRuntimeTrace?: boolean;\n  now?: () => number;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  id: number;\n  timestamp: number;\n  label: string;\n  state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  timestamp: number;\n  name: string;\n  payload?: unknown;\n  durationMs?: number;\n  error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
           ],
           "members": [
             {
@@ -2252,13 +2267,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IStoreDevTools when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreDevTools does not match the required inputs or return contract.",
+          "whenToUse": "Investigate field changes, inspect completed actions and replay retained local snapshots.",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IStoreDevTools is part of this module's public type contract."
+              "content": "Caller-owned local diagnostic session subscribed to an existing reactive store, with bounded history and runtime traces."
             },
             {
               "id": "getting-started",
@@ -2278,12 +2293,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevTools."
+              "content": "history: Frozen chronological array snapshot of retained IStoreHistoryEntry entries, bounded by maxHistory. Entry state is shallow-frozen after cloning.\nactions: Frozen chronological array of manual and completed runtime action traces, bounded by maxTrace rather than maxHistory.\ntrace: Frozen chronological array of original runtime events, bounded by maxTrace; empty when runtime capture is disabled.\nrecord: Prepares the clock and cloned store snapshot, checks that the session is still active, then publishes one history entry. Callback failure or disposal during preparation leaves queues and the next history ID unchanged.\nrecord.label: Optional application label; omitted defaults to state change. Initial construction and clear use initial.\nFrozen IStoreHistoryEntry with a new monotonic ID. Unclassified clock or clone failures become CALLBACK_FAILED; writable native errors retain identity, foreign identities remain unchanged, and immutable errors or primitive values remain on cause.\nrecordAction: Prepares an application action record and session timestamp, then checks session activity before publishing. Disposal from a getter or clock prevents publication; payload and errors retain their supplied identity.\nrecordAction.trace: Application-created action name, optional payload, durationMs and error; omit timestamp because the session supplies it.\nNo return value; the operation is complete. After disposal it throws SESSION_DISPOSED.\njumpTo: Clones a retained history state into store.$hydrate(), suppressing replay-generated history; business side effects are not undone.\njumpTo.id: ID returned by tools.record() or read from tools.history; an entry trimmed by maxHistory is no longer available.\nNo return value; unknown IDs throw native RangeError tagged UNKNOWN_HISTORY_ENTRY. Hydration or clone failures propagate and replay suppression is restored.\nclear: Prepares one current initial snapshot and rechecks session activity before clearing all three queues. A preparation failure or disposal leaves queues and history ID unchanged; success retains only the new entry without resetting IDs.\ndispose: Idempotently closes the session and cancels store and runtime subscriptions; it neither disposes the store nor clears diagnostic queues.\nNo value. One cleanup failure propagates unchanged; several produce CLEANUP_FAILED AggregateError. The session remains terminal even after cleanup failure."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreDevTools."
+              "content": "Investigate field changes, inspect completed actions and replay retained local snapshots."
             }
           ],
           "declaredConfiguration": [],
@@ -2294,90 +2309,22 @@
           "fragment": "store-devtools-index--IStoreDevTools"
         },
         {
-          "name": "IStoreDevtoolsCommand",
-          "kind": "type",
-          "signature": "export type IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];",
-          "declarationLine": 21,
-          "source": "packages/store-devtools/dist/devtools-constants.d.ts",
-          "purpose": "IStoreDevtoolsCommand is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevtoolsCommand.",
-          "advanced": "No additional advanced behavior is declared for IStoreDevtoolsCommand.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreDevtoolsCommand."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDevtoolsCommand.",
-          "examples": [
-            "import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';",
-            "const StoreDevtoolsCommand: {\n  readonly dispatch: 'DISPATCH';\n  readonly commit: 'COMMIT';\n  readonly jumpToState: 'JUMP_TO_STATE';\n  readonly jumpToAction: 'JUMP_TO_ACTION';\n  readonly rollback: 'ROLLBACK';\n  readonly reset: 'RESET';\n};\ntype IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];"
-          ],
-          "members": [],
-          "composes": [],
-          "aliasOf": "IStoreDevtoolsCommand",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IStoreDevtoolsCommand when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreDevtoolsCommand does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IStoreDevtoolsCommand is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IStoreDevtoolsCommand from @migaia/store-devtools, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IStoreDevtoolsCommand when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreDevtoolsCommand does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevtoolsCommand."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreDevtoolsCommand."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools-constants.d.ts:IStoreDevtoolsCommand:export type IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];",
-          "guidance": [],
-          "usageScore": 22,
-          "configuration": [],
-          "fragment": "store-devtools-index--IStoreDevtoolsCommand"
-        },
-        {
           "name": "IStoreDevtoolsErrorCode",
           "kind": "type",
           "signature": "export type IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];",
-          "declarationLine": 31,
+          "declarationLine": 40,
           "source": "packages/store-devtools/dist/error-code.d.ts",
-          "purpose": "IStoreDevtoolsErrorCode is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevtoolsErrorCode.",
-          "advanced": "No additional advanced behavior is declared for IStoreDevtoolsErrorCode.",
+          "purpose": "Value union of StoreDevtoolsErrorCode; classify with STORE_DEVTOOLS_SOURCE and preserve original causes.",
+          "core": "Value union of StoreDevtoolsErrorCode; classify with STORE_DEVTOOLS_SOURCE and preserve original causes.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreDevtoolsErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDevtoolsErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  StoreDevtoolsErrorCode,\n  type IStoreDevtoolsErrorCode,\n  STORE_DEVTOOLS_SOURCE,\n  createStoreDevtoolsError,\n  createStoreDevtoolsRangeError,\n  createStoreDevtoolsAggregateError\n} from '@migaia/store-devtools';",
-            "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];",
+            "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];",
             "function createStoreDevtoolsError(\n  code: IStoreDevtoolsErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreDevtoolsRangeError(code: IStoreDevtoolsErrorCode, message: string): RangeError;\n\nfunction createStoreDevtoolsAggregateError(\n  code: IStoreDevtoolsErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;",
             "import { StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode } from '@migaia/store-devtools';\n\ntry {\n  tools.jumpTo(staleId);\n} catch (error) {\n  if (\n    (error as { code?: IStoreDevtoolsErrorCode }).code ===\n    StoreDevtoolsErrorCode.unknownHistoryEntry\n  ) {\n    console.warn('该历史条目已被裁剪，改用当前 history 里最早的一条');\n    tools.jumpTo(tools.history[0].id);\n  } else {\n    throw error;\n  }\n}",
             "import {\n  StoreDevtoolsErrorCode,\n  STORE_DEVTOOLS_SOURCE,\n  createStoreDevtoolsError,\n  createStoreDevtoolsRangeError,\n  createStoreDevtoolsAggregateError,\n  type IStoreDevtoolsErrorCode\n} from '@migaia/store-devtools';"
@@ -2391,13 +2338,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IStoreDevtoolsErrorCode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreDevtoolsErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IStoreDevtoolsErrorCode is part of this module's public type contract."
+              "content": "Value union of StoreDevtoolsErrorCode; classify with STORE_DEVTOOLS_SOURCE and preserve original causes."
             },
             {
               "id": "getting-started",
@@ -2417,12 +2364,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevtoolsErrorCode."
+              "content": "Value union of StoreDevtoolsErrorCode; classify with STORE_DEVTOOLS_SOURCE and preserve original causes."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreDevtoolsErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2439,7 +2386,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                  "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
                 },
                 {
                   "type": "code",
@@ -2455,7 +2402,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
+                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
                 },
                 {
                   "type": "table",
@@ -2473,12 +2420,17 @@
                     ],
                     [
                       "`INVALID_OPTION`",
-                      "`createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数",
+                      "`createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数",
                       "`Error`（options 校验）或 `RangeError`（`maxDepth` 校验）"
                     ],
                     [
+                      "`CALLBACK_FAILED`",
+                      "未分类的 clock、clone 或 action 属性读取失败",
+                      "原生错误同一实例；不可注记值保留在 cause"
+                    ],
+                    [
                       "`CLEANUP_FAILED`",
-                      "`dispose()` 或构造期回滚清理时，多个订阅清理同时失败",
+                      "多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败",
                       "`AggregateError`，`errors` 保留每个原始失败"
                     ]
                   ]
@@ -2548,7 +2500,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2580,7 +2532,7 @@
                   "type": "list",
                   "items": [
                     "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                     "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                   ]
                 }
@@ -2597,17 +2549,17 @@
           "signature": "export type IStoreDevToolsOptions = { maxHistory?: number; maxTrace?: number; captureRuntimeTrace?: boolean; now?: () => number; clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
           "declarationLine": 25,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "IStoreDevToolsOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevToolsOptions.",
-          "advanced": "No additional advanced behavior is declared for IStoreDevToolsOptions.",
+          "purpose": "Queue limits, runtime capture, clock and snapshot policy fixed when a session is created.",
+          "core": "maxHistory: Safe integer at least one limiting retained state-history entries; old entries are evicted chronologically.\n100 history entries; it does not bound the action queue.\nmaxTrace: Safe integer at least one bounding both runtime trace and action queues independently.\n1000 entries per queue for actions and runtime trace.\ncaptureRuntimeTrace: False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.\ntrue: capture runtime events and completed action outcomes.\nnow: Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.\nDate.now supplies ordinary wall-clock timestamps.\nclone: Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot preparation classifies unowned failures as CALLBACK_FAILED; automatic capture reports them without failing business writes. Replay propagates clone failures. Apply redaction here.\nClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreDevToolsOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDevToolsOptions.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+            "type IStoreDevToolsOptions = {\n  maxHistory?: number;\n  maxTrace?: number;\n  captureRuntimeTrace?: boolean;\n  now?: () => number;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  id: number;\n  timestamp: number;\n  label: string;\n  state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  timestamp: number;\n  name: string;\n  payload?: unknown;\n  durationMs?: number;\n  error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
           ],
           "members": [
             {
@@ -2663,13 +2615,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IStoreDevToolsOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreDevToolsOptions does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IStoreDevToolsOptions is part of this module's public type contract."
+              "content": "Queue limits, runtime capture, clock and snapshot policy fixed when a session is created."
             },
             {
               "id": "getting-started",
@@ -2689,12 +2641,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevToolsOptions."
+              "content": "maxHistory: Safe integer at least one limiting retained state-history entries; old entries are evicted chronologically.\n100 history entries; it does not bound the action queue.\nmaxTrace: Safe integer at least one bounding both runtime trace and action queues independently.\n1000 entries per queue for actions and runtime trace.\ncaptureRuntimeTrace: False skips runtime subscription and automatic completed-action capture; manual recordAction remains available.\ntrue: capture runtime events and completed action outcomes.\nnow: Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.\nDate.now supplies ordinary wall-clock timestamps.\nclone: Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot preparation classifies unowned failures as CALLBACK_FAILED; automatic capture reports them without failing business writes. Replay propagates clone failures. Apply redaction here.\nClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreDevToolsOptions."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2710,17 +2662,17 @@
           "signature": "export type IStoreHistoryEntry = { id: number; timestamp: number; label: string; state: Record<string, unknown>; };",
           "declarationLine": 12,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "IStoreHistoryEntry is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreHistoryEntry.",
-          "advanced": "No additional advanced behavior is declared for IStoreHistoryEntry.",
+          "purpose": "Frozen local state checkpoint with a session-assigned monotonic ID and a shallow-frozen cloned state.",
+          "core": "id: Monotonic ID assigned by record or initial capture; retained history IDs are accepted by jumpTo.\ntimestamp: Milliseconds returned by the session now callback before any history mutation.\nlabel: Application checkpoint label, or the stable initial and state change labels supplied by the session.\nstate: Diagnostic clone of store.$plain(), shallow-frozen before publication; nested cloning semantics belong to clone.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreHistoryEntry."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreHistoryEntry.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
+            "type IStoreDevToolsOptions = {\n  maxHistory?: number;\n  maxTrace?: number;\n  captureRuntimeTrace?: boolean;\n  now?: () => number;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  id: number;\n  timestamp: number;\n  label: string;\n  state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  timestamp: number;\n  name: string;\n  payload?: unknown;\n  durationMs?: number;\n  error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
             "record(label: string = 'state change'): IStoreHistoryEntry"
           ],
           "members": [
@@ -2768,13 +2720,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IStoreHistoryEntry when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreHistoryEntry does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IStoreHistoryEntry is part of this module's public type contract."
+              "content": "Frozen local state checkpoint with a session-assigned monotonic ID and a shallow-frozen cloned state."
             },
             {
               "id": "getting-started",
@@ -2794,12 +2746,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreHistoryEntry."
+              "content": "id: Monotonic ID assigned by record or initial capture; retained history IDs are accepted by jumpTo.\ntimestamp: Milliseconds returned by the session now callback before any history mutation.\nlabel: Application checkpoint label, or the stable initial and state change labels supplied by the session.\nstate: Diagnostic clone of store.$plain(), shallow-frozen before publication; nested cloning semantics belong to clone."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreHistoryEntry."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2815,14 +2767,14 @@
           "signature": "export declare const STORE_DEVTOOLS_SOURCE = \"@migaia/store-devtools\";",
           "declarationLine": 4,
           "source": "packages/store-devtools/dist/errors.d.ts",
-          "purpose": "`source` value stamped onto every error this module throws.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORE_DEVTOOLS_SOURCE.",
-          "advanced": "No additional advanced behavior is declared for STORE_DEVTOOLS_SOURCE.",
+          "purpose": "Stable @migaia/store-devtools source on package-created native errors. Compare source and StoreDevtoolsErrorCode together; diagnostic callbacks may also propagate original foreign failures.",
+          "core": "Stable @migaia/store-devtools source on package-created native errors. Compare source and StoreDevtoolsErrorCode together; diagnostic callbacks may also propagate original foreign failures.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for STORE_DEVTOOLS_SOURCE."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_DEVTOOLS_SOURCE.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  StoreDevtoolsErrorCode,\n  type IStoreDevtoolsErrorCode,\n  STORE_DEVTOOLS_SOURCE,\n  createStoreDevtoolsError,\n  createStoreDevtoolsRangeError,\n  createStoreDevtoolsAggregateError\n} from '@migaia/store-devtools';",
             "const STORE_DEVTOOLS_SOURCE: '@migaia/store-devtools';",
@@ -2831,19 +2783,20 @@
           ],
           "members": [],
           "composes": [],
+          "aliasOf": "STORE_DEVTOOLS_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_DEVTOOLS_SOURCE = \"@migaia/store-devtools\";"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use STORE_DEVTOOLS_SOURCE when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when STORE_DEVTOOLS_SOURCE does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`source` value stamped onto every error this module throws."
+              "content": "Stable @migaia/store-devtools source on package-created native errors. Compare source and StoreDevtoolsErrorCode together; diagnostic callbacks may also propagate original foreign failures."
             },
             {
               "id": "getting-started",
@@ -2863,12 +2816,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORE_DEVTOOLS_SOURCE."
+              "content": "Stable @migaia/store-devtools source on package-created native errors. Compare source and StoreDevtoolsErrorCode together; diagnostic callbacks may also propagate original foreign failures."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for STORE_DEVTOOLS_SOURCE."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2885,7 +2838,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                  "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
                 },
                 {
                   "type": "code",
@@ -2914,7 +2867,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2946,7 +2899,7 @@
                   "type": "list",
                   "items": [
                     "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                     "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                   ]
                 }
@@ -2958,146 +2911,22 @@
           "fragment": "store-devtools-index--STORE_DEVTOOLS_SOURCE"
         },
         {
-          "name": "StoreDevtoolsCommand",
-          "kind": "const",
-          "signature": "export declare const StoreDevtoolsCommand: { readonly dispatch: \"DISPATCH\"; readonly commit: \"COMMIT\"; readonly jumpToState: \"JUMP_TO_STATE\"; readonly jumpToAction: \"JUMP_TO_ACTION\"; readonly rollback: \"ROLLBACK\"; readonly reset: \"RESET\"; };",
-          "declarationLine": 2,
-          "source": "packages/store-devtools/dist/devtools-constants.d.ts",
-          "purpose": "Devtools command names accepted by the store adapter.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreDevtoolsCommand.",
-          "advanced": "No additional advanced behavior is declared for StoreDevtoolsCommand.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for StoreDevtoolsCommand."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreDevtoolsCommand.",
-          "examples": [
-            "import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';",
-            "const StoreDevtoolsCommand: {\n  readonly dispatch: 'DISPATCH';\n  readonly commit: 'COMMIT';\n  readonly jumpToState: 'JUMP_TO_STATE';\n  readonly jumpToAction: 'JUMP_TO_ACTION';\n  readonly rollback: 'ROLLBACK';\n  readonly reset: 'RESET';\n};\ntype IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];",
-            "StoreDevtoolsCommand.jumpToState; // 'JUMP_TO_STATE'"
-          ],
-          "members": [
-            {
-              "name": "dispatch",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly dispatch: \"DISPATCH\";",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "\"DISPATCH\""
-            },
-            {
-              "name": "commit",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly commit: \"COMMIT\";",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "\"COMMIT\""
-            },
-            {
-              "name": "jumpToState",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly jumpToState: \"JUMP_TO_STATE\";",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "\"JUMP_TO_STATE\""
-            },
-            {
-              "name": "jumpToAction",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly jumpToAction: \"JUMP_TO_ACTION\";",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "\"JUMP_TO_ACTION\""
-            },
-            {
-              "name": "rollback",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly rollback: \"ROLLBACK\";",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "\"ROLLBACK\""
-            },
-            {
-              "name": "reset",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly reset: \"RESET\";",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "\"RESET\""
-            }
-          ],
-          "composes": [],
-          "aliasOf": "StoreDevtoolsCommand",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const StoreDevtoolsCommand: { readonly dispatch: \"DISPATCH\"; readonly commit: \"COMMIT\"; readonly jumpToState: \"JUMP_TO_STATE\"; readonly jumpToAction: \"JUMP_TO_ACTION\"; readonly rollback: \"ROLLBACK\"; readonly reset: \"RESET\"; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use StoreDevtoolsCommand when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when StoreDevtoolsCommand does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Devtools command names accepted by the store adapter."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import StoreDevtoolsCommand from @migaia/store-devtools, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use StoreDevtoolsCommand when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreDevtoolsCommand does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreDevtoolsCommand."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for StoreDevtoolsCommand."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools-constants.d.ts:StoreDevtoolsCommand:export declare const StoreDevtoolsCommand: { readonly dispatch: \"DISPATCH\"; readonly commit: \"COMMIT\"; readonly jumpToState: \"JUMP_TO_STATE\"; readonly jumpToAction: \"JUMP_TO_ACTION\"; readonly rollback: \"ROLLBACK\"; readonly reset: \"RESET\"; };",
-          "guidance": [],
-          "usageScore": 48,
-          "configuration": [],
-          "fragment": "store-devtools-index--StoreDevtoolsCommand"
-        },
-        {
           "name": "StoreDevtoolsErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * A history/trace limit is non-finite or below one. Callers must provide a finite positive * integer to retain bounded diagnostics. */ readonly invalidOption: \"INVALID_OPTION\"; /** * One or more DevTools subscriptions failed during cleanup. The caller must inspect `errors[]`; * the session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "signature": "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: \"CALLBACK_FAILED\"; };",
           "declarationLine": 8,
           "source": "packages/store-devtools/dist/error-code.d.ts",
-          "purpose": "Owns the error-code declarations for `@migaia/store-devtools`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-devtools'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`error-code-rollout.sdd.md` §1.2).",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreDevtoolsErrorCode.",
-          "advanced": "No additional advanced behavior is declared for StoreDevtoolsErrorCode.",
+          "purpose": "Stable failure codes under source @migaia/store-devtools; native error types are retained. Consult each member before interpreting a diagnostic or implementing your own bridge.",
+          "core": "sessionDisposed: A session mutation ran after disposal; create a new diagnostic session.\nunknownHistoryEntry: The selected ID is absent or was trimmed; inspect the current history before replay.\ninvalidOption: Options are not an object, an option getter fails, a callback is not callable, a queue limit is not a positive safe integer, or tree depth is not a nonnegative safe integer. Fix the input before retrying.\ncallbackFailed: Unclassified diagnostic preparation failed in a clock, snapshot clone or action property read. Manual capture throws; automatic capture reports through the runtime. Original errors remain identical or reachable on cause.\ncleanupFailed: Several cleanup failures were aggregated, or setup rollback also failed; inspect errors for originals.",
+          "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for StoreDevtoolsErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreDevtoolsErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import {\n  StoreDevtoolsErrorCode,\n  type IStoreDevtoolsErrorCode,\n  STORE_DEVTOOLS_SOURCE,\n  createStoreDevtoolsError,\n  createStoreDevtoolsRangeError,\n  createStoreDevtoolsAggregateError\n} from '@migaia/store-devtools';",
-            "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];",
+            "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];",
             "const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option', {\n  cause: originalError\n});\nerror.message; // 'bad option'\n(error as { code?: string }).code; // 'INVALID_OPTION'\n(error as { source?: string }).source; // '@migaia/store-devtools'",
             "import { StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode } from '@migaia/store-devtools';\n\ntry {\n  tools.jumpTo(staleId);\n} catch (error) {\n  if (\n    (error as { code?: IStoreDevtoolsErrorCode }).code ===\n    StoreDevtoolsErrorCode.unknownHistoryEntry\n  ) {\n    console.warn('该历史条目已被裁剪，改用当前 history 里最早的一条');\n    tools.jumpTo(tools.history[0].id);\n  } else {\n    throw error;\n  }\n}",
             "import {\n  StoreDevtoolsErrorCode,\n  STORE_DEVTOOLS_SOURCE,\n  createStoreDevtoolsError,\n  createStoreDevtoolsRangeError,\n  createStoreDevtoolsAggregateError,\n  type IStoreDevtoolsErrorCode\n} from '@migaia/store-devtools';",
@@ -3128,7 +2957,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidOption: \"INVALID_OPTION\";",
-              "description": "A history/trace limit is non-finite or below one. Callers must provide a finite positive * integer to retain bounded diagnostics.",
+              "description": "Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying.",
               "parameterDetails": [],
               "returns": "\"INVALID_OPTION\""
             },
@@ -3137,26 +2966,35 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly cleanupFailed: \"CLEANUP_FAILED\";",
-              "description": "One or more DevTools subscriptions failed during cleanup. The caller must inspect `errors[]`; * the session is terminal and cannot be revived.",
+              "description": "Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived.",
               "parameterDetails": [],
               "returns": "\"CLEANUP_FAILED\""
+            },
+            {
+              "name": "callbackFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly callbackFailed: \"CALLBACK_FAILED\";",
+              "description": "A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause.",
+              "parameterDetails": [],
+              "returns": "\"CALLBACK_FAILED\""
             }
           ],
           "composes": [],
           "aliasOf": "StoreDevtoolsErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * A history/trace limit is non-finite or below one. Callers must provide a finite positive * integer to retain bounded diagnostics. */ readonly invalidOption: \"INVALID_OPTION\"; /** * One or more DevTools subscriptions failed during cleanup. The caller must inspect `errors[]`; * the session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };"
+            "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: \"CALLBACK_FAILED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use StoreDevtoolsErrorCode when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when StoreDevtoolsErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Owns the error-code declarations for `@migaia/store-devtools`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-devtools'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`error-code-rollout.sdd.md` §1.2)."
+              "content": "Stable failure codes under source @migaia/store-devtools; native error types are retained. Consult each member before interpreting a diagnostic or implementing your own bridge."
             },
             {
               "id": "getting-started",
@@ -3176,16 +3014,16 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreDevtoolsErrorCode."
+              "content": "sessionDisposed: A session mutation ran after disposal; create a new diagnostic session.\nunknownHistoryEntry: The selected ID is absent or was trimmed; inspect the current history before replay.\ninvalidOption: Options are not an object, an option getter fails, a callback is not callable, a queue limit is not a positive safe integer, or tree depth is not a nonnegative safe integer. Fix the input before retrying.\ncallbackFailed: Unclassified diagnostic preparation failed in a clock, snapshot clone or action property read. Manual capture throws; automatic capture reports through the runtime. Original errors remain identical or reachable on cause.\ncleanupFailed: Several cleanup failures were aggregated, or setup rollback also failed; inspect errors for originals."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for StoreDevtoolsErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/error-code.d.ts:StoreDevtoolsErrorCode:export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * A history/trace limit is non-finite or below one. Callers must provide a finite positive * integer to retain bounded diagnostics. */ readonly invalidOption: \"INVALID_OPTION\"; /** * One or more DevTools subscriptions failed during cleanup. The caller must inspect `errors[]`; * the session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "identity": "packages/store-devtools/dist/error-code.d.ts:StoreDevtoolsErrorCode:export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: \"CALLBACK_FAILED\"; };",
           "guidance": [
             {
               "id": "错误模块",
@@ -3198,7 +3036,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。"
+                  "text": "包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。"
                 },
                 {
                   "type": "code",
@@ -3214,7 +3052,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
+                  "code": "const StoreDevtoolsErrorCode: {\n  readonly sessionDisposed: 'SESSION_DISPOSED';\n  readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';\n  readonly invalidOption: 'INVALID_OPTION';\n  readonly cleanupFailed: 'CLEANUP_FAILED';\n  readonly callbackFailed: 'CALLBACK_FAILED';\n};\ntype IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];"
                 },
                 {
                   "type": "table",
@@ -3232,12 +3070,17 @@
                     ],
                     [
                       "`INVALID_OPTION`",
-                      "`createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数",
+                      "`createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数",
                       "`Error`（options 校验）或 `RangeError`（`maxDepth` 校验）"
                     ],
                     [
+                      "`CALLBACK_FAILED`",
+                      "未分类的 clock、clone 或 action 属性读取失败",
+                      "原生错误同一实例；不可注记值保留在 cause"
+                    ],
+                    [
                       "`CLEANUP_FAILED`",
-                      "`dispose()` 或构造期回滚清理时，多个订阅清理同时失败",
+                      "多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败",
                       "`AggregateError`，`errors` 保留每个原始失败"
                     ]
                   ]
@@ -3307,7 +3150,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。"
+                  "text": "无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。"
                 },
                 {
                   "type": "paragraph",
@@ -3339,7 +3182,7 @@
                   "type": "list",
                   "items": [
                     "`createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`",
-                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）",
+                    "`createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）",
                     "`createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`"
                   ]
                 }
