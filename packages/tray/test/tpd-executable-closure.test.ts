@@ -313,7 +313,12 @@ const runtimeCases: readonly IRuntimeCase[] = [
       } catch (error) {
         thrown = error
       }
-      expect((thrown as Error & { readonly cause?: unknown }).cause).toBe(primary)
+      // Tray detail wraps the untouched PluginHost error, whose cause retains the native setup error.
+      expect((thrown as Error).cause).toMatchObject({
+        source: '@migaia/plugin-host',
+        code: 'PLUGIN_INSTALL_FAILED'
+      })
+      expect(((thrown as Error).cause as Error).cause).toBe(primary)
       expect(thrown).toMatchObject({
         detail: {
           phase: 'factory',

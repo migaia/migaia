@@ -8,23 +8,15 @@ import type {
 } from '@migaia/plugin-host'
 import type { IAbortSignal, IUrlLike } from '@migaia/utils'
 import type { IRuntimeConnectionDetail } from '@migaia/rpc-core/remote'
-import type {
-  TrayInstanceEvent as TrayInstanceEventValues,
-  TrayInstanceState as TrayInstanceStateValues,
-  TrayRuntime
-} from './constants.js'
+import type { TrayInstanceEvent, TrayInstanceState, TrayRuntime } from './constants.js'
 import type { ITrayRoutingPolicy } from './routing-policy.js'
 
 /** Caller cancellation and deadline occupy only the third public call position. */
 export type ITrayCallOptions = Readonly<{ signal?: IAbortSignal; timeoutMs?: number }>
 /** Accepted host runtime families; transport and supervision remain rpc-owned. */
 export type ITrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime]
-/** Current registry state published through discovery. */
-export type TrayInstanceState =
-  (typeof TrayInstanceStateValues)[keyof typeof TrayInstanceStateValues]
-/** Read-only registry lifecycle topic. */
-export type TrayInstanceEvent =
-  (typeof TrayInstanceEventValues)[keyof typeof TrayInstanceEventValues]
+/** Registry domains are declared once by their canonical value/type owner. */
+export type { TrayInstanceState, TrayInstanceEvent } from './constants.js'
 /** Native plugin tuple, retaining each definition's Feature metadata. */
 export type ITrayPlugins = readonly IPluginConstraint<any, any, any>[]
 /** Selects a literal plugin identity without recursively walking its tuple. */

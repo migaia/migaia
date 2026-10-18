@@ -56,10 +56,9 @@ export type IRuntimeRunOptions = Readonly<{
   readonly timeoutMs: number | false
 }>
 
-/** Runtime shutdown policy. */
+/** Runtime mode only: strict waits for callback settlement, bounded returns without waiting. */
 export type IRuntimeShutdownOptions = Readonly<{
   readonly mode: TrayShutdownMode
-  readonly quiescenceMs?: number
 }>
 
 /** Physical runtime disposal observation. */

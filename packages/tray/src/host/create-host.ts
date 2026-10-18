@@ -14,7 +14,6 @@ import {
   type IPluginConstraint,
   type IPluginAdmission,
   type IPluginDataOrderSlot,
-  type IPluginRegistrationReceipt,
   type IPluginHostDisposalResult,
   type IPluginDependency
 } from '@migaia/plugin-host'
@@ -46,6 +45,7 @@ import {
   isManagedHost,
   openComposition,
   type IPluginHostCompositionIntegration,
+  type IRegistrationToken,
   type IPluginHostCompositionSnapshot
 } from '@migaia/plugin-host/composition'
 
@@ -64,7 +64,7 @@ type IAdmissionRecord = {
   readonly snapshot: IPluginSnapshot
   readonly admission: IPluginAdmission<IPluginConstraint<any>>
   readonly slot: IPluginDataOrderSlot
-  receipt?: IPluginRegistrationReceipt
+  receipt?: IRegistrationToken
   artifactCustody?: ITrayArtifactCustody
 }
 type IGraph = IDynamicCapabilityGraph<IAdmissionRecord>
@@ -154,7 +154,7 @@ export async function createHost<
     const prepared = await composition!.prepareAdmissions(
       initialAdmissions.map(({ admission, slot }) => ({ admission, slot }))
     )
-    let receipts: readonly IPluginRegistrationReceipt[]
+    let receipts: readonly IRegistrationToken[]
     try {
       receipts = composition!.commitPreparedAdmissions(prepared)
     } catch (error) {
@@ -181,7 +181,7 @@ export async function createHost<
           const prepared = await composition!.prepareAdmissions(
             missing.map(({ admission, slot }) => ({ admission, slot }))
           )
-          let nextReceipts: readonly IPluginRegistrationReceipt[]
+          let nextReceipts: readonly IRegistrationToken[]
           try {
             nextReceipts = composition!.commitPreparedAdmissions(prepared)
           } catch (error) {
@@ -349,7 +349,12 @@ export async function createHost<
     } catch (cleanupError) {
       cleanupErrors.push(cleanupError)
     }
-    if (concrete !== undefined) {
+    // Rollback owns only this call's acquired claim, never another live managed session.
+    if (
+      concrete !== undefined &&
+      session !== undefined &&
+      claims.get(concrete as object) === session
+    ) {
       if (anchorName !== undefined) {
         try {
           const anchorRemoval = await (concrete as IAnyHost).unUse(anchorName)
@@ -369,16 +374,19 @@ export async function createHost<
       }
       claims.delete(concrete as object)
     }
-    const primary =
-      error instanceof Error ? error : createTrayError(TrayErrorCode.invalidEntry, error)
+    /** Classify first so a frozen factory failure remains reachable without masking it. */
+    let primary = attachTrayError(error, TrayErrorCode.invalidEntry)
     const detail = Object.freeze({
       phase: graph ? 'setup' : 'factory',
       cleanupComplete: cleanup.complete && cleanupErrors.length === 0 && physical.length === 0,
       cleanupErrors: Object.freeze(cleanupErrors),
       ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
     })
+    // Foreign immutable errors and pre-existing detail remain intact on the cause chain.
+    if (!Object.isExtensible(primary) || Object.getOwnPropertyDescriptor(primary, 'detail'))
+      primary = createTrayError(TrayErrorCode.invalidEntry, primary)
     Object.defineProperty(primary, 'detail', { value: detail, enumerable: true })
-    throw attachTrayError(primary, TrayErrorCode.invalidEntry)
+    throw primary
   }
 }
 
@@ -705,8 +713,8 @@ function createManagedHost(
     dispose(): Promise<ITrayHostDisposalResult> {
       if (disposal) return disposal
       state = TrayHostState.closing
-      hub.publish('disposing', { state: 'closing' })
-      disposal = (async () => {
+      // Publish completion identity before invoking any reentrant disposing observer.
+      disposal = Promise.resolve().then(async () => {
         const cleanupErrors: unknown[] = []
         const physical: Promise<ITrayPluginPhysicalCleanupResult>[] = []
         try {
@@ -810,7 +818,8 @@ function createManagedHost(
             error: error instanceof Error ? error : undefined
           }
         }
-      })()
+      })
+      hub.publish('disposing', { state: 'closing' })
       return disposal
     },
     [asyncDisposeKey]() {

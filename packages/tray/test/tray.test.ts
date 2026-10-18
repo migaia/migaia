@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 import { GraphReadinessState, type IGraphReadinessSnapshot } from '@migaia/capability'
 import { CapabilityGraphErrorCode } from '@migaia/capability/graph'
@@ -227,7 +228,7 @@ describe('tray', () => {
       )
     ]
   ] as const)(
-    'caches actual gate rejection for hostile %s without replacing it',
+    'caches the coded gate rejection and retains hostile %s as its cause',
     async (_label, thrown) => {
       const tray = createTrayGraph([
         {
@@ -245,11 +246,11 @@ describe('tray', () => {
       const first = tray.ready()
       const second = tray.ready()
       expect(second).toBe(first)
-      await expect(first).rejects.toSatisfy((received: unknown) =>
-        typeof thrown === 'object' && thrown !== null
-          ? received === thrown
-          : (received as Error & { cause?: unknown }).cause === thrown
-      )
+      await expect(first).rejects.toMatchObject({
+        source: TRAY_SOURCE,
+        code: TrayErrorCode.gateReadFailed
+      })
+      await expect(first).rejects.toSatisfy((received: Error) => received.cause === thrown)
     }
   )
 
@@ -374,13 +375,9 @@ describe('tray', () => {
     expect(native).toBeInstanceOf(TypeError)
     expect((native as Error & { code?: string }).code).toBe(TrayErrorCode.gateReadFailed)
     const frozen = Object.freeze(new Error('frozen'))
-    expect(attachTrayError(frozen, TrayErrorCode.gateReadFailed)).toBe(frozen)
-    const crossRealmError = Object.create(Error.prototype) as Error & {
-      name: string
-      message: string
-    }
-    crossRealmError.name = 'Error'
-    crossRealmError.message = 'cross realm'
+    expect(attachTrayError(frozen, TrayErrorCode.gateReadFailed).cause).toBe(frozen)
+    /** Native foreign realm error, rather than an Error.prototype lookalike. */
+    const crossRealmError = runInNewContext("new Error('cross realm')") as Error
     expect(attachTrayError(crossRealmError, TrayErrorCode.gateReadFailed)).toBe(crossRealmError)
     expect((crossRealmError as Error & { source?: string }).source).toBe(TRAY_SOURCE)
     const proxy = new Proxy(
@@ -391,13 +388,13 @@ describe('tray', () => {
         }
       }
     )
-    expect(attachTrayError(proxy, TrayErrorCode.gateReadFailed)).toBe(proxy)
+    expect(attachTrayError(proxy, TrayErrorCode.gateReadFailed).cause).toBe(proxy)
     const errorProxy = new Proxy(new Error('proxied'), {
       getPrototypeOf() {
         throw new Error('prototype trap')
       }
     })
-    expect(attachTrayError(errorProxy, TrayErrorCode.gateReadFailed)).toBe(errorProxy)
+    expect(attachTrayError(errorProxy, TrayErrorCode.gateReadFailed).cause).toBe(errorProxy)
   })
 
   it('keeps declared direct dependency reads isolated from transitive lookup', async () => {

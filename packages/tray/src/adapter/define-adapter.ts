@@ -9,9 +9,11 @@ export function defineAdapter<
   THost extends import('../host/typing.js').ITrayHostSource,
   const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>
 >(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin> {
-  if (!adapter || typeof adapter !== 'object' || typeof adapter.adapt !== 'function')
+  if (!adapter || typeof adapter !== 'object')
     throw createTrayError(TrayErrorCode.adapterContractInvalid)
+  /** The validated method is exactly the method retained for every invocation. */
   const adapt = adapter.adapt
+  if (typeof adapt !== 'function') throw createTrayError(TrayErrorCode.adapterContractInvalid)
   return Object.freeze({
     adapt: (artifact: TArtifact, context: IAdapterContext): TPlugin | PromiseLike<TPlugin> => {
       const result = adapt(artifact, context)

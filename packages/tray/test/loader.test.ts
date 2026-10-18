@@ -355,7 +355,10 @@ describe('@migaia/tray/loader', () => {
       cleanupComplete: false
     })
     expect(removed.cleanupErrors[0]).toBe(cleanupFailure)
-    expect(removed.cleanupErrors[0]).toMatchObject({ code: 'ARTIFACT_CLEANUP_FAILED' })
+    expect(removed.cleanupErrors[0]).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: 'SCOPE_DISPOSAL_FAILED'
+    })
 
     let releaseOld!: () => void
     let oldReleaseCount = 0

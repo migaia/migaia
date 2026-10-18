@@ -246,11 +246,7 @@ import { defineAdapter, type IAdapter } from '@migaia/tray/adapter'
 import { createRuntime, type IRuntime } from '@migaia/tray/runtime'
 import {
   createHost,
-  type ICanResolveReadyDefinitions,
   type ICreateHostOptions,
-  type IHostBaselinePlugins,
-  type IPluginWithSynchronousShared,
-  type IResolveReadyTrayPlugins,
   type ITrayHost,
   type ITrayHostCreationError,
   type ITrayHostCreationFailureDetail,
@@ -287,11 +283,7 @@ await using scoped = managed
 scoped.extensions.packedExtension
 
 type IPublicHostTypes = [
-  ICanResolveReadyDefinitions<readonly [typeof plugin]>,
   ICreateHostOptions<ConsumerHost, readonly [typeof plugin]>,
-  IHostBaselinePlugins<ConsumerHost>,
-  IPluginWithSynchronousShared<typeof plugin>,
-  IResolveReadyTrayPlugins<readonly [typeof plugin]>,
   ITrayHost<ConsumerHost, readonly [typeof plugin]>,
   ITrayHostCreationError,
   ITrayHostCreationFailureDetail,

@@ -16,6 +16,24 @@ import { DependencyPolicy } from '@migaia/capability/graph/dependency'
 import { createHost } from '../src/host/index.js'
 import { TrayErrorCode } from '../src/error-code.js'
 
+/** Real provenance remains owned by PluginHost; this test only observes the public protocol read. */
+const actualOpenComposition = composition.openComposition
+
+/** Replaces the existing reader seam for this fixture's concrete host, preserving every other read. */
+function overrideCompositionPortForTest(
+  target: object,
+  port: ReturnType<typeof openComposition>
+): void {
+  vi.spyOn(composition, 'openComposition').mockImplementation((host) =>
+    host === target ? port : actualOpenComposition(host)
+  )
+}
+
+/** Protocol observation must not leak into another test. */
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 type ITestCore = Record<string, never>
 
 class TestHost extends PluginHost<ITestCore, string> {}

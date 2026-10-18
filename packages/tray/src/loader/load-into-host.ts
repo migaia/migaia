@@ -47,10 +47,12 @@ export async function loadIntoHost<
   if (options.mutation !== 'use' && options.mutation !== 'replace')
     throw createTrayError(TrayErrorCode.loaderContractInvalid)
   const controller = createAbortController()
-  const scope = createProvisionalScope({ parentSignal: options.signal })
-  const forwardScopeAbort = (): void => controller.abort(scope.signal.reason)
-  scope.signal.addEventListener('abort', forwardScopeAbort, { once: true })
-  if (scope.signal.aborted) forwardScopeAbort()
+  /** Admission cancellation ends with this transaction; the scope keeps generation custody. */
+  const scope = createProvisionalScope({ parentSignal: controller.signal })
+  /** Forward only the caller cancellation received while admission is still pending. */
+  const forwardCallerAbort = (): void => controller.abort(options.signal?.reason)
+  options.signal?.addEventListener('abort', forwardCallerAbort, { once: true })
+  if (options.signal?.aborted) forwardCallerAbort()
   const deadlineAt = timeoutMs === false ? undefined : systemScheduler.now() + timeoutMs
   const timeoutTask =
     timeoutMs === false ? undefined : systemScheduler.schedule(() => controller.abort(), timeoutMs)
@@ -62,7 +64,7 @@ export async function loadIntoHost<
     }
   }
   const context: ILoaderContext = Object.freeze({
-    signal: controller.signal,
+    signal: scope.signal,
     deadlineAt,
     report
   })
@@ -89,7 +91,7 @@ export async function loadIntoHost<
           ITrayHostReadyPlugins<THost>
         >[0]
     >(options.adapter).adapt(artifact.value, {
-      signal: controller.signal,
+      signal: scope.signal,
       deadlineAt
     })
     if (!plugin || typeof plugin !== 'object')
@@ -110,7 +112,6 @@ export async function loadIntoHost<
     if (!(result as { readonly committed: boolean }).committed) await scope.rollback()
     return result as ILoadIntoHostResult<THost, TPlugin, TMutation>
   } catch (error) {
-    timeoutTask?.cancel()
     try {
       await scope.rollback()
     } catch (cleanupError) {
@@ -123,5 +124,8 @@ export async function loadIntoHost<
           ? TrayErrorCode.adapterExecutionFailed
           : TrayErrorCode.invalidEntry
     throw attachTrayError(error instanceof Error ? error : createTrayError(code, error), code)
+  } finally {
+    timeoutTask?.cancel()
+    options.signal?.removeEventListener('abort', forwardCallerAbort)
   }
 }

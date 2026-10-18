@@ -269,3 +269,5 @@ by the parent: `{ id, host, generation }` for an instance, `{ parent: true }` fo
 parent publication. Payload fields cannot impersonate the sender. Subscriptions
 end with their admission and generation; messages sent while an instance is not
 ready are missed. There is no replay, persistence or delivery acknowledgement.
+
+审计迁移：Runtime shutdown 删除无效 `quiescenceMs` 字段，实际清理预算仍配置 managed Host。四个 managed 推导 helper 类型取消公开导出，使用 `ITrayResolvedHost` / `ITrayHostDynamic`；详见 USEGUIDE 审计修订。重复 claim 不再清理已有 Host；dispose 同步重入共享 Promise；冻结 factory 错误保留在带 detail 的错误 cause。成功 load 返回即取消本次 timer/caller bridge，artifact 生命周期继续归 generation。

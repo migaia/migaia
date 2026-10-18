@@ -2,9 +2,6 @@ export { createHost } from './create-host.js'
 export { TrayHostState } from './typing.js'
 export type {
   ICreateHostOptions,
-  ICanResolveReadyDefinitions,
-  IHostBaselinePlugins,
-  IPluginWithSynchronousShared,
   ITrayHost,
   ITrayHostSource,
   ITrayHostCreationError,
@@ -21,6 +18,5 @@ export type {
   ITrayPluginRemovalObservation,
   ITrayPluginRemovalResult,
   ITrayResolvedHost,
-  IResolveReadyTrayPlugins,
   IUnsubscribe
 } from './typing.js'

@@ -1,3 +1,8 @@
+import type {
+  IHostBaselinePlugins,
+  ICanResolveReadyDefinitions,
+  IResolveReadyTrayPlugins
+} from '../src/host/typing.js'
 import { describe, expect, it } from 'vitest'
 import {
   defineFeature,
@@ -8,9 +13,6 @@ import {
 } from '@migaia/plugin-host'
 import {
   createHost,
-  type ICanResolveReadyDefinitions,
-  type IHostBaselinePlugins,
-  type IResolveReadyTrayPlugins,
   type ITrayHost,
   type ITrayHostDynamic,
   type ITrayResolvedHost,

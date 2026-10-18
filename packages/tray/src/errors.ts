@@ -1,24 +1,27 @@
 import { TrayErrorCode, type ITrayErrorCode } from './error-code.js'
 import { TrayErrorText } from './error-text.js'
+import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
 
 /** Stable package source attached to every Tray-owned boundary error. */
 export const TRAY_SOURCE = '@migaia/tray'
 
 /**
- * Attaches code/source to same- or cross-realm Error-shaped objects when extensible. Frozen objects
- * remain the primary value without a tag; this avoids replacing native identity or masking the
- * original failure.
+ * Classifies native errors without replacing their type or stack. Complete foreign identities stay
+ * with their owner; immutable/non-native throws remain reachable through a tagged wrapper's cause.
  */
-export function attachTrayError(error: unknown, code: ITrayErrorCode): unknown {
-  const classification = classifyError(error)
-  if (classification === 'hostile') return error
-  if (classification === 'error') {
+export function attachTrayError(error: unknown, code: ITrayErrorCode): Error {
+  if (isNativeErrorValue(error)) {
     try {
-      Object.defineProperties(error, { source: { value: TRAY_SOURCE }, code: { value: code } })
-    } catch {
-      // Preserve primary identity/type/stack when hostile errors reject tagging.
+      /** Annotation inspects descriptors so application metadata getters are not invoked. */
+      const source = Object.getOwnPropertyDescriptor(error, 'source')
+      /** Complete existing identities remain owned by their originating package. */
+      const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
+      if (typeof source?.value === 'string' && typeof existingCode?.value === 'string') return error
+      if (!source && !existingCode && Object.isExtensible(error))
+        return attachErrorIdentity(error, { source: TRAY_SOURCE, code })
+    } catch (metadataError) {
+      return attachSecondaryErrors(createTrayError(code, error), [metadataError]) as Error
     }
-    return error
   }
   return createTrayError(code, error)
 }
@@ -70,24 +73,4 @@ export function createTrayError(code: ITrayErrorCode, cause?: unknown): Error {
     code: { value: code }
   })
   return error
-}
-
-/** Recognizes cross-realm Error-shaped values without unsafe prototype assumptions. */
-function isErrorLike(value: unknown): value is Error {
-  return Object.prototype.toString.call(value) === '[object Error]'
-}
-
-/** Classifies thrown values without allowing hostile Proxy traps to replace them. */
-function classifyError(value: unknown): 'error' | 'other' | 'hostile' {
-  try {
-    if (value instanceof Error) return 'error'
-  } catch {
-    return 'hostile'
-  }
-  if (typeof value !== 'object' || value === null) return 'other'
-  try {
-    return isErrorLike(value) ? 'error' : 'other'
-  } catch {
-    return 'hostile'
-  }
 }

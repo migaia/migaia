@@ -7,9 +7,11 @@ import type { ILoadedArtifact, ILoader, ILoaderContext } from './typing.js'
 export function defineLoader<TSource, TArtifact>(
   loader: ILoader<TSource, TArtifact>
 ): ILoader<TSource, TArtifact> {
-  if (!loader || typeof loader !== 'object' || typeof loader.load !== 'function')
+  if (!loader || typeof loader !== 'object')
     throw createTrayError(TrayErrorCode.loaderContractInvalid)
+  /** The validated method is exactly the method retained for every invocation. */
   const load = loader.load
+  if (typeof load !== 'function') throw createTrayError(TrayErrorCode.loaderContractInvalid)
   return Object.freeze({
     load: (
       source: TSource,

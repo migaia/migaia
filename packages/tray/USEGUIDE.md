@@ -280,6 +280,24 @@ Tray core 不增加 timeout、scheduler 或强制终止策略。可能永久 pen
 | `runtimeAborted`         | `RUNTIME_ABORTED`          | caller/runtime/deadline cooperative abort                      | 按 cancellation 处理并等待 settlement                              |
 | `artifactCleanupFailed`  | `ARTIFACT_CLEANUP_FAILED`  | artifact secondary cleanup failure                             | 检查 cleanupErrors，不替换 mutation primary                        |
 
+| `topicInvalid` | `TRAY_TOPIC_INVALID` | Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostInvalid` | `TRAY_HOST_INVALID` | Host definition violates instances R1; provide an admitted host DSL. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostUnknown` | `TRAY_HOST_UNKNOWN` | Spawn names an unregistered host in R3; register the host before spawning. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostMismatch` | `TRAY_HOST_MISMATCH` | Remote host differs from the admission in R6; select the record's host. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `reservedName` | `TRAY_RESERVED_NAME` | Expose uses a reserved internal plugin in R1; rename the business plugin. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `valueNotPortable` | `TRAY_VALUE_NOT_PORTABLE` | Config or payload violates R3/R6 portable data; remove unsupported values. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceDuplicate` | `TRAY_INSTANCE_DUPLICATE` | Spawn reuses an admitted id in R3; choose a free id or remove the admission. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceStartFailed` | `TRAY_INSTANCE_START_FAILED` | Install or generation init fails in R3/R5; inspect the preserved cause. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `pathNotExposed` | `TRAY_PATH_NOT_EXPOSED` | Dispatcher receives a path outside R2 exposure; use an exposed Feature method. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `childStateInvalid` | `TRAY_CHILD_STATE_INVALID` | Child init repeats or names another host in R2; init once per generation. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `disposed` | `TRAY_DISPOSED` | Operation enters a closing registry in R3; create a new Tray. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+
+| `hostUnavailable` | `TRAY_HOST_UNAVAILABLE` | Mesh R1 has no ready host candidate; await a ready instance before calling again. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `routingUnknown` | `TRAY_ROUTING_UNKNOWN` | Mesh R1 policy is absent from registration or declaration; register its branded definition. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `routingInvalid` | `TRAY_ROUTING_INVALID` | Routing policy name or pick violates instances R1; provide a named synchronous policy. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceUnknown` | `TRAY_INSTANCE_UNKNOWN` | Lookup or remote uses an ended admission in R6; obtain a fresh remote. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceNotReady` | `TRAY_INSTANCE_NOT_READY` | Call targets a non-ready instance in R6; await its ready transition. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+
 Graph 启动、节点或释放错误仍保留 `@migaia/capability` 的 source/code，不会被 Tray 强行改写。
 
 ## 8. 生产使用检查单
@@ -397,8 +415,8 @@ managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并
 从 callback 捕获 concrete Host 执行 self mutation。
 
 Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native
-error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用
-`ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。
+error 在可注记时保留同一对象、type、stack；冻结或无法安全注记的值通过已编码 wrapper 的 cause 保留；完整外包身份不改写。artifact secondary cleanup 的未分类失败使用
+`ARTIFACT_CLEANUP_FAILED`；已带 lifecycle 等完整身份的失败保持原 source/code，不能替换更早 mutation primary。
 
 ## Routing
 
@@ -448,3 +466,14 @@ is reported on the child. Neither failure rejects the publisher.
 静态组合的 `get(key)` 直接读取 Capability Graph 自己的可见 value；没有第二份 Tray value 表。调用方仍须先等待 ready，关闭后和启动失败后均以 `TRAY_UNAVAILABLE` 拒绝。
 
 路由选择仍按同一记录表的 spawn 顺序扫描，传给自定义 policy 的快照每次独立冻结，反映当次 inFlight，不缓存旧计数。
+
+
+### 审计修订与迁移
+
+重复 `createHost({ create: () => sameHost, ... })` 被拒绝时，只回滚本次取得的 claim，不释放已有会话。factory 失败附带 creation detail；原生可注记异常保持 identity，冻结异常经 cause 保留，不再被定义 detail 时的新 TypeError 遮蔽。disposing 观察者同步重入 `dispose()` 取得同一 Promise，只执行一轮清理。
+
+成功 `loadIntoHost` 返回时结束本次 timeout/caller cancellation bridge；它们不再影响已提交 generation 的 loader context。artifact 仍由现有 generation custody 持有，unUse/replace/dispose 时按原路径释放；context.signal 也在 scope 结束时中止。Loader/Adapter 的方法 getter 只取一次，校验和执行使用同一函数。
+
+`IRuntimeShutdownOptions` 仅包含 `mode`：`strict-drain` 等待真实 callback settlement；`bounded` 立即返回并用 cleanupComplete 表达尚有运行。删除此前未读取的 Runtime `quiescenceMs` 对象字段；需要物理清理等待预算时配置 managed Host 的 `ICreateHostOptions.quiescenceMs`，这不会给 Runtime bounded 添加等待。callback 内直接 await 非 thenable ticket 不等于完成变更，须在 callback 结束后读取 ticket.completion。
+
+managed Host 子路径不再导出 `IHostBaselinePlugins`、`IPluginWithSynchronousShared`、`ICanResolveReadyDefinitions`、`IResolveReadyTrayPlugins`。外部类型标注使用公开 `ITrayResolvedHost` / `ITrayHostDynamic` / Runtime 推导；四个求解辅助声明保留在内部，供公开 .d.ts 引用。TrayInstanceState/Event 的值与同名 union 统一由 hosts/constants 拥有，公开名称不变。

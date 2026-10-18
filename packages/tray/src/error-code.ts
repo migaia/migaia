@@ -48,9 +48,15 @@ export const TrayErrorCode = {
   runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED',
   /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */
   runtimeAborted: 'RUNTIME_ABORTED',
-  /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */
+  /**
+   * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged.
+   * Inspect cleanupErrors.
+   */
   artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED',
-  /** Invalid entry descriptor or start result; caller must provide a complete static entry. */
+  /**
+   * An entry, managed factory result, or Host claim is invalid; provide a complete definition and
+   * an unclaimed Host.
+   */
   invalidEntry: 'TRAY_INVALID_ENTRY',
   /** Duplicate key during factory admission; caller must provide unique keys. */
   duplicateEntry: 'TRAY_DUPLICATE_ENTRY',
