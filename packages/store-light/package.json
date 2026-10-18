@@ -1,6 +1,6 @@
 {
   "name": "@migaia/store-light",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Minimal object-state Store facade.",
   "license": "MIT",
@@ -36,8 +36,8 @@
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^",
-    "@migaia/utils": "workspace:^",
-    "@migaia/resource": "workspace:^"
+    "@migaia/resource": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
