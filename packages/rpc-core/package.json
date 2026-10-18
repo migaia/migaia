@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-core",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "description": "RPC core owner.",
   "license": "MIT",
