@@ -3789,7 +3789,7 @@ function errorReferencePath(locale: ILocale, library: string | undefined): strin
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
 const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   supervision:
-    '用于应用需要在进程、线程或协程退出、启动失败、健康异常与替换竞态中可靠管理原生执行单元的场景。监督器通过原 launcher/profile 取得真实 handle，用共享 budget 持有 lease，按 readiness 与 generation 控制准入，退出后才归还容量；stop、drain 与强制终止由原适配器执行，缺能力明确报告，不能从平台名伪造强隔离或零资源使用。',
+    '用于可靠地管理进程、线程和协程：它们可能意外退出、启动失败、健康检查不通过，或在被替换时与新实例同时存在。监督器负责启动、观察和停止这些单元，它通过平台对应的启动器创建单元，并用预算限制同时运行的数量；每个单元在真正退出之前都占着一个名额。新单元报告准备就绪后才被当作可用；每次启动的实例都带一个代次编号，用来区分重启或替换前后的新旧实例。停止、等待手头工作完成和强制结束，都交给启动这个单元的启动器去做。启动器做不到的操作会被明确报告，监督器不会仅凭平台名称就假定有严格隔离或不占资源。',
   capability:
     '用于把可选功能从零散的 if 判断提升为可治理的能力：统一处理开关、依赖、启停、替换和资源释放。核心设计是由 Host 持有能力定义与上下文，只有满足 flag 和依赖的能力才能启用，并通过句柄消费和关闭；它不是业务状态容器。',
   docs: '用于生成和维护仓库的文档清单、公开 API 索引与站点内容，让源码契约能够被稳定检索和校验。核心设计是从包元数据与源码生成结构化清单，再由网站按路由投影；它不承载运行时业务逻辑。',

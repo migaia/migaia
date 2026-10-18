@@ -4209,12 +4209,12 @@ console.log(event)`
           '`PROCESS_CHANNEL_CLOSED`：在已关闭的通道上继续工作；重新连接并对账。'
         ),
         connectFailed: t(
-          '`PROCESS_CHANNEL_CONNECT_FAILED`: dial, launch or partial channel construction failed. Native synchronous spawn and stream acquisition errors retain the original object, native type, stack and other fields; errno code becomes this semantic code and existing wrappers retain cause.',
-          '`PROCESS_CHANNEL_CONNECT_FAILED`：拨号、启动或部分通道构造失败；原生同步启动及流获取错误保留原对象、类型、堆栈及其它字段，原生系统码转为语义码，既有包装保留原因链。'
+          '`PROCESS_CHANNEL_CONNECT_FAILED`: connecting to the other process, starting it, or setting up part of the channel failed. If the system call that starts the process or opens its streams throws, you get that same error object with its type, stack and fields intact. Its `source` becomes this package and its system `code` (such as `ENOENT`) becomes `PROCESS_CHANNEL_CONNECT_FAILED`, one stable value to check. An already wrapped failure keeps the original on `cause`.',
+          '`PROCESS_CHANNEL_CONNECT_FAILED`：连接另一个进程、启动进程，或建立通道的某一部分时失败。如果是启动进程或打开其数据流的系统调用直接抛错，你拿到的仍是那个错误对象，类型、堆栈和其他字段都不变；只是 `source` 被设为本包，系统错误码 `code`（例如 `ENOENT`）被换成 `PROCESS_CHANNEL_CONNECT_FAILED`，方便用一个固定的值判断。如果错误原本已经被包装过，最初的错误仍保留在 `cause` 上。'
         ),
         listenFailed: t(
-          '`PROCESS_CHANNEL_LISTEN_FAILED`: listener preparation or bind failed; the original native error keeps its type, stack and other fields while receiving package semantic identity. Reporter and rejection retain original cause chains.',
-          '`PROCESS_CHANNEL_LISTEN_FAILED`：监听准备或绑定失败；原生错误保留类型、堆栈及其它字段并附包语义身份，报告与拒绝保留原原因链。'
+          '`PROCESS_CHANNEL_LISTEN_FAILED`: preparing to listen, or binding the listening address, failed. You receive the same system error object, with its type, stack and other fields unchanged; it only gains this package as `source` and `PROCESS_CHANNEL_LISTEN_FAILED` as `code`. Both the reported error and the rejected promise keep the original `cause` chain.',
+          '`PROCESS_CHANNEL_LISTEN_FAILED`：准备监听或绑定监听地址时失败。你拿到的仍是原来的系统错误对象，类型、堆栈和其他字段都不变，只是多了 `source`（本包）和 `code`（`PROCESS_CHANNEL_LISTEN_FAILED`），可以据此判断错误来自哪里、属于哪一类。无论错误是被报告出去，还是作为 Promise 的拒绝原因返回，原来的 `cause` 链都保留。'
         ),
         pluginInvalidOption: t(
           '`PROCESS_PLUGIN_INVALID_OPTION`: a plugin or source option is invalid.',

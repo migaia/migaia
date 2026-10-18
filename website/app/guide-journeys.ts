@@ -31138,7 +31138,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '停止先清监控，再结束实例，实例真正退出后才清附件并归还容量。强制请求不是退出确认。超过最后时限时会记录 `abandoned`，停止可以完成，但未退出实例仍占用容量；它真正退出后才归还。'
+                text: '停止按固定顺序进行：先停掉对这个单元的监控（例如健康检查），再结束进程、线程或协程本身。只有确认它真正退出后，才会清理附加在它上面的资源，并把它占用的名额还给预算。'
+              },
+              {
+                type: 'paragraph',
+                text: '发出强制停止请求不等于它已经退出。如果到了最后时限仍未确认退出，结果会记为 `abandoned`，表示不再等待：stop 调用可以结束，但这个单元仍占着名额，直到它真正退出才归还。'
               }
             ]
           }
@@ -31333,7 +31337,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Shutdown releases monitors first, then terminates the unit. Attachments and the budget slot release after actual exit. A force request does not prove exit. The final deadline records abandonment; stop may finish while the unit retains its slot until it truly exits.'
+                text: 'Stopping follows a fixed order. Monitoring of the unit, such as health checks, stops first; then the process, thread or coroutine itself is ended. Only after its exit is confirmed are the resources attached to it cleaned up and its budget slot returned.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Sending a force-stop request does not mean the unit has exited. If exit is still unconfirmed at the final deadline, the result is recorded as `abandoned`, meaning the supervisor stops waiting: the stop call can finish, but the unit keeps its slot until it really exits.'
               }
             ]
           }

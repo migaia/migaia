@@ -1640,13 +1640,13 @@ export const reference: ILibraryReference = {
     },
     IUnitLease: {
       summary: t(
-        'Budget-owned occupied slot transferred to the unit owner until actual exit.',
-        '预算拥有的占用名额，转交单元所有者保持到实际退出。'
+        'Proof that a process, thread or coroutine occupies one slot of a budget. The budget hands it to whoever owns that unit, and the owner keeps it until the unit has actually exited.',
+        '表示一个进程、线程或协程占用了预算中的一个名额。预算把它交给负责这个单元的一方，由对方一直持有，直到单元真正退出。'
       ),
       scenarios: [
         t(
-          'Release capacity once actual native or cooperative work has ended.',
-          '实际原生或协作工作结束后归还容量。'
+          'Call release after the process, thread or coroutine has really stopped, so the budget can admit the next one.',
+          '进程、线程或协程真正停止后调用 release，把名额还给预算，让下一个单元可以进入。'
         )
       ],
       example:
