@@ -221,6 +221,7 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'error-identity-and-causes',
     'bytes-and-text',
     'immutable-objects-and-paths',
+    'type-utilities',
     'configuration-ownership',
     'function-and-value-guards',
     'strings-and-numbers'

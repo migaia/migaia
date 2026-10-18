@@ -41004,6 +41004,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '[说明](/zh/docs/utils/configuration-ownership)'
                   ],
                   [
+                    '@migaia/utils/typing',
+                    'IDiscriminatedByField, IDiscriminatedByPath, IObjectPathInput, IAbortSignal, IUrlLike',
+                    '整理事件类型，并在自己的接口中复用工具接受的类型。',
+                    '[说明](/zh/docs/utils/type-utilities)'
+                  ],
+                  [
                     '@migaia/utils/function',
                     'once, onceAsync, noop, probeThenable, assimilateCapturedThen',
                     '只执行一次的初始化，以及库适配器的 thenable 读取。',
@@ -41156,6 +41162,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'ownConfig, readonlyConfig, patchConfig, combineConfig',
                     'accept, protect, update, and merge configuration',
                     '[Guide](/en/docs/utils/configuration-ownership)'
+                  ],
+                  [
+                    '@migaia/utils/typing',
+                    'IDiscriminatedByField, IDiscriminatedByPath, IObjectPathInput, IAbortSignal, IUrlLike',
+                    "Group event types and reuse the tools' accepted types in your own interfaces.",
+                    '[Guide](/en/docs/utils/type-utilities)'
                   ],
                   [
                     '@migaia/utils/function',
@@ -42442,6 +42454,658 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           label: 'set API',
           path: 'docs/utils/object-path/set'
         }
+      ]
+    }
+  },
+  'utils:type-utilities': {
+    zh: {
+      title: '类型工具：让接口与数据保持一致',
+      lede: '只导入类型，在自己的接口中复用工具接受的数据形态，并让编译器检查事件处理和配置读写。',
+      document: {
+        sections: [
+          {
+            id: 'type-only-entry',
+            heading: '只需要类型时，从这里导入',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '写接口时，可能只需要描述数据形态，不需要调用任何工具。@migaia/utils/typing 集中提供这些类型，没有运行时函数。用 import type 导入后，生成代码时会移除这条导入，不会为类型生成可执行代码，也不会加载运行时模块。'
+              },
+              {
+                type: 'paragraph',
+                text: '这个入口包含两组类型：按事件或消息的种类整理不同形态的分组工具，以及从其他入口重新导出的共享类型。下面先比较正确导入与错误导入；如何填写分组工具的输入，稍后再解释。'
+              },
+              {
+                type: 'paragraph',
+                text: "错误写法是 `import type { IDiscriminatedByField } from '@migaia/utils'`，因为根入口没有导出这个工具。下面把根入口提供的类型放在 IRootUtils 名下，再查看其中缺少的成员。"
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByField } from '@migaia/utils/typing'\nimport type * as IRootUtils from '@migaia/utils'\n\n// @ts-expect-error 根入口没有导出这个分组工具。\ntype IWrongImport = IRootUtils.IDiscriminatedByField"
+              },
+              {
+                type: 'paragraph',
+                text: '前两行导入能通过类型检查。IRootUtils 表示根入口提供的类型，最后一行会提示其中没有 IDiscriminatedByField；注释标明这处预期错误。两个分组工具都只在 /typing 导出，部分共享类型则也能从根入口导入。'
+              }
+            ]
+          },
+          {
+            id: 'when-to-use',
+            heading: '哪些接口适合使用这些类型',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '写自己的库或共享模块时，如果接口需要接收与工具相同的中止信号或网址，可以直接使用 IAbortSignal 和 IUrlLike。这样接口描述沿用已有声明，无需再维护一套相同的类型。'
+              },
+              {
+                type: 'paragraph',
+                text: '事件或消息有不同形态时，可以按表示种类的字段整理对应关系，再为每一种事件要求一个处理函数。漏写一种处理函数时，编译器就会报错。后面的分组示例会展示完整写法；手工列出每一项则需要自己同步数据形态与处理表。'
+              },
+              {
+                type: 'paragraph',
+                text: '声明配置读取接口时，可以用 IObjectPathInput 限制逐层读取时允许使用的属性顺序，再用 IObjectPathValue 描述读到的值。写错配置属性名会在类型检查时暴露，而不是等调用后才发现没有对应的值。'
+              }
+            ]
+          },
+          {
+            id: 'runtime-boundary',
+            heading: '需要执行操作时，使用运行时入口',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '类型只描述允许传入或返回的数据，不会执行操作。要读取或更新对象、创建可从外部完成的 Promise，或合并超时与外部中止通知，仍需从对应运行时入口导入函数。只导入类型不会得到这些行为。'
+              },
+              {
+                type: 'table',
+                headers: ['要执行的操作', '导入位置与函数'],
+                rows: [
+                  [
+                    '读取或更新对象中的值',
+                    '@migaia/utils/object-path 的 [get](/zh/docs/utils/api/object-path/get) 与 [set](/zh/docs/utils/api/object-path/set)'
+                  ],
+                  [
+                    '创建可从外部完成或拒绝的 Promise',
+                    '@migaia/utils/promise 的 [deferred](/zh/docs/utils/api/promise/deferred)'
+                  ],
+                  [
+                    '合并超时与外部中止通知',
+                    '@migaia/utils/promise 的 [createAbortTimeoutSignal](/zh/docs/utils/api/promise/createAbortTimeoutSignal)'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '共享类型仍由原来的模块定义。例如 IObjectPathInput 在对象读写模块定义，IAbortSignal 在异步工具模块定义。/typing 用 export type 重新导出同一声明，两个入口引用的是同一个类型。类型导入仍不会执行那些模块中的函数。'
+              }
+            ]
+          },
+          {
+            id: 'group-unions',
+            heading: '按字段或路径整理联合类型',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '联合类型表示一个值可以是列出的几种形态之一。判别字段是用固定值区分这些形态的字段，例如值为“新增”或“删除”的种类字段。'
+              },
+              {
+                type: 'paragraph',
+                text: '需要为每种消息提供一个处理函数时，可以先按判别字段整理消息类型。IDiscriminatedByField 的结果是一个对象类型：字段值成为键，对应的完整消息类型成为该键的值。它不会替你创建处理函数。'
+              },
+              {
+                type: 'paragraph',
+                text: '类型参数是写在类型名后面尖括号中的输入，用来告诉类型工具要处理哪些数据形态。在 IDiscriminatedByField<F, T> 中，F 是最外层字段的名字，T 是消息的联合类型。下面用 kind 作为 F，用 IMessage 作为 T。'
+              },
+              {
+                type: 'paragraph',
+                text: '下面的消息分为新增和删除两种。keyof 取出对象类型的全部键名；IHandlers 按这些键要求处理函数，每个函数只接收对应的消息。这样就不必在处理表中手写一份独立的种类清单。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByField } from '@migaia/utils/typing'\n\ntype IMessage =\n  | { kind: 'created'; userId: string }\n  | { kind: 'deleted'; reason: string }\n\ntype IByKind = IDiscriminatedByField<'kind', IMessage>\ntype IMessageKinds = keyof IByKind // 'created' | 'deleted'\ntype ICreatedMessage = IByKind['created'] // { kind: 'created'; userId: string }\n\ntype IHandlers = {\n  [K in keyof IByKind]: (message: IByKind[K]) => string\n}\n\n/** 为每种消息提供接收对应成员的处理函数。 */\nconst handlers: IHandlers = {\n  created: (message) => message.userId,\n  deleted: (message) => message.reason\n}\n\nhandlers.created({ kind: 'created', userId: 'Ada' })\n\n/** 有意省略一种处理函数，展示完整性检查。 */\n// @ts-expect-error 缺少 deleted 处理函数。\nconst incompleteHandlers: IHandlers = { created: (message) => message.userId }"
+              },
+              {
+                type: 'paragraph',
+                text: "悬停 IMessageKinds 可见 'created' | 'deleted'。ICreatedMessage 只保留新增消息，因此 created 函数能直接读取 userId。incompleteHandlers 那行因缺少 deleted 而报编译错误；完整的 handlers 则通过检查。"
+              },
+              {
+                type: 'paragraph',
+                text: '路径是从对象根部逐层找到一个值的属性顺序，例如先取消息头，再取其中的种类字段。种类字段位于 meta 内部时，使用 IDiscriminatedByPath，不必为了分组而把字段搬到最外层。'
+              },
+              {
+                type: 'paragraph',
+                text: "IDiscriminatedByPath<T, P> 的参数顺序与前一个工具不同：先给消息类型 T，再给路径 P。下面用字符串 'meta.kind' 表示先取 meta，再取 kind；readonly ['meta', 'kind'] 是把同样步骤逐项列出的元组写法。"
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByPath } from '@migaia/utils/typing'\n\ntype IMessage =\n  | { meta: { kind: 'created' }; userId: string }\n  | { meta: { kind: 'deleted' }; reason: string }\n\ntype IByString = IDiscriminatedByPath<IMessage, 'meta.kind'>\ntype IByTuple = IDiscriminatedByPath<IMessage, readonly ['meta', 'kind']>\ntype IMessageKinds = keyof IByString // 'created' | 'deleted'\ntype IStringCreated = IByString['created']\ntype ITupleCreated = IByTuple['created']\n// 以上两个类型都是 { meta: { kind: 'created' }; userId: string }。"
+              },
+              {
+                type: 'paragraph',
+                text: "两个写法得到相同的分组结果。IMessageKinds 是 'created' | 'deleted'；IStringCreated 与 ITupleCreated 都保留新增消息的完整形态。字段在最外层时选 IDiscriminatedByField；需要逐层查找时选 IDiscriminatedByPath。"
+              },
+              {
+                type: 'paragraph',
+                text: '分组后的键必须是字符串、数字或符号。IDiscriminatedByField 要求每个成员都具有所选字段，且字段值能用作键。下面把对象和真假值用作字段值，两个类型声明都会报约束错误。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByField } from '@migaia/utils/typing'\n\ntype IObjectTag = { kind: { name: 'created' }; userId: string }\ntype IBooleanTag = { kind: true; userId: string }\n\n// @ts-expect-error 对象不能用作分组键。\ntype IByObject = IDiscriminatedByField<'kind', IObjectTag>\n// @ts-expect-error 真假值不能用作分组键。\ntype IByBoolean = IDiscriminatedByField<'kind', IBooleanTag>"
+              },
+              {
+                type: 'paragraph',
+                text: '编译错误分别出现在 IByObject 和 IByBoolean 的声明处，而不是在运行时抛错。选择值为字符串、数字或符号的字段，才能让这个字段工具建立分组键。按路径分组的边界不同，下面分别说明。'
+              },
+              {
+                type: 'paragraph',
+                text: '最容易忽略的是路径只存在于部分成员。IDiscriminatedByPath 不保证在声明处报错；缺少路径的成员不能进入对应分组，而且整个结果还可能变成没有任何键的对象类型。下面的删除消息没有 meta，连新增消息的键也没有出现在结果中。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByPath } from '@migaia/utils/typing'\n\ntype IPartialMessages =\n  | { kind: 'created'; meta: { kind: 'created' }; userId: string }\n  | { kind: 'deleted'; reason: string }\n\ntype IByMeta = IDiscriminatedByPath<IPartialMessages, 'meta.kind'>\ntype IVisibleKinds = keyof IByMeta // never\n\n// @ts-expect-error 结果中没有 created 键。\ntype ICreatedMessage = IByMeta['created']\n\n// @ts-expect-error 所有成员都没有这个字符串路径。\ntype IUnknownPath = IDiscriminatedByPath<IPartialMessages, 'meta.unknown'>"
+              },
+              {
+                type: 'paragraph',
+                text: "IByMeta 在这里没有任何键，IVisibleKinds 因而是 never，表示没有可选的键名。声明 IByMeta 本身通过检查，但读取它的 created 类型会报错。相比之下，所有成员都没有的字符串路径 'meta.unknown' 会让 IUnknownPath 的声明直接报错。"
+              },
+              {
+                type: 'paragraph',
+                text: '路径存在，但末尾的值不能用作键，也是另一种静默遗漏。与字段工具不同，IDiscriminatedByPath 会过滤这些叶值，而不一定拒绝类型声明。下面每个成员都有 meta.kind，但只有新增消息使用字符串，另外两个成员分别使用对象和真假值。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByPath } from '@migaia/utils/typing'\n\ntype IMixedTags =\n  | { meta: { kind: 'created' }; userId: string }\n  | { meta: { kind: { name: 'deleted' } }; reason: string }\n  | { meta: { kind: false }; retry: boolean }\n\ntype IByMeta = IDiscriminatedByPath<IMixedTags, 'meta.kind'>\ntype IVisibleKinds = keyof IByMeta // 'created'\ntype ICreatedMessage = IByMeta['created']\n// { meta: { kind: 'created' }; userId: string }\n\ntype IObjectOnly = IDiscriminatedByPath<\n  { meta: { kind: { name: 'deleted' } } },\n  'meta.kind'\n>\ntype IBooleanOnly = IDiscriminatedByPath<{ meta: { kind: false } }, 'meta.kind'>\ntype IObjectKeys = keyof IObjectOnly // never\ntype IBooleanKeys = keyof IBooleanOnly // never\n\n// @ts-expect-error 没有可用作键的叶值，因此没有 created 键。\ntype IEmptyCreated = IObjectOnly['created']"
+              },
+              {
+                type: 'paragraph',
+                text: "IVisibleKinds 只有 'created'，ICreatedMessage 只包含新增消息。只含对象叶值的 IObjectOnly 和只含真假值叶值的 IBooleanOnly 都没有键，因此 IObjectKeys 与 IBooleanKeys 都是 never。IEmptyCreated 那行显示：空的结果中也没有 created。"
+              },
+              {
+                type: 'paragraph',
+                text: '依赖分组结果建立处理表前，先查看 keyof 得到的键名，并与预期种类核对。还要查看各键对应的消息类型。声明通过不代表所有成员都进入了分组；类型层面的遗漏也不会在运行时替你删除或校验消息。'
+              }
+            ]
+          },
+          {
+            id: 'typed-paths',
+            heading: '用路径类型约束配置读写',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '为配置读取接口写一个普通字符串参数，调用方就能把拼错的字段名传进来。[`IObjectPath`](/zh/docs/utils/api/object-path/IObjectPath) 回答“这个对象类型有哪些合法的字符串路径”；[`IObjectPathInput`](/zh/docs/utils/api/object-path/IObjectPathInput) 还接收合法元组路径，让同一个接口支持两种写法。'
+              },
+              {
+                type: 'paragraph',
+                text: "字符串路径把各级属性写在一起，例如 `servers.[0].port`；元组则逐段写成 `['servers', 0, 'port']`。[`IObjectPathTupleFor`](/zh/docs/utils/api/object-path/IObjectPathTupleFor) 回答“这个对象类型允许哪些元组路径”。数组下标可用两种形式；对象键若是符号，元组能直接保存该符号。"
+              },
+              {
+                type: 'paragraph',
+                text: '若只需要描述路径的形状，[`IObjectPathSegment`](/zh/docs/utils/api/object-path/IObjectPathSegment) 表示一个字符串、数值或符号路径段，[`IObjectPathTuple`](/zh/docs/utils/api/object-path/IObjectPathTuple) 表示这些路径段组成的只读数组。它们本身不检查某个对象是否具有这些属性；要约束具体对象，请用 `IObjectPathTupleFor<T>` 或 `IObjectPathInput<T>`。'
+              },
+              {
+                type: 'paragraph',
+                text: '路径有效之后，还需要知道结果是什么类型。[`IObjectPathValue`](/zh/docs/utils/api/object-path/IObjectPathValue) 接收对象类型和路径，得出该处的值类型。下面声明一个配置读取接口；`P` 保留调用方所选的具体路径，因此不同字段有各自的返回类型。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IObjectPathInput, IObjectPathValue } from '@migaia/utils/typing'\n\n/** 此读取接口允许访问的配置字段。 */\ntype IConfiguration = {\n  readonly service: { readonly port: number; readonly region: string }\n}\n\n/** 声明读取接口，让结果类型随所选配置路径变化。 */\ndeclare function readConfiguration<P extends IObjectPathInput<IConfiguration>>(\n  path: P\n): IObjectPathValue<IConfiguration, P>\n\n/** 所选字段存放数值。 */\nconst port = readConfiguration('service.port')\n/** 用元组选择同一个配置中的字段。 */\nconst region = readConfiguration(['service', 'region'] as const)\n// @ts-expect-error 配置中不存在此字段。\nreadConfiguration('service.missing')"
+              },
+              {
+                type: 'paragraph',
+                text: '悬停 `port` 会看到 `number`，悬停 `region` 会看到 `string`。最后一行的路径不存在，会产生编译错误；`@ts-expect-error` 用来标记这处预期错误。示例只声明读取接口，实际读取仍需相应实现。'
+              },
+              {
+                type: 'paragraph',
+                text: '当配置中既有数组又有符号键时，用元组保留路径段原本的类型。下面用数值 `0` 选择服务器，用 `accessToken` 这个符号选择另一个字段；两个路径都由配置类型检查。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IObjectPathTupleFor, IObjectPathValue } from '@migaia/utils/typing'\n\n/** 作为实际对象键使用的符号。 */\ndeclare const accessToken: unique symbol\n/** 配置包含数组和以符号为键的字段。 */\ntype IConfiguration = {\n  readonly servers: readonly { readonly port: number }[]\n  readonly [accessToken]: { readonly enabled: boolean }\n}\n\n/** 用数值路径段选择数组元素。 */\nconst serverPortPath: IObjectPathTupleFor<IConfiguration> = ['servers', 0, 'port']\n/** 用符号本身保留对象键的身份。 */\nconst enabledPath: IObjectPathTupleFor<IConfiguration> = [accessToken, 'enabled']\n/** 数组元素中的端口字段读作数值。 */\ntype IServerPort = IObjectPathValue<IConfiguration, readonly ['servers', 0, 'port']>\n// @ts-expect-error 数组元素没有此字段。\nconst missingPath: IObjectPathTupleFor<IConfiguration> = ['servers', 0, 'hostname']"
+              },
+              {
+                type: 'paragraph',
+                text: '`serverPortPath` 和 `enabledPath` 都能通过检查，`IServerPort` 为 `number`。`missingPath` 的末段不属于数组元素，所以该行产生编译错误。这里的检查依据是 `IObjectPathTupleFor<IConfiguration>`，不是任意路径段数组。'
+              },
+              {
+                type: 'paragraph',
+                text: '读取和替换回答的问题不同。[`IObjectPathWriteValue`](/zh/docs/utils/api/object-path/IObjectPathWriteValue) 回答“这个路径允许写入什么类型”。它将字符串、数值、布尔值和大整数字面量放宽为对应基础类型，其余类型保持原样；`IObjectPathValue` 则按读取规则得出原值类型。'
+              },
+              {
+                type: 'paragraph',
+                text: '下面的配置把当前主题写成固定值。读取类型只表示这个值，替换类型则允许另一个字符串；这能避免把“当前值是什么”误当成“以后只能写什么”。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IObjectPathValue, IObjectPathWriteValue } from '@migaia/utils/typing'\n\n/** 配置把当前主题记录为一个固定字面量。 */\ntype IConfiguration = {\n  readonly appearance: { readonly theme: 'light' }\n}\n/** 读取保留配置类型中的固定值。 */\ntype ICurrentTheme = IObjectPathValue<IConfiguration, 'appearance.theme'>\n/** 写入允许在这个字段使用另一个字符串。 */\ntype IReplacementTheme = IObjectPathWriteValue<IConfiguration, 'appearance.theme'>\n\n/** 替换值可以改变当前字符串。 */\nconst replacement: IReplacementTheme = 'dark'\n// @ts-expect-error 读取类型仍然只描述当前固定值。\nconst current: ICurrentTheme = 'dark'\n// @ts-expect-error 放宽字符串字面量并不允许改成数值。\nconst wrongReplacement: IReplacementTheme = 42"
+              },
+              {
+                type: 'paragraph',
+                text: "`ICurrentTheme` 为 `'light'`，`IReplacementTheme` 为 `string`。`replacement` 合法；给读取类型赋另一个字符串、给替换类型赋数值的两行都会报编译错误。这些类型只描述值，不会执行写入。"
+              }
+            ]
+          },
+          {
+            id: 'shared-signatures',
+            heading: '在自己的接口中使用共享类型',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '自己的接口接收中止信号时，可写 [`IAbortSignal`](/zh/docs/utils/api/promise/IAbortSignal)。它按字段和方法约束输入：只读 `aborted`、可选的只读 `reason`，以及添加和移除中止监听器的方法。调用方只要提供这个形状，就满足类型约定，不必继承某个宿主类。'
+              },
+              {
+                type: 'paragraph',
+                text: '对于工具库用真实中止控制器创建、再交给操作的信号，使用 [`INativeAbortSignal`](/zh/docs/utils/api/promise/INativeAbortSignal)。有宿主类型声明时，它就是该环境的 `AbortSignal`，可直接交给对应宿主接口；没有宿主类型声明时，它退回 `IAbortSignal`。输入仍使用较小的结构约定。'
+              },
+              {
+                type: 'paragraph',
+                text: '下面只声明任务的输入选项和操作签名。选项接受外部信号，操作参数描述工具库产出的信号；读取中止状态的函数只依赖输入约定中的字段。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/typing'\n\n/** 选项接收调用方提供的中止信号。 */\ntype IJobOptions = { readonly signal?: IAbortSignal }\n/** 操作接收与工具库产出相同类型的信号。 */\ntype IJobOperation = (context: { readonly signal: INativeAbortSignal }) => Promise<string>\n\n/** 通过共享字段约定读取传入信号的中止状态。 */\nfunction isCancelled(options: IJobOptions): boolean {\n  return options.signal?.aborted ?? false\n}\n\n// @ts-expect-error 信号还必须提供添加和移除监听器的方法。\nconst incompleteSignal: IAbortSignal = { aborted: false }"
+              },
+              {
+                type: 'paragraph',
+                text: '缺少监听器方法的 `incompleteSignal` 会报编译错误，只有 `aborted` 不够。`IJobOperation` 的参数随使用者的宿主类型声明变化；即使没有这些声明，这段代码也不需要另外声明一个宿主信号类。'
+              },
+              {
+                type: 'paragraph',
+                text: '若接口需要交出一个可由调用方完成的异步结果，可用 [`IDeferred`](/zh/docs/utils/api/promise/IDeferred)。它包含 `promise: Promise<T>`、接收 `T` 或`PromiseLike<T>`（可像 Promise 一样等待的值）的 `resolve`，以及接收可选原因的 `reject`。单独使用 `Promise<T>` 只描述等待结果的一面，不包含这两个完成方法。'
+              },
+              {
+                type: 'paragraph',
+                text: '自定义属性读取接口可返回 [`IProbePropertyResult`](/zh/docs/utils/api/object/IProbePropertyResult)，区分三种结果：`kind` 为 `missing` 时缺失，`value` 时带 `value: T`，`failed` 时带 `error: unknown`。先检查 `kind` 再读对应字段，便不会把属性不存在与读取抛错混在一起。'
+              },
+              {
+                type: 'paragraph',
+                text: '下面把属性读取结果交给完成函数。这个应用明确选择：缺失时使用默认名字，读取失败时拒绝结果，读到值时完成结果；这些选择写在应用函数里。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDeferred, IProbePropertyResult } from '@migaia/utils/typing'\nimport { deferred } from '@migaia/utils/promise'\nimport { probeProperty } from '@migaia/utils/object'\n\n/** 此应用在字段缺失时使用默认名字，在读取失败时拒绝结果。 */\nfunction settleName(result: IProbePropertyResult<string>, pending: IDeferred<string>): void {\n  if (result.kind === 'failed') pending.reject(result.error)\n  else pending.resolve(result.kind === 'value' ? result.value : 'Guest')\n}\n\n/** 调用方负责完成这个字符串结果。 */\nconst pendingName = deferred<string>()\n/** 读取属性会得到三种已定义结果之一。 */\nconst nameResult = probeProperty<string>({ displayName: 'Ada' }, 'displayName')\nsettleName(nameResult, pendingName)\n/** 使用者等待Promise 对象，不负责完成结果。 */\nconst name: Promise<string> = pendingName.promise\n// @ts-expect-error 缺失和失败分支都没有值字段。\nnameResult.value"
+              },
+              {
+                type: 'paragraph',
+                text: '`name` 是 `Promise<string>`。`settleName` 检查 `kind` 后才能读取值或错误；最后一行跳过检查，编译器会指出部分分支没有 `value`。类型工具入口只提供这些类型，创建和读取操作分别来自对应运行时入口。'
+              },
+              {
+                type: 'paragraph',
+                text: '共享模块若要同时接收网址文本和原生网址对象，可用 [`IUrlLike`](/zh/docs/utils/api/typing/IUrlLike)：它是字符串或带只读 `href: string` 的对象。这样签名无需引用浏览器或服务器宿主的网址类型声明；原生网址对象只需满足这个公开形状。这个类型不代表网址文本已经通过解析或校验。'
+              },
+              {
+                type: 'paragraph',
+                text: '下面的函数只取出网址文本，因此只需要两种输入形状。对象形式只读取 `href`，不依赖宿主网址类的其他成员。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IUrlLike } from '@migaia/utils/typing'\n\n/** 不引用宿主网址类，同时接收文本和带有地址字段的对象。 */\nfunction destinationText(destination: IUrlLike): string {\n  return typeof destination === 'string' ? destination : destination.href\n}\n\n/** 共享模块只凭公开字段就能接收对象形式。 */\nconst destination = destinationText({ href: 'https://example.com/help' })\n// @ts-expect-error 对象形式的地址字段必须是字符串。\ndestinationText({ href: 42 })"
+              },
+              {
+                type: 'paragraph',
+                text: '`destination` 的类型为 `string`。对象的 `href` 写成数值时会报编译错误；它必须是字符串。若需要检查网址是否有效，还要在实际处理文本时安排自己的校验。'
+              }
+            ]
+          },
+          {
+            id: 'next-steps',
+            heading: '继续阅读',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '准备声明事件处理表时，查阅 [IDiscriminatedByField](/zh/docs/utils/api/typing/IDiscriminatedByField) 与 [IDiscriminatedByPath](/zh/docs/utils/api/typing/IDiscriminatedByPath) 的完整签名。配置读取接口可以从 [IObjectPathInput](/zh/docs/utils/api/object-path/IObjectPathInput) 和 [IObjectPathValue](/zh/docs/utils/api/object-path/IObjectPathValue) 开始。'
+              },
+              {
+                type: 'paragraph',
+                text: '需要真正读取、更新对象时，继续阅读[对象路径与不可变更新](/zh/docs/utils/immutable-objects-and-paths)。需要控制异步操作时，阅读[超时与取消](/zh/docs/utils/deadlines-and-abort)。这两篇分别说明运行时函数的行为，不要求你已经读过它们。'
+              },
+              {
+                type: 'paragraph',
+                text: '要在自己的接口中接收中止信号或网址，查阅 [IAbortSignal](/zh/docs/utils/api/promise/IAbortSignal) 与 [IUrlLike](/zh/docs/utils/api/typing/IUrlLike)。这些类型只负责描述输入；执行操作时仍需使用相应函数。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '对象路径与不可变更新', path: 'immutable-objects-and-paths' },
+        { label: '超时与取消', path: 'deadlines-and-abort' },
+        { label: '配置所有权', path: 'configuration-ownership' }
+      ]
+    },
+    en: {
+      title: 'Type utilities: keep interfaces aligned with data',
+      lede: 'Import types for your own interfaces, reuse the shapes accepted by Utils, and let the compiler check event handling and configuration access.',
+      document: {
+        sections: [
+          {
+            id: 'type-only-entry',
+            heading: 'Import here when you only need types',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'An interface may need to describe data without calling a utility. @migaia/utils/typing collects types for that job and has no runtime functions. Use import type: the import is removed from emitted JavaScript, generates no executable code for these types, and loads no runtime module.'
+              },
+              {
+                type: 'paragraph',
+                text: "This entry has two groups: helpers that organize event or message variants by kind, and shared types re-exported from other entries. Start with the import location below. The grouping section will explain how to supply the helpers' inputs."
+              },
+              {
+                type: 'paragraph',
+                text: "The wrong form is `import type { IDiscriminatedByField } from '@migaia/utils'`: the root does not export that helper. The example names the root's exported types IRootUtils and then asks for the missing member."
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByField } from '@migaia/utils/typing'\nimport type * as IRootUtils from '@migaia/utils'\n\n// @ts-expect-error The root entry does not export this grouping helper.\ntype IWrongImport = IRootUtils.IDiscriminatedByField"
+              },
+              {
+                type: 'paragraph',
+                text: 'Both import lines pass type checking. IRootUtils names the types exported by the root, but the final line fails because that collection has no IDiscriminatedByField. The comment marks the expected error. Both grouping helpers are exported only through /typing. Some shared types are also available from the root.'
+              }
+            ]
+          },
+          {
+            id: 'when-to-use',
+            heading: 'Where these types help your interfaces',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A library or shared module can accept the same cancellation signals and URL inputs as Utils by using IAbortSignal and IUrlLike in its own signatures. Reusing those declarations saves you from maintaining a second description of the same input.'
+              },
+              {
+                type: 'paragraph',
+                text: 'If events or messages come in several shapes, group them by the field that identifies their kind. You can then require a handler for every kind, so a missing handler causes a compiler error. The grouping section builds that table. With a manually listed table, you must keep the event shapes and handlers aligned yourself.'
+              },
+              {
+                type: 'paragraph',
+                text: 'For a configuration reader, use IObjectPathInput to restrict the sequence of properties it accepts, and IObjectPathValue to describe the resulting value. A misspelled configuration property can then fail type checking instead of being discovered only when a call finds no matching value.'
+              }
+            ]
+          },
+          {
+            id: 'runtime-boundary',
+            heading: 'Use runtime entries to perform operations',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A type describes accepted inputs or results; it does not perform an operation. To read or update an object, create an externally settled Promise, or merge a timeout with an external abort, import a function from its runtime entry. Importing types alone provides none of those behaviors.'
+              },
+              {
+                type: 'table',
+                headers: ['Operation', 'Runtime entry and functions'],
+                rows: [
+                  [
+                    'Read or update a value inside an object',
+                    '[get](/en/docs/utils/api/object-path/get) and [set](/en/docs/utils/api/object-path/set) from @migaia/utils/object-path'
+                  ],
+                  [
+                    'Create a Promise that can be resolved or rejected externally',
+                    '[deferred](/en/docs/utils/api/promise/deferred) from @migaia/utils/promise'
+                  ],
+                  [
+                    'Merge a timeout with an external abort',
+                    '[createAbortTimeoutSignal](/en/docs/utils/api/promise/createAbortTimeoutSignal) from @migaia/utils/promise'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Each shared type remains defined by its original module: IObjectPathInput belongs to the object access module, for example, and IAbortSignal to the async tools. /typing re-exports the same declarations with export type. Both import locations refer to the same type. A type import still does not run functions from those modules.'
+              }
+            ]
+          },
+          {
+            id: 'group-unions',
+            heading: 'Group a union by a field or path',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A union type says that a value can have one of several listed shapes. A discriminant field holds a fixed value that tells those shapes apart, such as a kind field containing “created” or “deleted”.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Use IDiscriminatedByField when every message kind needs its own handler. The result is an object type: each field value becomes a key, and that key holds the full matching message type. The utility describes types; you still write the handler functions.'
+              },
+              {
+                type: 'paragraph',
+                text: 'A type parameter is an input inside angle brackets after a type name; it tells a type utility which data shapes to work with. In IDiscriminatedByField<F, T>, F names the top-level field and T supplies the message union. The example uses kind for F and IMessage for T.'
+              },
+              {
+                type: 'paragraph',
+                text: 'This message can describe a creation or a deletion. keyof gives the keys of an object type. IHandlers requires a function at each of those keys and gives each function only its matching message. The handler table therefore takes its kind list from the message type.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByField } from '@migaia/utils/typing'\n\ntype IMessage =\n  | { kind: 'created'; userId: string }\n  | { kind: 'deleted'; reason: string }\n\ntype IByKind = IDiscriminatedByField<'kind', IMessage>\ntype IMessageKinds = keyof IByKind // 'created' | 'deleted'\ntype ICreatedMessage = IByKind['created'] // { kind: 'created'; userId: string }\n\ntype IHandlers = {\n  [K in keyof IByKind]: (message: IByKind[K]) => string\n}\n\n/** Handle every kind with its corresponding message shape. */\nconst handlers: IHandlers = {\n  created: (message) => message.userId,\n  deleted: (message) => message.reason\n}\n\nhandlers.created({ kind: 'created', userId: 'Ada' })\n\n/** Leave one handler out to demonstrate the required key. */\n// @ts-expect-error The deleted handler is required.\nconst incompleteHandlers: IHandlers = { created: (message) => message.userId }"
+              },
+              {
+                type: 'paragraph',
+                text: "IMessageKinds resolves to 'created' | 'deleted'. ICreatedMessage contains only the creation shape, so the created handler can read userId directly. The incompleteHandlers declaration reports a missing deleted property. The complete handlers table passes checking."
+              },
+              {
+                type: 'paragraph',
+                text: 'A path is the sequence of properties followed from an object’s root to a value, such as a message header and then its kind field. When the kind lives inside meta, use IDiscriminatedByPath to group messages without moving that field.'
+              },
+              {
+                type: 'paragraph',
+                text: "IDiscriminatedByPath<T, P> takes its inputs in a different order: the message type T comes first, followed by the path P. Here 'meta.kind' follows meta and then kind. The tuple form, readonly ['meta', 'kind'], lists the same steps individually."
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByPath } from '@migaia/utils/typing'\n\ntype IMessage =\n  | { meta: { kind: 'created' }; userId: string }\n  | { meta: { kind: 'deleted' }; reason: string }\n\ntype IByString = IDiscriminatedByPath<IMessage, 'meta.kind'>\ntype IByTuple = IDiscriminatedByPath<IMessage, readonly ['meta', 'kind']>\ntype IMessageKinds = keyof IByString // 'created' | 'deleted'\ntype IStringCreated = IByString['created']\ntype ITupleCreated = IByTuple['created']\n// Both types are { meta: { kind: 'created' }; userId: string }."
+              },
+              {
+                type: 'paragraph',
+                text: "Both forms produce the same grouping. IMessageKinds is 'created' | 'deleted', and IStringCreated and ITupleCreated both describe the complete creation message. Choose IDiscriminatedByField for a top-level field and IDiscriminatedByPath when reaching the field takes several steps."
+              },
+              {
+                type: 'paragraph',
+                text: 'Grouping keys must be strings, numbers or symbols. IDiscriminatedByField requires every member to have the selected field with a value usable as a key. The next example instead uses an object and a boolean. Both declarations fail the type constraint.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByField } from '@migaia/utils/typing'\n\ntype IObjectTag = { kind: { name: 'created' }; userId: string }\ntype IBooleanTag = { kind: true; userId: string }\n\n// @ts-expect-error An object cannot be a grouping key.\ntype IByObject = IDiscriminatedByField<'kind', IObjectTag>\n// @ts-expect-error A boolean cannot be a grouping key.\ntype IByBoolean = IDiscriminatedByField<'kind', IBooleanTag>"
+              },
+              {
+                type: 'paragraph',
+                text: 'The errors appear on the IByObject and IByBoolean declarations; they are compile errors, not runtime exceptions. Choose a field with string, number or symbol values for this field-based utility. The path-based utility handles invalid leaves differently, as shown below.'
+              },
+              {
+                type: 'paragraph',
+                text: 'A path present in only some members is the easiest trap. IDiscriminatedByPath need not report an error at its declaration. Members without the path cannot enter a matching group, and the entire result can even have no keys. In this example the deletion message lacks meta, and the result also loses the creation key.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByPath } from '@migaia/utils/typing'\n\ntype IPartialMessages =\n  | { kind: 'created'; meta: { kind: 'created' }; userId: string }\n  | { kind: 'deleted'; reason: string }\n\ntype IByMeta = IDiscriminatedByPath<IPartialMessages, 'meta.kind'>\ntype IVisibleKinds = keyof IByMeta // never\n\n// @ts-expect-error The result has no created key.\ntype ICreatedMessage = IByMeta['created']\n\n// @ts-expect-error This string path exists in no member.\ntype IUnknownPath = IDiscriminatedByPath<IPartialMessages, 'meta.unknown'>"
+              },
+              {
+                type: 'paragraph',
+                text: "IByMeta has no keys here. IVisibleKinds is therefore never: no key name is available. Declaring IByMeta passes, but looking up its created type fails. By contrast, the string path 'meta.unknown' exists in no member, so the IUnknownPath declaration itself reports an error."
+              },
+              {
+                type: 'paragraph',
+                text: 'A path can also exist while its final value cannot be a key. Unlike the field utility, IDiscriminatedByPath filters out such leaves instead of necessarily rejecting the declaration. All three members below have meta.kind. Only the creation member has a string there; the others have an object and a boolean.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDiscriminatedByPath } from '@migaia/utils/typing'\n\ntype IMixedTags =\n  | { meta: { kind: 'created' }; userId: string }\n  | { meta: { kind: { name: 'deleted' } }; reason: string }\n  | { meta: { kind: false }; retry: boolean }\n\ntype IByMeta = IDiscriminatedByPath<IMixedTags, 'meta.kind'>\ntype IVisibleKinds = keyof IByMeta // 'created'\ntype ICreatedMessage = IByMeta['created']\n// { meta: { kind: 'created' }; userId: string }\n\ntype IObjectOnly = IDiscriminatedByPath<\n  { meta: { kind: { name: 'deleted' } } },\n  'meta.kind'\n>\ntype IBooleanOnly = IDiscriminatedByPath<{ meta: { kind: false } }, 'meta.kind'>\ntype IObjectKeys = keyof IObjectOnly // never\ntype IBooleanKeys = keyof IBooleanOnly // never\n\n// @ts-expect-error No key-valued leaf means no created key.\ntype IEmptyCreated = IObjectOnly['created']"
+              },
+              {
+                type: 'paragraph',
+                text: "IVisibleKinds contains only 'created', and ICreatedMessage contains only the creation shape. IObjectOnly and IBooleanOnly each have no keys, so IObjectKeys and IBooleanKeys are both never. The error on IEmptyCreated confirms that the empty result has no created key either."
+              },
+              {
+                type: 'paragraph',
+                text: 'Before relying on a grouping to require handlers, inspect its keys with keyof and compare them with the kinds you expect. Inspect the message type under each key too. An accepted declaration does not prove that every member was grouped. These type-level omissions do not remove or validate messages at runtime.'
+              }
+            ]
+          },
+          {
+            id: 'typed-paths',
+            heading: 'Describe configuration reads and writes with paths',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A configuration reader that accepts any string also accepts misspelled fields. Use [`IObjectPath`](/en/docs/utils/api/object-path/IObjectPath) to ask which string paths belong to a type. Choose [`IObjectPathInput`](/en/docs/utils/api/object-path/IObjectPathInput) when callers should be able to supply either a valid string path or a valid tuple path.'
+              },
+              {
+                type: 'paragraph',
+                text: "A string combines the steps, as in `servers.[0].port`. A tuple keeps them separate: `['servers', 0, 'port']`. [`IObjectPathTupleFor`](/en/docs/utils/api/object-path/IObjectPathTupleFor) gives the tuple paths allowed by one object type. Both forms can address array indexes. A tuple also carries a symbol key itself, which a string cannot preserve."
+              },
+              {
+                type: 'paragraph',
+                text: 'For the shape alone, [`IObjectPathSegment`](/en/docs/utils/api/object-path/IObjectPathSegment) is one string, number or symbol, and [`IObjectPathTuple`](/en/docs/utils/api/object-path/IObjectPathTuple) is a readonly array of those segments. Neither proves that an object has those properties. Use `IObjectPathTupleFor<T>` or `IObjectPathInput<T>` to check a path against a particular object type.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Once a path is chosen, [`IObjectPathValue`](/en/docs/utils/api/object-path/IObjectPathValue) answers what type it reads. The reader declaration below uses `P` to retain the selected path. Its return type can therefore follow the field requested, rather than treating every configuration value as the same type.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IObjectPathInput, IObjectPathValue } from '@migaia/utils/typing'\n\n/** Configuration fields available to this reader. */\ntype IConfiguration = {\n  readonly service: { readonly port: number; readonly region: string }\n}\n\n/** Declares a reader whose result follows the selected configuration path. */\ndeclare function readConfiguration<P extends IObjectPathInput<IConfiguration>>(\n  path: P\n): IObjectPathValue<IConfiguration, P>\n\n/** The selected field contains a number. */\nconst port = readConfiguration('service.port')\n/** Tuple paths select the same fields without a path string. */\nconst region = readConfiguration(['service', 'region'] as const)\n// @ts-expect-error The configuration has no service.missing field.\nreadConfiguration('service.missing')"
+              },
+              {
+                type: 'paragraph',
+                text: 'Hovering over `port` shows `number`; `region` is `string`. The final call produces a compile error because the field does not exist. `@ts-expect-error` marks that intended error. This example declares the interface; an implementation still has to perform the read.'
+              },
+              {
+                type: 'paragraph',
+                text: 'For arrays and symbol-keyed fields, preserve each step in a tuple. The next configuration has both. The number `0` chooses a server, while `accessToken` is the actual symbol used as another object key. Both paths are checked against the configuration.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IObjectPathTupleFor, IObjectPathValue } from '@migaia/utils/typing'\n\n/** A symbol used as an actual object key. */\ndeclare const accessToken: unique symbol\n/** The configuration includes an array and a symbol-keyed field. */\ntype IConfiguration = {\n  readonly servers: readonly { readonly port: number }[]\n  readonly [accessToken]: { readonly enabled: boolean }\n}\n\n/** A number segment selects an array element. */\nconst serverPortPath: IObjectPathTupleFor<IConfiguration> = ['servers', 0, 'port']\n/** A symbol segment retains the identity of the object key. */\nconst enabledPath: IObjectPathTupleFor<IConfiguration> = [accessToken, 'enabled']\n/** The indexed field reads as a number. */\ntype IServerPort = IObjectPathValue<IConfiguration, readonly ['servers', 0, 'port']>\n// @ts-expect-error Array elements have no hostname field.\nconst missingPath: IObjectPathTupleFor<IConfiguration> = ['servers', 0, 'hostname']"
+              },
+              {
+                type: 'paragraph',
+                text: 'Both declared paths are accepted, and `IServerPort` is `number`. The `missingPath` line fails because an array element has no `hostname` field. That guarantee comes from `IObjectPathTupleFor<IConfiguration>`, rather than from an unrestricted array of path segments.'
+              },
+              {
+                type: 'paragraph',
+                text: 'A replacement needs a different question: what may be written there? [`IObjectPathWriteValue`](/en/docs/utils/api/object-path/IObjectPathWriteValue) widens string, number, boolean and bigint literal values to their corresponding base types. It leaves other types unchanged. `IObjectPathValue` instead follows the read rules to obtain the original value type.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Here the configuration records its current theme as one fixed string. The read type retains that value. The replacement type allows a different string, so the current value does not accidentally become the only value a writer can accept.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IObjectPathValue, IObjectPathWriteValue } from '@migaia/utils/typing'\n\n/** A configuration whose current theme is recorded as one literal value. */\ntype IConfiguration = {\n  readonly appearance: { readonly theme: 'light' }\n}\n/** A read retains the literal from the configuration type. */\ntype ICurrentTheme = IObjectPathValue<IConfiguration, 'appearance.theme'>\n/** A write accepts another string at that field. */\ntype IReplacementTheme = IObjectPathWriteValue<IConfiguration, 'appearance.theme'>\n\n/** A replacement can change the current string value. */\nconst replacement: IReplacementTheme = 'dark'\n// @ts-expect-error The read type still describes only the current literal.\nconst current: ICurrentTheme = 'dark'\n// @ts-expect-error Widening a string literal does not permit a number.\nconst wrongReplacement: IReplacementTheme = 42"
+              },
+              {
+                type: 'paragraph',
+                text: "`ICurrentTheme` is `'light'`; `IReplacementTheme` is `string`. The `replacement` assignment passes. Assigning a different string to the read type or a number to the replacement type produces the marked errors. These aliases describe values; they do not perform a write."
+              }
+            ]
+          },
+          {
+            id: 'shared-signatures',
+            heading: 'Reuse shared types in your own signatures',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Use [`IAbortSignal`](/en/docs/utils/api/promise/IAbortSignal) for an input that accepts cancellation. It requires readonly `aborted`, optional readonly `reason`, and methods to add and remove an abort listener. This is a structural input: a value qualifies by providing those fields and methods, without inheriting from a particular host class.'
+              },
+              {
+                type: 'paragraph',
+                text: '[`INativeAbortSignal`](/en/docs/utils/api/promise/INativeAbortSignal) describes signals that Utils creates with a real abort controller and passes to an operation. With host declarations, it resolves to that host’s `AbortSignal`, ready for host APIs. Without host declarations, it falls back to `IAbortSignal`. Inputs keep the smaller structural contract.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The next declarations separate a job’s input options from its operation signature. Callers supply the input signal. The operation parameter uses the type of signal produced by Utils. The small helper reads cancellation through the input contract.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/typing'\n\n/** Options accept a cancellation signal supplied by the caller. */\ntype IJobOptions = { readonly signal?: IAbortSignal }\n/** Work receives the kind of signal produced by Utils. */\ntype IJobOperation = (context: { readonly signal: INativeAbortSignal }) => Promise<string>\n\n/** Reads the input signal through the shared structural contract. */\nfunction isCancelled(options: IJobOptions): boolean {\n  return options.signal?.aborted ?? false\n}\n\n// @ts-expect-error A signal must also provide both listener methods.\nconst incompleteSignal: IAbortSignal = { aborted: false }"
+              },
+              {
+                type: 'paragraph',
+                text: '`incompleteSignal` fails to compile: `aborted` alone omits the required listener methods. The parameter of `IJobOperation` follows the consumer’s host declarations. The example also compiles without those declarations, because it does not require a host signal class to be named.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Choose [`IDeferred`](/en/docs/utils/api/promise/IDeferred) when an interface exposes completion of an asynchronous result. It has `promise: Promise<T>`, `resolve` accepting `T` or a promise-like value, and `reject` accepting an optional reason. A plain `Promise<T>` describes the waiting side and does not expose those completion methods.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Return [`IProbePropertyResult`](/en/docs/utils/api/object/IProbePropertyResult) from a property reader that distinguishes absence from failure. Its `kind` is `missing`, `value` with `value: T`, or `failed` with `error: unknown`. Check `kind` before reading the corresponding field; a missing property and a thrown read remain different results.'
+              },
+              {
+                type: 'paragraph',
+                text: 'This application completes a deferred result from a property read. It chooses a fallback name when the field is absent, rejects a failed read and resolves a found value. Those application choices are explicit in `settleName`.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IDeferred, IProbePropertyResult } from '@migaia/utils/typing'\nimport { deferred } from '@migaia/utils/promise'\nimport { probeProperty } from '@migaia/utils/object'\n\n/** This application uses a fallback name for an absent field and rejects a failed read. */\nfunction settleName(result: IProbePropertyResult<string>, pending: IDeferred<string>): void {\n  if (result.kind === 'failed') pending.reject(result.error)\n  else pending.resolve(result.kind === 'value' ? result.value : 'Guest')\n}\n\n/** The caller owns completion of this string-valued result. */\nconst pendingName = deferred<string>()\n/** Reading the property produces one of three documented result shapes. */\nconst nameResult = probeProperty<string>({ displayName: 'Ada' }, 'displayName')\nsettleName(nameResult, pendingName)\n/** Consumers await the Promise, rather than controlling its completion. */\nconst name: Promise<string> = pendingName.promise\n// @ts-expect-error The missing and failed branches have no value field.\nnameResult.value"
+              },
+              {
+                type: 'paragraph',
+                text: '`name` is `Promise<string>`. Inside `settleName`, checking `kind` makes the relevant value or error available. The last line skips that check and fails because some branches have no `value`. The types come from the typing entry; creation and reading come from their runtime entries.'
+              },
+              {
+                type: 'paragraph',
+                text: '[`IUrlLike`](/en/docs/utils/api/typing/IUrlLike) lets a shared module accept URL text or an object with readonly `href: string`, including a native URL object. The signature needs neither DOM nor Node type declarations, because it names the public shape rather than the host class. This type does not certify that the text has been parsed or validated.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The helper below only extracts text. It uses the string directly or reads `href` from the object form. No other member of a host URL class is needed.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IUrlLike } from '@migaia/utils/typing'\n\n/** Accepts URL text or an href-bearing object without naming a host URL class. */\nfunction destinationText(destination: IUrlLike): string {\n  return typeof destination === 'string' ? destination : destination.href\n}\n\n/** A shared module can accept the object form using only its public field. */\nconst destination = destinationText({ href: 'https://example.com/help' })\n// @ts-expect-error The object form requires a string href.\ndestinationText({ href: 42 })"
+              },
+              {
+                type: 'paragraph',
+                text: '`destination` is `string`. Passing a numeric `href` produces the marked compile error because the object form requires text. If the application needs a valid URL, it must arrange validation when it processes that text.'
+              }
+            ]
+          },
+          {
+            id: 'next-steps',
+            heading: 'Continue reading',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'For an event handler table, see the full signatures of [IDiscriminatedByField](/en/docs/utils/api/typing/IDiscriminatedByField) and [IDiscriminatedByPath](/en/docs/utils/api/typing/IDiscriminatedByPath). Start a configuration reader with [IObjectPathInput](/en/docs/utils/api/object-path/IObjectPathInput) and [IObjectPathValue](/en/docs/utils/api/object-path/IObjectPathValue).'
+              },
+              {
+                type: 'paragraph',
+                text: 'When you need to perform object reads and updates, continue with [Object paths and immutable updates](/en/docs/utils/immutable-objects-and-paths). For control over async work, read [Timeouts and cancellation](/en/docs/utils/deadlines-and-abort). These guides explain the runtime functions; neither is a prerequisite for this page.'
+              },
+              {
+                type: 'paragraph',
+                text: 'To accept cancellation signals or URLs in your own signatures, see [IAbortSignal](/en/docs/utils/api/promise/IAbortSignal) and [IUrlLike](/en/docs/utils/api/typing/IUrlLike). These types describe inputs. Use the corresponding functions to perform operations.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Object paths and immutable updates', path: 'immutable-objects-and-paths' },
+        { label: 'Timeouts and cancellation', path: 'deadlines-and-abort' },
+        { label: 'Configuration ownership', path: 'configuration-ownership' }
       ]
     }
   },

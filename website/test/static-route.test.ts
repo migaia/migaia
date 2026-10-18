@@ -4821,6 +4821,7 @@ test('SITE-T-UTILS-LINKS keeps every maintained Utils continuation resolvable', 
     'error-identity-and-causes',
     'bytes-and-text',
     'immutable-objects-and-paths',
+    'type-utilities',
     'configuration-ownership',
     'function-and-value-guards',
     'strings-and-numbers'

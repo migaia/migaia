@@ -359,12 +359,17 @@ format('你好，{user.name}', { user: { name: 'Ada' } }) // '你好，Ada'`
     },
     typing: {
       summary: t(
-        'Type-only entry point: shared object-path and abort-signal types, plus `IDiscriminatedByField` / `IDiscriminatedByPath` that group a discriminated union by its tag. Produces no JavaScript.',
-        '纯类型入口：共享的对象路径与中止信号类型，以及按判别字段对联合类型分组的 `IDiscriminatedByField` / `IDiscriminatedByPath`。不会产生任何 JavaScript 代码。'
+        "Import types with `import type { ... } from '@migaia/utils/typing'`; this import is removed from emitted code and loads no runtime module. This entry contains grouping helpers for event or message variants, plus shared types re-exported from runtime entries. The example groups events by kind; see the [type utilities guide](/en/docs/utils/type-utilities) for uses and boundaries.",
+        "用 `import type { ... } from '@migaia/utils/typing'` 导入类型；生成代码时会移除这条导入，不会加载运行时模块。此入口包含两组类型：整理事件或消息不同形态的分组工具，以及从运行时入口重新导出的共享类型。下面按事件种类分组；使用场景与边界见[类型工具指南](/zh/docs/utils/type-utilities)。"
       ),
       example: `import type { IDiscriminatedByField } from '@migaia/utils/typing'
 
-type IByType = IDiscriminatedByField<'type', IEvent>`
+type IEvent =
+  | { readonly kind: 'created'; readonly userId: string }
+  | { readonly kind: 'deleted'; readonly reason: string }
+
+type IByKind = IDiscriminatedByField<'kind', IEvent>
+// IByKind['created'] is { readonly kind: 'created'; readonly userId: string }.`
     },
     value: {
       summary: t(
@@ -3667,18 +3672,24 @@ else console.log(result.value)`,
       }
     },
     IDiscriminatedByField: alias(
-      'Groups a discriminated union by a top-level tag field.',
-      '按顶层判别字段对联合类型分组的类型工具。'
+      'Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.',
+      '按顶层判别字段对联合类型分组的类型工具。需要为最外层字段的每个种类提供处理函数，并让函数只接收对应成员时使用。'
     ),
     IDiscriminatedByPath: alias(
-      'Groups a discriminated union by a nested tag path.',
-      '按嵌套判别路径对联合类型分组的类型工具。'
+      'Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.',
+      '按嵌套判别路径对联合类型分组的类型工具。种类字段位于深层时使用；建立处理表前先检查结果键名，因为路径缺失或叶值不能用作键时，可能遗漏成员或没有任何键。'
     ),
     IUrlLike: {
       summary: t(
         'Caller-supplied URL input as a string or an object exposing a string href, including native URL objects.',
         '调用方提供的网址输入，可为字符串或暴露字符串地址属性的对象，包括原生网址对象。'
       ),
+      scenarios: [
+        t(
+          'Use it in a shared module signature that accepts URL text and native URL objects without requiring DOM or Node type declarations. See the [type utilities guide](/en/docs/utils/type-utilities#shared-signatures).',
+          '共享模块的接口若要同时接收网址文本和原生网址对象，又不要求使用者引入浏览器或服务器宿主类型声明，可使用此类型。详见[类型工具指南](/zh/docs/utils/type-utilities#shared-signatures)。'
+        )
+      ],
       members: {
         href: {
           summary: t(
