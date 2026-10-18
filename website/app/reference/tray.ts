@@ -1,9 +1,9 @@
 /**
  * Reference documentation of `@migaia/tray`. Rules: `app/reference/contract.ts`. Verified against
  * `packages/tray/src` (hosts/_, host/_, loader/_, adapter/_, runtime/*, tray.ts,
- * state-constants.ts, error-code.ts), README and USEGUIDE on 2026-10-17. Known discrepancy (not
- * changed here): `IRuntimeShutdownOptions.quiescenceMs` is declared, but `createRuntime()` does not
- * read it; only the managed host option `quiescenceMs` bounds waiting.
+ * state-constants.ts, error-code.ts), README and USEGUIDE on 2026-10-18. Runtime shutdown owns only
+ * `mode`; bounded mode returns without waiting, while the managed host owns `quiescenceMs`. The
+ * four internal managed-host inference helpers are no longer public reference nodes.
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityReference } from './capability.js'
@@ -163,8 +163,8 @@ await runtime.dispose()`
 const loaderExample = `import { defineAdapter } from '@migaia/tray/adapter'
 import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
 
-const moduleLoader = defineLoader<string, { plugin: unknown }>({
-  load: async (url) => ({ value: await import(url), release: () => undefined })
+const moduleLoader = defineLoader<string, { plugin: typeof searchPlugin }>({
+  load: async (url) => ({ value: await import(url), release: { force: () => undefined } })
 })
 const moduleAdapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin }) => artifact.plugin })
 const result = await loadIntoHost({
@@ -722,8 +722,8 @@ if (result.ok) result.view.extensions.search('tray')`
   },
   dispose: {
     summary: t(
-      'Ends the graph, removes the internal anchor and closes the host; concurrent calls share one Promise.',
-      '终止依赖图、移除内部锚点并关闭宿主；并发调用共享同一个 Promise。'
+      'Ends the graph, removes the internal anchor and closes the host once. Concurrent calls and synchronous reentry from a disposing listener share the same Promise.',
+      '终止依赖图、移除内部锚点并关闭宿主一次。并发调用及释放中监听器的同步重入共享同一个 Promise。'
     ),
     returns: t(
       'An `ITrayHostDisposalResult`; `cleanupComplete: false` means cleanup continues in `physicalCompletion`.',
@@ -842,12 +842,12 @@ const adapter = defineAdapter({ adapt: (artifact: { plugin: typeof searchPlugin 
         },
         routing: {
           summary: t(
-            'Additional shared policies returned by `defineRouting()`.',
-            '由 `defineRouting()` 返回的附加共享路由策略。'
+            'Additional shared policies returned by `defineRoutingPolicy()`, merged with built-ins and every registered host definition’s routing tuple.',
+            '由 `defineRoutingPolicy()` 返回的附加共享策略，与内置策略及所有已注册宿主定义的路由元组合并。'
           ),
           default: t(
-            'Omitted: only built-in routing policies are registered.',
-            '省略时仅注册内置路由策略。'
+            'Omitted: built-ins and the policies declared by registered host definitions remain available.',
+            '省略时仍注册内置策略及已注册宿主定义所声明的策略。'
           )
         },
         probe: {
@@ -978,8 +978,8 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     TRAY_SOURCE: {
       role: 'constant',
       purpose: t(
-        'The `source` value (`@migaia/tray`) on every error of this package; compare it before branching on `code`.',
-        '本包每个错误上的 `source` 值（`@migaia/tray`）；先比对它确认错误来源，再按 `code` 分支处理。'
+        'The `source` value (`@migaia/tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.',
+        '归 Tray 所有的边界错误使用此 `source` 值（`@migaia/tray`）；已有完整身份的外包错误保留原来源和错误码。先比对来源，再按错误码分支处理。'
       ),
       example: `if (error.source === TRAY_SOURCE && error.code === TrayErrorCode.unavailable) await graph.ready()`
     },
@@ -1018,12 +1018,12 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     createHost: {
       role: 'factory',
       purpose: t(
-        'Creates a managed host around one PluginHost built by `create()`. Plugins are admitted, ordered by their Feature dependencies and installed before the Promise resolves; failures roll back.',
-        '围绕由 `create()` 构建的一个 PluginHost 创建托管宿主。插件在 Promise resolve 前完成接纳、按 Feature 依赖排序并安装；失败时回滚。'
+        'Creates a managed host around one PluginHost built by `create()`. Plugins are admitted, ordered by Feature dependencies and installed before resolution. Rollback releases only the claim acquired by this call; rejecting an already claimed host leaves its existing managed session intact.',
+        '围绕由 `create()` 构建的一个 PluginHost 创建托管宿主。插件在返回前完成接纳、按 Feature 依赖排序并安装。回滚只释放本次取得的认领；拒绝已被认领的宿主不会清理其既有托管会话。'
       ),
       returns: t(
-        'The managed `ITrayHost`; it supports `await using`. Failures throw an error whose `detail` gives the phase and cleanup state.',
-        '托管的 `ITrayHost`，支持 `await using`。失败时抛出的错误带有 `detail`，说明失败阶段与清理状态。'
+        'The managed `ITrayHost`, supporting `await using`. Construction failures carry `detail` with the phase and rollback state. Safe native errors retain identity, type and stack; frozen errors or existing detail are preserved through cause rather than overwritten.',
+        '支持 `await using` 的托管 `ITrayHost`。构造失败通过 `detail` 给出阶段与回滚状态。可安全注记的原生错误保留对象身份、类型和堆栈；冻结错误或已有详情通过 `cause` 保留，不被覆写。'
       ),
       options: 'ICreateHostOptions',
       example: managedExample,
@@ -1045,8 +1045,8 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     defineLoader: {
       role: 'factory',
       purpose: t(
-        'Validates and freezes a loader `{ load(source, context) }` that returns `{ value, release }`; sync values, Promises and other thenables are accepted.',
-        '校验并冻结一个加载器 `{ load(source, context) }`，它返回 `{ value, release }`；接受同步值、Promise 以及其它 thenable。'
+        'Reads `load` once, validates that captured function and freezes a loader invoking it without a receiver. The result is `{ value, release }`; sync values, Promises and foreign thenables are accepted.',
+        '只读取一次 `load`，校验并捕获同一个函数，再冻结以无接收者方式调用它的加载器。结果为 `{ value, release }`；接受同步值、Promise 和跨来源的 thenable。'
       ),
       params: {
         loader: t(
@@ -1063,12 +1063,12 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     loadIntoHost: {
       role: 'operation',
       purpose: t(
-        'Runs load → adapt → `use` or `replace` as one transaction on a managed host. Before commit every failure releases the artifact; after commit the plugin generation owns its cleanup.',
-        '在托管宿主上把“加载 → 适配 → `use` 或 `replace`”作为一个事务执行。提交前的任何失败都会释放产物；提交后由该插件的这一代负责清理。'
+        'Runs load → adapt → `use` or `replace` as one managed-host transaction. Before commit, failure rolls back the artifact; after commit, its definition generation owns cleanup. Settlement cancels the admission timer and removes the caller abort bridge, so later cancellation or the former deadline cannot abort the committed artifact context.',
+        '在托管宿主上把“加载 → 适配 → `use` 或 `replace`”作为一个事务执行。提交前失败会回滚产物；提交后清理由对应定义的世代所有。事务结束即取消接纳定时器并移除调用方中止桥，之后的取消或原截止时间不会中止已提交产物的上下文。'
       ),
       returns: t(
-        'The mutation result of `use` / `replace` (`ok`, `committed`, `view`).',
-        '`use` / `replace` 的变更结果（`ok`、`committed`、`view`）。'
+        'The `use` / `replace` mutation result (`ok`, `committed`, `view`). A committed artifact stays owned until that generation is removed and is released once; transaction listeners and timers are already detached.',
+        '`use` / `replace` 的变更结果（`ok`、`committed`、`view`）。已提交产物持续归该世代保管，直至移除时释放一次；事务监听器和定时器此时已解除。'
       ),
       options: 'ILoadIntoHostOptions',
       example: loaderExample
@@ -1076,8 +1076,8 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     defineAdapter: {
       role: 'factory',
       purpose: t(
-        'Validates and freezes an adapter `{ adapt(artifact, context) }` that turns a loaded artifact into a plugin definition for the host.',
-        '校验并冻结一个适配器 `{ adapt(artifact, context) }`，它把已加载的产物转换为宿主可用的插件定义。'
+        'Reads `adapt` once, validates that captured function and freezes an adapter invoking it without a receiver. It converts an artifact into a host plugin definition and accepts sync results, Promises and foreign thenables without owning artifact cleanup.',
+        '只读取一次 `adapt`，校验并捕获同一个函数，再冻结以无接收者方式调用它的适配器。它把产物转换为宿主插件定义，接受同步结果、Promise 和跨来源的 thenable，不拥有产物清理。'
       ),
       params: {
         adapter: t(
@@ -1133,16 +1133,6 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
               '等待全部被跟踪回调结算后再完成释放。'
             )
           }
-        },
-        'shutdown.quiescenceMs': {
-          summary: t(
-            'Declared shutdown budget field; the current runtime implementation does not read it.',
-            '已声明的关闭预算字段；当前运行器实现不读取此值。'
-          ),
-          default: t(
-            'Omitted: no effect, as this runtime does not consume the field.',
-            '省略时没有影响，因为当前运行器不使用此字段。'
-          )
         },
         report: {
           summary: t(
@@ -1938,7 +1928,10 @@ console.log(same.id) // 'alice'`,
       }
     },
     ITrayHostCreationError: {
-      summary: t('Error thrown by `createHost()`.', '`createHost()` 抛出的错误，带失败详情。'),
+      summary: t(
+        'Construction error from `createHost()` with rollback detail. Native errors retain their type and stack when safely annotated; immutable errors and any existing detail remain reachable through cause.',
+        '`createHost()` 的构造错误，带回滚详情。可安全注记的原生错误保留类型和堆栈；不可变错误及其已有详情继续通过 `cause` 可达。'
+      ),
       members: {
         detail: {
           summary: t('Phase and cleanup state of the failure.', '失败所在阶段与清理状态。')
@@ -2140,29 +2133,6 @@ console.log(same.id) // 'alice'`,
       'Unsubscribe function returned by `host.on()`.',
       '调用 `host.on()` 返回的取消订阅函数。'
     ),
-    IHostBaselinePlugins: alias(
-      'Plugins installed by the inner host constructor.',
-      '内部宿主构造时已安装的插件。'
-    ),
-    IPluginWithSynchronousShared: {
-      summary: t(
-        'Plugin with an optional synchronous `shared` factory.',
-        '带可选同步 `shared` 工厂的插件。'
-      ),
-      members: {
-        shared: {
-          summary: t('Optional synchronous factory of shared values.', '可选的共享值同步工厂函数。')
-        }
-      }
-    },
-    ICanResolveReadyDefinitions: alias(
-      'Whether exact ready-plugin types can be computed.',
-      '能否精确推导就绪插件类型的判断类型。'
-    ),
-    IResolveReadyTrayPlugins: alias(
-      'Exact ready plugin tuple, when computable.',
-      '可计算时得到的精确就绪插件元组。'
-    ),
     ILoader: {
       summary: t(
         'A loader from `defineLoader()`.',
@@ -2192,7 +2162,7 @@ console.log(same.id) // 'alice'`,
             )
           },
           returns: t('The loaded artifact or a Promise of it.', '已加载的产物或其 Promise。'),
-          example: `load: async (url) => ({ value: await import(url), release: () => undefined })`
+          example: `load: async (url) => ({ value: await import(url), release: { force: () => undefined } })`
         }
       }
     },
@@ -2202,7 +2172,12 @@ console.log(same.id) // 'alice'`,
         '`load()` 收到的上下文：取消、截止时间与上报。'
       ),
       members: {
-        signal: { summary: t('Aborts on cancellation or deadline.', '取消或到达截止时间时中止。') },
+        signal: {
+          summary: t(
+            'Transaction signal supplied by `loadIntoHost()`. Caller cancellation and deadline forwarding end when the transaction settles; a committed artifact remains owned by its definition generation.',
+            '`loadIntoHost()` 提供的事务信号。事务结束后不再转发调用方取消与截止时间；已提交产物仍由对应定义的世代保管。'
+          )
+        },
         deadlineAt: {
           summary: t(
             'Absolute deadline on `systemScheduler.now()`, or `undefined` without `timeoutMs`.',
@@ -2227,7 +2202,10 @@ console.log(same.id) // 'alice'`,
           summary: t('The artifact passed to the adapter.', '加载得到、随后交给适配器的产物。')
         },
         release: {
-          summary: t('Release descriptor that frees the artifact.', '释放该产物的释放描述。')
+          summary: t(
+            'Lifecycle release descriptor with a callable `force`; rollback owns it before commit and the committed definition generation releases it once on removal.',
+            '具有可调用 `force` 的生命周期释放描述；提交前由回滚所有，提交后由对应定义的世代在移除时释放一次。'
+          )
         }
       }
     },
@@ -2409,7 +2387,10 @@ console.log(result.view, result.cleanupComplete)`,
           values: {
             active: t('Accepts new runs.', '接受新的运行请求。'),
             closing: t('`dispose()` started; no new runs.', '`dispose()` 已开始；不再接受新请求。'),
-            terminal: t('Fully closed.', '已完全关闭。')
+            terminal: t(
+              'Runtime admission has ended; bounded disposal can still leave callbacks counted in activeRuns.',
+              '运行器已停止接纳；有界释放后仍可能存在计入 `activeRuns` 的未结束回调。'
+            )
           }
         },
         activeRuns: { summary: t('Callbacks currently running.', '当前正在运行的回调数量。') },
@@ -2430,19 +2411,19 @@ console.log(result.view, result.cleanupComplete)`,
             )
           },
           returns: t(
-            'The callback result; failures use `RUNTIME_*` codes with the original on `cause`.',
-            '回调的结果；失败使用 `RUNTIME_*` 错误码，原始错误在 `cause` 上。'
+            'The callback result. Safe native failures retain identity, type and stack with a runtime code; frozen or non-native values remain on cause, and complete foreign source/code identities are preserved.',
+            '回调的结果。可安全注记的原生失败保留对象身份、类型和堆栈并附运行器错误码；冻结或非原生值保留在 `cause` 上，完整的外包来源与错误码身份不改写。'
           ),
           example: `await runtime.run('search', { timeoutMs: 5000 }, ({ extensions }) => extensions.search('q'))`
         },
         dispose: {
           summary: t(
-            'Stops new runs and aborts running signals, then waits according to the shutdown mode.',
-            '停止接受新请求并中止运行中的信号，然后按关闭方式等待。'
+            'Stops new runs and aborts running signals. Strict-drain waits for callback settlement; bounded returns immediately without a runtime budget. The managed Host separately owns quiescenceMs.',
+            '停止接受新请求并中止运行中的信号。严格排空等待回调结束；有界模式立即返回，不设置运行器预算。等待预算 `quiescenceMs` 单独归托管宿主所有。'
           ),
           returns: t(
-            '`{ state: "terminal", cleanupComplete }`.',
-            '`{ state: "terminal", cleanupComplete }` 结果对象。'
+            '`{ state: "terminal", cleanupComplete }`; false means callbacks remain active, and activeRuns continues to count them until actual settlement.',
+            '`{ state: "terminal", cleanupComplete }`；假值表示仍有回调运行，`activeRuns` 在真正结束前继续计数。'
           ),
           example: `await runtime.dispose()`
         }
@@ -2518,8 +2499,8 @@ console.log(result.view, result.cleanupComplete)`,
           ),
           params: { plugin: t('New definition with the same name.', '同名的新插件定义。') },
           returns: t(
-            'A ticket; awaiting it inside the callback throws `RUNTIME_CONTRACT_INVALID`.',
-            '一个票据；在回调内部等待它会抛 `RUNTIME_CONTRACT_INVALID`。'
+            'A non-thenable ticket: directly awaiting it returns the ticket without waiting for mutation. Reading ticket.completion before callback settlement produces a rejected Promise with RUNTIME_CONTRACT_INVALID; await completion outside the callback.',
+            '非 thenable 的票据：直接等待它只会得到票据，不会等待变更。回调结束前读取 `ticket.completion` 会得到以 `RUNTIME_CONTRACT_INVALID` 拒绝的 Promise；应在回调之外等待完成。'
           ),
           example: `return self.replace(searchPluginV2)`
         }
@@ -2533,16 +2514,16 @@ console.log(result.view, result.cleanupComplete)`,
       members: {
         completion: {
           summary: t(
-            'Resolves after the callback settled and the host mutation finished.',
-            '回调结束且宿主变更完成后 resolve。'
+            'Resolves after callback settlement, exact-generation lease release and the host mutation. Reading it earlier returns a rejected Promise with RUNTIME_CONTRACT_INVALID; awaiting the ticket itself does not read this property.',
+            '回调结束、精确世代租约释放且宿主变更完成后兑现。提前读取会得到以 `RUNTIME_CONTRACT_INVALID` 拒绝的 Promise；等待票据本身不会读取此属性。'
           )
         }
       }
     },
     IRuntimeShutdownOptions: {
       summary: t(
-        '`shutdown` option of `createRuntime()`.',
-        '`createRuntime()` 的 `shutdown` 选项：释放时的等待方式。'
+        '`shutdown` option of `createRuntime()`, containing only mode. Configure quiescenceMs on the managed Host; Runtime has no waiting-budget field.',
+        '`createRuntime()` 的 `shutdown` 选项，只包含 `mode`。等待预算 `quiescenceMs` 配置在托管宿主上；运行器没有等待预算字段。'
       ),
       members: {
         mode: {
@@ -2558,13 +2539,6 @@ console.log(result.view, result.cleanupComplete)`,
               '一直等到所有运行中的回调结束。'
             )
           }
-        },
-        quiescenceMs: {
-          summary: t(
-            'Declared bound for `bounded` waiting; the current `createRuntime()` does not read it.',
-            '为 `bounded` 等待声明的上限；当前的 `createRuntime()` 并未读取该字段。'
-          ),
-          default: t('Not set.', '不设置：不起作用。')
         }
       }
     },
