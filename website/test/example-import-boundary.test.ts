@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createScanner } from 'typescript/unstable/ast/scanner'
+import { parseSync } from 'oxc-parser'
 import exampleImportManifest from '../src/generated/manifests/example-imports.json'
 import { normalizeExampleImports } from '../app/example-imports.js'
 
@@ -48,10 +48,21 @@ function authoredGuideExamples(): ICodeExample[] {
     )) {
       const encoded = match[1] ?? match[2] ?? match[3] ?? ''
       const quote = match[1] !== undefined ? '"' : match[2] !== undefined ? "'" : '`'
-      /** TypeScript's lexer decodes JavaScript escapes without evaluating authored code. */
-      const scanner = createScanner(true, undefined, `${quote}${encoded}${quote}`)
-      scanner.scan()
-      const code = scanner.getTokenValue()
+      /** Oxc decodes the authored literal without evaluating its contents or substitutions. */
+      const parsed = parseSync(path, `${quote}${encoded}${quote}`)
+      assert.deepEqual(parsed.errors, [], `${path}: invalid authored example literal`)
+      /** Both quoted strings and templates appear as one expression statement. */
+      const statement = parsed.program.body[0]
+      /** Preserve the scanner's first static template segment when substitutions are present. */
+      const expression =
+        statement?.type === 'ExpressionStatement' ? statement.expression : undefined
+      /** Decoded static example text owns the import spellings inspected below. */
+      const code =
+        expression?.type === 'Literal' && typeof expression.value === 'string'
+          ? expression.value
+          : expression?.type === 'TemplateLiteral'
+            ? (expression.quasis[0]?.value.cooked ?? '')
+            : ''
       if (!code.includes('import ') || !code.includes('@migaia/')) continue
       const line = source.slice(0, match.index).split('\n').length
       examples.push({ code, location: `${path}:${line}` })
