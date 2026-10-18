@@ -319,7 +319,8 @@ import {
   boundedWait,
   createTerminalController
 } from '@migaia/lifecycle'
-import { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
 ```
 
 调度器契约 `IScheduler`、默认实现 `systemScheduler` 与测试用 `createManualScheduler` 由 `@migaia/utils/scheduler` 提供（`now()` 为单调时钟，详见 utils 文档）；本包不再导出它们，只保留注入准入：lifecycle 工厂收到的 scheduler（含缺省时的 `systemScheduler`）都先经 `snapshotScheduler` 快照，非法延迟以 lifecycle `INVALID_OPTION` 拒绝。
@@ -576,7 +577,7 @@ async function applyBatch(mutations: Array<() => Promise<void>>) {
 
 ```ts
 import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing';
 
 const scheduler = createManualScheduler()
 const items: IDisposeItem[] = [
@@ -635,7 +636,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 ```ts
 import { abortableDelay, createAbortController } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing';
 
 const scheduler = createManualScheduler()
 const controller = createAbortController()

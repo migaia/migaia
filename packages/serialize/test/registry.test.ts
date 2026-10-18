@@ -3,7 +3,8 @@ import * as utilsRoot from '@migaia/utils'
 import * as utilsScheduler from '@migaia/utils/scheduler'
 import * as lifecycleScheduler from '@migaia/lifecycle/scheduler'
 import { createAbortController } from '@migaia/lifecycle'
-import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { type IScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import {
   SerializeCodecError,
   chunkToBytes,
@@ -1758,7 +1759,8 @@ describe('T-22 detached 迟到错误经 report 通道', () => {
 describe('A10 single scheduler export surface consumed by serialize', () => {
   it('exposes one scheduler implementation through utils and none through lifecycle', () => {
     expect(utilsRoot.systemScheduler).toBe(utilsScheduler.systemScheduler)
-    expect(utilsRoot.createManualScheduler).toBe(utilsScheduler.createManualScheduler)
+    expect('createManualScheduler' in utilsRoot).toBe(false)
+    expect('createManualScheduler' in utilsScheduler).toBe(false)
     expect(utilsRoot.systemWallClock).toBe(utilsScheduler.systemWallClock)
     expect('systemScheduler' in lifecycleScheduler).toBe(false)
     expect('createManualScheduler' in lifecycleScheduler).toBe(false)

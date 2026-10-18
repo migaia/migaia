@@ -10,7 +10,7 @@ import {
   type IPluginHostCore,
   type IPluginPreparedAdmissions
 } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { DependencyPolicy } from '@migaia/capability/graph/dependency'
 import { createHost } from '../src/host/index.js'
 import { TrayErrorCode } from '../src/error-code.js'

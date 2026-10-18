@@ -65,6 +65,10 @@
     "./number": {
       "types": "./dist/number.d.ts",
       "default": "./dist/number.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
   "scripts": {

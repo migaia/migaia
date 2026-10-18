@@ -1,4 +1,5 @@
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import * as remoteRetry from '../../../rpc-core/dist/remote/retry.js'
 import { createRemoteRetryPort } from '@migaia/rpc-core/remote'

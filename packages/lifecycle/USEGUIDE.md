@@ -644,16 +644,13 @@ import {
 } from '@migaia/lifecycle/scheduler'
 
 // 调度器契约与实现来自 utils：
-import {
-  systemScheduler,
-  createManualScheduler,
-  type IScheduler,
-  type IScheduledTask,
-  type IManualScheduler
-} from '@migaia/utils/scheduler'
+import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler';
+import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing';
 ```
 
-调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.field: 'delayMs'`）拒绝；直接调用 utils `systemScheduler.schedule()` 时同样输入得到的是 utils `INVALID_ARGUMENT`。
+调度器契约 `IScheduler`/`IScheduledTask` 与默认实现 `systemScheduler`（`performance.now()` 单调时钟）由 `@migaia/utils/scheduler` 导出；`createManualScheduler`/`IManualScheduler` 由 `@migaia/utils/testing` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.field: 'delayMs'`）拒绝；直接调用 utils `systemScheduler.schedule()` 时同样输入得到的是 utils `INVALID_ARGUMENT`。
+
+`abortableDelay(scheduler, ms, signal, reportCleanup?)` 的前三个位置参数必填，直接使用传入 scheduler；需要准入时由调用者先 resolve/snapshot。
 
 ### `snapshotScheduler`
 
@@ -1081,7 +1078,7 @@ async function applyBatch(mutations: Array<() => Promise<void>>) {
 
 ```ts
 import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing';
 
 const scheduler = createManualScheduler()
 const items: IDisposeItem[] = [
@@ -1206,7 +1203,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 ```ts
 import { abortableDelay, createAbortController } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing';
 
 const scheduler = createManualScheduler()
 const controller = createAbortController()

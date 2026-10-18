@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { addSchedulerTime, resolveScheduler, snapshotScheduler } from '../src/scheduler.js'
 import { boundedWait } from '../src/bounded-wait.js'
 import { createLifecycleScope } from '../src/lifecycle-scope.js'

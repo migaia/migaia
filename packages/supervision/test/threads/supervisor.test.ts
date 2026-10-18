@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
 import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '../../src/index.js'
 import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.js'

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createUnitBudget, type ISupervisorEvent } from '../../src/index.js'
 import { createProcessSupervisor, type IProcessHandle } from '../../src/process/index.js'
 import { memoryProcessLauncher, processSpec } from '../process/support/memory-process-launcher.js'

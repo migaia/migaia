@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin, PluginHost, isDefinedPlugin } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { RpcPlatform } from '@migaia/rpc-core/transport-constants'

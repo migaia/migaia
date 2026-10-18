@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { definePlugin, PluginHost } from '../src/index.js'
 import { openComposition } from '../src/composition-entry.js'
 import { PluginHostErrorCode, type IPluginHostErrorCode } from '../src/error-code.js'

@@ -13,7 +13,7 @@ import { LoggerErrorCode } from './src/errors'
 import type { ILogEntry, ILoggerPlugin, ILoggerPluginCore } from './src/typing'
 import { GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
 import { definePlugin } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 
 describe('logger plugin host integration', () => {
   it('runs without process through the runtime manager', () => {

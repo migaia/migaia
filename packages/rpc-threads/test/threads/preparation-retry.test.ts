@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
 import { createWebThreadChannelFactory } from '../../src/threads/adapters/web.js'
 import type { IThreadWebPort } from '../../src/threads/types.js'

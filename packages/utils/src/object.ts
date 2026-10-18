@@ -50,8 +50,8 @@ export function isPlainObject(value: unknown): value is Record<PropertyKey, unkn
 
 /** Reads one property exactly once and exposes getter failures explicitly. */
 export function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T> {
-  if (!Reflect.has(value, key)) return { kind: 'missing' }
   try {
+    if (!Reflect.has(value, key)) return { kind: 'missing' }
     return { kind: 'value', value: Reflect.get(value, key, value) as T }
   } catch (error) {
     return { kind: 'failed', error }

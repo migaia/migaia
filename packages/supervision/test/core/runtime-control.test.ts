@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createSupervisor, createUnitBudget } from '../../src/index.js'
 import { createMemoryLauncher, deferred, type IMemoryHandle } from '../support/memory-launcher.js'
 import { createMemoryProfile } from '../support/memory-profile.js'

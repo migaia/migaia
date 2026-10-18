@@ -1,7 +1,7 @@
 import { createLifecycleUnit } from '../src/lifecycle-unit.js'
 import { describe, expect, it, vi } from 'vitest'
 import { boundedWait, createProvisionalScope } from '../src/index.js'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { observeAbortSubscription } from '../src/observed-subscription.js'
 
 describe('MA-052 through MA-080 lifecycle closure regressions', () => {

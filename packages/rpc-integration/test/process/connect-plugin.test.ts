@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
 import { createConnectProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
 import { createProcessPlugin } from '@migaia/rpc-process'

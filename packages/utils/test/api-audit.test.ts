@@ -1,0 +1,192 @@
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { attachErrorIdentity, isUtilsError, UtilsErrorCode } from '../src/error.js'
+import { decodeUtf8, splitUtf8, streamBase64Chunks } from '../src/bytes.js'
+import { inspectThenable, observeThenableRejection, onceAsync } from '../src/function.js'
+import { probeProperty } from '../src/object.js'
+import { probeObjectPathSegments } from '../src/object-path.js'
+import { createManualScheduler } from '../src/testing.js'
+import {
+  createAbortTimeoutSignal,
+  createConcurrencyLimiter,
+  raceWithAbort,
+  retry,
+  sleep,
+  withTimeout
+} from '../src/promise.js'
+
+describe('utils audited public contracts', () => {
+  it('U-B14 accepts PromiseLike callbacks and preserves the one native Promise identity', async () => {
+    /** The public signature must match the existing captured-then assimilation contract. */
+    const load = onceAsync((): PromiseLike<number> => Promise.resolve(7))
+    /** All consumers share one native Promise even when the callback only promises PromiseLike. */
+    const first = load()
+    await expect(first).resolves.toBe(7)
+    expect(load()).toBe(first)
+    expect(first).toBeInstanceOf(Promise)
+  })
+
+  it('U-D04 retains the conflict cause and attaches its registered native identity', () => {
+    /** Conflicting public identities must not erase the first error. */
+    const original = attachErrorIdentity(new Error('original'), { source: 'first', code: 'FIRST' })
+    expect(() => attachErrorIdentity(original, { source: 'second', code: 'SECOND' })).toThrowError(
+      expect.objectContaining({
+        source: '@migaia/utils',
+        code: 'ERROR_IDENTITY_CONFLICT',
+        cause: original
+      })
+    )
+  })
+
+  it('U-D05 attaches INVALID_ARGUMENT while retaining native validation error families', async () => {
+    /** Every documented public argument rejection uses the existing code, never a new error family. */
+    const operations: readonly (() => unknown)[] = [
+      () => [...streamBase64Chunks(new Uint8Array([1]), 2)],
+      () => splitUtf8('x', 3),
+      () => sleep(-1),
+      () => withTimeout(() => 1, { timeoutMs: -1 }),
+      () => raceWithAbort(() => 1, { signal: new AbortController().signal, signals: [] }),
+      () => retry(() => 1, { maxAttempts: 0, shouldRetry: () => false }),
+      () => createAbortTimeoutSignal({ timeoutMs: -1 }),
+      () => createConcurrencyLimiter({ concurrency: 0 })
+    ]
+    for (const operation of operations) {
+      await expect(Promise.resolve().then(operation)).rejects.toSatisfy(
+        (error: unknown) =>
+          (error instanceof RangeError || error instanceof TypeError) &&
+          Object.hasOwn(error, 'stack') &&
+          (error as { source?: string }).source === '@migaia/utils' &&
+          (error as { code?: string }).code === UtilsErrorCode.invalidArgument
+      )
+    }
+  })
+
+  it('U-D06 names UTF-8 in fatal decoding diagnostics', () => {
+    expect(() => decodeUtf8(new Uint8Array([255]), { fatal: true })).toThrowError(
+      expect.objectContaining({
+        code: 'INVALID_ENCODING',
+        message: '[utils] invalid UTF-8 input at offset 0'
+      })
+    )
+  })
+
+  it('U-D07 contains has trap failures in the property probe result', () => {
+    /** A failed existence probe is observable data, just like a failed getter. */
+    const cause = new Error('has trap failed')
+    expect(
+      probeProperty(
+        new Proxy(
+          {},
+          {
+            has: () => {
+              throw cause
+            }
+          }
+        ),
+        'name'
+      )
+    ).toEqual({ kind: 'failed', error: cause })
+  })
+
+  it('U-D08 accepts parsed tuples and rejects string paths at the type boundary', () => {
+    expect(probeObjectPathSegments({ name: 'value' }, ['name'] as const)).toMatchObject({
+      kind: 'value',
+      value: 'value'
+    })
+    // @ts-expect-error This entry consumes parsed tuples; strings go through probeObjectPath.
+    expectTypeOf(probeObjectPathSegments<{ name: string }, 'name'>).toBeFunction()
+  })
+
+  it('U-D09 rejects exclusive signal options before total timeout can start work', async () => {
+    /** The total deadline must not remove an invalid public option before admission checks. */
+    const operation = vi.fn(() => 42)
+    await expect(
+      Promise.resolve().then(() =>
+        retry(operation, {
+          maxAttempts: 1,
+          shouldRetry: () => false,
+          totalTimeoutMs: 100,
+          signal: new AbortController().signal,
+          signals: []
+        })
+      )
+    ).rejects.toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(operation).not.toHaveBeenCalled()
+  })
+
+  it('U-D10 exposes attempt scope on both the rejection and operation cancellation reason', async () => {
+    /** The same attempt deadline must identify both cancellation and the rejected result. */
+    const scheduler = createManualScheduler()
+    /** Captured native signal proves the actual operation observes the promised reason. */
+    let signal: AbortSignal | undefined
+    /** The operation intentionally waits for its deadline. */
+    const pending = retry(
+      (context) => {
+        signal = context.signal
+        return new Promise(() => {})
+      },
+      {
+        maxAttempts: 1,
+        shouldRetry: () => false,
+        attemptTimeoutMs: 5,
+        scheduler
+      }
+    )
+    /** Observe rejection before advancing the deterministic clock. */
+    const observed = expect(pending).rejects.toMatchObject({
+      code: 'DEADLINE_EXCEEDED',
+      scope: 'attempt'
+    })
+    scheduler.advance(5)
+    await observed
+    expect(signal?.reason).toMatchObject({ code: 'DEADLINE_EXCEEDED', scope: 'attempt' })
+  })
+
+  it('U-D11 reports secondary reporter failures without an unhandled rejected Promise', async () => {
+    /**
+     * Captured host callbacks prove reporting while preventing intentional host throws during
+     * tests.
+     */
+    const callbacks: (() => void)[] = []
+    /** Exact reporter failures remain reachable at the host boundary. */
+    const reporterFailure = new Error('reporter failure')
+    /** Stub only the existing host diagnostic seam, restoring it even if assertions fail. */
+    const enqueue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
+    try {
+      observeThenableRejection(undefined, { error: new Error('inspection failed') }, () => {
+        throw reporterFailure
+      })
+      /** A native rejected Promise exercises the asynchronous reporting branch. */
+      const rejected = Promise.reject(new Error('operation failed'))
+      observeThenableRejection(rejected, inspectThenable(rejected), () => {
+        throw reporterFailure
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(callbacks).toHaveLength(2)
+      for (const callback of callbacks) expect(callback).toThrow(reporterFailure)
+    } finally {
+      enqueue.mockRestore()
+    }
+  })
+
+  it('U-D12 only narrows errors with a registered utils code', () => {
+    expect(isUtilsError(Object.assign(new Error('missing'), { source: '@migaia/utils' }))).toBe(
+      false
+    )
+    expect(
+      isUtilsError(
+        Object.assign(new Error('unknown'), { source: '@migaia/utils', code: 'UNKNOWN' })
+      )
+    ).toBe(false)
+    expect(
+      isUtilsError(
+        attachErrorIdentity(new TypeError('argument'), {
+          source: '@migaia/utils',
+          code: UtilsErrorCode.invalidArgument
+        })
+      )
+    ).toBe(true)
+  })
+})

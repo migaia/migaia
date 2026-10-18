@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { normalizeRpcEnvelope, RpcRouteProfile, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'

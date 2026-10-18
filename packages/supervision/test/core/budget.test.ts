@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createAbortController } from '@migaia/lifecycle'
 import { BudgetRejection, createUnitBudget } from '../../src/index.js'
 

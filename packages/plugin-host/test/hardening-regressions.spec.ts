@@ -8,7 +8,7 @@ import {
   PluginHostError
 } from '../src/index.js'
 import { createAbortController } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { PluginHostOperationRuntime } from '../src/operation-runtime.js'
 
 class Host extends PluginHost<Record<string, never>, string> {

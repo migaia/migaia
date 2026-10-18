@@ -1,5 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcAbortError, RpcTimeoutError } from '../../../dist/core/errors.js'
 import type { IRpcTransport } from '../../../dist/core/transport.js'

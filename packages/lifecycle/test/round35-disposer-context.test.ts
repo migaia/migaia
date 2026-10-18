@@ -5,7 +5,7 @@ import {
   createSyncLifecycleScope,
   LifecycleErrorCode
 } from '../src/index.js'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import type { IReleaseContext } from '../src/index.js'
 
 describe('disposer context owner-join contract', () => {

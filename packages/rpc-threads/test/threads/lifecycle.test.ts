@@ -1,5 +1,5 @@
 import { createUnitBudget } from '@migaia/supervision'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/public-host.js'

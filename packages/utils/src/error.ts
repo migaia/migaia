@@ -136,7 +136,10 @@ export function attachErrorIdentity<T extends object>(
         target = hooks.onConflict({ target, key, existing: existing.value, incoming: value })
         continue
       }
-      throw new TypeError(UtilsErrorText.errorIdentityConflict(key), { cause: target })
+      throw attachErrorIdentity(
+        new TypeError(UtilsErrorText.errorIdentityConflict(key), { cause: target }),
+        { source: '@migaia/utils', code: UtilsErrorCode.errorIdentityConflict }
+      )
     }
     if (existing) continue
     try {
@@ -294,8 +297,19 @@ export function combineErrors(errors: Iterable<unknown>, message: string): Error
   return new AggregateError(collected, message)
 }
 
+/** Recognizes diagnostic error shapes only when both utils identity fields are valid. */
 export function isUtilsError(value: unknown): value is UtilsError {
-  return isErrorLike(value) && (value as { source?: unknown }).source === '@migaia/utils'
+  if (!isErrorLike(value)) return false
+  try {
+    /** Code admission must prove the union promised by this type guard. */
+    const code = (value as { code?: unknown }).code
+    return (
+      (value as { source?: unknown }).source === '@migaia/utils' &&
+      Object.values(UtilsErrorCode).some((registered) => registered === code)
+    )
+  } catch {
+    return false
+  }
 }
 
 export function isUtilsAbortError(value: unknown): value is UtilsAbortError {

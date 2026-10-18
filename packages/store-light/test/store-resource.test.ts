@@ -1,7 +1,7 @@
 /* oxlint-disable unicorn/no-thenable -- adversarial fixtures verify lifecycle thenable admission. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { ResourceOwnershipRegistry } from '../src/store-resource-ownership.js'
 import { ResourceCachePolicy } from '../src/store-resource-cache-policy.js'
 import { createStoreResource, createStoreResourceScope } from '../src/store-resource.js'

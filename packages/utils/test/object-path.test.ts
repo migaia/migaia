@@ -24,6 +24,29 @@ const fixture: IFixture = {
 }
 
 describe('object path primitives', () => {
+  it('U-D01 preserves genuine sparse arrays, descriptors and unchanged branches on writes', () => {
+    /** Sparse frozen input exercises array identity without losing holes or source ownership. */
+    const items = Object.freeze(
+      Object.assign([] as { name: string }[], {
+        length: 3,
+        1: { name: 'old' },
+        2: { name: 'shared' }
+      })
+    )
+    /** Immutable update must keep the array exotic behavior required by native consumers. */
+    const updated = set({ items }, ['items', 1, 'name'] as const, 'new')
+    expect(Array.isArray(updated.items)).toBe(true)
+    expect(updated.items.length).toBe(3)
+    expect(0 in updated.items).toBe(false)
+    expect(updated.items[1]?.name).toBe('new')
+    expect(updated.items[2]).toBe(items[2])
+    expect(items[1]?.name).toBe('old')
+    expect(Object.getOwnPropertyDescriptor(updated.items, '2')).toEqual(
+      Object.getOwnPropertyDescriptor(items, '2')
+    )
+    expect(structuredClone(updated).items).toEqual(updated.items)
+  })
+
   it('parses strict string paths and snapshots tuple paths', () => {
     expect(parseObjectPath('user.addresses.[0].city')).toEqual(['user', 'addresses', 0, 'city'])
     const tuple = ['user', 'name'] as const

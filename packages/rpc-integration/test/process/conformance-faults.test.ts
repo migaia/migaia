@@ -8,7 +8,8 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import {
   createProcessPlugin,
   createProcessResilience,

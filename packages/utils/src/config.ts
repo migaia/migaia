@@ -668,6 +668,7 @@ function cloneGraph<T>(
   return target as T
 }
 
+/** Creates a stable readonly facade without imposing raw frozen descriptors on Proxy reads. */
 function readonlyWrap(value: object): object {
   const existing = readonlyCache.get(value)
   if (existing) return existing
@@ -682,6 +683,7 @@ function readonlyWrap(value: object): object {
         }
       })()
     : false
+  /** Independent targets allow nested facades even when owned data has frozen descriptors. */
   const target = callable
     ? constructable
       ? function (this: unknown, ...args: unknown[]): unknown {
@@ -689,7 +691,9 @@ function readonlyWrap(value: object): object {
         }
       : (...args: unknown[]) =>
           Reflect.apply(value as (...args: unknown[]) => unknown, undefined, args)
-    : value
+    : Array.isArray(value)
+      ? []
+      : Object.create(null)
   if (callable && constructable) {
     const sourcePrototype = Object.getOwnPropertyDescriptor(value, 'prototype')?.value
     if (sourcePrototype !== undefined)
@@ -700,7 +704,9 @@ function readonlyWrap(value: object): object {
       })
   }
   const proxy = new Proxy(target, {
-    get: (target, key, receiver) => {
+    get: (_target, key, receiver) => {
+      /** Built-in methods need the owned object's internal slots, never the facade target. */
+      const target = value
       if (
         ((target instanceof Map && hasBuiltinBrand(target, 'map')) ||
           (target instanceof Set && hasBuiltinBrand(target, 'set')) ||
@@ -719,6 +725,7 @@ function readonlyWrap(value: object): object {
           'setHours',
           'setMinutes',
           'setSeconds',
+          'setMilliseconds',
           'setUTCDate',
           'setUTCFullYear',
           'setUTCHours',
@@ -809,6 +816,23 @@ function readonlyWrap(value: object): object {
       return result && (typeof result === 'object' || typeof result === 'function')
         ? readonlyWrap(result)
         : result
+    },
+    has: (_target, key) => Reflect.has(callable ? target : value, key),
+    ownKeys: () => Reflect.ownKeys(callable ? target : value),
+    /** Keep reflection live while returning readonly nested values from extensible facades. */
+    getOwnPropertyDescriptor: (_target, key) => {
+      if (callable) return Reflect.getOwnPropertyDescriptor(target, key)
+      /** Array length is the only fixed own property on the independent object target. */
+      const arrayLength = Array.isArray(value) && key === 'length'
+      /** Reflect owned descriptors without leaking their unwrapped graph values. */
+      const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+      if (!descriptor) return undefined
+      return {
+        ...descriptor,
+        configurable: !arrayLength,
+        ...('value' in descriptor ? { value: readonlyValue(descriptor.value) } : {}),
+        ...(arrayLength ? { writable: true } : {})
+      }
     },
     set: () => {
       throw readonlyMutation()

@@ -1,4 +1,5 @@
-import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { type IScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IRuntimePeer } from '@migaia/rpc-core/remote'
 import { createThreadPool } from '../dist/index.js'

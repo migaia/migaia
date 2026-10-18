@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createManualScheduler, deferTask, systemScheduler } from '@migaia/utils/scheduler'
+import { deferTask, systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 
 afterEach(() => vi.unstubAllGlobals())
 

@@ -1,4 +1,4 @@
-import { createManualScheduler, type IManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'
 
 /** Deterministic scheduler with observable unref hints on scheduled tasks. */
 export function createRecordingScheduler(): IManualScheduler & { readonly unrefCalls: number } {

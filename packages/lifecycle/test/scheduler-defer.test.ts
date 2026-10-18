@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'
+import { deferTask } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { resolveScheduler } from '@migaia/lifecycle/scheduler'
 
 it('SD-T02 captures deferred registration once with its original receiver', () => {

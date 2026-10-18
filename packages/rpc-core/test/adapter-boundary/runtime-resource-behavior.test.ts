@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import * as promiseTools from '@migaia/utils/promise'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'

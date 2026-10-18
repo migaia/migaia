@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createRemoteRetryPort } from '../../dist/remote/retry.js'
 import type { IRemoteGenerationEvents } from '../../dist/remote/types.js'

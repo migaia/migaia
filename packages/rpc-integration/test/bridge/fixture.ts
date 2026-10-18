@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
 import {

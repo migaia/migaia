@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import {
   definePlugin,
   defineFeature,

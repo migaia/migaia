@@ -16,6 +16,20 @@ import {
 } from '../src/object.js'
 
 describe('function and object primitives', () => {
+  it('U-C04 reserves the manual scheduler for the explicit testing entry', async () => {
+    expect(Object.hasOwn(utils, 'createManualScheduler')).toBe(false)
+    /** The dedicated entry retains the existing deterministic scheduler behavior. */
+    const testing = await import('../src/testing.js')
+    /** A cancelled test task must release its pending slot through the same canonical heap. */
+    const clock = testing.createManualScheduler()
+    /** Cancellation remains idempotent after the export migration. */
+    const task = clock.schedule(() => undefined, 1)
+    expect(clock.pendingCount).toBe(1)
+    task.cancel()
+    task.cancel()
+    expect(clock.pendingCount).toBe(0)
+  })
+
   it('exports the shared native recursion boundary from the module and root barrel', () => {
     expect(MAX_NATIVE_RECURSION_DEPTH).toBe(256)
     expect(utils.MAX_NATIVE_RECURSION_DEPTH).toBe(256)

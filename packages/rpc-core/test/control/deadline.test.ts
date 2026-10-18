@@ -1,5 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
 import { createClientEndpoint } from '../../dist/core/client.js'

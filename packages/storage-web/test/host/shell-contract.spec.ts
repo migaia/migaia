@@ -9,7 +9,8 @@ import {
 } from '../../src/host/index.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 import { defineReactiveAdapterFeature } from '../../src/reactive-adapter.js'
-import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { type IScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 

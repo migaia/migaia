@@ -22,7 +22,7 @@ const CollectorStageKind = {
 } as const
 
 /** Actions available before and after a field scope is selected. */
-export type ICollectorActions<T, Self> = {
+type ICollectorActions<T, Self> = {
   readonly result: readonly T[]
 
   fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(

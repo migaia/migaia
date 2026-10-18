@@ -47,14 +47,11 @@ import {
   toPromise,
   hostRethrowReporter
 } from '@migaia/utils/promise';
-import {
-  createManualScheduler,
-  systemScheduler,
-  systemWallClock
-} from '@migaia/utils/scheduler';
+import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
 ```
 
-调度器契约（`IScheduler`、`IScheduledTask`、`IManualScheduler`、`IWallClock`）与三个实现只由 `@migaia/utils/scheduler`（及根入口 `@migaia/utils`）导出；`@migaia/utils/promise` 不再导出任何调度符号。
+运行时契约 IScheduler、IScheduledTask、IWallClock 与 systemScheduler/systemWallClock/deferTask 由 /scheduler 和根入口导出。createManualScheduler 与 IManualScheduler 仅由 @migaia/utils/testing 导出，不进入根或 /scheduler。
 
 **`sleep`｜5 秒上手** —— 可中止的延时：
 
@@ -103,7 +100,7 @@ await withTimeout(
 
 - `timeoutMs: number`（必填）—— 有限非负数
 - `report?: IUtilsReporter` —— 结算后才到达的迟到结果如何上报，默认 `hostRethrowReporter`
-- `zeroTimeoutBehavior?: 'skip' | 'start'` —— `timeoutMs: 0` 时默认 `'skip'`（立即以超时错误 reject）；`'start'` 改为立即执行、不设超时
+- `zeroTimeoutBehavior?: 'skip' | 'start'` —— `timeoutMs: 0` 时默认 `'skip'`（立即以超时错误 reject）；`'start'` 改为立即执行，并保留零延时 deadline
 - `cooperativeCancellation?: boolean` —— 默认 `true`；`false` 时不分配内部 `AbortController`，操作拿到的是恒不中止的惰性信号
 
 **`raceWithAbort`｜5 秒上手** —— 只响应外部中止，不设截止时间：
@@ -318,6 +315,7 @@ if (error.code === UtilsErrorCode.aborted) {
 - `aborted`（`ABORTED`）—— 外部 `AbortSignal` 已请求取消协作式操作；停止后续工作并向上传递取消原因。
 - `deadlineExceeded`（`DEADLINE_EXCEEDED`）—— 操作、单次尝试或整个重试流程超过约定时限；检查 `scope` 与 `timeoutMs` 决定重试或降级。
 - `schedulerRunaway`（`SCHEDULER_RUNAWAY`）—— 手动调度器一次推进执行超过 10000 个任务，通常表示回调在同一时刻递归调度；修复循环，而不是提高阈值。
+- `errorChainInvalid`（`ERROR_CHAIN_INVALID`）—— 收到的错误链或 plain data 违反字段、深度、数量或文本预算；修正输入或边界策略。
 - `errorIdentityConflict`（`ERROR_IDENTITY_CONFLICT`）—— 错误已有的 `source` 或 `code` 与准备附加的身份冲突；保留原错误身份，不要重复改写。
 - `cloneUnsupported`（`CLONE_UNSUPPORTED`）—— `structuredClone` 无法复制该值，例如包含不可克隆成员；先转换为可克隆数据再创建不可变快照。
 - `invalidEncoding`（`INVALID_ENCODING`）—— Base64 等输入不符合本包要求的规范编码；根据错误偏移修正输入，不会宽松解码。
@@ -378,7 +376,7 @@ isArrayBuffer(new SharedArrayBuffer(1)); // false
 
 两者接受合法的跨 iframe/Worker 值和子类，拒绝 Proxy 与外形伪造对象。detached `Uint8Array` / `ArrayBuffer` 仍保留自身品牌；调用方必须在读取字节前另行判断可用性。
 
-**`bytesToBase64` / `base64ToBytes`｜3 秒上手**（单参数，无选项）：
+**`bytesToBase64` / `base64ToBytes`｜3 秒上手**：base64ToBytes 可传第二参数 target，复用恰好等于解码长度的 Uint8Array。
 
 ```ts
 bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'
@@ -660,7 +658,7 @@ type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;
 // 等价于 IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>
 ```
 
-类型参数：`T`（必填，联合类型本身）、`P extends IObjectPathInput<T>`（必填，字符串或元组路径；路径必须在联合的**每个分支**上都存在且合法，否则该分支被排除；路径值解析不出 `PropertyKey` 时整体报编译错误）。
+类型参数：`T`（必填，联合类型本身）、`P extends IObjectPathInput<T>`（必填，字符串或元组路径；部分分支缺路径或路径值不是 PropertyKey 时可能被映射排除，甚至得到空对象类型；不保证类型 alias 声明报错）。
 
 其余重导出的类型（`IObjectPath`、`IObjectPathInput`、`IObjectPathSegment`、`IObjectPathTuple`、`IObjectPathTupleFor`、`IObjectPathValue`、`IObjectPathWriteValue`、`IProbePropertyResult`、`IAbortSignal`、`IDeferred`）语义与 `/object`、`/promise` 模块中完全一致，仅为了方便跨包复用类型而在这里再导出一份，不是新的类型定义。
 
@@ -895,7 +893,7 @@ Collector 不复制或追踪外部修改：调用方必须在 collector 生命�
 
 ```ts
 import { retry, withTimeout } from '@migaia/utils/promise';
-import { createManualScheduler } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
 import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
 
 const scheduler = createManualScheduler();
@@ -1010,7 +1008,8 @@ if (isNativeErrorValue(failure)) console.log(failure.stack)
 `deferTask(scheduler, callback)` registers a non-cancellable asynchronous job. `systemScheduler` uses a native microtask; manual clocks run it at the existing zero-time deadline when advanced. A scheduler with only `now`/`schedule` still works through its zero-delay registration. The separate `schedule(callback, 0)` timer behavior stays unchanged.
 
 ```ts
-import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'
+import { deferTask } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
 
 const clock = createManualScheduler()
 let delivered = false
@@ -1019,3 +1018,11 @@ console.log(delivered) // false
 clock.advance(0)
 console.log(delivered) // true
 ```
+
+`decodeUtf8(bytes, { fatal: true })` 遇到非法输入时抛原生 TypeError，身份为 (@migaia/utils, INVALID_ENCODING)，message 标明 UTF-8 与字节偏移；Base64 错误仍标明 Base64。
+
+## 公开名称与详细契约
+
+完整逐名用途、入口与类型 helper 说明见 [USEGUIDE 公开入口索引](./USEGUIDE.md#公开入口索引)。
+
+`CONFIG_DELETE`, `ConfigProfile`, `IAbortOperation`, `IAbortSignal`, `IAbortSignalAdmission`, `IAbortSignalRejection`, `IAbortTimeoutSignal`, `IAbortTimeoutSignalOptions`, `IAsyncControls`, `ICollector`, `IConcurrencyLimiter`, `IConfigCombineOptions`, `IConfigConflictContext`, `IConfigConflictDecision`, `IConfigLimits`, `IConfigMergeStrategies`, `IConfigPatch`, `IConfigPatchOptions`, `IConfigPathRule`, `IConfigProfile`, `IConfigReadResult`, `IConfigRecord`, `IDeadlineOnlyOperation`, `IDeferred`, `IDiagnosticSnapshot`, `IDiscriminatedByField`, `IDiscriminatedByPath`, `IErrorChainData`, `IErrorChainStrategy`, `IErrorIdentity`, `IErrorIdentityHooks`, `IFieldCollector`, `IFormatOptions`, `IFormatPlaceholder`, `IManualScheduler`, `INativeAbortSignal`, `INumberFormatOptions`, `INumberFormatter`, `INumericValue`, `IObjectPath`, `IObjectPathInput`, `IObjectPathSegment`, `IObjectPathTuple`, `IObjectPathTupleFor`, `IObjectPathValue`, `IObjectPathWriteValue`, `IOwnConfigOptions`, `IOwnDescriptorsSnapshot`, `IOwnedConfig`, `IPathAccessor`, `IPathAccessorOptions`, `IPathBlockedProbe`, `IPathFailedProbe`, `IPathGetEvent`, `IPathMissingProbe`, `IPathProbe`, `IPathSetEvent`, `IPathValueProbe`, `IPrimitive`, `IProbePropertyResult`, `IPropertyRead`, `IRetryContext`, `IRetryFailureContext`, `IScheduledTask`, `IScheduler`, `ISerializedErrorChain`, `ISnapshotDiagnostic`, `IStringConversion`, `IThenableInspection`, `IThenableProbe`, `ITimeoutOperation`, `IUrlLike`, `IUtilsErrorCode`, `IUtilsReporter`, `IWallClock`, `MAX_NATIVE_RECURSION_DEPTH`, `ThenableProbeKind`, `UtilsAbortError`, `UtilsError`, `UtilsErrorCode`, `UtilsTimeoutError`, `admitAbortSignal`, `assimilateCapturedThen`, `attachErrorIdentity`, `attachSecondaryErrors`, `base64ToBytes`, `bytesToBase64`, `collect`, `combineConfig`, `combineErrors`, `createAbortTimeoutSignal`, `createConcurrencyLimiter`, `createManualScheduler`, `createNumberFormatter`, `createPathAccessor`, `createSafeRecord`, `decodeUtf8`, `deferTask`, `deferred`, `deserializeErrorChain`, `diagnosticSnapshot`, `encodeUtf8`, `format`, `formatCompactNumber`, `formatCurrency`, `formatInteger`, `formatNumber`, `formatPercent`, `get`, `hostRethrowReporter`, `identitySnapshot`, `immutableSnapshot`, `inspectThenable`, `isArrayBuffer`, `isBlankString`, `isEmptyValue`, `isNativeErrorValue`, `isNullish`, `isPlainObject`, `isPrimitive`, `isSafeIntegerValue`, `isUint8Array`, `isUrlObject`, `isUtilsAbortError`, `isUtilsError`, `isUtilsTimeoutError`, `noop`, `normalizeSerializedErrorChain`, `observeThenableRejection`, `once`, `onceAsync`, `ownConfig`, `parseConfigPath`, `parseObjectPath`, `patchConfig`, `probeObjectPath`, `probeObjectPathSegments`, `probeProperty`, `probeThenable`, `raceWithAbort`, `reachErrorChain`, `readConfigPath`, `readUrlHref`, `readonlyConfig`, `retry`, `safeErrorReason`, `sanitizeErrorText`, `serializeErrorChain`, `set`, `sleep`, `snapshotOwnDescriptors`, `splitUtf8`, `streamBase64Chunks`, `structuredDiagnosticSnapshot`, `systemScheduler`, `systemWallClock`, `toError`, `toPromise`, `tryReadProperty`, `tryString`, `utf8ByteLength`, `walkErrorCauses`, `withTimeout`.

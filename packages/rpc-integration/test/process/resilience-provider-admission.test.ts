@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcContext, IRpcEndpoint, IRpcProvider, IRpcProviderResult } from '@migaia/rpc-core'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'

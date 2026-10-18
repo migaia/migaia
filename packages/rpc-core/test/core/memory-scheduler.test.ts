@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 it('SD-T01 uses the injected clock when the host has no microtask queue', () => {

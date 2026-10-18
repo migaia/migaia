@@ -1,12 +1,8 @@
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  createManualScheduler,
-  systemScheduler,
-  systemWallClock,
-  type IScheduler
-} from '../src/scheduler.js'
+import { systemScheduler, systemWallClock, type IScheduler } from '../src/scheduler.js'
+import { createManualScheduler } from '../src/testing.js'
 
 /** Largest delay one host timer segment may carry. */
 const MAXIMUM_TIMER_DELAY = 2_147_483_647
@@ -434,7 +430,7 @@ describe('A6 wall clock stays separate from the monotonic clock', () => {
 describe('A9 scheduler module stays runtime-neutral', () => {
   it('references no host types, no bare host identifiers and only utils-local imports', () => {
     /** Source text of the scheduler module. */
-    const text = readFileSync(new URL('../src/scheduler.ts', import.meta.url), 'utf8')
+    const text = readFileSync(new URL('../src/internal/scheduler.ts', import.meta.url), 'utf8')
     const source = ts.createSourceFile('scheduler.ts', text, ts.ScriptTarget.Latest, true)
     /** Module specifiers of every import declaration. */
     const imports: string[] = []
@@ -470,6 +466,8 @@ describe('A9 scheduler module stays runtime-neutral', () => {
     visit(source)
     expect(typeReferences).toEqual([])
     expect(bareHostIdentifiers).toEqual([])
-    expect(new Set(imports)).toEqual(new Set(['./error.js', './error-code.js', './error-text.js']))
+    expect(new Set(imports)).toEqual(
+      new Set(['../error.js', '../error-code.js', '../error-text.js'])
+    )
   })
 })

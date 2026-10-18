@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'

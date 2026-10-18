@@ -1,7 +1,7 @@
 import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { serveProcessSessions } from '../../../rpc-process/dist/process/plugin/serve.js'
 import { createProcessResilience } from '@migaia/rpc-process'

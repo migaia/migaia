@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createRemoteRetryPort } from '../../dist/remote/retry.js'
 import type { IRemoteGenerationEvents } from '../../dist/remote/types.js'
 

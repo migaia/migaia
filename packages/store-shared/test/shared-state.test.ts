@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { sharedInt32, sharedInt32Array } from '../src/shared-state'
 
 /** Runs notifications immediately so cross-runtime assertions observe committed writes. */

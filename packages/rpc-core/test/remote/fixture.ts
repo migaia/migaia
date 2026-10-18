@@ -1,6 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { ISupervisor, ISupervisorEvent } from '@migaia/supervision'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IRpcEndpoint } from '../../dist/core/typing.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'

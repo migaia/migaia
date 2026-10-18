@@ -11,7 +11,7 @@ import {
   set,
   walkErrorCauses
 } from '../src/index.js'
-import { createManualScheduler } from '../src/scheduler.js'
+import { createManualScheduler } from '../src/testing.js'
 
 describe('round 34 contract regressions', () => {
   it('preserves missing-versus-undefined presence and array descriptors', () => {

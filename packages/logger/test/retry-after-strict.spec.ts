@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { type IScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { Logger } from '../src/index.js'
 import { http } from '../src/plugins/http.js'
 import { setLoggerRuntimeManager } from '../src/runtime-manager.js'

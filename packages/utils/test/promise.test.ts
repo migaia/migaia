@@ -12,7 +12,7 @@ import {
   toPromise,
   withTimeout
 } from '../src/promise.js'
-import { createManualScheduler } from '../src/scheduler.js'
+import { createManualScheduler } from '../src/testing.js'
 
 /** Creates a manually triggered signal whose cancellation reason getter is hostile. */
 const createHostileReasonSignal = (cause: Error) => {
@@ -39,6 +39,44 @@ const createHostileReasonSignal = (cause: Error) => {
 }
 
 describe('promise primitives', () => {
+  it.each(['sleep', 'withTimeout', 'raceWithAbort'] as const)(
+    'U-D13 rolls back partial signal registration in %s',
+    async (operation) => {
+      /** Registration can acquire a listener before the structural host reports failure. */
+      const listeners = new Set<() => void>()
+      /** Preserve the original registration failure through the cleanup boundary. */
+      const cause = new Error('partial registration')
+      /** Actual removals prove resource release, independently of Promise settlement. */
+      let removed = 0
+      /** Supported structural signal deliberately fails after acquiring the listener. */
+      const signal = {
+        aborted: false,
+        addEventListener: (_type: 'abort', listener: () => void) => {
+          listeners.add(listener)
+          throw cause
+        },
+        removeEventListener: (_type: 'abort', listener: () => void) => {
+          removed++
+          listeners.delete(listener)
+        }
+      }
+      /** Local clock avoids real timer ownership in the failing admission case. */
+      const scheduler = createManualScheduler()
+      /** Exercise the public boundary that must roll back its acquired listener. */
+      const pending =
+        operation === 'sleep'
+          ? sleep(10, { signal, scheduler })
+          : operation === 'withTimeout'
+            ? withTimeout(() => 1, { timeoutMs: 10, signal, scheduler })
+            : raceWithAbort(() => 1, { signal })
+      await expect(pending).rejects.toSatisfy(
+        (error: unknown) => error === cause || (error as Error).cause === cause
+      )
+      expect(listeners.size).toBe(0)
+      expect(removed).toBe(1)
+    }
+  )
+
   it('admits only structural signals, reads aborted once, and never reads reason', () => {
     const reasonFailure = new Error('reason must remain unread')
     const reads = { aborted: 0, reason: 0 }

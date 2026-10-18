@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { createProviderEndpoint } from '../../dist/core/provider.js'
 import { createComposedEndpoint } from '../../dist/core/composed.js'

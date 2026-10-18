@@ -1,5 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
 import {
   dialProcessByteChannel,

@@ -1,6 +1,7 @@
 import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { tryReadProperty } from './error.js'
+import { reportUnhandledError } from './host-report.js'
 
 /**
  * Maximum synchronous reentrancy before consumers spill work from the native stack.
@@ -17,8 +18,6 @@ export const ThenableProbeKind = {
   thenable: 'thenable',
   failed: 'failed'
 } as const
-
-export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind]
 
 /** Result of a single, failure-contained thenable inspection. */
 export type IThenableProbe =
@@ -97,15 +96,15 @@ export function observeThenableRejection(
     void assimilateCapturedThen<unknown>(inspection.then, value).then(undefined, (error) => {
       try {
         onRejected(error)
-      } catch {
-        // The supplied reporter is the terminal boundary for its own failure.
+      } catch (reporterError) {
+        reportUnhandledError(reporterError)
       }
     })
   } else if ('error' in inspection) {
     try {
       onRejected(inspection.error)
-    } catch {
-      // The supplied reporter is the terminal boundary for its own failure.
+    } catch (reporterError) {
+      reportUnhandledError(reporterError)
     }
   }
 }
@@ -145,7 +144,7 @@ export function once<T extends (...args: never[]) => unknown>(functionValue: T):
 }
 
 /** Memoizes one asynchronous invocation and preserves exact Promise identity. */
-export function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T> {
+export function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T> {
   let promise: Promise<T> | undefined
   return () => {
     if (promise === undefined)

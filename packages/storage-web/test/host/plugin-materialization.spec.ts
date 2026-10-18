@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import {

@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import type { IPluginDependencyPlan, IPluginRemoval } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessResilience } from '@migaia/rpc-process'

@@ -275,11 +275,11 @@ export function probeObjectPath<T, P extends IObjectPathInput<T>>(
 }
 
 /** Probes an already parsed tuple without reparsing it during delivery. */
-export function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
+export function probeObjectPathSegments<T, P extends IObjectPathTupleFor<T>>(
   object: T,
   segments: P
 ): IPathProbe<T, P> {
-  return probeParsedObjectPath(object, segments, segments as IObjectPathTuple)
+  return probeParsedObjectPath(object, segments, segments)
 }
 
 /** Reads one path; missing/blocked paths yield undefined while getter failures remain observable. */
@@ -299,7 +299,9 @@ function cloneContainer(value: object, replacedKey: IObjectPathSegment): object 
     throw invalidPath(String(replacedKey), 'path container is not a plain object or array')
   const descriptors = Object.getOwnPropertyDescriptors(value)
   Reflect.deleteProperty(descriptors, replacedKey)
-  return Object.defineProperties(Object.create(Object.getPrototypeOf(value)), descriptors)
+  /** Arrays need their native indexed-property behavior, including sparse slots and length. */
+  const target = Array.isArray(value) ? [] : Object.create(prototype)
+  return Object.defineProperties(target, descriptors)
 }
 
 /** Performs an immutable path update with structural sharing and missing-container creation. */

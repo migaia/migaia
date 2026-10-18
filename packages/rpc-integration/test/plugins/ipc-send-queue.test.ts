@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, RpcStreamEvent } from '@migaia/rpc-contract'
 import { createMemoryTransportPair } from '../../../rpc-core/dist/core/adapters/memory.js'

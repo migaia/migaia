@@ -1,6 +1,6 @@
 # `@migaia/utils` 使用指南
 
-本指南逐个模块覆盖公开运行时 API、直接配置所需的关键类型、语义与用法示例。仅用于泛型推导的 type-only helper 以发布的 `.d.ts` 和编辑器提示为准；包的定位与安装方式见 [README](./README.md)。
+本指南逐个模块覆盖公开运行时 API、直接配置所需的关键类型、语义与用法示例。所有公开名称（包括 type-only helper）的用途与入口列在文末索引；精确类型以发布的 `.d.ts` 为准；包的定位与安装方式见 [README](./README.md)。
 
 ## 目录
 
@@ -28,8 +28,9 @@
 调度器契约与实现只由 `@migaia/utils/scheduler`（及根入口 `@migaia/utils`）导出；本模块的 `sleep`、`withTimeout`、`retry`、`createAbortTimeoutSignal` 以它为 `scheduler` 选项类型与默认值。
 
 ```ts
-import { createManualScheduler, systemScheduler, systemWallClock } from '@migaia/utils/scheduler';
-// 同一子路径还导出下列类型：IManualScheduler、IScheduledTask、IScheduler、IWallClock
+import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
+// /scheduler 导出 IScheduledTask、IScheduler、IWallClock；/testing 导出 IManualScheduler。
 
 type IScheduledTask = { cancel(): void; unref?(): void };
 type IScheduler = {
@@ -130,7 +131,7 @@ await pending; // 异步观察 rejection
 function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;
 ```
 
-在调度器延迟后 resolve；若传入的 `signal`/`signals` 在等待期间中止，则以 `UtilsAbortError` reject。`delayMs` 必须是有限非负数。会正确清理已注册的定时器与 abort 监听器，即使清理过程本身抛错也会通过 `hostRethrowReporter`（或调用方指定的 reporter）上报，而不是吞掉。
+在调度器延迟后 resolve；若传入的 `signal`/`signals` 在等待期间中止，则以 `UtilsAbortError` reject。`delayMs` 必须是有限非负数。会正确清理已注册的定时器与 abort 监听器，即使清理过程本身抛错也会通过 `hostRethrowReporter`（sleep 不接受自定义 reporter）上报，而不是吞掉。
 
 ```ts
 type IAsyncControls = {
@@ -208,16 +209,19 @@ function withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTime
 
 用截止时间包裹一个惰性操作。`operation` 收到的 `signal` 是**内部生成的合并信号**：外部 `signal(s)` 中止、或截止时间到达，都会让这个 `signal` 变为 `aborted`；操作函数必须自行检查它才能提前退出。
 
-- `timeoutMs`：必须是有限非负数；`timeoutMs === 0` 时默认立即以 `UtilsTimeoutError('operation', 0)` reject（除非 `zeroTimeoutBehavior: 'start'`，此时改为立刻启动操作、不设超时）。
+- `timeoutMs`：必须是有限非负数；`timeoutMs === 0` 时默认立即以 `UtilsTimeoutError('operation', 0)` reject（除非 `zeroTimeoutBehavior: 'start'`，此时立刻启动操作，并保留零延时 deadline；操作若未在 deadline 回调前结算，仍会超时）。
 - `cooperativeCancellation`（默认 `true`）：为 `false` 时不分配内部 `AbortController`，操作函数只会拿到一个惰性的、恒不中止的结构化信号（类型是 `IAbortSignal`，不能传给 `fetch`）——用于纯粹的"限时等待结果，但不需要通知操作提前退出"的场景。
-- `report`：当操作在已经结算（超时/被外部中止）之后才 resolve/reject，这个迟到的结果不会再影响最终返回值，但会经由 `report`（默认 `hostRethrowReporter`）上报，避免静默丢弃未处理的错误。
+- `report`：操作结算后，迟到成功值直接丢弃；只有迟到 rejection 交给 `report`（默认 `hostRethrowReporter`）。清理失败通过返回 Promise 的 rejection/aggregate 暴露，不交给这个 reporter。
 - 清理阶段（取消定时器、移除监听器）失败时，会把清理错误与原始错误一起包装成 `AggregateError` 一并 reject。
 
 ```ts
+import { sleep, withTimeout } from '@migaia/utils/promise';
+
 await withTimeout(
   async ({ signal }) => {
     while (!signal.aborted) {
-      // 做一些可中断的工作
+      // 完成一小批同步工作后，必须让出事件循环，让 deadline 能执行。
+      await sleep(10);
     }
     throw signal.reason;
   },
@@ -304,7 +308,7 @@ await retry(
 type IUtilsReporter = (
   error: unknown,
   context: {
-    readonly operation: 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter';
+    readonly operation: 'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter';
     readonly phase: 'late-rejection' | 'cleanup' | 'reporter';
     readonly attempt?: number;
   }
@@ -426,7 +430,7 @@ attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' });
 function toError(value: unknown, options?: { readonly message?: string }): Error;
 ```
 
-把任意 `throw` 出来的值规整为 `Error` 实例：已经是 `Error` 的原样返回；否则包装成携带 `cause: value` 的内部错误类型，消息优先取 `options.message`，其次（当抛出值本身是字符串时）取该字符串，否则用固定的兜底文案。
+把任意抛出值规整为可诊断错误：原生 `Error` 或具有字符串 name/message/stack 的跨 realm/结构化错误形状原样返回；后者不保证 instanceof 本地 Error。其余值包装成携带 `cause: value` 的内部错误类型，消息优先取 `options.message`，其次（当抛出值本身是字符串时）取该字符串，否则用固定的兜底文案。
 
 ```ts
 function walkErrorCauses(
@@ -457,7 +461,7 @@ function isUtilsAbortError(value: unknown): value is UtilsAbortError;
 function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;
 ```
 
-标准的 `instanceof` 类型守卫，便于在 `catch` 块中按类型分支处理。
+诊断形状守卫：检查 error-like 的 name/message/stack、source 为 @migaia/utils，且 code 属于 UtilsErrorCode；abort/timeout 再核对对应 code。无需 instanceof 本地构造器，不用作来源认证。
 
 ### `UtilsErrorCode`
 
@@ -547,7 +551,7 @@ function bytesToBase64(value: Uint8Array): string;
 function base64ToBytes(value: string, target?: Uint8Array): Uint8Array; // target 长度须等于解码字节数，复用而不分配
 ```
 
-**只接受规范形式**：标准字母表、必须 4 的倍数长度、正确的 `=` 补齐。非规范输入（URL-safe 变体、无补齐、多余空白等）一律拒绝，抛出携带 `code: 'INVALID_ENCODING'` 的 `TypeError`。解码后会反向编码校验往返一致性，进一步拒绝虽然长度/字符集正确但数值不对齐的输入。
+**只接受规范形式**：标准字母表、必须 4 的倍数长度、正确的 `=` 补齐。非规范输入（URL-safe 变体、无补齐、多余空白等）一律拒绝，抛出携带 `code: 'INVALID_ENCODING'` 的 `TypeError`。解码时直接检查 padding 未使用位必须为零，不进行反向编码，拒绝数值不对齐的输入。
 
 ```ts
 bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'
@@ -598,7 +602,7 @@ splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']
 function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;
 ```
 
-仅当 `value` 是普通 `{}` 字面量或 `Object.create(null)` 创建的对象时返回 `true`；数组、`class` 实例、内置对象（`Date`/`Map`/...）一律 `false`。读取原型链失败（代理陷阱抛错）时同样返回 `false`，不会向上抛错。
+非数组对象的原型为 null，或其原型的父原型为 null 时返回 true。因此也接受 Object.create(Object.create(null))，并非只检查当前 realm 的 Object.prototype 等值；通常的 class 实例与 Date/Map 等内置对象返回 false。读取原型链失败（代理陷阱抛错）时同样返回 `false`，不会向上抛错。
 
 ```ts
 type IProbePropertyResult<T> =
@@ -884,7 +888,7 @@ type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
 
 - 类型参数 `T`：目标联合类型本身。
 - 类型参数 `P extends IObjectPathInput<T>`：字符串路径（如 `'meta.category'`）或元组路径（如 `readonly ['meta', 'category']`），和 `get`/`set`（`/object` 模块）接受的路径写法完全相同。
-- 路径必须在联合的**每一个分支**上都能解析出值，且该值必须收窄到 `PropertyKey`；哪个分支上路径不存在/类型不对，该分支在实现细节上通过条件类型被排除出结果（不是抛运行时错误——这纯粹是类型层行为，错误的路径在 TypeScript 编译期就直接报错，不会产出一个"缺分支"的类型让你在运行时才发现）。
+- 路径必须在联合的**每一个分支**上都能解析出值，且该值必须收窄到 `PropertyKey`；哪个分支上路径不存在/类型不对，该分支在实现细节上通过条件类型被排除出结果（不是抛运行时错误——这纯粹是类型层行为，部分分支缺路径或判别值非 PropertyKey 时，结果可能是缺少对应分支的映射，甚至空对象类型，不保证 alias 声明本身编译报错）。
 - 结果：以路径解析出的每个字面量判别值为 key，value 是对应的联合分支（同判别值的多个分支合并为联合）。
 
 **用法示例**（摘自包自带测试 `test/typing.test.ts`，行为已用 `expectTypeOf` 验证）：
@@ -917,10 +921,10 @@ type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category
 // 与 IByCategory 完全等价——字符串路径和元组路径是同一套解析逻辑的两种写法
 ```
 
-**编译期会拒绝的用法**（同样摘自测试文件）：
+**类型边界示例**：全部路径不存在时会违反路径约束；部分分支缺路径或非 PropertyKey 的路径值可能只产生空映射。
 
 ```ts
-// @ts-expect-error 路径在联合的某些/全部分支上不存在，判别提取前就被拒绝
+// @ts-expect-error 所有分支均不存在此路径，违反 IObjectPathInput 约束
 type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>;
 
 type INotPropertyKey = { readonly discriminator: { readonly nested: true } };
@@ -977,7 +981,7 @@ type IConfigLimits = {
 };
 ```
 
-`limits` 只能收紧（小于等于）默认值，不能放宽——`patchConfig`/`combineConfig` 里若传入的 `limits` 试图超过基准限制会抛 `code: 'CONFIG_CONFLICT'`。
+`limits` 不得超过包级默认上限。`patchConfig` 相对输入基准只能收紧，放宽会抛 CONFIG_CONFLICT；`combineConfig` 取所有输入与请求上限的逐项最小值，放宽请求被自动收紧，不因此抛 CONFIG_CONFLICT。
 
 ```ts
 function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;
@@ -1039,7 +1043,7 @@ function combineConfig(
 ): IOwnedConfig<IConfigRecord>;
 ```
 
-按 `sources` 数组的顺序（后者覆盖前者）合并多个已拥有的配置根，产出一个新的 `ownConfig` 结果。全部来源必须共享同一个 `profile`，否则抛 `code: 'CONFIG_CONFLICT'`。
+按 `sources` 数组的顺序（后者覆盖前者）合并多个已拥有的配置根。只有一个来源且未提供任何合并选项时，直接返回该来源，保留根 identity；其他情形产出新的 owned 配置。全部来源必须共享同一个 `profile`，否则抛 `code: 'CONFIG_CONFLICT'`。
 
 ```ts
 type IConfigMergeStrategies = {
@@ -1140,7 +1144,7 @@ first === second; // true
 `Proxy` 适合把首次属性访问变成惰性初始化，或限制访问方式；它本身不提供唯一性。是否是单例仍由 Proxy 后面的实例存储位置和 owner 数量决定，因此无需为了“真实单例”给 `once` 结果额外套 Proxy。
 
 ```ts
-function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T>;
+function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T>;
 ```
 
 记忆化一次**异步**调用：首次调用时启动 `functionValue()`，包装函数会保留并返回同一个 Promise；后续调用无论发生在 pending、fulfilled 还是 rejected 阶段，都直接拿到这个 Promise。`functionValue()` 可以返回原生 `Promise` 或合法 PromiseLike；其他值会让共享 Promise 以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。
@@ -1174,6 +1178,7 @@ const [routerConfig, telemetryConfig] = await Promise.all([
 Collector 是包根入口提供的、数组专用的惰性查询流水线：
 
 ```ts
+// 内部组合类型，不是公开导出；使用者导入 ICollector 或 IFieldCollector。
 type ICollectorActions<T, Self> = {
   readonly result: readonly T[];
   fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(
@@ -1238,7 +1243,7 @@ const result = collector.result;
 
 ```ts
 import { retry, withTimeout } from '@migaia/utils/promise';
-import { createManualScheduler } from '@migaia/utils/scheduler';
+import { createManualScheduler } from '@migaia/utils/testing';
 import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
 
 const scheduler = createManualScheduler();
@@ -1297,7 +1302,7 @@ const text = converted.value;
 - **写只读配置抛错**：这是刻意的行为——`readonlyConfig` 就是用来防止意外修改的；需要变更时对原来的 owned config 调用 `patchConfig`，而不是修改只读对象。
 - **`once` 报重入错误**：说明首次调用尚未返回时，函数体内部又调用了同一个被包装的函数；把递归逻辑挪到包装函数之外，或改用普通函数自身递归。
 - **需要"当前值订阅/重放"或资源释放生命周期**：`@migaia/utils` 不提供响应式状态或资源所有权模型，应使用专门的响应式/生命周期管理包，而不是在这里找替代品。
-- **`ownConfig`/`patchConfig` 抛 `CONFIG_LIMIT_EXCEEDED`**：说明配置图的深度/节点数/键数超过了限制；确认是否存在非预期的深层嵌套或循环膨胀，必要时通过 `limits` 选项显式收紧或（在确认安全的前提下）放宽默认值。
+- **`ownConfig`/`patchConfig` 抛 `CONFIG_LIMIT_EXCEEDED`**：说明配置图的深度/节点数/键数超过了限制；确认是否存在非预期的深层嵌套或循环膨胀，必要时收紧 `limits` 或缩小数据；包级默认上限不能放宽。
 
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
@@ -1319,3 +1324,175 @@ if (isNativeErrorValue(failure)) console.log(failure.stack)
 The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery. Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle.
 
 Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery. Resource retry/Suspense yields continue using the ordinary timer API.
+
+UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 UTF-8 与字节偏移；Base64 失败仍标明 Base64。
+
+## 公开入口索引
+
+下表逐名覆盖公开表面。具体参数、错误与生命周期约束见前述模块说明；类型 helper 同样列出用途。URL helper 只提供结构读取，不做 URL 合法性或安全性校验。
+
+| 名称 | 规范入口 | 用途与约束 |
+| --- | --- | --- |
+| `CONFIG_DELETE` | `@migaia/utils/config` | 根级 patch 或合并冲突决策中的删除哨兵；不会递归应用到嵌套 patch。 |
+| `ConfigProfile` | `@migaia/utils/config` | data 与 richRuntime 两种配置输入域常量。 |
+| `IAbortOperation` | `@migaia/utils/promise` | 接收本包生成的 signal，可返回值或 PromiseLike 的惰性操作。 |
+| `IAbortSignal` | `@migaia/utils/promise` | 无 DOM/Node 依赖的结构 signal：aborted、reason 与 abort 监听方法。 |
+| `IAbortSignalAdmission` | `@migaia/utils/promise` | Result of one structural signal admission read; callers retain all error and abort policy. |
+| `IAbortSignalRejection` | `@migaia/utils/promise` | Stable reasons for rejecting an untrusted abort-signal-shaped value without throwing. |
+| `IAbortTimeoutSignal` | `@migaia/utils/promise` | 合并信号与幂等 dispose 句柄；没有输入信号和预算时 signal 可为 undefined。 |
+| `IAbortTimeoutSignalOptions` | `@migaia/utils/promise` | 外部 signal、timeoutMs、scheduler、timeoutReason、report 的输入配置。 |
+| `IAsyncControls` | `@migaia/utils/promise` | 异步等待共享的 signal/signals、scheduler 与 unref 选项；signal 与 signals 互斥。 |
+| `ICollector` | `@migaia/utils` | Collector state before a field scope enables field-dependent predicates. |
+| `IConcurrencyLimiter` | `@migaia/utils/promise` | FIFO 并发 owner：run、close、whenIdle、dispose 与活动/排队数量。 |
+| `IConfigCombineOptions` | `@migaia/utils/config` | 按 profile、limits、合并策略、路径规则与冲突回调组合 owned 配置。 |
+| `IConfigConflictContext` | `@migaia/utils/config` | 冲突的当前路径、左右值、探测结果与输入 owner 上下文。 |
+| `IConfigConflictDecision` | `@migaia/utils/config` | 选择 left/right、delete 或一个替换 value；同步回调不得返回 thenable。 |
+| `IConfigLimits` | `@migaia/utils/config` | 配置图深度、节点、键与路径/分段长度上限；只允许收紧包级上限。 |
+| `IConfigMergeStrategies` | `@migaia/utils/config` | record/array/map/set 与 undefined 的合并策略。 |
+| `IConfigPatch` | `@migaia/utils/config` | 根字段的部分补丁；CONFIG_DELETE 表示删除该根字段。 |
+| `IConfigPatchOptions` | `@migaia/utils/config` | ownConfig 的 profile/limits 与 reuseUnchanged 结构共享控制。 |
+| `IConfigPathRule` | `@migaia/utils/config` | 按路径前缀选择局部合并策略。 |
+| `IConfigProfile` | `@migaia/utils/config` | data 或 richRuntime 输入域；后者允许受控 callable。 |
+| `IConfigReadResult` | `@migaia/utils/config` | 区分 missing 与 value（值可为 undefined）的路径读取结果。 |
+| `IConfigRecord` | `@migaia/utils/config` | 具有字符串键的只读配置根结构。 |
+| `IDeadlineOnlyOperation` | `@migaia/utils/promise` | Deadline-only operation used when `cooperativeCancellation` may be `false`: the operation then receives a stable never-aborting structural signal, not a host `AbortSignal`. |
+| `IDeferred` | `@migaia/utils/promise` | 原生 promise 与对应 resolve/reject 能力；由调用方拥有结算。 |
+| `IDiagnosticSnapshot` | `@migaia/utils/object` | 隔离的 value 与逐路径 diagnostics；不能假设所有 unsupported 叶已复制。 |
+| `IDiscriminatedByField` | `@migaia/utils/typing` | Groups a discriminated union by one top-level property-key field. |
+| `IDiscriminatedByPath` | `@migaia/utils/typing` | Groups a discriminated union by a typed string or tuple object path. |
+| `IErrorChainData` | `@migaia/utils/error` | Plain, finite JSON data accepted by the generic error boundary and structured clone. |
+| `IErrorChainStrategy` | `@migaia/utils/error` | Small policy surface for fields, privacy, budgets, portable data, and native restoration. |
+| `IErrorIdentity` | `@migaia/utils/error` | source/code 二元组，可附 phase/detail；语义归属由包边界决定。 |
+| `IErrorIdentityHooks` | `@migaia/utils/error` | 身份冲突与属性写入失败时的可选恢复策略，必须保留原始错误可达。 |
+| `IFieldCollector` | `@migaia/utils` | Collector state whose values are inferred from the latest `fieldBy`. |
+| `IFormatOptions` | `@migaia/utils/string` | String-template policies; defaults preserve missing placeholders and blank nullish values. |
+| `IFormatPlaceholder` | `@migaia/utils/string` | Placeholder delimiters used by the linear template scanner. |
+| `IManualScheduler` | `@migaia/utils/testing` | 测试用虚拟时钟，提供 advance 与 pendingCount；仅从 /testing 导入。 |
+| `INativeAbortSignal` | `@migaia/utils/promise` | The signal type for values this module creates with a real `AbortController` and hands to an operation, so callers can pass it to host APIs such as `fetch` without an assertion. |
+| `INumberFormatOptions` | `@migaia/utils/number` | Locale and Intl policy used by all numeric format helpers. |
+| `INumberFormatter` | `@migaia/utils/number` | Reusable formatter for hot loops such as inventory tables and market data. |
+| `INumericValue` | `@migaia/utils/number` | Public numeric values accepted without lossy coercion from strings. |
+| `IObjectPath` | `@migaia/utils/object` | Typed dot/bracket paths, capped at eight levels to bound compiler work. |
+| `IObjectPathInput` | `@migaia/utils/object` | All statically valid string and tuple paths for one root type. |
+| `IObjectPathSegment` | `@migaia/utils/object` | 路径元组中的字符串、数字或 symbol 键。 |
+| `IObjectPathTuple` | `@migaia/utils/object` | 由字符串、数字或 symbol 构成的只读路径分段数组。 |
+| `IObjectPathTupleFor` | `@migaia/utils/object` | Typed readonly tuple paths, including number indexes and symbol object keys. |
+| `IObjectPathValue` | `@migaia/utils/object` | Resolves a string or tuple path to its value type. |
+| `IObjectPathWriteValue` | `@migaia/utils/object` | Resolves the accepted replacement type for a string or tuple path. |
+| `IOwnConfigOptions` | `@migaia/utils/config` | 选择 data/richRuntime profile 并收紧配置资源预算。 |
+| `IOwnDescriptorsSnapshot` | `@migaia/utils/object` | Result of one non-throwing own-descriptor capture at an object boundary. |
+| `IOwnedConfig` | `@migaia/utils/config` | 由 ownConfig 接纳并登记所有权的配置类型；品牌不授予伪造对象运行时权限。 |
+| `IPathAccessor` | `@migaia/utils/object` | 维护当前 immutable 根，提供 get/set、probeValue 与 parsePath。 |
+| `IPathAccessorOptions` | `@migaia/utils/object` | 缺失、阻塞、读取失败与 get/set 转换回调。 |
+| `IPathBlockedProbe` | `@migaia/utils/object` | 路径被非对象中间值阻塞，记录失败分段与 parent。 |
+| `IPathFailedProbe` | `@migaia/utils/object` | 成员反射失败，保留原始 error 与失败路径位置。 |
+| `IPathGetEvent` | `@migaia/utils/object` | 携带原路径、已解析分段、读取 probe 与 replace 的读取转换事件。 |
+| `IPathMissingProbe` | `@migaia/utils/object` | 路径成员缺失，记录失败分段与已解析前缀。 |
+| `IPathProbe` | `@migaia/utils/object` | 路径探测的 value/missing/blocked/failed 判别联合。 |
+| `IPathSetEvent` | `@migaia/utils/object` | 携带待写新值、synthetic probe 与 replace 的写转换事件。 |
+| `IPathValueProbe` | `@migaia/utils/object` | 成功读取的路径、分段与按路径推导的值。 |
+| `IPrimitive` | `@migaia/utils/value` | string、number、boolean、bigint、symbol、null 或 undefined。 |
+| `IProbePropertyResult` | `@migaia/utils/object` | 属性 missing/value/failed 判别结果；has/get trap 失败均作为数据返回。 |
+| `IPropertyRead` | `@migaia/utils/error` | Result of one property read; failures retain the exact value thrown by the getter. |
+| `IRetryContext` | `@migaia/utils/promise` | 当前 attempt、该次尝试的原生 signal 与可选 remainingMs。 |
+| `IRetryFailureContext` | `@migaia/utils/promise` | 失败策略上下文，增加 maxAttempts；不保证提供 remainingMs。 |
+| `IScheduledTask` | `@migaia/utils/scheduler` | Handle of one scheduled callback. |
+| `IScheduler` | `@migaia/utils/scheduler` | The only scheduler contract. |
+| `ISerializedErrorChain` | `@migaia/utils/error` | Frozen error tree; extension fields are admitted only by the caller's strategy whitelist. |
+| `ISnapshotDiagnostic` | `@migaia/utils/object` | 快照中 accessor/read-failed/unsupported 的路径、原因和原始 cause。 |
+| `IStringConversion` | `@migaia/utils/string` | Outcome of one conversion; failures retain the exact value thrown by user coercion. |
+| `IThenableInspection` | `@migaia/utils/function` | 单次 then getter 的捕获结果；普通值返回空对象，读取失败保留 error。 |
+| `IThenableProbe` | `@migaia/utils/function` | Result of a single, failure-contained thenable inspection. |
+| `ITimeoutOperation` | `@migaia/utils/promise` | 接收本包生成的原生 signal，返回值或 PromiseLike 的限时操作。 |
+| `IUrlLike` | `@migaia/utils/typing` | A URL given either as text or as any object with an `href`, such as a WHATWG `URL`. |
+| `IUtilsErrorCode` | `@migaia/utils/error` | UtilsErrorCode 常量对象的值联合；不是任意字符串。 |
+| `IUtilsReporter` | `@migaia/utils/promise` | 异步控制的 late-rejection/cleanup/reporter 诊断回调；operation 指明来源。 |
+| `IWallClock` | `@migaia/utils/scheduler` | Wall clock for diagnostic timestamps only. |
+| `MAX_NATIVE_RECURSION_DEPTH` | `@migaia/utils/function` | Maximum synchronous reentrancy before consumers spill work from the native stack. |
+| `ThenableProbeKind` | `@migaia/utils/function` | Stable outcomes for one `.then` admission read. |
+| `UtilsAbortError` | `@migaia/utils/promise` | Error representing cooperative cancellation. |
+| `UtilsError` | `@migaia/utils/error` | Base error retaining the utils source and stable semantic code. |
+| `UtilsErrorCode` | `@migaia/utils/error` | Stable semantic codes emitted by the utils package boundary. |
+| `UtilsTimeoutError` | `@migaia/utils/error` | Error representing an operation, attempt, or total deadline. |
+| `admitAbortSignal` | `@migaia/utils/promise` | Admits an abort signal shape through one `aborted` read without probing `reason` or subscribing. |
+| `assimilateCapturedThen` | `@migaia/utils/function` | Invokes an already-captured then method once with its original thenable receiver. |
+| `attachErrorIdentity` | `@migaia/utils/error` | Attaches stable identity without replacing the original object. |
+| `attachSecondaryErrors` | `@migaia/utils/error` | Appends secondary failures to a primary without changing primary identity. |
+| `base64ToBytes` | `@migaia/utils/bytes` | Decode canonical RFC 4648 Base64. |
+| `bytesToBase64` | `@migaia/utils/bytes` | Encodes bytes using the canonical RFC 4648 alphabet. |
+| `collect` | `@migaia/utils` | Creates a lazy collector over a borrowed readonly array. |
+| `combineConfig` | `@migaia/utils/config` | Combines owned roots in source order using explicit record conflict policy. |
+| `combineErrors` | `@migaia/utils/error` | Combines zero, one, or many errors while preserving iteration failures. |
+| `createAbortTimeoutSignal` | `@migaia/utils/promise` | Creates the canonical merged signal used by adapters that need timeout plus external abort. |
+| `createConcurrencyLimiter` | `@migaia/utils/promise` | Limits active tasks with FIFO admission and cooperative queued cancellation. |
+| `createManualScheduler` | `@migaia/utils/testing` | Creates a deterministic scheduler over a virtual clock that starts at `0`. |
+| `createNumberFormatter` | `@migaia/utils/number` | Creates a reusable formatter so hot loops pay option parsing and cache lookup only once. |
+| `createPathAccessor` | `@migaia/utils/object` | Creates a reusable accessor whose immutable root advances after each successful set. |
+| `createSafeRecord` | `@migaia/utils/object` | Creates a new null-prototype dictionary whose untrusted keys cannot invoke prototype setters. |
+| `decodeUtf8` | `@migaia/utils/bytes` | Decodes UTF-8 bytes using replacement or fatal mode. |
+| `deferTask` | `@migaia/utils/scheduler` | Register one deferred job through its scheduler receiver. |
+| `deferred` | `@migaia/utils/promise` | Creates a native Promise deferred without exposing mutable settlement state. |
+| `deserializeErrorChain` | `@migaia/utils/error` | Rebuild a native error graph after validating the entire untrusted tree. |
+| `diagnosticSnapshot` | `@migaia/utils/object` | Produces a best-effort value snapshot plus explicit diagnostics. |
+| `encodeUtf8` | `@migaia/utils/bytes` | Encodes into a new byte array using the native encoder, or an equivalent loop when absent. |
+| `format` | `@migaia/utils/string` | Replaces placeholder paths in one linear scan. |
+| `formatCompactNumber` | `@migaia/utils/number` | Formats large quantitative values with compact notation and caller-owned precision. |
+| `formatCurrency` | `@migaia/utils/number` | Formats money while requiring the caller to own currency and rounding policy. |
+| `formatInteger` | `@migaia/utils/number` | Formats inventory-style whole numbers; callers may override fraction policy explicitly. |
+| `formatNumber` | `@migaia/utils/number` | Formats one number or bigint with explicit Intl policy and cached formatter reuse. |
+| `formatPercent` | `@migaia/utils/number` | Formats a ratio as a percentage while leaving precision policy configurable. |
+| `get` | `@migaia/utils/object` | Reads one path; missing/blocked paths yield undefined while getter failures remain observable. |
+| `hostRethrowReporter` | `@migaia/utils/promise` | Reports a diagnostic to the host without creating an unhandled rejected Promise. |
+| `identitySnapshot` | `@migaia/utils/object` | Returns the original value while making identity preservation explicit. |
+| `immutableSnapshot` | `@migaia/utils/object` | Produces an independent immutable data snapshot for supported plain values. |
+| `inspectThenable` | `@migaia/utils/function` | Reads a callback result's then property once for synchronous-contract enforcement. |
+| `isArrayBuffer` | `@migaia/utils/bytes` | Recognizes ArrayBuffer internal slots across realms, including detached buffers, without accepting SharedArrayBuffer, proxies, or objects that imitate the public constructor shape. |
+| `isBlankString` | `@migaia/utils/value` | Detects empty or whitespace-only strings without coercing non-string values. |
+| `isEmptyValue` | `@migaia/utils/value` | Detects common business-form emptiness while preserving `0`, `0n`, and `false` as real values. |
+| `isNativeErrorValue` | `@migaia/utils/error` | Recognizes Error-family prototype chains across realms for native identity preservation. |
+| `isNullish` | `@migaia/utils/value` | Narrows null and undefined without treating other falsy business values as absent. |
+| `isPlainObject` | `@migaia/utils/object` | Accepts only ordinary record objects or null-prototype records, never arrays. |
+| `isPrimitive` | `@migaia/utils/value` | Narrows all JavaScript primitives without allocating a runtime type tag. |
+| `isSafeIntegerValue` | `@migaia/utils/value` | Narrows finite safe integers without converting strings, boxed numbers, or other values. |
+| `isUint8Array` | `@migaia/utils/bytes` | Recognizes Uint8Array internal slots across realms and subclasses without trusting mutable prototypes, constructor names, or Symbol.toStringTag properties supplied by the value. |
+| `isUrlObject` | `@migaia/utils` | True for the object form of `IUrlLike`: a non-null object whose `href` is a string. |
+| `isUtilsAbortError` | `@migaia/utils/error` | 先验证 utils 错误形状与身份，再检查 ABORTED。 |
+| `isUtilsError` | `@migaia/utils/error` | Recognizes diagnostic error shapes only when both utils identity fields are valid. |
+| `isUtilsTimeoutError` | `@migaia/utils/error` | 先验证 utils 错误形状与身份，再检查 DEADLINE_EXCEEDED。 |
+| `noop` | `@migaia/utils/function` | Returns a function that always returns the same stable value. |
+| `normalizeSerializedErrorChain` | `@migaia/utils/error` | Validate and freeze a fresh wire error tree before any receiver uses its fields. |
+| `observeThenableRejection` | `@migaia/utils/function` | Observes a captured thenable rejection while containing reporter failures at the boundary. |
+| `once` | `@migaia/utils/function` | Memoizes a synchronous function, including its first thrown result. |
+| `onceAsync` | `@migaia/utils/function` | Memoizes one asynchronous invocation and preserves exact Promise identity. |
+| `ownConfig` | `@migaia/utils/config` | Creates a validated isolated graph with a runtime ownership brand. |
+| `parseConfigPath` | `@migaia/utils/config` | Applies config limits and string-key policy over the canonical object-path parser. |
+| `parseObjectPath` | `@migaia/utils/object` | Parses strict `a.b.[0].c` syntax or snapshots a tuple path. |
+| `patchConfig` | `@migaia/utils/config` | Applies a root-level copy-on-write overlay. |
+| `probeObjectPath` | `@migaia/utils/object` | Parses and probes one path in a single operation. |
+| `probeObjectPathSegments` | `@migaia/utils/object` | Probes an already parsed tuple without reparsing it during delivery. |
+| `probeProperty` | `@migaia/utils/object` | Reads one property exactly once and exposes getter failures explicitly. |
+| `probeThenable` | `@migaia/utils/function` | Reads `value.then` once and returns an explicit discriminant. |
+| `raceWithAbort` | `@migaia/utils/promise` | Races a lazy operation against one or more external abort signals without creating a timer. |
+| `reachErrorChain` | `@migaia/utils/error` | 按 identity 去重遍历 cause 与 aggregate children，受策略的对象预算约束。 |
+| `readConfigPath` | `@migaia/utils/config` | Reads a config path and distinguishes missing from an undefined value. |
+| `readUrlHref` | `@migaia/utils` | Returns the text form of a URL-like value: the string itself, or the object's `href`. |
+| `readonlyConfig` | `@migaia/utils/config` | Creates a cached readonly facade that rejects structural mutation. |
+| `retry` | `@migaia/utils/promise` | Enforces the retry task's outer deadline, including policy and backoff admission work. |
+| `safeErrorReason` | `@migaia/utils/error` | Reads an arbitrary failure's diagnostic reason once, returning a caller-owned safe fallback. |
+| `sanitizeErrorText` | `@migaia/utils/error` | Replace lone surrogates and retain the longest allowed UTF-8 scalar prefix. |
+| `serializeErrorChain` | `@migaia/utils/error` | Projects any thrown value into a bounded, frozen, language-neutral error tree. |
+| `set` | `@migaia/utils/object` | Performs an immutable path update with structural sharing and missing-container creation. |
+| `sleep` | `@migaia/utils/promise` | Resolves after a scheduler delay or rejects on cooperative abort. |
+| `snapshotOwnDescriptors` | `@migaia/utils/object` | Captures own descriptors at most once and contains revoked-proxy or descriptor-trap failures. |
+| `splitUtf8` | `@migaia/utils/bytes` | Splits normalized UTF-8 text within maxBytes without splitting a Unicode scalar value. |
+| `streamBase64Chunks` | `@migaia/utils/bytes` | 按 maxChunkBytes 产生规范 Base64 块；块宽为不超过预算的 3 字节倍数。 |
+| `structuredDiagnosticSnapshot` | `@migaia/utils/object` | Produces one structuredClone-first diagnostic projection for tolerant consumers. |
+| `systemScheduler` | `@migaia/utils/scheduler` | Default scheduler: `performance.now()` as the monotonic clock and host `setTimeout` / `clearTimeout` for timers. |
+| `systemWallClock` | `@migaia/utils/scheduler` | Default wall clock: `Date.now()` epoch milliseconds, for diagnostic timestamps only. |
+| `toError` | `@migaia/utils/error` | Converts arbitrary thrown values while preserving the original as cause. |
+| `toPromise` | `@migaia/utils/promise` | Runs one synchronous computation immediately while normalizing its value or thrown reason to a native Promise settlement. |
+| `tryReadProperty` | `@migaia/utils/error` | Reads one property with the original receiver and returns a throwing getter's value as data. |
+| `tryString` | `@migaia/utils/string` | Converts a value once with native String semantics, keeping strings unchanged. |
+| `utf8ByteLength` | `@migaia/utils/bytes` | Counts UTF-8 bytes without allocating a buffer or iterator. |
+| `walkErrorCauses` | `@migaia/utils/error` | Walks cause and AggregateError chains with bounded identity deduplication. |
+| `withTimeout` | `@migaia/utils/promise` | Races a lazy operation against an abort-aware deadline. |

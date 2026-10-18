@@ -10,6 +10,44 @@ import {
 } from '../src/config.js'
 
 describe('config primitives', () => {
+  it('U-D02 rejects setMilliseconds through every readonly Date entry', () => {
+    /** Both accessors must protect the same owned Date from supported native mutators. */
+    const owned = ownConfig({ when: new Date(0) })
+    /** Direct readonly view retains native Date reads while denying writes. */
+    const view = readonlyConfig(owned)
+    expect(() => view.when.setMilliseconds(123)).toThrowError(
+      expect.objectContaining({ source: '@migaia/utils', code: 'CONFIG_READONLY' })
+    )
+    /** Path reads return a discriminated result whose value carries the same protection. */
+    const read = readConfigPath(owned, 'when')
+    expect(read.kind).toBe('value')
+    if (read.kind === 'value')
+      expect(() => (read.value as Date).setMilliseconds(123)).toThrowError(
+        expect.objectContaining({ source: '@migaia/utils', code: 'CONFIG_READONLY' })
+      )
+    expect(owned.when.getTime()).toBe(0)
+  })
+
+  it('U-D03 reads frozen nested descriptors through stable recursive readonly views', () => {
+    /** Frozen arrays and records are valid owned data, including shared nested identities. */
+    const nested = Object.freeze({ value: 1 })
+    /** Ownership keeps source descriptors; the readonly facade must not violate Proxy invariants. */
+    const owned = ownConfig(Object.freeze({ nested, items: Object.freeze([nested]) }))
+    /** Repeated reads must share the same readonly view without exposing the mutable raw value. */
+    const view = readonlyConfig(owned)
+    expect(view.nested.value).toBe(1)
+    expect(view.items[0]).toBe(view.nested)
+    expect(readConfigPath(owned, 'nested')).toEqual({ kind: 'value', value: view.nested })
+    expect(Array.isArray(view.items)).toBe(true)
+    expect(Object.keys(view)).toEqual(['nested', 'items'])
+    expect('nested' in view).toBe(true)
+    expect(Object.getOwnPropertyDescriptor(owned, 'nested')?.configurable).toBe(false)
+    expect(() => Reflect.set(view.nested, 'value', 2)).toThrowError(
+      expect.objectContaining({ source: '@migaia/utils', code: 'CONFIG_READONLY' })
+    )
+    expect(owned.nested.value).toBe(1)
+  })
+
   it('supports owned copy-on-write and stable empty identity', () => {
     const base = ownConfig({ a: 1, nested: { ok: true } })
     expect(patchConfig(base, {})).toBe(base)

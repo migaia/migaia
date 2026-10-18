@@ -119,7 +119,10 @@ export function base64ToBytes(value: string, target?: Uint8Array): Uint8Array {
 /** Encodes a byte sequence as canonical chunks with a bounded chunk size. */
 export function* streamBase64Chunks(value: Uint8Array, maxChunkBytes = 32763): Iterable<string> {
   if (!Number.isSafeInteger(maxChunkBytes) || maxChunkBytes < 3)
-    throw new RangeError(UtilsErrorText.invalidArgument('maxChunkBytes', 'a safe integer >= 3'))
+    throw attachErrorIdentity(
+      new RangeError(UtilsErrorText.invalidArgument('maxChunkBytes', 'a safe integer >= 3')),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+    )
   const width = maxChunkBytes - (maxChunkBytes % 3)
   for (let offset = 0; offset < value.length; offset += width)
     yield bytesToBase64(value.subarray(offset, Math.min(offset + width, value.length)))
@@ -202,7 +205,7 @@ export function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boole
       codePoint > 0x10ffff ||
       (codePoint >= 0xd800 && codePoint <= 0xdfff)
     ) {
-      if (fatal) throw encodingError(start)
+      if (fatal) throw encodingError(start, 'UTF-8')
       offset = start + 1
       result += '\ufffd'
     } else result += String.fromCodePoint(codePoint)
@@ -213,7 +216,10 @@ export function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boole
 /** Splits normalized UTF-8 text within maxBytes without splitting a Unicode scalar value. */
 export function splitUtf8(value: string, maxBytes: number): readonly string[] {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 4)
-    throw new RangeError(UtilsErrorText.invalidArgument('maxBytes', 'a safe integer >= 4'))
+    throw attachErrorIdentity(
+      new RangeError(UtilsErrorText.invalidArgument('maxBytes', 'a safe integer >= 4')),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+    )
   if (value.length === 0) return ['']
   /** Completed chunks preserve input order and the existing empty-input special case. */
   const chunks: string[] = []
@@ -246,8 +252,12 @@ function readUtf8CodePoint(value: string, index: number): number {
   return codePoint >= 0xd800 && codePoint <= 0xdfff ? 0xfffd : codePoint
 }
 
-function encodingError(offset: number, cause?: unknown): TypeError {
-  const error = new TypeError(UtilsErrorText.invalidEncoding('Base64', offset), { cause })
+/** Names the actual decoder while retaining the shared registered encoding failure identity. */
+function encodingError(offset: number, encoding: 'Base64' | 'UTF-8' = 'Base64'): TypeError {
+  /** Native TypeError remains the public malformed-input error family. */
+  const error = new TypeError(UtilsErrorText.invalidEncoding(encoding, offset), {
+    cause: undefined
+  })
   Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
   Object.defineProperty(error, 'code', { value: UtilsErrorCode.invalidEncoding, enumerable: true })
   return error

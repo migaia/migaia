@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { type IScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { abortableDelay, createAbortController, LifecycleErrorCode } from '../src/index.js'
 
 describe('review 1c abortableDelay', () => {

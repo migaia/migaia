@@ -7,6 +7,7 @@ import {
   UtilsTimeoutError
 } from './error.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.js'
+import { reportUnhandledError } from './host-report.js'
 
 export { UtilsAbortError } from './error.js'
 
@@ -41,7 +42,7 @@ export type INativeAbortSignal = typeof globalThis extends {
  * requirement of every such consumer, and a packed consumer compiling under `lib: ["ES2022"]` fails
  * on a name this runtime-neutral package should never have asked it to provide.
  */
-export type IAbortControllerLike = {
+type IAbortControllerLike = {
   readonly signal: IAbortSignal
   abort(reason?: unknown): void
 }
@@ -126,14 +127,7 @@ export type IUtilsReporter = (
   }
 ) => void
 /** Reports a diagnostic to the host without creating an unhandled rejected Promise. */
-export const hostRethrowReporter: IUtilsReporter = (error) => {
-  const enqueue = globalThis.queueMicrotask
-  if (typeof enqueue === 'function')
-    enqueue(() => {
-      throw error
-    })
-  else throw error
-}
+export const hostRethrowReporter: IUtilsReporter = reportUnhandledError
 export type ITimeoutOperation<T> = (context: {
   readonly signal: INativeAbortSignal
 }) => T | PromiseLike<T>
@@ -217,8 +211,9 @@ export function createAbortTimeoutSignal(
   const report = options.report ?? hostRethrowReporter
   if (timeoutMs === undefined) return { signal: externalSignal, dispose: () => undefined }
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
-    throw new RangeError(
-      UtilsErrorText.invalidArgument('timeoutMs', 'a finite non-negative number')
+    throw attachErrorIdentity(
+      new RangeError(UtilsErrorText.invalidArgument('timeoutMs', 'a finite non-negative number')),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
     )
   const controller = new AbortController()
   const scheduler = options.scheduler ?? systemScheduler
@@ -328,12 +323,18 @@ export function sleep(delayMs: number, options?: IAsyncControls): Promise<void> 
   const scheduler = schedulerOption ?? systemScheduler
   if (!Number.isFinite(delayMs) || delayMs < 0)
     return Promise.reject(
-      new RangeError(UtilsErrorText.invalidArgument('delayMs', 'a finite non-negative number'))
+      attachErrorIdentity(
+        new RangeError(UtilsErrorText.invalidArgument('delayMs', 'a finite non-negative number')),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      )
     )
   if (signal && signalsOption)
     return Promise.reject(
-      new TypeError(
-        UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+      attachErrorIdentity(
+        new TypeError(
+          UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+        ),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
       )
     )
   const signals = snapshotSignals(signalsOption, signal)
@@ -386,8 +387,9 @@ export function sleep(delayMs: number, options?: IAsyncControls): Promise<void> 
       }, delayMs)
       if (unref) timer.unref?.()
       for (const candidate of signals) {
-        candidate.addEventListener('abort', onAbort, { once: true })
+        // Own rollback before registration, which may acquire a listener and then throw.
         admitted.push(candidate)
+        candidate.addEventListener('abort', onAbort, { once: true })
       }
       const after = observeAbort(signals)
       if (after.kind === 'failed') {
@@ -409,7 +411,10 @@ type IWithTimeoutOptions = IAsyncControls & {
   readonly zeroTimeoutBehavior?: 'skip' | 'start'
   /** Disables internal cancellation allocation for deadline-only operations. */
   readonly cooperativeCancellation?: boolean
-  readonly [retryAttemptController]?: IAbortControllerLike
+  readonly [retryAttemptController]?: {
+    readonly controller: IAbortControllerLike
+    readonly scope: 'attempt' | 'total'
+  }
 }
 
 /**
@@ -439,23 +444,28 @@ export function withTimeout<T>(
   const unref = options.unref
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
     return Promise.reject(
-      new RangeError(UtilsErrorText.invalidArgument('timeoutMs', 'a finite non-negative number'))
+      attachErrorIdentity(
+        new RangeError(UtilsErrorText.invalidArgument('timeoutMs', 'a finite non-negative number')),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      )
     )
   if (signal && signalsOption)
     return Promise.reject(
-      new TypeError(
-        UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+      attachErrorIdentity(
+        new TypeError(
+          UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+        ),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
       )
     )
   const signals = snapshotSignals(signalsOption, signal)
   const report = reportOption ?? hostRethrowReporter
-  const internalController = (
-    options as typeof options & {
-      [retryAttemptController]?: IAbortControllerLike
-    }
-  )[retryAttemptController]
+  /** Retry owns the attempt controller and the semantic scope of its deadline. */
+  const internalDeadline = options[retryAttemptController]
   const controller =
-    internalController ?? (cooperativeCancellation ? new AbortController() : undefined)
+    internalDeadline?.controller ?? (cooperativeCancellation ? new AbortController() : undefined)
+  /** Ordinary withTimeout calls retain operation scope; retry passes its actual budget scope. */
+  const timeoutScope = internalDeadline?.scope ?? 'operation'
   const operationSignal = controller?.signal
   return new Promise<T>((resolve, reject) => {
     let settled = false
@@ -503,12 +513,12 @@ export function withTimeout<T>(
     if (initial.kind === 'failed') return finish(() => reject(initial.error), initial.error)
     if (initial.kind === 'aborted') return onAbort()
     if (timeoutMs === 0 && zeroTimeoutBehavior !== 'start') {
-      const error = new UtilsTimeoutError('operation', 0)
+      const error = new UtilsTimeoutError(timeoutScope, 0)
       return finish(() => reject(error), error)
     }
     timer = scheduler.schedule(() => {
       timedOut = true
-      const timeoutError = new UtilsTimeoutError('operation', timeoutMs)
+      const timeoutError = new UtilsTimeoutError(timeoutScope, timeoutMs)
       controller?.abort(timeoutError)
       finish(() => reject(timeoutError), timeoutError)
     }, timeoutMs)
@@ -521,8 +531,9 @@ export function withTimeout<T>(
     }
     try {
       for (const candidate of signals) {
-        candidate.addEventListener('abort', onAbort, { once: true })
+        // A failed registration may still have installed the listener.
         admitted.push(candidate)
+        candidate.addEventListener('abort', onAbort, { once: true })
       }
     } catch (error) {
       finish(() => reject(error), error)
@@ -572,8 +583,11 @@ export function raceWithAbort<T>(
   const cleanupPolicy = options.cleanupPolicy ?? 'reject'
   if (signal && signalsOption)
     return Promise.reject(
-      new TypeError(
-        UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+      attachErrorIdentity(
+        new TypeError(
+          UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+        ),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
       )
     )
   const signals = snapshotSignals(signalsOption, signal)
@@ -624,8 +638,9 @@ export function raceWithAbort<T>(
     if (initial.kind === 'aborted') return onAbort()
     try {
       for (const candidate of signals) {
-        candidate.addEventListener('abort', onAbort, { once: true })
+        // A failed registration may still have installed the listener.
         admitted.push(candidate)
+        candidate.addEventListener('abort', onAbort, { once: true })
       }
     } catch (error) {
       const admissionError = attachErrorIdentity(
@@ -683,17 +698,26 @@ async function retryCore<T>(
   }
 ): Promise<T> {
   if (!Number.isSafeInteger(options.maxAttempts) || options.maxAttempts < 1)
-    throw new RangeError(UtilsErrorText.invalidArgument('maxAttempts', 'a positive safe integer'))
+    throw attachErrorIdentity(
+      new RangeError(UtilsErrorText.invalidArgument('maxAttempts', 'a positive safe integer')),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+    )
   if (options.signal && options.signals)
-    throw new TypeError(
-      UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+    throw attachErrorIdentity(
+      new TypeError(
+        UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+      ),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
     )
   for (const [name, value] of [
     ['totalTimeoutMs', options.totalTimeoutMs],
     ['attemptTimeoutMs', options.attemptTimeoutMs]
   ] as const)
     if (value !== undefined && (!Number.isFinite(value) || value < 0))
-      throw new RangeError(UtilsErrorText.invalidArgument(name, 'a finite non-negative number'))
+      throw attachErrorIdentity(
+        new RangeError(UtilsErrorText.invalidArgument(name, 'a finite non-negative number')),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      )
   const externalSignals = options.signals ?? (options.signal ? [options.signal] : [])
   const preAbort = observeAbort(externalSignals)
   if (preAbort.kind === 'failed') throw preAbort.error
@@ -720,7 +744,7 @@ async function retryCore<T>(
           zeroTimeoutBehavior: options.zeroTimeoutBehavior,
           unref: options.unref,
           report: options.report,
-          [retryAttemptController]: attemptController
+          [retryAttemptController]: { controller: attemptController, scope: 'attempt' }
         })
       }
       if (remainingMs !== undefined) {
@@ -732,7 +756,7 @@ async function retryCore<T>(
             zeroTimeoutBehavior: options.zeroTimeoutBehavior,
             unref: options.unref,
             report: options.report,
-            [retryAttemptController]: attemptController
+            [retryAttemptController]: { controller: attemptController, scope: 'total' }
           })
         } catch (error) {
           if (error instanceof UtilsTimeoutError)
@@ -771,8 +795,9 @@ async function retryCore<T>(
           ? options.delay(error, { attempt, maxAttempts: options.maxAttempts, signal })
           : (options.delay ?? 0)
       if (!Number.isFinite(delay) || delay < 0)
-        throw new RangeError(
-          UtilsErrorText.invalidArgument('delay', 'a finite non-negative number')
+        throw attachErrorIdentity(
+          new RangeError(UtilsErrorText.invalidArgument('delay', 'a finite non-negative number')),
+          { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
         )
       if (options.totalTimeoutMs !== undefined) {
         const elapsed = (options.scheduler?.now() ?? systemScheduler.now()) - startedAt
@@ -796,6 +821,15 @@ export function retry<T>(
   options: Parameters<typeof retryCore<T>>[1]
 ): Promise<T> {
   const snapshot = { ...options }
+  if (snapshot.signal && snapshot.signals)
+    return Promise.reject(
+      attachErrorIdentity(
+        new TypeError(
+          UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
+        ),
+        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      )
+    )
   if (snapshot.totalTimeoutMs === undefined) return retryCore(operation, snapshot)
   const externalSignals = snapshotSignals(snapshot.signals, snapshot.signal)
   return withTimeout(
@@ -904,7 +938,10 @@ export function createConcurrencyLimiter(options: {
   const concurrency = options.concurrency
   const report = options.report ?? hostRethrowReporter
   if (!Number.isSafeInteger(concurrency) || concurrency < 1)
-    throw new RangeError(UtilsErrorText.invalidArgument('concurrency', 'a positive safe integer'))
+    throw attachErrorIdentity(
+      new RangeError(UtilsErrorText.invalidArgument('concurrency', 'a positive safe integer')),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+    )
   type IEntry = {
     readonly task: (context: { readonly signal?: IAbortSignal }) => unknown
     readonly signal?: IAbortSignal

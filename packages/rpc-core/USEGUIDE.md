@@ -993,7 +993,7 @@ release()
 
 ```ts
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing';
 
 const clock = createManualScheduler()
 const [sender, receiver] = createMemoryTransportPair({ scheduler: clock })

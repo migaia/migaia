@@ -1,5 +1,5 @@
 import { MessageChannel } from 'node:worker_threads'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 
 describe('Node child-port lazy replay ownership', () => {

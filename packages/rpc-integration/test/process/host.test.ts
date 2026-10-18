@@ -1,6 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import * as bindingModule from '../../../rpc-process/dist/process/plugin/binding.js'
 import { nativeHostFixture } from './fixtures/host-native.js'

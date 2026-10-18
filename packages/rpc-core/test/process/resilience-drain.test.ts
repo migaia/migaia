@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import { createRemoteBindingDrain } from '../../dist/remote/internal/binding-drain.js'

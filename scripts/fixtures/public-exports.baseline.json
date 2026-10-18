@@ -1494,7 +1494,6 @@
         "combineErrors",
         "createAbortTimeoutSignal",
         "createConcurrencyLimiter",
-        "createManualScheduler",
         "createNumberFormatter",
         "createPathAccessor",
         "createSafeRecord",
@@ -1580,7 +1579,6 @@
         "withTimeout"
       ],
       "./scheduler": [
-        "createManualScheduler",
         "deferTask",
         "systemScheduler",
         "systemWallClock"
@@ -1682,6 +1680,9 @@
         "formatInteger",
         "formatNumber",
         "formatPercent"
+      ],
+      "./testing": [
+        "createManualScheduler"
       ]
     }
   }

@@ -1,6 +1,7 @@
 import { access } from 'node:fs/promises'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
 import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
 import { createProcessTransport } from '@migaia/rpc-process'

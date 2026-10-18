@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createAbortTimeoutSignal, raceWithAbort } from '../src/promise.js'
-import { createManualScheduler } from '../src/scheduler.js'
+import { createManualScheduler } from '../src/testing.js'
 
 /** A structural signal whose reason accessor throws once per attempted read. */
 function hostileSignal(cause: unknown, initialAborted = false) {

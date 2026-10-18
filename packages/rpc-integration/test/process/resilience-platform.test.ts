@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createRemotePlugin } from '@migaia/rpc-core/remote'
 import { createSpawnProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
 import type { IProcessHandle } from '@migaia/supervision/process'

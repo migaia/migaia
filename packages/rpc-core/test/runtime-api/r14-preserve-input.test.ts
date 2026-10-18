@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { connected } from './fixture.js'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import {

@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { inspect } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { serializeRpcError } from '@migaia/rpc-contract'

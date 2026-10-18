@@ -1,7 +1,7 @@
 /* oxlint-disable unicorn/no-thenable -- The cancellation regression deliberately throws a captured thenable. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { Resource } from '../src/index.js'
 import { deferred, flushAsync } from './helpers.js'
 
