@@ -2352,44 +2352,59 @@ export const rpcProcessReference: ILibraryReference = {
       ),
       example: peerExample
     },
-    ...Object.fromEntries(
-      launchers.map(([module, name, en, zh]) => [
-        `adapters/${module}`,
-        {
-          summary: t(
-            `Launcher with ${en} (\`${name}\`) and the child-side \`openProcessStdioChannel\` for full sources.`,
-            `基于${zh}启动子进程的 launcher（\`${name}\`），以及供完整来源在子进程端读取自身 stdio 的 \`openProcessStdioChannel\`。`
-          ),
-          example: processSpawnExample(module, name)
-        }
-      ])
-    ),
-    ...Object.fromEntries(
-      sockets.map(([module, en, zh]) => [
-        `adapters/${module}`,
-        {
-          summary: t(
-            `Local sockets with ${en}: \`dialProcessByteChannel\` and \`listenProcessByteChannel\` (loopback TCP and Unix socket; Node/Bun also accept Windows pipes).`,
-            `基于${zh}的本机 socket 适配：拨号函数 \`dialProcessByteChannel\` 与监听函数 \`listenProcessByteChannel\`，支持回环 TCP、Unix socket；${module === 'deno-socket' ? '此入口拒绝 Windows 命名管道。' : '此入口也支持 Windows 命名管道。'}`
-          ),
-          example: processSocketExample(
-            module,
-            module === 'deno-socket' ? 'Deno' : module === 'bun-socket' ? 'Bun' : 'Node'
-          )
-        }
-      ])
-    ),
+    'adapters/node-child-process': {
+      summary: t(
+        'Use this adapter when a Node parent must start a child process and communicate through standard input and output. `createNodeProcessLauncher` creates the launcher using Node’s child-process API; `openProcessStdioChannel` opens the child’s own channel for manual setup.\n\nImport this platform subpath because the root exposes the general Peer API rather than the launcher. For an already running local service, use the matching socket adapter.',
+        '父进程运行于 `Node`，需要启动子进程并通过标准输入输出通信时，使用此适配器。`createNodeProcessLauncher` 基于 `Node` 的子进程接口创建启动器；手动配置子进程时，`openProcessStdioChannel` 打开子进程自身的通信通道。\n\n根入口提供通用对端接口，平台启动器从此子路径导入。若要连接已经运行的本机服务，使用对应的套接字适配器。'
+      ),
+      example: processSpawnExample('node-child-process', 'createNodeProcessLauncher')
+    },
+    'adapters/bun-spawn': {
+      summary: t(
+        'Use this adapter when a Bun parent must start a child process and communicate through standard input and output. `createBunProcessLauncher` creates the launcher using Bun’s Node-compatible child-process API; `openProcessStdioChannel` opens the child’s own channel for manual setup.\n\nImport this platform subpath because the root exposes the general Peer API rather than the launcher. For an already running local service, use the matching socket adapter.',
+        '父进程运行于 `Bun`，需要启动子进程并通过标准输入输出通信时，使用此适配器。`createBunProcessLauncher` 基于 `Bun` 提供的 `Node` 兼容子进程接口创建启动器；手动配置子进程时，`openProcessStdioChannel` 打开子进程自身的通信通道。\n\n根入口提供通用对端接口，平台启动器从此子路径导入。若要连接已经运行的本机服务，使用对应的套接字适配器。'
+      ),
+      example: processSpawnExample('bun-spawn', 'createBunProcessLauncher')
+    },
+    'adapters/deno-command': {
+      summary: t(
+        'Use this adapter when a Deno parent must start a child process and communicate through standard input and output. `createDenoProcessLauncher` creates the launcher using `Deno.Command`; `openProcessStdioChannel` opens the child’s own channel for manual setup.\n\nImport this platform subpath because the root exposes the general Peer API rather than the launcher. Deno requires permission to run child processes.',
+        '父进程运行于 `Deno`，需要启动子进程并通过标准输入输出通信时，使用此适配器。`createDenoProcessLauncher` 基于 `Deno.Command` 创建启动器；手动配置子进程时，`openProcessStdioChannel` 打开子进程自身的通信通道。\n\n根入口提供通用对端接口，平台启动器从此子路径导入。`Deno` 还需要获准运行子进程。'
+      ),
+      example: processSpawnExample('deno-command', 'createDenoProcessLauncher')
+    },
+    'adapters/node-socket': {
+      summary: t(
+        'Use this adapter when Node must connect to or listen for another process on the same machine. `dialProcessByteChannel` opens a connection, and `listenProcessByteChannel` creates a listener for local TCP or Unix sockets.\n\nImport this platform subpath for socket operations, which the root does not export. Windows named pipes are also supported; remote-machine addresses are rejected.',
+        '`Node` 需要连接或监听同一台机器上的其他进程时，使用此适配器。`dialProcessByteChannel` 打开连接，`listenProcessByteChannel` 创建监听端，支持本机回环地址与 `Unix` 套接字。\n\n根入口不导出这些套接字操作，因此从此平台子路径导入。也支持 `Windows` 命名管道，但拒绝远程机器地址。'
+      ),
+      example: processSocketExample('node-socket', 'Node')
+    },
+    'adapters/bun-socket': {
+      summary: t(
+        'Use this adapter when Bun must connect to or listen for another process on the same machine. `dialProcessByteChannel` opens a connection, and `listenProcessByteChannel` creates a listener for local TCP or Unix sockets.\n\nImport this platform subpath for socket operations, which the root does not export. Windows named pipes are also supported; remote-machine addresses are rejected.',
+        '`Bun` 需要连接或监听同一台机器上的其他进程时，使用此适配器。`dialProcessByteChannel` 打开连接，`listenProcessByteChannel` 创建监听端，支持本机回环地址与 `Unix` 套接字。\n\n根入口不导出这些套接字操作，因此从此平台子路径导入。也支持 `Windows` 命名管道，但拒绝远程机器地址。'
+      ),
+      example: processSocketExample('bun-socket', 'Bun')
+    },
+    'adapters/deno-socket': {
+      summary: t(
+        'Use this adapter when Deno must connect to or listen for another process on the same machine. `dialProcessByteChannel` opens a connection, and `listenProcessByteChannel` creates a listener for local TCP or Unix sockets.\n\nImport this platform subpath for socket operations, which the root does not export. Windows named pipes and remote-machine addresses are unsupported.',
+        '`Deno` 需要连接或监听同一台机器上的其他进程时，使用此适配器。`dialProcessByteChannel` 打开连接，`listenProcessByteChannel` 创建监听端，支持本机回环地址与 `Unix` 套接字。\n\n根入口不导出这些套接字操作，因此从此平台子路径导入。不支持 `Windows` 命名管道或远程机器地址。'
+      ),
+      example: processSocketExample('deno-socket', 'Deno')
+    },
     'adapters/electron-utility-process': {
       summary: t(
-        'Electron utility process launcher; requires `electron`.',
-        '在 Electron 主进程中启动 utility process 的 launcher，通过消息通道通信；需要安装 `electron`。'
+        'Use this adapter in Electron’s main process to start a utility process and exchange messages with it. `createElectronUtilityProcessLauncher` creates the launcher, whose process handle includes a message channel.\n\nImport this platform subpath because the root does not export the Electron launcher; the `electron` dependency must be available. This uses Electron messages rather than the standard-input byte channel provided by the other launchers.',
+        '在 `Electron` 主进程中，需要启动工具进程并与其交换消息时，使用此适配器。`createElectronUtilityProcessLauncher` 创建启动器，返回的进程句柄带有消息通道。\n\n根入口不导出 `Electron` 启动器，因此从此平台子路径导入，并确保已安装 `electron`。它使用 `Electron` 消息通信，不使用其他启动器的标准输入字节通道。'
       ),
       example: electronExample
     },
     'adapters/windows-job': {
       summary: t(
-        'Unsupported Windows Job launcher: `launch` always rejects before creating a process; the implementation does not load `koffi`.',
-        'Windows Job 对象启动器尚不支持实际启动；`launch` 在创建进程前总是拒绝，当前实现也不会加载 `koffi`。'
+        'This entry describes the current Windows Job launcher placeholder, so you can inspect its unsupported capabilities before choosing a launcher. `createWindowsJobProcessLauncher` returns a launcher whose `launch` always rejects without creating a process.\n\nThe root does not export this platform-specific factory. For working process startup, choose a supported launcher such as `adapters/node-child-process`; this entry currently provides no Windows Job resource enforcement.',
+        '此入口提供尚未实现的 `Windows Job` 进程启动器，供选择启动方式前查看其不支持的能力。`createWindowsJobProcessLauncher` 返回的启动器在调用 `launch` 时总是拒绝，不会创建进程。\n\n根入口不导出这个平台工厂。需要实际启动进程时，应选择 `adapters/node-child-process` 等已支持的入口；这里目前不提供 `Windows Job` 的资源限制能力。'
       ),
       example: adapterSymbols.createWindowsJobProcessLauncher!.example!
     }

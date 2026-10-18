@@ -4629,29 +4629,29 @@ const modules: ILibraryReference['modules'] = {
   },
   binary: {
     summary: t(
-      'Capture, prepare and restore closed binary manifests with exact original sidecar integrity; start with prepareRpcBinary or captureRpcBinaryData.',
-      '捕获、准备及恢复带精确原背板完整性的封闭二进制清单；从准备或捕获函数开始。'
+      'Use this entry when RPC messages contain byte buffers that must survive transport. `prepareRpcBinary` produces a description of the data and any separately carried buffers; `restoreRpcBinary` checks that description and restores the message.\n\nImport this subpath for the complete binary preparation and restoration workflow, which the root does not export. Use `binary/capture` when you need to capture data now and prepare it later.',
+      '当远程调用消息包含需要跨连接传递的字节缓冲区时，使用此入口。`prepareRpcBinary` 生成数据清单及需单独传递的缓冲区，`restoreRpcBinary` 校验清单并还原消息。\n\n根入口不导出这套完整的二进制准备与还原操作，因此从此子路径导入。若需要先捕获数据、稍后准备发送，使用 `binary/capture`。'
     ),
     example: binaryExample
   },
   'binary/capture': {
     summary: t(
-      'Narrow capture entry re-exports the canonical binary snapshot owner; start with captureRpcBinaryData and later call prepare.',
-      '精简捕获入口重新导出规范二进制快照所有者；从捕获函数开始，稍后调用准备。'
+      'Use this entry when the data must be captured before asynchronous encoding begins. `captureRpcBinaryData` captures the message synchronously; calling `prepare()` on its result later produces the binary description and buffers to send.\n\nImport this subpath for capture alone rather than the broader root API. Receiving and restoring those buffers belongs to `binary` or `binary/lazy`.',
+      '需要在异步编码开始前确定数据内容时，使用此入口。`captureRpcBinaryData` 同步捕获消息，稍后调用返回值的 `prepare()`，再生成待发送的数据清单和缓冲区。\n\n只需要捕获操作时，可直接导入此子路径，不必从根入口寻找相关能力。接收后的校验与还原由 `binary` 或 `binary/lazy` 提供。'
     ),
     example: binaryExample
   },
   'binary/inspect': {
     summary: t(
-      'Inspect actual native wrappers and complete backing sizes without encoding or hashing; start with readRpcNativeBinary.',
-      '不编码或作摘要而检查实际原生包装和完整背板大小；从原生二进制读取开始。'
+      'Use this entry to inspect a received native binary frame before decoding its message. `readRpcNativeBinary` checks the outer structure and counts the full underlying buffers against a size limit; `rpcBinaryView` reads a byte view’s offset and length.\n\nImport this inspection subpath because these operations are not exported by the root. Inspection does not encode data or verify its digest; use `binary` for preparation and restoration.',
+      '需要在解码消息前检查收到的原生二进制帧时，使用此入口。`readRpcNativeBinary` 检查外层结构，并按完整底层缓冲区核对大小上限；`rpcBinaryView` 读取字节视图的偏移与长度。\n\n根入口不导出这些检查操作，因此从此子路径导入。这里不编码数据，也不校验摘要；准备与还原消息请使用 `binary`。'
     ),
     example: 'const selected = readRpcNativeBinary(frame, limit)'
   },
   'binary/lazy': {
     summary: t(
-      'Lazy binary parser loading preserves original synchronous capture and digest ownership; start with prepareRpcBinary and matching restoreRpcBinary.',
-      '按需加载二进制解析器，保留原同步捕获及摘要所有权；从准备及对应恢复函数开始。'
+      'Use this entry to defer loading the binary codec until preparation or restoration needs it. `prepareRpcBinary` captures the message before loading the codec; `restoreRpcBinary` checks the binary description and restores the received data.\n\nImport this subpath for that loading behavior rather than the root, which does not expose these functions. Use `binary` when you want the ordinary entry without deferred codec loading.',
+      '希望等到准备或还原二进制消息时才加载编解码器，可使用此入口。`prepareRpcBinary` 在加载前先捕获消息，`restoreRpcBinary` 则校验二进制清单并还原收到的数据。\n\n根入口不提供这些函数；此子路径还明确选择了按需加载方式。无需延迟加载时，使用 `binary`。'
     ),
     example:
       "import { captureRpcBinaryData } from '@migaia/rpc-contract/binary/capture'\nimport { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\n" +
@@ -4659,99 +4659,99 @@ const modules: ILibraryReference['modules'] = {
   },
   errors: {
     summary: t(
-      'Bounded cross-realm error trees, native restoration and foreign bridge mapping; start with serializeRpcError and deserializeRpcError.',
-      '有界跨域错误树、原生恢复及外部桥映射；从错误序列化及反序列化开始。'
+      'Use this entry to carry an error and its causes across a process or language boundary. `serializeRpcError` turns the error tree into bounded data, and `deserializeRpcError` restores supported native error types while retaining the sender’s stack.\n\nThe root also exports these functions; this subpath groups the error tools for focused imports. Converting an error does not frame or send a message.',
+      '需要跨进程或跨语言传递错误及其原因时，使用此入口。`serializeRpcError` 把错误树转换为受大小限制的数据，`deserializeRpcError` 还原支持的原生错误类型并保留发送方的调用栈。\n\n根入口也导出这两个函数；此子路径便于集中导入错误工具。错误转换不负责分帧或发送消息。'
     ),
     example: errorExample
   },
   framing: {
     summary: t(
-      'Codec-independent fragments, original reassembly state and whole physical sizing; start with createStringFramer or createBinaryFramer.',
-      '独立于编解码的分片、原重组状态及整物理大小计量；从字符串或二进制分片工厂开始。'
+      'Use this entry to split an already encoded message into pieces and assemble received pieces back into one message. Start with `createStringFramer` for text or `createBinaryFramer` for bytes.\n\nImport this subpath because the root does not export these factories. For a continuous byte stream, choose the length-based framing in `framing/stream` or `framing/jsonrpc` instead.',
+      '需要把已编码消息拆成小片，并将收到的小片重新组成完整消息时，使用此入口。文本从 `createStringFramer` 开始，字节数据从 `createBinaryFramer` 开始。\n\n根入口不导出这两个工厂，因此从此子路径导入。如果底层连续传递字节而不保留消息边界，应使用 `framing/stream` 或 `framing/jsonrpc` 的长度分帧。'
     ),
     example: framerExample
   },
   'framing/jsonrpc': {
     summary: t(
-      'ASCII Content-Length plus UTF-8 JSON framing for foreign peers; start with encodeJsonRpcFrame and createJsonRpcFrameDecoder.',
-      '外部对端所用文本长度头及编码对象主体分帧；从对应编码函数和解码工厂开始。'
+      'Use this entry when a JSON-RPC peer sends messages over a byte stream, where one read may contain part of a message or several messages. Each frame starts with a `Content-Length` header that gives the JSON body’s UTF-8 byte length.\n\nImport this subpath because the root does not export this framing format. `encodeJsonRpcFrame` creates a frame; `createJsonRpcFrameDecoder` accepts incoming byte chunks and returns complete messages. It does not execute JSON-RPC methods or perform the connection handshake.',
+      '当 `JSON-RPC` 对端通过字节流传消息，一次读取可能只有半条消息，也可能包含多条消息时，使用此入口。每帧先写 `Content-Length` 头，声明后续消息正文编码后的字节数。\n\n根入口不导出这种分帧格式，因此从此子路径导入。`encodeJsonRpcFrame` 生成一帧，`createJsonRpcFrameDecoder` 接收陆续到达的字节块并返回完整消息。这里不执行远程方法，也不完成连接握手。'
     ),
     example: jsonExample
   },
   'framing/stream': {
     summary: t(
-      'Native four-byte big-endian length framing plus first-channel bootstrap/handshake receivers; start with createRpcStreamFrameDecoder.',
-      '原生四字节大端长度分帧及首通道引导握手接收器；从字节流解码工厂开始。'
+      'Use this entry to preserve message boundaries over the native RPC byte stream. `encodeRpcStreamFrame` prefixes a payload with its length in four bytes; `createRpcStreamFrameDecoder` joins arbitrary incoming chunks and delivers complete payloads to a callback.\n\nImport this subpath for the native framing functions, which the root does not export. A JSON-RPC peer uses the different header format in `framing/jsonrpc`.',
+      '原生远程调用协议通过连续字节流传输时，使用此入口划定每条消息的边界。`encodeRpcStreamFrame` 在内容前写入四字节长度，`createRpcStreamFrameDecoder` 拼接任意切分的输入，并通过回调交付完整内容。\n\n根入口不导出这些原生分帧函数，因此从此子路径导入。`JSON-RPC` 对端需要另一种头部格式，应使用 `framing/jsonrpc`。'
     ),
     example: streamExample
   },
   'framing/v1': {
     summary: t(
-      'Versioned whole-message identity framer keeps the canonical original callables; start with messageFramer.',
-      '带版本整消息恒等分片器保留规范原函数；从版本消息分片器开始。'
+      'Use this entry when the carrier already delivers complete messages and you need the version-one framing contract. `messageFramer.frame` returns the input as one frame, and `messageFramer.accept` returns it as a complete message.\n\nImport this versioned subpath for `messageFramer`; the root does not export it. It does not split large messages or recover boundaries from a byte stream.',
+      '底层已经逐条交付完整消息，而你需要第一版分帧契约时，使用此入口。`messageFramer.frame` 将输入作为唯一一帧返回，`messageFramer.accept` 将输入作为完整消息返回。\n\n根入口不导出 `messageFramer`，因此从此带版本的子路径导入。它不拆分大消息，也不从连续字节流中恢复消息边界。'
     ),
     example: 'const frames = messageFramer.frame(message, context); messageFramer.close()'
   },
   handshake: {
     summary: t(
-      'First-channel offer, intersection and reply verification; start with createRpcHello and complete both responder and initiator steps.',
-      '首通道提议、交集及响应校验；从问候构造开始，完成响应方和发起方双方步骤。'
+      'Use this entry to agree on a protocol version, data format and shared capabilities before exchanging RPC messages. `createRpcHello` creates the initiator’s opening message; `acceptRpcHandshake` selects compatible settings and creates the reply.\n\nThe initiator then validates that reply with `completeRpcHandshake`. These functions also exist at the root; this subpath groups the negotiation tools, while the connection owner remains responsible for checking credentials.',
+      '交换远程调用消息前，需要先约定协议版本、数据格式和共同支持的能力，可使用此入口。`createRpcHello` 生成发起方的开场消息，`acceptRpcHandshake` 选择双方兼容的设置并生成回复。\n\n发起方随后用 `completeRpcHandshake` 校验回复。根入口也提供这些函数；此子路径集中提供协商工具，凭据校验仍由连接的管理方负责。'
     ),
     example: handshakeExample
   },
   portable: {
     summary: t(
-      'Frozen data-only snapshots and legacy portable bytes; start with normalizePortable before placing application data on the wire.',
-      '冻结纯数据快照及传统可移植字节；应用数据上线前从可移植规范化开始。'
+      'Use this entry to convert application data into the restricted values accepted by the portable RPC format. `normalizePortable` copies supported records and arrays, freezes the resulting data, and converts byte views to tagged data.\n\nThe root also exports this function; import this subpath when your task is data normalization alone. It does not validate a complete RPC message or accept arbitrary class instances.',
+      '需要把业务数据转换为可通过远程调用传递的受限数据格式时，使用此入口。`normalizePortable` 复制支持的对象与数组、冻结结果，并把字节视图转换为带标记的数据。\n\n根入口也导出这个函数；只处理数据规范化时，可直接从此子路径导入。它不校验完整远程调用消息，也不接受任意类实例。'
     ),
     example: 'const value = normalizePortable({ count: 1 })'
   },
   runtime: {
     summary: t(
-      'Closed protected runtime task union, generations, operation options and parser selectors; start with normalizeRuntimeEnvelope; import createRuntimeCallEnvelope explicitly from the runtime/metadata entry.',
-      '封闭受保护运行任务联合、世代、选项和解析选择器；从运行规范化开始；调用构造函数须显式从 `runtime/metadata` 入口导入。'
+      'Use this entry to check the message structures used by Peer calls, replies and control messages. `normalizeRuntimeEnvelope` validates an unknown message without executing property getters; `normalizeRuntimeGeneration` checks the identifiers that distinguish call generations.\n\nImport this subpath for runtime message validation, which the root does not expose as a complete API. Constructing an outgoing call belongs to `runtime/metadata`; this module does not open a connection.',
+      '需要检查对端调用、回复和控制消息的结构时，使用此入口。`normalizeRuntimeEnvelope` 校验未知消息而不执行属性读取器，`normalizeRuntimeGeneration` 校验用于区分不同轮次调用的标识。\n\n根入口不提供完整的运行消息校验接口，因此从此子路径导入。构造出站调用请使用 `runtime/metadata`；本模块不建立连接。'
     ),
     example: 'const envelope = normalizeRuntimeEnvelope(candidate)'
   },
   'runtime/lazy': {
     summary: t(
-      'Lazily loaded canonical runtime and stream normalizers; the cold path may return a Promise while preserving grammar and failure identity.',
-      '按需加载规范运行及流规范化器；冷路径可能返回承诺，同时保留语法和失败身份。'
+      'Use this entry when a receiver should load runtime and stream parsers only when a message needs them. `normalizeRuntimeEnvelope` checks a runtime message, while `normalizeStreamPayload` checks the data describing a stream event.\n\nImport this subpath to select deferred parsing instead of the eager `runtime` entry or the general root. A call may return a value or a Promise, so use `await` when consuming the result.',
+      '希望接收方等到消息需要时才加载运行消息与流消息的解析器，可使用此入口。`normalizeRuntimeEnvelope` 检查运行消息，`normalizeStreamPayload` 检查描述流事件的数据。\n\n与普通 `runtime` 入口及通用根入口相比，此子路径明确选择按需加载。调用可能直接返回结果，也可能返回异步结果，使用 `await` 统一接收。'
     ),
     example: 'const envelope = await normalizeRuntimeEnvelope(candidate)'
   },
   'runtime/metadata': {
     summary: t(
-      'Typed call construction using owner-held accepted route/task headers; start with createRuntimeCallEnvelope to normalize payload last.',
-      '使用所有者持有已接受路由任务头构造类型化调用；从调用构造函数开始，最后规范载荷。'
+      'Use this entry when building an outgoing runtime call from a route and task header your code already owns. `createRuntimeCallEnvelope` checks that header and normalizes the payload before returning the call message.\n\nImport this subpath because the constructor is not exported by the root or `runtime`. To validate an unknown incoming message instead, use `normalizeRuntimeEnvelope` from `runtime`.',
+      '已有由本方管理的路由与任务头，需要构造出站运行调用时，使用此入口。`createRuntimeCallEnvelope` 检查头部并规范化业务数据，再返回调用消息。\n\n根入口与 `runtime` 都不导出这个构造函数，因此从此子路径导入。若要检查来源未知的入站消息，应使用 `runtime` 的 `normalizeRuntimeEnvelope`。'
     ),
     example: 'const envelope = createRuntimeCallEnvelope(header, { count: 1 })'
   },
   'schema/wire-error': {
     summary: t(
-      'Published JSON Schema data for the serialized error shape. Independent validators must also apply the limit metadata, canonical bytes and surrogate rules of the normalizer; the schema alone is not equivalent.',
-      '已发布序列化错误结构模式数据；独立校验器还须应用上限元数据、规范字节及代理字符规则，模式本身不等价于规范化器。'
+      'Use this entry when configuring a JSON Schema validator for serialized RPC errors. JSON Schema describes expected fields and shapes; this subpath exports the schema document itself rather than a function from the root.\n\nLoad the document into your validator to start checking structure. For the package’s full checks, use `normalizeRpcSerializedError` from `errors`: the schema alone does not enforce every size, byte-encoding and text-validity rule.',
+      '需要为序列化后的远程调用错误配置结构校验器时，使用此入口。这里发布的数据模式描述预期字段与形状；此子路径导出的是模式文档，而不是根入口中的函数。\n\n将文档交给校验器即可开始检查结构。若要执行本包的完整检查，使用 `errors` 的 `normalizeRpcSerializedError`；模式本身没有落实全部大小、字节编码和文本有效性规则。'
     )
   },
   stream: {
     summary: t(
-      'Seven-event portable stream grammar plus pure original sequence and credit checks; start with normalizeStreamPayload and the owner-specific check.',
-      '七事件可移植流语法及纯原序号额度检查；从流载荷规范化和所有者专用检查开始。'
+      'Use this entry when implementing an RPC stream and checking the events exchanged by its producer and consumer. `normalizeStreamPayload` validates one event’s data; `checkRpcStreamSequence` checks whether its sequence number follows the caller’s current state.\n\nThe root exports the normalizer, but this subpath also provides sequence and flow-control checks. The checks return violations for the caller to handle; they do not read a byte stream or schedule delivery.',
+      '实现远程调用流式调用，需要检查生产方与消费方交换的事件时，使用此入口。`normalizeStreamPayload` 校验一条事件的数据，`checkRpcStreamSequence` 根据调用方持有的当前状态检查序号是否连续。\n\n根入口提供规范化函数，此子路径还提供序号与发送额度检查。检查函数返回违规结果，由调用方处理；这里不读取字节流，也不调度交付。'
     ),
     example:
       'const payload = normalizeStreamPayload({ event: "open", seq: 0 }); console.log(checkRpcStreamInitialSequence(payload))'
   },
   v1: {
     summary: t(
-      'Canonical legacy semantic request/response/discovery/variation/stream envelopes; start with normalizeRpcEnvelope or rpcProtocol.normalize.',
-      '规范传统请求、响应、发现、控制及流语义信封；从信封规范化或协议规范化方法开始。'
+      'Use this entry when handling the version-one request, response, discovery, control and stream message format. `normalizeRpcEnvelope` validates an incoming message; `rpcProtocol.normalize` exposes the same operation through a protocol descriptor.\n\nThe root re-exports these as `normalizeRpcEnvelope` and `rpcProtocolV1`; this subpath makes the chosen version explicit. Peer runtime call messages use the separate `runtime` contract.',
+      '处理第一版请求、响应、发现、控制与流消息格式时，使用此入口。`normalizeRpcEnvelope` 校验入站消息，`rpcProtocol.normalize` 则通过协议描述对象提供同一操作。\n\n根入口以 `normalizeRpcEnvelope` 和 `rpcProtocolV1` 导出这些能力；此子路径让所选版本更明确。对端 的运行调用消息使用独立的 `runtime` 契约。'
     ),
     example: 'const envelope = normalizeRpcEnvelope(decoded)'
   },
   wire: {
     summary: t(
-      'Stable wire field names, kind domains and hard limits; import constants from this entry when implementing an independent compatible peer.',
-      '稳定线上字段名称、种类域及固定限制；实现独立兼容对端时从此入口导入常量。'
+      'Use this entry when writing a compatible peer that needs the protocol’s public field names, message kinds and limits. Start with `RpcEnvelopeKind` to identify message categories and `RpcWireLimit` to read the shared size limits.\n\nThe root includes common constants; this subpath groups the broader wire vocabulary and data types. Constants describe the format but do not validate an incoming message or establish a connection.',
+      '编写兼容对端，需要协议公开的字段名、消息种类和上限时，使用此入口。先用 `RpcEnvelopeKind` 查看消息分类，用 `RpcWireLimit` 读取共同遵守的大小限制。\n\n根入口包含常用常量，此子路径集中提供更完整的传输格式常量与数据类型。常量只描述格式，不校验入站消息，也不建立连接。'
     ),
     example: 'console.log(RpcEnvelopeKind.request, RpcWireLimit.maxHandshakeBytes)'
   }

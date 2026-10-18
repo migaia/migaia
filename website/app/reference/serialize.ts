@@ -816,15 +816,15 @@ export const serializeReference: ILibraryReference = {
     },
     codec: {
       summary: t(
-        'Runtime-neutral generic codec contract and portable traversal tools. Start with asCodecValue for validation or createPortableWalker for an explicitly owned traversal policy.',
-        '运行时中立的通用编解码器契约与可移植遍历工具；校验值从 `asCodecValue` 开始，自定义策略从 `createPortableWalker` 开始。'
+        'Use this entry when defining a synchronous encoder/decoder or checking values before passing them to a format codec. `asCodecValue` validates supported plain data without copying it; `createPortableWalker` builds a traversal whose callbacks define how values are checked or transformed.\n\nImport this subpath for codec contracts and validation tools beyond the root’s selected exports. It does not select a data format or register parsers; use `codecs/*` or `registry` for those tasks.',
+        '定义同步编解码器，或在交给格式编解码器前检查数据时，使用此入口。`asCodecValue` 校验支持的普通数据而不复制输入；`createPortableWalker` 创建遍历器，由回调决定如何检查或转换数据。\n\n此子路径提供编解码契约与校验工具，范围比根入口的部分导出更完整。它不选择数据格式，也不注册解析器；这些任务分别由 `codecs/*` 和 `registry` 负责。'
       ),
       example: walkerExample
     },
     'codecs/cbor': {
       summary: t(
-        'Optional CBOR format entry backed by cbor-x. Start with defineCBORCodec({ version: 1 }); import this subpath only when the optional format runtime is installed.',
-        '由 `cbor-x` 支持的可选 `CBOR` 格式入口；从 `defineCBORCodec({ version: 1 })` 开始，使用前需要安装对应可选格式运行库。'
+        'Use this entry when both ends need to encode plain data as CBOR bytes and decode it back. `defineCBORCodec({ version: 1 })` creates a synchronous codec with `encode` and `decode` methods and an explicit version.\n\nImport this format subpath because the root does not export the factory. Install `cbor-x` for this format; the codec is not a registry plugin.',
+        '双方需要将普通数据编码为 `CBOR` 格式并还原时，使用此入口。`defineCBORCodec({ version: 1 })` 创建同步编解码器，提供 `encode`、`decode` 方法及明确的版本。\n\n根入口不导出这个工厂，因此从此格式子路径导入。此格式需要安装 `cbor-x`；生成的编解码器不能直接当作注册表插件使用。'
       ),
       example: `import { defineCBORCodec } from '@migaia/serialize/codecs/cbor'
 const codec = defineCBORCodec({ version: 1 })
@@ -832,23 +832,23 @@ console.log(codec.decode(codec.encode({ count: 2 })))`
     },
     'codecs/identity/v1': {
       summary: t(
-        'Canonical version-one identity codec entry. Import `identityCodec` here; it returns each encoded or decoded input unchanged without loading a format runtime.',
-        '第一版恒等编解码器的规范入口。从此导入 `identityCodec`，编解码均原样返回输入，不加载格式运行库。'
+        'Use this entry when a carrier already accepts the values you send and no format conversion is needed. `identityCodec.encode` and `identityCodec.decode` return the exact input unchanged, retaining its type.\n\nImport this versioned subpath for the identity codec, which the root does not export. It does not copy or validate application values, so choose a format codec when you need text or bytes.',
+        '底层通信通道已经能接收原值，不需要格式转换时，使用此入口。`identityCodec.encode` 和 `identityCodec.decode` 都原样返回输入，并保留其类型。\n\n根入口不导出此编解码器，因此从这个带版本的子路径导入。它不复制或校验业务数据；需要文本或字节时，应选择具体的格式编解码器。'
       ),
       example: `import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 console.log(identityCodec.decode(identityCodec.encode({ count: 2 })))`
     },
     'codecs/json': {
       summary: t(
-        'Native synchronous JSON format codec with explicit version identity and portable-profile validation. Start with defineJsonCodec({ version: 1 }); unlike jsonPlugin this entry is not a registry plugin.',
-        '原生同步 `JSON` 格式编解码器，具有显式版本身份与可移植数据校验；从 `defineJsonCodec({ version: 1 })` 开始，此入口产生独立编解码器。'
+        'Use this entry when both ends need to encode plain data as JSON text and decode it back. `defineJsonCodec({ version: 1 })` creates a synchronous codec with `encode` and `decode` methods and an explicit version.\n\nImport this format subpath because the root does not export the factory. For a registry plugin instead of a standalone codec, use `jsonPlugin` from `plugins`.',
+        '双方需要将普通数据编码为 `JSON` 格式并还原时，使用此入口。`defineJsonCodec({ version: 1 })` 创建同步编解码器，提供 `encode`、`decode` 方法及明确的版本。\n\n根入口不导出这个工厂，因此从此格式子路径导入。需要注册表插件而非独立编解码器时，使用 `plugins` 的 `jsonPlugin`。'
       ),
       example: codecExample
     },
     'codecs/message-pack': {
       summary: t(
-        'Optional extension-free MessagePack format entry backed by @msgpack/msgpack. Start with defineMessagePackCodec({ version: 1 }) and keep its bytes with the matching format metadata.',
-        '由 `@msgpack/msgpack` 支持、不使用扩展的可选 `MessagePack` 格式入口；从 `defineMessagePackCodec({ version: 1 })` 开始，并保存对应格式元数据。'
+        'Use this entry when both ends need to encode plain data as MessagePack bytes and decode it back. `defineMessagePackCodec({ version: 1 })` creates a synchronous codec with `encode` and `decode` methods and an explicit version.\n\nImport this format subpath because the root does not export the factory. Install `@msgpack/msgpack` for this format; the codec is not a registry plugin.',
+        '双方需要将普通数据编码为 `MessagePack` 格式并还原时，使用此入口。`defineMessagePackCodec({ version: 1 })` 创建同步编解码器，提供 `encode`、`decode` 方法及明确的版本。\n\n根入口不导出这个工厂，因此从此格式子路径导入。此格式需要安装 `@msgpack/msgpack`；生成的编解码器不能直接当作注册表插件使用。'
       ),
       example: `import { defineMessagePackCodec } from '@migaia/serialize/codecs/message-pack'
 const codec = defineMessagePackCodec({ version: 1 })
@@ -856,8 +856,8 @@ console.log(codec.decode(codec.encode([1, 2])))`
     },
     'codecs/protobuf': {
       summary: t(
-        'Optional Buf Protobuf entry with independent codec version and schema identity. Start with defineProtobufCodec using a generated DescMessage binding and an application-owned schema descriptor.',
-        '基于 `Buf` 的可选协议缓冲区入口，编解码器版本与模式身份相互独立；向 `defineProtobufCodec` 传入生成的 `DescMessage` 绑定和应用拥有的模式描述。'
+        'Use this entry when exchanging Protobuf messages described by a generated Buf message descriptor. `defineProtobufCodec` takes that descriptor, a codec version and a separate schema identity, then returns synchronous methods for encoding to bytes and decoding messages.\n\nImport this subpath because the root does not export the factory, and install `@bufbuild/protobuf`. Unlike the plain-data codecs, this codec uses the supplied message schema to determine the data shape.',
+        '需要传递由 `Buf` 生成的消息描述符定义的 `Protobuf` 消息时，使用此入口。`defineProtobufCodec` 接收描述符、编解码器版本和独立的数据模式标识，再提供同步的字节编码与消息解码方法。\n\n根入口不导出这个工厂，因此从此子路径导入，并安装 `@bufbuild/protobuf`。与普通数据编解码器相比，这里的数据形状由传入的消息模式决定。'
       ),
       example: `import { defineProtobufCodec } from '@migaia/serialize/codecs/protobuf'
 import { FileDescriptorProtoSchema } from '@bufbuild/protobuf/wkt'
@@ -867,8 +867,8 @@ console.log(codec.decode(codec.encode(create(FileDescriptorProtoSchema, { name: 
     },
     core: {
       summary: t(
-        'Chunk contracts, coded native errors, Base64 and streaming algorithms. This entry depends only on the lifecycle abort leaf; inject scheduler and encoding capabilities where required. Start with sliceByFrameBudget or collectStream.',
-        '提供分块契约、带码原生错误、`Base64` 和流算法，仅依赖生命周期取消叶模块；按需要注入调度器及编码能力，从 `sliceByFrameBudget` 或 `collectStream` 开始。'
+        'Use this entry for chunk and stream operations without setting up a parser registry. `sliceByFrameBudget` divides an array into work slices using the scheduler you supply; `collectStream` assembles chunks when you need one complete result.\n\nThe root re-exports these operations; this subpath names the lower-level tools directly. Format selection and parser ownership belong to the format codecs and `registry`, and collecting a stream keeps its data in memory.',
+        '只需要处理数据块与数据流、不需要建立解析器注册表时，使用此入口。`sliceByFrameBudget` 利用你提供的调度器把数组分批交给调用方处理；`collectStream` 在需要完整结果时合并数据块。\n\n根入口也导出这些操作，此子路径便于直接选用底层工具。格式选择与解析器管理由具体格式编解码器和 `registry` 负责；合并流会把数据保留在内存中。'
       ),
       example: `import { sliceByFrameBudget } from '@migaia/serialize/core'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -876,15 +876,15 @@ for await (const rows of sliceByFrameBudget([1, 2, 3], { scheduler: systemSchedu
     },
     plugins: {
       summary: t(
-        'Native JSON parser and registry plugin constructors. Start with jsonPlugin for registry installation, or jsonParser when an explicit parser context and direct calls are needed.',
-        '提供原生 `JSON` 解析器及注册表插件构造函数；安装到注册表时使用 `jsonPlugin`，需要显式上下文直接调用解析器时使用 `jsonParser`。'
+        'Use this entry when adding the built-in JSON parser to a serialization registry. `jsonPlugin` creates the plugin that a registry accepts; `jsonParser` creates the parser itself for direct calls with an explicit context.\n\nThe root also exports both factories, while this subpath groups the parser tools. For a standalone versioned codec with synchronous value-to-text methods, use `codecs/json` instead.',
+        '需要给序列化注册表安装内置的 `JSON` 解析器时，使用此入口。`jsonPlugin` 创建注册表接收的插件，`jsonParser` 则创建解析器本身，供传入明确上下文后直接调用。\n\n根入口也导出这两个工厂，此子路径集中提供解析器工具。若需要独立、带版本且同步转换值与文本的编解码器，应使用 `codecs/json`。'
       ),
       example: registryExample
     },
     registry: {
       summary: t(
-        'Owns parser registration, cancellation, chunk assembly and two-phase close/dispose lifecycle. Start with createSerializeRegistry; chunkToText and chunkToBytes adapt wire chunks using explicit encoding capabilities.',
-        '负责解析器注册、取消、分块拼装及关闭与销毁两阶段生命周期；从 `createSerializeRegistry` 开始，使用 `chunkToText` 和 `chunkToBytes` 及显式编码能力转换线格式分块。'
+        'Use this entry when your application must register parsers, choose a format, and encode or decode chunks through one managed object. `createSerializeRegistry` takes parser plugins and returns that registry; call `close()` to stop new work and await `dispose()` to release resources.\n\nThe root also exports this factory, while this subpath focuses on registry management and chunk conversion. It does not supply format plugins; obtain those from `plugins`.',
+        '应用需要注册解析器、选择格式，并通过同一个管理对象编解码数据块时，使用此入口。`createSerializeRegistry` 接收解析器插件并创建注册表；用 `close()` 停止新工作，再等待 `dispose()` 释放资源。\n\n根入口也导出这个工厂，此子路径集中提供注册表管理与数据块转换。它不提供格式插件，插件由 `plugins` 提供。'
       ),
       example: registryExample
     }
