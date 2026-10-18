@@ -526,8 +526,15 @@ test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces'
     'utf8'
   )
 
-  assert.match(html, /<figure class="code-frame">/)
+  assert.match(
+    html,
+    /<div class="explained-code(?: annotated)?"[^>]*data-code-kind="example"[^>]*>\s*<figure class="code-frame">/
+  )
   assert.match(html, /<summary>Public type signature<\/summary>/)
+  assert.match(
+    html,
+    /<div class="explained-code(?: annotated)?"[^>]*data-code-kind="signature"[^>]*>\s*<figure class="code-frame">/
+  )
   assert.match(html, /<pre class="code-block"><code>/)
   assert.match(html, /class="syntax-keyword">export<\/span>/)
   assert.match(html, /class="syntax-type">IEventApiStyle<\/span>/)
@@ -575,12 +582,20 @@ test('SITE-T-RESOURCE-OVERVIEW keeps concrete learning content without the gener
     text,
     /从场景到生产组合|理解适用场景|完成 Quick Start|组合核心能力|确认高阶边界|按频率选择 API/
   )
-  assert.match(text, /需要缓存过期与后台刷新/)
+  /** 92fadb3d replaces generated lesson selections with the maintained module reference. */
+  assert.match(text, /跟踪其在第一个 await 之前读取的响应式值/)
+  assert.match(text, /这些值变化时自动重新请求/)
+  assert.match(text, /支持有效期缓存、失败重试与快照/)
   assert.match(text, /new Resource/)
-  assert.match(text, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
-  assert.match(text, /generation 校验.*?旧结果/s)
-  assert.match(text, /高阶用法教程/)
-  assert.ok(text.indexOf('需要缓存过期与后台刷新') < text.indexOf('选择一个入口'))
+  assert.match(text, /const id = userId\.value/)
+  assert.match(text, /const state = user\.state/)
+  assert.ok(text.indexOf('响应式、可取消的异步数据') < text.indexOf('选择一个入口'))
+  /** Detailed generation and composition lessons stay on the package's maintained README route. */
+  const readme = renderedText(
+    readFileSync(join(buildRoot, 'zh/docs/resource/readme/index.html'), 'utf8')
+  )
+  assert.match(readme, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
+  assert.match(readme, /generation 校验.*?旧结果/s)
 })
 
 test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
@@ -639,7 +654,16 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
     join(buildRoot, 'zh/docs/logger/api/setLoggerRuntimeManager/index.html'),
     'utf8'
   )
-  assert.match(loggerHtml, /进程级 Logger 宿主能力/)
+  assert.match(
+    renderedText(loggerHtml),
+    /为之后创建的 logger 设置默认运行时管理器（已存在的 logger 保持原样）/
+  )
+  assert.match(renderedText(loggerHtml), /恢复时按后进先出撤销/)
+  /** The manager is a positional argument, so its fields belong to its own type reference. */
+  const managerHtml = readFileSync(
+    join(buildRoot, 'zh/docs/logger/api/ILoggerRuntimeManager/index.html'),
+    'utf8'
+  )
   assert.match(loggerHtml, /finally/)
   assert.match(loggerHtml, /restore\(\)/)
   for (const option of [
@@ -652,7 +676,7 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
     'fs',
     'fetch'
   ]) {
-    assert.match(loggerHtml, new RegExp(`--option-${option}"`))
+    assert.match(managerHtml, new RegExp(`--member-${option}-[0-9]+"`))
   }
 })
 
@@ -663,11 +687,15 @@ test('SITE-T-PLUGIN-HOST-ERROR explains stable codes, original causes, and retai
   )
   /** The example proves failure identity without relying on the old constructor prose. */
   const text = renderedText(errorHtml)
-  assert.match(text, /error\.code !== PluginHostErrorCode\.pluginInstallFailed/)
+  assert.match(text, /error\.code === PluginHostErrorCode\.pluginInstallFailed/)
   assert.match(text, /error\.cause === unavailable/)
   assert.match(text, /保留触发当前错误的原始失败对象/)
-  assert.match(text, /附加应用需要的诊断数据/)
-  for (const option of ['code', 'message', 'options-cause', 'options-detail']) {
+  assert.match(text, /错误创建方提供的结构化诊断信息，与原始错误 cause 分开保存/)
+  assert.match(text, /error\.detail === detail/)
+  /** Constructor arguments stay in the parameter contract; ErrorOptions fields have option rows. */
+  assert.match(text, /code: IPluginHostErrorCode — 从本包错误码表选择/)
+  assert.match(text, /message: string — 调用方编写/)
+  for (const option of ['cause', 'detail']) {
     assert.match(errorHtml, new RegExp(`--option-${option}"`))
   }
 })
@@ -683,13 +711,17 @@ test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths
   )
   /** The fixed graph path starts declared dependencies, consumes a service, and releases the graph. */
   const staticText = renderedText(staticHtml)
-  assert.match(staticText, /能力集合在启动前固定/)
+  assert.match(staticText, /接纳一个完整、固定的条目数组/)
   assert.match(staticText, /requires: \[configKey\]/)
   assert.match(staticText, /await graph\.ready\(\)/)
-  assert.match(staticText, /greeting\.greet\('Migaia'\) === 'Hello, Migaia'/)
+  assert.match(staticText, /graph\.get<\{ baseUrl: string \}>\(apiKey\)\.baseUrl/)
   assert.match(staticText, /await graph\.dispose\(\)/)
-  assert.match(staticHtml, /--option-entries-key"/)
-  assert.match(hostHtml, /唯一由 Tray 托管的 PluginHost 身份/)
+  /** 92fadb3d documents the entries array as a positional parameter, not an options bag. */
+  assert.match(
+    staticText,
+    /entries: readonly ITrayEntryDefinition<unknown>\[\] — 条目定义数组；key 必须是唯一且非空的 ITrayKey/
+  )
+  assert.match(renderedText(hostHtml), /构建托管宿主所拥有的唯一 PluginHost/)
   assert.match(hostHtml, /physicalCompletion/)
   assert.match(hostHtml, /--option-mutationAdmissionMs"/)
   assert.match(hostHtml, /--option-shutdown-mode"/)
@@ -743,8 +775,9 @@ test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported ad
   ]) {
     assert.ok(text.includes(operation), `createPipeline must explain ${operation}`)
   }
-  assert.match(text, /创建时固定.*代数/)
-  assert.match(text, /lift 只适配支持的 stage 方向/)
+  assert.match(text, /创建某一种执行模式下可复用、无状态的中间件执行器/)
+  assert.match(text, /选项只读取一次并冻结/)
+  assert.match(text, /把为其它模式编写的步骤转换为当前 pipeline 的模式，只允许无损方向/)
   assert.match(text, /取消/)
 })
 
@@ -766,14 +799,32 @@ test('SITE-T-STORE-SHARED-API-ENTRYPOINTS render ABI, synchronization, and error
   /** Reads one maintained Store Shared API page. */
   const readShared = (routeSegment: string): string =>
     readFileSync(join(buildRoot, `zh/docs/store-shared/api/${routeSegment}/index.html`), 'utf8')
-  assert.match(readShared('sharedInt32'), /显式 sync 或 watch/)
-  assert.match(readShared('sharedInt32'), /--option-initialValue"/)
-  assert.match(readShared('SharedInt32Signal'), /dispose 一个 view/)
-  assert.match(readShared('sharedInt32Array-const'), /非追踪读取保持 O\(1\)/)
+  /** Shared scalar observation and positional argument contract. */
+  const signal = renderedText(readShared('sharedInt32'))
+  assert.match(signal, /reader\.sync\(\)/)
+  assert.match(signal, /把当前共享版本拉入本地游标，仅所属运行时尚未观察该版本时通知/)
+  assert.match(signal, /initialValue\?: number — 可选有符号三十二位初值，默认零，提供缓冲区时忽略/)
+  assert.match(
+    renderedText(readShared('SharedInt32Signal')),
+    /销毁仅断开当前运行时，其他共享同一缓冲区的包装仍存活/
+  )
+  assert.match(
+    renderedText(readShared('sharedInt32Array-const')),
+    /运行时追踪内仅实例化或复用当前下标源，其他情况直接读取/
+  )
   assert.match(readShared('sharedInt32Array-const'), /--option-initialValues"/)
-  assert.match(readShared('SharedInt32Array-class'), /底层 cell 原语/)
-  assert.match(readShared('createStoreSharedError'), /原始失败必须通过 cause 保持可达/)
-  assert.match(readShared('createStoreSharedRangeError'), /native error type 保持可观察/)
+  assert.match(
+    renderedText(readShared('SharedInt32Array-class')),
+    /不执行公开下标、活动检查或图追踪的低层一致值版本读取/
+  )
+  assert.match(
+    renderedText(readShared('createStoreSharedError')),
+    /由原生错误原因属性按身份保留的调用者原始失败/
+  )
+  assert.match(
+    renderedText(readShared('createStoreSharedRangeError')),
+    /原生 RangeError，保留运行时类型、堆栈及可选原始原因/
+  )
 })
 
 test('SITE-T-STORE-WORKER-API-ENTRYPOINTS render compute, streaming, and ownership boundaries', () => {
@@ -786,32 +837,75 @@ test('SITE-T-STORE-WORKER-API-ENTRYPOINTS render compute, streaming, and ownersh
       ),
       'utf8'
     )
-  assert.match(readWorker('index', 'WorkerAdapter'), /只有 await dispose 会释放 endpoint/)
-  assert.match(readWorker('index', 'WorkerAdapter'), /--option-request-options-transfer"/)
-  assert.match(readWorker('index', 'createWorkerHandler'), /不能成为 unhandled Worker error/)
-  assert.match(readWorker('index', 'workerComputed'), /supersede 旧 generation/)
-  assert.match(readWorker('serialize', 'workerParser'), /消费额度限制流/)
-  assert.match(readWorker('serialize', 'workerParser'), /--option-ownership"/)
-  assert.match(readWorker('serialize', 'workerPlugin'), /只增加 registry shape/)
-  assert.match(readWorker('serialize', 'createSerializeWorkerHandler'), /双 credit producer window/)
-  assert.match(readWorker('serialize', 'transferablesOf'), /SharedArrayBuffer/)
-  assert.match(readWorker('index', 'createStoreWorkerAggregateError'), /按顺序保留/)
+  /** The client owns endpoint cleanup while its request accepts cancellation and transfer options. */
+  const adapter = renderedText(readWorker('index', 'WorkerAdapter'))
+  assert.match(adapter, /关闭适配器、等待就绪并关闭端点，从不终止借用线程/)
+  assert.match(
+    adapter,
+    /可选含中止信号及转移列表对象，默认空，信号透传以合作取消，原生转移可能分离别名/
+  )
+  assert.match(
+    renderedText(readWorker('index', 'createWorkerHandler')),
+    /计算失败转回复，初始化或投递失败可使回调拒绝/
+  )
+  assert.match(
+    renderedText(readWorker('index', 'workerComputed')),
+    /代次取消和重试由资源包标准文档定义/
+  )
+  /** API audit a384c4d3 removes serialize aliases and the public transferables helper. */
+  assert.match(
+    renderedText(readWorker('serialize/worker', 'workerParser')),
+    /接值及上下文返回异步块流的编码/
+  )
+  assert.match(readWorker('serialize/worker', 'workerParser'), /--option-ownership"/)
+  assert.match(
+    renderedText(readWorker('serialize/worker', 'workerPlugin')),
+    /不额外检测格式、协商或取得线程所有权/
+  )
+  assert.match(
+    renderedText(readWorker('serialize/worker', 'createSerializeWorkerHandler')),
+    /编码初始两份额度并等待确认/
+  )
+  assert.match(
+    renderedText(readWorker('serialize/worker', 'workerParser')),
+    /局部视图及共享缓冲区回退空列表/
+  )
+  assert.match(
+    renderedText(readWorker('index', 'createStoreWorkerAggregateError')),
+    /按调用者顺序保留在聚合子项中的原始失败/
+  )
 })
 
 test('SITE-T-STORE-WASM-API-ENTRYPOINTS render readiness, field layout, and cleanup', () => {
   /** Reads one maintained Store WASM API page. */
   const readStoreWasm = (symbol: string): string =>
     readFileSync(join(buildRoot, 'zh/docs/store-wasm/api/' + symbol + '/index.html'), 'utf8')
-  assert.match(readStoreWasm('ensureWasm'), /identity 稳定的 readiness Promise/)
-  assert.match(readStoreWasm('number'), /8-byte WASM f64 allocation/)
-  assert.match(readStoreWasm('boolean'), /单个 WASM byte/)
-  assert.match(readStoreWasm('string'), /4-byte length header/)
-  assert.match(readStoreWasm('string'), /--option-maxBytes"/)
-  assert.match(readStoreWasm('array'), /commit 失败会回滚已写 cell/)
-  assert.match(readStoreWasm('array'), /--option-granularity"/)
-  assert.match(readStoreWasm('record'), /dispose\/disposed 是保留 lifecycle 名/)
-  assert.match(readStoreWasm('createStoreWasmTypeError'), /hostile property access failure/)
-  assert.match(readStoreWasm('createStoreWasmAggregateError'), /按顺序保留/)
+  assert.match(renderedText(readStoreWasm('ensureWasm')), /等待中及成功后保持同一承诺身份/)
+  assert.match(renderedText(readStoreWasm('number')), /八字节小端浮点数字段/)
+  assert.match(renderedText(readStoreWasm('boolean')), /单字节布尔字段/)
+  assert.match(renderedText(readStoreWasm('string')), /四字节长度头/)
+  /** MaxBytes and granularity are positional parameters in the current public signatures. */
+  assert.match(
+    renderedText(readStoreWasm('string')),
+    /maxBytes\?: number — 调用者选择的编码字节容量，默认二百五十六/
+  )
+  assert.match(renderedText(readStoreWasm('array')), /失败尝试回滚内存/)
+  assert.match(
+    renderedText(readStoreWasm('array')),
+    /granularity\?: number — 调用者选择的每桶下标数/
+  )
+  assert.match(
+    renderedText(readStoreWasm('record')),
+    /销毁方法及状态键在创建字段时以保留字段名错误拒绝/
+  )
+  assert.match(
+    renderedText(readStoreWasm('createStoreWasmTypeError')),
+    /非未定义的原始失败保留为原因/
+  )
+  assert.match(
+    renderedText(readStoreWasm('createStoreWasmAggregateError')),
+    /以原始身份及顺序保留在聚合子项/
+  )
 })
 
 test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampoline routes', () => {
@@ -877,12 +971,25 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
   assert.match(apiDetail, /<h2>完整类型签名<\/h2>/)
   assert.ok(apiDetail.indexOf('最小示例') < apiDetail.indexOf('<h2>选项</h2>'))
   assert.ok(apiDetail.indexOf('<h2>选项</h2>') < apiDetail.indexOf('类型签名'))
-  assert.match(apiDetail, /<figure class="code-frame">/)
+  assert.match(
+    apiDetail,
+    /<div class="explained-code(?: annotated)?"[^>]*data-code-kind="example"[^>]*>\s*<figure class="code-frame">/
+  )
   assert.doesNotMatch(architecture + api, /本节说明|场景 1|打开完整|This section records/)
 
   for (const [name, expectations] of [
-    ['createEventHub', ['按事件键惰性分配 Channel', 'resourceId']],
-    ['defineEventApiStyle', ['保留字符串字面量类型', '同一套领域命名', 'handle']]
+    ['createEventHub', ['每个事件名在第一次使用时才创建自己的 channel', 'resourceId']],
+    /** E3a98b85 removes defineEventApiStyle; custom names use this public type and satisfies. */
+    [
+      'IEventApiStyleNames',
+      [
+        '自定义别名表',
+        'as const satisfies IEventApiStyleNames',
+        "subscribe: 'observe'",
+        "publish: 'dispatch'",
+        "unsubscribe: 'dispose'"
+      ]
+    ]
   ] as const) {
     const candidate = apiManifest.apis
       .find((entry) => entry.library === 'event-subscriber' && entry.module === 'index')
@@ -895,7 +1002,8 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
       ),
       'utf8'
     )
-    for (const expectation of expectations) assert.match(candidateHtml, new RegExp(expectation))
+    for (const expectation of expectations)
+      assert.match(renderedText(candidateHtml), new RegExp(expectation))
     if (name === 'createEventHub') {
       /** The field's authored snippet proves the style projection independently of its caption. */
       const styleOption = candidateHtml.match(
@@ -904,7 +1012,10 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
         )
       )?.[1]
       assert.ok(styleOption, 'createEventHub must retain its style option')
-      assert.match(styleOption, /<figure class="code-frame">/)
+      assert.match(
+        styleOption,
+        /<div class="explained-code(?: annotated)?"[^>]*data-code-kind="example"[^>]*>\s*<figure class="code-frame">/
+      )
       for (const behavior of [/style: 'on-emit'/, /events\.on\(/, /events\.emit\(/, /stop\.off\(/])
         assert.match(renderedText(styleOption), behavior)
     }
@@ -1857,12 +1968,43 @@ test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module 
 })
 
 test('SITE-T-NO-ACCORDION keeps prose visible while complete signatures stay subordinate', () => {
+  /** Approved inventory links must resolve to a real generated API route. */
+  const apiRoutes = new Set(
+    routeManifest.entries
+      .map((entry) => entry.path)
+      .filter((path) => /^\/(?:en|zh)\/docs\/[^/]+\/api(?:\/|$)/.test(path))
+  )
   for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
     /** Signature declarations and the trailing page navigation may start collapsed. */
     const html = readFileSync(file, 'utf8')
-    /** All remaining prose must be visible outside those two defined disclosures. */
+    /** The audited sidebar keeps the full API inventory below its essential entry links. */
+    const leftRail = html.match(/<aside class="left-rail-content"[^>]*>([\s\S]*?)<\/aside>/)?.[1]
+    /**
+     * Body prose stays visible; only signatures and the two defined navigation disclosures may
+     * fold.
+     */
     const visibleProse = html
       .replace(/<section class="api-signature"[^>]*>[\s\S]*?<\/details>\s*<\/section>/g, '')
+      .replace(/<details class="left-rail-inventory"[^>]*>[\s\S]*?<\/details>/g, (inventory) => {
+        assert.ok(
+          leftRail?.includes(inventory),
+          `${file}: inventory must belong to library navigation`
+        )
+        assert.doesNotMatch(
+          inventory.match(/^<details[^>]*>/)?.[0] ?? '',
+          /\bopen(?:=|\s|>)/,
+          `${file}: inventory starts closed for stable navigation`
+        )
+        assert.match(inventory, /<summary>[\s\S]*?<small>\d+<\/small><\/summary>/, file)
+        /** Each inventory link uses a canonical module or symbol URL from the route manifest. */
+        const links = [
+          ...inventory.matchAll(/<a[^>]+href="(\/(?:en|zh)\/docs\/[^/]+\/api(?:\/[^"#]*)?)"/g)
+        ]
+        assert.ok(links.length > 0, `${file}: inventory must contain API links`)
+        for (const [, path] of links)
+          assert.ok(apiRoutes.has(path!), `${file}: inventory link must resolve: ${path}`)
+        return ''
+      })
       .replace(/<details class="page-toc"[^>]*>[\s\S]*?<\/details>/g, (navigation) => {
         assert.ok(html.indexOf(navigation) > html.lastIndexOf('</article>'), file)
         assert.doesNotMatch(
@@ -1898,7 +2040,7 @@ test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code
       const declaration = html.slice(start, next === -1 ? undefined : next)
       assert.match(
         declaration,
-        /<figure class="code-frame">/,
+        /<div class="explained-code(?: annotated)?"[^>]*data-code-kind="signature"[^>]*>\s*<figure class="code-frame">/,
         `${api.library}/${api.module} hides code for ${symbol.name}`
       )
     }
@@ -4162,7 +4304,9 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(resourceText, /dehydrate|hydrate/)
   assert.match(resourceText, /retryDelay/)
   assert.match(guideSource, /const id = userId\.value/)
-  assert.match(guideSource, /signal as AbortSignal/)
+  /** Resource now exposes the host AbortSignal directly; the old assertion cast is unnecessary. */
+  assert.match(resourceText, /\(\{ signal \}\) => fetchUser\('1', signal\)/)
+  assert.doesNotMatch(resourceText, /signal as AbortSignal/)
   assert.match(guideSource, /JSON\.stringify\(onServer\.dehydrate\(\)\)/)
   assert.match(guideSource, /initialSnapshot: JSON\.parse\(json\)/)
 

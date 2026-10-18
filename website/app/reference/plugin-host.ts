@@ -885,6 +885,16 @@ if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇�
         '返回携带本包来源、所选错误码、原始原因与可选诊断详情的宿主错误；构造本身不主动抛出该错误。'
       ),
       optionDocs: {
+        cause: {
+          summary: t(
+            'The original failure that caused this error. The constructor passes it to the native Error constructor without copying it, so `error.cause` is the same object. Read it when diagnosing the underlying failure.',
+            '保留触发当前错误的原始失败对象。构造函数把它原样交给原生错误构造器，因此 `error.cause` 仍是同一个对象；排查底层失败时读取它。'
+          ),
+          default: t(
+            'Omit it when this error has no earlier failure to preserve.',
+            '没有需要保留的先前失败时省略。'
+          )
+        },
         detail: {
           summary: t(
             'Structured diagnostics supplied by the error creator, retained separately from the original `cause`.',
@@ -900,11 +910,26 @@ if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇�
         'Host state/protocol error class, also used for invalid configuration data (INVALID_CONFIG_VALUE) and cycles (CONFIG_CYCLE_REJECTED). Ordinary name/path/stage/extension/domain-core/resource validation uses native TypeError/INVALID_OPTION; retired definition fields use TypeError/PLUGIN_DEFINITION_INVALID. Branch on source/code and native type; cause and detail retain originals and structured context.',
         '宿主状态及协议错误类，也用于非法配置值与配置循环。普通名称、路径、步骤、扩展、领域内核及资源校验用原生 `TypeError/INVALID_OPTION`，退役定义字段用 `TypeError/PLUGIN_DEFINITION_INVALID`。按来源、错误码与原生类型判断，原因与诊断详情保留原错及上下文。'
       ),
-      example: `try {
-  await host.use(broken)
-} catch (error) {
-  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') console.error(error.detail?.failedName, error.cause)
-}`
+      exampleIntro: t(
+        'This example creates an error for an unavailable inventory service and attaches the original failure and diagnostic detail.',
+        '下面模拟库存服务不可用时创建的错误，同时附上原始失败和诊断详情。'
+      ),
+      exampleResult: t(
+        'All three checks print true: the selected error code, the original cause object and the diagnostic detail are retained.',
+        '三个检查都输出 true，分别确认错误码、原始原因对象和诊断详情没有被替换。'
+      ),
+      example: `import { PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'
+
+const unavailable = { service: 'inventory', available: false }
+const detail = { failedName: 'inventory' }
+const error = new PluginHostError(
+  PluginHostErrorCode.pluginInstallFailed,
+  'Inventory plugin could not start',
+  { cause: unavailable, detail }
+)
+console.log(error.code === PluginHostErrorCode.pluginInstallFailed)
+console.log(error.cause === unavailable)
+console.log(error.detail === detail) // true`
     },
     ERROR_TEXT: {
       role: 'constant',

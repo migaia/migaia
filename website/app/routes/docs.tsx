@@ -527,7 +527,7 @@ function DocsLibrary({
         )
       )
     : api
-      ? moduleReferenceSections(library.documentation, api)
+      ? moduleReferenceSections(library.documentation, api, reference)
       : []
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
@@ -1107,10 +1107,15 @@ function RightRail({
 /** Mirrors the rendered package landing-page learning order in both table-of-contents rails. */
 function moduleReferenceSections(
   documentation: ILibrary['documentation'],
-  api: IApi
+  api: IApi,
+  reference?: ILocalizedReference
 ): readonly string[] {
   return [
-    ...packageLearningSections(documentation, api).map(({ kind }) => `learning-${kind}`),
+    ...(reference
+      ? reference.modules[api.module]
+        ? ['module-overview']
+        : []
+      : packageLearningSections(documentation, api).map(({ kind }) => `learning-${kind}`)),
     ...(api.aliases.length > 0 ||
     api.symbols.some((symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface') ||
     (api.library === 'rpc-contract' && api.module === 'schema/wire-error')
@@ -1122,6 +1127,7 @@ function moduleReferenceSections(
 /** Gives package learning anchors explicit task-oriented labels. */
 function moduleReferenceSectionLabel(locale: ILocale, section: string): string {
   const labels: Readonly<Record<string, readonly [string, string]>> = {
+    'module-overview': ['Module overview', '模块说明'],
     'learning-scenarios': ['Use cases', '使用场景'],
     'learning-quick-start': ['Quick Start', '快速上手'],
     'learning-composition': ['Composition', '组合用法'],
@@ -2074,10 +2080,13 @@ function inlineTextParts(text: string): readonly string[] {
 
 /** Renders reference prose without truncation; blank lines separate paragraphs. */
 function ReferenceParagraphs({
+  className,
   library,
   locale,
   text
 }: {
+  /** Optional emphasis belongs to the first paragraph, not a wrapper around nested paragraphs. */
+  readonly className?: string
   readonly library: string
   readonly locale: ILocale
   readonly text: string
@@ -2088,8 +2097,8 @@ function ReferenceParagraphs({
         .split(/\n\s*\n/)
         .flatMap((paragraph) => readableProseParagraphs(paragraph, locale, library))
         .filter((paragraph) => paragraph.trim())
-        .map((paragraph) => (
-          <p key={paragraph}>
+        .map((paragraph, index) => (
+          <p className={index === 0 ? className : undefined} key={paragraph}>
             <InlineText library={library} locale={locale} text={paragraph.trim()} />
           </p>
         ))}
@@ -2561,8 +2570,13 @@ function SingleApiReference({
       {purpose ? (
         <section className="api-overview" id={`${symbol.fragment}--overview`}>
           {symbolDoc ? (
-            <div className="lede">
-              <ReferenceParagraphs library={library.slug} locale={locale} text={purpose} />
+            <>
+              <ReferenceParagraphs
+                className="lede"
+                library={library.slug}
+                locale={locale}
+                text={purpose}
+              />
               {enumGuide && !sameProseIncluded(purpose, enumGuide.summary) ? (
                 <ReferenceParagraphs
                   library={library.slug}
@@ -2570,7 +2584,7 @@ function SingleApiReference({
                   text={enumGuide.summary}
                 />
               ) : null}
-            </div>
+            </>
           ) : (
             <p className="lede">
               <InlineText library={library.slug} locale={locale} text={purpose} />
