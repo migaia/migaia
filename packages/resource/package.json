@@ -1,6 +1,6 @@
 {
   "name": "@migaia/resource",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "description": "Store-neutral cancellable asynchronous reactive resources.",
   "license": "MIT",
