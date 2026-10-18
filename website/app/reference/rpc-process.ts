@@ -3147,8 +3147,8 @@ console.log(event)`
       members: {
         sessionOptions: {
           summary: t(
-            'Returns the idempotency and limits for one session.',
-            '返回某个会话的幂等配置与调用限制。'
+            'Returns the idempotency and limits for one session. The listener example under `listenRegistrations` below shows where the accepted session identity comes from.',
+            '返回某个会话的幂等配置与调用限制。下方 `listenRegistrations` 的监听示例展示了如何取得已接纳连接的会话身份。'
           ),
           params: {
             identity: t(
@@ -3156,8 +3156,7 @@ console.log(event)`
               '来自已接受连接的会话身份。'
             )
           },
-          returns: t('`{ idempotency, limits }`.', '`{ idempotency, limits }` 配置对象。'),
-          example: registrationListenerExample
+          returns: t('`{ idempotency, limits }`.', '`{ idempotency, limits }` 配置对象。')
         },
         listenRegistrations: {
           summary: t(
@@ -3178,54 +3177,52 @@ console.log(event)`
         },
         attachRegistration: {
           summary: t(
-            'Puts one supervised registration under this governance.',
-            '把一个受监督的登记纳入本治理对象管理。'
+            'Puts one supervised registration under this governance. The complete usage example above supplies the binding and the owner responsible for cleanup.',
+            '把一个受监督的登记纳入本治理对象管理。上方完整用法示例展示了如何提供登记绑定，以及负责清理的所有者。'
           ),
           params: {
             name: t('Registration name, the plugin `name`.', '登记名称，即插件的 `name`。'),
             binding: t('Ownership, supervisor and health mode.', '所有权、监督器与健康检查方式。'),
             liquidation: t('Who removes it when liquidated.', '被清算时由谁负责移除它。')
           },
-          returns: t('An `IProcessRegistration`.', '一个登记对象 `IProcessRegistration`。'),
-          example: registrationExample
+          returns: t('An `IProcessRegistration`.', '一个登记对象 `IProcessRegistration`。')
         },
         callGuard: {
           summary: t(
-            'Returns the guard that rejects calls to unhealthy or terminal registrations.',
-            '返回用于拒绝调用不健康或终态登记的守卫。'
+            'Returns the guard that rejects calls to unhealthy or terminal registrations. The usage example above calls `guard.beforeDispatch()` before each request.',
+            '返回用于拒绝调用不健康或终态登记的守卫。上方用法示例在每次请求前调用 `guard.beforeDispatch()`，检查该登记能否接受调用。'
           ),
           params: { name: t('Registration name.', '要守卫的登记名称。') },
-          returns: t('A remote call guard.', '远程调用守卫对象。'),
-          example: registrationExample
+          returns: t('A remote call guard.', '远程调用守卫对象。')
         },
         inspect: {
-          summary: t('Reads the current snapshot of one registration.', '读取某个登记的当前快照。'),
+          summary: t(
+            'Reads the current snapshot of one registration. Compare this snapshot with `registration.inspect()` in the usage example above.',
+            '读取某个登记的当前快照。上方用法示例同时输出该快照与 `registration.inspect()` 的结果，方便对照登记状态。'
+          ),
           params: { id: t('Registration id.', '要查询的登记 id。') },
           returns: t(
             'An `IProcessResilienceSnapshot`, or `undefined`.',
             '一个快照 `IProcessResilienceSnapshot`；未知 id 时为 `undefined`。'
-          ),
-          example: registrationExample
+          )
         },
         onTerminal: {
           summary: t(
-            'Observes registrations that entered the terminal state.',
-            '观察进入终态、需要处理的登记。'
+            'Observes registrations that entered the terminal state. The usage example above registers this listener and calls the returned unsubscribe function during cleanup.',
+            '观察进入终态、需要处理的登记。上方用法示例先注册监听，再在清理时调用返回的取消订阅函数。'
           ),
           params: { listener: t('Receives the snapshot.', '接收登记快照的监听函数。') },
-          returns: t('An unsubscribe function.', '取消订阅的函数。'),
-          example: registrationExample
+          returns: t('An unsubscribe function.', '取消订阅的函数。')
         },
         close: {
           summary: t(
-            'Stops governance, closes its listeners and detaches registrations. Adopters still own accepted endpoints and sessions, and execution owners still dispose their supervisors.',
-            '停止治理、关闭本对象持有的监听并解除登记附加；接纳方仍负责端点与已接纳会话，执行所有者仍须释放监督器。'
+            'Stops governance, closes its listeners and detaches registrations. Adopters still own accepted endpoints and sessions, and execution owners still dispose their supervisors. The final cleanup block in the usage example above shows these separate close operations.',
+            '停止治理、关闭本对象持有的监听并解除登记附加。接纳方仍负责端点与已接纳会话，执行所有者仍须释放监督器。上方用法示例的最后一个清理块展示了这些各自独立的关闭操作。'
           ),
           returns: t(
             'Resolves after owned governance resources close; it does not dispose caller-owned endpoints or supervisors.',
             '治理资源关闭后完成，不会代替调用方释放端点或监督器。'
-          ),
-          example: registrationExample
+          )
         }
       }
     },
@@ -3432,15 +3429,14 @@ console.log(event)`
       members: {
         replace: {
           summary: t(
-            'Replaces the whole process: `stop-then-start` or `start-then-switch`.',
-            '替换整个子进程，策略为 `stop-then-start` 或 `start-then-switch`。'
+            'Replaces the whole process: `stop-then-start` or `start-then-switch`. The complete deployment example above replaces the child while the host keeps running.',
+            '替换整个子进程，策略为 `stop-then-start` 或 `start-then-switch`。上方完整部署示例展示了如何替换子进程，同时保持宿主运行。'
           ),
           params: { options: t('`{ spec?, strategy? }`.', '替换选项 `{ spec?, strategy? }`。') },
           returns: t(
             'The strategy used and its outcome or new plugin.',
             '采用的策略，以及替换结果或新插件。'
-          ),
-          example: legacyReplaceExample
+          )
         }
       }
     },

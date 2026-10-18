@@ -12,6 +12,7 @@ import type {
   ITypeDoc,
   SymbolRole
 } from './contract.js'
+import type { IApiSymbol } from '../content-contract.js'
 
 /** Page locale of the reference projection. */
 export type IReferenceLocale = 'en' | 'zh'
@@ -235,6 +236,12 @@ export function localizeReference(
 /** Identifier tokens in serialized manifest or doc text, used to follow type references. */
 const IDENTIFIER = /[A-Za-z_$][\w$]*/g
 
+/** Declaration fields that establish a type dependency; examples and prose do not add edges. */
+type IReferenceDeclaration = Pick<
+  IApiSymbol,
+  'name' | 'signature' | 'returns' | 'parameterDetails' | 'composes'
+>
+
 /**
  * Cuts a localized library reference down to what one page renders, so a page's loader data (and
  * the copy inlined into its HTML for hydration) does not carry every other API's documentation. The
@@ -251,9 +258,9 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g
 export function pageReference(
   reference: ILocalizedReference,
   module: string,
-  declarations: readonly Readonly<{ name: string }>[],
+  declarations: readonly IReferenceDeclaration[],
   roots: readonly string[],
-  dependencies: readonly Readonly<{ name: string }>[] = declarations
+  dependencies: readonly IReferenceDeclaration[] = declarations
 ): ILocalizedReference {
   /** Strips the `module:` qualifier so qualified and bare keys match one declaration name. */
   const bare = (key: string) => key.slice(key.lastIndexOf(':') + 1)
@@ -271,11 +278,17 @@ export function pageReference(
     const [name, depth] = pending.pop()!
     if (reached.has(name)) continue
     reached.add(name)
+    /** Composed bases own inherited members, so they expand with their declaring type. */
+    const owners = dependencies.filter((declaration) => declaration.name === name)
+    for (const declaration of owners)
+      for (const base of declaration.composes ?? []) if (!reached.has(base)) pending.push([base, 1])
     if (depth > 0) continue
-    /** Declaration text plus the doc fields that name other types. */
-    const texts = dependencies
-      .filter((declaration) => declaration.name === name)
-      .map((declaration) => JSON.stringify(declaration))
+    /** Only actual declarations and authored type surfaces establish direct type references. */
+    const texts = owners.flatMap((declaration) => [
+      declaration.signature,
+      declaration.returns,
+      ...declaration.parameterDetails.map((parameter) => parameter.type)
+    ])
     for (const [key, doc] of Object.entries(reference.symbols))
       if (bare(key) === name && doc.optionsType) texts.push(doc.optionsType)
     for (const [key, doc] of Object.entries(reference.types))

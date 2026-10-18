@@ -17,15 +17,12 @@ import {
   type IMaintainedDocument,
   type ILocale
 } from '../content-contract.js'
-import {
-  librarySummaries,
-  loadLibraryApiLinks,
-  loadLibraryRouteContent,
-  type IGuideApiLink,
-  type ILibraryRouteContent
-} from '../content-loader.js'
+import type { IGuideApiLink, ILibraryRouteContent } from '../content-loader.js'
 import { apiKindLabel, copyFor, domainDescription, domainTitle, interfaceCopyFor } from '../copy.js'
-import { libraryReferenceDescription } from '../library-descriptions.js'
+import {
+  LIBRARY_INDEX as librarySummaries,
+  libraryReferenceDescription
+} from '../library-descriptions.js'
 import type { IApiGuide } from '../api-guides.js'
 import type { IGuideJourney } from '../guide-journeys.js'
 import { ScrollArea } from '../components/ui/scroll-area.js'
@@ -34,16 +31,13 @@ import { Button } from '../components/ui/button.js'
 import { usePageNavigation } from '../components/page-navigation.js'
 import { normalizeExampleImports } from '../example-imports.js'
 import { commentExample, type IExampleCommentaryContext } from '../example-commentary.js'
-import { referenceFor } from '../reference/index.js'
-import {
-  localizeReference,
-  pageReference,
-  type ILocalizedEnhancerDoc,
-  type ILocalizedMemberDoc,
-  type ILocalizedReference,
-  type ILocalizedSymbolDoc,
-  type ILocalizedTypeDoc,
-  type ILocalizedValue
+import type {
+  ILocalizedEnhancerDoc,
+  ILocalizedMemberDoc,
+  ILocalizedReference,
+  ILocalizedSymbolDoc,
+  ILocalizedTypeDoc,
+  ILocalizedValue
 } from '../reference/localize.js'
 import { essentialApiParts, essentialApis } from '../essential-apis.js'
 import {
@@ -78,6 +72,15 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   const librarySlug = parts[0]
   // The docs index merged into the language home; old `/<locale>/docs` links land there.
   if (!librarySlug) throw redirect(`/${params.lang === 'zh' ? 'zh' : 'en'}`)
+  /** Keep manifest and reference registries inside prerendering; the browser receives page data. */
+  const [contentModule, referenceModule, localizationModule] = await Promise.all([
+    import('../content-loader.js'),
+    import('../reference/index.js'),
+    import('../reference/localize.js')
+  ])
+  const { loadLibraryApiLinks, loadLibraryRouteContent } = contentModule
+  const { referenceFor } = referenceModule
+  const { localizeReference, pageReference } = localizationModule
   /** Route params stay basename-relative, so a sub-path deployment cannot shift the locale segment. */
   const locale = params.lang
   const domain = pageKind(parts)
@@ -1577,6 +1580,7 @@ function InstalledCapabilities({
   locale,
   memberDocs,
   purpose,
+  shownExample,
   symbol
 }: {
   readonly api: IApi
@@ -1587,6 +1591,8 @@ function InstalledCapabilities({
   readonly memberDocs: Readonly<Record<string, ILocalizedMemberDoc>>
   /** The overview already owns this description when the enhancer reuses it verbatim. */
   readonly purpose: string
+  /** Complete primary program already rendered above this section. */
+  readonly shownExample?: string
   readonly symbol: IApiSymbol
 }) {
   /** Locale index into the bilingual label tuples. */
@@ -1607,11 +1613,13 @@ function InstalledCapabilities({
       {!sameProseIncluded(purpose, guide.summary) ? (
         <ReferenceParagraphs library={api.library} locale={locale} text={guide.summary} />
       ) : null}
-      <CodeBlock
-        code={guide.install}
-        label={locale === 'zh' ? `安装 ${symbol.name}` : `Install ${symbol.name}`}
-        locale={locale}
-      />
+      {guide.install !== shownExample ? (
+        <CodeBlock
+          code={guide.install}
+          label={locale === 'zh' ? `安装 ${symbol.name}` : `Install ${symbol.name}`}
+          locale={locale}
+        />
+      ) : null}
       {guide.grants.length > 0 ? (
         <>
           <h3>{locale === 'zh' ? '新增 API' : 'Added APIs'}</h3>
@@ -1670,11 +1678,13 @@ function InstalledCapabilities({
           </ul>
         </>
       ) : null}
-      <CodeBlock
-        code={guide.example}
-        label={locale === 'zh' ? `${symbol.name} 完整示例` : `${symbol.name} end-to-end example`}
-        locale={locale}
-      />
+      {guide.example !== shownExample && guide.example !== guide.install ? (
+        <CodeBlock
+          code={guide.example}
+          label={locale === 'zh' ? `${symbol.name} 完整示例` : `${symbol.name} end-to-end example`}
+          locale={locale}
+        />
+      ) : null}
     </section>
   )
 }
@@ -2873,6 +2883,7 @@ function SingleApiReference({
             )
           )}
           purpose={purpose}
+          shownExample={rawQuickExample}
           symbol={symbol}
         />
       ) : null}
@@ -4467,6 +4478,12 @@ function CodeBlock({
 }) {
   /** Each code surface owns its clipboard result independently. */
   const [copyState, setCopyState] = useState<'ready' | 'copied' | 'failed'>('ready')
+  /** Example colors enhance the complete server text without serializing one span per token. */
+  const [highlightReady, setHighlightReady] = useState(false)
+  /** Keep the first hydration render identical to the server, then restore example colors. */
+  useEffect(() => {
+    setHighlightReady(true)
+  }, [])
   const normalizedLanguage = language.toLowerCase()
   const isTypeScript = ['ts', 'tsx', 'typescript'].includes(normalizedLanguage)
   /** Plain-text blocks in maintained docs are program output, styled as a terminal pane. */
@@ -4525,7 +4542,8 @@ function CodeBlock({
         </figcaption>
         <pre className="code-block">
           <code>
-            {isTypeScript
+            {isTypeScript &&
+            (signature || commentaryContext?.kind === 'signature' || highlightReady)
               ? highlightTypeScript(commentary.code)
               : isOutput
                 ? highlightOutputComments(commentary.code)
