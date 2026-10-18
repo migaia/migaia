@@ -115,7 +115,6 @@ export type {
   IPluginAdmission,
   IPluginAdmissionRequest,
   IPluginPreparedAdmissions,
-  IPluginRegistrationReceipt,
   IRegistrationToken,
   IRegistrationView,
   IPluginPreparedRemovalBatch,
@@ -139,5 +138,4 @@ export type {
   IFeatureRecordRequiredExpose
 } from './feature-types.js'
 export { asyncDisposeKey } from './symbols.js'
-export { createRegistrationView } from './composition.js'
 export { isPluginHandleCurrent } from './plugin-handle.js'

@@ -2,11 +2,12 @@ import { assimilateCapturedThen } from '@migaia/utils/function'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type {
   IPluginDataOrderSlot,
+  IPluginHostCompositionIntegration,
   IPluginAdmissionRequest,
   IPluginHostPhysicalCleanupResult,
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
-  IPluginRegistrationReceipt
+  IRegistrationToken
 } from './typing.js'
 import { createPluginHostExtensionPublication } from './publication.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -75,7 +76,7 @@ const preparedAdmissions = new WeakMap<object, IPreparedAdmissionsState<unknown,
 /** Prepared removal capsules and their exact registration state. */
 const preparedRemovals = new WeakMap<object, IPreparedRemovalState<unknown>>()
 /** Exact committed registration to opaque receipt provenance. */
-const registrationReceipts = new WeakMap<object, IPluginRegistrationReceipt>()
+const registrationReceipts = new WeakMap<object, IRegistrationToken>()
 /** Reverse receipt lookup keeps standalone composition views identity-bound. */
 const receiptRegistrations = new WeakMap<
   object,
@@ -154,7 +155,7 @@ export const readPreparedRemoval = <TRegistration>(
 export const createRegistrationReceipt = (
   registration: object,
   host: object
-): IPluginRegistrationReceipt => {
+): IRegistrationToken => {
   /** Frozen receipt exposes only identity-based authority. */
   const receipt = Object.freeze({})
   registrationReceipts.set(registration, receipt)
@@ -163,13 +164,12 @@ export const createRegistrationReceipt = (
 }
 
 /** Reads the exact receipt issued for one committed registration. */
-export const readRegistrationReceipt = (
-  registration: object
-): IPluginRegistrationReceipt | undefined => registrationReceipts.get(registration)
+export const readRegistrationReceipt = (registration: object): IRegistrationToken | undefined =>
+  registrationReceipts.get(registration)
 
 /** Resolves a token to its exact registration without exposing registry ownership. */
 export const readRegistrationForReceipt = (
-  receipt: IPluginRegistrationReceipt
+  receipt: IRegistrationToken
 ): { readonly registration: object; readonly host: object } | undefined =>
   receiptRegistrations.get(receipt)
 
@@ -180,7 +180,7 @@ export const markRegistrationRevoked = (registration: object): void => {
 
 /** Creates a narrow extension-only view for one live registration token. */
 export const createRegistrationView = (
-  receipt: IPluginRegistrationReceipt
+  receipt: IRegistrationToken
 ): Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }> => {
   const resolved = readRegistrationForReceipt(receipt)
   const registration = resolved?.registration as
@@ -247,3 +247,76 @@ export const captureCleanupFence = (value: PromiseLike<void> | undefined): Promi
 /** Empty physical cleanup result shared by idempotent discard calls. */
 export const emptyPhysicalCleanupResult = (): IPluginHostPhysicalCleanupResult =>
   Object.freeze({ cleanupErrors: Object.freeze([]) })
+
+/**
+ * Hosts this package constructed, mapped to their managed-protocol port.
+ *
+ * Module-private and deliberately separate from the disposal-provenance map in `host-runtime`: the
+ * two answer different questions about the same objects, and one map answering both would make
+ * either owner unable to change its own key set. A `WeakMap` means a host that goes out of scope
+ * takes its entry with it, so there is no registration to undo and nothing to leak.
+ */
+const managedHosts = new WeakMap<object, IPluginHostCompositionIntegration<object>>()
+
+/**
+ * Builds the managed-protocol port over a host's composition runtime.
+ *
+ * It lives here rather than in the host constructor because this module owns what the protocol is:
+ * the host only owns the runtime the port delegates to, and a literal spelled out in the
+ * constructor put the shape of a composition-only surface in the middle of ordinary host wiring.
+ */
+export const buildManagedPort = <TRuntime extends IPluginHostCompositionIntegration<object>>(
+  runtime: TRuntime,
+  readRevision: () => number,
+  readCurrentSnapshot: () => unknown
+): IPluginHostCompositionIntegration<object> =>
+  Object.freeze({
+    createPluginAdmission: (plugin) => runtime.createPluginAdmission(plugin),
+    createDataOrderSlot: (name) => runtime.createDataOrderSlot(name),
+    retireDataOrderSlot: (slot) => runtime.retireDataOrderSlot(slot),
+    prepareAdmissions: (requests) => runtime.prepareAdmissions(requests),
+    commitPreparedAdmissions: (prepared) => runtime.commitPreparedAdmissions(prepared),
+    discardPreparedAdmissions: (prepared) => runtime.discardPreparedAdmissions(prepared),
+    prepareUnUseBatch: (receipts) => runtime.prepareUnUseBatch(receipts),
+    commitPreparedUnUseBatch: (prepared, options) =>
+      runtime.commitPreparedUnUseBatch(prepared, options),
+    // getter，不是快照：`revision` 每次读都必须反映当前提交代次。
+    get revision(): number {
+      return readRevision()
+    },
+    getCurrentSnapshot: () =>
+      readCurrentSnapshot() as ReturnType<
+        IPluginHostCompositionIntegration<object>['getCurrentSnapshot']
+      >
+  })
+
+/** Records a host's managed-protocol port. Called once, at the end of host construction. */
+export const registerManagedHost = (
+  target: object,
+  port: IPluginHostCompositionIntegration<object>
+): void => {
+  managedHosts.set(target, port)
+}
+
+/**
+ * Whether a value is a host this package constructed.
+ *
+ * The predicate a composing package should branch on instead of `instanceof`: a nominal check fails
+ * across two copies of the package and cannot see a host produced by a factory rather than a
+ * constructor, and both of those are shapes this package now ships.
+ */
+export const isManagedHost = (target: unknown): boolean =>
+  (typeof target === 'object' || typeof target === 'function') &&
+  target !== null &&
+  managedHosts.has(target as object)
+
+/** The managed-protocol port of a registered host, or `COMPOSITION_TARGET_UNMANAGED`. */
+export const openComposition = (target: object): IPluginHostCompositionIntegration<object> => {
+  const port = managedHosts.get(target)
+  if (!port)
+    throw new PluginHostError(
+      PluginHostErrorCode.compositionTargetUnmanaged,
+      ERROR_TEXT.COMPOSITION_TARGET_UNMANAGED
+    )
+  return port
+}

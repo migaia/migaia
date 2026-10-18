@@ -20,7 +20,7 @@ import {
   registerManagedHost,
   isManagedHost,
   openComposition
-} from './composition-entry.js'
+} from './composition.js'
 import { PluginHostState } from './host-state.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
@@ -1041,14 +1041,35 @@ export class PluginHost<
   }
 
   /** Seals one registration's pipeline owner and waits for its active leases to drain. */
-  async #drainRegistrationLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void> {
+  async #drainRegistrationLeases(
+    registration: IRegistration<TDomainCore, TValue>,
+    cleanupErrors?: unknown[]
+  ): Promise<void> {
     this.#state.lanes.retireLeaseOwner(registration, this.#state.lanes.leases)
-    await drainPipelineLeases({
+    /** The existing drain result distinguishes physical completion from bounded continuation. */
+    const result = await drainPipelineLeases({
       leases: this.#state.lanes.leases,
       key: registration.pipelineOwnerKey,
       drainTimeoutMs: this.#pipelineDrainTimeoutMs,
       scheduler: this.#scheduler
     })
+    if (!result.complete) {
+      /** Reuse the caller's existing cleanup accumulator; every caller also gets the diagnostic. */
+      const error = attachPluginHostIdentity(
+        new PluginHostError(
+          PluginHostErrorCode.pipelineDrainTimeout,
+          ERROR_TEXT.PIPELINE_DRAIN_TIMEOUT(this.#pipelineDrainTimeoutMs as number)
+        ),
+        this
+      )
+      cleanupErrors?.push(error)
+      reportDiagnostic(
+        this.#diagnostic,
+        error.message,
+        PluginHostErrorCode.pipelineDrainTimeout,
+        error
+      )
+    }
   }
 
   /** Preparing Feature reads may see their original batch; committed handles resolve live state. */
@@ -1199,7 +1220,7 @@ export class PluginHost<
             if (step.action !== DependencyAction.release) continue
             const beforeRelease = this.#removalRuntime.runBeforeRelease(registration)
             if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
-            await this.#drainRegistrationLeases(registration)
+            await this.#drainRegistrationLeases(registration, cleanupErrors)
             cleanupErrors.push(
               ...(await this.#removalRuntime.disposeRegistration(registration)).cleanupErrors
             )

@@ -709,11 +709,6 @@ export type IPluginPreparedAdmissions = object
 export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> =
   object & Readonly<{ readonly __plugin?: TPlugin }>
 
-/** @deprecated Use IRegistrationToken from `@migaia/plugin-host/composition`. */
-export type IPluginRegistrationReceipt<
-  TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>
-> = IRegistrationToken<TPlugin>
-
 /** Narrow extension-only view for one live registration token. */
 export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> =
   Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>> }>
@@ -727,7 +722,7 @@ export type IPluginBatchRemovalOptions = Readonly<{ readonly beforeCleanup?: Pro
 /** Result of one prepared batch removal, preserving the Host dynamic-view contract. */
 export type IPluginBatchRemovalLeaf = ICleanupResult &
   Readonly<{
-    readonly receipt: IPluginRegistrationReceipt
+    readonly receipt: IRegistrationToken
     readonly name: string
     readonly cleanupComplete: boolean
   }>
@@ -759,15 +754,13 @@ export type IPluginHostCompositionIntegration<_THost> = Readonly<{
   prepareAdmissions(
     requestsInPublicationOrder: readonly IPluginAdmissionRequest[]
   ): Promise<IPluginPreparedAdmissions>
-  commitPreparedAdmissions(
-    prepared: IPluginPreparedAdmissions
-  ): readonly IPluginRegistrationReceipt[]
+  commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IRegistrationToken[]
   discardPreparedAdmissions(
     prepared: IPluginPreparedAdmissions
   ): Promise<IPluginHostPhysicalCleanupResult>
   retireDataOrderSlot(slot: IPluginDataOrderSlot): void
   prepareUnUseBatch(
-    receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]
+    receiptsInCleanupOrder: readonly IRegistrationToken[]
   ): IPluginPreparedRemovalBatch
   commitPreparedUnUseBatch<TView>(
     prepared: IPluginPreparedRemovalBatch,

@@ -3,6 +3,7 @@ import type { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { PluginHostState } from './host-state.js'
 import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.js'
 import ERROR_TEXT, {
+  identifyPluginHostCallbackFailure,
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
@@ -86,33 +87,37 @@ export class PluginHostConfigRuntime<
         new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION)
       )
     return this.#port.enqueue(async () => {
-      const registration = this.#port.state.registrations.get(name)
-      if (!registration)
-        throw new PluginHostError(
-          PluginHostErrorCode.pluginNotInstalled,
-          ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
-        )
-      const previous = registration.config
-      const patch = recipe(previous as Readonly<T>)
-      const next = copyConfigWithPatch(registration.config, patch)
       try {
-        if (registration.plugin.update) {
-          this.#port.operations.begin(registration)
-          this.#port.setHookRegistration(registration)
-          const updateResult = this.#port.invokeHook(() =>
-            invokeCaptured(registration.plugin.update!, registration.plugin.owner, [
-              next as never,
-              this.#port.core.create(registration)
-            ])
+        const registration = this.#port.state.registrations.get(name)
+        if (!registration)
+          throw new PluginHostError(
+            PluginHostErrorCode.pluginNotInstalled,
+            ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
           )
-          await this.#port.operations.await(updateResult, registration)
-          this.#port.operations.assertCurrent(registration)
+        const previous = registration.config
+        const patch = recipe(previous as Readonly<T>)
+        const next = copyConfigWithPatch(registration.config, patch)
+        try {
+          if (registration.plugin.update) {
+            this.#port.operations.begin(registration)
+            this.#port.setHookRegistration(registration)
+            const updateResult = this.#port.invokeHook(() =>
+              invokeCaptured(registration.plugin.update!, registration.plugin.owner, [
+                next as never,
+                this.#port.core.create(registration)
+              ])
+            )
+            await this.#port.operations.await(updateResult, registration)
+            this.#port.operations.assertCurrent(registration)
+          }
+        } finally {
+          this.#port.setHookRegistration(undefined)
         }
-      } finally {
-        this.#port.setHookRegistration(undefined)
+        registration.config = next
+        this.#port.state.commit()
+      } catch (error) {
+        throw identifyPluginHostCallbackFailure(error)
       }
-      registration.config = next
-      this.#port.state.commit()
     })
   }
 }

@@ -55,10 +55,12 @@ export class PluginHostOperationRuntime {
     const deadlineAt = registration.operationDeadlineAt
     if (!request || this.#options.timeoutMs === false || deadlineAt === undefined)
       return await result
-    const settled = await boundedWait(Promise.resolve(result), deadlineAt, {
+    /** One normalization owns a legal thenable's side effects throughout this operation. */
+    const observed = Promise.resolve(result)
+    const settled = await boundedWait(observed, deadlineAt, {
       scheduler: this.#options.scheduler
     })
-    if (settled) return await result
+    if (settled) return await observed
     const timeout = this.#createTimeoutError()
     try {
       this.#controller.supersede(timeout)

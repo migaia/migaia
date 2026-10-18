@@ -11,6 +11,34 @@ const hostOptions = {
 const plugin = (name: string) => definePlugin({ name, install: () => ({}) })
 
 describe('defineHost', () => {
+  it('SM-D01 preserves live domain accessors on the canonical frozen fluent handle', async () => {
+    /** Application state changes independently of the immutable public member descriptors. */
+    let current = 1
+    /** The domain surface must keep this accessor instead of copying its first value. */
+    const surface = {
+      get current() {
+        return current
+      }
+    }
+    /** The original defineHost path still owns identity, composition and all lifecycle state. */
+    const host = defineHost<Record<never, never>, number, readonly [], typeof surface>({
+      host: hostOptions,
+      surface
+    })
+    try {
+      expect(isManagedHost(host)).toBe(true)
+      expect(Object.isFrozen(host)).toBe(true)
+      expect(host.current).toBe(1)
+      /** Typed fluent returns retain domain members as well as exact runtime identity. */
+      const fluent = host.usePipeline((value, next) => next(value))
+      current = 2
+      expect(fluent).toBe(host)
+      expect(fluent.current).toBe(2)
+    } finally {
+      await host.dispose()
+    }
+  })
+
   it('rejects an empty identity label and admits only identities issued for an exact Host', async () => {
     expect(() => defineHost({ host: { ...hostOptions, identity: { name: '' } } })).toThrow(
       expect.objectContaining({ source: '@migaia/plugin-host', code: 'INVALID_OPTION' })
@@ -161,14 +189,6 @@ describe('defineHost', () => {
     const composition = openComposition(host)
     expect(typeof composition.createDataOrderSlot).toBe('function')
     expect(typeof composition.revision).toBe('number')
-    await host.dispose()
-  })
-
-  it('registers an explicit receiver as the same managed host', async () => {
-    const receiver = {}
-    const host = defineHost({ host: hostOptions, receiver })
-    expect(isManagedHost(receiver)).toBe(true)
-    expect(openComposition(receiver).revision).toBe(openComposition(host).revision)
     await host.dispose()
   })
 })

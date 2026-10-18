@@ -1,5 +1,6 @@
-import { openComposition, registerManagedHost } from '@migaia/plugin-host/composition'
-import { describe, expect, it } from 'vitest'
+import * as composition from '@migaia/plugin-host/composition'
+import { openComposition } from '@migaia/plugin-host/composition'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runInNewContext } from 'node:vm'
 import {
   PluginHost,
@@ -26,10 +27,8 @@ class AsyncTestHost extends PluginHost<ITestCore, string> {
 }
 
 /**
- * 在发布点插一个观察者。
- *
- * 托管协议已不在宿主实例表面，覆写方法只会得到一段永不被调用的死代码。改为重新登记一个包装过的 协议出口：`registerManagedHost`
- * 覆盖同一个宿主的条目，`openComposition` 之后取到的就是包装版。 `revision` 必须重新声明为 getter——展开对象会把它变成一次性求值的快照。
+ * Observes publication through the public composition reader fixture. The wrapped port delegates to
+ * the canonical producer and keeps revision as a live getter, rather than a spread-time snapshot.
  */
 class PublicationBarrierHost extends TestHost {
   observeCommit: (() => void) | undefined
@@ -37,7 +36,7 @@ class PublicationBarrierHost extends TestHost {
   constructor(options: ConstructorParameters<typeof TestHost>[0]) {
     super(options)
     const port = openComposition(this)
-    registerManagedHost(
+    overrideCompositionPortForTest(
       this,
       Object.freeze({
         createPluginAdmission: port.createPluginAdmission,
@@ -260,7 +259,7 @@ describe('@migaia/tray/host', () => {
         })
         /** Original port remains owner of every admission and publication. */
         const port = openComposition(raw)
-        registerManagedHost(
+        overrideCompositionPortForTest(
           raw,
           Object.freeze({
             ...port,

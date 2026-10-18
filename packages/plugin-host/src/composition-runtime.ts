@@ -44,7 +44,7 @@ import type {
   IPluginHostPhysicalCleanupResult,
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
-  IPluginRegistrationReceipt,
+  IRegistrationToken,
   IPluginHostDiagnostic
 } from './typing.js'
 
@@ -157,9 +157,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
   }
 
   /** Publishes one prepared candidate at a single synchronous commit point. */
-  commitPreparedAdmissions(
-    prepared: IPluginPreparedAdmissions
-  ): readonly IPluginRegistrationReceipt[] {
+  commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IRegistrationToken[] {
     const state = readPreparedAdmissions<
       IRegistration<TDomainCore, TValue>,
       IInstallBatchContext<TDomainCore, TValue>
@@ -218,7 +216,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
   }
 
   /** Binds exact live receipts into one prepared removal capability. */
-  prepareUnUseBatch(receipts: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch {
+  prepareUnUseBatch(receipts: readonly IRegistrationToken[]): IPluginPreparedRemovalBatch {
     this.#port.assertActive()
     if (!Array.isArray(receipts))
       throw createPluginHostTypeError(PluginHostInternalText.REGISTRATION_RECEIPTS_ARRAY)
@@ -262,6 +260,14 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     const beforeCleanup = captureCleanupFence(options.beforeCleanup)
     this.#port.assertActive()
     this.#port.assertMutationAllowed()
+    // A prepared receipt belongs to one generation, never a replacement sharing its name.
+    for (const registration of state.registrations) {
+      if (this.#port.state.registrations.get(registration.name) !== registration)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginNotInstalled,
+          ERROR_TEXT.PLUGIN_NOT_INSTALLED(registration.name)
+        )
+    }
     // Registrations may have changed since preparation; the dependency check is re-run at the
     // commit point, which is the only point that actually revokes anything.
     this.#orderRemoval(state.registrations)

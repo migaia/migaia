@@ -1,7 +1,12 @@
 import type { IPluginHostErrorCode, IPluginHostErrorDetail } from './typing.js'
 import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
 import { readHostIdentity } from './host-identity.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import {
+  attachErrorIdentity,
+  attachSecondaryErrors,
+  isNativeErrorValue,
+  tryReadProperty
+} from '@migaia/utils/error'
 
 export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
   /**
@@ -78,6 +83,42 @@ export function tagPluginHostError<E extends Error>(
 }
 
 /**
+ * Gives unclassified callback failures a Host identity while retaining existing owners and native
+ * errors.
+ */
+export function identifyPluginHostCallbackFailure(error: unknown): Error {
+  if (isNativeErrorValue(error)) {
+    /** A complete semantic identity remains owned by the originating package. */
+    const source = tryReadProperty(error as { source?: unknown }, 'source')
+    /** Native host codes without a source are not a package semantic identity. */
+    const code = tryReadProperty(error as { code?: unknown }, 'code')
+    if (
+      !source.threw &&
+      !code.threw &&
+      typeof source.value === 'string' &&
+      source.value.length > 0 &&
+      typeof code.value === 'string' &&
+      code.value.length > 0
+    )
+      return error
+    try {
+      return tagPluginHostError(error, PluginHostErrorCode.callbackFailed)
+    } catch (attachmentError) {
+      /** Immutable/conflicting errors retain their original stack and identity through cause. */
+      const wrapper = new PluginHostError(
+        PluginHostErrorCode.callbackFailed,
+        ERROR_TEXT.CALLBACK_FAILED,
+        { cause: error }
+      )
+      return attachSecondaryErrors(wrapper, [attachmentError]) as Error
+    }
+  }
+  return new PluginHostError(PluginHostErrorCode.callbackFailed, ERROR_TEXT.CALLBACK_FAILED, {
+    cause: error
+  })
+}
+
+/**
  * Creates a native input-validation `TypeError` tagged with `INVALID_OPTION`
  * (`docs/contracts/error-codes.md` §7).
  */
@@ -109,6 +150,8 @@ const prefixed = (en: string): string => `${PREFIX}${en}`
 
 /** PluginHost 错误与诊断文本集中维护处，便于调用方和维护者查找。 */
 const ERROR_TEXT = {
+  /** Public callback failures need a stable fallback when their original error cannot be annotated. */
+  CALLBACK_FAILED: prefixed('host callback failed'),
   /** Host node identity requires cryptographic entropy; no process id or weak fallback is admitted. */
   HOST_IDENTITY_ENTROPY: prefixed('host node identity requires secure randomness'),
   /** Stable validation text for the optional human-readable Host identity name. */

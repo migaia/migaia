@@ -1,5 +1,7 @@
+import { identifyPluginHostCallbackFailure } from './error-text.js'
+import { deferred } from '@migaia/utils/promise'
 import { PluginHost } from './host-runtime.js'
-import { openComposition, registerManagedHost } from './composition-entry.js'
+import { openComposition, registerManagedHost } from './composition.js'
 import { readDefinedPluginDefinition } from './define-plugin.js'
 import type { PluginHostError } from './error-text.js'
 import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
@@ -54,9 +56,19 @@ export type IHostDomainCoreRequest = Readonly<{
  * API section declares it as `IDefineHostOptions<TDomainCore, TValue>`, which would be an unused
  * type parameter — `defineHost` still takes both, because the handle it returns does use `TValue`.
  */
-export type IDefineHostOptions<TDomainCore extends object> = Readonly<{
+export type IDefineHostOptions<
+  TDomainCore extends object,
+  TPublicSurface extends object = Record<never, never>
+> = Readonly<{
   /** Forwarded to the host unchanged; identical in shape to the class constructor's options. */
   readonly host: IPluginHostOptions
+  /**
+   * Domain-owned public descriptors installed before the single canonical handle is frozen.
+   * Canonical host keys are reserved; domain methods and fluent host entries share one identity.
+   */
+  readonly surface?: TPublicSurface & {
+    readonly [K in keyof IHostHandle<Record<string, never>, never, readonly []>]?: never
+  }
   /** Replaces the `protected createPluginDomainCore` override; absent means an empty object. */
   readonly domainCore?: (request: IHostDomainCoreRequest) => TDomainCore
   /** Replaces the `protected translateDisposalError` override. */
@@ -65,8 +77,6 @@ export type IDefineHostOptions<TDomainCore extends object> = Readonly<{
   readonly dispose?: (
     next: () => Promise<IPluginHostDisposalResult>
   ) => Promise<IPluginHostDisposalResult>
-  /** `this` receiver for published callable extensions; the handle itself by default. */
-  readonly receiver?: object
 }>
 
 /**
@@ -79,11 +89,12 @@ export type IDefineHostOptions<TDomainCore extends object> = Readonly<{
 export type IHostHandle<
   TDomainCore extends object,
   TValue,
-  TInstalled extends readonly IPluginConstraint<any>[]
+  TInstalled extends readonly IPluginConstraint<any>[],
+  TPublicSurface extends object = Record<never, never>
 > = Readonly<{
   readonly identity: IPluginHostIdentity
   readonly plugin: IPluginEnablement<
-    IHostHandle<TDomainCore, TValue, TInstalled>,
+    IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>,
     TInstalled,
     TDomainCore,
     TValue
@@ -112,22 +123,25 @@ export type IHostHandle<
     name: string,
     next: TPlugin
   ): Promise<IPluginHandle<TPlugin>>
-  usePipeline(stage: ISyncMiddlewareStage<TValue>): IHostHandle<TDomainCore, TValue, TInstalled>
+  usePipeline(
+    stage: ISyncMiddlewareStage<TValue>
+  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
   useAsyncPipeline(
     stage: IAsyncMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled>
+  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
   useGeneratorPipeline(
     stage: IGeneratorMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled>
+  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
   useAsyncGeneratorPipeline(
     stage: IAsyncGeneratorMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled>
+  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
   /** Replaces the `protected runPipeline`; only the handle's holder can reach it. */
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
   dispose(): Promise<IPluginHostDisposalResult>
 }> &
   IPluginHostRuntimeExtensions<TInstalled> &
-  IPluginHostCoreTypeInfo<TDomainCore, TValue>
+  IPluginHostCoreTypeInfo<TDomainCore, TValue> &
+  Readonly<TPublicSurface>
 
 /**
  * A host as a value instead of a base class.
@@ -144,8 +158,21 @@ export type IHostHandle<
 export function defineHost<
   TDomainCore extends object = Record<string, never>,
   TValue = never,
-  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
->(options: IDefineHostOptions<TDomainCore>): IHostHandle<TDomainCore, TValue, TInstalled> {
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
+  TPublicSurface extends object = Record<never, never>
+>(
+  options: IDefineHostOptions<TDomainCore, TPublicSurface>
+): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface> {
+  /** Snapshot descriptors before acquiring a runtime; do not evaluate domain accessors. */
+  let surfaceDescriptors: PropertyDescriptorMap | undefined
+  try {
+    /** Capture the option once even when the caller supplies a getter. */
+    const publicSurface = options.surface
+    surfaceDescriptors =
+      publicSurface === undefined ? undefined : Object.getOwnPropertyDescriptors(publicSurface)
+  } catch (error) {
+    throw identifyPluginHostCallbackFailure(error)
+  }
   /** Per-batch admission counters, keyed by the batch token the core runtime supplies. */
   const batchCounters = new WeakMap<object, number>()
   class Runtime extends PluginHost<TDomainCore, TValue> {
@@ -232,8 +259,31 @@ export function defineHost<
     },
     runPipeline: (value: TValue, done: (value: TValue) => void) =>
       runtime.runPipelinePublic(value, done),
-    dispose: (): Promise<IPluginHostDisposalResult> =>
-      (disposal ??= options.dispose ? options.dispose(() => runtime.dispose()) : runtime.dispose())
+    dispose: (): Promise<IPluginHostDisposalResult> => {
+      if (disposal) return disposal
+      /** Publish before user middleware can synchronously call this same public method again. */
+      const completion = deferred<IPluginHostDisposalResult>()
+      disposal = completion.promise
+      try {
+        /** One existing runtime owns cleanup; the facade only adopts its selected middleware result. */
+        const result = options.dispose
+          ? options.dispose(() => runtime.dispose())
+          : runtime.dispose()
+        void Promise.resolve(result).then(completion.resolve, (error: unknown) =>
+          completion.reject(identifyPluginHostCallbackFailure(error))
+        )
+      } catch (error) {
+        completion.reject(identifyPluginHostCallbackFailure(error))
+      }
+      return disposal
+    }
+  }
+  if (surfaceDescriptors) {
+    for (const key of Reflect.ownKeys(surfaceDescriptors)) {
+      // Host methods and the issued identity remain canonical even at a plain-JS boundary.
+      if (key !== 'identity' && !Object.hasOwn(handleSurface, key))
+        Object.defineProperty(handleSurface, key, surfaceDescriptors[key])
+    }
   }
   /** Shared outlets are read through original state while the existing public protocol stays frozen. */
   const handle = new Proxy(handleSurface, {
@@ -252,6 +302,5 @@ export function defineHost<
   })
   Object.freeze(handleSurface)
   registerManagedHost(handle, openComposition(runtime))
-  if (options.receiver) registerManagedHost(options.receiver, openComposition(runtime))
-  return handle as unknown as IHostHandle<TDomainCore, TValue, TInstalled>
+  return handle as unknown as IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
 }

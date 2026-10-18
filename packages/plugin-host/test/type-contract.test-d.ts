@@ -5,13 +5,7 @@ import {
   type IRegistrationToken,
   type IRegistrationView
 } from '../src/composition-entry.js'
-import {
-  defineFeature,
-  definePlugin,
-  type IPlugin,
-  type IPluginRegistrationReceipt,
-  PluginHost
-} from '../src/index.js'
+import { defineFeature, definePlugin, type IPlugin, PluginHost } from '../src/index.js'
 
 const dependency = defineFeature(() => ({ read: () => 1 }))
 // @ts-expect-error Feature factories are synchronous; returned methods may be async instead.
@@ -64,13 +58,8 @@ void composition.createDataOrderSlot('typed')
 void composition.getCurrentSnapshot()
 void composition.revision
 
-declare const legacyToken: IPluginRegistrationReceipt<typeof plugin>
 declare const canonicalToken: IRegistrationToken<typeof plugin>
-const canonicalFromLegacy: IRegistrationToken<typeof plugin> = legacyToken
-const legacyFromCanonical: IPluginRegistrationReceipt<typeof plugin> = canonicalToken
 const canonicalView: IRegistrationView<typeof plugin> = createView(canonicalToken)
-void canonicalFromLegacy
-void legacyFromCanonical
 void canonicalView.extensions.result
 
 const coreBound = definePlugin<

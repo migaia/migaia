@@ -35,7 +35,9 @@ export const PluginHostErrorCode = {
   /**
    * Thrown when `unUse()` or another operation targets an uninstalled plugin name.
    *
-   * Check for repeated removal or a misspelled name. Host state stays unchanged.
+   * Check for repeated removal or a misspelled name. Host state stays unchanged. Prepared removals
+   * also reject this code when their exact generation is no longer current; no cleanup may repeat
+   * and a replacement registration stays live.
    */
   pluginNotInstalled: 'PLUGIN_NOT_INSTALLED',
 
@@ -77,7 +79,7 @@ export const PluginHostErrorCode = {
   /**
    * `unUse`/`disable` (or a managed removal) would leave required dependents behind and cascade was
    * not requested. State is unchanged (R6); `detail.blockedBy` lists every transitive dependent in
-   * cascade order — pass `cascade: true`, include them, or inspect `dryRun` first.
+   * cascade order — pass `policy: 'cascade'`, include them, or inspect `dryRun` first.
    */
   dependencyBlocked: 'DEPENDENCY_BLOCKED',
   /**
@@ -300,6 +302,14 @@ export const PluginHostErrorCode = {
   invalidOption: 'INVALID_OPTION',
   /** Config value violates the admitted plain-data grammar; caller must supply an allowed value. */
   invalidConfigValue: 'INVALID_CONFIG_VALUE',
+  /**
+   * A public configuration recipe/update, domain-surface descriptor read, or factory disposal
+   * callback failed without a semantic identity. Native mutable errors keep their instance, type,
+   * and stack; immutable/non-Error values stay on cause. Existing upstream source/code stays owned
+   * there. Inspect the callback failure; a rejected configuration patch was not committed and a
+   * disposal completion remains terminal.
+   */
+  callbackFailed: 'CALLBACK_FAILED',
   /** Config input contains a reference cycle; caller must supply an acyclic value graph. */
   configCycleRejected: 'CONFIG_CYCLE_REJECTED',
   /** A lifecycle hook exceeded the admitted mutation budget and lost commit authority. */
@@ -311,7 +321,10 @@ export const PluginHostErrorCode = {
   /** Plugin install returned an own `then` key, which is never a publishable extension result. */
   installResultThenable: 'INSTALL_RESULT_THENABLE',
 
-  /** Active pipeline work did not drain before the explicit disposal budget elapsed. */
+  /**
+   * Active pipeline work exceeded the admitted drain budget; ordinary unUse reports it and returns
+   * ok:false while bounded cleanup continues.
+   */
   pipelineDrainTimeout: 'PIPELINE_DRAIN_TIMEOUT',
 
   /** Logical disposal completed while one or more physical cleanup tasks remain unsettled. */

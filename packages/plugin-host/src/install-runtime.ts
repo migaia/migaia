@@ -13,6 +13,7 @@ import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
 import ERROR_TEXT, {
+  identifyPluginHostCallbackFailure,
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
@@ -420,7 +421,14 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
               void assimilateCapturedThen(
                 installedThen as (...args: unknown[]) => void,
                 installedValue
-              ).catch(() => undefined)
+              ).catch((error: unknown) => {
+                reportDiagnostic(
+                  this.#port.diagnostic,
+                  ERROR_TEXT.PLUGIN_INSTALL_FAILED(registration.name),
+                  PluginHostErrorCode.pluginInstallFailed,
+                  identifyPluginHostCallbackFailure(error)
+                )
+              })
             throw this.#installResultThenable(registration.name)
           }
           this.#prepareInstallResult(registration, batch, installedValue)

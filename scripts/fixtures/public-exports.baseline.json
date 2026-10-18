@@ -188,7 +188,6 @@
         "PluginHostRegistrationLifecycle",
         "PluginHostStatus",
         "asyncDisposeKey",
-        "createRegistrationView",
         "defineFeature",
         "defineHost",
         "definePlugin",
@@ -199,12 +198,10 @@
         "readPluginHostDisposalProvenance"
       ],
       "./composition": [
-        "buildManagedPort",
         "createView",
         "inspectFeatures",
         "isManagedHost",
-        "openComposition",
-        "registerManagedHost"
+        "openComposition"
       ]
     },
     "@migaia/reactive": {

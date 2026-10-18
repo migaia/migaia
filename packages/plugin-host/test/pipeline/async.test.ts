@@ -106,7 +106,7 @@ describe('async host pipeline failure and closing baselines', () => {
   })
 
   it.each(['await', 'return'] as const)(
-    'keeps two error slots when %s next() and downstream reject with the same Error',
+    'preserves one error when %s next() propagates the same downstream Error',
     async (style) => {
       const host = new AsyncHost()
       const sharedError = new Error(`same ${style} error`)
@@ -116,10 +116,7 @@ describe('async host pipeline failure and closing baselines', () => {
         else return result
       })
       host.useAsyncPipeline(async () => Promise.reject(sharedError))
-      await expect(host.run(1)).rejects.toMatchObject({
-        code: 'PIPELINE_FAILED',
-        errors: [sharedError, sharedError]
-      })
+      await expect(host.run(1)).rejects.toBe(sharedError)
     }
   )
 
@@ -128,14 +125,22 @@ describe('async host pipeline failure and closing baselines', () => {
     thrown.useAsyncPipeline(async () => {
       throw undefined
     })
-    await expect(thrown.run(1)).rejects.toBeUndefined()
+    await expect(thrown.run(1)).rejects.toMatchObject({
+      source: '@migaia/middleware-pipeline',
+      code: 'EXECUTION_FAILED',
+      cause: undefined
+    })
 
     const rejected = new AsyncHost()
     rejected.useAsyncPipeline(async (_value, next) => {
       void next(2)
     })
     rejected.useAsyncPipeline(async () => Promise.reject(undefined))
-    await expect(rejected.run(1)).rejects.toBeUndefined()
+    await expect(rejected.run(1)).rejects.toMatchObject({
+      source: '@migaia/middleware-pipeline',
+      code: 'EXECUTION_FAILED',
+      cause: undefined
+    })
   })
 
   it('AF-T24: double undefined failures produce a tagged AggregateError with two undefined slots', async () => {
@@ -209,12 +214,15 @@ describe('async host pipeline failure and closing baselines', () => {
     })
   })
 
-  it('does not assert HOST_DISPOSING after done completes dispatch', async () => {
+  it('asserts HOST_DISPOSING when an outer stage closes after done completes dispatch', async () => {
     const host = new AsyncHost()
     host.useAsyncPipeline(async (value, next) => {
       await next(value + 1)
       void host.dispose()
     })
-    await expect(host.run(1)).resolves.toBe(2)
+    await expect(host.run(1)).rejects.toMatchObject({
+      source: '@migaia/plugin-host',
+      code: 'HOST_DISPOSING'
+    })
   })
 })
