@@ -401,7 +401,12 @@ export function array<T>(
 ): readonly T[] {
   if (!Array.isArray(value)) invalid(pointer)
   /** The input's index descriptors are read once without executing index accessors. */
-  const descriptors: Record<string, PropertyDescriptor> = Object.getOwnPropertyDescriptors(value)
+  let descriptors: Record<string, PropertyDescriptor>
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(value)
+  } catch (cause) {
+    invalid(pointer, cause)
+  }
   /** Array length is taken from its own data descriptor, not a proxy's property getter. */
   const length = descriptors.length?.value
   if (

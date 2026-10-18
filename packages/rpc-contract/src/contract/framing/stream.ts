@@ -93,7 +93,7 @@ export function createRpcStreamFrameDecoderWithLimit(
         throw createContractError(RpcContractErrorCode.invalidFrame)
       /** Position in this caller-owned chunk. */
       let offset = 0
-      while (offset < chunk.byteLength) {
+      while (!terminal && offset < chunk.byteLength) {
         if (payload === undefined) {
           /** Complete the prefix before allocating any frame payload. */
           const copied = Math.min(4 - headerBytes, chunk.byteLength - offset)

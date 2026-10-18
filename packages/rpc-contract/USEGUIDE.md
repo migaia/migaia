@@ -1,6 +1,6 @@
 # `@migaia/rpc-contract` 使用手册
 
-本包定义线上格式并提供纯数据函数：给定输入，返回规范化后的结果，或抛出带 `(source, code)` 的错误。它不持有连接、不调度、不执行业务。安装与入口一览见 [README](./README.md)。
+本包定义线上格式并提供纯数据函数：给定输入，返回规范化后的结果，或抛出带 `(source, code)` 的错误。它不持有连接、不执行业务；有状态 framer 拥有有界重组缓存及 assembly expiry 计时器。安装与入口一览见 [README](./README.md)。
 
 ## 目录
 
@@ -25,15 +25,15 @@
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `RpcProtocol`                                         | 协议标识 `migaia.rpc` 与当前版本 `major` / `minor`（1.1）                                                 |
 | `RpcCodecId`                                          | codec 名，例如 `json`                                                                                     |
-| `RpcPeerRuntime`                                      | 对端运行时标签：`node`、`bun`、`deno`、`browser` 等                                                       |
+| `RpcPeerRuntime`                                      | 对端运行时标签键：`node`、`bun`、`deno`、`electron`、`python`、`rust`、`go`、`java` 等；合法字符串 browser 不等于存在 browser 常量键                                                       |
 | `RpcCapability`                                       | 能力名，形如 `name@version`：`ping@1`、`batch@1`、`stream@1`、`runtime-api@1`、`group@1`、`transfer@1` 等 |
 | `RpcEnvelopeKind`                                     | 信封种类                                                                                                  |
 | `RpcRouteField`                                       | 路由字段名：`timeoutMs`、`idempotencyKey`、`trace` 等                                                     |
 | `RpcWireLimit`、`RpcStreamLimit`、`RpcWireErrorLimit` | 各类上限（深度、长度、字节数）                                                                            |
 | `RpcRuntime*`（`./runtime`）                          | runtime 调用的模式、字段、结果状态等                                                                      |
-| `RpcBinary*`（`./binary*`）                           | 二进制清单的 profile、存储方式、标签                                                                      |
+| `RpcBinary*`（标签从 `./wire`）                           | 二进制清单的 profile、存储方式、标签                                                                      |
 
-完整列表从 `@migaia/rpc-contract/wire` 导入；该入口只导出常量，不包含校验逻辑。
+常量与公开类型可从 `@migaia/rpc-contract/wire` 导入；它也导出 measurePortableStreamValue 等纯数据操作，不能把该入口视为只有常量。RpcBinaryTag 从 ./wire 导入，./binary* 提供二进制操作及其 profile/storage/native-kind 公共域。
 
 ## 2. 握手
 
@@ -159,7 +159,7 @@ decoder.finish()
 
 ### 完整字符串消息
 
-载体已经保证每次交付一条完整字符串时，用 `./framing` 的 `processStringFramer`；接收值类型不确定时用 `remoteProcessStringFramer`，它会先校验输入是字符串（否则 `TypeError` / `INVALID_FRAME`）。两者都不再分片，保留载体自身的消息边界。
+载体保证每次交付完整字符串时，统一用 ./framing 的 remoteProcessStringFramer；它校验输入是字符串（否则 TypeError / INVALID_FRAME），不再分片，保留载体消息边界。bare processStringFramer 已收回包内。
 
 ### 物理帧大小
 
@@ -175,7 +175,7 @@ runtime 调用（Peer 的 request / notify / stream / group）在线上以 runti
 | `normalizeRuntimeEnvelopeDecoded(value)`              | `./runtime`          | 校验**由本库 codec 刚解码出的**纯 JSON 对象，省去属性描述符检查 |
 | `createRuntimeCallEnvelope(...)`                      | `./runtime/metadata` | 按类型构造出站调用信封                                          |
 | `normalizeRuntimeGeneration`、`normalizeRuntimeSteps` | `./runtime/metadata` | 校验代次与 group 步骤                                           |
-| 同名函数                                              | `./runtime/lazy`     | 异步版本，首次使用时才加载完整解析器，适合冷启动路径            |
+| 同名函数                                              | `./runtime/lazy`     | 首次需要时才加载对应解析器；scalar 可同步返回，stream 分支可返回 Promise，调用者应支持两种返回域            |
 
 **`*Decoded` 系列只用于本库 codec 的输出**：它们读取对象自身的可枚举属性时会执行 getter，不对调用方自行构造的对象做防御性检查。接收来源不确定的数据时，使用对应的严格版本（`normalizeRuntimeEnvelope`、`restoreRpcBinary`）。
 
@@ -199,7 +199,7 @@ runtime 调用（Peer 的 request / notify / stream / group）在线上以 runti
 | `captureRpcBinaryData(...)`                                  | `./binary/capture`          | 先同步捕获数据，稍后再 `prepare()`；适合捕获点早于编码的场景    |
 | `assertRpcNativeBinaryFrameSize` 等                          | `./binary/inspect`          | 按完整 backing 字节数检查帧大小、读取原生二进制、判断完整性错误 |
 
-- 大小与配额按**完整的底层 `ArrayBuffer`** 计算，而不只是视图可见的部分。
+- native 表示按**完整的底层 ArrayBuffer** 计入 backing 配额；inline 表示按 offset + visibleLength 计入分配配额，只复制可见字节并保留零前缀语义。limit 不无条件覆盖清单全部元数据。native + encode-only codec 的 prehash 分支另查实际整帧；inline/其他 codec 的物理帧上限由相应 codec 或调用者负责。
 - `./binary/lazy` 导出同名函数，在加载完整 codec 前先同步捕获数据并计算第一个摘要，适合冷启动路径。
 - `digest` 由调用方提供，必须是真实的 SHA-256；自定义的元数据 codec 通过最后一个参数传入，需保证输出准确。
 
@@ -209,6 +209,7 @@ runtime 调用（Peer 的 request / notify / stream / group）在线上以 runti
 
 | code                     | 何时发生                                   | 处理                                           |
 | ------------------------ | ------------------------------------------ | ---------------------------------------------- |
+| `CALLBACK_FAILED` | warn/schedule/cancel 等回调的未分类失败 | 修正回调；可写 native Error 保持实例/类型/stack，immutable/primitive 经 cause，已有外包身份保持 |
 | `INVALID_DESCRIPTOR`     | codec / framer / 协议描述不合法            | 修正配置                                       |
 | `INVALID_ENVELOPE`       | 信封字段或数据不合法（包括不可移植的数据） | 修正发送端；不要重发同一坏消息                 |
 | `INVALID_STREAM`         | 流消息的序号、字段或值不合法               | 终止该流；已交付的项不重放                     |
@@ -251,9 +252,9 @@ restored instanceof RangeError // true；stack 保留发送方的原始 stack
 ```
 
 - 错误树必有 `source`、`code`、`name`、`message`、`stack`；可选 `cause`、`errors`（`AggregateError`）、可移植的 `data`、路由信息 `route`，以及表示被截断的 `truncated: true`。
-- 序列化受深度、节点数和字节数上限约束（`RpcWireErrorLimit`），超出部分被截断，并通过 `report` 报告被省略的内容。读取错误属性时 getter 抛错也会经 `report` 报告，不会中断序列化。
-- `normalizeRpcSerializedError(value)` 校验收到的错误树；`reachRpcError(error)` 遍历本地错误的 `cause` 与 `errors`，按引用去重。
-- JSON Schema 随包发布在 `@migaia/rpc-contract/schema/wire-error`，其它语言可用它校验。
+- 序列化受深度、节点数和字节数上限约束（`RpcWireErrorLimit`），超出部分可能截断并设置 truncated；预算或文本截断不保证逐次调用 report。读取属性失败或规范化失败会经 report 报告，不会中断序列化，不能以 report 次数统计所有截断。
+- `normalizeRpcSerializedError(value)` 校验收到的错误树；`reachRpcError(error, { report: failure => console.error(failure) })` 遍历本地错误的 `cause` 与 `errors`，按引用去重。
+- JSON Schema 随包发布在 `@migaia/rpc-contract/schema/wire-error`，可作结构校验起点；它不等价于完整有界 normalizer。独立实现还须执行 x-migaia-limits、canonical base64url、surrogate 等规则；Schema 的 additionalProperties 与 normalizer 默认 reject 也有区别。
 
 **脱敏**：可以给 `serializeRpcError` 传第三个参数 `{ summaries, routes }`（两个以 Error 对象为键的 `WeakMap`），为指定的错误提供对外展示的摘要（例如统一的 code 与消息），隐藏内部细节与 `cause`。
 
@@ -325,3 +326,7 @@ try {
 
 **`*Decoded` 和严格版本该用哪个？**
 数据刚从本库 codec 解码出来、没有经过其它代码时可用 `*Decoded`；其它情况一律用严格版本。
+
+完整载体和分片接收都执行 maxMessageBytes；字符串按现有 UTF-16 code unit 口径，二进制按 byteLength。onFrame 内 close/finish 会停止当前 chunk 的剩余交付；重组 timer 从 owner 脱离后才 cancel，重入 close 不重复取消。反射失败以 INVALID_ENVELOPE 保留原 cause；warn/schedule 的未分类 native 失败附 CALLBACK_FAILED。cancel 失败先交可用的 host reportError，缺席或报告失败时由 utils 的宿主异常队列观察，保留 cleanup primary 与 reporter secondary；不替换已产生的帧结果。fatal UTF-8 的原生 decoder 错误留在 HANDSHAKE_INVALID/INVALID_FRAME 的 cause。
+
+公开收敛：./v1 移除冗余 default 聚合，用具名 rpcProtocol、normalizeRpcEnvelope。./framing 移除 createReassembler/IRpcReassembler，直接使用原 framer.accept/close 或 Pick 对应方法类型；不增加同义包装。公开完整字符串 framer 统一为 remoteProcessStringFramer，不保留 bare alias。

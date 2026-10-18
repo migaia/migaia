@@ -42,7 +42,8 @@ describe('RPCC-T01 architecture and export boundary', () => {
     const allowedBareSpecifiers = new Set<string>([
       '@migaia/serialize',
       '@migaia/utils/bytes',
-      '@migaia/utils/error'
+      '@migaia/utils/error',
+      '@migaia/utils/function'
     ])
     const bareSpecifiers = new Set<string>()
     for (const path of sourceFiles(join(packageRoot, 'src', 'contract'))) {

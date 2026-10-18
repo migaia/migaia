@@ -1,10 +1,4 @@
-import type { IRpcFrameAcceptResult, IRpcFrameContext, IRpcFramer } from '../types.js'
-
-/** Thin named facade for callers that need to document a reassembly boundary explicitly. */
-export type IRpcReassembler<TFrame, TEncoded> = Readonly<{
-  accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>
-  close: (reason?: unknown) => void
-}>
+import type { IRpcFrameAcceptResult, IRpcFrameContext } from '../types.js'
 
 /**
  * Binds native framing ingress preparation to the exact `accept` callable. Structural copies retain
@@ -126,11 +120,4 @@ export function bindRpcFrameIngress<TFrame, TEncoded>(
       writable: false
     })
   return bound
-}
-
-/** Projects the reassembly methods of a framer without introducing a second state owner. */
-export function createReassembler<TEncoded, TFrame, TId extends string, TVersion extends number>(
-  framer: IRpcFramer<TEncoded, TFrame, TId, TVersion>
-): IRpcReassembler<TFrame, TEncoded> {
-  return Object.freeze({ accept: framer.accept, close: framer.close })
 }

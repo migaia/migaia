@@ -2,13 +2,11 @@ export type { IRpcFrameAcceptResult, IRpcFrameContext, IRpcFramer } from './type
 export { messageFramerV1 } from './message-framer.js'
 export { createBinaryFramer, createStringFramer } from './message-framer.js'
 /** Whole-message string carriers reuse these exact canonical framers without chunk framing. */
-export { processStringFramer, remoteProcessStringFramer } from './string-framer.js'
+export { remoteProcessStringFramer } from './string-framer.js'
 export {
   bindRpcFrameIngress,
-  createReassembler,
   type IRpcBoundFrameIngress,
-  type IRpcNativeFrameOutputDomain,
-  type IRpcReassembler
+  type IRpcNativeFrameOutputDomain
 } from './reassembler.js'
 
 export {

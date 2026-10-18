@@ -5,6 +5,8 @@ export const RPC_CONTRACT_SOURCE = ERROR_SOURCE
 
 /** Stable diagnostics for hostile RPC contract input and bounded framing. */
 export const RpcContractErrorText = {
+  /** Safe wire summary for an unclassified callback failure; the original stays locally reachable. */
+  callbackFailed: 'rpc contract callback failed',
   invalidDescriptor: 'rpc descriptor is invalid',
   invalidEnvelope: 'rpc envelope is invalid',
   /** Stable diagnostic for a stream frame rejected by the contract validator. */

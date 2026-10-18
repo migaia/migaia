@@ -1,4 +1,6 @@
 import { isUint8Array } from '@migaia/utils/bytes'
+import { observeThenableRejection } from '@migaia/utils/function'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import { createDescriptor } from '../protocol.js'
 import {
   registerNativeRpcFrameIngress,
@@ -6,7 +8,7 @@ import {
   type IRpcNativeFrameOutputDomain
 } from './reassembler.js'
 import { RpcContractErrorCode } from '../error-code.js'
-import { createContractError } from '../contract-error.js'
+import { createContractError, identifyContractCallbackFailure } from '../contract-error.js'
 import type {
   IRpcBinaryFrame,
   IRpcFrameAcceptResult,
@@ -183,12 +185,16 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     return result
   }
   const schedule = (callback: () => void, delay: number): unknown => {
-    if (options.schedule) return options.schedule(callback, delay)
-    const timer = (
-      globalThis as unknown as { setTimeout?: (task: () => void, timeout: number) => unknown }
-    ).setTimeout
-    if (!timer) return undefined
-    return timer(callback, delay)
+    try {
+      if (options.schedule) return options.schedule(callback, delay)
+      const timer = (
+        globalThis as unknown as { setTimeout?: (task: () => void, timeout: number) => unknown }
+      ).setTimeout
+      if (!timer) return undefined
+      return timer(callback, delay)
+    } catch (error) {
+      throw identifyContractCallbackFailure(error)
+    }
   }
   const cancel = (handle: unknown): void => {
     if (options.cancel) options.cancel(handle)
@@ -199,29 +205,39 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     }
   }
   const reportCleanupFailure = (error: unknown): void => {
-    const reporter = (globalThis as unknown as { reportError?: (value: unknown) => void })
-      .reportError
-    try {
-      reporter?.(error)
-    } catch {
-      // Reporting is diagnostic only and must not replace the primary frame result.
-    }
+    /** Reuse utils' terminal host observation when the optional host reporter cannot accept it. */
+    const failure = identifyContractCallbackFailure(error)
+    observeThenableRejection(undefined, { error: failure }, (primary) => {
+      try {
+        const reporter = (globalThis as unknown as { reportError?: (value: unknown) => void })
+          .reportError
+        if (typeof reporter !== 'function') throw primary
+        reporter(primary)
+      } catch (reporterFailure) {
+        throw reporterFailure === primary
+          ? primary
+          : attachSecondaryErrors(primary, [reporterFailure])
+      }
+    })
   }
   const clearBuffer = (source: string, messageId: string): void => {
     const sourceMap = buffers.get(source)
     const buffer = sourceMap?.get(messageId)
     if (!sourceMap || !buffer) return
-    if (buffer.timer !== undefined) {
-      try {
-        cancel(buffer.timer)
-      } catch (error) {
-        reportCleanupFailure(error)
-      }
-    }
+    /** Revoke assembly ownership and account once before a user cancel callback can reenter. */
+    const timer = buffer.timer
+    buffer.timer = undefined
     bufferedBytes -= buffer.bytes
     sourceMap.delete(messageId)
     if (sourceMap.size === 0) buffers.delete(source)
     activeBuffers -= 1
+    if (timer !== undefined) {
+      try {
+        cancel(timer)
+      } catch (error) {
+        reportCleanupFailure(error)
+      }
+    }
   }
   const frame = (value: TEncoded, context: IRpcFrameContext): readonly (TEncoded | IFrame)[] => {
     const size = lengthOf(value)
@@ -254,8 +270,16 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     if (
       (kind === 'string' && typeof value === 'string') ||
       (kind === 'binary' && typeof value === 'object' && value !== null && isUint8Array(value))
-    )
+    ) {
+      /** Whole carriers have the same message ceiling as fragmented and outbound messages. */
+      const size = lengthOf(value as TEncoded)
+      if (!Number.isSafeInteger(size) || size > options.maxMessageBytes)
+        return {
+          status: 'rejected',
+          error: createContractError(RpcContractErrorCode.frameLimitExceeded)
+        }
       return { status: 'complete', value: value as TEncoded }
+    }
     if (typeof value !== 'object' || value === null)
       return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     let snapshot: IFrameSnapshot | undefined

@@ -63,6 +63,7 @@ describe('rpc-contract error identity', () => {
 
   it('maps every code to its own text, native type and package source', () => {
     const expected = {
+      CALLBACK_FAILED: [Error, 'rpc contract callback failed'],
       INVALID_DESCRIPTOR: [TypeError, 'rpc descriptor is invalid'],
       INVALID_ENVELOPE: [TypeError, 'rpc envelope is invalid'],
       INVALID_STREAM: [TypeError, 'rpc stream is invalid'],

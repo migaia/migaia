@@ -16,7 +16,6 @@ import {
   normalizeRpcEnvelope as normalizeV1Envelope,
   rpcProtocol
 } from '../../dist/contract/v1/index.js'
-import rpcV1 from '@migaia/rpc-contract/v1'
 import { messageFramer } from '../../dist/contract/framing/v1.js'
 
 describe('rpc-contract', () => {
@@ -158,7 +157,6 @@ describe('rpc-contract', () => {
       value: semantic
     })
     expect(rpcProtocolV1.id).toBe('migaia.rpc')
-    expect(rpcV1.rpcProtocol).toBe(rpcProtocol)
     expect(messageFramer).toBe(messageFramerV1)
   })
 

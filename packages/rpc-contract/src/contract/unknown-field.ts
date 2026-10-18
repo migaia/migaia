@@ -1,3 +1,5 @@
+import { identifyContractCallbackFailure } from './contract-error.js'
+
 /** A bounded endpoint-owned warning cache for additive protocol fields. */
 export type IRpcUnknownFieldWarner = Readonly<{
   note: (connection: string, kind: string, pointer: string, field: string) => void
@@ -31,6 +33,14 @@ export function createRpcUnknownFieldWarner(options: {
   /** Local caps let a connection's unknown fields use bounded memory. */
   const maxKeys = options.maxKeysPerConnection ?? 256
   const maxConnections = options.maxConnections ?? 1024
+  /** The callback retains its original read/call timing and one semantic failure boundary. */
+  const warn = (connection: string, fieldKey: string): void => {
+    try {
+      options.warn(connection, fieldKey)
+    } catch (error) {
+      throw identifyContractCallbackFailure(error)
+    }
+  }
   return {
     note(connection, kind, pointer, field) {
       let state = connections.get(connection)
@@ -50,11 +60,11 @@ export function createRpcUnknownFieldWarner(options: {
       if (state.fields.has(fieldKey) || state.overflowWarned) return
       if (state.fields.size >= maxKeys) {
         state.overflowWarned = true
-        options.warn(connection, '*')
+        warn(connection, '*')
         return
       }
       state.fields.add(fieldKey)
-      options.warn(connection, fieldKey)
+      warn(connection, fieldKey)
     },
     clear() {
       connections.clear()

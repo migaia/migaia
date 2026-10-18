@@ -6,7 +6,6 @@ import { dirname, join, relative, resolve } from 'node:path'
 export const RPC_RESOURCE_POINTS = {
   '@migaia/rpc-contract': {
     'contract/framing/message-framer.ts': ['createStringFramer', 'createBinaryFramer'],
-    'contract/framing/reassembler.ts': ['createReassembler'],
     'contract/framing/stream.ts': [
       'createRpcStreamFrameDecoder',
       'createRpcStreamFrameDecoderWithLimit'

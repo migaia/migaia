@@ -18,7 +18,7 @@ function asStringFrame(value: unknown): string {
 }
 
 /** Exact whole-message string framer; native length framing already marks message boundaries. */
-export const processStringFramer: IRpcFramer<string, string, 'process-stream', 1> = Object.freeze({
+const processStringFramer: IRpcFramer<string, string, 'process-stream', 1> = Object.freeze({
   id: 'process-stream',
   version: 1,
   inputEncodedType: 'string',

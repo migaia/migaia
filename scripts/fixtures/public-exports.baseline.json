@@ -321,7 +321,6 @@
         "toJsonRpcError"
       ],
       "./v1": [
-        "default",
         "normalizeRpcEnvelope",
         "normalizeStreamPayload",
         "rpcProtocol"
@@ -330,12 +329,10 @@
         "assertRpcPhysicalFrameSize",
         "bindRpcFrameIngress",
         "createBinaryFramer",
-        "createReassembler",
         "createStringFramer",
         "inspectRpcPhysicalFrame",
         "measureRpcPhysicalFrame",
         "messageFramerV1",
-        "processStringFramer",
         "readRpcBatchMembers",
         "remoteProcessStringFramer"
       ],

@@ -25,7 +25,7 @@ pnpm add @migaia/rpc-contract
 | 入口                                                                | 内容                                                                                              |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `@migaia/rpc-contract`                                              | 常用常量（`RpcCapability`、`RpcProtocol`、`RpcCodecId` 等）、信封校验、握手、错误工具、可移植数据 |
-| `./wire`                                                            | 全部线上格式常量（字段名、枚举、上限、违规原因），不含函数逻辑                                    |
+| `./wire`                                                            | 线上格式常量与公开类型，并含 measurePortableStreamValue 等纯数据操作                                    |
 | `./handshake`                                                       | `createRpcHello`、`acceptRpcHandshake`、`completeRpcHandshake`、`normalizeRpcHandshake`           |
 | `./portable`                                                        | `normalizePortable`：把业务数据规范化为可在线上传输的形式                                         |
 | `./errors`                                                          | `serializeRpcError`、`deserializeRpcError`、`toJsonRpcError`、`fromJsonRpcError` 等               |
@@ -83,7 +83,7 @@ console.log((restored.cause as Error).message) // 'root cause'
 
 本包错误的 source 为 `@migaia/rpc/contract`（常量 `RPC_CONTRACT_SOURCE`），code 取自 `RpcContractErrorCode`：
 
-`INVALID_DESCRIPTOR`、`INVALID_ENVELOPE`、`INVALID_STREAM`、`INVALID_FRAME`、`FRAME_LIMIT_EXCEEDED`、`FRAME_ASSEMBLY_EXPIRED`、`INVALID_WIRE_ERROR`、`HANDSHAKE_INVALID`、`HANDSHAKE_INCOMPATIBLE`、`HANDSHAKE_REJECTED`。
+`CALLBACK_FAILED`、`INVALID_DESCRIPTOR`、`INVALID_ENVELOPE`、`INVALID_STREAM`、`INVALID_FRAME`、`FRAME_LIMIT_EXCEEDED`、`FRAME_ASSEMBLY_EXPIRED`、`INVALID_WIRE_ERROR`、`HANDSHAKE_INVALID`、`HANDSHAKE_INCOMPATIBLE`、`HANDSHAKE_REJECTED`。
 
 Content-Length 分帧错误使用 JSON-RPC 桥的身份 `@migaia/rpc/bridge/jsonrpc`（`JsonRpcBridgeErrorCode`）。各错误码的含义与处理见 [USEGUIDE 第 8 节](./USEGUIDE.md#8-错误码)。
 
@@ -96,3 +96,5 @@ Content-Length 分帧错误使用 JSON-RPC 桥的身份 `@migaia/rpc/bridge/json
 | [`@migaia/serialize`](../serialize/README.md)     | 可移植数据遍历的底层实现                 |
 
 各入口的详细用法见 [USEGUIDE](./USEGUIDE.md)。
+
+./v1 使用具名 rpcProtocol / normalizeRpcEnvelope，不再导出 default 聚合。./framing 的重组直接由原 framer.accept/close 完成，createReassembler 与 IRpcReassembler 已移除；完整字符串载体统一使用 remoteProcessStringFramer，bare processStringFramer 只留包内复用。

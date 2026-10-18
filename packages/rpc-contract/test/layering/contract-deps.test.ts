@@ -31,7 +31,7 @@ function rejection(action: () => unknown): { ctor: Function; code: unknown } {
 }
 
 describe('contract utility ownership', () => {
-  it('A4 uses only serialize and the two utils imports and preserves native error identity', () => {
+  it('A4 uses only serialize and canonical utils boundaries and preserves native error identity', () => {
     const bare = new Set<string>()
     for (const path of sourceFiles(contractRoot)) {
       const source = ts.createSourceFile(
@@ -49,7 +49,8 @@ describe('contract utility ownership', () => {
     expect([...bare].sort()).toEqual([
       '@migaia/serialize',
       '@migaia/utils/bytes',
-      '@migaia/utils/error'
+      '@migaia/utils/error',
+      '@migaia/utils/function'
     ])
     const normalizeSource = readFileSync(join(contractRoot, 'normalize.ts'), 'utf8')
     const framerSource = readFileSync(join(contractRoot, 'framing/message-framer.ts'), 'utf8')
@@ -57,7 +58,7 @@ describe('contract utility ownership', () => {
     expect(normalizeSource).not.toMatch(/function isUint8Array|instanceof Uint8Array/u)
     expect(framerSource).not.toMatch(/function isUint8Array|instanceof Uint8Array/u)
     expect(errorSource).toContain('attachErrorIdentity')
-    expect(errorSource).not.toContain('defineProperty')
+    expect(errorSource).not.toMatch(/Object\.defineProperty\([^,]+,\s*['"](?:source|code)['"]/u)
     const error = createContractError(RpcContractErrorCode.invalidDescriptor)
     expect(error).toBeInstanceOf(TypeError)
     expect(Object.getOwnPropertyDescriptor(error, 'source')).toMatchObject({

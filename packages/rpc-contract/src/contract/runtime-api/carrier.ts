@@ -35,19 +35,23 @@ export function readRuntimeCarrier(value: unknown): IRpcRuntimeCarrierSelection 
     return Object.freeze({ frame: value.subarray(prefix.length) })
   }
   if (value === null || typeof value !== 'object') return undefined
-  /** Descriptor inspection never calls an outer kind getter or trusts inner routing data. */
-  const kind = Object.getOwnPropertyDescriptor(value, RpcRuntimeField.kind)
-  if (!kind || !Object.hasOwn(kind, 'value') || kind.value !== RpcRuntimeCarrier.kind)
-    return undefined
-  /** A known selector cannot conceal accessors or extra metadata outside protection. */
-  const frame = Object.getOwnPropertyDescriptor(value, RpcRuntimeCarrier.frame)
-  if (
-    !kind.enumerable ||
-    !frame?.enumerable ||
-    !Object.hasOwn(frame, 'value') ||
-    Reflect.ownKeys(value).length !== 2 ||
-    ![Object.prototype, null].includes(Object.getPrototypeOf(value))
-  )
-    throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, '/carrier')
-  return Object.freeze({ frame: frame.value })
+  try {
+    /** Descriptor inspection never calls an outer kind getter or trusts inner routing data. */
+    const kind = Object.getOwnPropertyDescriptor(value, RpcRuntimeField.kind)
+    if (!kind || !Object.hasOwn(kind, 'value') || kind.value !== RpcRuntimeCarrier.kind)
+      return undefined
+    /** A known selector cannot conceal accessors or extra metadata outside protection. */
+    const frame = Object.getOwnPropertyDescriptor(value, RpcRuntimeCarrier.frame)
+    if (
+      kind.enumerable &&
+      frame?.enumerable &&
+      Object.hasOwn(frame, 'value') &&
+      Reflect.ownKeys(value).length === 2 &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    )
+      return Object.freeze({ frame: frame.value })
+  } catch (cause) {
+    throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, '/carrier', cause)
+  }
+  throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, '/carrier')
 }

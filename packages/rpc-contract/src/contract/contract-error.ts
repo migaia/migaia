@@ -1,4 +1,9 @@
-import { attachErrorIdentity } from '@migaia/utils/error'
+import {
+  attachErrorIdentity,
+  attachSecondaryErrors,
+  isNativeErrorValue,
+  tryReadProperty
+} from '@migaia/utils/error'
 import { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
 
@@ -64,6 +69,7 @@ export function localErrorWireSummary(error: unknown): ILocalErrorWireSummary | 
  * adding a code without text fails typecheck instead of silently reusing another message.
  */
 const TEXT_BY_CODE: Readonly<Record<IRpcContractErrorCode, string>> = {
+  [RpcContractErrorCode.callbackFailed]: RpcContractErrorText.callbackFailed,
   [RpcContractErrorCode.invalidDescriptor]: RpcContractErrorText.invalidDescriptor,
   [RpcContractErrorCode.invalidEnvelope]: RpcContractErrorText.invalidEnvelope,
   [RpcContractErrorCode.invalidStream]: RpcContractErrorText.invalidStream,
@@ -97,10 +103,51 @@ export function createContractError(code: IRpcContractErrorCode, cause?: unknown
   /** Native error preserving the per-code runtime type. */
   const error = RANGE_CODES.has(code)
     ? new RangeError(TEXT_BY_CODE[code], options)
-    : code === RpcContractErrorCode.handshakeIncompatible ||
+    : code === RpcContractErrorCode.callbackFailed ||
+        code === RpcContractErrorCode.handshakeIncompatible ||
         code === RpcContractErrorCode.handshakeRejected
       ? new Error(TEXT_BY_CODE[code], options)
       : new TypeError(TEXT_BY_CODE[code], options)
   registerLocalErrorWireSummary(error, code, TEXT_BY_CODE[code])
   return attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code })
+}
+
+/** Identifies a callback failure without replacing a mutable native error or another owner. */
+export function identifyContractCallbackFailure(error: unknown): Error {
+  if (isNativeErrorValue(error)) {
+    /** A full semantic identity remains with the originating package. */
+    const source = tryReadProperty(error as { source?: unknown }, 'source')
+    /** Host-only native codes are not a complete package error identity. */
+    const code = tryReadProperty(error as { code?: unknown }, 'code')
+    if (
+      !source.threw &&
+      !code.threw &&
+      typeof source.value === 'string' &&
+      source.value.length > 0 &&
+      typeof code.value === 'string' &&
+      code.value.length > 0
+    )
+      return error
+    try {
+      attachErrorIdentity(error, {
+        source: RPC_CONTRACT_SOURCE,
+        code: RpcContractErrorCode.callbackFailed
+      })
+      registerLocalErrorWireSummary(
+        error,
+        RpcContractErrorCode.callbackFailed,
+        RpcContractErrorText.callbackFailed
+      )
+      return error
+    } catch (attachmentError) {
+      return attachSecondaryErrors(
+        createContractError(RpcContractErrorCode.callbackFailed, error),
+        [attachmentError]
+      ) as Error
+    }
+  }
+  /** Explicit cause presence retains even a callback that threw undefined. */
+  const failure = createContractError(RpcContractErrorCode.callbackFailed)
+  Object.defineProperty(failure, 'cause', { value: error, configurable: true, writable: true })
+  return failure
 }

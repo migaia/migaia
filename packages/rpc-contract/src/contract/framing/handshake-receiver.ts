@@ -77,9 +77,10 @@ class RpcHandshakeFrameReceiver implements IRpcHandshakeFrameReceiver {
     let text: string
     try {
       text = this.#decoder.decode(frame)
-    } catch {
+    } catch (cause) {
       return createContractError(
-        this.#ready ? RpcContractErrorCode.invalidFrame : RpcContractErrorCode.handshakeInvalid
+        this.#ready ? RpcContractErrorCode.invalidFrame : RpcContractErrorCode.handshakeInvalid,
+        cause
       )
     }
     if (!this.#ready) {

@@ -3,6 +3,12 @@ export const ERROR_SOURCE = '@migaia/rpc/contract'
 
 /** Public error codes owned by the runtime-neutral RPC contract layer. */
 export const RpcContractErrorCode = {
+  /**
+   * A warning, scheduler, or timer-cleanup callback failed without an upstream semantic identity.
+   * Mutable native errors retain identity/type/stack; other values remain on cause. Correct the
+   * callback; cleanup failures are observed without replacing the current frame result.
+   */
+  callbackFailed: 'CALLBACK_FAILED',
   /** Invalid descriptor identity or shape; caller must correct the component configuration. */
   invalidDescriptor: 'INVALID_DESCRIPTOR',
   /** Invalid semantic envelope; caller must reject the untrusted message. */
