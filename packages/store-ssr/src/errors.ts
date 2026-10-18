@@ -3,7 +3,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreSsrErrorCode, type IStoreSsrErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/** Identity for package-owned failures; complete foreign identities retain their existing source. */
 export const STORE_SSR_SOURCE = '@migaia/store-ssr'
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */

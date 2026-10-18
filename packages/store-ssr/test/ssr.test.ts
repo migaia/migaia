@@ -195,7 +195,7 @@ function fakeResource(
   options: {
     promise?: Promise<unknown>
     snapshot?:
-      | { version: 1; data: unknown; updatedAt: number; expiresAt: number | null }
+      | { version: 2; data: unknown; ageMs: number; remainingTtlMs: number | null }
       | undefined
   } = {}
 ): ISSRResource & { readonly hydrateCalls: unknown[]; readonly disposeCalls: number } {
@@ -466,12 +466,12 @@ describe('registerResource() / unregisterResource() / detachResource()', () => {
     scope.hydrate({
       version: 1,
       stores: {},
-      resources: { user: { version: 1, data: { id: 1 }, updatedAt: 0, expiresAt: null } }
+      resources: { user: { version: 2, data: { id: 1 }, ageMs: 0, remainingTtlMs: null } }
     })
     const resource = fakeResource(scope.runtime)
     scope.registerResource('user', resource)
     expect(resource.hydrateCalls).toEqual([
-      { version: 1, data: { id: 1 }, updatedAt: 0, expiresAt: null }
+      { version: 2, data: { id: 1 }, ageMs: 0, remainingTtlMs: null }
     ])
 
     expect(scope.unregisterResource('user')).toBe(true)
@@ -565,7 +565,7 @@ describe('hydrate()', () => {
       scope.hydrate({
         version: 1,
         stores: { s: {} },
-        resources: { r: { version: 1, data: null, updatedAt: 0, expiresAt: null } }
+        resources: { r: { version: 2, data: null, ageMs: 0, remainingTtlMs: null } }
       })
     } catch (error) {
       caught = error
@@ -585,10 +585,10 @@ describe('hydrate()', () => {
       stores: {},
       resources: {
         r: {
-          version: 1,
+          version: 2,
           data: { nested: { list: [{ deep: true }] } },
-          updatedAt: 1,
-          expiresAt: null
+          ageMs: 1,
+          remainingTtlMs: null
         }
       }
     })
@@ -628,7 +628,7 @@ describe('dehydrate()', () => {
     scope.registerResource('pending', emptyResource)
 
     const filledResource = fakeResource(scope.runtime, {
-      snapshot: { version: 1, data: { ok: true }, updatedAt: 1, expiresAt: null }
+      snapshot: { version: 2, data: { ok: true }, ageMs: 1, remainingTtlMs: null }
     })
     scope.registerResource('ready', filledResource)
 
@@ -920,26 +920,39 @@ describe('dehydrateAsync()', () => {
     scope.dispose()
   })
 
-  it('contains both user and runtime reporter failures at the final boundary', async () => {
+  it('contains user reporter failure while surfacing runtime reporter failure on the host queue', async () => {
+    /** Terminal reporter errors remain observable separately from the successful SSR result. */
+    const callbacks: (() => void)[] = []
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
+    /** Exact reporter failure survives the shared Reactive/Utils last-boundary channel. */
+    const reporterFailure = new Error('runtime reporter failed')
     const scope = new SSRRequestScope({
       runtimeOptions: {
         onError: () => {
-          throw new Error('runtime reporter failed')
+          throw reporterFailure
         }
       }
     })
-    scope.registerResource(
-      'bad',
-      fakeResource(scope.runtime, { promise: Promise.reject(new Error('resource failed')) })
-    )
-    await expect(
-      scope.dehydrateAsync({
-        onResourceError: () => {
-          throw new Error('user reporter failed')
-        }
-      })
-    ).resolves.toEqual({ version: 1, stores: {}, resources: {} })
-    scope.dispose()
+    try {
+      scope.registerResource(
+        'bad',
+        fakeResource(scope.runtime, { promise: Promise.reject(new Error('resource failed')) })
+      )
+      await expect(
+        scope.dehydrateAsync({
+          onResourceError: () => {
+            throw new Error('user reporter failed')
+          }
+        })
+      ).resolves.toEqual({ version: 1, stores: {}, resources: {} })
+      expect(callbacks).toHaveLength(1)
+      expect(callbacks[0]).toThrow(reporterFailure)
+    } finally {
+      scope.dispose()
+      queue.mockRestore()
+    }
   })
 
   it('reports resource failures to Runtime.reportError by default and omits them from the payload', async () => {
@@ -953,7 +966,7 @@ describe('dehydrateAsync()', () => {
       'good',
       fakeResource(scope.runtime, {
         promise: Promise.resolve(1),
-        snapshot: { version: 1, data: 'ok', updatedAt: 1, expiresAt: null }
+        snapshot: { version: 2, data: 'ok', ageMs: 1, remainingTtlMs: null }
       })
     )
     const state = await scope.dehydrateAsync()
@@ -1461,26 +1474,26 @@ describe('assertSSRState()', () => {
 
   it('rejects a resource snapshot missing required fields', () => {
     expect(() =>
-      assertSSRState({ version: 1, stores: {}, resources: { r: { version: 1 } } })
+      assertSSRState({ version: 1, stores: {}, resources: { r: { version: 2 } } })
     ).toThrow('[store] invalid SSR resource snapshot: r')
   })
 
-  it('rejects a resource snapshot with a non-finite updatedAt', () => {
+  it('rejects a resource snapshot with a non-finite ageMs', () => {
     expect(() =>
       assertSSRState({
         version: 1,
         stores: {},
-        resources: { r: { version: 1, updatedAt: Number.NaN, expiresAt: null, data: null } }
+        resources: { r: { version: 2, ageMs: Number.NaN, remainingTtlMs: null, data: null } }
       })
     ).toThrow('[store] invalid SSR resource snapshot: r')
   })
 
-  it('accepts expiresAt: null and rejects a non-finite expiresAt', () => {
+  it('accepts remainingTtlMs: null and rejects a non-finite remainingTtlMs', () => {
     expect(() =>
       assertSSRState({
         version: 1,
         stores: {},
-        resources: { r: { version: 1, updatedAt: 1, expiresAt: null, data: null } }
+        resources: { r: { version: 2, ageMs: 1, remainingTtlMs: null, data: null } }
       })
     ).not.toThrow()
     expect(() =>
@@ -1488,7 +1501,7 @@ describe('assertSSRState()', () => {
         version: 1,
         stores: {},
         resources: {
-          r: { version: 1, updatedAt: 1, expiresAt: Number.POSITIVE_INFINITY, data: null }
+          r: { version: 2, ageMs: 1, remainingTtlMs: Number.POSITIVE_INFINITY, data: null }
         }
       })
     ).toThrow('[store] invalid SSR resource snapshot: r')
@@ -1501,7 +1514,7 @@ describe('assertSSRState()', () => {
       assertSSRState({
         version: 1,
         stores: {},
-        resources: { r: { version: 1, updatedAt: 1, expiresAt: null, data: cyclic } }
+        resources: { r: { version: 2, ageMs: 1, remainingTtlMs: null, data: cyclic } }
       })
     ).toThrow('contains a cycle')
   })

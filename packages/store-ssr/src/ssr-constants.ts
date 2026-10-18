@@ -1,4 +1,4 @@
-/** Outcomes used while waiting for SSR work to settle or be disposed. */
+/** Private SSR wait-race tags, not part of any public method input or output. */
 export const SsrWorkOutcome = {
   value: 'value',
   disposed: 'disposed',
@@ -12,5 +12,4 @@ export const SsrWireType = {
   bytes: 'bytes'
 } as const
 
-export type ISsrWorkOutcome = (typeof SsrWorkOutcome)[keyof typeof SsrWorkOutcome]
 export type ISsrWireType = (typeof SsrWireType)[keyof typeof SsrWireType]

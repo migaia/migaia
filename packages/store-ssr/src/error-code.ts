@@ -34,14 +34,16 @@ export const StoreSsrErrorCode = {
 
   /**
    * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource
-   * snapshot field is invalid.
+   * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original
+   * reflective failure reachable and correct the supplied data before retrying.
    *
    * Check the supplied `ISSRState` structure.
    */
   invalidSnapshot: 'INVALID_SNAPSHOT',
 
   /**
-   * The inline state script ID is invalid or `ISSRState.version` is not the supported version `1`.
+   * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is
+   * not the supported version `1`. Syntax errors retain their native class and stack.
    *
    * Use a valid ID and the supported version.
    */

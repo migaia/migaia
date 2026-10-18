@@ -75,7 +75,7 @@ const taken = scope.detach('app'); // 移除但不 dispose，所有权转给调�
 - `unregister(key, disposeOwned?)`：`disposeOwned: boolean`(默认 `true`)；返回该 key 是否存在过。owned 且 `disposeOwned` 为真时启动 `$dispose()`(异步结果由 scope 观察)。
 - `detach(key)`：移除登记但不 dispose，返回 `ISSRStore | undefined`。
 
-`registerResource`/`unregisterResource`/`detachResource` 是 Resource 版，签名与语义完全对应，只是校验 `resource.runtime === scope.runtime`。
+`registerResource`/`unregisterResource`/`detachResource` 是 Resource 版，签名与都按 key 操作，但失败顺序不同：Store 注销先摘登记再调用 cleanup；Resource 注销先 dispose，若同步失败则登记仍在，可 detach/重试。Resource 校验 runtime === scope.runtime。
 
 ---
 
@@ -101,7 +101,7 @@ scope.hydrate(state); // state: ISSRState
 const state = scope.dehydrate(); // ISSRState
 ```
 
-无参数。按 key 字典序遍历：Store 调 `$plain()`，结果经深度校验 + 深拷贝 + 冻结；Resource 调 `dehydrate()`，返回 `undefined` 直接跳过，有值则只对 `snapshot.data` 做同样处理，`version`/`updatedAt`/`expiresAt` 原样保留。整体 `Object.freeze`。
+无参数。按 key 字典序遍历：Store 调 `$plain()`，结果经深度校验 + 深拷贝 + 冻结；Resource 调 `dehydrate()`，返回 `undefined` 直接跳过，有值则只对 `snapshot.data` 做同样处理，`version`/`ageMs`/`remainingTtlMs` 原样保留。整体 `Object.freeze`。
 
 **`scope.dehydrateTrusted()`｜5 秒上手** —— 跳过校验/拷贝的快速路径，**不是快照**：
 
@@ -130,7 +130,7 @@ const failures = await scope.awaitResources({ timeoutMs: 3000 });
 
 `IAwaitResourcesOptions` 全部字段：
 
-- `timeoutMs?: number` —— 整个等待过程的总预算(不是单个 Resource 各自的超时)；不设置则一直等到全部 settle；`0` 合法，语义是"立刻过期"；非法值(非有限数字或负数)同步抛 `RangeError`
+- `timeoutMs?: number` —— 整个等待过程的总预算(不是单个 Resource 各自的超时)；不设置则一直等到全部 settle；`0` 合法，语义是"立刻过期"；合法范围 [0, 2147483647]；非法值通过返回 Promise 拒绝为 RangeError/INVALID_OPTION
 
 逐轮 settle，按 **Promise 身份**去重(不按 key)——同一 key 的 retry/refetch 拿到新 Promise 仍会被继续等到。三种失败旁路都收进 `failures`，不中止整个等待：`.promise` getter 同步抛错(同 key 只记一次)、单个 Resource 超时(`'[store] SSR resource "${key}" did not settle within ${timeoutMs}ms'`)、等待期间 `scope.dispose()` 被调用(直接返回已收集结果)。轮次上限 64，超过抛 `Error('[store] SSR resources kept registering new resources past 64 rounds')`(应对瀑布式无限注册)。
 
@@ -148,7 +148,7 @@ const state = await scope.dehydrateAsync({
 - `timeoutMs?: number` —— 透传给内部 `awaitResources`
 - `onResourceError?: (failure: ISSRResourceFailure) => void` —— 提供后**替代**默认行为(默认转发给 `scope.runtime.reportError(failure.error, { phase: 'ssr-resource' })`)
 
-失败的 Resource 不会出现在返回的 `state.resources` 里，其余成功的 Resource 和全部 Store 照常打包，不会因一个 Resource 失败拖垮整页。
+failure 列表不独立过滤 state.resources；资源是否纳入由自己的 dehydrate() 返回值决定。canonical Resource 通常返回可用缓存，结构适配器应明确自己的快照策略。
 
 ---
 
@@ -190,7 +190,7 @@ const html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__
 **`readSSRStateFromDocument`｜5 秒上手** —— 从注入的文档对象读回并反序列化：
 
 ```ts
-const state = readSSRStateFromDocument(); // 默认同一个 elementId，浏览器端传 window.document
+const state = readSSRStateFromDocument(undefined, document); // 默认同一个 elementId，浏览器端传 window.document
 ```
 
 全部参数：`elementId?: string`(默认 `'__STORE_STATE__'`)、`document?: ISSRDocument`(不传视为找不到元素)。元素不存在或 `textContent` 为空返回 `undefined`。`ISSRDocument` 只要求 `getElementById(id)` 返回 `{ textContent, getAttribute(name) } | null`。
@@ -252,7 +252,7 @@ import { assertSSRState } from '@migaia/store-ssr';
 assertSSRState(value); // 通过则收窄类型为 ISSRState，不通过则抛错
 ```
 
-单参数，无选项。规则：必须是纯对象且 `version === 1`；`stores` 必须是纯对象，每个 key 非空且不能是 `'__proto__'`，每个 value 必须是合法 JSON 对象；`resources`(可选)必须是纯对象，每个 value 必须是纯对象、`version === 1`、`updatedAt` 是有限数字、`expiresAt` 是 `null` 或有限数字，`data` 字段再走一遍 JSON 合法性校验(拒绝非纯对象/非有限数字/循环引用/深度超 256/节点数超 1,000,000)。
+单参数，无选项。规则：必须是纯对象且 `version === 1`；`stores` 必须是纯对象，每个 key 非空且不能是 `'__proto__'`，每个 value 必须是合法 JSON 对象；`resources`(可选)必须是纯对象，每个 value 必须是纯对象、Resource `version === 2`、`ageMs` 是有限非负数、`remainingTtlMs` 是 `null` 或有限非负数，`data` 字段再走一遍 JSON 合法性校验(拒绝非纯对象/非有限数字/循环引用/深度超 256/节点数超 1,000,000)。
 
 ---
 
@@ -261,18 +261,8 @@ assertSSRState(value); // 通过则收窄类型为 ISSRState，不通过则抛�
 ## 常量
 
 ```ts
-import { SsrWorkOutcome, SsrWireType } from '@migaia/store-ssr';
+import { SsrWireType } from '@migaia/store-ssr';
 ```
-
-**`SsrWorkOutcome`｜3 秒上手** —— `awaitResources()` 内部三方竞速的结果标签，一般不需要在业务代码里直接使用：
-
-```ts
-SsrWorkOutcome.value; // 'value'
-SsrWorkOutcome.disposed; // 'disposed'
-SsrWorkOutcome.timeout; // 'timeout'
-```
-
-无调用参数，是一个 `as const` 常量对象；`ISsrWorkOutcome` 是其取值的联合类型。
 
 **`SsrWireType`｜3 秒上手** —— `createSSRStateScriptWith`/`readSSRStateFromDocumentWith` 用到的线上编码标签：
 
@@ -318,7 +308,7 @@ throw createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, '自定义消息
 throw createStoreSsrTypeError(StoreSsrErrorCode.invalidOption, '自定义消息');
 ```
 
-三者签名一致：`(code: IStoreSsrErrorCode, message: string, options?: { readonly cause?: unknown })`，分别产出 `Error`/`RangeError`/`TypeError`(`createStoreSsrTypeError` 不接受第三个 `options` 参数)，内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-ssr'` 与传入的 `code`。
+createStoreSsrError(code, message, options?) 接受可选 cause；createStoreSsrRangeError(code, message) 与 createStoreSsrTypeError(code, message) 均仅两个参数，不接受 cause 选项。三者经 canonical attachErrorIdentity 附码，保持 native 类型与 stack。
 
 **`createStoreSsrAggregateError`｜5 秒上手**：
 
@@ -328,7 +318,7 @@ throw createStoreSsrAggregateError(StoreSsrErrorCode.hydrateFailed, [err1, err2]
 
 签名：`(code: IStoreSsrErrorCode, errors: unknown[], message: string)`，产出贴好身份的 `AggregateError`，`errors[]` 保持可达。
 
-`STORE_SSR_SOURCE`(`'@migaia/store-ssr'`)是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误。
+`STORE_SSR_SOURCE`(`'@migaia/store-ssr'`)是本包构造错误携带的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误。
 
 ---
 
@@ -368,7 +358,7 @@ export async function renderPage(userId: string): Promise<string> {
 
     return `<!doctype html><html><body>${createSSRStateScript(state)}<div id="root"></div></body></html>`;
   } finally {
-    scope.dispose();
+    await scope.disposeAsync();
   }
 }
 ```
@@ -385,7 +375,7 @@ const runtime = createRuntime();
 const app = createStore({ theme: 'dark' }, { runtime });
 const user = new Resource(fetchUser, runtime, { ttl: 30_000, autoStart: false });
 
-const state = readSSRStateFromDocument();
+const state = readSSRStateFromDocument(undefined, document);
 if (state) {
   if (state.stores.app) app.$hydrate(state.stores.app);
   if (state.resources?.user) user.hydrate(state.resources.user);
@@ -436,3 +426,11 @@ pnpm --filter @migaia/store-ssr typecheck:test
 pnpm --filter @migaia/store-ssr test
 pnpm --filter @migaia/store-ssr build
 ```
+
+Resource v2 快照在 hydration 时恢复捕获的剩余 TTL；调用方应在传入 SSR hydration 前计入已知传输/存储耗时（增加 ageMs、从有限 remainingTtlMs 扣除，最低 0）。SSR 外层 ISSRState.version 仍为 1。
+
+登记与收尾：水合回调若关闭 scope，Store/Resource 登记在提交前拒绝 SCOPE_DISPOSED；候选未被接纳，仍归调用方处理。sync dispose 与 disposeAsync 都先发布同一完成 Promise 再启动 cleanup；完成等待该次清理启动的全部作业。scope 不释放 Runtime 本体。
+
+等待与错误：超时按单个 Promise 的实际结算结果分类；已有成功不报 RESOURCE_TIMEOUT，已有拒绝保留其原因，仅未结算项报超时。0 预算不等待在途工作，但识别已完成 Promise。dehydrateAsync 不按 failure key 另作过滤。unknown snapshot 属性失败以 INVALID_SNAPSHOT 保留 native 原实例或 cause；JSON parse 的 SyntaxError 原位附 INVALID_STATE_SCRIPT。foreign source/code 保留原 owner。
+
+API 收敛：SsrWorkOutcome/ISsrWorkOutcome 从根入口收回，仅内部竞速使用；公开 awaitResources 仍返回 failure 数组，不增加状态 wrapper 或兼容 alias。外部旧 import 需 breaking 迁移，SsrWireType 及其类型保持。

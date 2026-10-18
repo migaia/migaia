@@ -1287,7 +1287,6 @@
         "SSRRequestScope",
         "STORE_SSR_SOURCE",
         "SsrWireType",
-        "SsrWorkOutcome",
         "StoreSsrErrorCode",
         "assertSSRState",
         "createSSRRequestScope",

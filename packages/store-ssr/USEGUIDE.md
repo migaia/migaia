@@ -1,6 +1,6 @@
 # 使用手册
 
-本文是 `@migaia/store-ssr` 的完整参考手册。先看 [README.md](./README.md#5-五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来",本文讲"每一个 API、每一个字段、每一种边界行为"。
+本文是 `@migaia/store-ssr` 的完整参考手册。先看 [README.md](./README.md#scope) 的请求作用域示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来",本文讲"每一个 API、每一个字段、每一种边界行为"。
 
 ## 目录
 
@@ -54,7 +54,7 @@ import type {
 } from '@migaia/store-ssr';
 ```
 
-这个包只有 `src/ssr.ts` 一个源文件,依赖 `@migaia/reactive`(`createRuntime`、`IRuntime`、`claimOwnership`)、`@migaia/resource`(`IResourceCacheSnapshot`)、`@migaia/serialize`(`ISerializeChunk`、`ISerializeRegistry`、`base64ToBytes`、`bytesToBase64`)。它不 import 任何 DOM 全局对象,也不读取 `globalThis.document`——需要读文档时,`readSSRStateFromDocument`/`readSSRStateFromDocumentWith` 要求显式传入一个满足 `ISSRDocument` 接口的对象。
+本包由 ssr.ts、ssr-constants.ts、errors.ts、error-code.ts、error-text.ts、index.ts 六个源码文件组成；依赖 utils 的 canonical descriptor/普通对象工具，以及 `@migaia/reactive`(`createRuntime`、`IRuntime`、`claimOwnership` 来自 reactive/extension)、`@migaia/resource`(`IResourceCacheSnapshot`)、`@migaia/serialize`(`ISerializeChunk`、`ISerializeRegistry`、`base64ToBytes`、`bytesToBase64`)。它不 import 任何 DOM 全局对象,也不读取 `globalThis.document`——需要读文档时,`readSSRStateFromDocument`/`readSSRStateFromDocumentWith` 要求显式传入一个满足 `ISSRDocument` 接口的对象。
 
 ---
 
@@ -64,7 +64,7 @@ SSR 场景里最危险的错误是"两个并发请求共享了同一份可变状
 
 1. **每个 `SSRRequestScope` 自带一个独立的 `Runtime`**(除非显式传入)。`Runtime` 是 `@migaia/reactive` 里状态归属的最终判据。
 2. **`register()`/`registerResource()` 会强制校验归属**:传入的 Store/Resource 必须满足 `store.$runtime === this.runtime`(或 `resource.runtime === this.runtime`),否则直接抛错拒绝注册。这意味着即使不小心把一个挂在全局默认 Runtime、或另一个请求的 Runtime 上的 Store 传进来,也无法注册成功——校验在注册那一刻就拦下,不会等到脱水阶段才发现串数据。
-3. **`scope.runtime` 本身也向 `@migaia/reactive` 的所有权表登记**(内部调用 `claimOwnership`),防止同一个 Runtime 被两个 scope 同时声明所有权。
+3. claimOwnership(scope, scope.runtime) 登记 scope 实例，不独占 Runtime；两个 scope 可显式复用一个 Runtime。请求隔离仍由应用为每请求创建独立 Runtime 保证。
 
 因此正确的用法永远是:**为每个请求调用一次 `createSSRRequestScope()`,用 `scope.runtime` 创建这个请求要用的全部 Store/Resource,请求结束后 `await scope.disposeAsync()`**。只需同步关闭入口时可调用 `scope.dispose()`；真实 Store 的异步 `$dispose()` 仍由 `disposeAsync()` 等待。把 Store 创建在进程级单例 Runtime 上再注册进 scope,是这个库明确设计为要拒绝的用法。
 
@@ -181,7 +181,7 @@ scope.hydrate(state); // state: ISSRState
 const state: ISSRState = scope.dehydrate();
 ```
 
-按 key 字典序遍历所有已注册且未销毁(`$disposed`/`disposed` 为 `false`)的 Store 和 Resource:Store 调用 `$plain()`,结果经过深度校验 + 深拷贝 + 冻结,产出 JSON-safe 的 `Readonly<Record<string, IJSONValue>>`;Resource 调用 `dehydrate()`,返回 `undefined` 的直接跳过(表示还没有成功值可脱水),有值的话只对 `snapshot.data` 做同样的深拷贝校验,`version`/`updatedAt`/`expiresAt` 原样保留。返回值整体 `Object.freeze`,`stores`/`resources` 各自也是冻结对象。
+按 key 字典序遍历所有已注册且未销毁(`$disposed`/`disposed` 为 `false`)的 Store 和 Resource:Store 调用 `$plain()`,结果经过深度校验 + 深拷贝 + 冻结,产出 JSON-safe 的 `Readonly<Record<string, IJSONValue>>`;Resource 调用 `dehydrate()`,返回 `undefined` 的直接跳过(表示还没有成功值可脱水),有值的话只对 `snapshot.data` 做同样的深拷贝校验,`version`/`ageMs`/`remainingTtlMs` 原样保留。返回值整体 `Object.freeze`,`stores`/`resources` 各自也是冻结对象。
 
 ### `dehydrateTrusted()`
 
@@ -206,9 +206,9 @@ const failures: readonly ISSRResourceFailure[] = await scope.awaitResources({ ti
 
 | 选项        | 类型     | 必填性 | 默认值   | 说明                                                                                                    |
 | ----------- | -------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
-| `timeoutMs` | `number` | 可选   | 不设超时 | 整个等待过程的总预算,不是单个 Resource 各自的超时。`0` 合法,语义是"立刻过期"——不等待任何在途 Resource。 |
+| `timeoutMs` | `number` | 可选   | 不设超时 | 有限范围 [0, 2147483647]；整个等待过程的总预算,不是单个 Resource 各自的超时。`0` 合法,语义是"立刻过期"——不等待任何在途 Resource。 |
 
-传入非法值(不是有限数字,或为负数)会同步抛出 `RangeError('[store] SSR awaitResources timeoutMs must be finite and non-negative')`。
+timeoutMs 合法范围是 [0, 2147483647]；非法值通过 awaitResources 返回的 Promise 拒绝为 `RangeError('[store] SSR awaitResources timeoutMs must be finite and non-negative')`。
 
 逐轮 settle 是这个方法的核心行为:每一轮只等待"这一轮新出现的 Promise",按 **Promise 身份**去重而不是按 key——同一个 key 首次 settle 后又发起了 retry/refetch(拿到一个新 Promise),仍然会被继续等到,不会因为这个 key "见过"就永久跳过。这样设计是为了正确处理瀑布式注册(Resource A resolve 之后的回调里才注册 Resource B)——旧版本用一趟 `Promise.all` 时,B 根本来不及被等到,`dehydrate()` 时它还没准备好,预取等于白做。
 
@@ -229,7 +229,7 @@ const state = await scope.dehydrateAsync({
 });
 ```
 
-等价于先 `awaitResources({ timeoutMs })`,再 `dehydrate()`。每个失败默认转发给 `scope.runtime.reportError(failure.error, { phase: 'ssr-resource' })`(`@migaia/reactive` 的 `IRuntimeErrorPhase` 里专门为这个场景保留了 `'ssr-resource'`);传入 `onResourceError` 会**替代**默认行为,而不是在默认行为之外追加——只调用你传入的回调。**失败的 Resource 不会出现在返回的 `state.resources` 里**,其余成功的 Resource 和全部 Store 照常打包,不会因为一个 Resource 挂了就让整页脱水失败。
+等价于先 `awaitResources({ timeoutMs })`,再 `dehydrate()`。每个失败默认转发给 `scope.runtime.reportError(failure.error, { phase: 'ssr-resource' })`(`@migaia/reactive` 的 `IRuntimeErrorPhase` 里专门为这个场景保留了 `'ssr-resource'`);传入 `onResourceError` 会**替代**默认行为,而不是在默认行为之外追加——只调用你传入的回调。failure 列表不独立过滤 payload；最终是否包含某资源由其 dehydrate() 返回值决定。canonical Resource 通常只返回可用缓存，其他结构适配器须明确自己的快照策略。
 
 ---
 
@@ -264,18 +264,18 @@ type ISSRState = {
 
 - 必须是纯对象且 `version === 1`,否则 `Error('[store] invalid SSR state version')`。
 - `stores` 必须是纯对象,否则 `Error('[store] invalid SSR stores snapshot')`;每个 key 都要通过 `assertStoreKey`(非空、不是 `'__proto__'`),每个 value 必须是合法 JSON 对象。
-- `resources`(可选)必须是纯对象,否则 `Error('[store] invalid SSR resources snapshot')`;每个 value 必须是纯对象、`version === 1`、`updatedAt` 是有限数字、`expiresAt` 是 `null` 或有限数字,否则 `Error('[store] invalid SSR resource snapshot: ${key}')`;`data` 字段再走一遍 JSON 合法性校验。
+- `resources`(可选)必须是纯对象,否则 `Error('[store] invalid SSR resources snapshot')`;每个 value 必须是纯对象、Resource `version === 2`、`ageMs` 是有限非负数、`remainingTtlMs` 是 `null` 或有限非负数,否则 `Error('[store] invalid SSR resource snapshot: ${key}')`;`data` 字段再走一遍 JSON 合法性校验。
 
 JSON 合法性校验(`dehydrate()` 的深拷贝路径与纯校验路径共用同一套判定顺序,保证同一份非法数据在两条路上报出一致的原因)拒绝:
 
 | 情形                                                | 报错                                                |
 | --------------------------------------------------- | --------------------------------------------------- |
-| 非纯对象(有自定义原型的实例、`Map`/`Set`/`Date` 等) | `TypeError('${path} contains a non-plain object')`  |
-| 非有限数字(`NaN`/`Infinity`)                        | `TypeError('${path} contains a non-finite number')` |
-| 不是 `string`/`boolean`/`number`/`null`/纯对象/数组 | `TypeError('${path} is not JSON serializable')`     |
-| 循环引用(同一个对象在自己的子树里再次出现)          | `TypeError('${path} contains a cycle')`             |
-| 嵌套深度超过 256 层(`MAX_JSON_DEPTH`)               | `TypeError('${path} exceeds the JSON depth limit')` |
-| 节点总数超过 1,000,000(`MAX_JSON_NODES`)            | `TypeError('${path} exceeds the JSON node limit')`  |
+| 非纯对象(有自定义原型的实例、`Map`/`Set`/`Date` 等) | `TypeError('[store] ${path} contains a non-plain object')`  |
+| 非有限数字(`NaN`/`Infinity`)                        | `TypeError('[store] ${path} contains a non-finite number')` |
+| 不是 `string`/`boolean`/`number`/`null`/纯对象/数组 | `TypeError('[store] ${path} is not JSON serializable')`     |
+| 循环引用(同一个对象在自己的子树里再次出现)          | `TypeError('[store] ${path} contains a cycle')`             |
+| 嵌套深度超过 256 层(`MAX_JSON_DEPTH`)               | `TypeError('[store] ${path} exceeds the JSON depth limit')` |
+| 节点总数超过 1,000,000(`MAX_JSON_NODES`)            | `TypeError('[store] ${path} exceeds the JSON node limit')`  |
 
 `path` 会精确到具体字段,比如 `stores.app.count` 或 `resources.user.data[2].name`,方便定位是哪个 Store/Resource 的哪个字段出的问题。
 
@@ -289,7 +289,7 @@ const html = createSSRStateScript(scope.dehydrate()); // 默认 elementId = '__S
 // => <script type="application/json" id="__STORE_STATE__">{"version":1,...}</script>
 
 // 读取(浏览器端)
-const state = readSSRStateFromDocument(); // 默认同一个 elementId
+const state = readSSRStateFromDocument(undefined, document); // 默认同一个 elementId
 ```
 
 | 方法/签名                                         | 参数类型                                                                  | 同步/异步 | 说明                                                                                                      |
@@ -299,7 +299,7 @@ const state = readSSRStateFromDocument(); // 默认同一个 elementId
 | `createSSRStateScript(state, elementId?)`         | `state: ISSRState`；`elementId?: string`(默认 `'__STORE_STATE__'`)        | 同步      | 生成完整的 `<script type="application/json">` 标签。                                                      |
 | `readSSRStateFromDocument(elementId?, document?)` | `elementId?: string`(默认 `'__STORE_STATE__'`)；`document?: ISSRDocument` | 同步      | 从 `document.getElementById(elementId).textContent` 读回并反序列化;元素不存在或内容为空返回 `undefined`。 |
 
-**HTML 转义细节**:`serializeSSRState` 对 `&`、`<`、`>`、` `、` ` 做单次正则扫描替换(不是五次 `replaceAll`——SSR 载荷通常是这份数据里最大的字符串,单次扫描明显更快),分别转成 `&`/`<`/`>`/` `/` `,防止载荷里出现 `</script>` 之类的字符串提前闭合标签,也避免 U+2028/U+2029 在某些解析路径下被当成行终止符。
+**HTML 转义细节**：单次扫描把 `&`、`<`、`>`、U+2028、U+2029 分别写为 JSON 中的 `\u0026`、`\u003c`、`\u003e`、`\u2028`、`\u2029`；这里每项是一个反斜杠加 u 与四位十六进制数，防止脚本提前闭合并保持 JSON 读回原值。
 
 **`elementId` 校验**:必须匹配 `/^[A-Za-z_][A-Za-z0-9_:.-]*$/`(首字符允许下划线,是为了让默认值 `__STORE_STATE__` 本身合法),不匹配抛出 `Error('[store] invalid SSR state script id')`。这个正则本身就排除了空白和引号,所以纯 JSON 版本不需要对 `elementId` 再单独做属性转义。
 
@@ -341,20 +341,11 @@ const state = await readSSRStateFromDocumentWith({ codecs, document });
 
 ## 13. 常量与错误码完整参考
 
-### 13.1 `SsrWorkOutcome` / `SsrWireType`
+### 13.1 `SsrWireType`
 
 ```ts
-import { SsrWorkOutcome, SsrWireType } from '@migaia/store-ssr';
+import { SsrWireType } from '@migaia/store-ssr';
 ```
-
-**`SsrWorkOutcome`** —— `awaitResources()` 内部三方竞速（真正的等待 / scope dispose 信号 / 可选超时）的结果标签，是包内部实现细节的公开镜像，一般不需要在业务代码里直接使用：
-
-```ts
-const SsrWorkOutcome = { value: 'value', disposed: 'disposed', timeout: 'timeout' } as const;
-type ISsrWorkOutcome = 'value' | 'disposed' | 'timeout';
-```
-
-无调用参数，`as const` 常量对象；`ISsrWorkOutcome` 是其取值的联合类型。三个值分别对应 [§8](#8-awaitresources-与-dehydrateasync) 描述的三种竞速结果：某一轮 `Promise.allSettled` 真正完成（`value`）、等待期间 `scope.dispose()` 被调用（`disposed`）、`timeoutMs` 预算耗尽（`timeout`）。
 
 **`SsrWireType`** —— `createSSRStateScriptWith`/`readSSRStateFromDocumentWith`（[§12](#12-内联进-html多编解码器版本)）用到的线上编码标签：
 
@@ -393,7 +384,7 @@ if ((error as { code?: string }).code === StoreSsrErrorCode.crossRuntime) {
 | `scopeDisposalFailed`  | `SCOPE_DISPOSAL_FAILED` | `dispose()` 时多个 store/resource 清理失败，作为 `AggregateError` 抛出                     |
 | `hydrateFailed`        | `HYDRATE_FAILED`        | `hydrate()` 对多个 store/resource 应用失败，作为 `AggregateError` 抛出（尽力而为，非原子） |
 | `invalidSnapshot`      | `INVALID_SNAPSHOT`      | SSR 快照形状非法：`stores`/`resources` 不是纯对象，或某个资源快照字段非法                  |
-| `invalidStateScript`   | `INVALID_STATE_SCRIPT`  | 内联状态脚本 id 非法，或 `ISSRState.version` 不是受支持的 1                                |
+| `invalidStateScript`   | `INVALID_STATE_SCRIPT`  | 内联脚本 id 非法、JSON parse 失败或不支持的 state.version；SyntaxError 原位附码                                |
 | `invalidStoreKey`      | `INVALID_STORE_KEY`     | SSR store/resource 注册键非法（空串或 `__proto__`）                                        |
 | `serializeUnsupported` | `SERIALIZE_UNSUPPORTED` | 载荷包含无法 JSON 序列化的值：循环引用、非有限数、非纯对象、超节点/深度上限、非 JSON 类型  |
 | `invalidOption`        | `INVALID_OPTION`        | 入参校验失败：`timeoutMs` 非法、同时给 `runtime` 与 `runtimeOptions`、键重复               |
@@ -402,7 +393,7 @@ if ((error as { code?: string }).code === StoreSsrErrorCode.crossRuntime) {
 | `resourceRoundLimit`   | `RESOURCE_ROUND_LIMIT`  | `awaitResources()` 期间资源持续注册新资源，超过探测轮数上限（64）仍未收敛                  |
 | `resourceTimeout`      | `RESOURCE_TIMEOUT`      | 单个已注册的 resource 在 SSR 截止时间前未 settle                                           |
 
-**`createStoreSsrError`/`createStoreSsrRangeError`/`createStoreSsrTypeError`** —— 三者签名一致：
+**`createStoreSsrError`/`createStoreSsrRangeError`/`createStoreSsrTypeError`** —— 签名分别为：
 
 ```ts
 throw createStoreSsrError(StoreSsrErrorCode.invalidOption, '自定义消息');
@@ -410,7 +401,7 @@ throw createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, '自定义消息
 throw createStoreSsrTypeError(StoreSsrErrorCode.invalidOption, '自定义消息');
 ```
 
-`(code: IStoreSsrErrorCode, message: string, options?: { readonly cause?: unknown }) => Error | RangeError | TypeError`，分别产出 `Error`/`RangeError`/`TypeError`（**`createStoreSsrTypeError` 不接受第三个 `options` 参数**——它的签名少了 `options`，需要挂 `cause` 时只能用另外两个工厂）。内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-ssr'` 与传入的 `code`，不改写 `stack`。本包内部与调用方代码都可以复用同一套错误身份约定构造自己的错误。
+createStoreSsrError(code, message, options?) 接受可选 cause；createStoreSsrRangeError(code, message) 与 createStoreSsrTypeError(code, message) 都只有两个参数，没有 cause 选项。三者保持原生类型和 stack；AggregateError 的 errors 保持原对象及顺序。
 
 **`createStoreSsrAggregateError`**：
 
@@ -420,7 +411,7 @@ throw createStoreSsrAggregateError(StoreSsrErrorCode.hydrateFailed, [err1, err2]
 
 签名：`(code: IStoreSsrErrorCode, errors: unknown[], message: string) => AggregateError`，产出贴好身份的 `AggregateError`，`errors[]` 保持可达、顺序不变。
 
-`STORE_SSR_SOURCE`（`'@migaia/store-ssr'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误。
+`STORE_SSR_SOURCE`（`'@migaia/store-ssr'`）是本包构造错误携带的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误。
 
 ---
 
@@ -435,7 +426,7 @@ throw createStoreSsrAggregateError(StoreSsrErrorCode.hydrateFailed, [err1, err2]
 | `Error('[store] duplicate SSR store key: <key>')`                                                 | 重复注册同一个 Store key                                                               |
 | `Error('[store] duplicate SSR resource key: <key>')`                                              | 重复注册同一个 Resource key                                                            |
 | `Error` / `AggregateError('[store] SSR hydrate() failed ...')`                                    | `hydrate()` 时一个或多个条目的 `$hydrate`/`hydrate` 抛错                               |
-| `RangeError('[store] SSR awaitResources timeoutMs must be finite and non-negative')`              | `timeoutMs` 不是有限数字或为负                                                         |
+| `RangeError('[store] SSR awaitResources timeoutMs must be finite and non-negative')`              | `timeoutMs` 不在 [0, 2147483647] 有限范围                                                         |
 | `Error('[store] SSR resource "<key>" did not settle within <ms>ms')`                              | 单个 Resource 在预算内未 settle(仅出现在 `awaitResources` 返回的失败清单里,不会被抛出) |
 | `Error('[store] SSR resources kept registering new resources past 64 rounds')`                    | 瀑布式注册超过轮次上限                                                                 |
 | `Error` / `AggregateError('[store] SSR request scope disposal failed')`                           | `dispose()` 时一个或多个 owned 条目的销毁方法抛错                                      |
@@ -443,7 +434,7 @@ throw createStoreSsrAggregateError(StoreSsrErrorCode.hydrateFailed, [err1, err2]
 | `Error('[store] invalid SSR state version')`                                                      | 反序列化/hydrate 的数据 `version !== 1` 或不是纯对象                                   |
 | `Error('[store] invalid SSR stores snapshot')` / `'invalid SSR resources snapshot'`               | `stores`/`resources` 不是纯对象                                                        |
 | `Error('[store] invalid SSR resource snapshot: <key>')`                                           | 单个 resource 快照缺字段/字段类型不对                                                  |
-| `TypeError('<path> ...')` 系列(非纯对象/非有限数字/不可 JSON 序列化/循环引用/深度超限/节点数超限) | 脱水或校验时遇到不合法的 JSON 值,见 [§10](#10-issrstate-校验规则与-json-安全限制)      |
+| `TypeError('[store] <path> ...')` 系列(非纯对象/非有限数字/不可 JSON 序列化/循环引用/深度超限/节点数超限) | 脱水或校验时遇到不合法的 JSON 值,见 [§10](#10-issrstate-校验规则与-json-安全限制)      |
 | `Error('[store] invalid SSR state script id')`                                                    | `elementId` 不匹配允许的字符集                                                         |
 | `TypeError('[store] SSR codec <type> must produce wire data, not a value chunk')`                 | 编解码器的 `encode` 产出了 value chunk 而不是线上数据                                  |
 | `Error('[store] SSR payload was written by codec "<type>", which is not registered')`             | 读取时 `data-codec` 标注的类型未注册进传入的 `codecs`                                  |
@@ -483,7 +474,7 @@ export async function renderPage(userId: string): Promise<string> {
 
     return `<!doctype html><html><body>${createSSRStateScript(state)}<div id="root"></div></body></html>`;
   } finally {
-    scope.dispose(); // 无论成功失败,请求结束都要释放这个请求专属的 Runtime
+    await scope.disposeAsync(); // 等待本请求 owned Store/Resource 清理；不释放 Runtime 本体
   }
 }
 ```
@@ -498,7 +489,7 @@ const runtime = createRuntime(); // 客户端自己的 Runtime,与服务端隔�
 const app = createStore({ theme: 'dark' }, { runtime });
 const user = new Resource(fetchUser, runtime, { ttl: 30_000, autoStart: false });
 
-const state = readSSRStateFromDocument();
+const state = readSSRStateFromDocument(undefined, document);
 if (state) {
   if (state.stores.app) app.$hydrate(state.stores.app);
   if (state.resources?.user) user.hydrate(state.resources.user);
@@ -513,7 +504,7 @@ if (state) {
 Store/Resource 创建时用的 `runtime` 参数,必须是 `scope.runtime`,不能是全局默认 Runtime,也不能是另一个请求/另一个 scope 的 Runtime。检查创建 Store 时传的 `{ runtime: scope.runtime }` 是否写对。
 
 **Q:`dehydrateAsync()` 拿到的 `state.resources` 里少了某个 key。**
-两种可能:该 Resource 的 `dehydrate()` 返回了 `undefined`(还没有成功值,比如从未 `await` 过就直接脱水),或者它在 `awaitResources` 阶段超时/失败了——失败的 Resource 不会出现在最终结果里,检查有没有传 `onResourceError` 观察失败原因。
+检查该 Resource 的 dehydrate() 是否返回 undefined；failure 列表不独立删除 payload key。通过 onResourceError 观察等待失败，并分别检查资源自己的缓存/快照策略。
 
 **Q:`hydrate()` 之后 Store 里的数据没变。**
 确认 `hydrate()` 调用发生在对应 key 通过 `register()` 注册**之前还是之后**都可以——未匹配的快照会自动缓存并在注册时应用。真正的问题往往是 key 拼错,或者 `state.stores` 里根本没有这个 key(检查服务端 `dehydrate()` 时这个 Store 是否已经 `$disposed`——已销毁的 Store 会被跳过,不会出现在脱水结果里)。
@@ -538,3 +529,11 @@ pnpm --filter @migaia/store-ssr build
 ```
 
 测试覆盖请求隔离、脱水/复水、JSON 边界、资源等待、销毁顺序和错误码。
+
+Resource v2 快照在 hydration 时恢复捕获的剩余 TTL；调用方应在传入 SSR hydration 前计入已知传输/存储耗时（增加 ageMs、从有限 remainingTtlMs 扣除，最低 0）。SSR 外层 ISSRState.version 仍为 1。
+
+登记与收尾：水合回调若关闭 scope，Store/Resource 登记在提交前拒绝 SCOPE_DISPOSED；候选未被接纳，仍归调用方处理。sync dispose 与 disposeAsync 都先发布同一完成 Promise 再启动 cleanup；完成等待该次清理启动的全部作业。scope 不释放 Runtime 本体。
+
+等待与错误：超时按单个 Promise 的实际结算结果分类；已有成功不报 RESOURCE_TIMEOUT，已有拒绝保留其原因，仅未结算项报超时。0 预算不等待在途工作，但识别已完成 Promise。dehydrateAsync 不按 failure key 另作过滤。unknown snapshot 属性失败以 INVALID_SNAPSHOT 保留 native 原实例或 cause；JSON parse 的 SyntaxError 原位附 INVALID_STATE_SCRIPT。foreign source/code 保留原 owner。
+
+API 收敛：SsrWorkOutcome/ISsrWorkOutcome 从根入口收回，仅内部竞速使用；公开 awaitResources 仍返回 failure 数组，不增加状态 wrapper 或兼容 alias。外部旧 import 需 breaking 迁移，SsrWireType 及其类型保持。

@@ -14,12 +14,14 @@ import {
   createStoreSsrError,
   createStoreSsrRangeError,
   createStoreSsrTypeError,
+  STORE_SSR_SOURCE,
   StoreSsrErrorCode
 } from './errors.js'
 import { SsrWireType, SsrWorkOutcome } from './ssr-constants.js'
 import { StoreSsrErrorText } from './error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import { isPlainObject } from '@migaia/utils/object'
+import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 /** Rejects null/non-object public options before SSR entry points read their fields. */
 function assertOptionObject(options: unknown): asserts options is object {
@@ -199,10 +201,15 @@ async function raceOutcome<T>(
  */
 export class SSRRequestScope {
   readonly runtime: IRuntime
+  /** Stores accepted by this request; ownership transfers only after pending hydration succeeds. */
   #registrations = new Map<string, ISSRRegistration>()
+  /** Resources accepted by this request and released before owned Stores. */
   #resources = new Map<string, ISSRResourceRegistration>()
+  /** Store snapshots waiting for a matching successful registration. */
   #pendingHydration = new Map<string, Record<string, unknown>>()
+  /** Resource cache snapshots waiting for a matching successful registration. */
   #pendingResourceHydration = new Map<string, IResourceCacheSnapshot<unknown>>()
+  /** Closes public admission before any owned cleanup callback runs. */
   #disposed = false
   /** Async store cleanup jobs started by unregister/dispose and observed until settlement. */
   #pendingDisposals = new Set<Promise<void>>()
@@ -213,7 +220,9 @@ export class SSRRequestScope {
   // Resolved from dispose(); lets awaitResources() race a genuinely pending
   // resource against "the request disconnected" instead of only noticing
   // dispose *between* rounds, after whatever was already in flight settles.
+  /** Settles the existing wait-cancellation signal when synchronous closure begins. */
   #resolveDisposedSignal!: () => void
+  /** Interrupts in-flight resource waits without canceling their underlying Resource work. */
   #disposedSignal = new Promise<void>((resolve) => {
     this.#resolveDisposedSignal = resolve
   })
@@ -265,6 +274,8 @@ export class SSRRequestScope {
     // still there to try again — not an occupied key with no way back in.
     const hydration = this.#pendingHydration.get(key)
     if (hydration) store.$hydrate(hydration)
+    // Hydration is application code and may close this owner before admission commits.
+    this.#assertActive()
     this.#registrations.set(key, {
       store,
       owned,
@@ -317,6 +328,8 @@ export class SSRRequestScope {
     // leaves the key free and the pending hydration intact for a retry.
     const hydration = this.#pendingResourceHydration.get(key)
     if (hydration) resource.hydrate(hydration)
+    // Failed admission retains the candidate's caller ownership, as on a hydration throw.
+    this.#assertActive()
     this.#resources.set(key, {
       resource,
       owned,
@@ -473,16 +486,26 @@ export class SSRRequestScope {
     // timeoutMs: 0 是合法值，语义是"立刻过期"——deadline 就是此刻，第一轮
     // 检查 remaining 时几乎必然已经 <= 0，等价于完全不等待任何在途 resource。
     const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs
+    /** At the deadline, only genuinely unsettled promises receive a timeout identity. */
     const timeoutFailures = (
-      pending: ReadonlyArray<readonly [string, Promise<unknown>]>
+      pending: ReadonlyArray<readonly [string, Promise<unknown>]>,
+      settled: readonly (PromiseSettledResult<unknown> | undefined)[]
     ): ISSRResourceFailure[] =>
-      pending.map(([key]) => ({
-        key,
-        error: createStoreSsrError(
-          StoreSsrErrorCode.resourceTimeout,
-          StoreSsrErrorText.resourceTimeout(key, timeoutMs)
-        )
-      }))
+      pending.flatMap(([key], index) => {
+        /** Settlement belongs to this exact promise, independently of the rest of the round. */
+        const result = settled[index]
+        if (result?.status === 'fulfilled') return []
+        if (result?.status === 'rejected') return [{ key, error: result.reason }]
+        return [
+          {
+            key,
+            error: createStoreSsrError(
+              StoreSsrErrorCode.resourceTimeout,
+              StoreSsrErrorText.resourceTimeout(key, timeoutMs)
+            )
+          }
+        ]
+      })
     // 轮次上限：resource 的完成回调里无限注册新 resource 属于调用方的 bug，
     // 但不能让它把渲染线程永远吊在这里。
     // The counter is inclusive because round zero is the first settled
@@ -505,19 +528,29 @@ export class SSRRequestScope {
         pending.push([key, current])
       }
       if (pending.length === 0) return failures
+      /** Observe each existing Promise before racing the whole round against its shared deadline. */
+      const settled: Array<PromiseSettledResult<unknown> | undefined> = []
+      /** Both handlers fulfill with a result, so a late resource rejection is always observed. */
+      const work = Promise.all(
+        pending.map(([, promise], index) =>
+          Promise.resolve(promise).then(
+            (value) => (settled[index] = { status: 'fulfilled', value }),
+            (reason: unknown) => (settled[index] = { status: 'rejected', reason })
+          )
+        )
+      )
       const remaining = deadline === undefined ? undefined : deadline - Date.now()
       if (remaining !== undefined && remaining <= 0) {
-        failures.push(...timeoutFailures(pending))
+        // Drain already-settled Promise reactions without waiting for still-pending resource work.
+        await Promise.resolve()
+        if (this.#disposed) return failures
+        failures.push(...timeoutFailures(pending, settled))
         return failures
       }
-      const outcome = await raceOutcome(
-        Promise.allSettled(pending.map(([, promise]) => promise)),
-        this.#disposedSignal,
-        remaining
-      )
+      const outcome = await raceOutcome(work, this.#disposedSignal, remaining)
       if (outcome.kind === SsrWorkOutcome.disposed) return failures
-      if (outcome.kind === 'timeout') {
-        failures.push(...timeoutFailures(pending))
+      if (outcome.kind === SsrWorkOutcome.timeout) {
+        failures.push(...timeoutFailures(pending, settled))
         return failures
       }
       for (let index = 0; index < outcome.value.length; index++) {
@@ -534,8 +567,8 @@ export class SSRRequestScope {
   }
 
   /**
-   * Takes a snapshot after prefetching. Failed resources are omitted from the payload; other
-   * resources remain included.
+   * Takes a snapshot after prefetching. Each resource decides inclusion through its own dehydrate()
+   * result; the failure list does not independently filter payload keys.
    *
    * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client
    * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting
@@ -585,6 +618,21 @@ export class SSRRequestScope {
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
+    // Publish completion before callbacks, for both sync and async entry. Its microtask reads the
+    // cleanup set only after this synchronous start pass has admitted every owned cleanup job.
+    this.#disposePromise = Promise.resolve().then(async () => {
+      await Promise.all(this.#pendingDisposals)
+      if (this.#disposalErrors.length === 1) throw this.#disposalErrors[0]
+      if (this.#disposalErrors.length > 1) {
+        throw createStoreSsrAggregateError(
+          StoreSsrErrorCode.scopeDisposalFailed,
+          this.#disposalErrors,
+          StoreSsrErrorText.scopeDisposalFailed
+        )
+      }
+    })
+    // Sync callers may never observe async completion; the stable public Promise still replays it.
+    void this.#disposePromise.catch(() => undefined)
     this.#resolveDisposedSignal()
     // 显式释放顺序（migration.sdd.md §3.1/M-T31）：resource（order 0）先于 store（order 1）——
     // store 逻辑上拥有 resource，必须先摘子资源再释放 store。组内仍按注册逆序（LIFO）。
@@ -632,23 +680,14 @@ export class SSRRequestScope {
    * Concurrent and repeated callers share the same completion and failure replay.
    */
   disposeAsync(): Promise<void> {
-    this.#disposePromise ??= (async () => {
+    if (!this.#disposePromise) {
       try {
         this.dispose()
       } catch {
         // Synchronous failures were recorded by dispose() and are replayed below.
       }
-      await Promise.all(this.#pendingDisposals)
-      if (this.#disposalErrors.length === 1) throw this.#disposalErrors[0]
-      if (this.#disposalErrors.length > 1) {
-        throw createStoreSsrAggregateError(
-          StoreSsrErrorCode.scopeDisposalFailed,
-          this.#disposalErrors,
-          StoreSsrErrorText.scopeDisposalFailed
-        )
-      }
-    })()
-    return this.#disposePromise
+    }
+    return this.#disposePromise!
   }
 
   /** Observes a thenable cleanup without allowing a rejection to escape globally. */
@@ -709,7 +748,16 @@ function escapeJSONForHTML(json: string): string {
 }
 
 export function deserializeSSRState(serialized: string): ISSRState {
-  const parsed: unknown = JSON.parse(serialized)
+  /** Parsing creates a native SyntaxError; classify it without replacing its class or stack. */
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(serialized)
+  } catch (error) {
+    throw attachErrorIdentity(error as SyntaxError, {
+      source: STORE_SSR_SOURCE,
+      code: StoreSsrErrorCode.invalidStateScript
+    })
+  }
   assertSSRState(parsed)
   return parsed
 }
@@ -868,47 +916,87 @@ function readSnapshotEntries(value: object, path: string): [string, unknown][] {
   }
 }
 
-export function assertSSRState(value: unknown): asserts value is ISSRState {
-  if (!isPlainObject(value) || value.version !== 1) {
-    throw createStoreSsrError(
-      StoreSsrErrorCode.invalidStateScript,
-      StoreSsrErrorText.invalidStateVersion
-    )
-  }
-  if (!isPlainObject(value.stores)) {
-    throw createStoreSsrError(
-      StoreSsrErrorCode.invalidSnapshot,
-      StoreSsrErrorText.invalidStoresSnapshot
-    )
-  }
-  for (const [key, store] of readSnapshotEntries(value.stores, 'stores')) {
-    assertStoreKey(key)
-    assertJSONObject(store, `stores.${key}`)
-  }
-  if (value.resources !== undefined) {
-    if (!isPlainObject(value.resources)) {
-      throw createStoreSsrError(
+/** Contains unknown snapshot property failures while retaining native and foreign error identity. */
+function identifySnapshotFailure(error: unknown): Error {
+  if (isNativeErrorValue(error)) {
+    try {
+      /** Descriptor reads avoid invoking application-defined error metadata. */
+      const source = Object.getOwnPropertyDescriptor(error, 'source')
+      /** A complete existing identity remains with its original owner. */
+      const code = Object.getOwnPropertyDescriptor(error, 'code')
+      if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
+      if (!source && !code && Object.isExtensible(error))
+        return attachErrorIdentity(error, {
+          source: STORE_SSR_SOURCE,
+          code: StoreSsrErrorCode.invalidSnapshot
+        })
+    } catch (metadataError) {
+      return createStoreSsrAggregateError(
         StoreSsrErrorCode.invalidSnapshot,
-        StoreSsrErrorText.invalidResourcesSnapshot
+        [error, metadataError],
+        StoreSsrErrorText.propertyAccess('state')
       )
     }
-    for (const [key, snapshot] of readSnapshotEntries(value.resources, 'resources')) {
+  }
+  return createStoreSsrError(
+    StoreSsrErrorCode.invalidSnapshot,
+    StoreSsrErrorText.propertyAccess('state'),
+    { cause: error }
+  )
+}
+
+/**
+ * Validates the public unknown input boundary without allowing inaccessible properties to escape
+ * bare.
+ */
+export function assertSSRState(value: unknown): asserts value is ISSRState {
+  try {
+    if (!isPlainObject(value) || value.version !== 1) {
+      throw createStoreSsrError(
+        StoreSsrErrorCode.invalidStateScript,
+        StoreSsrErrorText.invalidStateVersion
+      )
+    }
+    if (!isPlainObject(value.stores)) {
+      throw createStoreSsrError(
+        StoreSsrErrorCode.invalidSnapshot,
+        StoreSsrErrorText.invalidStoresSnapshot
+      )
+    }
+    for (const [key, store] of readSnapshotEntries(value.stores, 'stores')) {
       assertStoreKey(key)
-      if (
-        !isPlainObject(snapshot) ||
-        snapshot.version !== 1 ||
-        typeof snapshot.updatedAt !== 'number' ||
-        !Number.isFinite(snapshot.updatedAt) ||
-        (snapshot.expiresAt !== null &&
-          (typeof snapshot.expiresAt !== 'number' || !Number.isFinite(snapshot.expiresAt)))
-      ) {
+      assertJSONObject(store, `stores.${key}`)
+    }
+    if (value.resources !== undefined) {
+      if (!isPlainObject(value.resources)) {
         throw createStoreSsrError(
           StoreSsrErrorCode.invalidSnapshot,
-          StoreSsrErrorText.invalidResourceSnapshot(key)
+          StoreSsrErrorText.invalidResourcesSnapshot
         )
       }
-      assertJSONValue(snapshot.data, `resources.${key}.data`, new WeakSet())
+      for (const [key, snapshot] of readSnapshotEntries(value.resources, 'resources')) {
+        assertStoreKey(key)
+        if (
+          !isPlainObject(snapshot) ||
+          snapshot.version !== 2 ||
+          typeof snapshot.ageMs !== 'number' ||
+          !Number.isFinite(snapshot.ageMs) ||
+          snapshot.ageMs < 0 ||
+          (snapshot.remainingTtlMs !== null &&
+            (typeof snapshot.remainingTtlMs !== 'number' ||
+              !Number.isFinite(snapshot.remainingTtlMs) ||
+              snapshot.remainingTtlMs < 0))
+        ) {
+          throw createStoreSsrError(
+            StoreSsrErrorCode.invalidSnapshot,
+            StoreSsrErrorText.invalidResourceSnapshot(key)
+          )
+        }
+        assertJSONValue(snapshot.data, `resources.${key}.data`, new WeakSet())
+      }
     }
+  } catch (error) {
+    throw identifySnapshotFailure(error)
   }
 }
 
