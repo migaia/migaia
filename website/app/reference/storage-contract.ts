@@ -1,6 +1,6 @@
 /**
  * Reference documentation of `@migaia/storage-contract`. Rules: `app/reference/contract.ts`.
- * Verified against every public barrel and all 17 source modules on 2026-10-17. Source
+ * Updated against current public barrels and follow-up source boundaries on 2026-10-18. Source
  * clarifications: capability/store inspection results and codec snapshots are not frozen, despite
  * some immutable/unchanged wording in their JSDoc or README. Operation-context snapshots are frozen
  * and reused by identity. A codec snapshot copies functions without binding them to their original
@@ -68,7 +68,7 @@ const backendValues = {
   )
 }
 
-/** Both public conflict tables expose the same value semantics without sharing object identity. */
+/** The canonical public conflict table owns existing-key write policy values. */
 const conflictValues = {
   conflict: t(
     'Reject a write colliding with an existing key instead of replacing its value.',
@@ -625,8 +625,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'The exact store as `IRecordStore<T>`; insufficient shape or capabilities throws `UNSUPPORTED_CAPABILITY`.',
-        '同一个存储，收窄为 `IRecordStore<T>`；形状或能力不足时抛 `UNSUPPORTED_CAPABILITY`。'
+        'The exact store as `IRecordStore<T>`; insufficient shape or capabilities throws `UNSUPPORTED_CAPABILITY`. An original reflection or accessor failure remains reachable through `cause`.',
+        '同一个存储，收窄为 `IRecordStore<T>`；形状或能力不足时抛 `UNSUPPORTED_CAPABILITY`，原始反射或访问器失败沿 `cause` 可达。'
       ),
       example: storeExample
     },
@@ -643,8 +643,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'The original store as `ISecondaryIndexRecordStore<T>`; missing capability or methods throws `UNSUPPORTED_CAPABILITY`.',
-        '原存储收窄为 `ISecondaryIndexRecordStore<T>`；缺少能力或方法时抛 `UNSUPPORTED_CAPABILITY`。'
+        'The original store as `ISecondaryIndexRecordStore<T>`; missing capability or methods throws `UNSUPPORTED_CAPABILITY`. Original reflection or accessor failures remain reachable through `cause`.',
+        '原存储收窄为 `ISecondaryIndexRecordStore<T>`；缺少能力或方法时抛 `UNSUPPORTED_CAPABILITY`，原始反射或访问器失败沿 `cause` 可达。'
       ),
       example: indexExample
     },
@@ -661,8 +661,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'The exact store as `IChangeFeedStore`; incomplete feed capability throws `UNSUPPORTED_CAPABILITY`.',
-        '同一个存储收窄为 `IChangeFeedStore`；变更流能力不完整时抛 `UNSUPPORTED_CAPABILITY`。'
+        'The exact store as `IChangeFeedStore`; incomplete feed capability throws `UNSUPPORTED_CAPABILITY`. Original reflection or accessor failures remain reachable through `cause`.',
+        '同一个存储收窄为 `IChangeFeedStore`；变更流能力不完整时抛 `UNSUPPORTED_CAPABILITY`，原始反射或访问器失败沿 `cause` 可达。'
       ),
       example: `const feed = asChangeFeedStore(store)
 const unsubscribe = feed.subscribeChanges((change) => console.log(change.channel, change.kind))
@@ -766,8 +766,8 @@ if (snapshot) console.log(await snapshot.store.get('theme'))`
     snapshotKeyValueStoreDetailed: {
       role: 'operation',
       purpose: t(
-        'Performs one L0 admission while retaining the exact accessor failure for its owning boundary. A valid result also captures the raw disposer and its original receiver so later cleanup need not reread mutable accessors.',
-        '执行单次基础存储接纳，并为所属边界保留精确访问器失败。有效结果还捕获原释放函数及接收者，后续清理无需重读可变访问器。'
+        'Performs one L0 admission while retaining the exact reflection or accessor failure for its owning boundary. A valid result also captures the raw disposer and its original receiver so later cleanup need not reread mutable accessors.',
+        '执行单次基础存储接纳，并为所属边界保留精确反射或访问器失败。有效结果还捕获原释放函数及接收者，后续清理无需重读可变访问器。'
       ),
       params: {
         store: t(
@@ -776,8 +776,8 @@ if (snapshot) console.log(await snapshot.store.get('theme'))`
         )
       },
       returns: t(
-        'An `IKeyValueStoreAdmission`; invalid plain shapes carry undefined cause, while observed getter failures retain their exact thrown value.',
-        '一个 `IKeyValueStoreAdmission`；普通形状无效时原因为空值，访问器失败则保留精确抛出值。'
+        'An `IKeyValueStoreAdmission`; invalid plain shapes carry undefined cause, while observed reflection or getter failures retain their exact thrown value.',
+        '一个 `IKeyValueStoreAdmission`；普通形状无效时原因为空值，反射或访问器失败则保留精确抛出值。'
       ),
       example: `const admission = snapshotKeyValueStoreDetailed(candidate)
 if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, [])
@@ -1089,14 +1089,6 @@ console.log(candidate.name, candidate.output)`
       ),
       example: `await store.set('theme', 'dark', { conflictPolicy: ConflictPolicy.replace })`
     },
-    StorageContractConflictPolicy: {
-      role: 'constant',
-      purpose: t(
-        'Canonical declaration table for conflict and replacement values. It has the same value semantics as `ConflictPolicy`, while callers should not rely on the two table objects having identical reference identity.',
-        '冲突和替换值的统一声明表。与 `ConflictPolicy` 具有相同值语义，但调用方不应依赖两个表对象的引用身份相同。'
-      ),
-      example: `console.log(StorageContractConflictPolicy.replace === ConflictPolicy.replace)`
-    },
     StorageContractError: {
       role: 'error',
       purpose: t(
@@ -1158,39 +1150,6 @@ console.log(error.cause === cause, error.source, error.code)`
         '仅当前 `StorageContractError` 构造函数识别的实例返回真值。'
       ),
       example: `if (isStorageContractError(error)) console.log(error.backend, error.code)`
-    },
-    isArrayBuffer: {
-      role: 'operation',
-      purpose: t(
-        'Compatibility re-export preserving the canonical `@migaia/utils/bytes` function identity. Detects genuine ArrayBuffer internal slots across supported realms rather than trusting a mutable constructor name.',
-        '保留 `@migaia/utils/bytes` 统一函数身份的兼容转出。按真实缓冲区内部槽识别受支持执行环境中的值，不信任可变构造名称。'
-      ),
-      params: {
-        value: t(
-          'Unknown candidate from the caller’s binary input boundary.',
-          '来自调用方二进制输入边界的未知候选值。'
-        )
-      },
-      returns: t(
-        'A boolean narrowing to native `ArrayBuffer` for genuine matching values.',
-        '真实匹配值收窄到原生 `ArrayBuffer` 的布尔结果。'
-      ),
-      example: `console.log(isArrayBuffer(new ArrayBuffer(1)))`
-    },
-    isUint8Array: {
-      role: 'operation',
-      purpose: t(
-        'Compatibility re-export of the canonical `@migaia/utils/bytes` typed-byte predicate, preserving function identity and native internal-slot classification.',
-        '统一字节工具的类型字节判断兼容转出，保留函数身份与原生内部槽分类，不依赖本包重复实现。'
-      ),
-      params: {
-        value: t('Unknown application-supplied binary candidate.', '应用提供的未知二进制候选值。')
-      },
-      returns: t(
-        'A boolean narrowing to genuine `Uint8Array` byte views.',
-        '收窄到真实 `Uint8Array` 字节视图的布尔值。'
-      ),
-      example: `console.log(isUint8Array(new Uint8Array([1])))`
     },
     intrinsicConstructorName: {
       role: 'operation',
@@ -1448,8 +1407,8 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
         },
         cause: {
           summary: t(
-            'Exact observed getter failure for invalid admission, or undefined when rejection was a plain shape mismatch.',
-            '无效接纳中观察到的精确访问器失败；普通形状不匹配则为空值。'
+            'Exact observed reflection or getter failure for invalid admission, or undefined when rejection was a plain shape mismatch.',
+            '无效接纳中观察到的精确反射或访问器失败；普通形状不匹配则为空值。'
           )
         }
       }
@@ -1564,8 +1523,8 @@ console.log(Object.isFrozen(context), snapshotOperationContext(context) === cont
     },
     ISyncWriteOptions: {
       summary: t(
-        'Reduced synchronous write policy with no signal, timeout or paging fields accepted by the synchronous validation helpers.',
-        '同步校验辅助函数接受的精简同步写策略，不包含信号、超时或分页字段。'
+        'Reduced synchronous write policy exposing only conflictPolicy. Validation rejects signal or timeoutMs only when their values are not undefined; an extra pageSize field is not read or validated.',
+        '仅公开冲突策略的精简同步写策略。校验仅在 `signal` 或 `timeoutMs` 值非空值时拒绝；额外的 `pageSize` 字段不会被读取或校验。'
       ),
       members: { conflictPolicy: conflictMember }
     },
@@ -2128,13 +2087,6 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
       ),
       members: {}
     },
-    IStorageContractConflictPolicy: {
-      summary: t(
-        'Value union of the canonical `StorageContractConflictPolicy` declaration table, matching normal write policy semantics.',
-        '统一 `StorageContractConflictPolicy` 声明表的值联合，采用常规写策略语义。'
-      ),
-      members: {}
-    },
     IStorageContractErrorCode: {
       summary: t(
         'Stable semantic code union from `StorageContractErrorCode`; source identity is required when interpreting these strings.',
@@ -2187,13 +2139,6 @@ console.log(error.code, error.backend, error.cause === cause)`,
       summary: t(
         'Existing-key outcomes used by asynchronous, synchronous and transaction write options.',
         '异步、同步和事务写选项使用的已有键处理方式。'
-      ),
-      values: conflictValues
-    },
-    StorageContractConflictPolicy: {
-      summary: t(
-        'Canonical existing-key policy domain used by contract implementations.',
-        '契约实现使用的统一已有键策略取值域。'
       ),
       values: conflictValues
     },

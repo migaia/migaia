@@ -1,8 +1,8 @@
 /**
  * Reference documentation of `@migaia/storage-web`. Rules: `app/reference/contract.ts`. Verified
  * against `packages/storage-web/src` (backends/_, entity/_, host/_, plugins/_, reactive-adapter.ts,
- * schema/_, serialize/_, error-code.ts), README and USEGUIDE on 2026-10-17. Store interfaces
- * (`IKeyValueStore`, `IRecordStore`, ...) belong to `@migaia/storage-contract`.
+ * schema/_, serialize/_, error-code.ts), README and USEGUIDE follow-ups on 2026-10-18. Store
+ * interfaces (`IKeyValueStore`, `IRecordStore`, ...) belong to `@migaia/storage-contract`.
  */
 import { storageContractReference } from './storage-contract.js'
 import type {
@@ -382,11 +382,14 @@ const hostMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   backends: {
     summary: t(
-      'Returns a read-only snapshot of all installed stores by id.',
-      '返回按 id 排列的全部已安装存储的只读快照。'
+      'Returns a copied map of all installed stores by id; its ReadonlyMap type prevents typed mutation, but the map is not frozen at runtime.',
+      '返回按标识索引的全部已安装存储的映射副本；`ReadonlyMap` 类型限制类型层面的修改，运行时并未冻结映射。'
     ),
-    returns: t('A record of id to store.', 'id 到存储对象的只读记录。'),
-    example: `Object.keys(host.backends())`
+    returns: t(
+      'A fresh `ReadonlyMap<string, IKeyValueStore>`; mutating the copy never changes host registrations.',
+      '新的 `ReadonlyMap<string, IKeyValueStore>`；修改副本不会改变宿主登记。'
+    ),
+    example: `[...host.backends().keys()]`
   },
   hasReactiveBackend: {
     summary: t(
@@ -450,7 +453,7 @@ const host = await createStorageHost({
   plugins: [memoryBackendPlugin({ id: 'cache' }), indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })] as const
 })
 await host.backend('cache').set('theme', 'dark')
-console.log(host.hasBackend('primary'), Object.keys(host.backends()))
+console.log(host.hasBackend('primary'), [...host.backends().keys()])
 await host.dispose()`
 
 /** Repository members (`IRepository`). */
@@ -561,8 +564,8 @@ const repositoryMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   migrate: {
     summary: t(
-      'Upgrades stored records to the current `version` in batches; IndexedDB keeps a checkpoint to resume.',
-      '分批把已存储的记录升级到当前 `version`；IndexedDB 会保存检查点以便续跑。'
+      'Upgrades stored records to the current version in batches; IndexedDB keeps a checkpoint to resume. Record backends materialize the current raw value inside the write transaction. A concurrently upgraded current-version value is preserved and counted as alreadyCurrent; without contention each migration callback runs once.',
+      '分批把已存储记录升级到当前版本；索引数据库保存检查点以便续跑。记录后端在写事务内物化当前原始值；并发更新已达到当前版本时保留该值并计入 `alreadyCurrent`，无竞争时每个迁移回调仍执行一次。'
     ),
     params: {
       options: t(
@@ -579,8 +582,8 @@ const repositoryMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   batch: {
     summary: t(
-      'Runs reads and writes in one transaction (structured backends only); key-value backends throw `UNSUPPORTED_CAPABILITY`.',
-      '在一个事务中执行读写（仅结构化后端）；键值后端抛 `UNSUPPORTED_CAPABILITY`。'
+      'Runs reads and writes in one transaction on structured backends; key-value backends throw `UNSUPPORTED_CAPABILITY`. Fallback unique constraints check the final draft, allowing a previous owner to be deleted later in the same batch. Failure leaves the draft uncommitted.',
+      '在结构化后端的一个事务中执行读写；键值后端抛 `UNSUPPORTED_CAPABILITY`。回退唯一约束校验最终草稿，允许在同批次后续删除旧所有者；失败不提交草稿。'
     ),
     params: {
       run: t(
@@ -607,6 +610,8 @@ type IUser = { id: string; email: string }
 const users = defineEntity<IUser>()({
   name: 'users',
   key: 'id',
+  version: 2,
+  migrations: { 2: async (previous) => previous },
   indexes: { byEmail: { path: 'email', unique: true } }
 }).connect(indexedDbHost({ dbName: 'app-data' }))
 await users.put({ id: 'ada', email: 'ada@example.com' })
@@ -617,8 +622,8 @@ export const storageWebReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Root entry point: only the stable error contract (`StorageError`, `StorageErrorCode`, `STORAGE_WEB_SOURCE`), the default namespace codec, the host API and `memoryStorageHost`. Each backend lives in its own subpath so unused backends never load.',
-        '根入口：只包含稳定的错误契约（`StorageError`、`StorageErrorCode`、`STORAGE_WEB_SOURCE`）、默认的命名空间编码器、宿主 API 以及 `memoryStorageHost`。每个后端都在自己的子路径中，未使用的后端不会被加载。'
+        'Root entry point: ten exports covering the stable error contract, `StorageErrorText` and the default namespace codec. Import host APIs from `@migaia/storage-web/host`, memory storage from `@migaia/storage-web/memory`, other backends from their exact subpaths, and neutral store types from `@migaia/storage-contract`.',
+        '根入口只有错误契约、`StorageErrorText` 与默认命名空间编码器相关的十项导出。宿主从 `@migaia/storage-web/host` 导入，内存存储从 `@migaia/storage-web/memory` 导入，其他后端使用各自精确子路径；中立存储类型从 `@migaia/storage-contract` 导入。'
       ),
       example: `import { StorageError, StorageErrorCode } from '@migaia/storage-web'
 
@@ -777,8 +782,8 @@ await jar.set('session', 'abc123', { maxAge: 3600 })`
     indexedDbHost: {
       role: 'factory',
       purpose: t(
-        'Creates an IndexedDB store with values, bytes, records, transactions, iteration and secondary indexes. The connection opens once and yields to version upgrades from other tabs.',
-        '创建支持值、字节、记录、事务、迭代与二级索引的 IndexedDB 存储。连接只打开一次，并会为其它标签页的版本升级让路。'
+        'Creates an IndexedDB store with values, bytes, records, transactions, iteration and secondary indexes. The connection opens once and yields to version upgrades from other tabs. `ensureRecordIndexes` races shared opening against the operation deadline through `raceWithAbort`; stopping one waiter leaves shared preparation owned by the backend. `iterateRecordIndex` uses one deadline across the whole iterator, including buffered yields, and releases its abort subscription and timer in finally when iteration completes or the consumer calls return.',
+        '创建支持值、字节、记录、事务、迭代与二级索引的 IndexedDB 存储。连接只打开一次，并为其他标签页的版本升级让路。`ensureRecordIndexes` 通过 `raceWithAbort` 让共享打开与操作截止时间竞争；单个等待者停止等待后，共享准备仍由后端持有。`iterateRecordIndex` 在整个迭代生命周期共用一个截止时间，包括缓冲结果产出期间；迭代结束或消费者调用返回方法时，在最终清理中释放中止订阅与计时器。'
       ),
       returns: t(
         'A record store with change feed; capabilities report what is native.',
@@ -792,8 +797,8 @@ for await (const [key, value] of db.iterateRecords()) console.log(key, value)`
     memoryStorageHost: {
       role: 'factory',
       purpose: t(
-        'Creates an independent volatile store in memory with records, bytes, transactions and change feed; nothing is shared between calls.',
-        '在内存中创建一个独立的易失存储，支持记录、字节、事务与变更通知；每次调用之间不共享数据。'
+        'Creates an independent volatile store in memory with records, bytes, transactions and change feed. Cross-channel replacement commits all removals and the destination write before publishing remove then put notifications, so reentrant observers see the complete commit. Nothing is shared between calls.',
+        '在内存中创建独立的易失存储，支持记录、字节、事务与变更通知。跨通道替换先完成所有删除和目标写入，再依次发布删除与写入通知，重入观察者看到完整提交；每次调用之间不共享数据。'
       ),
       returns: t('A record store with `sync` and change feed.', '带 `sync` 与变更通知的记录存储。'),
       example: `const store = memoryStorageHost<{ id: string }>()
@@ -802,8 +807,8 @@ await store.putRecord({ id: '1' }, '1')`
     lengthPrefixedNamespaceCodec: {
       role: 'constant',
       purpose: t(
-        'Default namespace codec: encodes `(namespace, key)` as `sw1:<length>:<namespace>:<key>` so namespaces never collide; decode returns `undefined` for other namespaces.',
-        '默认的命名空间编码器：把 `(namespace, key)` 编码为 `sw1:<长度>:<命名空间>:<key>`，保证命名空间不会冲突；解码其它命名空间的 key 时返回 `undefined`。'
+        'Default namespace codec: encodes `(namespace, key)` as `sw1:<length>:<namespace>:<key>`. Decoding returns undefined for foreign namespaces or malformed encoded namespace text; enumeration and clearing skip these nonmatching physical keys and preserve unrelated data.',
+        '默认命名空间编码器把 `(namespace, key)` 编码为 `sw1:<长度>:<命名空间>:<key>`。其他命名空间或命名空间编码损坏时解码返回空值；枚举和清理跳过这些不匹配的物理键，保留无关数据。'
       ),
       example: `lengthPrefixedNamespaceCodec.encode('app', 'theme') // 'sw1:3:app:theme'`
     },
@@ -845,8 +850,8 @@ await store.putRecord({ id: '1' }, '1')`
     StorageErrorCode: {
       role: 'constant',
       purpose: t(
-        'Table of the stable error codes of this package; values are the strings on `error.code`.',
-        '本包稳定错误码的对照表；值就是错误对象 `error.code` 上的字符串。'
+        'Table of this package’s 37 stable error codes; values are the strings on error.code. `INDEX_BACKFILL_FAILED` identifies backfill and failed-readiness persistence failing together on a native AggregateError.',
+        '本包三十七个稳定错误码的对照表，值为错误对象的 `code` 字符串。`INDEX_BACKFILL_FAILED` 标识回填与失败就绪状态保存同时失败，交付原生聚合错误。'
       ),
       example: `if (error.code === StorageErrorCode.quotaExceeded) await cleanupOldEntries()`
     },
@@ -865,8 +870,8 @@ await store.putRecord({ id: '1' }, '1')`
         '定义一类类型化记录：主键、schema、编解码器、带迁移的版本、读取校验以及二级索引。声明 `indexes` 时使用柯里化形式 `defineEntity<T>()({...})`。`connect(store)` 把它绑定到某个存储。'
       ),
       returns: t(
-        'An `IEntityDefinition`; an incomplete migration chain throws `INVALID_CONFIG`.',
-        '一个 `IEntityDefinition`；迁移链不完整时抛 `INVALID_CONFIG`。'
+        'An `IEntityDefinition`; every target step from 2 through version must be declared. A version above 1 with omitted migrations is also incomplete and throws `INVALID_CONFIG`.',
+        '返回 `IEntityDefinition`；必须声明从二到当前版本的每个目标迁移步骤。高于一的版本省略迁移表也属于不完整，抛 `INVALID_CONFIG`。'
       ),
       options: 'IEntityOptions',
       example: repositoryExample,
@@ -968,47 +973,6 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
       ),
       example: `assertStorageBackendId(config.backend)`
     },
-    pluginNameFromBackendId: {
-      role: 'operation',
-      purpose: t(
-        'Maps a backend id to its PluginHost registration name (`storage-backend:<hex>`), for diagnostics.',
-        '把后端 id 映射为其在 PluginHost 中的注册名（`storage-backend:<十六进制>`），用于诊断。'
-      ),
-      params: { id: t('A valid backend id.', '合法的后端 id。') },
-      returns: t('The registration name.', '对应的插件注册名称。'),
-      example: `pluginNameFromBackendId('cache') // 'storage-backend:6361636865'`
-    },
-    reactiveAdapterNameFromBackendId: {
-      role: 'operation',
-      purpose: t(
-        'Maps a backend id to the registration name of its reactive adapter (`storage-reactive-adapter:<hex>`).',
-        '把后端 id 映射为其响应式适配器的注册名（`storage-reactive-adapter:<十六进制>`）。'
-      ),
-      params: { id: t('A valid backend id.', '合法的后端 id。') },
-      returns: t('The adapter registration name.', '适配器的注册名称。'),
-      example: `reactiveAdapterNameFromBackendId('app')`
-    },
-    readStorageNativePluginMetadata: {
-      role: 'operation',
-      purpose: t(
-        'Reads the id and reactive metadata of a plugin handle created by this package; foreign objects give `undefined`.',
-        '读取由本包创建的插件句柄的 id 与响应式元数据；其它对象返回 `undefined`。'
-      ),
-      params: { plugin: t('A plugin handle.', '要读取的插件句柄。') },
-      returns: t(
-        '`{ id, backendKind, reactiveFeatureName, ... }` or `undefined`.',
-        '元数据 `{ id, backendKind, reactiveFeatureName, ... }`，不是本包插件时为 `undefined`。'
-      ),
-      example: `readStorageNativePluginMetadata(plugin)?.id`
-    },
-    STORAGE_LIVE_QUERY_SERVICE_NAME: {
-      role: 'constant',
-      purpose: t(
-        'Registration name (`storage-live-query-service`) of the shared live query service inside a host.',
-        '存储宿主内部共享的实时查询服务在 PluginHost 中的注册名称（`storage-live-query-service`）。'
-      ),
-      example: `console.log(STORAGE_LIVE_QUERY_SERVICE_NAME)`
-    },
     storageBackendPluginExtensionsBrand: {
       role: 'constant',
       purpose: t(
@@ -1070,8 +1034,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         schema: t('A schema object with `~standard`.', '带 `~standard` 属性的 schema 对象。')
       },
       returns: t(
-        'A schema adapter; failures throw `VALIDATION_FAILED` with joined issue messages.',
-        '一个 schema 适配器；校验失败时抛 `VALIDATION_FAILED`，带有拼接后的问题信息。'
+        'A schema adapter; invalid schema descriptors throw `INVALID_CONFIG` at construction. Validator synchronous throws and asynchronous rejections become `VALIDATION_FAILED` with the original failure on cause; issue results use joined issue messages.',
+        '返回结构校验适配器；构造时描述器无效抛 `INVALID_CONFIG`。校验器同步抛错与异步拒绝统一为 `VALIDATION_FAILED`，原始失败保留在原因链；问题结果使用拼接后的问题信息。'
       ),
       example: `const schema = fromStandardSchema(z.object({ id: z.string() }))`
     },
@@ -1156,18 +1120,36 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
     ICodec: storageContractReference.types.ICodec!,
     ICodecOutput: storageContractReference.types.ICodecOutput!,
     StorageError: {
-      summary: t('Error of this package with its detail fields.', '本包的错误对象及其详情字段。'),
+      summary: t(
+        'Error of this package with its detail fields. Entity stage wrappers preserve the complete original StorageError on the cause chain and keep its message, rather than retaining only the leaf cause.',
+        '本包错误对象及其详情字段。实体阶段包装在原因链保留完整原始存储错误及其消息，而非只保留叶子原因。'
+      ),
       scenarios: [
         t(
           'Recover from quota, conflict or unavailable backends by `code`.',
           '按 `code` 从配额不足、冲突或后端不可用中恢复。'
         )
       ],
-      example: `try {
-  await users.put(user)
+      example: `import { StorageError, StorageErrorCode } from '@migaia/storage-web'
+import { defineEntity } from '@migaia/storage-web/entity'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+
+const original = new StorageError(StorageErrorCode.validationFailed, { cause: new TypeError('invalid input') })
+const store = memoryStorageHost()
+const users = defineEntity<{ id: string }>({
+  name: 'users',
+  key: 'id',
+  schema: { name: 'reject', validate: async () => { throw original } }
+}).connect(store)
+try {
+  await users.put({ id: 'ada' })
 } catch (error) {
-  if (error instanceof StorageError && error.code === StorageErrorCode.indexUniqueConflict) showDuplicateEmail()
-  else throw error
+  if (!(error instanceof Error)) throw error
+  let current: unknown = error
+  while (current instanceof Error && current !== original) current = current.cause
+  console.log(current === original, error.message === original.message, original.cause)
+} finally {
+  await store.dispose()
 }`,
       members: {
         source: {
@@ -1276,8 +1258,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
             )
           },
           returns: t(
-            'The logical key, or `undefined` for another namespace.',
-            '逻辑 key；属于其它命名空间时为 `undefined`。'
+            'The logical key, or undefined for a nonmatching namespace. The default codec also treats malformed encoded namespace text as nonmatching, so enumeration skips it without deleting foreign physical data.',
+            '返回逻辑键；其他命名空间返回空值。默认编码器还把损坏的命名空间编码视为不匹配，枚举时跳过且不删除无关物理数据。'
           )
         }
       }
@@ -1432,8 +1414,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
     },
     IRepository: {
       summary: t(
-        'Typed access to the records of one entity on one store.',
-        '对某个存储上某个实体记录的类型化访问。'
+        'Typed access to one entity on one store. Fallback unique validation adds full-scan schema and projection reads without a persistent sidecar or a native capability claim. Record put, batch and migration validate the final draft and update the internal two-slot key `[REPOSITORY_KEY_PREFIX, entityName]` (`REPOSITORY_KEY_PREFIX` is `"__storage_web_entity_v2__"`) to detect concurrent new owners; raw record enumeration can see this marker, while entity queries and migration exclude it. KV preparation runs schema and codec callbacks outside the lock, then verifies the raw-text snapshot under an exclusive commit lock; changes during preparation yield retryable `TRANSACTION_CONFLICT`. Host Web Locks guarantee cross-page uniqueness and are provided by modern browsers. Injected ports without a host lock serialize within one module instance. Server-rewritten cookies follow the server and are outside this uniqueness constraint.',
+        '提供单个存储上的实体记录访问。回退唯一约束增加全扫描及结构校验、投影读取，不增加持久化辅助索引，也不声称原生能力。记录写入、批处理和迁移校验最终草稿，并更新内部两段键 `[REPOSITORY_KEY_PREFIX, entityName]`（前缀值为 `"__storage_web_entity_v2__"`） 以检测并发新增所有者；原始记录枚举可见该标记，实体查询与迁移排除它。键值后端在锁外执行结构校验和编解码准备，再在独占提交锁内核对原始文本快照；准备期间发生变化返回可重试的 `TRANSACTION_CONFLICT`。跨页面唯一性由宿主 `Web Locks` 保证，现代浏览器均已提供。没有宿主锁的注入端口只在同一模块实例内串行。服务端改写的 `cookie` 以服务端为准，不在该唯一约束范围内。'
       ),
       scenarios: [
         t(
@@ -1487,8 +1469,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         },
         unique: {
           summary: t(
-            'Whether each projected logical key may belong to only one record; a collision with another record rejects the write.',
-            '每个投影逻辑键是否只能属于一条记录；与其他记录冲突时拒绝写入。'
+            'Whether each projected logical key may belong to only one record. Native and fallback paths use the same owner rule: a different owner rejects with `INDEX_UNIQUE_CONFLICT`, while replacement by the same id, reuse after deletion, compound keys and multi-entry keys follow the same rule.',
+            '每个投影逻辑键是否只能属于一条记录。原生与回退路径共用所有者判定：不同所有者冲突以 `INDEX_UNIQUE_CONFLICT` 拒绝；同标识替换、删除后复用、复合键与多项键均适用同一规则。'
           ),
           default: t(
             '`false`: several records may share one logical index key.',
@@ -1537,8 +1519,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         },
         select: {
           summary: t(
-            'Synchronous caller-owned `(value) => projection` receiving the domain record. Return a single key, multiple keys or undefined to omit indexing; a throw fails projection and propagates to the enclosing operation.',
-            '调用方持有的同步 `(value) => projection`，接收领域记录。返回单键、多键或空值以跳过索引；抛错使投影失败并传给所属操作。'
+            'Synchronous caller-owned `(value) => projection` receiving the domain record. Return a single key, multiple keys or undefined to omit indexing. Ordinary throws in fallback write validation cross the existing `EXTENSION_FAILED` boundary with operation `entity.index.project` and the original cause; native backfill preserves original error identity.',
+            '调用方持有的同步 `(value) => projection`，接收领域记录，返回单键、多键或空值以跳过索引。回退写校验中的普通抛错经既有 `EXTENSION_FAILED` 边界交付，操作为 `entity.index.project`，保留原始原因；原生回填保留原错误身份。'
           ),
           params: {
             value: t(
@@ -1647,7 +1629,10 @@ console.log(byStatus.select({ status: 'ready' }))`
         },
         skipped: { summary: t('Invalid records skipped.', '因无效而被跳过的记录数。') },
         alreadyCurrent: {
-          summary: t('Records already at the current version.', '已经是当前版本的记录数。')
+          summary: t(
+            'Records already at the current version, including concurrent upgrades observed inside the write transaction and preserved without overwrite.',
+            '已经是当前版本的记录数，包括写事务内观察到并保留、未被覆写的并发升级。'
+          )
         },
         conflicted: {
           summary: t(
@@ -2097,13 +2082,13 @@ const query = handle.liveQuery({ runtime, query: ({ store }) => store.get('theme
         },
         subscribe: {
           summary: t(
-            'Starts listening and calls `context.invalidate(change)` on changes.',
-            '开始监听，并在数据变化时调用 `context.invalidate(change)`。'
+            'Starts listening and calls `context.invalidate(change)` for known changes, or `context.invalidate()` to refresh every query on this adapter when no payload is available.',
+            '开始监听；已知变化时调用 `context.invalidate(change)`，没有具体载荷时调用 `context.invalidate()` 刷新本适配器全部查询。'
           ),
           params: {
             context: t(
-              '`{ store, scheduler, signal, invalidate, report }`.',
-              '订阅上下文 `{ store, scheduler, signal, invalidate, report }`。'
+              'Host-supplied `{ store, scheduler, signal, invalidate, report }` for this adapter; the signal ends source listening when the adapter stops.',
+              '宿主为本适配器提供的订阅上下文 `{ store, scheduler, signal, invalidate, report }`；适配器停止时信号结束来源监听。'
             )
           },
           returns: t('A disposer that stops listening.', '停止监听的清理函数。')
@@ -2121,8 +2106,8 @@ const query = handle.liveQuery({ runtime, query: ({ store }) => store.get('theme
         signal: { summary: t('Aborts when the adapter stops.', '适配器停止时中止的信号。') },
         invalidate: {
           summary: t(
-            'Marks queries stale; pass the change when known.',
-            '把相关查询标记为过期；已知变化时传入 change。'
+            'Marks queries stale; pass a known change to permit filtering. Calling invalidate() without a change refreshes every live query on the same adapter, bypassing scope and matches filters without inventing sequence or origin values.',
+            '把查询标记为过期；已知变化时传入变更以允许过滤。无参数调用使同一适配器全部实时查询刷新，跳过作用域和匹配过滤，不虚构序号或来源值。'
           )
         },
         report: { summary: t('Reports adapter failures.', '上报适配器内部的失败。') }
@@ -2145,8 +2130,8 @@ const query = handle.liveQuery({ runtime, query: ({ store }) => store.get('theme
         report: { summary: t('Reports adapter failures.', '上报适配器内部的失败。') },
         onChange: {
           summary: t(
-            'Invalidates query runs after a backend change.',
-            '在后端数据变化后使查询结果失效。'
+            'Receives an optional backend change. Undefined invalidates all queries on this adapter; a known change permits scope and matches filtering, with no fabricated sequence or origin.',
+            '接收可选后端变更。空值使本适配器全部查询失效；已知变更允许作用域与匹配过滤，不虚构序号或来源。'
           )
         }
       }
@@ -2415,6 +2400,14 @@ const bytes = await selected.decode(text)`,
         '按所属接纳、后端、索引或实时查询失败场景命名的稳定诊断消息。'
       ),
       values: {
+        entityUniqueSnapshotChanged: t(
+          'The KV raw-text snapshot changed during preparation; `TRANSACTION_CONFLICT` asks the caller to retry the complete write.',
+          '键值原始文本快照在准备期间发生变化；`TRANSACTION_CONFLICT` 要求调用方重试完整写入。'
+        ),
+        entityMigrationGraphIncomplete: t(
+          'Entity construction omitted an upgrade step from 2 through the current version; correct the graph before retrying.',
+          '实体构造缺少从二到当前版本的升级步骤；重试前必须补全迁移图。'
+        ),
         standardSchemaIssuesInvalid: t(
           'A Standard Schema implementation returned malformed issue entries rather than message-bearing objects.',
           '标准结构校验实现返回了格式错误的问题条目，而非携带消息的对象。'
@@ -2654,6 +2647,10 @@ const bytes = await selected.decode(text)`,
         indexBackfillStale: t(
           '`INDEX_BACKFILL_STALE`: an index backfill checkpoint expired; reconnect and retry.',
           '`INDEX_BACKFILL_STALE`：索引回填检查点已过期；重新连接后重试。'
+        ),
+        indexBackfillFailed: t(
+          '`INDEX_BACKFILL_FAILED`: backfill and persisting failed readiness both failed. The native AggregateError keeps the primary error first in errors and as cause, followed by the persistence failure; inspect both original objects before retrying.',
+          '`INDEX_BACKFILL_FAILED`：回填与保存失败就绪状态同时失败。原生聚合错误在错误数组首位及原因保留原始主错误，随后保留持久化失败；重试前检查两个原对象。'
         ),
         backendIdInvalid: t(
           '`BACKEND_ID_INVALID`: the backend id breaks the id rule.',
