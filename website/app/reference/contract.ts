@@ -78,10 +78,28 @@
  * - `CODE-ZH` code comments inside an example shown on Chinese pages are Chinese; use the `{ en, zh
  *   }` form of `ICode` when an example has comments.
  *
- * Page rule (rendered output):
+ * Page rules (rendered output):
  *
  * - `PAGE-ZH` a Chinese API page shows no English prose outside code, signatures and identifiers;
  *   checked against the running site by `reference-pages.ts`.
+ * - `PAGE-COVERAGE` every localized prose leaf and shared/localized example of the full authored
+ *   reference appears in its own module/symbol article in that locale. Ownership comes from the
+ *   generated manifest, including unlinked type pages, module-qualified entries and case-collision
+ *   slugs. Summaries, callback/property params, nested/composed member descriptions, returns,
+ *   defaults, values, usage notes, scenarios, examples and enhancer grants are all checked. Loader
+ *   serialization, other pages, declaration signatures and hover notes never satisfy coverage. Code
+ *   is identified by its schema-owned example/install field; parameters or value keys named
+ *   `example` or `install` remain prose. Named comparison rules: `COVER-WHITESPACE-BACKTICKS`
+ *   removes layout whitespace and inline-code delimiters; `COVER-TERM-POPOVER` removes only
+ *   injected library-reference hover notes; `COVER-LINK-LABEL` compares supported Markdown links by
+ *   visible label; `COVER-DISPLAY-LIBRARY` applies InlineText's package/packages to
+ *   library/libraries substitution while preserving identifiers and GitHub Packages;
+ *   `COVER-CODE-LAYOUT` compares example tokens ignoring whitespace and optional trailing commas
+ *   while retaining literals and comments; `COVER-PUBLIC-IMPORT` applies the canonical
+ *   public-import rewrite. No fuzzy match or exclusion of an authored description is permitted.
+ * - `PAGE-LINK` every actual in-site anchor on an audited page resolves to a successful response
+ *   containing an article. A 200 shell without an article fails. Fragment links share the owning
+ *   article check; external links are outside this rule. Findings identify source and destination.
  */
 
 /** One text in both site locales. */
