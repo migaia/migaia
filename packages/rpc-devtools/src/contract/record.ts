@@ -6,7 +6,7 @@ export const RpcDevtoolsRecordFormat = Object.freeze({
   version: 1
 } as const)
 
-/** Private v1 byte-tag vocabulary shared by codec encoding and revival; not a public entry export. */
+/** A sole $bytes key is reserved v1 byte syntax at any event depth, not an ordinary JSON object. */
 export const RpcDevtoolsRecordField = { bytes: '$bytes' } as const
 
 /** Private padded RFC 4648 alphabet keeps v1 byte conversion portable and owned by this format. */

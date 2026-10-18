@@ -109,7 +109,7 @@ function replaceBytes(this: object, key: string, value: unknown): unknown {
   return value
 }
 
-/** A sole $bytes key identifies the v1 byte tag, keeping ordinary event objects untouched. */
+/** A sole $bytes key is reserved v1 byte syntax; all other JSON object shapes remain ordinary. */
 function reviveBytes(_key: string, value: unknown): unknown {
   if (
     typeof value === 'object' &&

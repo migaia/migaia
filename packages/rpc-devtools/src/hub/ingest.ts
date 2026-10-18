@@ -7,7 +7,7 @@ import { HubServiceMethod } from './text.js'
 /** Frozen service pages accept at most 1,000 retained events per query. */
 const QUERY_PAGE_SIZE = 1000
 
-/** Fetch retained pages before acquiring a live watch; cancellation prevents any late insertion. */
+/** Fetch retained pages after activating the live watch; cancellation prevents late insertion. */
 export async function catchUpTarget(
   target: IHubTarget,
   accept: (event: IRpcDevtoolsWireEvent) => void
@@ -28,30 +28,53 @@ export async function catchUpTarget(
 }
 
 /** Own the iterator immediately, then receive batches without exposing watch failure to callers. */
-export function startTargetWatch(
+export async function startTargetWatch(
   target: IHubTarget,
   accept: (event: IRpcDevtoolsWireEvent) => void,
   report: (error: unknown) => void,
-  disconnected: () => void
-): void {
+  disconnected: () => void,
+  catchUp: () => Promise<void>
+): Promise<void> {
   target.iterator = target
     .client!.stream(HubServiceMethod.watch)
     [Symbol.asyncIterator]() as AsyncIterator<IRpcDevtoolsWatchBatch>
   /** This iterator remains the one resource released even if its target is removed during next(). */
   const iterator = target.iterator
+  /** One initial read activates the existing bounded watch before the historical snapshot starts. */
+  const first = (async () => {
+    try {
+      return { ok: true as const, value: await iterator.next() }
+    } catch (error) {
+      return { ok: false as const, error }
+    }
+  })()
+  try {
+    await catchUp()
+  } catch (error) {
+    /** A failed snapshot still reports any independent late failure from its already-owned watch. */
+    void first.then((outcome) => {
+      if (!outcome.ok) report(outcome.error)
+    })
+    throw error
+  }
   /** The asynchronous service consumer is separate from synchronous business observation paths. */
   async function follow(): Promise<void> {
     try {
+      /** History is ingested first; the first live batch then deduplicates through the same cursor. */
+      const initial = await first
+      if (!initial.ok) throw initial.error
+      /** Subsequent reads reuse the original iterator rather than creating another pending queue. */
+      let next = initial.value
+      /** The existing active flag rejects results that settled after target removal. */
       while (target.active) {
-        /** A pending read may finish after removal; the active flag rejects that stale batch. */
-        const next = await iterator.next()
-        if (!target.active) return
         if (next.done) {
           disconnected()
           return
         }
         for (let i = 0; i < next.value.events.length && target.active; i++)
           accept(next.value.events[i]!)
+        if (!target.active) return
+        next = await iterator.next()
       }
     } catch (error) {
       report(error)

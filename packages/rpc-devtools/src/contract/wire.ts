@@ -33,5 +33,6 @@ export type IRpcDevtoolsWireEvent = Readonly<{
   error?: IRpcWireError
   carrier?: string
   detail?: Readonly<Record<string, string | number | boolean>>
+  /** Stage-specific content; offline v1 codecs additionally apply JSON and reserved byte-tag syntax. */
   content?: unknown
 }>

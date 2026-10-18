@@ -23,6 +23,7 @@ export type IRpcDevtoolsOptions = Readonly<{
   methods?: readonly string[]
   sample?: number
   maxEvents?: number
+  /** Bounds retained content in the main query ring; recording and watch retention are independent. */
   maxContentBytes?: number
   /** Bounds the reader name table; ingestion retains raw string references without interning. */
   maxInterned?: number
@@ -36,6 +37,10 @@ export type IRpcDevtools = IRpcProbe &
     /** Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields. */
     emit(view: IRpcProbeEventView): void
     query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage
+    /**
+     * A local iterator return wakes its pending next and releases only that watch, not the
+     * Collector.
+     */
     watch(
       input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>
     ): AsyncGenerator<IRpcDevtoolsWatchBatch>

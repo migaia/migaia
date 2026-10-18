@@ -32,7 +32,7 @@ devtools.close()
 
 默认阶段为 `message` 与 `peer`。`envelope`、`encoded`、`frame`、`protected` 与 `carrier` 必须显式启用，例如构造时传入 `stages: ['message', 'peer', 'carrier']`，或调用上面的 `setStages()`；选择阶段不会开启内容捕获。
 
-默认保留最近 10,000 个事件，内容预算 8 MiB，读取时的字符串驻留上限 65,536。仅携带非负 durationMs 和 method 的 settled/failed/rejected `message` 事件同步更新 endpoint/method 统计；查询环淘汰不清除累计值，`clear()` 同时清空主环与统计。
+默认主查询环保留最近 10,000 个事件，主环内容预算 8 MiB，读取时的字符串驻留上限 65,536。recording 与 watch 独立保留的引用不计入该字节预算，它不是所有窗口或进程总内存上限。仅携带非负 durationMs 和 method 的 settled/failed/rejected `message` 事件同步更新 endpoint/method 统计；查询环淘汰不清除累计值，`clear()` 同时清空主环与统计。
 
 活跃 watcher 共用 16,384 行的原始待通知窗口。一个同步 burst 最多安排一次通知，没有活跃 watcher 时不安排通知；通知阶段才执行各 watcher 的过滤与入队。`watch()` 每批最多 256 个事件，每个消费者最多排队 64 批，保留原有筛选后的队列与最旧批次淘汰规则。共享原始窗口先于 watch 过滤发生的覆盖计入 `dropped`，因此该部分是原始丢失行数，不能还原为筛选后命中数。
 
@@ -76,11 +76,13 @@ console.log(decodeRpcDevtoolsRecord(text).header.version) // 1
 
 录制格式为 UTF-8 NDJSON：第一行为 `{ format: 'migaia-rpc-devtools', version: 1 }`，后续每行一个事件。Bytes 用 base64 标记保存；错误沿用 RPC 错误 codec 保留 source、code、name、message、stack 与 cause 链。Service wire event 使用已序列化错误；record 输入同时接受原生 Error 与已序列化 wire error，解码输出还原为原生 Error。
 
+v1 在事件任意深度将单键 `{ "$bytes": base64 }` 对象保留为字节语法，解码为 Uint8Array；`content: unknown` 不承诺任意对象无损往返。业务若要保留同形普通对象，应先用 JSON.stringify 保存为内容字符串，读取后自行 JSON.parse。v1 不对这种对象自动转义。
+
 统计使用 24 个固定 log2 延迟桶，公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值；末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，公开实际 `latencyMaxMs`；所有分位数钳制到该最大值，末桶没有固定宽度误差承诺。
 
 ## Hub · 实时聚合与离线查询
 
-Hub 不创建 transport 或 Peer。调用方把已有的 `request`/`stream` client 交给 `await hub.addTarget(name, client)`；client 的方法名须与 `IRpcDevtoolsServiceApi` 一致。Hub 先以五次 `describe` 中 RTT 最小的样本对齐时钟，再用 `query` 追上现有事件，最后消费 `watch`。`realignMs` 可启用周期对齐。
+Hub 不创建 transport 或 Peer。调用方把已有的 `request`/`stream` client 交给 `await hub.addTarget(name, client)`；client 的方法名须与 `IRpcDevtoolsServiceApi` 一致。Hub 先以五次 `describe` 中 RTT 最小的样本对齐单调时钟，先激活 `watch` 的首次读取，再用 `query` 补历史，补完后消费已开始的 watch；只有一个有界 watch 队列。`realignMs` 可启用周期对齐。
 
 ```ts doc-test=check
 import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
@@ -115,7 +117,7 @@ try {
 }
 ```
 
-`timeline()` 以 k-way merge 合并 target 序列，按对齐时间排序，同时间按 target 名及 `seq` 决定顺序。`interactions(trace?)` 按显式 `trace` 与 `(senderId, messageId)` 关联，并通过同一 target 的 `carrierSeq` 加入对应 carrier；只有一侧的观察标记为 `oneSided`，不会补造缺失事件。`stats(name?)` 转发实时 target 的统计，省略名称时逐桶汇总各 target 的直方图。
+`timeline()` 按对齐时间排序，同时间按 target 名及 `seq` 决定顺序。有序 target 环经过顺序检查后用 k-way merge；合法非单调记录走完整排序再应用 limit，保留原事件引用。`interactions(trace?)` 按显式 `trace` 与 `(senderId, messageId)` 关联，并通过同一 target 的 `carrierSeq` 加入对应 carrier；只有一侧的观察标记为 `oneSided`，不会补造缺失事件。`stats(name?)` 转发实时 target 的统计，省略名称时逐桶汇总各 target 的直方图。
 
 返回数组中的事件是已存储引用。未转移的 content、`detail` 与 error 保留引用；发送后修改原对象可能改变后续读取。详见 [USEGUIDE](./USEGUIDE.md) 的生命周期、时钟误差与引用语义。
 

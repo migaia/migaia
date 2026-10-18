@@ -1,4 +1,5 @@
 import type { IRpcContext } from '@migaia/rpc-core'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   defineProbe,
   readProbeStages,
@@ -258,7 +259,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     assertOpen()
     return {
       version: CollectorText.version,
-      now: Date.now(),
+      now: systemScheduler.now(),
       paused,
       descriptors: Array.from(descriptors.values()),
       limits: { maxEvents, maxContentBytes },

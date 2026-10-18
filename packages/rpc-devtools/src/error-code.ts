@@ -26,7 +26,12 @@ export const RpcDevtoolsErrorCode = {
   /** A hub target name is registered; remove it before replacement (hub R1). */
   targetDuplicate: 'TARGET_DUPLICATE',
   /** A hub operation names an unknown target; register it before use (hub R1). */
-  targetUnknown: 'TARGET_UNKNOWN'
+  targetUnknown: 'TARGET_UNKNOWN',
+  /**
+   * Hub close reports failed target iterator returns; inspect original cause/errors and fix
+   * cleanup.
+   */
+  targetReleaseFailed: 'TARGET_RELEASE_FAILED'
 } as const
 
 /** Semantic code union retains the registry's exact value spelling. */

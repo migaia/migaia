@@ -32,6 +32,9 @@
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
+  },
   "peerDependencies": {
     "@migaia/rpc-core": "workspace:*",
     "@migaia/rpc-contract": "workspace:*"

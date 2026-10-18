@@ -25,6 +25,8 @@ export class CollectorWatcher {
   #dropped = 0
   /** Terminal watchers wake a pending consumer and discard all retained references. */
   #closed = false
+  /** Explicit iterator return completes its pending next normally; Collector close still rejects. */
+  #returning = false
   /** Iterator registration belongs to the collector's existing indexed active watcher array. */
   #active: CollectorWatcher[]
   /** Service exposure applies at the one representation boundary owned by iterate. */
@@ -142,8 +144,28 @@ export class CollectorWatcher {
     this.#dropped = 0
   }
 
+  /** Wake this watch's existing pending next before queuing the native generator return. */
+  iterate(): AsyncGenerator<IRpcDevtoolsWatchBatch> {
+    /** The native generator continues to own next/throw/return sequencing and finalization. */
+    const iterator = this.#iterate()
+    /** Its inherited built-in return requires the exact branded generator as receiver. */
+    const returnIterator = iterator.return
+    Object.defineProperty(iterator, 'return', {
+      configurable: true,
+      writable: true,
+      value: (value?: unknown) => {
+        if (!this.#closed) {
+          this.#returning = true
+          this.close()
+        }
+        return Reflect.apply(returnIterator, iterator, [value]) as ReturnType<typeof returnIterator>
+      }
+    })
+    return iterator
+  }
+
   /** Activate before the first await; conversion, batching objects and Promises belong here. */
-  async *iterate(): AsyncGenerator<IRpcDevtoolsWatchBatch> {
+  async *#iterate(): AsyncGenerator<IRpcDevtoolsWatchBatch> {
     this.#assertOpen?.()
     this.#filter.after = this.#readSequence()
     this.#active.push(this)
@@ -154,7 +176,7 @@ export class CollectorWatcher {
     try {
       while (true) {
         if (this.#closed) {
-          if (this.#signal?.aborted) return
+          if (this.#returning || this.#signal?.aborted) return
           throw identifyDevtoolsError(new Error(CollectorText.closed), RpcDevtoolsErrorCode.closed)
         }
         if (this.#count === 0) {
@@ -162,7 +184,7 @@ export class CollectorWatcher {
             this.#wake = resolve
           })
           if (this.#closed) {
-            if (this.#signal?.aborted) return
+            if (this.#returning || this.#signal?.aborted) return
             throw identifyDevtoolsError(
               new Error(CollectorText.closed),
               RpcDevtoolsErrorCode.closed

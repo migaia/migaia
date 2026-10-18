@@ -61,6 +61,7 @@ export type IRpcDevtoolsStats = Readonly<{
 /** Describe supplies the target's current clock sample, active descriptors and retention limits. */
 export type IRpcDevtoolsDescribe = Readonly<{
   version: string
+  /** Monotonic milliseconds in the default Core event clock domain, not an epoch timestamp. */
   now: number
   paused: boolean
   descriptors: readonly IRpcProbeDescriptor[]

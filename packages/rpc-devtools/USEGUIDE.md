@@ -35,7 +35,9 @@ const decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))
 console.log(decoded.events[0]?.method)
 ```
 
-Bytes 表示为 `{ "$bytes": base64 }`。录制错误使用 `serializeRpcError` / `deserializeRpcError`，保留原始 stack 和 cause 链；解码不重建 stack。`IRpcDevtoolsWireEvent.error` 是 service 传输的序列化错误；`IRpcDevtoolsRecordEvent.error` 的输入接受 `Error | IRpcWireError`，以便直接录制 service 事件。编码原生 Error 时序列化，已序列化错误按 RPC 契约规范化；解码后还原为原生 Error。
+Bytes 表示为 `{ "$bytes": base64 }`。这是 v1 在事件任意深度的保留语法：单键同形对象均解码为 Uint8Array，非法 Base64 标签使 record 无效；content 的 unknown 类型不保证任意对象无损往返。业务若需保留同形普通对象，可先 JSON.stringify 成内容字符串，导入后自行 JSON.parse；v1 不提供自动转义。
+
+录制错误使用 `serializeRpcError` / `deserializeRpcError`，保留原始 stack 和 cause 链；解码不重建 stack。`IRpcDevtoolsWireEvent.error` 是 service 传输的序列化错误；`IRpcDevtoolsRecordEvent.error` 的输入接受 `Error | IRpcWireError`，以便直接录制 service 事件。编码原生 Error 时序列化，已序列化错误按 RPC 契约规范化；解码后还原为原生 Error。
 
 错误格式名、非 1 版本、缺少 header 字段或非法 JSON 会抛出 `RECORD_FORMAT_INVALID`，原始解析或验证失败保留在 `cause`。
 
@@ -138,7 +140,7 @@ devtools.close()
 
 `query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。读取时驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。构造时的 `methods` 是采集过滤，query/watch 的 `methods` 则选择实际携带相应 method 的行，因此 reader 的方法筛选不会包含没有 method 的 control。
 
-只有活跃 watcher 才启用共享原始待通知窗口；每个同步 burst 最多安排一次通知，没有活跃 watcher 时零通知。该窗口最多保存 16,384 行，先保留原始事件，再在通知时执行每个 watcher 的筛选。窗口覆盖计入原始行损失，发生在筛选前，不能恢复丢失行原本是否命中某个过滤器。通知后仍使用每个消费者原有的筛选后队列：每批最多 256 个事件，最多排队 64 批；过慢时丢弃最旧批次。下一批 `dropped` 同时报告原始窗口覆盖与该消费者队列淘汰的损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。
+只有活跃 watcher 才启用共享原始待通知窗口；每个同步 burst 最多安排一次通知，没有活跃 watcher 时零通知。该窗口最多保存 16,384 行，先保留原始事件，再在通知时执行每个 watcher 的筛选。窗口覆盖计入原始行损失，发生在筛选前，不能恢复丢失行原本是否命中某个过滤器。通知后仍使用每个消费者原有的筛选后队列：每批最多 256 个事件，最多排队 64 批；过慢时丢弃最旧批次。下一批 `dropped` 同时报告原始窗口覆盖与该消费者队列淘汰的损失。Collector 的 `close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。单个 iterator.return() 则先唤醒自己的挂起 next 并正常结束，不需要关闭 Collector；Hub 释放自己取得的本地 watch 走同一路径。
 
 当前共享原始丢失计数在通知时分发给届时活跃的 watcher；若某个 watcher 在 burst 已安排通知、尚未交付时首次调用 `next()`，其后续批次可能包含订阅前的原始丢失计数。这是源码审查确认的限制，尚未运行对应的复现。
 
@@ -148,7 +150,7 @@ devtools.close()
 
 `IRpcDevtoolsWireEvent.variation` 是 message/envelope 事件上可选的原 `route.variation` 字符串，保留 ping、pong、close、abort 与已注册用户 subtype 的身份。Abort 的 kind 为 cancel，其余 variation 为 control；request、response 与其它阶段省略该字段。Query、watch 与 record v1 codec 保留同一名称。
 
-内容预算只计入已知大小：字符串按 UTF-8 长度、ArrayBuffer/View 按 byteLength、opaque object 按事件提供的 sizeBytes。Opaque object 的 sizeBytes 为 -1 时计为 0；collector 不编码或遍历其对象图。因此 maxContentBytes 不保证约束任意 opaque object 的真实堆大小。需要可核算预算时，提供已有编码层的大小，或捕获 bytes/string。
+内容预算只计入已知大小：字符串按 UTF-8 长度、ArrayBuffer/View 按 byteLength、opaque object 按事件提供的 sizeBytes。Opaque object 的 sizeBytes 为 -1 时计为 0；collector 不编码或遍历其对象图。该计数只约束主查询环，recording 与 watch 的独立引用不计入该预算；因此 maxContentBytes 也不是所有窗口或进程的总内存上限，不保证约束任意 opaque object 的真实堆大小。需要可核算预算时，提供已有编码层的大小，或捕获 bytes/string。
 
 `watch` 的批次类型是 `{ events, dropped }`。`record().stop()` 返回离线 record；service 的 `record.stop()` 返回编码文本。Service 默认不暴露 content，须由 `exposeContent` 明确启用。`IRpcDevtoolsCounters` 包含环形存储淘汰、内容丢弃、重入丢弃、采样丢弃、暂停/关闭忽略与字符串驻留溢出的计数。
 
@@ -227,25 +229,25 @@ export async function inspectHosts(
 }
 ```
 
-连接时依次取五个 `describe` 时钟样本，保留 RTT 最小的样本。`offset = remoteNow − (t0 + t1) / 2`，`uncertaintyMs = RTT / 2`，`alignedAt = event.at − offset`。该估算依赖往返延迟对称假设；读取 `uncertaintyMs`，不要把对齐时间当成无误差时钟。初始化先按 `afterSeq` 分页执行 `query`，追上后跟随 `watch`。
+连接时依次取五个 `describe` 时钟样本，保留 RTT 最小的样本。`offset = remoteNow − (t0 + t1) / 2`，`uncertaintyMs = RTT / 2`，`alignedAt = event.at − offset`。该估算依赖往返延迟对称假设；读取 `uncertaintyMs`，不要把对齐时间当成无误差时钟。默认 `describe().now` 与 Core 事件 at 共用 systemScheduler 单调毫秒，不是 epoch；stats.since 仍是墙上时钟。自定义时钟由 target client 提供同域样本，单一样本不能转换混合时域。初始化先开始唯一 watch 的首次读取，再按 afterSeq 分页补历史，补完后消费首批并按原 sequence 去重，复用 Collector 的有界队列。
 
 `on('event', listener)` 提供新摄入的 timeline 事件；`on('status', listener)` 发布 `connecting`、`connected`、`disconnected`、`offline` 与 `removed`。`status(name)` 返回指定 target 的状态，省略名称时返回状态 Map。这些是生命周期值，不是错误码。
 
-`timeline({ targets, stages, trace, method, from, to, limit })` 可筛选 target、stage、显式 trace、method、对齐时间范围与结果数量。每个 target 保持 `seq` 顺序，跨 target 用 k-way merge 按 `alignedAt` 合并；同时间先按 target 名、再按 `seq` 排序。`interactions(trace?)` 查询增量索引，按 `(senderId, messageId)` 关联两侧和响应。相同非空 trace 可查询到多跳 interaction；只有一侧时 `oneSided` 为 `true`。Hub 不自动传播 trace，不推断缺失侧，也不重新发起业务调用。
+`timeline({ targets, stages, trace, method, from, to, limit })` 可筛选 target、stage、显式 trace、method、对齐时间范围与结果数量。每个 target 按 seq 保留；时间有序的环经过顺序检查后用 k-way merge，合法非单调记录则完整排序后再应用 limit；全局按 alignedAt、target 名、seq 排序。`interactions(trace?)` 查询增量索引，按 `(senderId, messageId)` 关联两侧和响应。相同非空 trace 可查询到多跳 interaction；只有一侧时 `oneSided` 为 `true`。Hub 不自动传播 trace，不推断缺失侧，也不重新发起业务调用。
 
 `stats(name)` 转发指定实时 target 的统计；`stats()` 逐 endpoint/method 汇总计数，并逐桶相加固定延迟直方图后计算分位数。聚合不平均各 target 的 p50/p95/p99。Record v1 不保存聚合统计；离线 target 的 stats 返回 `{ since: 0, methods: [] }`，汇总时不补造离线计数。
 
 `importRecord(name, text)` 使用 contract NDJSON codec 注册只读 `offline` target，不连接远程 service。离线事件的 `alignedAt` 等于原 `at`，`uncertaintyMs` 为 `undefined`；导入不恢复录制时的时钟偏移。可用 `timeline` 与 `interactions` 查询这些事件。
 
-**引用语义（SC9）：** Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。
+**引用语义（SC9）：** Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。排序不改变记录文件/sequence 顺序或事件对象引用。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。
 
-**失败与释放：** 重复 target 名抛出 `TARGET_DUPLICATE`。移除未知名称抛出 `TARGET_UNKNOWN`，重复移除已经移除的名称无害。初始化 `describe` 失败时，target 变为 `disconnected`，原错误交给 `onError`，`addTarget` 以同一错误拒绝。运行中的 `watch` 中断会报告失败并保留已收到事件；hub 不自动重试。Listener 失败报告给 `onError`，其他 listener 继续运行。
+**失败与释放：** 重复 target 名抛出 `TARGET_DUPLICATE`。移除未知名称抛出 `TARGET_UNKNOWN`，重复移除已经移除的名称无害。初始化 describe/query 失败时，target 变为 disconnected，原错误交给 onError，addTarget 以同一错误拒绝；已经取得的 watch 会释放，独立清理失败另行报告，不替换主错。运行中的 `watch` 中断会报告失败并保留已收到事件；hub 不自动重试。Listener 失败报告给 `onError`，其他 listener 继续运行。
 
-`close()` 停止所有 watch，重复关闭无害。释放失败汇总为 `AggregateError` 并报告，`errors[0]` 保留第一个原错误。关闭后的操作抛出 `CLOSED`，重复 `close()` 除外。Hub 只释放自己持有的 watch 与状态；调用方仍负责已有 client/Peer 的生命周期。
+`close()` 停止所有 watch，重复关闭无害。释放失败汇总为带本包 `TARGET_RELEASE_FAILED` 的原生 `AggregateError` 并报告；cause 和 errors[0] 保留第一个原错误，errors 保留全体，close 继续完成。关闭后的操作抛出 `CLOSED`，重复 `close()` 除外。Hub 只释放自己持有的 watch 与状态；调用方仍负责已有 client/Peer 的生命周期。
 
 ## 4. 错误身份
 
-错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。
+错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN`、`TARGET_RELEASE_FAILED` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。
 
 ## 5. 日志接入
 

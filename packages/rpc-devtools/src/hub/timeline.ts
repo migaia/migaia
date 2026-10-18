@@ -60,6 +60,23 @@ function nextTimelinePosition(
   return source.count
 }
 
+/** A valid record may have nonmonotonic times; only ordered sources may use the merge shortcut. */
+function isTimelineSourceOrdered(
+  source: IHubTimelineSource,
+  compare: IHubTimelineComparator
+): boolean {
+  /** The previous retained wrapper is borrowed only for this query's order check. */
+  let previous: IRpcDevtoolsTimelineEvent | undefined
+  for (let position = 0; position < source.count; position++) {
+    /** Sparse slots stay absent; no alternate event storage or wrapper is created. */
+    const event = source.events[(source.head + position) % source.events.length]
+    if (event === undefined) continue
+    if (previous !== undefined && compare(previous, event) > 0) return false
+    previous = event
+  }
+  return true
+}
+
 /** Restore the min-heap after insertion without creating an event wrapper or callback. */
 function siftTimelineUp(
   heap: IHubTimelineCursor[],
@@ -101,9 +118,9 @@ function siftTimelineDown(heap: IHubTimelineCursor[], compare: IHubTimelineCompa
 }
 
 /**
- * Merge sequence-ordered target rings in O(n log k), returning their stored event references.
- * Target clocks preserve per-target time order; alignment subtracts one offset for the whole ring.
- * For A3's three targets, each consumed event needs at most two sift comparisons, plus setup.
+ * Check retained order, then merge ordered rings in O(n log k), retaining original event
+ * references. Nonmonotonic records use a complete result sort before limit; no input-order
+ * precondition is added.
  */
 export function mergeTimeline(
   targets: Iterable<IHubTimelineSource>,
@@ -115,10 +132,26 @@ export function mergeTimeline(
   /** The public hub validates limits; absence permits the entire retained timeline. */
   const limit = query?.limit ?? Infinity
   if (limit === 0) return result
+  /** Selection is shared by order detection, the complete-sort fallback and the merge path. */
+  const sources = Array.from(targets).filter(
+    (source) => query?.targets === undefined || query.targets.includes(source.name)
+  )
+  if (sources.some((source) => !isTimelineSourceOrdered(source, compare))) {
+    for (const source of sources) {
+      /** Filter using the same existing query projection before sorting borrowed wrappers. */
+      let position = nextTimelinePosition(source, 0, query)
+      while (position < source.count) {
+        result.push(source.events[(source.head + position) % source.events.length]!)
+        position = nextTimelinePosition(source, position + 1, query)
+      }
+    }
+    result.sort(compare)
+    if (result.length > limit) result.length = limit
+    return result
+  }
   /** Only one cursor per selected, nonempty target is held by the query. */
   const heap: IHubTimelineCursor[] = []
-  for (const source of targets) {
-    if (query?.targets !== undefined && !query.targets.includes(source.name)) continue
+  for (const source of sources) {
     /** Filters advance within the original ring rather than constructing intermediate arrays. */
     const position = nextTimelinePosition(source, 0, query)
     if (position === source.count) continue

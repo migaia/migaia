@@ -283,7 +283,7 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
     }, realignMs)
   }
 
-  /** Register before describe, then catch up before acquiring the target's single live watch. */
+  /** Register before describe, activate one watch, then catch up before consuming its first batch. */
   async function addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void> {
     assertOpen()
     assertAvailable(name)
@@ -302,17 +302,28 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
     try {
       await alignTarget(target)
       if (!target.active) return
-      await catchUpTarget(target, ingest)
-      if (!target.active) return
-      startTargetWatch(target, ingest, report, () => {
-        if (target.active) setStatus(target, RpcDevtoolsTargetStatus.disconnected)
-      })
+      await startTargetWatch(
+        target,
+        ingest,
+        report,
+        () => {
+          if (target.active) setStatus(target, RpcDevtoolsTargetStatus.disconnected)
+        },
+        () => catchUpTarget(target, ingest)
+      )
       if (!target.active || target.status === RpcDevtoolsTargetStatus.disconnected) return
       startRealignment(target)
       setStatus(target, RpcDevtoolsTargetStatus.connected)
     } catch (error) {
       report(error)
-      if (target.active) setStatus(target, RpcDevtoolsTargetStatus.disconnected)
+      if (target.active) {
+        setStatus(target, RpcDevtoolsTargetStatus.disconnected)
+        try {
+          await releaseTarget(target)
+        } catch (releaseError) {
+          report(releaseError)
+        }
+      }
       throw error
     }
   }
@@ -466,7 +477,12 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
       const failures: unknown[] = []
       for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
       if (failures.length > 0)
-        report(new AggregateError(failures, HubErrorText.release, { cause: failures[0] }))
+        report(
+          identifyDevtoolsError(
+            new AggregateError(failures, HubErrorText.release, { cause: failures[0] }),
+            RpcDevtoolsErrorCode.targetReleaseFailed
+          )
+        )
       for (const slot of statusListeners) slot.listener = undefined
       for (const slot of eventListeners) slot.listener = undefined
       statusListeners.length = 0
