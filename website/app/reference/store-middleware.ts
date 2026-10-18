@@ -988,8 +988,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
     },
     IStoreMiddlewareHost: {
       summary: t(
-        'Frozen defineHost-composed store event handle; local domain methods coexist with the canonical [IHostHandle](/en/docs/plugin-host/api/IHostHandle) from `@migaia/plugin-host`. Pipeline mode is fixed sync.',
-        '经宿主组合产生的冻结存储事件句柄，本地领域方法与 `@migaia/plugin-host` 的规范 [IHostHandle](/zh/docs/plugin-host/api/IHostHandle) 共存，继承其安装、移除、配置、流水线及销毁控制，模式固定同步。'
+        'A frozen store event handle composed with [Plugin Host](/en/docs/plugin-host). Its [IHostHandle](/en/docs/plugin-host/api/IHostHandle) methods install and remove plugins, change configuration, and dispose the host alongside the store event methods. Pipelines always run synchronously.',
+        '与 [Plugin Host](/zh/docs/plugin-host) 组合后得到的冻结存储事件句柄。[IHostHandle](/zh/docs/plugin-host/api/IHostHandle) 方法负责安装和移除插件、更改配置及关闭宿主，与存储事件方法共存。流水线始终同步执行。'
       ),
       scenarios: [
         t(

@@ -11759,8 +11759,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '提供错误来源 @migaia/store-devtools。'
                   ],
                   [
-                    '[StoreDevtoolsCommand](/zh/docs/store-devtools/api/StoreDevtoolsCommand)',
-                    '提供六个命令名称，应用自行决定怎么处理。用法见[命令连接](/zh/docs/store-devtools/command-bridge-boundary)。'
+                    '[ReduxDevToolsCommand](/zh/docs/store-middleware/api/ReduxDevToolsCommand)',
+                    '由 [Store Middleware](/zh/docs/store-middleware) 提供六个扩展命令名称。应用仍需把选中的历史编号交给诊断会话；用法见[命令连接](/zh/docs/store-devtools/command-bridge-boundary)。'
                   ]
                 ]
               }
@@ -11889,8 +11889,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Provides the error source @migaia/store-devtools.'
                   ],
                   [
-                    '[StoreDevtoolsCommand](/en/docs/store-devtools/api/StoreDevtoolsCommand)',
-                    'Provides six command names for application-defined handling. See [command wiring](/en/docs/store-devtools/command-bridge-boundary).'
+                    '[ReduxDevToolsCommand](/en/docs/store-middleware/api/ReduxDevToolsCommand)',
+                    '[Store Middleware](/en/docs/store-middleware) owns these six extension command names. Map the selected history entry to a diagnostic session method; see [command wiring](/en/docs/store-devtools/command-bridge-boundary).'
                   ]
                 ]
               }
@@ -13568,7 +13568,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '这是一份应用自己创建的本地命令数据。代码把选中的历史 id 交给 jumpTo，没有连接浏览器扩展，也没有向外发送消息。'
+                text: '命令名称由 [Store Middleware](/zh/docs/store-middleware/api/ReduxDevToolsCommand) 提供，需要从该包导入。本例只创建本地命令，把选中的历史编号交给 `jumpTo`，然后恢复那份状态。'
               },
               {
                 type: 'paragraph',
@@ -13577,7 +13577,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools, StoreDevtoolsCommand } from '@migaia/store-devtools'\n\nconst store = createStore({ count: 0 })\nconst tools = createStoreDevTools(store)\nconst saved = tools.record('before-edit')\nstore.count = 3\nstore.$runtime.flush()\nconst command = { type: StoreDevtoolsCommand.jumpToState, id: saved.id }\nif (command.type === StoreDevtoolsCommand.jumpToState) {\n  tools.jumpTo(command.id)\n}\nconsole.log('本地命令选中的数量:', store.count)\n\ntools.dispose()\nawait store.$dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\nimport { ReduxDevToolsCommand } from '@migaia/store-middleware'\n\nconst store = createStore({ count: 0 })\nconst tools = createStoreDevTools(store)\nconst saved = tools.record('before-edit')\nstore.count = 3\nstore.$runtime.flush()\nconst command = { type: ReduxDevToolsCommand.jumpToState, id: saved.id }\nif (command.type === ReduxDevToolsCommand.jumpToState) {\n  tools.jumpTo(command.id)\n}\nconsole.log('本地命令选中的数量:', store.count)\n\ntools.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -13599,7 +13599,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['成员与选项', '说明'],
                 rows: [
                   [
-                    "`StoreDevtoolsCommand.dispatch: 'DISPATCH'`",
+                    "`ReduxDevToolsCommand.dispatch: 'DISPATCH'`",
                     '提供命令名。外部消息如何解析、允许哪些操作，由应用的连接层处理。'
                   ],
                   ["`commit: 'COMMIT'`", '常量本身不会提交或清空历史。应用决定如何建立当前基线。'],
@@ -13620,14 +13620,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '由业务决定重置状态，不能把清空诊断记录的 clear 当作业务状态重置。'
                   ],
                   [
-                    '`IStoreDevtoolsCommand`',
+                    '`IReduxDevToolsCommand`',
                     '上面六个字符串的值类型。常量表没有监听器、连接或发送方法。'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '本包没有消费这些常量的命令执行器。外部面板的消息格式、连接和 id 转换都由应用负责；需要完整扩展接入时，查看 [Store Middleware](/zh/docs/store-middleware) 的连接能力。'
+                text: '本包只记录和恢复本地状态，不导出这些命令常量。外部面板的消息解析、连接和编号转换由应用或 [Store Middleware 的扩展适配器](/zh/docs/store-middleware/api/createReduxDevToolsAdapter) 处理。'
               }
             ]
           }
@@ -13655,7 +13655,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'This command is local application data. The example passes the selected history id to jumpTo, without a browser-extension connection or external message send.'
+                text: 'Import the command names from [Store Middleware](/en/docs/store-middleware/api/ReduxDevToolsCommand), which owns the extension protocol. This example creates a local command and passes its selected history entry to `jumpTo`, restoring that state.'
               },
               {
                 type: 'paragraph',
@@ -13664,7 +13664,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools, StoreDevtoolsCommand } from '@migaia/store-devtools'\n\nconst store = createStore({ count: 0 })\nconst tools = createStoreDevTools(store)\nconst saved = tools.record('before-edit')\nstore.count = 3\nstore.$runtime.flush()\nconst command = { type: StoreDevtoolsCommand.jumpToState, id: saved.id }\nif (command.type === StoreDevtoolsCommand.jumpToState) {\n  tools.jumpTo(command.id)\n}\nconsole.log('Count selected by local command:', store.count)\n\ntools.dispose()\nawait store.$dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStoreDevTools } from '@migaia/store-devtools'\nimport { ReduxDevToolsCommand } from '@migaia/store-middleware'\n\nconst store = createStore({ count: 0 })\nconst tools = createStoreDevTools(store)\nconst saved = tools.record('before-edit')\nstore.count = 3\nstore.$runtime.flush()\nconst command = { type: ReduxDevToolsCommand.jumpToState, id: saved.id }\nif (command.type === ReduxDevToolsCommand.jumpToState) {\n  tools.jumpTo(command.id)\n}\nconsole.log('Count selected by local command:', store.count)\n\ntools.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -13686,7 +13686,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Member or option', 'Description'],
                 rows: [
                   [
-                    "`StoreDevtoolsCommand.dispatch: 'DISPATCH'`",
+                    "`ReduxDevToolsCommand.dispatch: 'DISPATCH'`",
                     'Provides a command name. The application integration handles parsing and allowed operations.'
                   ],
                   [
@@ -13710,14 +13710,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'The application defines state reset. Clearing diagnostic records is not a reset of business state.'
                   ],
                   [
-                    '`IStoreDevtoolsCommand`',
+                    '`IReduxDevToolsCommand`',
                     'The value type for these six strings. The table supplies no listener, connection, or sender.'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'This package has no command executor consuming these constants. Applications own external formats, connections, and id mapping. For extension integration, see the connection facilities in [Store Middleware](/en/docs/store-middleware).'
+                text: 'This package records and restores local state; it does not export these command constants. Handle external message formats, connections, and entry IDs in your application or use the [Store Middleware extension adapter](/en/docs/store-middleware/api/createReduxDevToolsAdapter).'
               }
             ]
           }
@@ -38451,11 +38451,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '列出 coroutine、thread 和 process 名称。'
                   ],
                   [
-                    '[TrayInstanceState](/zh/docs/tray/api/TrayInstanceState-const)',
+                    '[TrayInstanceState](/zh/docs/tray/api/TrayInstanceState)',
                     '提供实例状态的固定名称。'
                   ],
                   [
-                    '[TrayInstanceEvent](/zh/docs/tray/api/TrayInstanceEvent-const)',
+                    '[TrayInstanceEvent](/zh/docs/tray/api/TrayInstanceEvent)',
                     '提供生命周期事件的固定名称。'
                   ],
                   [
@@ -38626,11 +38626,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'List the coroutine, thread, and process runtime names.'
                   ],
                   [
-                    '[TrayInstanceState](/en/docs/tray/api/TrayInstanceState-const)',
+                    '[TrayInstanceState](/en/docs/tray/api/TrayInstanceState)',
                     'Provide stable instance-state names.'
                   ],
                   [
-                    '[TrayInstanceEvent](/en/docs/tray/api/TrayInstanceEvent-const)',
+                    '[TrayInstanceEvent](/en/docs/tray/api/TrayInstanceEvent)',
                     'Provide stable lifecycle-event names.'
                   ],
                   [
@@ -48518,12 +48518,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '定义存储插件及可复用功能。'
                   ],
                   [
-                    '[assertStorageBackendId](/zh/docs/storage-web/api/host/assertStorageBackendId) / [pluginNameFromBackendId](/zh/docs/storage-web/api/host/pluginNameFromBackendId) / [reactiveAdapterNameFromBackendId](/zh/docs/storage-web/api/host/reactiveAdapterNameFromBackendId)',
-                    '检查后端 ID 并生成注册名称。'
-                  ],
-                  [
-                    '[readStorageNativePluginMetadata](/zh/docs/storage-web/api/host/readStorageNativePluginMetadata)',
-                    '读取本包创建的插件信息，未知对象返回 `undefined`。'
+                    '[assertStorageBackendId](/zh/docs/storage-web/api/host/assertStorageBackendId)',
+                    '检查后端 ID；非法值抛出带 `BACKEND_ID_INVALID` 的 `TypeError`。'
                   ],
                   [
                     '[prepareIndexedDbStore](/zh/docs/storage-web/api/plugins/indexed-db/prepareIndexedDbStore)',
@@ -48656,12 +48652,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Define storage plugins and reusable features.'
                   ],
                   [
-                    '[assertStorageBackendId](/en/docs/storage-web/api/host/assertStorageBackendId) / [pluginNameFromBackendId](/en/docs/storage-web/api/host/pluginNameFromBackendId) / [reactiveAdapterNameFromBackendId](/en/docs/storage-web/api/host/reactiveAdapterNameFromBackendId)',
-                    'Validate backend IDs and derive registration names.'
-                  ],
-                  [
-                    '[readStorageNativePluginMetadata](/en/docs/storage-web/api/host/readStorageNativePluginMetadata)',
-                    'Read plugin metadata created by this package; unknown objects return undefined.'
+                    '[assertStorageBackendId](/en/docs/storage-web/api/host/assertStorageBackendId)',
+                    'Validate a backend ID; invalid values throw a `TypeError` with `BACKEND_ID_INVALID`.'
                   ],
                   [
                     '[prepareIndexedDbStore](/en/docs/storage-web/api/plugins/indexed-db/prepareIndexedDbStore)',
@@ -50983,7 +50975,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'helpers',
-            heading: '插件编写者使用的辅助入口',
+            heading: '检查自定义后端 ID',
             blocks: [
               {
                 type: 'table',
@@ -50992,28 +50984,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`assertStorageBackendId(id: unknown): asserts id is string`',
                     '检查大小写敏感的 ID，以 ASCII 字母开头，后接字母、数字、点、下划线或连字符，总长 `1..64`。失败为带 `BACKEND_ID_INVALID` 的原生 `TypeError`。'
-                  ],
-                  [
-                    '`pluginNameFromBackendId(id: string): string`',
-                    '先检查 ID，再返回 `storage-backend:<大写十六进制>` 名称。'
-                  ],
-                  [
-                    '`reactiveAdapterNameFromBackendId(id: string): string`',
-                    '用同一编码生成 `storage-reactive-adapter:<...>` 名称；无效 ID 报 `BACKEND_ID_INVALID`。'
-                  ],
-                  [
-                    '`STORAGE_LIVE_QUERY_SERVICE_NAME`',
-                    '固定为 `storage-live-query-service`，标记 Host 的共享查询服务注册。'
-                  ],
-                  [
-                    '`readStorageNativePluginMetadata(plugin: object)`',
-                    '已知插件返回 `id`、`backendKind`、`reactiveFeatureName`、`reactiveFeatureReference`、`reactiveExpectedKinds`；未知对象返回 `undefined`。'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '底层插件信息用于安装检查，不要修改或用它构造另一份插件。安装失败的 Promise 通常以 `BACKEND_INSTALL_FAILED` 结束，原始配置、拓扑或插件失败保留在 `cause` 中。详细错误分类见排错页。'
+                text: '为自定义插件选择 ID 后，可先调用 `assertStorageBackendId` 检查拼写。Host 在安装时也会检查 ID；若安装失败，`BACKEND_INSTALL_FAILED` 错误的 `cause` 会保留原始配置或插件错误。详细处理见[关闭与排错](/zh/docs/storage-web/cancellation-errors-and-shutdown)。'
               }
             ]
           }
@@ -51257,7 +51233,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'helpers',
-            heading: 'Helpers for plugin authors',
+            heading: 'Validate custom backend IDs',
             blocks: [
               {
                 type: 'table',
@@ -51266,28 +51242,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`assertStorageBackendId(id: unknown): asserts id is string`',
                     'Checks a case-sensitive ID: an ASCII letter followed by letters, digits, dots, underscores, or hyphens, with length 1..64. Failure is a native TypeError carrying `BACKEND_ID_INVALID`.'
-                  ],
-                  [
-                    '`pluginNameFromBackendId(id: string): string`',
-                    'Validates the ID, then returns a storage-backend name with uppercase hexadecimal encoding.'
-                  ],
-                  [
-                    '`reactiveAdapterNameFromBackendId(id: string): string`',
-                    'Uses the same encoding for a storage-reactive-adapter name; invalid IDs use `BACKEND_ID_INVALID`.'
-                  ],
-                  [
-                    '`STORAGE_LIVE_QUERY_SERVICE_NAME`',
-                    'Is fixed to storage-live-query-service, naming the Host’s shared query-service registration.'
-                  ],
-                  [
-                    '`readStorageNativePluginMetadata(plugin: object)`',
-                    'Returns id, backendKind, reactiveFeatureName, reactiveFeatureReference, and reactiveExpectedKinds for a known plugin, or undefined for an unknown object.'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'Low-level plugin metadata supports installation checks; do not modify it or reconstruct a plugin from it. Installation failure usually ends the Promise with `BACKEND_INSTALL_FAILED`, retaining configuration, topology, or plugin failures on cause. See troubleshooting for error classification.'
+                text: 'Call `assertStorageBackendId` after choosing an ID for a custom plugin to check its spelling before installation. The Host also checks IDs when installing. An installation failure uses `BACKEND_INSTALL_FAILED` and keeps the original configuration or plugin error in `cause`; see [shutdown and troubleshooting](/en/docs/storage-web/cancellation-errors-and-shutdown).'
               }
             ]
           }
@@ -70775,14 +70735,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '[SerializeCodecError](/zh/docs/serialize/api/core/SerializeCodecError)'
                   ],
                   [
-                    '`assertCodecVersion()` / `createCodecError()` / `normalizeCodecFailure()`',
-                    '帮助格式实现检查版本和保留原始失败。',
-                    '[assertCodecVersion](/zh/docs/serialize/api/codec/assertCodecVersion)'
+                    '`normalizeCodecFailure()`',
+                    '为自定义格式保留已有错误码，或把外部失败放进新错误的 `cause`。',
+                    '[normalizeCodecFailure](/zh/docs/serialize/api/codec/normalizeCodecFailure)'
                   ],
                   [
-                    '`identityCodec` / `identityCodecV1`',
+                    '`identityCodec`',
                     '直接传递原值，不转换或复制它。',
-                    '[identityCodec](/zh/docs/serialize/api/codecs/identity/identityCodec)'
+                    '[identityCodec](/zh/docs/serialize/api/codecs/identity/v1/identityCodec)'
                   ]
                 ]
               }
@@ -70937,14 +70897,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '[SerializeCodecError](/en/docs/serialize/api/core/SerializeCodecError)'
                   ],
                   [
-                    '`assertCodecVersion()` / `createCodecError()` / `normalizeCodecFailure()`',
-                    'Helps format implementations validate versions and retain the original failure.',
-                    '[assertCodecVersion](/en/docs/serialize/api/codec/assertCodecVersion)'
+                    '`normalizeCodecFailure()`',
+                    'Retains an existing codec error or keeps a foreign failure as the cause of a new error.',
+                    '[normalizeCodecFailure](/en/docs/serialize/api/codec/normalizeCodecFailure)'
                   ],
                   [
-                    '`identityCodec` / `identityCodecV1`',
+                    '`identityCodec`',
                     'Passes the original value through without converting or copying it.',
-                    '[identityCodec](/en/docs/serialize/api/codecs/identity/identityCodec)'
+                    '[identityCodec](/en/docs/serialize/api/codecs/identity/v1/identityCodec)'
                   ]
                 ]
               }
@@ -73550,15 +73510,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`identityCodec`',
-                    "从 `@migaia/serialize/codecs/identity/v1` 或 `@migaia/serialize/codecs/identity` 导入。它固定为 `version: 1`、`id: 'identity'`。"
+                    "从 `@migaia/serialize/codecs/identity/v1` 导入。它固定为 `version: 1`、`id: 'identity'`。"
                   ],
                   [
                     '`identityCodec.encode<T>(value)` / `decode<T>(value)`',
                     '原样返回输入，保留具体 TypeScript 类型，也保留同一个运行时对象。它不复制、不校验数据。'
-                  ],
-                  [
-                    '`identityCodecV1`',
-                    '旧名称可从 `/codec` 或 `/codecs/identity` 导入，指向与 `identityCodec` 相同的对象。'
                   ]
                 ]
               }
@@ -73576,14 +73532,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['辅助 API', '参数与结果'],
                 rows: [
-                  [
-                    '`assertCodecVersion(version): TVersion`',
-                    '正安全整数原样返回并保留字面量类型，其他值抛 `TypeError`，附 `INVALID_OPTION`。'
-                  ],
-                  [
-                    '`createCodecError(code, message, cause?): Error`',
-                    '前创建带 `@migaia/serialize` 来源及指定码的原生 `TypeError`，可选的原始失败放在 `cause`。'
-                  ],
                   [
                     '`normalizeCodecFailure(error, code, message): Error`',
                     '已经是本包来源且具有字符串码的 `Error` 原样返回，其他值用新的 `TypeError` 包装并保留 `cause`。'
@@ -73805,15 +73753,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`identityCodec`',
-                    "Import it from `@migaia/serialize/codecs/identity/v1` or `@migaia/serialize/codecs/identity`. Its fixed fields are `version: 1` and `id: 'identity'`."
+                    "Import it from `@migaia/serialize/codecs/identity/v1`. Its fixed fields are `version: 1` and `id: 'identity'`."
                   ],
                   [
                     '`identityCodec.encode<T>(value)` / `decode<T>(value)`',
                     'These return the original input, retaining its concrete TypeScript type and the same runtime object. They neither copy nor validate data.'
-                  ],
-                  [
-                    '`identityCodecV1`',
-                    'The legacy name is available from `/codec` or `/codecs/identity` and points to the same object as `identityCodec`.'
                   ]
                 ]
               }
@@ -73831,14 +73775,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['Helper API', 'Inputs and result'],
                 rows: [
-                  [
-                    '`assertCodecVersion(version): TVersion`',
-                    'Positive safe integers return unchanged with their literal type; other values throw `TypeError` with `INVALID_OPTION`.'
-                  ],
-                  [
-                    '`createCodecError(code, message, cause?): Error`',
-                    'It creates a native `TypeError` with source `@migaia/serialize` and the supplied code, retaining an optional original failure in `cause`.'
-                  ],
                   [
                     '`normalizeCodecFailure(error, code, message): Error`',
                     'An `Error` already carrying this package source and a string code returns unchanged; other values receive a new `TypeError` wrapper with `cause`.'
@@ -95746,7 +95682,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '[TrayInstanceEvent](/zh/docs/tray/api/TrayInstanceEvent-const) 列出六个事件名称；[TrayInstanceState](/zh/docs/tray/api/TrayInstanceState-const) 列出五个当前状态。状态和事件分别用于 list 筛选与观察。'
+                text: '[TrayInstanceEvent](/zh/docs/tray/api/TrayInstanceEvent) 列出六个事件名称；[TrayInstanceState](/zh/docs/tray/api/TrayInstanceState) 列出五个当前状态。状态和事件分别用于 list 筛选与观察。'
               },
               {
                 type: 'table',
@@ -95958,7 +95894,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '[TrayInstanceEvent](/en/docs/tray/api/TrayInstanceEvent-const) lists six event names, while [TrayInstanceState](/en/docs/tray/api/TrayInstanceState-const) lists five current states. Use states for list filters and events for observation.'
+                text: '[TrayInstanceEvent](/en/docs/tray/api/TrayInstanceEvent) lists six event names, while [TrayInstanceState](/en/docs/tray/api/TrayInstanceState) lists five current states. Use states for list filters and events for observation.'
               },
               {
                 type: 'table',

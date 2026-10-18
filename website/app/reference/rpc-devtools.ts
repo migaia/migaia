@@ -759,8 +759,8 @@ export const rpcDevtoolsReference: ILibraryReference = {
     RPC_DEVTOOLS_SOURCE: {
       role: 'error',
       purpose: t(
-        'Canonical error source string @migaia/rpc/devtools. Classify errors using this source together with RpcDevtoolsErrorCode, including native TypeError and lifecycle Error values.',
-        '规范错误来源字符串，与语义错误码一起分类，包括原生类型错误及生命周期错误，不依赖消息文本匹配。'
+        'Compare RPC_DEVTOOLS_SOURCE with an error’s source, then use RpcDevtoolsErrorCode to choose a response. Configuration failures retain their native TypeError type; session failures use Error.',
+        '先把错误的 source 与 RPC_DEVTOOLS_SOURCE 比较，再用 RpcDevtoolsErrorCode 选择处理方式。配置错误保留原生 TypeError 类型，会话错误使用 Error。'
       ),
       example: `import { RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode } from '@migaia/rpc-devtools/contract'
 console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode.closed)`
@@ -1032,8 +1032,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
     },
     IRpcWireError: {
       summary: t(
-        'Alias of external IRpcSerializedError from @migaia/rpc-contract/errors; that package owns canonical source/code, stack, cause and aggregate graph encoding.',
-        '外包规范序列化错误类型的别名，其来源、码、堆栈、原因及聚合图编码均由 `@migaia/rpc-contract/errors` 拥有。'
+        'An alias of [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError). RPC Contract defines how source, code, stack, causes, and grouped errors cross a connection; Devtools uses that same representation.',
+        '[IRpcSerializedError](/zh/docs/rpc-contract/api/errors/IRpcSerializedError) 的别名。RPC Contract 定义来源、错误码、堆栈、原因和多个错误如何跨连接传递；调试工具复用这份表示。'
       ),
       example: recordExample,
       members: {}

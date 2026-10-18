@@ -1685,8 +1685,8 @@ for (const [name, en, zh, example] of [
   ],
   [
     'RPC_REMOTE_ERROR_SOURCE',
-    'Stable error source @migaia/rpc/remote; inspect code with it.',
-    '稳定远程错误来源，应与错误码一起检查，避免混淆其他包的同名错误。',
+    'Compare RPC_REMOTE_ERROR_SOURCE with an error’s source before inspecting code. This identifies errors created by the remote execution layer.',
+    '先把错误的 source 与 RPC_REMOTE_ERROR_SOURCE 比较，再检查 code，确认失败是否由远程执行层创建。',
     `if (error.source === RPC_REMOTE_ERROR_SOURCE) console.error(error.code)`
   ],
   [

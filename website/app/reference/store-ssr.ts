@@ -782,8 +782,8 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
         )
       ],
       summary: t(
-        'Structural store adapter accepted by register, implemented by @migaia/store-light createStore.',
-        '注册方法接受的结构化状态适配器，由轻量状态包工厂实现。'
+        'The store methods required by register. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible store; create it with scope.runtime so the request scope can collect and release it.',
+        'register 所需的存储方法。[Store Light 的 createStore](/zh/docs/store-light/api/createStore) 返回兼容的存储；创建时传入 scope.runtime，请求作用域才能收集并释放它。'
       ),
       example: scopeExample,
       members: {
@@ -845,8 +845,8 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
         )
       ],
       summary: t(
-        'Structural adapter accepted by registerResource; @migaia/resource owns canonical cache/lifecycle semantics.',
-        '资源注册接受的结构化适配器，资源包拥有标准缓存及生命周期语义。'
+        'The resource methods required by registerResource. [Resource](/en/docs/resource/api/Resource) supplies the cache and cleanup behavior; create it with scope.runtime so the request scope can own its cleanup.',
+        'registerResource 所需的资源方法。[Resource](/zh/docs/resource/api/Resource) 提供缓存及清理行为；创建时传入 scope.runtime，请求作用域才能负责清理。'
       ),
       example: resourceExample,
       members: {

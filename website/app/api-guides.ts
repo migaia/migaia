@@ -4152,42 +4152,6 @@ const runtimeCompletionApiGuides = {
     ],
     avoidZh: ['数据有意包含类实例或函数。', '需要静默转换非法可移植输入。']
   }),
-  'serialize:codec:assertCodecVersion': createStorageContractGuide({
-    purposeEn:
-      'Validates a positive safe integer codec version while preserving its literal type. A codec version identifies format behavior and remains separate from a Protobuf schema version.',
-    purposeZh:
-      '验证 codec version 是正安全整数并保留其字面量类型；codec version 标识格式行为，与 Protobuf schema version 分开。',
-    quickStart:
-      "import { assertCodecVersion } from '@migaia/serialize/codec'\n\nconst version = assertCodecVersion(1)\nconsole.log(version)",
-    scenariosEn: [
-      'Admit a declared codec version during construction.',
-      'Validate data at an application-owned serialization boundary.'
-    ],
-    scenariosZh: ['构造期间准入声明的 codec version。', '在应用所属的序列化边界验证数据。'],
-    avoidEn: [
-      'The data intentionally contains class instances or functions.',
-      'The operation must silently coerce invalid portable input.'
-    ],
-    avoidZh: ['数据有意包含类实例或函数。', '需要静默转换非法可移植输入。']
-  }),
-  'serialize:codec:createCodecError': createStorageContractGuide({
-    purposeEn:
-      'Creates a native TypeError with Serialize source and semantic code, keeping the original cause reachable. This helper belongs to codec adapters, whose caller can still inspect the original failure.',
-    purposeZh:
-      '为 codec 适配器建立 Serialize 错误身份并保留原始 cause；已有带码错误保持原样，调用方仍可检查原始失败实例。',
-    quickStart:
-      "import { createCodecError, CodecErrorText } from '@migaia/serialize/codec'\nimport { SerializeErrorCode } from '@migaia/serialize'\n\nconst original = new Error('format callback failed')\nconst error = createCodecError(SerializeErrorCode.decodeFailed, CodecErrorText.decodeFailed, original)\nconsole.error(error, error.cause)",
-    scenariosEn: [
-      'Report a codec callback failure with stable Serialize identity.',
-      'Preserve original diagnostics when adapting a format implementation.'
-    ],
-    scenariosZh: ['使用稳定 Serialize 身份上报 codec 回调失败。', '适配格式实现时保留原始诊断。'],
-    avoidEn: [
-      'The failure belongs to another owner and must pass through unchanged.',
-      'The caller would replace cause with formatted text.'
-    ],
-    avoidZh: ['失败属于其他 owner 且必须原样透传。', '调用方准备把 cause 替换为格式化文本。']
-  }),
   'serialize:codec:normalizeCodecFailure': createStorageContractGuide({
     purposeEn:
       'Retains an already-coded codec error or wraps a foreign callback failure with Serialize identity and the exact original cause. This helper belongs to codec adapters, whose caller can still inspect the original failure.',
@@ -4340,24 +4304,6 @@ const runtimeCompletionApiGuides = {
       'External application tests already provide framework fake timers.'
     ],
     avoidZh: ['生产环境需要真实单调时钟。', '外部应用测试已经提供框架 fake timers。']
-  }),
-  'storage-web:host:readStorageNativePluginMetadata': createStorageContractGuide({
-    purposeEn:
-      'Reads library-owned metadata only for native Storage Web plugins. Foreign objects return undefined; matching metadata reports backend identity and reactive capability expectations without installing the plugin.',
-    purposeZh:
-      '仅读取原生 Storage Web plugin 的包属元数据；外部对象返回 undefined，匹配结果说明 backend 身份与 reactive 能力要求，不安装 plugin。',
-    quickStart:
-      "import { readStorageNativePluginMetadata } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst plugin = memoryBackendPlugin()\nconst metadata = readStorageNativePluginMetadata(plugin)\nconsole.log(metadata?.id, metadata?.backendKind)",
-    scenariosEn: [
-      'Inspect native plugin identity before Host installation.',
-      'Check reactive adapter expectations without opening storage.'
-    ],
-    scenariosZh: ['Host 安装前检查原生 plugin 身份。', '不开启存储地检查 reactive adapter 需求。'],
-    avoidEn: [
-      'A foreign plugin needs to be treated as Storage Web native.',
-      'The caller expects metadata inspection to install a backend.'
-    ],
-    avoidZh: ['希望把外部 plugin 当作 Storage Web 原生。', '希望读取元数据时同时安装 backend。']
   }),
   'storage-web:plugins-indexed-db:prepareIndexedDbStore': createStorageContractGuide({
     purposeEn:
@@ -5845,132 +5791,6 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         whenToUse: '接入 lifecycle diagnostic，同时不改变 primary error。',
         example: 'report'
       }
-    ]
-  }),
-  'storage-web:host:pluginNameFromBackendId': createStorageWebGuide({
-    purposeEn:
-      'Encodes a validated backend ID as a collision-free PluginHost registration name using its ASCII bytes. It keeps user-visible backend identity separate from the internal plugin namespace.',
-    purposeZh:
-      '把 validated backend ID 按 ASCII byte 编码成 collision-free PluginHost registration name，使 user-visible backend identity 与 internal plugin namespace 分离。',
-    quickStart: `import { pluginNameFromBackendId } from '@migaia/storage-web/host'\n\nconst registrationName = pluginNameFromBackendId('cache')\nconsole.log(registrationName) // storage-backend:6361636865`,
-    scenariosEn: [
-      'Host infrastructure needs a deterministic plugin registration key.',
-      'Punctuation in valid IDs must not collide.',
-      'Backend and reactive adapter registrations need separate namespaces.'
-    ],
-    scenariosZh: [
-      'Host infrastructure 需要 deterministic plugin registration key。',
-      'valid ID 中的 punctuation 不能 collision。',
-      'backend 与 reactive adapter registration 需要不同 namespace。'
-    ],
-    avoidEn: [
-      'A human-facing label or URL slug is needed.',
-      'The ID has not passed the public grammar.',
-      'Application persistence depends on the internal registration name.'
-    ],
-    avoidZh: [
-      '需要 human-facing label 或 URL slug。',
-      'ID 尚未通过 public grammar。',
-      'application persistence 依赖 internal registration name。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description: 'Validated backend ID encoded into the internal PluginHost namespace.',
-        defaultValue: 'required',
-        optional: false,
-        type: 'string',
-        whenToUse: 'Derive the canonical backend registration name.',
-        example: "'cache'"
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: '编码进 internal PluginHost namespace 的 validated backend ID。',
-        defaultValue: 'required',
-        optional: false,
-        type: 'string',
-        whenToUse: '派生 canonical backend registration name。',
-        example: "'cache'"
-      }
-    ]
-  }),
-  'storage-web:host:reactiveAdapterNameFromBackendId': createStorageWebGuide({
-    purposeEn:
-      'Derives the canonical internal registration name for one backend reactive adapter while preserving the same validated ID bytes as its backend registration.',
-    purposeZh:
-      '为一个 backend reactive adapter 派生 canonical internal registration name，同时保留与 backend registration 相同的 validated ID bytes。',
-    quickStart: `import { reactiveAdapterNameFromBackendId } from '@migaia/storage-web/host'\n\nconst adapterName = reactiveAdapterNameFromBackendId('cache')\nconsole.log(adapterName) // storage-reactive-adapter:6361636865`,
-    scenariosEn: [
-      'Host materialization installs a reactive adapter beside its backend.',
-      'Cleanup must address the exact adapter registration.',
-      'Diagnostics need a deterministic internal adapter identity.'
-    ],
-    scenariosZh: [
-      'Host materialization 在 backend 旁安装 reactive adapter。',
-      'cleanup 必须定位 exact adapter registration。',
-      'diagnostic 需要 deterministic internal adapter identity。'
-    ],
-    avoidEn: [
-      'The backend has no reactive feature.',
-      'A public backend ID or display label is needed.',
-      'The ID has not been validated.'
-    ],
-    avoidZh: [
-      'backend 没有 reactive feature。',
-      '需要 public backend ID 或 display label。',
-      'ID 尚未验证。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description:
-          'Validated backend ID encoded into the reactive-adapter registration namespace.',
-        defaultValue: 'required',
-        optional: false,
-        type: 'string',
-        whenToUse: 'Address the adapter paired with one installed backend.',
-        example: "'cache'"
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: '编码进 reactive-adapter registration namespace 的 validated backend ID。',
-        defaultValue: 'required',
-        optional: false,
-        type: 'string',
-        whenToUse: '定位与一个 installed backend 配对的 adapter。',
-        example: "'cache'"
-      }
-    ]
-  }),
-  'storage-web:host:STORAGE_LIVE_QUERY_SERVICE_NAME': createStorageWebGuide({
-    purposeEn:
-      'The stable internal provider name for the single Host-wide live-query service. Topology compilation injects this synthetic dependency when a candidate plugin declares reactive capability.',
-    purposeZh:
-      'Host-wide singleton live-query service 的稳定 internal provider name。candidate plugin 声明 reactive capability 时，topology compilation 会注入这个 synthetic dependency。',
-    quickStart: `import { STORAGE_LIVE_QUERY_SERVICE_NAME } from '@migaia/storage-web/host'\n\nconst providerIds = [STORAGE_LIVE_QUERY_SERVICE_NAME]\nconst ownsService = providerIds.includes(STORAGE_LIVE_QUERY_SERVICE_NAME)\nconsole.log(ownsService) // true: 当前 provider 列表包含 Host 共享服务`,
-    scenariosEn: [
-      'Host topology infrastructure identifies the shared service provider.',
-      'Tests assert singleton service admission.',
-      'Diagnostics distinguish service registration from backend adapters.'
-    ],
-    scenariosZh: [
-      'Host topology infrastructure 标识 shared service provider。',
-      '测试断言 singleton service admission。',
-      'diagnostic 区分 service registration 与 backend adapter。'
-    ],
-    avoidEn: [
-      'Application code is creating a live query; use Host APIs.',
-      'A backend or adapter instance ID is needed.',
-      'The value should be changed or namespaced by the caller.'
-    ],
-    avoidZh: [
-      'application code 正在创建 live query；使用 Host API。',
-      '需要 backend 或 adapter instance ID。',
-      'caller 打算改变该值或额外 namespace。'
     ]
   }),
   'storage-web:index:lengthPrefixedNamespaceCodec': createStorageWebGuide({

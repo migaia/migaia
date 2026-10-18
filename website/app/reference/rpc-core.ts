@@ -1295,8 +1295,8 @@ domain(
 symbols.RPC_CORE_ERROR_SOURCE = {
   role: 'error',
   purpose: t(
-    'Stable semantic source @migaia/rpc/core identifies errors minted by the actual Core owner; copied properties alone do not grant local control identity.',
-    '稳定语义来源 `@migaia/rpc/core` 标识实际核心所有者创建的错误，仅复制属性不能取得本地控制身份。'
+    'Compare RPC_CORE_ERROR_SOURCE with an error’s source, then inspect code to classify a Core failure. Copying these fields does not give an error the private identity needed to control a local operation.',
+    '先把错误的 source 与 RPC_CORE_ERROR_SOURCE 比较，再按 code 区分核心调用失败。复制这两个字段不会取得控制本地操作所需的内部错误身份。'
   ),
   example: 'if (isRpcError(error)) console.log(error.source, error.code)'
 }
@@ -1918,8 +1918,8 @@ types.IRpcFeatureDefinition = typeDoc(
 for (const [name, en, zh] of [
   [
     'IRpcFeature',
-    'Opaque genuine @migaia/plugin-host feature token; its identity owns installation and direct dependency outputs.',
-    '不透明真实原生功能令牌，其身份拥有安装及直接依赖输出。'
+    'A feature token created by [Plugin Host](/en/docs/plugin-host/api/defineFeature). Pass the original token when declaring dependencies so installation can find the matching feature output.',
+    '由 [Plugin Host](/zh/docs/plugin-host/api/defineFeature) 创建的功能令牌。声明依赖时传入原令牌，安装过程才能找到对应功能的输出。'
   ],
   [
     'IRpcFeatureSurface',
@@ -1933,8 +1933,8 @@ for (const [name, en, zh] of [
   ],
   [
     'IRpcNativeMiddleware',
-    'Genuine @migaia/plugin-host definition retaining original plugin identity, dependency typing and public output projection.',
-    '保留原插件身份、依赖类型及公开输出投影的真实原生定义。'
+    'A plugin definition created by [Plugin Host](/en/docs/plugin-host/api/definePlugin). Endpoint composition keeps its identity, dependency types, and published methods when installing it.',
+    '由 [Plugin Host](/zh/docs/plugin-host/api/definePlugin) 创建的插件定义。端点安装它时保留原插件身份、依赖类型和公开方法。'
   ]
 ] as const)
   types[name] = typeDoc(en, zh, {}, featureExample)
