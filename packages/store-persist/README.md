@@ -10,7 +10,7 @@
 
 依赖关系：
 
-- `@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils` 是运行时必需依赖。
+- `@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils`、`@migaia/lifecycle` 是运行时必需依赖。
 - `@migaia/storage-web` 仅在接入其 backend 或 codec 时安装。
 - `@migaia/store-light`、`@migaia/store-keyed`、`@migaia/store-indexed` 是可选 peer dependency；只安装当前状态模型使用的包。
 
@@ -151,7 +151,7 @@ const { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {
 const deletedCount = await clearFamily(storage, 'sessions');
 ```
 
-签名：`(storage: IPersistStorage, namespace: string) => Promise<number>`；两个参数均必填，无可选项，返回实际删除的条目数。
+签名：`(storage: IPersistStorage, namespace: string) => Promise<number>`；两个参数均必填，无可选项，返回枚举时匹配此前缀的记录数，不是成功 remove 的独占计数。
 
 ---
 
@@ -159,7 +159,7 @@ const deletedCount = await clearFamily(storage, 'sessions');
 
 ## `IPersistHandle`：三条路径共用的返回值
 
-`persist()`/`persistCollection()` 返回完整 `IPersistHandle`；`persistKeyed()` 只返回 `{ value, dispose() }`。
+`persist()`/`persistCollection()` 返回完整 `IPersistHandle`；`persistKeyed()` 返回完整 handle，加只读的初始 `value` 快照。
 
 **`handle.ready` / `handle.settled`｜3 秒上手**：
 
@@ -258,3 +258,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ```
 
 `maxWaitMs` 限制防抖后请求写入的时间，不限制串行队列或存储适配器的实际完成时间。`flush()`、`clear()`、`dispose()` 都取消当前防抖窗口；卸载前尚未触发的最新快照仍会发起最终写入，最终失败保留在 `writeError`，即使状态已是 disposed。计时和取消能力分别复用 scheduler 与 lifecycle 的原生 controller 工厂；原生 signal、默认 AbortError reason 与持久化失败的原始 cause 保持不变。
+
+API convergence：移除重复类型 IPersistCodecOutput，类型消费者直接使用 `@migaia/storage-contract` 的 ICodecOutput；PersistCodecOutput 运行时词表保留。PersistState.active 与 IPersistState 的 active 成员收回，私有开放状态只作布尔 reactive projection，不对外返回或新增状态名。其他公开状态和四个入口保持，外部旧类型/成员引用需破坏版本迁移，无兼容 alias。

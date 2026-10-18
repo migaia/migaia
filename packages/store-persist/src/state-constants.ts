@@ -1,7 +1,6 @@
-/** Persistence unit lifecycle states. */
+/** Public persistence hydration, write and terminal status vocabulary. */
 export const PersistState = {
   idle: 'idle',
-  active: 'active',
   loading: 'loading',
   writing: 'writing',
   ready: 'ready',
@@ -18,4 +17,3 @@ export const PersistCodecOutput = {
 } as const
 
 export type IPersistState = (typeof PersistState)[keyof typeof PersistState]
-export type IPersistCodecOutput = (typeof PersistCodecOutput)[keyof typeof PersistCodecOutput]

@@ -258,11 +258,10 @@ export function persistUnit<TState>(
   const hydrationError = runtime.signal<unknown>(undefined)
   const writeStatus = runtime.signal<IWriteStatus>(PersistState.idle)
   const writeError = runtime.signal<unknown>(undefined)
-  const lifecycleStatus = runtime.signal<typeof PersistState.active | typeof PersistState.disposed>(
-    PersistState.active
-  )
+  /** Reactive terminal projection only; the internal open marker is not a public status value. */
+  const lifecycleDisposed = runtime.signal<boolean>(false)
   const status = runtime.computed<IPersistStatus>(() => {
-    if (lifecycleStatus.value === PersistState.disposed) return PersistState.disposed
+    if (lifecycleDisposed.value) return PersistState.disposed
     if (hydrationStatus.value === PersistState.loading) return PersistState.loading
     if (hydrationStatus.value === PersistState.error || writeStatus.value === PersistState.error)
       return PersistState.error
@@ -299,6 +298,10 @@ export function persistUnit<TState>(
   const hydrationStartSnapshot = unit.snapshot()
   // 串行写队列：所有写入排成一条链，避免异步存储下"慢的旧写入后完成、覆盖新写入"的乱序问题。
   let writeChain: Promise<void> = Promise.resolve()
+  /**
+   * Actual unsettled write result shared by strict flush and background callers; recovery is
+   * separate.
+   */
   let writeDrain: Promise<void> | undefined
   let writeRequested = false
 
@@ -340,7 +343,8 @@ export function persistUnit<TState>(
     }
   }
 
-  function enqueueWrite(rejectOnError = false): Promise<void> {
+  /** Coalesces requests under one observable drain, including its original rejection. */
+  function enqueueWrite(): Promise<void> {
     writeRequested = true
     // A strict flush must observe the currently running debounced write itself;
     // chaining after writeChain would only see its error-swallowing recovery promise.
@@ -361,17 +365,15 @@ export function persistUnit<TState>(
       }
     })
     writeChain = operation.catch(() => undefined)
-    if (!rejectOnError) {
-      writeDrain = operation
-      void operation.then(
-        () => {
-          if (writeDrain === operation) writeDrain = undefined
-        },
-        () => {
-          if (writeDrain === operation) writeDrain = undefined
-        }
-      )
-    }
+    writeDrain = operation
+    void operation.then(
+      () => {
+        if (writeDrain === operation) writeDrain = undefined
+      },
+      () => {
+        if (writeDrain === operation) writeDrain = undefined
+      }
+    )
     return operation
   }
 
@@ -447,7 +449,7 @@ export function persistUnit<TState>(
       const raw = await runAdapterOperation((signal) =>
         readEnvelope(storage, key, codec, { signal })
       )
-      if (disposed) return
+      assertActive()
       if (raw !== undefined) {
         const envelope = assertEnvelope<Partial<TState>>(raw, key)
         let state = envelope.state
@@ -479,6 +481,7 @@ export function persistUnit<TState>(
           hydrating = false
         }
       }
+      assertActive()
       hydrationStatus.value = PersistState.success
       hydrationError.value = undefined
       hydrationSettled = true
@@ -486,7 +489,7 @@ export function persistUnit<TState>(
       dirtyDuringHydrate = false
       if (shouldWriteAfterHydrate) scheduleWrite()
     } catch (caught) {
-      if (disposed) return
+      if (disposed) throw caught
       hydrationError.value = caught
       hydrationStatus.value = PersistState.error
       hydrationSettled = true
@@ -495,12 +498,10 @@ export function persistUnit<TState>(
     }
   }
 
-  const settled = hydrateAttempt().catch(() => undefined)
-
-  const ready = settled.then(() => {
-    if (hydrationStatus.value === PersistState.error) throw hydrationError.value
-  })
-  void ready.catch(() => undefined)
+  /** The original attempt owns readiness success/rejection, including disposal cancellation. */
+  const ready = hydrateAttempt()
+  /** Background barriers may always settle without changing the public attempt result. */
+  const settled = ready.catch(() => undefined)
 
   return {
     status,
@@ -538,7 +539,7 @@ export function persistUnit<TState>(
       // late storage failure must remain reachable as the AbortError cause.
       if (pendingWrite) await pendingWrite
       assertActive()
-      await enqueueWrite(true)
+      await enqueueWrite()
       assertActive()
     },
     async clear() {
@@ -567,7 +568,7 @@ export function persistUnit<TState>(
       for (const controller of activeOperations) controller.abort()
       activeOperations.clear()
       writeStatus.value = PersistState.disposed
-      lifecycleStatus.value = PersistState.disposed
+      lifecycleDisposed.value = true
       if (clearWriteTimer()) {
         // A pending debounced write still owes storage the latest state.
         startFinalWrite()

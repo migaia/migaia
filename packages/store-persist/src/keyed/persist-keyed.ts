@@ -74,10 +74,8 @@ export function persistKeyed<T>(
     maxWaitMs: snapshot.maxWaitMs,
     scheduler: snapshot.scheduler
   })
-  return {
-    ...handle,
-    value
-  }
+  // Extend the actual engine handle so live getters retain their original descriptors and owner.
+  return Object.assign(handle, { value })
 }
 
 /**

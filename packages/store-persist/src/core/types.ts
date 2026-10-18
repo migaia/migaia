@@ -46,7 +46,7 @@ export type IPersistHandle = {
   hydrationError: IReadonlyPersistValue<unknown>
   writeStatus: IReadonlyPersistValue<IWriteStatus>
   writeError: IReadonlyPersistValue<unknown>
-  /** Resolves when hydration succeeds and rejects when hydration fails. */
+  /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */
   ready: Promise<void>
   /** Resolves after hydration, whether it succeeds or fails. */
   settled: Promise<void>

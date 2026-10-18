@@ -40,7 +40,12 @@ export function snapshotPersistOptions<T extends object>(options: T): T {
   try {
     const snapshot: Record<PropertyKey, unknown> = {}
     for (const [key, descriptor] of Object.entries(descriptorSnapshot.descriptors)) {
-      snapshot[key] = 'get' in descriptor ? descriptor.get?.() : descriptor.value
+      snapshot[key] =
+        'get' in descriptor
+          ? descriptor.get === undefined
+            ? undefined
+            : Reflect.apply(descriptor.get, options, [])
+          : descriptor.value
     }
     return snapshot as T
   } catch (error) {

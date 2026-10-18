@@ -11,13 +11,17 @@ import { StorePersistErrorCode } from '../error-code.js'
 import { PersistCodecOutput } from '../state-constants.js'
 import { StorePersistErrorText } from '../error-text.js'
 
+/** Exact legacy one-key archive marker; extra fields remain ordinary user data. */
 const MAP_TAG = '__migaia_persist_map__'
+/** Exact legacy Set archive marker; the current writer uses canonical versioned tuples. */
 const SET_TAG = '__migaia_persist_set__'
 
 /** Explicitly recognizes only the two legacy tags; ordinary JSON never enters this migration path. */
 function legacyReviver(_key: string, value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
+    /** Only sole-marker records belong to the reserved legacy archive grammar. */
     const record = value as Record<string, unknown>
+    if (Object.keys(record).length !== 1) return value
     if (Object.hasOwn(record, MAP_TAG) && Array.isArray(record[MAP_TAG]))
       return new Map(record[MAP_TAG] as [unknown, unknown][])
     if (Object.hasOwn(record, SET_TAG) && Array.isArray(record[SET_TAG]))
@@ -54,7 +58,9 @@ export const defaultJsonCodec: ICodec = Object.freeze({
     try {
       /** Legacy detection is explicit and exact; unrecognized lookalikes remain ordinary JSON. */
       let legacyFound = false
+      /** Preserve legacy application arrays instead of interpreting them as new-format tuples. */
       const parsed = JSON.parse(raw, (key, value: unknown) => {
+        /** A changed value identifies an exact legacy marker in this archive. */
         const migrated = legacyReviver(key, value)
         if (migrated !== value) legacyFound = true
         return migrated
