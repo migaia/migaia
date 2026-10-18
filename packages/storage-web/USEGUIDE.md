@@ -1098,7 +1098,7 @@ fallback 写约束使用与原生 sidecar 相同的逻辑唯一键判定。recor
 
 KV-only 写入先编码并物化原始文本快照，在宿主锁内重新核对快照后提交；应用 schema/codec 回调在锁外执行。准备期间竞争提交导致 `TRANSACTION_CONFLICT`，调用方可重试完整操作；稳定快照中的重复 owner 为 `INDEX_UNIQUE_CONFLICT`。fallback 为约束检查增加全扫描和对应 schema/projection 读取；不增加持久化 sidecar。新写路径中的 selector 普通异常通过既有 `EXTENSION_FAILED` 边界保留原 cause，原生 backfill 的原对象透传保持。
 
-跨页面 KV 提交已验证 Chromium/WebKit 的原生 Web Locks 路径。宿主没有 Web Locks 时，Lifecycle 队列仅协调同一模块实例的调用；这种环境下跨 realm/模块共享 KV 的全局保证仍是未闭合的契约裁定，不能宣称已验证。全部后端仍可使用原有 API，`secondaryIndexes` 能力位不变。
+跨页面 KV 提交由宿主 Web Locks 串行，已在 Chromium/WebKit 双页验证；现代浏览器均提供 Web Locks。没有宿主锁的注入端口（Node、测试）只在同一模块实例内串行。服务端改写的 cookie 以服务端为准，不在唯一约束范围内。全部后端仍可使用原有 API，`secondaryIndexes` 能力位不变。
 
 
 ---

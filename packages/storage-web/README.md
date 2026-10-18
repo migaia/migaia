@@ -360,7 +360,7 @@ await preferences.get('appearance') // { id: 'appearance', theme: 'dark' }
 
 非原生 unique 写入也执行约束：record 后端在既有事务内校验最终草稿；KV 后端在 schema/codec 准备后核对原始文本快照，并通过宿主 Web Locks 串行提交。已有键由另一记录占用时报 `INDEX_UNIQUE_CONFLICT`；准备期间快照发生变化时返回可重试的 `TRANSACTION_CONFLICT`。batch 可先写入再删除旧所有者，按最终草稿判断；失败不提交草稿。
 
-实现边界：无 Web Locks 的注入/隔离端口使用本模块的 Lifecycle 队列。缺少宿主锁时，跨 realm 或跨模块实例共享 KV 的全局唯一性尚未闭合，不能把同一队列的运行证据当作全局保证；该环境策略仍待裁定。此实现没有拒绝某一类 KV 后端。
+支持范围：跨页面的唯一性由宿主 Web Locks 保证，现代浏览器均已提供。没有宿主锁的注入端口（Node、测试）只在同一模块实例内串行提交。服务端改写的 cookie 以服务端为准，不在该约束范围内。
 
 ---
 
