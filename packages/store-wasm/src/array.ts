@@ -7,14 +7,15 @@ import {
   throwWasmConstructionFailure
 } from './arena.js'
 import {
+  assertWasmFieldNotAborted,
   createStoreWasmError,
   createStoreWasmRangeError,
   createStoreWasmTypeError,
+  identifyStoreWasmFailure,
   StoreWasmErrorCode
 } from './errors.js'
-import type { number as numberBuilder } from './number.js'
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
-import { WasmFieldMode } from './field-constants.js'
+import { StoreFieldMode } from '@migaia/store-light'
 import { StoreWasmErrorText } from './error-text.js'
 
 const DEFAULT_GRANULARITY = 64
@@ -29,9 +30,8 @@ export type IWasmArrayField = IDisposable & {
   view(): Float64Array
 }
 
-// Currently supports only `number()` items. `granularity` sets indices per shared `Source`; it defaults to 64, and 1 tracks each index.
+/** Builds a fixed f64 array; granularity shares one graph Source per bucket, defaulting to 64. */
 export function array(
-  _item: ReturnType<typeof numberBuilder>,
   length: number,
   granularity: number = DEFAULT_GRANULARITY
 ): IFieldBuilder<IWasmArrayField> {
@@ -49,14 +49,13 @@ export function array(
   }
   return {
     [FIELD_BUILDER]: true,
-    mode: WasmFieldMode.sync,
+    mode: StoreFieldMode.sync,
     create({ signal, createSource, runtime }: IFieldContext): IWasmArrayField {
       const block = allocateOwnedSync(length * 8)
       const { memory, ptr } = block
       const buckets: Array<IFieldSource | undefined> = []
       try {
-        if (signal.aborted)
-          throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
+        assertWasmFieldNotAborted(signal)
         // Float64Array(buffer, ptr, len) 要求 ptr % 8 === 0，否则抛 RangeError。显式校验，别依赖 allocator 巧合。
         if (length > 0 && ptr % 8 !== 0) {
           throw createStoreWasmError(
@@ -122,7 +121,8 @@ export function array(
             const memoryView = raw()
             if (Object.is(memoryView[i], v)) return
             bucketOf(i).commit(() => {
-              memoryView[i] = v
+              // The Source owner may grow native memory before invoking this write callback.
+              raw()[i] = v
             })
           },
           setRange(lo, hi, values) {
@@ -145,21 +145,30 @@ export function array(
                 StoreWasmErrorText.rangeValuesInvalid
               )
             }
-            if (values.length !== hi - lo) {
-              throw createStoreWasmRangeError(
-                StoreWasmErrorCode.invalidOption,
-                StoreWasmErrorText.rangeValueLength
-              )
-            }
+            /** Materialize every input before native writes; failed getters remain classified. */
             const pendingValues: number[] = []
-            for (let i = lo; i < hi; i++) {
-              const next = values[i - lo]
-              if (typeof next !== 'number')
-                throw createStoreWasmTypeError(
+            try {
+              if (values.length !== hi - lo) {
+                throw createStoreWasmRangeError(
                   StoreWasmErrorCode.invalidOption,
-                  StoreWasmErrorText.valueType('array', 'number')
+                  StoreWasmErrorText.rangeValueLength
                 )
-              pendingValues.push(next)
+              }
+              for (let i = lo; i < hi; i++) {
+                const next = values[i - lo]
+                if (typeof next !== 'number')
+                  throw createStoreWasmTypeError(
+                    StoreWasmErrorCode.invalidOption,
+                    StoreWasmErrorText.valueType('array', 'number')
+                  )
+                pendingValues.push(next)
+              }
+            } catch (error) {
+              throw identifyStoreWasmFailure(
+                error,
+                StoreWasmErrorCode.invalidOption,
+                StoreWasmErrorText.rangeValuesInvalid
+              )
             }
             const memoryView = raw()
             const touched = new Map<IFieldSource, Array<[number, number, number]>>()

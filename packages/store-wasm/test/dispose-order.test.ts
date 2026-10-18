@@ -128,7 +128,7 @@ describe('array normal dispose order (M-T35)', () => {
 
   it('正常 dispose() 先释放子资源再 dealloc block，与回滚路径一致', async () => {
     const runtime = createRuntime()
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime,
       signal: new AbortController().signal,
       createSource: () => ({
@@ -165,7 +165,7 @@ describe('array construction-failure rollback (M-T34)', () => {
     controller.abort()
     const runtime = createRuntime()
     expect(() =>
-      array(number(), 4, 2).create({
+      array(4, 2).create({
         runtime,
         signal: controller.signal,
         createSource: () => ({
@@ -244,7 +244,7 @@ describe('single-source field cleanup matrix', () => {
   it('attempts the source and block cleanup for array when the source fails', async () => {
     const runtime = createRuntime()
     const sourceError = new Error('array source cleanup failed')
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime,
       signal: new AbortController().signal,
       createSource: () => ({

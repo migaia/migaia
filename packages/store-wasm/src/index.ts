@@ -10,10 +10,13 @@ export { record } from './record.js'
  */
 export { ensureWasm } from './arena.js'
 
-export * from './errors.js'
 export {
-  WasmFieldMode,
-  WasmReservedKey,
-  type IWasmFieldMode,
-  type IWasmReservedKey
-} from './field-constants.js'
+  createStoreWasmError,
+  createStoreWasmRangeError,
+  createStoreWasmTypeError,
+  createStoreWasmAggregateError,
+  StoreWasmErrorCode,
+  STORE_WASM_SOURCE,
+  type IStoreWasmErrorCode
+} from './errors.js'
+export { WasmReservedKey, type IWasmReservedKey } from './field-constants.js'

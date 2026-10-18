@@ -6,9 +6,14 @@ import {
   disposeWasmField,
   throwWasmConstructionFailure
 } from './arena.js'
-import { createStoreWasmError, createStoreWasmTypeError, StoreWasmErrorCode } from './errors.js'
+import {
+  assertWasmFieldNotAborted,
+  createStoreWasmError,
+  createStoreWasmTypeError,
+  StoreWasmErrorCode
+} from './errors.js'
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
-import { WasmFieldMode } from './field-constants.js'
+import { StoreFieldMode } from '@migaia/store-light'
 import { StoreWasmErrorText } from './error-text.js'
 
 export type IWasmBooleanField = IDisposable & {
@@ -19,14 +24,13 @@ export type IWasmBooleanField = IDisposable & {
 export function boolean(): IFieldBuilder<IWasmBooleanField> {
   return {
     [FIELD_BUILDER]: true,
-    mode: WasmFieldMode.sync,
+    mode: StoreFieldMode.sync,
     create({ signal, createSource }: IFieldContext): IWasmBooleanField {
       const block = allocateOwnedSync(1)
       const { memory, ptr } = block
       let source: ReturnType<typeof createSource> | undefined
       try {
-        if (signal.aborted)
-          throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
+        assertWasmFieldNotAborted(signal)
         source = createSource('WasmBoolean')
         let disposed = false
         let disposing = false

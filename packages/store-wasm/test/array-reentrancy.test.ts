@@ -20,7 +20,6 @@ vi.mock('@migaia/wasm', () => ({
 import { ensureWasm } from '../src/arena'
 import { array } from '../src/array'
 import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '../src/errors'
-import { number } from '../src/number'
 
 describe('array setRange memory replacement', () => {
   beforeEach(async () => {
@@ -30,7 +29,7 @@ describe('array setRange memory replacement', () => {
 
   it('resolves a fresh view for each bucket commit after memory.grow', async () => {
     const runtime = createRuntime()
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime,
       signal: new AbortController().signal,
       createSource: () => ({
@@ -53,7 +52,7 @@ describe('array setRange memory replacement', () => {
 
   it('uses the canonical tagged diagnostic for a mismatched range payload', async () => {
     const runtime = createRuntime()
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime,
       signal: new AbortController().signal,
       createSource: () => ({
@@ -78,7 +77,7 @@ describe('array setRange memory replacement', () => {
 
   it('rejects non-array-like range payloads with a tagged TypeError', async () => {
     const runtime = createRuntime()
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime,
       signal: new AbortController().signal,
       createSource: () => ({
@@ -104,7 +103,7 @@ describe('array setRange memory replacement', () => {
   it('validates every range value before creating buckets or committing', async () => {
     const runtime = createRuntime()
     let sourceCount = 0
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime,
       signal: new AbortController().signal,
       createSource: () => {

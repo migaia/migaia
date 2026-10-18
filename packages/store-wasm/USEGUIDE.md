@@ -1,6 +1,6 @@
 # 使用手册
 
-本文是 `@migaia/store-wasm` 的完整参考手册。先看 [README.md](./README.md#4-五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来"，本文讲"每一个字段构造器的精确参数、每一种边界行为、每一条错误信息"。
+本文是 `@migaia/store-wasm` 的完整参考手册。先看 [README.md](./README.md#初始化模块) 的初始化示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来"，本文讲"每一个字段构造器的精确参数、每一种边界行为、每一条错误信息"。
 
 ## 目录
 
@@ -10,7 +10,7 @@
 4. [`number()`](#4-number)
 5. [`boolean()`](#5-boolean)
 6. [`string(maxBytes?)`](#6-stringmaxbytes)
-7. [`array(item, length, granularity?)`](#7-arrayitem-length-granularity)
+7. [`array(length, granularity?)`](#7-arraylength-granularity)
 8. [`record(shape)`](#8-recordshape)
 9. [生命周期与释放](#9-生命周期与释放)
 10. [错误信息完整参考](#10-错误信息完整参考)
@@ -45,7 +45,7 @@ await ensureWasm() // 之后所有字段构造器的 create() 才能同步工作
 
 ## 2. 与 `createStore()` 集成
 
-字段构造器实现的是 `@migaia/store-light` 的 `ISyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明：
+字段构造器实现的是 `@migaia/store-light` 的 `IFieldBuilder` 的 sync 分支 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明：
 
 ```ts
 import { createStore } from '@migaia/store-light'
@@ -57,7 +57,7 @@ const store = createStore({
   hp: number(),
   alive: boolean(),
   name: string(64),
-  hits: array(number(), 1000),
+  hits: array(1000),
   pos: record({ x: number(), y: number() })
 })
 
@@ -96,7 +96,7 @@ function App() {
 }
 ```
 
-`StoreProvider` 的 `config.features.wasm: true` 声明"这棵子树会用到 wasm 字段"；`config.ready` 是子树渲染前必须 settle 的屏障数组，把 `ensureWasm` 传进去之后，`Game` 组件挂载时 WASM 已经保证就绪，组件内部可以直接同步调用 `number()`、`array()` 等构造器，不需要再手动 `await`。如果 `features.wasm` 为 `true` 而 `ready` 留空，`StoreProvider` 会在开发期直接抛错提醒你漏配了就绪屏障——这是 `@migaia/store-react` 侧的行为，不是本包直接抛出的错误，完整语义见该包文档。
+features.wasm=true 且 ready 为空时，normalizer 创建拒绝的 readiness Promise；Provider 随后在 render 读取失败。该行为不受开发/生产环境限制，不是仅开发期的同步配置 throw。
 
 不使用 `StoreProvider` 的场景（Node 脚本、非 React 环境、测试），按 [§1](#1-初始化ensurewasm) 直接手动 `await ensureWasm()` 即可，效果等价。
 
@@ -164,16 +164,15 @@ const field2 = string(64) // 自定义最大字节数
 
 <a id="7-arrayitem-length-granularity"></a>
 
-## 7. `array(item, length, granularity?)`
+## 7. `array(length, granularity?)`
 
 ```ts
-const field = array(number(), 1000) // granularity 默认 64
-const field2 = array(number(), 1000, 1) // 每个 index 独立追踪
+const field = array(1000) // granularity 默认 64
+const field2 = array(1000, 1) // 每个 index 独立追踪
 ```
 
 | 参数          | 类型                        | 必填性 | 默认值 | 约束                                                                                        |
 | ------------- | --------------------------- | ------ | ------ | ------------------------------------------------------------------------------------------- |
-| `item`        | `ReturnType<typeof number>` | 必填   | 无     | **目前只支持 `number()`**；参数存在是为了给数组元素类型占位，未来扩展其他元素类型的接口形状 |
 | `length`      | `number`                    | 必填   | 无     | `[0, floor(0xffff_ffff / 8)]`（即 536,870,911）内的安全整数，否则构造时抛 `RangeError`      |
 | `granularity` | `number`                    | 可选   | `64`   | 必须是正安全整数，否则抛 `RangeError`                                                       |
 
@@ -229,7 +228,7 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 - 底层是一块 `keys.length * 8` 字节的连续分配，每个 key 占 8 字节（`f64`），偏移量按 `shape` 的 key 顺序（`Object.keys` 顺序）依次排列。
 - key 直接以属性访问的方式读写（`field.x = 1`），**不像 `number()`/`boolean()`/`string()` 那样要经过 `.value`**——`record()` 内部把每个 key 定义成了带 getter/setter 的属性，getter/setter 本身就是读写入口。
 - `dispose`/`disposed` 是不可枚举属性，`x`/`y`/`z` 这类业务 key 是可枚举的——对字段做 `for...in`、`Object.keys()`、`JSON.stringify()` 只会看到业务 key，不会意外带出 `dispose`/`disposed`。
-- `shape` 里的 key 若是 `'dispose'` 或 `'disposed'`，构造时立即抛 `TypeError`（这两个名字被字段实例自身的方法/属性占用，不能被业务字段覆盖）。
+- `shape` 里的 key 若是 `'dispose'` 或 `'disposed'`，字段 create(context) 时抛 `TypeError`（这两个名字被字段实例自身的方法/属性占用，不能被业务字段覆盖）。
 
 `record()` 目前不支持嵌套 `record()`、`array()` 或其他复合类型作为字段值——`shape` 的值必须是 `number()` 构造器本身。
 
@@ -254,7 +253,7 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 | --------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------- |
 | `allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数 | `RangeError` | `wasm.allocate: byteLen must fit an unsigned 32-bit integer`                                |
 | 字段构造时 WASM 尚未就绪（未 `await ensureWasm()`）                         | `Error`      | `[store] WASM is not initialized; await ensureWasm() or use StoreProvider`                  |
-| 字段构造时 `context.signal` 已经 aborted                                    | `Error`      | `[store] field init aborted`                                                                |
+| 字段构造时 signal 已 aborted | 原生 reason（通常 DOMException/AbortError）或带 cause 的 Error | 未编码 native reason 原位附 INIT_ABORTED；foreign identity 保留；无法附码时原值在 cause，message/stack 按原值保留 |
 | `number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`                | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
 | `number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`                | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
 | `array()` 字段 dispose 后调用任意方法                                       | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
@@ -287,8 +286,6 @@ import {
   createStoreWasmRangeError,
   createStoreWasmTypeError,
   createStoreWasmAggregateError,
-  WasmFieldMode,
-  type IWasmFieldMode,
   WasmReservedKey,
   type IWasmReservedKey
 } from '@migaia/store-wasm'
@@ -359,19 +356,14 @@ try {
 }
 ```
 
-```ts
-const WasmFieldMode = { sync: 'sync' } as const
-type IWasmFieldMode = 'sync'
-```
-
-字段构造器 `mode` 字段的取值集合，目前只有 `'sync'`——本包全部字段构造器都同步产出字段，`create()` 中不发起任何异步操作（异步初始化已经被 `ensureWasm()` 提前完成）。`createStore()` 依据这个字段判断某个 `FieldBuilder` 能否被同步调用。
+全部字段 builder 使用 store-light 的 StoreFieldMode.sync。若类型注解需要只表达同步分支，使用 typeof StoreFieldMode.sync，不把包含 async 的完整 IStoreFieldMode union 当作旧 sync-only 类型的等价别名。
 
 ```ts
 const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const
 type IWasmReservedKey = 'dispose' | 'disposed'
 ```
 
-`record()` 的 `shape` 禁止使用的 key 集合——这两个名字被字段实例自身的 `dispose()`/`disposed` 占用。`record()` 内部在构造时用这个常量做校验（见 [§8](#8-recordshape)）。
+record shape 保留 dispose/disposed 两个生命周期名；record(shape) 先创建描述，实际字段 create(context) 阶段检查并以 RESERVED_FIELD_NAME TypeError 拒绝，常见触发点是 createStore。
 
 ---
 
@@ -432,3 +424,7 @@ pnpm --filter @migaia/store-wasm build
 ```
 
 这些测试使用假的 WASM provider 验证字段布局、释放顺序、数组重入和公开导出；它们不替代 `@migaia/wasm` 的 Rust 测试。
+
+API convergence：array 改为 array(length, granularity?)，删除从未使用的 item 占位参数，编码仍固定 f64；旧 array(number(), n, g) 必须改 array(n, g)，不保留兼容入口。收回 WasmFieldMode/IWasmFieldMode，内部复用 store-light 的 StoreFieldMode.sync；WasmReservedKey 继续由本包持有。外部旧调用需 breaking 迁移。
+
+边界修复：setAt 在 Source.commit 回调内部刷新当前内存 view。setRange 先读取全部 ArrayLike 输入，getter 失败在未写入前以 INVALID_OPTION 保留 native 原错或 cause。五字段取消共用一个原因保留边界，原生 AbortError 不再换成无 cause 的普通 Error。

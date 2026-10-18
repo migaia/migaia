@@ -1307,7 +1307,6 @@
       ".": [
         "STORE_WASM_SOURCE",
         "StoreWasmErrorCode",
-        "WasmFieldMode",
         "WasmReservedKey",
         "array",
         "boolean",

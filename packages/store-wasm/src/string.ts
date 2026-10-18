@@ -7,13 +7,14 @@ import {
   throwWasmConstructionFailure
 } from './arena.js'
 import {
+  assertWasmFieldNotAborted,
   createStoreWasmError,
   createStoreWasmRangeError,
   createStoreWasmTypeError,
   StoreWasmErrorCode
 } from './errors.js'
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
-import { WasmFieldMode } from './field-constants.js'
+import { StoreFieldMode } from '@migaia/store-light'
 import { StoreWasmErrorText } from './error-text.js'
 
 const DEFAULT_MAX_BYTES = 256
@@ -35,15 +36,14 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
   }
   return {
     [FIELD_BUILDER]: true,
-    mode: WasmFieldMode.sync,
+    mode: StoreFieldMode.sync,
     create({ signal, createSource }: IFieldContext): IWasmStringField {
       // 前 4 字节存长度，后面定长字节缓冲区（固定容量：地址不能因变长而重分配）
       const block = allocateOwnedSync(4 + maxBytes)
       const { memory, ptr } = block
       let source: ReturnType<typeof createSource> | undefined
       try {
-        if (signal.aborted)
-          throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
+        assertWasmFieldNotAborted(signal)
         source = createSource('WasmString')
         let disposed = false
         let disposing = false

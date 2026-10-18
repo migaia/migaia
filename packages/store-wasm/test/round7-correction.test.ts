@@ -70,7 +70,7 @@ describe('Round 7 transactional correction', () => {
     const flag = await boolean().create(ctx)
     const text = await string(32).create(ctx)
     const position = await record({ x: number() }).create(ctx)
-    const items = await array(number(), 2).create(ctx)
+    const items = await array(2).create(ctx)
     numeric.value = 11
     flag.value = true
     text.value = 'before'
@@ -133,7 +133,7 @@ describe('Round 7 transactional correction', () => {
   it('undoes every earlier bucket write when a later range commit fails', async () => {
     const failure = new Error('second bucket rejected')
     let commits = 0
-    const field = await array(number(), 4, 2).create({
+    const field = await array(4, 2).create({
       runtime: createRuntime(),
       signal: new AbortController().signal,
       createSource: () => ({
@@ -186,7 +186,7 @@ describe('Round 7 transactional correction', () => {
       expect(() => field.dispose()).not.toThrow()
     }
 
-    const arrayField = await array(number(), 2).create(
+    const arrayField = await array(2).create(
       context(() =>
         source(() => {
           throw cleanupFailure

@@ -1,6 +1,6 @@
 # `@migaia/store-wasm`
 
-给 `@migaia/store-light` 用的 WASM 线性内存字段：`number`/`boolean`/`string`/`array`/`record` 五种字段构造器，把状态直接存进一块 `WebAssembly.Memory`，而不是普通 JS 堆对象。字段实现的是 `store-light` 的 `FieldBuilder` 协议，放进 `createStore({...})` 的字段声明里就能用，读写触发的响应式行为和普通字段完全一致，唯一不同的是数据存储位置。
+给 `@migaia/store-light` 用的 WASM 线性内存字段：`number`/`boolean`/`string`/`array`/`record` 五种字段构造器，把状态直接存进一块 `WebAssembly.Memory`，而不是普通 JS 堆对象。字段实现的是 `store-light` 的 `IFieldBuilder` 协议，放进 `createStore({...})` 的字段声明里就能用，读写触发的响应式行为和普通字段完全一致，唯一不同的是数据存储位置。
 
 ## 适用与不适用场景
 
@@ -37,7 +37,7 @@ import * as wasm from '@migaia/store-wasm'
 ## 初始化与 `createStore()` 集成
 
 ```ts
-import { ensureWasm } from '@migaia/store-wasm'
+import { ensureWasm, number } from '@migaia/store-wasm'
 import { createStore } from '@migaia/store-light'
 ```
 
@@ -53,14 +53,14 @@ store.score.value = 100
 
 在调用 `ensureWasm()` 之前构造任何字段，`create()` 会同步抛错（`[store] WASM is not initialized; await ensureWasm() or use StoreProvider`），不会静默用错误的内存。在 `@migaia/store-react` 里可以用 `StoreProvider` 的就绪屏障代替手动 `await`：`config={{ features: { wasm: true }, ready: [ensureWasm] }}`。
 
-**与 `createStore()` 集成** —— 字段构造器实现 `mode: 'sync'` 的 `FieldBuilder` 协议，直接放进字段声明即可，不需要 `createAsyncStore()`：
+**与 `createStore()` 集成** —— 字段构造器实现 `mode: 'sync'` 的 `IFieldBuilder` 协议，直接放进字段声明即可，不需要 `createAsyncStore()`：
 
 ```ts
 const store = createStore({
   hp: number(),
   alive: boolean(),
   name: string(64),
-  hits: array(number(), 1000),
+  hits: array(1000),
   pos: record({ x: number(), y: number() })
 })
 store.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配
@@ -78,7 +78,7 @@ store.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配
 import { number, boolean, string, array, record } from '@migaia/store-wasm'
 ```
 
-构造器本身返回 `FieldBuilder`（不是字段）；下面的示例都假设已 `await ensureWasm()`，并通过 `createStore()` 产出字段。
+构造器本身返回 `IFieldBuilder`（不是字段）；下面的示例都假设已 `await ensureWasm()`，并通过 `createStore()` 产出字段。
 
 **`number`｜3 秒上手** —— 单个 `f64`，8 字节：
 
@@ -110,14 +110,13 @@ store.field.value = 'hello'
 **`array`｜10 秒上手** —— 定长 `Float64Array`，索引按 `granularity` 分桶追踪：
 
 ```ts
-const store = createStore({ field: array(number(), 1000) }) // length=1000, granularity 默认 64
+const store = createStore({ field: array(1000) }) // length=1000, granularity 默认 64
 store.field.setAt(0, 1)
 store.field.setRange(1, 3, [2, 3])
 ```
 
 参数：
 
-- `item: ReturnType<typeof number>`（必填）—— 目前只支持 `number()`
 - `length: number`（必填）—— `[0, floor(0xffff_ffff / 8)]`（536,870,911）内的安全整数，否则抛 `RangeError`
 - `granularity?: number` —— 默认 `64`，必须是正安全整数；`granularity: 1` 让每个 index 独立追踪
 
@@ -148,7 +147,6 @@ import {
   createStoreWasmRangeError,
   createStoreWasmTypeError,
   createStoreWasmAggregateError,
-  WasmFieldMode,
   WasmReservedKey
 } from '@migaia/store-wasm'
 ```
@@ -161,7 +159,7 @@ if (error.code === StoreWasmErrorCode.fieldDisposed) {
 }
 ```
 
-全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。
+全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。本包构造错误带自身 source/code；native 输入读取失败原位附 INVALID_OPTION，取消保留 native reason 或 cause；完整 foreign identity 保留原 owner。
 
 **`createStoreWasmError` / `createStoreWasmRangeError` / `createStoreWasmTypeError` / `createStoreWasmAggregateError`｜5 秒上手** —— 一般由包内部使用，扩展自定义字段类型时可复用：
 
@@ -171,14 +169,13 @@ throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad valu
 
 参数：`code: IStoreWasmErrorCode`（必填）、`message: string`（必填）；`createStoreWasmError`/`createStoreWasmTypeError` 额外接受第三参数 `{ cause?: unknown }`；`createStoreWasmAggregateError` 签名为 `(code, errors: readonly unknown[], message: string)`。均返回已挂好 `(source, code)` 身份标记的对应错误类型（`Error`/`RangeError`/`TypeError`/`AggregateError`）。
 
-**`WasmFieldMode` / `WasmReservedKey`｜3 秒上手** —— 常量对象，无调用参数：
+**`WasmReservedKey`｜3 秒上手** —— 常量对象，无调用参数：
 
 ```ts
-WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode
 WasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一
 ```
 
-`WasmFieldMode` 取值：`sync`。`WasmReservedKey` 取值：`dispose`、`disposed`。
+全部 builder 使用 canonical StoreFieldMode.sync（来自 store-light），保持同步。`WasmReservedKey` 取值：`dispose`、`disposed`。
 
 ---
 
@@ -186,25 +183,29 @@ WasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一
 
 ## 高阶组合示例
 
-### 1. StoreProvider 就绪屏障 + wasm 字段的组件树
+### 1. 显式应用 owner + Provider 注入
 
 ```tsx
-import { StoreProvider } from '@migaia/store-react'
+import { StoreProvider, createStoreRegistry, createStoreToken, useProvidedStore } from '@migaia/store-react'
 import { ensureWasm, number, array } from '@migaia/store-wasm'
 import { createStore } from '@migaia/store-light'
 
-function Game() {
-  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造
-  const store = createStore({ hp: number(), hits: array(number(), 1000) })
-  return null
-}
-
-function App() {
-  return (
-    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>
-      <Game />
-    </StoreProvider>
-  )
+// 每个应用 owner 或 SSR 请求调用一次；在 React render 之外完成初始化和分配。
+async function createGameApplication() {
+  await ensureWasm()
+  const registry = createStoreRegistry()
+  const store = createStore({ hp: number(), hits: array(1000) }, { runtime: registry.runtime })
+  const gameToken = createStoreToken<typeof store>('game')
+  registry.register(gameToken, store, { owned: true })
+  function Game() {
+    const hp = useProvidedStore(gameToken, (state) => state.hp.value)
+    return <span>HP: {hp}</span>
+  }
+  function App() {
+    return <StoreProvider registry={registry}><Game /></StoreProvider>
+  }
+  // 外部 Registry 默认由调用方负责；React root 卸载后 await application.dispose()。
+  return { App, dispose: () => registry.disposeAsync() }
 }
 ```
 
@@ -217,7 +218,7 @@ import { createStore } from '@migaia/store-light'
 await import('@migaia/store-wasm').then((m) => m.ensureWasm())
 
 // 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并
-const particles = array(number(), 60_000)
+const particles = array(60_000)
 const store = createStore({ particles })
 
 const dx = new Float64Array(1000).fill(0.1)
@@ -263,3 +264,7 @@ try {
 ```bash
 pnpm --filter @migaia/store-wasm fmt && pnpm --filter @migaia/store-wasm lint && pnpm --filter @migaia/store-wasm typecheck && pnpm --filter @migaia/store-wasm typecheck:test && pnpm --filter @migaia/store-wasm test && pnpm --filter @migaia/store-wasm build
 ```
+
+API convergence：array 改为 array(length, granularity?)，删除从未使用的 item 占位参数，编码仍固定 f64；旧 array(number(), n, g) 必须改 array(n, g)，不保留兼容入口。收回 WasmFieldMode/IWasmFieldMode，内部复用 store-light 的 StoreFieldMode.sync；WasmReservedKey 继续由本包持有。外部旧调用需 breaking 迁移。
+
+边界修复：setAt 在 Source.commit 回调内部刷新当前内存 view。setRange 先读取全部 ArrayLike 输入，getter 失败在未写入前以 INVALID_OPTION 保留 native 原错或 cause。五字段取消共用一个原因保留边界，原生 AbortError 不再换成无 cause 的普通 Error。

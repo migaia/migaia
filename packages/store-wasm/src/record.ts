@@ -7,10 +7,16 @@ import {
   disposeWasmField,
   throwWasmConstructionFailure
 } from './arena.js'
-import { createStoreWasmError, createStoreWasmTypeError, StoreWasmErrorCode } from './errors.js'
+import {
+  assertWasmFieldNotAborted,
+  createStoreWasmError,
+  createStoreWasmTypeError,
+  StoreWasmErrorCode
+} from './errors.js'
 import type { number as numberBuilder } from './number.js'
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
-import { WasmFieldMode, WasmReservedKey } from './field-constants.js'
+import { StoreFieldMode } from '@migaia/store-light'
+import { WasmReservedKey } from './field-constants.js'
 import { StoreWasmErrorText } from './error-text.js'
 
 // 固定命名字段的结构体（Elm/Haskell record，不是 TS Record<K,V>）
@@ -70,7 +76,7 @@ export function record<Shape extends IRecordShape>(
   }
   return {
     [FIELD_BUILDER]: true,
-    mode: WasmFieldMode.sync,
+    mode: StoreFieldMode.sync,
     create({ signal, createSource }: IFieldContext): IWasmRecordField<Shape> {
       for (const key of keys) {
         if (key === WasmReservedKey.dispose || key === WasmReservedKey.disposed) {
@@ -85,8 +91,7 @@ export function record<Shape extends IRecordShape>(
       const { memory, ptr } = block
       const sources: IFieldSource[] = []
       try {
-        if (signal.aborted)
-          throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
+        assertWasmFieldNotAborted(signal)
         let disposed = false
         let disposing = false
 

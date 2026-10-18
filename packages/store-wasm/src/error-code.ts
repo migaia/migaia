@@ -19,8 +19,9 @@ export const StoreWasmErrorCode = {
   fieldDisposed: 'FIELD_DISPOSED',
 
   /**
-   * Reports field initialization cancelled through an `AbortSignal`. Handle it as cooperative
-   * cancellation.
+   * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native
+   * reason by identity/class/stack; complete foreign identities remain with their owner, and other
+   * reasons stay reachable through cause. Handle it as cooperative cancellation.
    */
   initAborted: 'INIT_ABORTED',
 
@@ -37,8 +38,9 @@ export const StoreWasmErrorCode = {
 
   /**
    * Rejects invalid field construction or write arguments, including excessive length, invalid
-   * `granularity`, or out-of-range indices or ranges. Correct the parameter instead of retrying the
-   * same invalid input.
+   * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the
+   * original read failure reachable. Correct the parameter instead of retrying the same invalid
+   * input.
    */
   invalidOption: 'INVALID_OPTION',
 
