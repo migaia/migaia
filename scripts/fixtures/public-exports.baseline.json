@@ -1170,7 +1170,6 @@
         "STORE_LIGHT_SOURCE",
         "StoreFieldMode",
         "StoreLightErrorCode",
-        "StoreResourceKind",
         "createAsyncStore",
         "createStore",
         "createStoreLightAggregateError",

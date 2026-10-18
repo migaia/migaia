@@ -64,13 +64,28 @@ export const StoreLightErrorCode = {
   storeNotReady: 'STORE_NOT_READY',
 
   /**
-   * Store initialization and its subsequent cleanup both fail. Both failures are thrown in an
-   * `AggregateError`.
+   * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary
+   * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own
+   * identity and receive cleanup through cause instead.
    *
    * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13).
    * Treat this as initialization failure and inspect the cleanup failure.
    */
   initAndCleanupFailed: 'INIT_AND_CLEANUP_FAILED',
+
+  /**
+   * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed.
+   * The owning Runtime receives the original native error when possible; non-extensible or
+   * non-Error failures remain reachable through the coded fallback's cause/errors.
+   */
+  fieldDisposeFailed: 'FIELD_DISPOSE_FAILED',
+
+  /**
+   * A FieldBuilder fails during initialization without an existing package error identity. Native
+   * mutable errors keep their object and stack; fallback errors retain the original cause. Treat
+   * creation as failed and inspect the original builder failure before retrying.
+   */
+  initializationFailed: 'INITIALIZATION_FAILED',
 
   /**
    * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract.
@@ -96,8 +111,8 @@ export const StoreLightErrorCode = {
   envUnsupported: 'ENV_UNSUPPORTED',
 
   /**
-   * Input or field validation fails for `keepAliveMs`, a non-writable `$set` target, or an unknown
-   * `$hydrate` field.
+   * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set`
+   * target, or an unknown `$hydrate` field.
    *
    * Correct the field or value named in the error message.
    */

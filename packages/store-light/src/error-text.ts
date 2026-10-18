@@ -13,6 +13,14 @@ export const StoreLightErrorText = {
   disposedResourceValue: '[store] resource factory returned a disposed value',
   noAsyncInitialization: '[store] store has no asynchronous initialization',
   cleanupFailed: '[store] initialization and cleanup both failed',
+  /** Fallback diagnostic for a late field disposer; native errors keep their own message. */
+  fieldDisposeFailed: '[store] late field disposal failed',
+  /** Fallback initialization diagnostic when the original failure cannot carry a package identity. */
+  initializationFailed: '[store] field initialization failed',
+  /** Explicit builder modes replace the removed pre-discriminant asynchronous compatibility path. */
+  fieldBuilderMode: '[store] field builder mode must be sync or async',
+  /** User field names must not replace the facade API; construction rolls back before returning. */
+  reservedField: (key: string): string => `[store] field conflicts with the store API: ${key}`,
   asyncAction: (key: string): string =>
     `[store] async action "${key}" only batches work before the first await; use $batch() for later writes`,
   asyncStore: (status: string): string =>

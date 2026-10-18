@@ -45,8 +45,6 @@ export type IStoreResource<T> = {
   read(): T
   preload(): void
   retry(): void
-  /** @deprecated Use retainResource() or retainVersion(). */
-  retain(version?: number | IVersionToken): () => void
   retainResource(): () => void
   retainVersion(version: number | IVersionToken): () => void
   /** Internal React bridge: protect version during render, then commit in layout. */
@@ -584,7 +582,7 @@ export function createStoreResource<T>(
             finalizeClosingFailure(error, superseded, stale)
             return
           }
-          if (stale) core.hydrate({ version: 1, data: stale.value, updatedAt: 0, expiresAt: null })
+          if (stale) core.hydrate({ version: 2, data: stale.value, ageMs: 0, remainingTtlMs: null })
           notify()
           cleanupUnique(superseded)
           if (stale && !hasOwners()) scheduleEviction()
@@ -703,6 +701,16 @@ export function createStoreResource<T>(
     activeLeaseTokens.set(token, id)
     return token
   }
+  /** The generation counter survives eviction; only a visible or owned value can accept a lease. */
+  const hasVisibleVersion = (id: number): boolean => {
+    const state = currentState()
+    return (
+      ((state.kind === StoreResourceKind.ready || state.kind === StoreResourceKind.closing) &&
+        state.current?.id === id) ||
+      ((state.kind === StoreResourceKind.loading || state.kind === StoreResourceKind.failed) &&
+        state.previous?.id === id)
+    )
+  }
   const retainVersionLease = (versionInput: number | IVersionToken) => {
     const id = typeof versionInput === 'number' ? versionInput : tokenVersions.get(versionInput)
     if (id === undefined)
@@ -718,7 +726,7 @@ export function createStoreResource<T>(
         StoreLightErrorCode.resourceDisposed,
         StoreLightErrorText.resourceDisposed
       )
-    if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
+    if (!hasVisibleVersion(id) && !versions.hasRetired(id) && versions.stale?.id !== id)
       throw createStoreLightError(
         StoreLightErrorCode.unknownVersion,
         StoreLightErrorText.unknownResourceVersion
@@ -736,7 +744,7 @@ export function createStoreResource<T>(
         StoreLightErrorCode.resourceDisposed,
         StoreLightErrorText.resourceDisposed
       )
-    if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
+    if (!hasVisibleVersion(id) && !versions.hasRetired(id) && versions.stale?.id !== id)
       throw createStoreLightError(
         StoreLightErrorCode.unknownVersion,
         StoreLightErrorText.unknownResourceVersion
@@ -751,7 +759,7 @@ export function createStoreResource<T>(
         StoreLightErrorText.resourceDisposed
       )
     if (
-      id !== version &&
+      !hasVisibleVersion(id) &&
       !versions.hasRetired(id) &&
       versions.stale?.id !== id &&
       !versions.hasClosing(id)
@@ -791,9 +799,6 @@ export function createStoreResource<T>(
       core.reset()
       notify()
       start()
-    },
-    retain(leaseVersion?: number) {
-      return leaseVersion === undefined ? retainResourceLease() : retainVersionLease(leaseVersion)
     },
     retainResource: retainResourceLease,
     retainVersion: retainVersionLease,

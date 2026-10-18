@@ -54,23 +54,20 @@ export type IAsyncFieldBuilder<F extends IDisposable> = {
   create(context: IFieldContext): Promise<F>
 }
 
-/** Pre-discriminant builder accepted by createAsyncStore, never createStore. */
-export type ILegacyFieldBuilder<F extends IDisposable> = {
-  readonly [FIELD_BUILDER]: true
-  create(context: IFieldContext): Promise<F>
-}
-
-export type IFieldBuilder<F extends IDisposable> =
-  | ISyncFieldBuilder<F>
-  | IAsyncFieldBuilder<F>
-  | ILegacyFieldBuilder<F>
+/** Builders select synchronous construction or asynchronous initialization explicitly. */
+export type IFieldBuilder<F extends IDisposable> = ISyncFieldBuilder<F> | IAsyncFieldBuilder<F>
 
 export function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposable> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as Record<PropertyKey, unknown>)[FIELD_BUILDER] === true
-  )
+  try {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      (value as Record<PropertyKey, unknown>)[FIELD_BUILDER] === true
+    )
+  } catch {
+    // A brand that cannot be read is not admitted by this unknown-value predicate.
+    return false
+  }
 }
 
 // Mutation guard protocol.
@@ -105,9 +102,14 @@ export function raw<T>(value: T): IRaw<T> {
 }
 
 export function isRaw(value: unknown): value is IRaw<unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as Record<PropertyKey, unknown>)[RAW] === true
-  )
+  try {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      (value as Record<PropertyKey, unknown>)[RAW] === true
+    )
+  } catch {
+    // A brand that cannot be read is not admitted by this unknown-value predicate.
+    return false
+  }
 }

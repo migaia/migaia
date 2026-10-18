@@ -1,3 +1,4 @@
+import { deferred } from '@migaia/utils/promise'
 import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type {
   IDisposable,
@@ -11,7 +12,6 @@ import {
   isRaw,
   type IFieldBuilder,
   type IAsyncFieldBuilder,
-  type ILegacyFieldBuilder,
   type IMutationPolicy,
   type IRaw
 } from './store-protocol.js'
@@ -40,6 +40,7 @@ import {
 import { StoreLightErrorText } from './error-text.js'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
+import { identifyStoreLightFailure } from './error-boundary.js'
 
 /**
  * Re-throws the construction primary with the cleanup failure appended to its non-enumerable
@@ -56,10 +57,10 @@ function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
 }
 
 /**
- * Reports synchronous-construction cleanup failures without creating a late rejection.
+ * Reports construction and late-field cleanup failures without creating a late rejection.
  * `Runtime.reportError` already contains reporter failures, so no host fallback is needed.
  */
-function reportSynchronousCleanupFailure(runtime: IRuntime, error: unknown): void {
+function reportCleanupFailure(runtime: IRuntime, error: unknown): void {
   runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
 }
 
@@ -210,9 +211,8 @@ export type ICreateStoreOptions = {
   /**
    * Isolates the runtime explicitly. Defaults to `defaultRuntime`.
    *
-   * The facade accepts `IRuntime` because it uses only interface capabilities such as node
-   * creation, batching, and scopes. A concrete `Runtime` requirement would force replacement
-   * runtimes to inherit the library class.
+   * Pass a registered `createRuntime()` result from the owning reactive package instance. Runtime
+   * branding and ownership are validated; an arbitrary structural `IRuntime` is not a SPI.
    */
   runtime?: IRuntime
   debugName?: string
@@ -391,12 +391,39 @@ function createStoreCore<S extends Record<string, unknown>>(
     disposed = true
     initAbort?.abort()
     void disposeOwned().catch((cleanupError: unknown) =>
-      reportSynchronousCleanupFailure(runtime, cleanupError)
+      reportCleanupFailure(runtime, cleanupError)
     )
     throw createStoreLightError(
       StoreLightErrorCode.invalidOption,
       StoreLightErrorText.shapeInvalid,
       { cause: error }
+    )
+  }
+  /** Roll back the same owned resources for every synchronous construction failure. */
+  const failConstruction = (error: unknown): never => {
+    // A synchronous builder failure is terminal too: async builders that are still
+    // resolving must see both guards before attempting to adopt their field.
+    initializationFailed = true
+    disposed = true
+    status = StoreInitializationStatus.failed
+    initAbort?.abort()
+    // `createStoreCore()` itself is synchronous (D-1 gives LifecycleScope no sync dispose()), so
+    // this cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
+    // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead
+    // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
+    void disposeOwned().catch((cleanupError: unknown) =>
+      reportCleanupFailure(runtime, cleanupError)
+    )
+    signals.clear()
+    computeds.clear()
+    wasmFields.clear()
+    fieldSources.clear()
+    for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key]
+    contextMembers.clear()
+    throw identifyStoreLightFailure(
+      error,
+      StoreLightErrorCode.initializationFailed,
+      StoreLightErrorText.initializationFailed
     )
   }
   try {
@@ -498,7 +525,14 @@ function createStoreCore<S extends Record<string, unknown>>(
         ensureScope()
         /** Capture before later siblings can fail and abort this generation. */
         const signal = initSignal()
-        if ('mode' in value && value.mode === StoreFieldMode.sync) {
+        /** Capture the public discriminant once; pre-discriminant builders are no longer supported. */
+        const mode = value.mode
+        if (mode !== StoreFieldMode.sync && mode !== StoreFieldMode.async)
+          throw createStoreLightTypeError(
+            StoreLightErrorCode.invalidOption,
+            StoreLightErrorText.fieldBuilderMode
+          )
+        if (mode === StoreFieldMode.sync) {
           const field = adoptField(
             value.create({
               runtime,
@@ -534,8 +568,22 @@ function createStoreCore<S extends Record<string, unknown>>(
             )
             .then((field) => {
               if (disposed || initializationFailed) {
-                field.dispose()
-                return
+                /** Late cleanup has no awaiting factory caller, so its Runtime owns diagnostics. */
+                const reportFailure = (error: unknown): void =>
+                  reportCleanupFailure(
+                    runtime,
+                    identifyStoreLightFailure(
+                      error,
+                      StoreLightErrorCode.fieldDisposeFailed,
+                      StoreLightErrorText.fieldDisposeFailed
+                    )
+                  )
+                try {
+                  return Promise.resolve(field.dispose()).catch(reportFailure)
+                } catch (error) {
+                  reportFailure(error)
+                  return
+                }
               }
               adoptField(field)
               wasmFields.set(key, field)
@@ -580,26 +628,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       })
     }
   } catch (error) {
-    // A synchronous builder failure is terminal too: async builders that are still
-    // resolving must see both guards before attempting to adopt their field.
-    initializationFailed = true
-    disposed = true
-    status = StoreInitializationStatus.failed
-    initAbort?.abort()
-    // `createStoreCore()` itself is synchronous (D-1 gives LifecycleScope no sync dispose()), so
-    // this cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
-    // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead
-    // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
-    void disposeOwned().catch((cleanupError: unknown) =>
-      reportSynchronousCleanupFailure(runtime, cleanupError)
-    )
-    signals.clear()
-    computeds.clear()
-    wasmFields.clear()
-    fieldSources.clear()
-    for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key]
-    contextMembers.clear()
-    throw error
+    failConstruction(error)
   }
 
   if (readyList.length === 0) status = StoreInitializationStatus.ready
@@ -646,7 +675,11 @@ function createStoreCore<S extends Record<string, unknown>>(
           )
         }
       }
-      throw error
+      throw identifyStoreLightFailure(
+        error,
+        StoreLightErrorCode.initializationFailed,
+        StoreLightErrorText.initializationFailed
+      )
     }
   )
 
@@ -825,7 +858,11 @@ function createStoreCore<S extends Record<string, unknown>>(
       return ensureScope().own(resource, { syncSafe: false, force: () => resource.dispose() })
     },
     $dispose() {
-      disposePromise ??= (async () => {
+      if (disposePromise) return disposePromise
+      /** Publish completion before abort listeners or owned disposers can synchronously reenter. */
+      const completion = deferred<void>()
+      disposePromise = completion.promise
+      void (async () => {
         disposed = true
         initAbort?.abort() // 中止在途异步字段初始化
         // Pure nodes release synchronously; mixed entries retain canonical scope ordering and
@@ -841,16 +878,25 @@ function createStoreCore<S extends Record<string, unknown>>(
           for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key]
           contextMembers.clear()
         }
-      })()
+      })().then(() => completion.resolve(), completion.reject)
       return disposePromise
     }
   }
 
   // $-API 挂成不可枚举，$snapshot 遍历用户字段时不会把它们也带出去。
   // 用 getOwnPropertyDescriptor 复制：保留 $disposed 这类 getter 的「实时」语义（不被求值成静态快照）。
-  for (const k of Object.keys(api)) {
-    const desc = Object.getOwnPropertyDescriptor(api, k)!
-    Object.defineProperty(store, k, { ...desc, enumerable: false })
+  try {
+    for (const k of Object.keys(api)) {
+      if (Object.hasOwn(descriptors, k))
+        throw createStoreLightTypeError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.reservedField(k)
+        )
+      const desc = Object.getOwnPropertyDescriptor(api, k)!
+      Object.defineProperty(store, k, { ...desc, enumerable: false })
+    }
+  } catch (error) {
+    failConstruction(error)
   }
 
   // 登记归属：Registry 与 SSR scope 据此校验，不再靠 $runtime 字段名
@@ -892,9 +938,7 @@ export function storeReady(store: object): Promise<void> {
  */
 export function createStore<S extends Record<string, unknown>>(
   shape: IStoreDefinition<S> & {
-    [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable>
-      ? never
-      : S[K]
+    [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> ? never : S[K]
   },
   options?: ICreateStoreOptions
 ): IReactiveStore<S> {
@@ -914,7 +958,7 @@ export function createStore<S extends Record<string, unknown>>(
     if (
       'value' in descriptor &&
       isFieldBuilder(descriptor.value) &&
-      (!('mode' in descriptor.value) || descriptor.value.mode !== StoreFieldMode.sync)
+      descriptor.value.mode !== StoreFieldMode.sync
     ) {
       throw createStoreLightError(
         StoreLightErrorCode.syncFieldRequired,

@@ -106,7 +106,7 @@ store.$snapshot() // { count: 1, doubled: 2 }
 
 无参数、无选项；异步字段未就绪时抛 `[store] store is pending; ...`。
 
-**`store.$subscribe(fn, options?)`｜5 秒上手** —— 粗粒度订阅，只追踪 signal/wasm 字段（不主动读取 computed）：
+**`store.$subscribe(fn, options?)`｜5 秒上手** —— 粗粒度订阅，读取 signal、computed 与 wasm source 建立订阅（首次订阅会求值 computed getter）：
 
 ```ts
 const unsubscribe = store.$subscribe(() => console.log('changed'), { fireImmediately: true })
@@ -161,13 +161,13 @@ const owned = store.$own(someDisposableResource)
 
 单参数 `resource: T extends IDisposable`（必填），无其他选项；资源必须未归属或已归属本 Runtime，跨 Runtime 直接拒绝。
 
-**`store.$dispose()`｜3 秒上手** —— 释放全部内部节点，之后任何字段读写/方法调用统一抛 `[store] store is disposed`：
+**`store.$dispose()`｜3 秒上手** —— 释放全部内部节点，之后用户字段读写和受守卫方法调用抛 `[store] store is disposed`：
 
 ```ts
 await store.$dispose()
 ```
 
-无参数；返回 `Promise<void>`，多次调用返回同一个 Promise。`$disposed`（只读 getter）、`$runtime`（只读 `IRuntime`）、`$async`（只读 `boolean`，是否含异步字段）无需调用，直接读属性。
+无参数；返回 `Promise<void>`，多次调用返回同一个 Promise。`$disposed`（只读 getter）、`$runtime`（`IRuntime`）、`$async`（`boolean`，是否含异步字段）无需调用，直接读属性。后两者是可写 data 属性，不提供只读保证；修改属性不会迁移闭包所属 Runtime。重复 `$dispose()` 与这些终态查询仍可使用。
 
 ---
 

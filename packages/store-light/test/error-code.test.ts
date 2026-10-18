@@ -6,10 +6,10 @@ import { createStore, createAsyncStore, FIELD_BUILDER, type IFieldBuilder } from
 import { createStoreLightRangeError, StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors'
 
 describe('store-light error-code contract (E-T9)', () => {
-  it('declares 12 unique codes under the package source', () => {
+  it('declares 14 unique codes under the package source', () => {
     const codes = Object.values(StoreLightErrorCode)
-    expect(codes).toHaveLength(12)
-    expect(new Set(codes).size).toBe(12)
+    expect(codes).toHaveLength(14)
+    expect(new Set(codes).size).toBe(14)
     expect(STORE_LIGHT_SOURCE).toBe('@migaia/store-light')
   })
 

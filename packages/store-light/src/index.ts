@@ -1,6 +1,5 @@
 export * from './reactive-store.js'
 export * from './store-protocol.js'
-export { StoreResourceKind, type IStoreResourceKind } from './resource-state-constants.js'
 
 export * from './errors.js'
 export { StoreFieldMode } from './field-mode-constants.js'
