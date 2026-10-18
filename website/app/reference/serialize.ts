@@ -228,8 +228,8 @@ const codecMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   version: {
     summary: t(
-      'The wire version captured when this codec was constructed; encoded data and compatibility checks use this retained value.',
-      '编解码器构造时接纳的线格式版本；编码数据与兼容性检查使用这个已保留的值。'
+      'The version number supplied when creating this codec, which converts values to a data format and back. It identifies the format version that producers and consumers agree to use. The codec retains the number; changing the original construction options later does not change this property.',
+      '创建编解码器时提供的版本号。编解码器负责把值转换成指定格式的数据并还原，此版本用于标识生产端与消费端约定的格式。该数字在创建时保存，之后修改原构造选项不会改变这个属性。'
     )
   },
   encodedType: {

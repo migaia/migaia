@@ -356,13 +356,13 @@ console.log(typeof channels.open)`,
   }),
   'wasm:index:__wbg_init': guide({
     purposeEn:
-      'The package default initializer loads and instantiates the WebAssembly module before its allocation and conversion functions are used. Import it as a default value, not as a named __wbg_init export. In a browser build that includes the package WASM asset, await init before the example allocates one byte. With memory available, its capacity output is 8 because allocations round up to eight bytes. Finally, dealloc_bytes releases the allocation. Native WebAssembly loading failures reject initialization.',
+      'Loads the package’s WebAssembly code and creates the module instance used by its memory-allocation and format-conversion functions. Import this initializer as the default export, using a local name such as init; __wbg_init is its documentation name, not a named export. Await initialization before calling those functions, because they need the loaded module. The example assumes a browser build that includes the package’s .wasm file. It initializes the module, requests one byte of memory, prints the allocated capacity and releases the allocation. Loading or instantiation failures reject initialization. Native WebAssembly errors pass through unchanged.',
     purposeZh:
-      '此包的默认初始化函数负责加载并实例化 WebAssembly，必须先完成，再调用分配和转换函数。应使用默认导入，不是名为 __wbg_init 的命名导入。在包含此包 WASM 文件的浏览器构建中，先 await init，再执行示例的一字节分配。内存足够时容量输出为 8，因为分配会向上取整到八字节。最后由 dealloc_bytes 释放分配。原生 WebAssembly 加载失败会使初始化被拒绝。',
+      '加载包中的 WebAssembly 代码，并创建内存分配和格式转换函数要使用的模块实例。此函数是包的默认导出，可以导入后命名为 init；__wbg_init 是文档中的函数名，不能用它进行命名导入。调用分配或转换函数前，必须先 await 初始化完成，否则这些函数没有可用的模块。下面假设浏览器构建已包含包的 .wasm 文件，先初始化，再申请一个字节，输出实际分配容量，最后释放。加载或创建模块实例失败会使初始化被拒绝，原生 WebAssembly 错误保持原样传出。',
     quickStart: `import init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'
 
 await init()
-/** The allocation id owns at least one byte and must be released. */
+/** Keep the allocation id so finally can release the requested memory. */
 const allocation = alloc_bytes(1)
 try {
   console.log(byte_len_of(allocation))
@@ -370,20 +370,20 @@ try {
   dealloc_bytes(allocation)
 }`,
     scenariosEn: [
-      'A browser application loads the packaged WASM asset before directly calling its exported functions.',
-      'The application has custom loading and passes bytes, a Response or a compiled WebAssembly.Module through module_or_path.'
+      'Use the default call when your browser build makes the packaged .wasm file available. With a successful allocation, the example prints 8: byte_len_of reports capacity rounded up to eight bytes. finally releases the allocation even if later code throws.',
+      'If your application loads the module itself, pass its bytes, a fetch Response or a compiled WebAssembly.Module in module_or_path. This selects the input to initialization instead of relying on the default asset URL.'
     ],
     scenariosZh: [
-      '浏览器应用直接调用导出函数前，先加载包内的 WASM 文件。',
-      '应用自行加载文件，再通过 module_or_path 提供字节、Response 或已编译的 WebAssembly.Module。'
+      '浏览器构建能访问包内 .wasm 文件时，可直接使用默认调用。内存分配成功后，示例输出 8，因为 byte_len_of 返回向上取整到八字节的容量。后续代码即使抛错，finally 也会释放分配。',
+      '应用自行加载模块时，通过 module_or_path 提供字节、fetch 返回的 Response 或已编译的 WebAssembly.Module。这会使用你提供的初始化输入，无需依赖默认资源地址。'
     ],
     avoidEn: [
-      'Do not call allocation or conversion functions before the initialization Promise resolves.',
-      'Use initSync only when bytes or a compiled module are already available and synchronous initialization is intended.'
+      'Wait for the initialization Promise to fulfill before calling allocation or conversion functions. Starting initialization without awaiting it does not make those functions ready.',
+      'Use initSync only when you already have module bytes or a compiled module and need initialization to finish in the current call. Use the default asynchronous initializer when loading still needs to complete.'
     ],
     avoidZh: [
-      '初始化 Promise 完成前，不要调用分配或转换函数。',
-      '只有已经取得字节或已编译模块，并明确需要同步初始化时，才使用 initSync。'
+      '初始化 Promise 成功完成后，才能调用分配和转换函数。只发起初始化而不等待完成，不会让这些函数立即可用。',
+      '已经取得模块字节或已编译模块，并且需要在当前调用中完成初始化时，才使用 initSync。仍需等待加载完成时，使用默认的异步初始化函数。'
     ]
   }),
   'utils:scheduler:deferTask': schedulerDeferGuide,

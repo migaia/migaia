@@ -975,17 +975,17 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
     defineFeature: {
       role: 'factory',
       purpose: t(
-        'Defines an optional capability for a storage plugin. A Feature describes how to build that capability; a Plugin is a backend plugin that combines a store with its capabilities and is installed and removed by the Host. Defining the Feature creates no Host and opens no storage. Pass it in the third argument of definePlugin, then install that Plugin with createStorageHost({ plugins }) or host.use(). Each installation gets its own store and Feature output. The Feature output stays inside the plugin unless install returns methods that expose it to callers.',
-        '给存储插件定义一项可选能力。Feature 是创建这项能力的定义；Plugin 是由 Host 安装和卸载的后端插件，把一个存储及其能力组合在一起，两者不是一回事。定义 Feature 不会创建 Host，也不会打开存储。把它作为第三个参数交给 `definePlugin()`，再通过 `createStorageHost({ plugins })` 或 `host.use()` 安装插件，能力才会生效。每次安装都使用各自的存储和能力输出；输出默认只供插件内部使用，调用方需要通过 `install` 返回的方法才能访问。'
+        'Defines an optional capability for a storage plugin, such as reading its key count. A Host manages plugin installation and cleanup. A Feature is the recipe for one capability; a Plugin combines a store and selected capabilities for the Host to install. Calling defineFeature only saves the recipe: it creates no Host and opens no storage. Pass the result as the third argument of definePlugin, then install the plugin with createStorageHost({ plugins }) or host.use(). Each installation uses its own store and capability output. To let application code call capability methods, return those methods from install.',
+        '给存储插件定义一项可选能力，例如读取键的数量。Host 是管理插件安装和清理的宿主对象。Feature 是创建一项能力的定义；Plugin 把存储和选定能力组合起来，供宿主安装。调用 defineFeature 只保存能力定义，不会创建宿主或打开存储。把返回值作为第三个参数交给 `definePlugin()`，再通过 `createStorageHost({ plugins })` 或 `host.use()` 安装插件。每次安装使用各自的存储和能力输出。应用需要调用能力方法时，从 `install` 返回这些方法。'
       ),
       params: {
         factory: t(
-          'Synchronous function receiving core.featureExpose for this installed backend and the outputs of declared dependencies; return the capability object for this plugin.',
-          '同步函数，接收本次后端安装的 `core.featureExpose` 和已声明依赖的输出，返回供这个插件使用的能力对象。'
+          'A required synchronous function that builds the capability object during plugin installation. core.featureExpose supplies getStore() and getBackendId() for this installation. The second argument contains the outputs of other capabilities listed in dependencies. Return the object whose methods the plugin will use; the factory itself must not return a Promise.',
+          '必填的同步函数，在插件安装期间创建能力对象。`core.featureExpose` 提供本次安装的 getStore() 和 getBackendId()，用来访问存储和后端名称。第二个参数包含 dependencies 所列其他能力的输出。返回插件要使用的能力对象，工厂自身不能返回 Promise。'
         ),
         dependencies: t(
-          'Optional named references to other Features; omit this record when the factory uses only its backend store.',
-          '可选的具名 Feature 引用记录；只使用本次后端存储时可以省略。'
+          'List other capabilities this factory needs by assigning each Feature reference a name. Their outputs are passed to the factory’s second argument under those names. Omit the record when the factory only needs the store and backend id supplied by core.featureExpose.',
+          '如果工厂需要其他能力，把相应 Feature 引用按名称放在这个对象中。工厂的第二个参数会按这些名称提供对应的能力输出。只需要 `core.featureExpose` 提供的存储和后端名称时，可以省略。'
         )
       },
       returns: t(
@@ -993,13 +993,13 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         '可交给 `definePlugin(name, factory, features)` 的 Feature。'
       ),
       exampleIntro: t(
-        'The cache plugin below stores one user in memory. Its metrics Feature counts the keys of that same backend, and install exposes the count through the installed plugin handle.',
-        '下面的缓存插件在内存中保存一个用户。`metrics` 能力统计这个后端的键数量，再由 `install` 把查询方法交给插件调用方。'
+        'The example adds key-counting behavior to an in-memory cache. metrics builds the counting methods, cachePlugin registers the memory store, and install saves one user before returning methods that application code can call.',
+        '下面为内存缓存添加统计键数量的能力。metrics 创建统计方法，cachePlugin 登记内存存储，install 保存一个用户后返回供应用调用的方法。'
       ),
       example: storageFeatureExample,
       exampleResult: t(
-        'The assertions pass and the output is 1 cache. Creating a bare Host does not add count(); installing cachePlugin makes it available as cache.extensions.count(). Finally, disposing the Host removes the plugin and releases its memory store.',
-        '两项断言通过，输出为 `1 cache`。只创建空 Host 不会得到 `count()`；安装 `cachePlugin` 后，才能调用 `cache.extensions.count()`。最后释放 Host，会卸载插件并释放其内存存储。'
+        'Both assertions pass and the output is 1 cache: one stored key and the plugin’s backend name. The empty Host has no count method. After cachePlugin is installed, cache.extensions.count() calls the method returned by install. The finally block closes the Host, removes the plugin and releases its memory store.',
+        '两项断言通过，输出为 `1 cache`，分别表示一个已保存的键和插件的后端名称。空宿主没有统计方法；安装 cachePlugin 后，`cache.extensions.count()` 才能调用 install 返回的方法。finally 中关闭宿主，会移除插件并释放内存存储。'
       )
     },
     assertStorageBackendId: {
