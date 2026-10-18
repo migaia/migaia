@@ -3956,21 +3956,148 @@ const runtimeCompletionApiGuides = {
   }),
   'middleware-pipeline:index:createPipeline': createStorageContractGuide({
     purposeEn:
-      'Constructs a stateless middleware runner whose sync, async, generator or async-generator algebra is fixed at creation. lift adapts only supported stage directions, and run owns all per-call state and cancellation.',
+      'Creates a reusable runner for a sequence of middleware functions. Choose how the functions execute with mode: sync runs immediately, async lets a function await the next one, and the two generator modes consume values produced with yield by generator functions. Each run keeps its own state; create the runner once and pass the request value to run().',
     purposeZh:
-      '构造无状态 middleware runner，创建时固定 sync、async、generator 或 async-generator 代数；lift 只适配支持的 stage 方向，run 拥有每次调用的状态和取消。',
+      '创建一个可复用的执行器，按顺序运行一组中间件函数。mode 决定执行方式：sync 立即执行，async 允许函数等待后续函数，两个生成器模式则读取函数用 yield 逐步产出的值。每次 run() 的状态互相独立，可以先创建执行器，再反复传入不同请求。',
     quickStart:
-      "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1)], 41, value => console.log(value))",
+      "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run(\n  [(value, next) => next(value + 1), (value, next) => next(value * 2)],\n  2,\n  result => console.log(result) // 6\n)",
     scenariosEn: [
-      'Run synchronous request stages without Promise conversion.',
-      'Lift compatible stages into a selected asynchronous algebra.'
+      'Run a sequence of synchronous transformations without converting the result into a Promise. A sync stage passes its next value to next(); downstream starts after that stage returns.',
+      'Wrap asynchronous work around later stages, such as timing a request. In async mode, await next(value) to wait for that downstream work.',
+      'Reuse a synchronous stage in another supported mode with pipeline.lift(stage, MiddlewarePipelineMode.sync). The runner checks that the source mode can be adapted to its selected mode.'
     ],
-    scenariosZh: ['执行同步请求 stage，避免转换为 Promise。', '将兼容 stage 提升到选定异步代数。'],
+    scenariosZh: [
+      '连续执行同步转换，且不需要 Promise 结果。同步函数通过 next() 交出新值，当前函数返回后才执行后续函数。',
+      '需要在后续异步任务前后做处理，例如统计请求耗时。在 async 模式中，await next(value) 会等待后续任务结束。',
+      '希望在其他受支持模式中复用同步函数。调用 pipeline.lift(stage, MiddlewarePipelineMode.sync)，执行器会检查是否支持该转换方向。'
+    ],
     avoidEn: [
-      'Stages belong to incompatible algebras without a supported lift.',
-      'A reusable runner is expected to retain per-request mutable state.'
+      'A task needs automatic parallel execution. The runner follows the selected middleware order; it does not schedule unrelated jobs.',
+      'A request must change the runner mode after creation. Create a separate runner for that mode instead.',
+      'A stage comes from an unsupported mode. lift() rejects unsupported directions rather than silently changing how the stage runs.'
     ],
-    avoidZh: ['stage 代数不兼容且没有支持的 lift。', '希望复用 runner 保存每个请求的可变状态。']
+    avoidZh: [
+      '需要自动并行执行独立任务。执行器遵循选定的中间件顺序，不会替调用方调度无关任务。',
+      '需要在创建后更改执行方式。请为另一种 mode 单独创建执行器。',
+      '函数来自不支持转换的模式。lift() 会拒绝该方向，不会悄悄改变函数的执行方式。'
+    ],
+    optionsEn: [
+      {
+        name: 'mode',
+        description:
+          'Selects sync, async, generator, or async-generator execution for every run. It is required and cannot change after construction.',
+        defaultValue: 'required',
+        optional: false,
+        type: 'IMiddlewarePipelineMode',
+        whenToUse:
+          'Choose sync for immediate transformations or async when a function must await downstream work.',
+        example: 'MiddlewarePipelineMode.sync'
+      },
+      {
+        name: 'onViolation',
+        description:
+          'Receives duplicate or late calls to next(). The rejected call does not start a second downstream traversal; without a callback, no violation report is emitted.',
+        defaultValue: 'no-op callback',
+        type: 'IMiddlewarePipelineViolationHandler',
+        whenToUse: 'Connect middleware protocol mistakes to application diagnostics.',
+        example: 'violation => console.warn(violation)'
+      },
+      {
+        name: 'assertActive',
+        description:
+          'Runs before each stage begins. Throwing stops that stage from starting, so the caller can enforce whether its request is still allowed to run.',
+        defaultValue: 'undefined',
+        type: '() => void',
+        whenToUse:
+          'The application already owns an admission or shutdown check that must run between stages.',
+        example: '() => { if (closed) throw closedError }'
+      },
+      {
+        name: 'signal',
+        description:
+          'Sets the default cancellation signal. run() can provide a different signal for one request; cancellation prevents further stage entry at the runner checks.',
+        defaultValue: 'undefined',
+        type: 'IAbortSignal',
+        whenToUse: 'Tie several runs to a shared shutdown signal, or override it per request.',
+        example: 'shutdown.signal'
+      },
+      {
+        name: 'signals',
+        description:
+          'Replaces the three generator control symbols: undefined, halt, and continue. They must be distinct symbols; the built-in set is used when this option is omitted.',
+        defaultValue: 'MiddlewarePipelineGeneratorSignals',
+        type: 'IGeneratorMiddlewareSignals',
+        whenToUse: 'Existing generator stages already return a shared custom symbol set.',
+        example: 'MiddlewarePipelineGeneratorSignals'
+      },
+      {
+        name: 'combineStageAndDownstreamError',
+        description:
+          'Combines a stage failure with a failure from downstream work that the stage already started. Without this callback, an asynchronous run rejects with an AggregateError containing both originals.',
+        defaultValue: 'AggregateError with both failures',
+        type: '(stage: unknown, downstream: unknown) => unknown',
+        whenToUse:
+          'The owning application needs its own error wrapper while keeping both original failures reachable.',
+        example: '(stage, downstream) => new AggregateError([stage, downstream])'
+      }
+    ],
+    optionsZh: [
+      {
+        name: 'mode',
+        description:
+          '选择 sync、async、generator 或 async-generator，决定每次调用的执行方式。该参数必填，创建后不能更改。',
+        defaultValue: '必填',
+        optional: false,
+        type: 'IMiddlewarePipelineMode',
+        whenToUse: '立即完成转换时用 sync；函数需要等待后续任务时用 async。',
+        example: 'MiddlewarePipelineMode.sync'
+      },
+      {
+        name: 'onViolation',
+        description:
+          '接收重复或过晚调用 next() 的通知。被拒绝的调用不会再次执行后续函数；省略回调时不会发出这类报告。',
+        defaultValue: '不做处理的回调',
+        type: 'IMiddlewarePipelineViolationHandler',
+        whenToUse: '需要把中间件使用错误送到应用日志或诊断系统。',
+        example: 'violation => console.warn(violation)'
+      },
+      {
+        name: 'assertActive',
+        description:
+          '在每个函数开始前执行检查。检查抛错时，该函数不会开始，调用方可以据此阻止已关闭或不再允许的请求继续执行。',
+        defaultValue: 'undefined',
+        type: '() => void',
+        whenToUse: '应用已经有请求准入或关闭检查，并要求在函数之间继续检查。',
+        example: '() => { if (closed) throw closedError }'
+      },
+      {
+        name: 'signal',
+        description:
+          '设置默认取消信号。单次 run() 可以传入另一个信号覆盖它；执行器检查到取消后，不再进入后续函数。',
+        defaultValue: 'undefined',
+        type: 'IAbortSignal',
+        whenToUse: '多个请求共享关闭信号，或需要在单次请求中使用独立信号。',
+        example: 'shutdown.signal'
+      },
+      {
+        name: 'signals',
+        description:
+          '替换生成器使用的 undefined、halt、continue 三个控制符号。三者必须是不同的 symbol；省略时使用库提供的默认集合。',
+        defaultValue: 'MiddlewarePipelineGeneratorSignals',
+        type: 'IGeneratorMiddlewareSignals',
+        whenToUse: '既有生成器函数已经返回一套共享的自定义控制符号。',
+        example: 'MiddlewarePipelineGeneratorSignals'
+      },
+      {
+        name: 'combineStageAndDownstreamError',
+        description:
+          '当前函数和它已启动的后续任务都失败时，合并两个错误。省略回调时，异步 run() 会以包含两个原始错误的 AggregateError 拒绝，调用方需要捕获它。',
+        defaultValue: '包含两个失败的 AggregateError',
+        type: '(stage: unknown, downstream: unknown) => unknown',
+        whenToUse: '应用需要使用自己的错误包装，同时保留两个原始错误。',
+        example: '(stage, downstream) => new AggregateError([stage, downstream])'
+      }
+    ]
   }),
   'serialize:codec:asCodecValue': createStorageContractGuide({
     purposeEn:

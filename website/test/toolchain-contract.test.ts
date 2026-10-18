@@ -296,18 +296,20 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   assert.ok(
     symbols.every((symbol) => symbol.signature.length > 0 && symbol.source.startsWith('packages/'))
   )
+  /** 5c067227 preserves authored classifications; missing prose must not become invented guarantees. */
   assert.ok(
     symbols.every(
       (symbol) =>
         symbol.purpose.length > 0 &&
         symbol.core.length > 0 &&
-        symbol.advanced.length > 0 &&
+        typeof symbol.advanced === 'string' &&
         symbol.parameters.length > 0 &&
         symbol.returns.length > 0 &&
-        symbol.errors.length > 0 &&
-        symbol.lifecycleConcurrency.length > 0 &&
-        symbol.whenToUse.length > 0 &&
-        symbol.notUse.length > 0 &&
+        Array.isArray(symbol.errors) &&
+        symbol.errors.every((error) => typeof error === 'string' && error.length > 0) &&
+        typeof symbol.lifecycleConcurrency === 'string' &&
+        typeof symbol.whenToUse === 'string' &&
+        typeof symbol.notUse === 'string' &&
         symbol.sections.length === 6 &&
         symbol.sections.map((section) => section.id).join(',') ===
           'introduction,getting-started,when-to-use,quick-implementation,core-usage,advanced-usage'
@@ -470,7 +472,12 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
   /** Coroutine BC1 removes createCoroutineHost while keeping the createCoroutinePlugin export. */
   /** The canonical defaultRpcReporter adds one runtime export to the reviewed RPC surface. */
   /** Removing four Bridge exports and adding one Process binding yields net minus three. */
-  assert.equal(runtimeSymbols.length, 334)
+  /**
+   * API audits 649eee7e/99b92efe/4c88a2c5 retire eleven runtime entries. The two RuntimeEventName
+   * re-exports are aliases; 5c067227 also projects the wire-error JSON default and
+   * identifyRpcBoundaryFailure as canonical entries: 334 - 13 + 2 = 323.
+   */
+  assert.equal(runtimeSymbols.length, 323)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -764,7 +771,8 @@ test('SITE-T-EVENT-GUIDES gives every event-subscriber function a bilingual task
   const functions = apis.flatMap((api) =>
     api.symbols.filter((symbol) => /^[a-z]/.test(symbol.name)).map((symbol) => ({ api, symbol }))
   )
-  assert.equal(functions.length, 14)
+  /** API audit e3a98b85 removed defineEventApiStyle in favor of the native event builders. */
+  assert.equal(functions.length, 13)
   for (const { api, symbol } of functions)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -1072,20 +1080,16 @@ test('SITE-T-CAPABILITY-COVERAGE separates gates, static graphs, dynamic graphs,
     }
 })
 
-test('SITE-T-MIDDLEWARE-API-COVERAGE keeps every runner and supported adapter distinct', () => {
-  /** Middleware entry points and the configuration owned by each runner. */
+test('SITE-T-MIDDLEWARE-API-COVERAGE documents the canonical runner and supported adaptation boundary', () => {
+  /**
+   * Commit ac5ed837 removed the eight public run/adapt helpers; createPipeline owns run() and
+   * lift().
+   */
   const targets = [
-    ['runSyncMiddleware', ['signal']],
     [
-      'runAsyncMiddleware',
-      ['onViolation', 'assertActive', 'combineStageAndDownstreamError', 'signal']
-    ],
-    ['runGeneratorMiddleware', ['signal']],
-    ['runAsyncGeneratorMiddleware', ['signal']],
-    ['adaptSyncStageToAsync', []],
-    ['adaptSyncStageToGenerator', []],
-    ['adaptGeneratorStageToAsyncGenerator', []],
-    ['adaptSyncStageToAsyncGenerator', []]
+      'createPipeline',
+      ['mode', 'onViolation', 'assertActive', 'signal', 'signals', 'combineStageAndDownstreamError']
+    ]
   ] as const
   for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
@@ -1242,21 +1246,19 @@ test('SITE-T-STORE-WORKER-COMPUTE-COVERAGE separates client, provider, and Resou
 })
 
 test('SITE-T-STORE-WORKER-SERIALIZE-COVERAGE explains streams, byte ownership, and cleanup', () => {
+  /** API audit a384c4d3 keeps only serialize/worker public; wire-value helpers are internal. */
   const targets = [
     [
-      'serialize',
+      'serialize/worker',
       'workerParser',
       ['worker', 'type', 'terminateOnDispose', 'ownership', 'clientId']
     ],
     [
-      'serialize',
+      'serialize/worker',
       'workerPlugin',
       ['worker', 'type', 'terminateOnDispose', 'ownership', 'clientId']
     ],
-    ['serialize', 'createSerializeWorkerHandler', ['parser', 'post']],
-    ['serialize', 'encodeWorkerValue', ['value']],
-    ['serialize', 'decodeWorkerValue', ['value']],
-    ['serialize', 'transferablesOf', ['chunk', 'ownership']],
+    ['serialize/worker', 'createSerializeWorkerHandler', ['parser', 'post']],
     ['index', 'createStoreWorkerError', ['code', 'message', 'options.cause']],
     ['index', 'createStoreWorkerAggregateError', ['code', 'errors', 'message']]
   ] as const
@@ -1283,12 +1285,13 @@ test('SITE-T-STORE-WORKER-SERIALIZE-COVERAGE explains streams, byte ownership, a
 })
 
 test('SITE-T-STORE-WASM-FIELD-COVERAGE separates readiness, scalar, bucket, and record semantics', () => {
+  /** The array(length, granularity) function stores f64 values; it has no item-builder parameter. */
   const targets = [
     ['ensureWasm', []],
     ['number', []],
     ['boolean', []],
     ['string', ['maxBytes']],
-    ['array', ['item', 'length', 'granularity']],
+    ['array', ['length', 'granularity']],
     ['record', ['shape']],
     ['createStoreWasmError', ['code', 'message', 'options.cause']],
     ['createStoreWasmRangeError', ['code', 'message']],
@@ -1472,8 +1475,8 @@ test('SITE-T-STORE-KEYED-PROTOCOL documents brands, cross-runtime access, and im
     ['atom-definition', 'assertNotThenable', ['value', 'context']],
     ['reactive-atom', 'atomGetter', ['runtime']],
     ['reactive-atom', 'atomSetter', ['runtime']],
-    ['index', 'readOpticPath', ['value', 'path', 'label']],
-    ['index', 'writeOpticPath', ['value', 'path', 'next', 'label']]
+    ['optics', 'readOpticPath', ['value', 'path', 'label']],
+    ['optics', 'writeOpticPath', ['value', 'path', 'next', 'label']]
   ] as const
 
   for (const [moduleName, symbolName, expectedOptions] of targets)
@@ -1511,8 +1514,8 @@ test('SITE-T-STORE-KEYED-HELPERS documents keyed lookup, transforms, and cache c
 
   for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('store-keyed', 'index', symbolName, locale)
-      assert.ok(guide, `store-keyed:index#${symbolName} has no ${locale} helper guide`)
+      const guide = findApiGuide('store-keyed', 'optics', symbolName, locale)
+      assert.ok(guide, `store-keyed:optics#${symbolName} has no ${locale} helper guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -1572,17 +1575,9 @@ test('SITE-T-STORE-KEYED-CONSTANTS explains discriminators without fake configur
     }
 })
 
-test('SITE-T-STORE-INDEXED-COLLECTIONS documents factories, classes, and ownership', () => {
-  const targets = [
-    'observableObject',
-    'ObservableObject',
-    'observableArray',
-    'ObservableArray',
-    'observableMap',
-    'ObservableMap',
-    'observableSet',
-    'ObservableSet'
-  ] as const
+test('SITE-T-STORE-INDEXED-COLLECTIONS documents classes and ownership', () => {
+  /** API audit 87ed84be removed lowercase observableObject/Array/Map/Set factories. */
+  const targets = ['ObservableObject', 'ObservableArray', 'ObservableMap', 'ObservableSet'] as const
 
   for (const symbolName of targets)
     for (const locale of ['en', 'zh'] as const) {
@@ -1636,14 +1631,14 @@ test('SITE-T-STORE-INDEXED-DIAGNOSTICS documents constants and native error iden
 })
 
 test('SITE-T-STORE-MIDDLEWARE-POLICY-CLONE separates mutation admission and snapshot guarantees', () => {
+  /** API audit 7f681bd4 removed tolerantClone; callers choose an explicit clone policy. */
   const targets = [
     ['index', 'createMutationPolicy', ['mode']],
     ['index', 'MutationPolicy', ['mode']],
     ['tolerant-clone', 'immutableSnapshotClone', ['value']],
     ['tolerant-clone', 'opaqueReferenceClone', ['value']],
     ['tolerant-clone', 'diagnosticClone', ['value']],
-    ['tolerant-clone', 'ClonePolicy', []],
-    ['tolerant-clone', 'tolerantClone', ['value']]
+    ['tolerant-clone', 'ClonePolicy', []]
   ] as const
 
   for (const [moduleName, symbolName, expectedOptions] of targets)
@@ -1668,6 +1663,7 @@ test('SITE-T-STORE-MIDDLEWARE-POLICY-CLONE separates mutation admission and snap
 })
 
 test('SITE-T-STORE-MIDDLEWARE-HOST documents binding, plugins, DevTools, and every Host control', () => {
+  /** API audit 7f681bd4 removed middlewarePlugin; install native plugins through the Host. */
   const hostOptions = [
     'execution.mutationTimeoutMs',
     'execution.pipelineDrainTimeoutMs',
@@ -1695,7 +1691,6 @@ test('SITE-T-STORE-MIDDLEWARE-HOST documents binding, plugins, DevTools, and eve
         'options.clone'
       ]
     ],
-    ['middlewarePlugin', ['name', 'middleware']],
     ['loggerMiddleware', ['sink']],
     ['createReduxDevToolsAdapter', ['connection']]
   ] as const
@@ -2495,6 +2490,10 @@ test('SITE-T-STORAGE-WEB-BOUNDARIES documents internal names, metadata, namespac
 })
 
 test('SITE-T-STORAGE-WEB-PLUGINS documents non-reactive factories and custom reactive adapters', () => {
+  /**
+   * Commit c8d24f68 made custom reactive features store-owned; the definition no longer takes
+   * backendKind.
+   */
   const targets = [
     ['plugins-memory', 'memoryBackendPlugin', ['id']],
     ['plugins-local-storage', 'localStorageBackendPlugin', ['storage']],
@@ -2521,7 +2520,7 @@ test('SITE-T-STORAGE-WEB-PLUGINS documents non-reactive factories and custom rea
     [
       'reactive-adapter',
       'defineReactiveAdapterFeature',
-      ['backendKind', 'mode', 'pollIntervalMs', 'visibility', 'subscribe']
+      ['mode', 'pollIntervalMs', 'visibility', 'subscribe']
     ]
   ] as const
 

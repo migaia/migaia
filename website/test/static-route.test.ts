@@ -394,9 +394,11 @@ test('SITE-T-SEMANTIC-ROUTES keeps API links stable, readable, and collision-saf
     routeManifest.entries.some((entry) => /\/[A-Za-z_$][\w$]*-[a-f0-9]{10}$/.test(entry.path)),
     false
   )
+  /** API audit 87ed84be removed lowercase factories, so ObservableArray has no name collision. */
+  assert.ok(routes.has('/en/docs/store-indexed/api/ObservableArray'))
+  assert.equal(routes.has('/en/docs/store-indexed/api/observableArray-function'), false)
+  assert.equal(routes.has('/en/docs/store-indexed/api/ObservableArray-class'), false)
   for (const path of [
-    '/en/docs/store-indexed/api/observableArray-function',
-    '/en/docs/store-indexed/api/ObservableArray-class',
     '/en/docs/store-shared/api/sharedInt32Array-const',
     '/en/docs/store-shared/api/SharedInt32Array-class'
   ])
