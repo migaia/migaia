@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createMutationPolicy, createStoreMiddlewareHost, middlewarePlugin } from '../src/index'
+import {
+  createMutationPolicy,
+  createStoreMiddlewareHost,
+  type IStoreMiddlewarePlugin
+} from '../src/index'
 import { createRuntime } from '@migaia/reactive'
 
 /** Explicit unbounded policy used by the Store export smoke test. */
@@ -21,12 +25,16 @@ describe('store-middleware exports', () => {
       pipeline: { mode: 'async' }
     })
 
-    await host.use(
-      middlewarePlugin<{ value: number }>('capture', (event, _context, next) => {
-        events.push(event.type)
-        next()
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          events.push(event.type)
+          next(event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<{ value: number }>)
     host.recordState('test', { value: 0 }, { value: 1 })
     expect(events).toEqual(['state'])
 

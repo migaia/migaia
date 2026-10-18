@@ -1,3 +1,7 @@
+import { ReduxDevToolsCommand } from './devtools-constants.js'
+import { identifyMiddlewareFailure } from './error-boundary.js'
+import { getDefaultRuntime } from '@migaia/reactive/extension'
+import { ReactiveErrorPhase } from '@migaia/reactive'
 import type { IDisposer, IRuntime } from '@migaia/reactive'
 import type { IMutationGuard } from '@migaia/store-light'
 import { createStoreMiddlewareError } from './errors.js'
@@ -8,8 +12,6 @@ import {
   MiddlewareEventPhase,
   MiddlewareEventType
 } from './event-constants.js'
-
-export type { IMutationGuard, IMutationPolicy } from '@migaia/store-light'
 
 /** Controls strict mutation policy. Defaults to `off` to preserve existing store behavior. */
 export type IMutationPolicyMode = 'off' | 'actions-only'
@@ -39,6 +41,8 @@ export class MutationPolicy implements IMutationGuard {
     this.#actionDepth++
     try {
       return fn()
+    } catch (error) {
+      throw identifyMiddlewareFailure(error)
     } finally {
       this.#actionDepth--
     }
@@ -97,21 +101,6 @@ export type IMiddlewareEvent<S> =
   | IMiddlewareStateEvent<S>
   | IMiddlewareErrorEvent
 
-/**
- * Provides the legacy middleware context used by migration adapters. New code uses
- * `IStoreMiddlewarePlugin`.
- */
-export type IMiddlewareContext<S> = {
-  readonly runtime: IRuntime
-  readonly getState: () => S
-}
-
-export type IStoreMiddleware<S> = (
-  event: IMiddlewareEvent<S>,
-  context: IMiddlewareContext<S>,
-  next: () => void
-) => void
-
 export type IDevToolsCommand<S> =
   | { readonly type: typeof MiddlewareCommandType.jump; readonly state: S }
   | { readonly type: typeof MiddlewareCommandType.reset; readonly state: S }
@@ -137,35 +126,47 @@ export type IReduxDevToolsConnection<S> = {
 
 /** Converts Redux DevTools messages into store middleware domain events. */
 export function createReduxDevToolsAdapter<S>(
-  connection: IReduxDevToolsConnection<S>
+  connection: IReduxDevToolsConnection<S>,
+  runtime: IRuntime = getDefaultRuntime()
 ): IDevToolsAdapter<S> {
   return {
     init: (state) => connection.init(state),
     send: (event, state) => connection.send({ type: middlewareEventLabel(event), event }, state),
     subscribe(listener) {
       return connection.subscribe((message) => {
-        if (message.type !== 'DISPATCH') return
+        if (message.type !== ReduxDevToolsCommand.dispatch) return
         const type = message.payload?.type
-        if (type === 'COMMIT') {
+        if (type === ReduxDevToolsCommand.commit) {
           listener({ type: MiddlewareCommandType.commit })
           return
         }
         if (
-          type !== 'JUMP_TO_STATE' &&
-          type !== 'JUMP_TO_ACTION' &&
-          type !== 'ROLLBACK' &&
-          type !== 'RESET'
+          type !== ReduxDevToolsCommand.jumpToState &&
+          type !== ReduxDevToolsCommand.jumpToAction &&
+          type !== ReduxDevToolsCommand.rollback &&
+          type !== ReduxDevToolsCommand.reset
         )
           return
         if (message.state === undefined) return
         let state: S
         try {
           state = JSON.parse(message.state) as S
-        } catch {
+        } catch (error) {
+          runtime.reportError(
+            identifyMiddlewareFailure(
+              error,
+              StoreMiddlewareErrorCode.devtoolsMessageInvalid,
+              StoreMiddlewareErrorText.devtoolsMessageInvalid
+            ),
+            { phase: ReactiveErrorPhase.traceListener }
+          )
           return
         }
         listener({
-          type: type === 'RESET' ? MiddlewareCommandType.reset : MiddlewareCommandType.jump,
+          type:
+            type === ReduxDevToolsCommand.reset
+              ? MiddlewareCommandType.reset
+              : MiddlewareCommandType.jump,
           state
         })
       })

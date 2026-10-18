@@ -132,7 +132,7 @@ const host = bindStoreMiddleware(store, {
 
 - ① 是真正生效的一半：Store 的 `$batch()`/`$set()`/action 方法调用会经过 `mutationPolicy.runInAction(() => runtime.batch(fn))`，直接字段赋值（比如 `store.count = 1`）会先过 `assertMutationAllowed('set(count)')`。
 - ② 只是把同一个实例挂到 `host.mutationPolicy` 上，供你在别处读取 `host.mutationPolicy.insideAction`，或者用 `host.runAction()` 包裹**不是** Store 方法、但你也想纳入同一套 action 边界判断的代码。
-- 如果 ①②两处各自调用 `createMutationPolicy()` 生成两个独立实例，`actions-only` 完全不会生效——Store 内部判断走的是它自己那个实例的 `actionDepth`，和 `bindStoreMiddleware` 传入的实例毫无关系。这是本包最容易踩的坑，**没有共享同一个实例，`actions-only` 就是摆设**。
+- 两个独立策略不会取消 Store 自己的直接写守卫；Store action 仍能进入其自身作用域。只有同实例时，host.runAction 才能替 Store 策略授权。
 - `bindStoreMiddleware()` 转发 Store 自己的 action trace 时，用的是 `host.emit()` 直接派发事件，**不会**再调用一次 `host.runAction()`（否则会重复触发 ①的 `runInAction`，虽然重入安全，但会产生重复的 action 事件）。真正让 `actionDepth` 递增的，只有 `createStore` 内部对 action/`$batch`/`$set` 的包裹，以及你显式调用的 `host.runAction()`/`mutationPolicy.runInAction()`。
 
 ### 独立使用（不接 Store）
@@ -155,20 +155,28 @@ policy.runInAction(() => {
 function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;
 
 // 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员
-type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {
-  readonly mutationPolicy: MutationPolicy;
-  emit(event: IMiddlewareEvent<S>): void;
-  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;
+// IStoreMiddlewareSurface 用于展开领域成员，不是新增根导出。
+type IStoreMiddlewareSurface<S> = Readonly<{
+  readonly mutationPolicy: MutationPolicy
+  emit(event: IMiddlewareEvent<S>): void
+  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T
   recordState(
     name: string,
     previous: S,
     next: S,
     metadata?: Readonly<Record<string, unknown>>
-  ): void;
-  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;
-  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'
-  attachBindingDisposer(disposer: IDisposer): void;
-};
+  ): void
+  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void
+  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>
+  attachBindingDisposer(disposer: IDisposer): void
+}>
+
+type IStoreMiddlewareHost<S> = IHostHandle<
+  IStoreMiddlewareCore<S>,
+  IMiddlewareEvent<S>,
+  readonly [],
+  IStoreMiddlewareSurface<S>
+>
 
 type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
   runtime: IRuntime;
@@ -182,12 +190,12 @@ type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
 
 | 方法                                           | 参数类型                                                                                 | 同步/异步 | 行为                                                                                                                                                                                                               | 抛错语义                                    |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| `emit(event)`                                  | `event: IMiddlewareEvent<S>`                                                             | 同步      | 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错                                                                         | 不抛错，异常通过 `runtime.reportError` 上报 |
+| `emit(event)`                                  | `event: IMiddlewareEvent<S>`                                                             | 同步      | 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，公开 emit 的 pipeline 失败可同步传播                                                                         | 可同步抛出 pipeline 错误；遗漏 next 另行报告 |
 | `runAction(name, fn, metadata?)`               | `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>`            | 同步      | 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后**重新抛出原始异常**                                | `fn` 抛出的异常会正常向调用方传播           |
 | `recordState(name, previous, next, metadata?)` | `name: string`；`previous: S`；`next: S`；`metadata?: Readonly<Record<string, unknown>>` | 同步      | 派发一个 `state` 事件                                                                                                                                                                                              | 中间件抛错被隔离，不会传给调用方            |
 | `recordError(phase, error, metadata?)`         | `phase: string`；`error: unknown`；`metadata?: Readonly<Record<string, unknown>>`        | 同步      | 派发一个 `error` 事件；如果在处理上一个 `error` 事件期间**又**调用了 `recordError`（重入），直接把新错误转发给 `runtime.reportError({ phase: 'trace-listener' })`，不会再触发一轮 pipeline，避免错误处理本身死循环 | 不抛错                                      |
 | `connectDevTools(adapter, name?)`              | `adapter: IDevToolsAdapter<S>`；`name?: string`                                          | 异步      | 见 [§7](#7-devtools-集成)                                                                                                                                                                                          | 安装失败按 `host.use()` 的规则处理    |
-| `attachBindingDisposer(disposer)`              | `disposer: IDisposer`                                                                    | 同步      | 登记一个额外的清理函数，`dispose()` 时按后进先出顺序执行，先于插件卸载                                                                                                                                             | —                                           |
+| `attachBindingDisposer(disposer)`              | `disposer: IDisposer`                                                                    | 同步      | 登记一个额外的清理函数，`dispose()` 时按后进先出顺序执行，先于插件卸载；关闭开始后新登记立即执行，同步失败向调用方传播                                                                                                                                             | —                                           |
 
 **所有派发方法（`runAction`/`recordState`/`recordError`）对中间件本身抛出的异常都是隔离的**——一个写日志的中间件报错，不会影响业务代码继续执行；唯一的例外是 `runAction()` 包裹的**业务函数 `fn`** 抛错，这个异常按原样向外传播，因为那是业务逻辑本身的失败，不是中间件诊断层的失败。
 
@@ -217,9 +225,12 @@ type IStoreMiddlewareBindingOptions = {
   clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic
 };
 
-type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<
-  Record<string, unknown>
-> & { readonly store: IReactiveStore<S> };
+type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<
+  IStoreMiddlewareCore<Record<string, unknown>>,
+  IMiddlewareEvent<Record<string, unknown>>,
+  readonly [],
+  IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S> }
+>
 
 function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
@@ -229,7 +240,7 @@ function bindStoreMiddleware<S extends Record<string, unknown>>(
 
 这是接入一个已有 `@migaia/store-light` Store 的推荐入口，内部做了三件事：
 
-1. **创建 Host**：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取都是一份新的快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。
+1. **创建 Host**：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取尽力复制；不可复制子树可能与 Store、其它中间件或其它读取共享引用，不保证全树隔离。`applyState` 桥接到 `store.$hydrate(state)`。
 2. **订阅状态变化**：`store.$subscribe(() => { ... })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。
    - `previous` 的初值是**绑定那一刻**的 `clone(store.$plain())`——如果 Store 在 `bindStoreMiddleware()` 调用之前已经有过状态变化，这些历史变化不会被回溯出事件，第一条 `state` 事件的 `previous` 反映的是"绑定时刻"的状态，不是"Store 创建时刻"的状态。
 3. **订阅 Runtime action trace**：`store.$runtime.subscribeTrace((event) => { ... })`——只转发 `event.type === 'action'` 的 trace，且如果传了 `actionPrefix`，只转发 `event.name` 以该前缀开头的 action；转发时直接调用 `host.emit(...)` 构造对应的 `action:start`/`action:end`/`action:error` 事件（**不经过** `host.runAction()`，不会重复触发 `mutationPolicy.runInAction`）。
@@ -266,20 +277,7 @@ await host.use(audit);
 await host.unUse('audit');
 ```
 
-如果只是想写一个更简单的 `(event, context, next) => void` 函数（旧式 `IStoreMiddleware<S>` 形状），用 `middlewarePlugin()` 适配成插件：
-
-```ts
-import { middlewarePlugin } from '@migaia/store-middleware';
-
-const audit = middlewarePlugin<AppState>('audit', (event, context, next) => {
-  next();
-  auditSink({ event, state: context.getState() });
-});
-
-await host.use(audit);
-```
-
-`context` 只有 `{ runtime, getState }` 两个字段，没有 `config`/`getShared`/`onDispose`——需要这些通用插件能力时应该直接写 `IStoreMiddlewarePlugin`，而不是这个简化的函数形状。`middleware()` 函数体里如果不调用 `next()`，这个事件不会继续往后面的插件传递（但不影响已经发生的 Store 写入）。
+旧 middlewarePlugin/IStoreMiddleware/IMiddlewareContext 适配路已删除；直接采用上面的 canonical plugin 与 sync stage。
 
 内置的 `loggerMiddleware(sink?)`：
 
@@ -289,7 +287,7 @@ function loggerMiddleware<S>(
 ): IStoreMiddlewarePlugin<S>;
 ```
 
-默认 `sink` 是 `console.log('[store]', event, state)`；插件名固定 `'store-logger'`；每个事件先放行给下游插件（`next(event)`），再调用 `sink(event, core.getState())`——`state` 是调用 `sink` 那一刻的最新快照，不是事件产生时的快照。
+默认 `sink` 是 `console.log('[store]', event, state)`；插件名固定 `'store-logger'`；每个事件先用 `next(event)` 记录继续值，再在当前 stage 内调用 `sink(event, core.getState())`；下游在当前 stage 返回后才执行——`state` 是调用 `sink` 那一刻的最新快照，不是事件产生时的快照。
 
 **一个插件 stage 最多调用一次 `next(event)`。** 不调用 `next()` 只会阻止事件继续传给后面的插件，不会撤销已经发生的 Store 写入——重复或延迟调用会被 `@migaia/plugin-host` 报告为 pipeline 违规（见其 USEGUIDE 的 `PIPELINE_NEXT_DUPLICATE`/`PIPELINE_NEXT_LATE`）。插件需要监听外部资源时，在 `install(core)` 内调用 `core.onDispose(disposer)`；卸载时 Host 自动清理。
 
@@ -308,14 +306,15 @@ type IDevToolsAdapter<S> = {
 };
 
 function createReduxDevToolsAdapter<S>(
-  connection: IReduxDevToolsConnection<S>
+  connection: IReduxDevToolsConnection<S>,
+  runtime?: IRuntime
 ): IDevToolsAdapter<S>;
 ```
 
 `createReduxDevToolsAdapter()` 把一个符合 Redux DevTools 扩展协议的 `connection`（`init`/`send`/`subscribe`）转换成本包的 `IDevToolsAdapter`：
 
 - `send` 会把事件包装成 `{ type: '<name>:<phase>' 或 '<name>' 或 'error:<phase>', event }` 发给 `connection.send()`。
-- `subscribe` 只识别 `message.type === 'DISPATCH'` 的消息；`payload.type` 为 `COMMIT` 时产生 `{ type: 'commit' }`；为 `JUMP_TO_STATE`/`JUMP_TO_ACTION`/`ROLLBACK`/`RESET` 且 `message.state` 存在时，尝试 `JSON.parse(message.state)`，解析失败静默忽略这条消息；`RESET` 映射成 `{ type: 'reset' }`，其余映射成 `{ type: 'jump' }`。
+- `subscribe` 只识别 `message.type === 'DISPATCH'` 的消息；`payload.type` 为 `COMMIT` 时产生 `{ type: 'commit' }`；为 `JUMP_TO_STATE`/`JUMP_TO_ACTION`/`ROLLBACK`/`RESET` 且 `message.state` 存在时，尝试 `JSON.parse(message.state)`，解析失败不执行该命令，并向可选 runtime（默认共享 Runtime）报告原 SyntaxError/DEVTOOLS_MESSAGE_INVALID；`RESET` 映射成 `{ type: 'reset' }`，其余映射成 `{ type: 'jump' }`。
 
 `host.connectDevTools(adapter, name = 'store-devtools')` 内部把 adapter 包成一个插件并 `await host.use(plugin)`：
 
@@ -350,25 +349,23 @@ const ClonePolicy: {
   diagnostic: typeof diagnosticClone;
 };
 
-/** @deprecated 用 ClonePolicy.diagnostic（或 diagnosticClone），行为相同，名字更明确 */
-const tolerantClone: typeof diagnosticClone;
 ```
 
 | 方法/签名                                                  | 参数类型   | 同步/异步 | 行为                                                                                                                                                                               | 适合谁                                                                                             |
 | ---------------------------------------------------------- | ---------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `ClonePolicy.immutable`（`immutableSnapshotClone(value)`） | `value: T` | 同步      | 优先用 `structuredClone`；当前环境没有 `structuredClone`，或值里含有函数/DOM 句柄/类实例等不可克隆内容时，**抛错**而不是悄悄返回一份共享引用                                       | 需要"这一定是独立快照"这个保证的调用方——比如把 `previous` 当作历史记录长期持有，不能被后续写入污染 |
+| `ClonePolicy.immutable`（`immutableSnapshotClone(value)`） | `value: T` | 同步      | 先接纳严格数据图再交给 Utils 克隆；缺少 `structuredClone`，或值里含有函数/DOM 句柄/类实例等不可克隆内容时，**抛错**而不是悄悄返回一份共享引用                                       | 需要"这一定是独立快照"这个保证的调用方——比如把 `previous` 当作历史记录长期持有，不能被后续写入污染 |
 | `ClonePolicy.opaque`（`opaqueReferenceClone(value)`）      | `value: T` | 同步      | 不做任何拷贝，直接返回同一个引用                                                                                                                                                   | 已经明确知道部分状态不可克隆、接受引用共享，或只是想要最低开销的"快照"                             |
 | `ClonePolicy.diagnostic`（`diagnosticClone(value)`）       | `value: T` | 同步      | 优先 `structuredClone`；失败时退回递归拷贝：可以拷贝的部分（plain object/array）逐层深拷贝，**只有真正不可克隆的那个子树**按引用保留，不会因为树里一处不可克隆就放弃整棵树的独立性 | 中间件、DevTools 这类诊断场景——可用性优先于严格性，一个不常见的字段值不应该让整条诊断链路崩溃      |
 
 `bindStoreMiddleware()` 默认用的是 `state => ClonePolicy.diagnostic(state)`：尽力深拷贝，遇到不可结构化克隆的值（类实例、外部句柄等）时按引用保留那个子树，不抛错。需要严格独立快照时显式传 `options.clone: ClonePolicy.immutable`（做不到就抛错）；接受引用共享、换取零开销时传 `ClonePolicy.opaque`。
 
-`diagnosticClone` 的递归兜底细节：数组逐项递归；非 `Object.prototype` 原型的值（`Map`/`Set`/`Date`/`RegExp`/类实例/Proxy/宿主对象）直接按引用返回，不会伪造一个丢失原型和方法的普通对象；plain object 只拷贝可枚举属性，accessor 属性会读取其当前值合入拷贝（和 `structuredClone` 的行为保持一致），并对 `__proto__` 键做了显式处理避免原型链污染；用 `WeakMap` 记录已访问对象处理循环引用。
+`diagnosticClone` 的 fallback 递归复制 plain object/array；可复制 Date/RegExp/Map/Set/ArrayBuffer/TypedArray 子树单独 structuredClone；函数、不支持类或宿主子树可保留原引用。枚举访问器按 canonical utils 行为读取并记录，__proto__ 用 defineProperty 写入，循环/共享结构由 canonical traversal 处理；不承诺全树隔离。
 
 ---
 
 ## 9. Pipeline 模式与错误边界
 
-包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为
+本包创建的错误带 `source: '@migaia/store-middleware'` 与稳定 `code`；Reactive、pipeline 及其它已编码错误保留实际 owner。独立动作与 binding disposer 的未编码失败附 CALLBACK_FAILED；不可附码的原值经 cause/errors 保留。`actions-only` 越界写入为
 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告
 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；`bindStoreMiddleware()` 绑定失败且回滚清理也失败时为 `CLEANUP_FAILED`。
 
@@ -376,7 +373,7 @@ Host 的 pipeline 模式**固定是 `sync`**（见 [§4](#4-istoremiddlewarehost
 
 - 中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。
 - sync 是"扁平转换管道"：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回**之后**才执行，当前 stage 调用 `next()` 之后无法同步观察到下游已经处理完的结果（想要"后置逻辑能看到下游效果"的洋葱模型语义，需要 async pipeline——但本包的 Host 不支持切换）。
-- `emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走隔离派发（`emitIsolated`）：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，**不会**从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。
+- 公开 emit 直接执行同步 pipeline，可向调用方传播错误；recordState/recordError 与 runAction 的观察事件使用隔离派发并向 Runtime 报告。runAction 业务函数失败继续抛出，保留其实际错误 owner。
 - 如果一个 pipeline stage 忘了调用 `next()`，`emit()` 会检测到 `completed` 标记未被置位，同样以 `phase: 'trace-listener'` 上报一条 `[store] middleware did not call next()` 错误。
 
 更细的 pipeline 执行顺序、错误码、`onDispose` 清理协议等通用机制，见 `@migaia/plugin-host` 的 USEGUIDE。
@@ -409,7 +406,7 @@ Host 的 pipeline 模式**固定是 `sync`**（见 [§4](#4-istoremiddlewarehost
 ## 12. 常见问题排查
 
 **Q：设了 `mutationPolicy: createMutationPolicy('actions-only')`，但 action 外直接改字段没有报错。**
-检查是否把**同一个** `MutationPolicy` 实例同时传给了 `createStore({ mutationPolicy })` 和 `bindStoreMiddleware(store, { mutationPolicy })`。只传给其中一个不会生效——真正拦截写入的是 `createStore` 那一侧，见 [§3](#3-mutationpolicy-写入策略)。
+先确认 Store 构造时传入了 actions-only 策略；这决定直接写保护。绑定侧传另一实例不会取消它，但 host.runAction 不能替 Store 策略授权。共享实例用于统一宿主与 Store 的 action 边界。
 
 **Q：装了一个用 `useAsyncPipeline` 注册 stage 的插件，报 `PIPELINE_MODE_MISMATCH`。**
 Host 的 pipeline 模式固定是 `sync`，创建时传的 `pipeline.mode` 会被强制覆盖，见 [§4](#4-istoremiddlewarehost-api-参考)。中间件只能用 `core.usePipeline`。
@@ -418,10 +415,10 @@ Host 的 pipeline 模式固定是 `sync`，创建时传的 `pipeline.mode` 会�
 创建 Host 时没有传 `applyState`；如果是自己调用 `createStoreMiddlewareHost(...)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。
 
 **Q：`state` 事件里的 `previous`/`next` 拿到的是同一个对象，改了一个另一个也变了。**
-检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `ClonePolicy.diagnostic` 或显式传 `ClonePolicy.immutable`。
+检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用显式传 `ClonePolicy.immutable`；默认 diagnostic 仍可共享不支持子树。
 
 **Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。**
-默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。如果不需要"绝对独立"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。
+默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。默认策略不提供绝对独立保证；若明确接受完全共享，可换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。
 
 **Q：同一个 action 在中间件里被记录了两次。**
 检查是否在 `bindStoreMiddleware()` 已经转发了 Store 自身 action trace 的情况下，又手动用 `host.runAction()` 包了一遍同一个 Store 方法——两条路径都会各自派发一次 `action` 事件，见 [§5](#5-bindstoremiddleware-完整行为)。
@@ -432,3 +429,22 @@ Host 的 pipeline 模式固定是 `sync`，创建时传的 `pipeline.mode` 会�
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
+### 错误构造入口
+
+```ts
+function createStoreMiddlewareError(code: IStoreMiddlewareErrorCode, message: string, options?: { readonly cause?: unknown }): Error;
+function createStoreMiddlewareAggregateError(code: IStoreMiddlewareErrorCode, errors: readonly unknown[], message: string): AggregateError;
+```
+
+它们只返回原生错误，不自动抛出；保留 stack。显式 cause（包括 undefined）由 Error 保存，AggregateError.errors 保留输入错误对象。STORE_MIDDLEWARE_SOURCE 只用于本包创建的错误，外包编码错误保持实际 owner。CALLBACK_FAILED 用于未编码的同步动作/disposer 失败；DEVTOOLS_MESSAGE_INVALID 用于报告支持 Redux 命令里的非法 JSON。immutable 失败的 cause 是完整 Utils 错误，原生复制失败在其下游 cause 上。
+
+immutable 的严格数据契约：接纳普通/null 原型记录、普通数组、当前 realm 的原生 Map/Set/Date/RegExp/ArrayBuffer、非共享 ArrayBuffer 支持的标准 TypedArray/DataView。自定义 class（包括内建子类）、访问器与其它未接纳的原生对象以 CLONE_UNSUPPORTED 拒绝；访问器在求值前拒绝，不额外执行 getter。Map key/value、Set 成员及记录/数组数据递归接纳，循环与共享引用仍由唯一的 utils structuredClone 保持。此收窄修正旧版 class 静默丢方法的问题；旧版 getter、跨 realm 内建值及未列类型需迁移为支持的数据，或显式选择 diagnostic/opaque。Utils.immutableSnapshot 原生投影契约不变。本策略不另实现 clone 引擎。
+
+API convergence：克隆五名只从既有 `/tolerant-clone` 导入；deprecated tolerantClone 两入口均删除。IMutationGuard/IMutationPolicy 从 `@migaia/store-light` 直接导入。旧 middlewarePlugin/IStoreMiddleware/IMiddlewareContext 删除，迁移为 IStoreMiddlewarePlugin 与 core.usePipeline；没有 shim/alias。外部旧导入需破坏版本迁移，仓库唯一生产 clone consumer 已使用窄入口。
+
+`StoreMiddlewareErrorCode` 当前9个稳定成员：`invalidOption` (`INVALID_OPTION`)、`middlewareNotChained` (`MIDDLEWARE_NOT_CHAINED`)、`actionScopeRequired` (`ACTION_SCOPE_REQUIRED`)、`cloneUnsupported` (`CLONE_UNSUPPORTED`)、`callbackFailed` (`CALLBACK_FAILED`)、`devtoolsMessageInvalid` (`DEVTOOLS_MESSAGE_INVALID`)、`devtoolsCapability` (`DEVTOOLS_CAPABILITY`)、`envUnsupported` (`ENV_UNSUPPORTED`)、`cleanupFailed` (`CLEANUP_FAILED`)。对应值的联合为 `IStoreMiddlewareErrorCode`；两新增场景见上述边界说明。
+
+### Redux 扩展命令词表
+
+根入口导出 `ReduxDevToolsCommand` 与值联合 `IReduxDevToolsCommand`。`createReduxDevToolsAdapter` 使用 dispatch/commit/jumpToState/jumpToAction/rollback/reset 六个键，其值分别为 DISPATCH/COMMIT/JUMP_TO_STATE/JUMP_TO_ACTION/ROLLBACK/RESET。原 `@migaia/store-devtools` 的 `StoreDevtoolsCommand` / `IStoreDevtoolsCommand` 导入迁移到这里，协议字符串不变；middleware 领域命令继续使用 `MiddlewareCommandType`。

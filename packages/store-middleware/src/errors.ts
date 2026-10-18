@@ -3,7 +3,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/** `source` assigned by this package’s factories; upstream errors keep their actual owner. */
 export const STORE_MIDDLEWARE_SOURCE = '@migaia/store-middleware'
 
 function tagStoreMiddlewareError<E extends Error>(error: E, code: IStoreMiddlewareErrorCode): E {
@@ -18,7 +18,7 @@ export function createStoreMiddlewareError(
 ): Error {
   const error = new Error(
     message,
-    options?.cause !== undefined ? { cause: options.cause } : undefined
+    options !== undefined && Object.hasOwn(options, 'cause') ? { cause: options.cause } : undefined
   )
   return tagStoreMiddlewareError(error, code)
 }

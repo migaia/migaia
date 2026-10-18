@@ -1,3 +1,4 @@
+import { isImmutableSnapshotData } from './immutable-data.js'
 /**
  * ClonePolicy — three explicit, differently-guaranteed ways to hand a caller "a copy" of a value,
  * instead of one fuzzy `clone()` that quietly decides how hard to try. Each mode's name is its
@@ -33,6 +34,22 @@ import { UtilsErrorCode } from '@migaia/utils/error'
  * itself a reason to refuse rather than guess.
  */
 export function immutableSnapshotClone<T>(value: T): T {
+  /** Admission is policy-owned here; Utils remains the single graph-cloning owner. */
+  let admitted: boolean
+  try {
+    admitted = isImmutableSnapshotData(value)
+  } catch (error) {
+    throw createStoreMiddlewareError(
+      StoreMiddlewareErrorCode.cloneUnsupported,
+      StoreMiddlewareErrorText.cloneUnsupported,
+      { cause: error }
+    )
+  }
+  if (!admitted)
+    throw createStoreMiddlewareError(
+      StoreMiddlewareErrorCode.cloneUnsupported,
+      StoreMiddlewareErrorText.cloneUnsupported
+    )
   try {
     return immutableSnapshot(value)
   } catch (error) {
@@ -43,19 +60,13 @@ export function immutableSnapshotClone<T>(value: T): T {
     if (errorCode === UtilsErrorCode.envUnsupported)
       throw createStoreMiddlewareError(
         StoreMiddlewareErrorCode.envUnsupported,
-        StoreMiddlewareErrorText.immutableClone
+        StoreMiddlewareErrorText.immutableClone,
+        { cause: error }
       )
-    const cause =
-      errorCode === UtilsErrorCode.cloneUnsupported &&
-      typeof error === 'object' &&
-      error !== null &&
-      'cause' in error
-        ? (error as { readonly cause?: unknown }).cause
-        : error
     throw createStoreMiddlewareError(
       StoreMiddlewareErrorCode.cloneUnsupported,
       StoreMiddlewareErrorText.cloneUnsupported,
-      { cause }
+      { cause: error }
     )
   }
 }
@@ -87,6 +98,3 @@ export const ClonePolicy = {
   opaque: opaqueReferenceClone,
   diagnostic: diagnosticClone
 } as const
-
-/** @deprecated Use `ClonePolicy.diagnostic` (or `diagnosticClone`) — same behavior, explicit name. */
-export const tolerantClone = diagnosticClone

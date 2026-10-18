@@ -9,7 +9,10 @@
  * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StoreMiddlewareErrorCode = {
-  /** Host options were null or non-object at the JavaScript package boundary. */
+  /**
+   * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable
+   * subscribe.
+   */
   invalidOption: 'INVALID_OPTION',
   /**
    * A middleware stage omits `next()`, filtering the event chain at that stage.
@@ -27,12 +30,27 @@ export const StoreMiddlewareErrorCode = {
   actionScopeRequired: 'ACTION_SCOPE_REQUIRED',
 
   /**
-   * `ClonePolicy.immutable` receives a value that `structuredClone` cannot copy independently, such
-   * as a function, DOM handle, or class instance.
+   * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a
+   * value the canonical structured clone cannot copy. Admission supports data-only records/arrays,
+   * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage.
    *
    * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable.
    */
   cloneUnsupported: 'CLONE_UNSUPPORTED',
+
+  /**
+   * A synchronous action or binding disposer callback fails without another package identity.
+   * Native mutable errors retain their object/type/stack; fallback cause/errors retain the
+   * original. The action scope still exits and each binding cleanup is attempted once.
+   */
+  callbackFailed: 'CALLBACK_FAILED',
+
+  /**
+   * A supported Redux state command contains invalid JSON. The adapter ignores that command and
+   * reports its original SyntaxError through the requested Runtime; later valid commands still
+   * work.
+   */
+  devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID',
 
   /**
    * A DevTools state command, such as jump or reset, is called without `applyState`.

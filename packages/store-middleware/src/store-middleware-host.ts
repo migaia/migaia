@@ -1,3 +1,4 @@
+import { identifyMiddlewareFailure } from './error-boundary.js'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
   defineHost,
@@ -19,9 +20,7 @@ import {
   createMutationPolicy,
   type IDevToolsAdapter,
   type IMiddlewareEvent,
-  type IMiddlewareContext,
-  type MutationPolicy,
-  type IStoreMiddleware
+  type MutationPolicy
 } from './middleware.js'
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
 import { ClonePolicy } from './tolerant-clone.js'
@@ -89,9 +88,11 @@ function snapshotHostOptions<T>(
 ): IStoreMiddlewareHostOptions<T> {
   assertHostOptions(options)
   try {
+    /** Read pipeline once even when non-enumerable; rest excludes it from the option spread. */
+    const { pipeline, ...snapshot } = options
     return {
-      ...options,
-      pipeline: { ...options.pipeline, mode: MiddlewarePipelineMode.sync }
+      ...snapshot,
+      pipeline: { ...pipeline, mode: MiddlewarePipelineMode.sync }
     }
   } catch (error) {
     throw createStoreMiddlewareError(
@@ -108,83 +109,53 @@ function snapshotHostOptions<T>(
  * `defineHost` composes the store domain core and pre-disposal hook instead of inheriting
  * `PluginHost`. The handle exposes store members together with the host's public surface.
  */
+/** Domain members installed into the canonical plugin-host handle before it freezes. */
+type IStoreMiddlewareSurface<S> = Readonly<{
+  readonly mutationPolicy: MutationPolicy
+  emit(event: IMiddlewareEvent<S>): void
+  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T
+  recordState(
+    name: string,
+    previous: S,
+    next: S,
+    metadata?: Readonly<Record<string, unknown>>
+  ): void
+  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void
+  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>
+  attachBindingDisposer(disposer: IDisposer): void
+}>
+
 export type IStoreMiddlewareHost<S> = IHostHandle<
   IStoreMiddlewareCore<S>,
   IMiddlewareEvent<S>,
-  readonly []
-> &
-  Readonly<{
-    readonly mutationPolicy: MutationPolicy
-    emit(event: IMiddlewareEvent<S>): void
-    runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T
-    recordState(
-      name: string,
-      previous: S,
-      next: S,
-      metadata?: Readonly<Record<string, unknown>>
-    ): void
-    recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void
-    connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>
-    attachBindingDisposer(disposer: IDisposer): void
-  }>
+  readonly [],
+  IStoreMiddlewareSurface<S>
+>
 
+/** Creates one managed frozen handle with the Store domain and canonical host methods. */
 export function createStoreMiddlewareHost<S>(
   options: IStoreMiddlewareHostOptions<S>
+): IStoreMiddlewareHost<S> {
+  return createStoreMiddlewareHostCore(options)
+}
+
+/** Shared construction adds the binding's Store reference before canonical handle publication. */
+function createStoreMiddlewareHostCore<S>(
+  options: IStoreMiddlewareHostOptions<S>,
+  bindingStore?: object
 ): IStoreMiddlewareHost<S> {
   const settled = snapshotHostOptions(options)
   const runtime = settled.runtime
   const getState = settled.getState
   const applyState = settled.applyState
   const mutationPolicy = settled.mutationPolicy ?? createMutationPolicy('off')
-  /** Store 绑定的卸载器；在委托 plugin-host 清理之前按后进先出释放。 */
-  const bindingDisposers: IDisposer[] = []
+  /**
+   * Binding cleanup is LIFO while open; undefined means the owner is closed and new cleanup runs
+   * now.
+   */
+  let bindingDisposers: IDisposer[] | undefined = []
   /** 防止 recordError 在上报自身失败时递归。 */
   let reportingError = false
-
-  const host = defineHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>({
-    host: settled,
-    domainCore: () => ({
-      runtime,
-      getState: () => getState(),
-      applyState: (state) => {
-        if (!applyState)
-          throw createStoreMiddlewareError(
-            StoreMiddlewareErrorCode.devtoolsCapability,
-            StoreMiddlewareErrorText.applyState
-          )
-        applyState(state)
-      },
-      reportError: (error, phase) =>
-        reportMiddlewareFailure(runtime, error, phase as IRuntimeErrorContext['phase'])
-    }),
-    // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
-    dispose: async (next) => {
-      const errors: unknown[] = []
-      for (const disposer of bindingDisposers.splice(0).reverse()) {
-        try {
-          disposer()
-        } catch (error) {
-          errors.push(error)
-        }
-      }
-      let pluginResult: IPluginHostDisposalResult
-      try {
-        pluginResult = await next()
-      } catch (error) {
-        pluginResult = {
-          logicalTerminal: true,
-          cleanupComplete: false,
-          cleanupErrors: Object.freeze([error])
-        }
-      }
-      return Object.freeze({
-        ...pluginResult,
-        // 同步的绑定失败是已落定的观测，不是未完成的物理清理。
-        cleanupComplete: pluginResult.cleanupComplete,
-        cleanupErrors: Object.freeze([...errors, ...pluginResult.cleanupErrors])
-      })
-    }
-  })
 
   const emit = (event: IMiddlewareEvent<S>): void => {
     let completed = false
@@ -248,8 +219,9 @@ export function createStoreMiddlewareHost<S>(
     }
   }
 
-  const handle: IStoreMiddlewareHost<S> = Object.freeze({
-    ...host,
+  /** Domain descriptors join the single canonical handle before identity publication and freezing. */
+  const surface: IStoreMiddlewareSurface<S> & { readonly store?: object } = {
+    ...(bindingStore === undefined ? {} : { store: bindingStore }),
     mutationPolicy,
     emit,
     runAction,
@@ -327,31 +299,69 @@ export function createStoreMiddlewareHost<S>(
       await host.use(plugin as never)
     },
     attachBindingDisposer: (disposer: IDisposer) => {
-      bindingDisposers.push(disposer)
-    }
-  }) as IStoreMiddlewareHost<S>
-  return handle
-}
-
-export function middlewarePlugin<S>(
-  name: string,
-  middleware: IStoreMiddleware<S>
-): IStoreMiddlewarePlugin<S> {
-  return {
-    name,
-    install: (core) => {
-      core.usePipeline((event, next) => {
-        let advanced = false
-        const context: IMiddlewareContext<S> = { runtime: core.runtime, getState: core.getState }
-        middleware(event, context, () => {
-          advanced = true
-          next(event)
-        })
-        void advanced
-      })
-      return {}
+      if (bindingDisposers === undefined) {
+        try {
+          disposer()
+        } catch (error) {
+          throw identifyMiddlewareFailure(error)
+        }
+      } else bindingDisposers.push(disposer)
     }
   }
+  const host = defineHost<
+    IStoreMiddlewareCore<S>,
+    IMiddlewareEvent<S>,
+    readonly [],
+    typeof surface
+  >({
+    host: settled,
+    surface,
+    domainCore: () => ({
+      runtime,
+      getState: () => getState(),
+      applyState: (state) => {
+        if (!applyState)
+          throw createStoreMiddlewareError(
+            StoreMiddlewareErrorCode.devtoolsCapability,
+            StoreMiddlewareErrorText.applyState
+          )
+        applyState(state)
+      },
+      reportError: (error, phase) =>
+        reportMiddlewareFailure(runtime, error, phase as IRuntimeErrorContext['phase'])
+    }),
+    // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
+    dispose: async (next) => {
+      const errors: unknown[] = []
+      /** Close admission before any disposer can reenter registration. */
+      const disposers = bindingDisposers ?? []
+      bindingDisposers = undefined
+      for (const disposer of disposers.reverse()) {
+        try {
+          disposer()
+        } catch (error) {
+          errors.push(identifyMiddlewareFailure(error))
+        }
+      }
+      let pluginResult: IPluginHostDisposalResult
+      try {
+        pluginResult = await next()
+      } catch (error) {
+        pluginResult = {
+          logicalTerminal: true,
+          cleanupComplete: false,
+          cleanupErrors: Object.freeze([error])
+        }
+      }
+      return Object.freeze({
+        ...pluginResult,
+        // 同步的绑定失败是已落定的观测，不是未完成的物理清理。
+        cleanupComplete: pluginResult.cleanupComplete,
+        cleanupErrors: Object.freeze([...errors, ...pluginResult.cleanupErrors])
+      })
+    }
+  })
+  return host
 }
 
 export function loggerMiddleware<S>(
@@ -378,11 +388,12 @@ export type IStoreMiddlewareBindingOptions = {
   readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>
 }
 
-export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<
-  Record<string, unknown>
-> & {
-  readonly store: IReactiveStore<S>
-}
+export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<
+  IStoreMiddlewareCore<Record<string, unknown>>,
+  IMiddlewareEvent<Record<string, unknown>>,
+  readonly [],
+  IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S> }
+>
 
 export function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
@@ -390,13 +401,16 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
 ): IStoreMiddlewareBinding<S> {
   const clone = options.clone ?? ((state) => ClonePolicy.diagnostic(state))
   let previous = clone(store.$plain())
-  const host = createStoreMiddlewareHost<Record<string, unknown>>({
-    execution: options.execution,
-    runtime: store.$runtime,
-    getState: () => clone(store.$plain()),
-    applyState: (state: Record<string, unknown>) => store.$hydrate(state),
-    mutationPolicy: options.mutationPolicy
-  })
+  const host = createStoreMiddlewareHostCore<Record<string, unknown>>(
+    {
+      execution: options.execution,
+      runtime: store.$runtime,
+      getState: () => clone(store.$plain()),
+      applyState: (state: Record<string, unknown>) => store.$hydrate(state),
+      mutationPolicy: options.mutationPolicy
+    },
+    store
+  )
   let unsubscribeStore: IDisposer | undefined
   let unsubscribeTrace: IDisposer | undefined
   try {
@@ -462,6 +476,6 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
     }
     throw error
   }
-  // 句柄是冻结的，不能被就地扩展；绑定是一个新对象，宿主成员照原样带过来。
-  return Object.freeze({ ...host, store }) as IStoreMiddlewareBinding<S>
+  // The Store reference was installed before this same canonical handle was frozen and registered.
+  return host as IStoreMiddlewareBinding<S>
 }

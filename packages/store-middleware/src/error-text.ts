@@ -1,5 +1,9 @@
 /** Stable public diagnostics owned by `@migaia/store-middleware`. */
 export const StoreMiddlewareErrorText = {
+  /** Fallback for unclassified synchronous action/disposer failures; native messages are preserved. */
+  callbackFailed: '[store] middleware callback failed',
+  /** Fallback diagnostic for a malformed Redux state command; native SyntaxError remains preferred. */
+  devtoolsMessageInvalid: '[store] DevTools state JSON is invalid',
   optionsObject: '[store] middleware host options must be an object',
   adapterInvalid:
     '[store] DevTools adapter must provide init/send functions and an optional subscribe function',

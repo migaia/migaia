@@ -6,7 +6,6 @@ import {
   createStoreMiddlewareHost,
   bindStoreMiddleware,
   loggerMiddleware,
-  middlewarePlugin,
   type IDevToolsCommand,
   type IMiddlewareEvent,
   type IStoreMiddlewarePlugin
@@ -174,12 +173,16 @@ describe('IStoreMiddlewareHost.emit', () => {
       getState: () => ({ value: 0 })
     })
     const seen: IMiddlewareEvent<IState>[] = []
-    await host.use(
-      middlewarePlugin<IState>('capture', (event, _ctx, next) => {
-        seen.push(event)
-        next()
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          seen.push(event)
+          next(event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     host.recordState('test', { value: 0 }, { value: 1 })
     expect(errors).toHaveLength(0)
     expect(seen).toHaveLength(1)
@@ -196,12 +199,16 @@ describe('IStoreMiddlewareHost.runAction', () => {
       getState: () => ({ value: 0 })
     })
     const events: IMiddlewareEvent<IState>[] = []
-    await host.use(
-      middlewarePlugin<IState>('capture', (event, _ctx, next) => {
-        events.push(event)
-        next()
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          events.push(event)
+          next(event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     const result = host.runAction('increment', () => 7, { source: 'test' })
     expect(result).toBe(7)
     expect(events.map((e) => e.type + ':' + (e as { phase?: string }).phase)).toEqual([
@@ -242,12 +249,16 @@ describe('IStoreMiddlewareHost.runAction', () => {
       getState: () => ({ value: 0 })
     })
     const events: IMiddlewareEvent<IState>[] = []
-    await host.use(
-      middlewarePlugin<IState>('capture', (event, _ctx, next) => {
-        events.push(event)
-        next()
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          events.push(event)
+          next(event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     const boom = new Error('business failure')
     expect(() =>
       host.runAction('risky', () => {
@@ -273,12 +284,16 @@ describe('IStoreMiddlewareHost.recordState / recordError', () => {
       getState: () => ({ value: 0 })
     })
     const events: IMiddlewareEvent<IState>[] = []
-    await host.use(
-      middlewarePlugin<IState>('capture', (event, _ctx, next) => {
-        events.push(event)
-        next()
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          events.push(event)
+          next(event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     host.recordState('name', { value: 1 }, { value: 2 }, { by: 'test' })
     expect(events).toEqual([
       expect.objectContaining({
@@ -300,12 +315,16 @@ describe('IStoreMiddlewareHost.recordState / recordError', () => {
       getState: () => ({ value: 0 })
     })
     const events: IMiddlewareEvent<IState>[] = []
-    await host.use(
-      middlewarePlugin<IState>('capture', (event, _ctx, next) => {
-        events.push(event)
-        next()
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          events.push(event)
+          next(event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     const err = new Error('diagnostic failure')
     host.recordError('custom-phase', err)
     expect(events).toEqual([
@@ -323,19 +342,23 @@ describe('IStoreMiddlewareHost.recordState / recordError', () => {
     })
     const events: IMiddlewareEvent<IState>[] = []
     let triggeredNested = false
-    await host.use(
-      middlewarePlugin<IState>('capture', (event, _ctx, next) => {
-        events.push(event)
-        next()
-        if (event.type === 'error' && !triggeredNested) {
-          triggeredNested = true
-          // Calling recordError() again from inside the first error's stage
-          // must NOT re-enter the pipeline (would recurse); it must be
-          // forwarded straight to runtime.reportError instead.
-          host.recordError('nested-phase', new Error('nested'))
-        }
-      })
-    )
+    await host.use({
+      name: 'capture',
+      install(core) {
+        core.usePipeline((event, next) => {
+          events.push(event)
+          next(event)
+          if (event.type === 'error' && !triggeredNested) {
+            triggeredNested = true
+            // Calling recordError() again from inside the first error's stage
+            // must NOT re-enter the pipeline (would recurse); it must be
+            // forwarded straight to runtime.reportError instead.
+            host.recordError('nested-phase', new Error('nested'))
+          }
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     host.recordError('first-phase', new Error('first'))
 
     // Only the first error event went through the pipeline.
@@ -444,13 +467,17 @@ describe('loggerMiddleware', () => {
         seenBySink.push(state as IState)
       })
     )
-    await host.use(
-      middlewarePlugin<IState>('mutator', (_event, _ctx, next) => {
-        downstreamSeenSinkAlreadyRan.push(sinkRan)
-        currentValue = 99
-        next()
-      })
-    )
+    await host.use({
+      name: 'mutator',
+      install(core) {
+        core.usePipeline((_event, next) => {
+          downstreamSeenSinkAlreadyRan.push(sinkRan)
+          currentValue = 99
+          next(_event)
+        })
+        return {}
+      }
+    } satisfies IStoreMiddlewarePlugin<IState>)
     host.recordState('name', { value: 0 }, { value: 1 })
     expect(seenBySink).toEqual([{ value: 1 }])
     expect(downstreamSeenSinkAlreadyRan).toEqual([true])

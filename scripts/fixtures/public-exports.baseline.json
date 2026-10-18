@@ -1183,11 +1183,11 @@
     },
     "@migaia/store-middleware": {
       ".": [
-        "ClonePolicy",
         "MiddlewareCommandType",
         "MiddlewareEventPhase",
         "MiddlewareEventType",
         "MutationPolicy",
+        "ReduxDevToolsCommand",
         "STORE_MIDDLEWARE_SOURCE",
         "StoreMiddlewareErrorCode",
         "bindStoreMiddleware",
@@ -1196,19 +1196,13 @@
         "createStoreMiddlewareAggregateError",
         "createStoreMiddlewareError",
         "createStoreMiddlewareHost",
-        "diagnosticClone",
-        "immutableSnapshotClone",
-        "loggerMiddleware",
-        "middlewarePlugin",
-        "opaqueReferenceClone",
-        "tolerantClone"
+        "loggerMiddleware"
       ],
       "./tolerant-clone": [
         "ClonePolicy",
         "diagnosticClone",
         "immutableSnapshotClone",
-        "opaqueReferenceClone",
-        "tolerantClone"
+        "opaqueReferenceClone"
       ]
     },
     "@migaia/store-persist": {
