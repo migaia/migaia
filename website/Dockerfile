@@ -10,7 +10,13 @@ ARG CADDY_VERSION=2.10.2
 FROM oven/bun:${BUN_VERSION}-debian AS build
 WORKDIR /website
 COPY package.json bun.lock bunfig.toml ./
-RUN bun install --frozen-lockfile
+# @migaia/* packages come from the private GitHub Packages registry. The token arrives as a
+# BuildKit secret and the .npmrc holding it is deleted in the same layer, so no image keeps it.
+RUN --mount=type=secret,id=npm_token,required=true \
+  printf '@migaia:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' \
+    "$(cat /run/secrets/npm_token)" > .npmrc \
+  && bun install --frozen-lockfile \
+  && rm .npmrc
 COPY . .
 ENV WEBSITE_BASE=/migaia/
 # Index the basename directory so Pagefind URLs are /zh/... ; indexing build/client would record
