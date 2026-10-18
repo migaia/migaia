@@ -1,5 +1,5 @@
 /**
- * Reference checked against rust/src/lib.rs and generated wasm_provider.{js,d.ts} on 2026-10-17.
+ * Reference checked against rust/src/lib.rs and generated wasm_provider.{js,d.ts} on 2026-10-18.
  * Source corrections to README/USEGUIDE examples: ConversionResult is a wasm-bindgen allocation
  * separate from the arena output; free its metadata with free()/Symbol.dispose as well as freeing
  * input/output IDs with dealloc_bytes. InitOutput conversion functions return raw pointers, not
@@ -213,8 +213,8 @@ export const reference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Initialize the Rust module through its default init import, then allocate aligned bytes or transcode JSON and MessagePack with named JS wrappers. Explicitly release both arena IDs and conversion metadata.',
-        '先通过默认导入初始化编译模块，再用具名包装函数分配对齐字节或转码两种格式；字节区标识与转码元数据都必须显式释放。'
+        'Initialize the Rust module through its default init import, then allocate aligned bytes or transcode JSON and MessagePack with named JS wrappers. Explicitly release both arena IDs and conversion metadata. Native CompileError/LinkError/RuntimeError pass unchanged without source/code; store-wasm also rethrows them and codes only follow-on INSTANCE_POISONED with the trap on cause.',
+        '先通过默认导入初始化编译模块，再用具名包装函数分配对齐字节或转码两种格式；字节区标识与转码元数据都必须显式释放。原生 `CompileError/LinkError/RuntimeError` 原样透传且不附 `source/code`；`store-wasm` 同样重抛原错，仅把后续失败编码为 `INSTANCE_POISONED` 并以原因保留陷阱。'
       ),
       example: conversionExample
     }
@@ -223,13 +223,13 @@ export const reference: ILibraryReference = {
     __wbg_init: {
       role: 'factory',
       purpose: t(
-        'Default async initializer imported as init; fetches the bundled wasm asset when omitted, or instantiates application-provided bytes/module. Call before any allocation or conversion. Once initialized, returns the existing exports.',
-        '默认异步初始化器，以默认导入使用；省略输入时获取包内编译资源，也可实例化应用字节或模块。任何分配及转码前必须完成初始化；初始化后返回既有导出对象。'
+        'Default async initializer imported as init; fetches the bundled wasm asset when omitted, or instantiates application-provided bytes/module. Call before any allocation or conversion. The first completed initialization publishes the exports; concurrent calls return that same memory/arena as named wrappers. Concurrent instantiation may still occur: Promise identity and single compilation are not promised.',
+        '默认异步初始化器，以默认导入使用；省略输入时获取包内编译资源，也可实例化应用字节或模块。任何分配及转码前必须完成初始化；首个完成初始化的结果发布导出，并发调用与具名包装函数返回同一内存及字节区；仍可能并发实例化，不承诺承诺对象相同或只编译一次。'
       ),
       params: { module_or_path: initInput },
       returns: t(
-        'Promise of `InitOutput`; native fetch, compile or instantiation failures reject unchanged. No package-specific error code is attached.',
-        '返回 `InitOutput` 承诺；获取、编译或实例化的原生失败原样拒绝，不附加包专用错误码。'
+        'Promise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes.',
+        '返回 `InitOutput` 承诺；已登记的原生透传例外使 `WebAssembly.CompileError`、`WebAssembly.LinkError`、`WebAssembly.RuntimeError` 原样越界，不附 `source/code`。加载失败会拒绝，本包未定义自有错误码。'
       ),
       example:
         "import init from '@migaia/wasm'\nconst wasm = await init()\nconsole.log(wasm.memory.buffer.byteLength)"
@@ -247,8 +247,8 @@ export const reference: ILibraryReference = {
         )
       },
       returns: t(
-        'An `InitOutput`; native compilation or instantiation errors throw unchanged.',
-        '返回 `InitOutput`；原生编译或实例化错误原样抛出。'
+        'An `InitOutput`; native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError retain their type, identity and stack without source/code, as the registered pass-through exception.',
+        '返回 `InitOutput`；已登记透传的 `WebAssembly.CompileError`、`WebAssembly.LinkError`、`WebAssembly.RuntimeError` 保持类型、身份与堆栈，不附 `source/code`。'
       ),
       example:
         "import { initSync } from '@migaia/wasm'\nconst wasm = initSync({ module: wasmBytes })\nconsole.log(wasm.memory.buffer.byteLength)"

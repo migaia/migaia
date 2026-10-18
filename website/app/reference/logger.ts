@@ -1,10 +1,9 @@
 /**
  * Reference documentation of `@migaia/logger`. Rules: `app/reference/contract.ts`. Verified against
  * `packages/logger/src` (log.ts, typing.ts, runtime-manager.ts, state-constants.ts, error-code.ts,
- * plugins/*.ts), README and USEGUIDE on 2026-10-17. Known source/doc discrepancies (not changed
- * here): USEGUIDE says `use()` resolves to the logger, the declaration resolves to a tuple of
- * plugin handles; the `rotate` JSDoc says "rotate before a write", the code rotates after appending
- * a batch that reached the threshold.
+ * plugins/*.ts), README and USEGUIDE on 2026-10-18. Runtime shutdown drains final structured
+ * entries before plugin disposal; raw output stops at shutdown admission. Native error references
+ * remain local while HTTP/color JSON use the canonical bounded error-chain projection.
  */
 import type {
   ICode,
@@ -56,14 +55,14 @@ const logEntryMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   error: {
     summary: t(
-      'Serializable view of an `Error` argument; see `IErrorInfo`.',
-      '`Error` 参数的可序列化投影，见 `IErrorInfo`。'
+      'Local projection of an Error argument, retaining its original native object; HTTP/color JSON serialize a bounded chain instead of raw. See IErrorInfo.',
+      '`Error` 参数的本地投影，保留原生对象；网络与颜色插件的结构化输出改用有界错误链而不发送原对象，见 `IErrorInfo`。'
     )
   },
   data: {
     summary: t(
-      'Area for plugin data: `uuid()` writes `uuid`, `reasoning()` sets `silent: true` so the console skips the entry.',
-      '插件数据区：`uuid()` 写入 `uuid`，`reasoning()` 设置 `silent: true` 让控制台跳过该条目。'
+      'Plugin data area: uuid writes uuid and reasoning sets silent so console skips the entry. A forwarded sink copy also contains display-only topicChain; the internal cycle-detection symbol remains hidden.',
+      '插件数据区：`uuid()` 写入 `uuid`，`reasoning()` 设置 `silent: true` 使控制台跳过。转发后的输出端副本含仅供展示的 `topicChain`，内部循环检测符号不外泄。'
     )
   }
 }
@@ -177,12 +176,6 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
       '构造时从 `runtimeManager` 选项或 `getLoggerRuntimeManager()` 捕获的宿主能力（stdout、UUID、调度、fetch、fs）；插件使用同一个对象。'
     )
   },
-  pipelineMode: {
-    summary: t(
-      'The pipeline mode fixed at construction (`sync`, `async`, `generator`, `async-generator`); it decides which `use*Pipeline` method is allowed.',
-      '构造时固定的管线模式（`sync`、`async`、`generator`、`async-generator`）；它决定哪个 `use*Pipeline` 方法可用。'
-    )
-  },
   log: {
     summary: t(
       'Console-style entry point: builds an entry with this tag and message and dispatches it through pipeline, hooks and sinks. A trailing object stays an argument; it is not turned into `meta`. Never throws for sink failures.',
@@ -203,8 +196,8 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'Nothing; after `shutdown()` the call is silently ignored.',
-      '无返回值；`shutdown()` 之后的调用会被静默忽略。'
+      'No value. Shutdown handlers can still enqueue final structured entries; calls are ignored after draining closes dispatch admission.',
+      '无返回值；关闭回调期间仍接收最终结构化日志，排空结束并撤销准入后才忽略后续调用。'
     ),
     example: `log.log('info', 'user %s logged in', userId)`
   },
@@ -229,7 +222,10 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
       '把文本直接写到 stdout（没有 `process` 时用 `console.log`），跳过管线和 sink；用于流式输出。关闭流程开始后忽略。'
     ),
     params: {
-      text: t('Text written as is, without newline.', '原样写入的文本，不会自动换行。'),
+      text: t(
+        'Text passed unchanged to runtimeManager.write. A host stdout writer can preserve no-newline output; the default console.log fallback without process adds its own newline.',
+        '原样传给 `runtimeManager.write` 的文本；宿主标准输出写入可保留不换行效果，无进程宿主的默认 `console.log` 回退会自行换行。'
+      ),
       options: dispatchOptionsParam
     },
     returns: t('Nothing.', '无返回值；文本已写出或已排入调度。'),
@@ -237,15 +233,15 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   usePipeline: {
     summary: t(
-      'Registers a synchronous pipeline stage `(entry, next) => void` (mode `sync`): call `next(entry)` to pass a possibly replaced entry on, or skip it to drop the entry.',
-      '注册同步管线阶段 `(entry, next) => void`（`sync` 模式）：调用 `next(entry)` 继续传递（可替换条目），不调用则丢弃该条目。'
+      'Registers a synchronous stage (entry, next, context?) => void in every pipeline mode. PluginHost lifts it into the selected mode; call next(entry) to continue or omit next to drop the entry.',
+      '所有管线模式均可注册同步阶段 `(entry, next, context?) => void`，功能宿主把它提升至所选模式；调用 `next(entry)` 继续，不调用则丢弃条目。'
     ),
     params: {
       stage: t('The stage function; call `next` at most once.', '阶段函数；`next` 最多调用一次。')
     },
     returns: t(
-      'The same logger, for chaining; a mode mismatch throws `PIPELINE_MODE_MISMATCH`.',
-      '同一个 logger，可链式调用；模式不匹配时抛 `PIPELINE_MODE_MISMATCH`。'
+      'The same logger for chaining; synchronous registration works in all modes. Other stage registration methods follow the mode compatibility matrix.',
+      '返回同一个日志实例以便链式调用，同步注册适用于全部模式，其余阶段注册按模式兼容矩阵准入。'
     ),
     example: `log.usePipeline((entry, next) => {
   if (entry.meta?.secret) return
@@ -275,13 +271,16 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: {
       stage: t(
-        'Generator stage as defined by `@migaia/middleware-pipeline`.',
-        '`@migaia/middleware-pipeline` 定义的生成器阶段。'
+        'Generator (entry, context?), with optional pipeline context as the second argument, never next. Return a payload or GENERATOR_CONTINUE after yielding to continue; an implicit undefined return halts.',
+        '生成器 `(entry, context?)`，第二参数是可选管线上下文而非继续函数；返回载荷，或产出后返回 `GENERATOR_CONTINUE` 才继续，隐式空返回会终止。'
       )
     },
     returns: t('The same logger, for chaining.', '同一个 logger，可链式调用。'),
-    example: `log.useGeneratorPipeline(function* (entry, next) {
-  yield next(entry)
+    example: `import { GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
+log.useGeneratorPipeline(function* (entry, context) {
+  if (context?.signal.aborted) return
+  yield entry
+  return GENERATOR_CONTINUE
 })`
   },
   useAsyncGeneratorPipeline: {
@@ -291,13 +290,16 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: {
       stage: t(
-        'Async generator stage as defined by `@migaia/middleware-pipeline`.',
-        '`@migaia/middleware-pipeline` 定义的异步生成器阶段。'
+        'Async generator (entry, context?) with optional context as the second argument. Yield stores a candidate; return payload or GENERATOR_CONTINUE to continue. The logger explicitly delegates stage registration to its functional Host.',
+        '异步生成器 `(entry, context?)` 的第二参数为可选上下文；产出只保存候选值，返回载荷或 `GENERATOR_CONTINUE` 才继续。日志实例显式委派功能宿主登记阶段。'
       )
     },
     returns: t('The same logger, for chaining.', '同一个 logger，可链式调用。'),
-    example: `log.useAsyncGeneratorPipeline(async function* (entry, next) {
-  yield next(entry)
+    example: `import { GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
+log.useAsyncGeneratorPipeline(async function* (entry, context) {
+  if (context?.signal.aborted) return
+  yield await Promise.resolve(entry)
+  return GENERATOR_CONTINUE
 })`
   },
   useSink: {
@@ -309,7 +311,7 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
       sink: t('`(entry) => void | Promise<void>`.', '输出函数 `(entry) => void | Promise<void>`。')
     },
     returns: offReturns,
-    example: `const stopSink = log.useSink((entry) => auditQueue.push(entry))`
+    example: `const stopSink = log.useSink((entry) => { auditQueue.push(entry) })`
   },
   hook: {
     summary: t(
@@ -323,7 +325,10 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
         '`(entry) => void | Promise<void>`；返回的 Promise 会被 `flush()` 等待。'
       )
     },
-    returns: offReturns,
+    returns: t(
+      'An idempotent off callback removing only this registration; registering the same function again creates an independent subscription.',
+      '幂等取消函数，只释放本次登记；同一函数再次登记仍是互不影响的独立订阅。'
+    ),
     example: `log.hook('before:error', (entry) => {
   entry.data.alert = true
 })`
@@ -348,8 +353,8 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   onFailure: {
     summary: t(
-      'Observes failures of sinks, hooks, pipeline, deferred tasks, flush, forwarding and shutdown. Logging calls never throw them, so register this in production.',
-      '观察 sink、钩子、管线、延后任务、flush、转发与关闭过程中的失败。日志调用本身不会抛出这些失败，生产环境应当登记它。'
+      'Observes failures of sinks, hooks, pipeline, deferred tasks, flush, forwarding and shutdown. Logging calls never throw them, so register this in production. If the terminal runtime reporter throws, rejects or has a throwing then getter, the existing Utils host exception queue exposes that failure without recursion or changing the business result.',
+      '观察 sink、钩子、管线、延后任务、flush、转发与关闭过程中的失败。日志调用本身不会抛出这些失败，生产环境应当登记它。终端运行时报告器自身抛错、拒绝或读取异步方法失败时，由现有工具库宿主异常队列暴露，不递归报告，也不改变业务结果。'
     ),
     params: {
       fn: t(
@@ -420,8 +425,8 @@ const coreMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'An `IPluginHostDisposalResult` from `@migaia/plugin-host`; `cleanupErrors` lists plugin cleanup failures.',
-      '来自 `@migaia/plugin-host` 的 `IPluginHostDisposalResult`；`cleanupErrors` 列出插件清理失败。'
+      'An `IPluginHostDisposalResult` from `@migaia/plugin-host`; `cleanupErrors` lists plugin cleanup failures. A clock failure rejects this same published completion after attempting Host cleanup, retaining primary and cleanup causes. Persistent clock failure can also defeat the Host budget; cleanup or receipt success does not promise remote delivery.',
+      '来自 `@migaia/plugin-host` 的 `IPluginHostDisposalResult`；`cleanupErrors` 列出插件清理失败。时钟失败仍先尝试宿主清理，再拒绝同一已发布完成对象，主因与清理失败均可追溯。持续时钟失败仍可能使宿主预算失败；清理或回执成功不保证远端送达。'
     ),
     example: `const result = await log.shutdown('manual')
 if (result.cleanupErrors.length) console.error(result.cleanupErrors)`
@@ -478,7 +483,16 @@ levelHandle.extensions.warn('disk almost full')`
       )
     },
     returns: t('This logger, for chaining.', '本 logger，可链式调用。'),
-    example: `apiLog.extends(auditLog)`
+    example: `import { Logger } from '@migaia/logger'
+import { color } from '@migaia/logger/plugins'
+const source = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'source' })
+const target = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'target', plugins: [color({ format: 'json', color: 'never' })] })
+target.useSink((entry) => { console.log(entry.data.topicChain) })
+source.extends(target)
+source.log('info', 'forwarded')
+await source.flush()
+await source.shutdown('manual')
+await target.shutdown('manual')`
   },
   unextend: {
     summary: t(
@@ -815,19 +829,26 @@ if (!manager.fetch) console.warn('no fetch')`
         )
       },
       returns: t(
-        'A restore function; calling it again does nothing.',
-        '恢复函数；重复调用没有效果。'
+        'An idempotent restore function. Final restoration reuses the exact default manager object captured by this module, so getLoggerRuntimeManager() returns the original object identity.',
+        '幂等恢复函数；最后一次恢复复用本模块最初捕获的默认管理器，`getLoggerRuntimeManager()` 返回原对象身份。'
       ),
-      example: `const restore = setLoggerRuntimeManager({
+      example: `import { Logger, getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'
+import { color } from '@migaia/logger/plugins'
+const previous = getLoggerRuntimeManager()
+const lines: string[] = []
+const restore = setLoggerRuntimeManager({
   randomUUID: () => crypto.randomUUID(),
   defer: (task) => queueMicrotask(task),
-  write: (text) => lines.push(text)
+  write: (text) => { lines.push(text) }
 })
 try {
-  runScenario()
+  const log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, plugins: [color({ format: 'json', color: 'never' })] })
+  log.log('info', 'captured without a console capability')
+  await log.shutdown('manual')
 } finally {
   restore()
-}`
+}
+console.log(getLoggerRuntimeManager() === previous, lines)`
     },
     LOGGER_SOURCE: {
       role: 'constant',
@@ -901,8 +922,8 @@ log.warn('cache miss for %s', key)`
     color: {
       role: 'enhancer',
       purpose: t(
-        'Plugin that prints entries to the console as readable lines or JSON, with optional ANSI colors. It also offers `paint` / `dim` to `reasoning()`.',
-        '把日志条目以可读文本或 JSON 输出到控制台的插件，可选 ANSI 颜色。它还向 `reasoning()` 提供 `paint` / `dim`。'
+        'Prints readable lines or JSON with optional ANSI colors, using captured runtimeManager.console in preference to write. To capture output replace that console or supply a pure write manager without console. It offers paint/dim to reasoning().',
+        '把日志输出为可读文本或结构化格式，可选终端颜色；优先使用捕获的管理器控制台，捕获输出应替换控制台或提供不含控制台的纯写入管理器；另向流式插件提供着色能力。'
       ),
       params: {
         config: t('Optional; see `IColorPluginConfig`.', '可选配置，见 `IColorPluginConfig`。')
@@ -919,8 +940,8 @@ ${create}
     batch: {
       role: 'enhancer',
       purpose: t(
-        'Plugin that adds no logger methods; it provides the batching used by `http()` and `file()` when installed before them, with the defaults given here.',
-        '不增加任何 logger 方法的插件；安装在 `http()`、`file()` 之前时，为它们提供攒批能力，并使用这里给出的默认配置。'
+        'Plugin adding no logger methods; it provides batching for HTTP and file consumers. Same-batch plugins are sorted by Feature dependencies, independent of array order; a provider installed in a later use call does not retroactively rebind consumers.',
+        '不增加日志方法的插件，为上传及文件消费者提供攒批能力；同批插件按功能依赖排序而非输入顺序，跨调用迟到安装的提供者不会追溯重绑。'
       ),
       params: {
         config: t(
@@ -940,8 +961,8 @@ ${create}
     http: {
       role: 'enhancer',
       purpose: t(
-        'Plugin that sends entries as `POST { entries }` JSON to an endpoint, with retries, a request timeout and `Retry-After` handling. With `batch()` installed before it, entries are sent in batches; otherwise one request per entry.',
-        '把日志条目以 `POST { entries }` JSON 发送到指定地址的插件，内置重试、请求超时与 `Retry-After` 处理。在它之前安装了 `batch()` 时按批发送，否则每条日志一个请求。'
+        'Sends POST { entries } JSON with retries, timeout and Retry-After. A batch provider installed earlier or in the same dependency-sorted batch enables shared batching. Without it, http.batch creates a bounded local queue forced to maxSize:1 and asyncOutput:false; no batch option uses a direct per-entry sink.',
+        '以结构化请求上传条目，提供重试、超时及重试响应头处理；已安装或同批的攒批提供者可启用共享队列。无提供者时显式队列设置仍创建有界单条同步队列，省略设置才直接逐条发送。'
       ),
       params: {
         config: t(
@@ -964,8 +985,8 @@ ${create}
     process: {
       role: 'enhancer',
       purpose: t(
-        'Plugin that flushes and shuts down the logger on `SIGINT`, `SIGTERM`, `beforeExit` and crashes in Node or Bun. Without a `process` global it does nothing.',
-        '在 Node 或 Bun 中，收到 `SIGINT`、`SIGTERM`、`beforeExit` 或发生崩溃时刷新并关闭 logger 的插件。没有 `process` 全局对象时什么也不做。'
+        'Node/Bun process adapter: SIGINT/SIGTERM and crashes trigger drain and shutdown; crashes exit with code 1 even when captureCrashes is false. beforeExit flushes without initiating shutdown. Without a captured process capability it does nothing.',
+        '进程适配器在退出信号与崩溃时排空并关闭；即使关闭崩溃日志，崩溃仍以退出码一结束。`beforeExit` 仅刷新，不主动关闭；没有捕获的进程能力时为空操作。'
       ),
       params: {
         config: t('Optional; see `IProcessPluginConfig`.', '可选配置，见 `IProcessPluginConfig`。')
@@ -1137,13 +1158,6 @@ ${create}
       ),
       members: coreMembers
     },
-    ILoggerDomainCore: {
-      summary: t(
-        'The logger core without plugin management and pipeline registration, for code that only logs and observes.',
-        '去掉插件管理与管线注册能力的 logger 核心，供只需记录和观察日志的代码使用。'
-      ),
-      members: coreMembers
-    },
     ILoggerConfig: {
       summary: t(
         'The `config` store of a logger instance, addressed by plugin name.',
@@ -1162,10 +1176,11 @@ ${create}
             )
           },
           returns: t(
-            'The value, or `undefined` when missing.',
-            '读取到的值；不存在时为 `undefined`。'
+            'The stored value, or undefined when omitted. Consumption-time defaults are not filled into this snapshot: omitted HTTP retries reads undefined even though sending uses 2.',
+            '返回存储值，省略时为 `undefined`；消费时默认值不会写回快照，因此省略上传重试数时读取为空，而实际发送采用二次重试。'
           ),
-          example: `log.config.get('http.retries') // 2`
+          example: `const storedRetries = log.config.get('http.retries')
+console.log(storedRetries ?? 2)`
         },
         update: {
           summary: t(
@@ -1362,8 +1377,8 @@ ${create}
             'flush、shutdown 与批处理截止时间使用的时钟和计时器；测试时可注入手动调度器。'
           ),
           default: t(
-            '`systemScheduler` from `@migaia/lifecycle`.',
-            '`@migaia/lifecycle` 的 `systemScheduler`。'
+            '`systemScheduler` from `@migaia/utils/scheduler`.',
+            '`@migaia/utils/scheduler` 的 `systemScheduler`。'
           )
         }
       }
@@ -1506,8 +1521,8 @@ ${create}
     },
     IErrorInfo: {
       summary: t(
-        'Serializable view of an error stored on `entry.error`.',
-        '保存在 `entry.error` 上的错误可序列化投影。'
+        'Local error projection on entry.error with native raw identity for console/custom sinks. HTTP and color JSON use the shared bounded source/code/name/message/stack/cause/errors projection without raw; unclassified business errors use diagnostic unknown/UNKNOWN placeholders.',
+        '保存在 `entry.error` 上的本地错误投影，供控制台及自定义输出使用原生对象。上传与颜色插件结构化输出使用共享有界链，保留来源、错误码、名称、消息、堆栈及原因和聚合分支，不含 `raw`；未分类业务错误使用诊断占位 `unknown/UNKNOWN`。'
       ),
       members: {
         name: {
@@ -1519,8 +1534,8 @@ ${create}
         stack: { summary: t('Stack text, when available.', '调用栈文本（可获得时才有）。') },
         raw: {
           summary: t(
-            'The original error object (not serialized by JSON).',
-            '原始错误对象（JSON 序列化时不会保留）。'
+            'The exact original Error for local inspection. Generic JSON may serialize enumerable own custom properties even though built-in native fields are usually non-enumerable. Built-in HTTP/color JSON deliberately omit raw and project the full bounded chain.',
+            '供本地检查的原始错误对象。普通序列化仍可能输出可枚举自有字段，原生内置字段通常不可枚举；内置上传与颜色插件结构化输出明确省略 `raw` 并投影完整有界链。'
           )
         }
       }
@@ -1662,14 +1677,6 @@ ${create}
     ILoggerStatus: alias(
       'Union of `LoggerStatus` values.',
       '`LoggerStatus` 全部取值组成的联合类型。'
-    ),
-    ILogLevel: alias(
-      'Level names accepted by `level()`: `debug`, `info`, `warn`, `error`, `fatal`.',
-      '`level()` 插件接受的级别名称取值：`debug`、`info`、`warn`、`error`、`fatal`。'
-    ),
-    IColorMode: alias(
-      'Values of the `color` option of `color()`.',
-      '`color()` 插件 `color` 选项的取值类型，决定是否上色。'
     ),
     IOutputFormat: alias(
       'Values of the `format` option of `color()`: `auto`, `pretty`, `json`.',
@@ -1939,8 +1946,8 @@ await batcher.flush()`,
         },
         retries: {
           summary: t(
-            'Extra attempts after network errors, 429 and 5xx; other 4xx fail at once. Waits `Retry-After` or 200 ms × 2^attempt.',
-            '网络错误、429 与 5xx 之后的额外重试次数；其它 4xx 立即失败。等待时间取 `Retry-After`，否则为 200 毫秒 × 2^尝试次数。'
+            'Extra attempts after network errors, 429 and 5xx; other 4xx fail immediately. Waiting uses Retry-After or 200 ms × 2^attempt. Omitted config remains absent; the send path consumes retries ?? 2.',
+            '网络错误、429 与 5xx 后的额外重试次数，其它客户端错误立即失败；等待采用重试响应头或指数退避。省略配置时快照保持缺省，发送路径用 `retries ?? 2` 取消费默认值。'
           ),
           default: t('`2`.', '默认值为 `2` 次。')
         },
@@ -1953,8 +1960,8 @@ await batcher.flush()`,
         },
         batch: {
           summary: t(
-            'Batch settings for this upload, used only when `batch()` is installed before `http()`.',
-            '本插件的攒批设置，只有在 `http()` 之前安装了 `batch()` 时才生效。'
+            'Upload queue settings. An earlier or same-batch Feature provider supplies shared batching regardless of input order. Without a provider, this option still creates a bounded local queue forced to maxSize:1 and asyncOutput:false; other queue bounds apply.',
+            '本次上传队列设置；已安装或同批的功能提供者按依赖绑定，不受输入顺序限制。没有提供者时此选项仍创建本地有界队列，强制单条大小及同步输出，其余队列边界仍适用。'
           ),
           default: t('Not set: the `batch()` defaults.', '不设置：使用 `batch()` 的默认设置。')
         },
@@ -1989,8 +1996,8 @@ await batcher.flush()`,
       members: {
         captureCrashes: {
           summary: t(
-            'Log `uncaughtException` and `unhandledRejection` as `fatal` entries before shutting down.',
-            '把 `uncaughtException` 与 `unhandledRejection` 记录为 `fatal` 条目，然后关闭。'
+            'Controls only fatal logging for uncaughtException/unhandledRejection. Both crash events still trigger shutdown and exit(1) when false; beforeExit only flushes.',
+            '仅控制未捕获异常与拒绝是否记录为致命日志；关闭此开关时两类崩溃仍触发关闭及退出码一，`beforeExit` 仅刷新。'
           ),
           default: t('`true`.', '`true`：捕获崩溃。')
         },
@@ -2405,8 +2412,8 @@ await log.flush()`
       kind: 'plugin',
       target: 'Logger',
       summary: t(
-        'After installation every entry is uploaded as JSON to `url`, in batches when `batch()` is installed before it. No methods are added; failures go to `onFailure()`.',
-        '安装后每条日志都会以 JSON 上报到 `url`；在它之前安装了 `batch()` 时按批上报。不增加方法；失败交给 `onFailure()`。'
+        'Uploads JSON entries to url. Feature dependency sorting makes same-batch provider order irrelevant; a later provider installation does not rebind HTTP. No methods are added. Installation receipt confirms registration, not remote delivery; failures go to onFailure().',
+        '安装后向地址上传结构化条目。同批提供者按功能依赖排序，跨调用迟到安装不会重绑。无需增加方法；安装回执只确认登记，不等于远端送达，失败交给 `onFailure()`。'
       ),
       install: `import { Logger } from '@migaia/logger'
 import { batch, http } from '@migaia/logger/plugins'
@@ -2421,8 +2428,8 @@ ${create}
           '对网络错误、429 与 5xx 重试；遵守 `Retry-After`，最长 `maxRetryAfterMs`。'
         ),
         t(
-          '`shutdown()` aborts unfinished requests; their failures reach `onFailure()`.',
-          '`shutdown()` 会中止未完成的请求，其失败交给 `onFailure()`。'
+          'shutdown runs final-log handlers and drains before HTTP plugin disposal aborts remaining requests. The shared shutdown budget can expire; neither a plugin receipt nor cleanup completion guarantees delivery. Failures reach onFailure().',
+          '`shutdown()` 先执行最终日志回调并排空，再在上传插件释放时中止剩余请求；共享预算可能耗尽，插件回执与清理完成均不保证远端送达，失败交给 `onFailure()`。'
         )
       ],
       scenarios: [t('Ship production logs to a log platform.', '把生产日志上报到日志平台。')],
@@ -2440,8 +2447,8 @@ await log.shutdown('manual')`
       kind: 'adapter',
       target: 'Logger',
       summary: t(
-        'After installation the logger flushes and shuts down on `SIGINT`, `SIGTERM`, `beforeExit` and (with `captureCrashes`) crashes, which are logged as `fatal`. No methods are added.',
-        '安装后 logger 会在 `SIGINT`、`SIGTERM`、`beforeExit` 以及（开启 `captureCrashes` 时）崩溃时刷新并关闭，崩溃会记录为 `fatal`。不增加方法。'
+        'Signals and crashes drain then shut down; captureCrashes controls fatal logging only, while crashes still exit(1). beforeExit flushes without initiating shutdown. The adapter adds no methods.',
+        '信号与崩溃先排空再关闭，崩溃开关仅控制致命日志，崩溃仍以退出码一结束；`beforeExit` 刷新但不主动关闭，适配器不增加方法。'
       ),
       install: `import { Logger } from '@migaia/logger'
 import { process } from '@migaia/logger/plugins'

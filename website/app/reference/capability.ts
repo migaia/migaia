@@ -138,8 +138,8 @@ const members: Record<string, IMemberDoc> = {
   },
   dispose: {
     summary: t(
-      'Closes the host and releases capabilities in reverse registration order, awaiting pending activation cleanup.',
-      '关闭宿主并按登记逆序释放能力，同时等待在途激活的清理完成。'
+      'Closes the host and releases capabilities in reverse activation-completion order (if B completes before A, A releases first), awaiting pending activation cleanup.',
+      '关闭宿主并按激活完成顺序的逆序释放能力（若先完成乙、后完成甲，则先释放甲），同时等待在途激活的清理完成。'
     ),
     returns: t(
       'The sole completion Promise. Unsettled concurrent calls reject HOST_TRANSITIONING; settled repeats return that original Promise. Later mutations throw HOST_DISPOSED.',
@@ -193,8 +193,8 @@ const enums: ILibraryReference['enums'] = {
         '已接纳激活句柄，或已有启用句柄继续保持有效。'
       ),
       gated: t(
-        'No permission was granted, so activation was skipped.',
-        '开关没有授予许可，已完全跳过本次激活操作。'
+        'Permission is denied. Initial denial skips activation; if permission is withdrawn while activation runs, its late handle is released before returning gated.',
+        '当前没有许可。初始禁止时跳过激活；若激活中途撤回许可，迟到句柄释放后仍返回禁止状态。'
       ),
       cancelled: t(
         'A newer operation invalidated this activation; late handles are released.',
@@ -355,8 +355,8 @@ const types: Record<string, ITypeDoc> = {
       },
       onError: {
         ...p(
-          'Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; reporter failure does not corrupt state.',
-          '通过 `(name, error)` 接收激活或释放失败；名称来自登记，错误保持原值，不使用返回值，报告函数失败不破坏状态。'
+          'Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.',
+          '通过 `(name, error)` 接收激活或释放失败；名称来自登记，错误保持原值，不使用返回值；报告函数同步失败与异步拒绝进入工具包共享宿主异常队列，不改变业务状态。'
         ),
         default: t(
           'Omitted: no external reporter; failures remain readable through host.error(name).',
@@ -387,10 +387,6 @@ const types: Record<string, ITypeDoc> = {
   ICapabilityState: alias(
     'Capability gate lifecycle values, distinct from graph availability.',
     '能力闸门的生命周期取值，与依赖图可用性状态分别表达。'
-  ),
-  ICapabilityStateValue: alias(
-    'Value union of CapabilityState for storing and comparing gate states.',
-    '`CapabilityState` 的取值联合，供保存与比较闸门生命周期状态。'
   ),
   ICapabilityEnableStatusValue: alias(
     'Value union of CapabilityEnableStatus used by activation results.',
@@ -441,11 +437,7 @@ const types: Record<string, ITypeDoc> = {
         '完成可用性校验后捕获的原始失败值，保持原始身份。'
       )
     }
-  },
-  IGraphReadinessState: alias(
-    'Availability values admitted by readiness snapshots, separate from gate lifecycle.',
-    '就绪快照接纳的可用性取值，与闸门生命周期独立维护。'
-  )
+  }
 }
 /** Runtime enum introductions reuse only their own canonical state or error description. */
 const enumSymbols = Object.fromEntries(
@@ -516,8 +508,8 @@ export const capabilityReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen IGraphReadinessSnapshot. Invalid state throws INVALID_OPTION; thrown Error objects propagate unchanged and non-Error throws remain reachable as cause.',
-        '返回冻结的 `IGraphReadinessSnapshot`；非法状态抛出 `INVALID_OPTION`，抛出的错误实例原样传播，非错误抛出值保留在原因链。'
+        'Frozen IGraphReadinessSnapshot. Invalid state uses `INVALID_OPTION`; native getter errors receive this code in place where possible, preserving type and identity. Primitive, immutable or conflicting failures stay reachable through `cause`, including undefined.',
+        '返回冻结的 `IGraphReadinessSnapshot`；非法状态使用 `INVALID_OPTION`。原生读取器错误尽可能原位附码并保留类型身份；原始值、不可修改或身份冲突失败通过 `cause` 保留，包含空缺值。'
       ),
       example: `import { snapshotGraphReadiness } from '@migaia/capability'\nconsole.log(snapshotGraphReadiness({ state: 'ready', error: undefined }))`
     },

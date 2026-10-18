@@ -1,13 +1,9 @@
 /**
  * Reference documentation of `@migaia/lifecycle`. Rules: `app/reference/contract.ts`. Verified
- * against every public barrel and its owning source module on 2026-10-17. Source clarifications:
- * provisional rollback throws a single release error unchanged, despite its JSDoc promising one
- * AggregateError for every failure. An overdue asynchronous graceful callback is invoked before
- * deadline fallback; a synchronous graceful overrun only reports.
- * `createGenerationController().adopt()` contains synchronous `onSuperseded` throws but does not
- * observe a returned thenable. Generic transactions without a signal use an inert signal. USEGUIDE
- * says direct descriptor execution never throws, but invalid context access/deadline rejects its
- * promise. Scope unregister removes the earliest active duplicate registration.
+ * against public barrels, owning modules, README and USEGUIDE on 2026-10-18. Generic transactions
+ * without a signal use an inert signal. Scope unregister removes the earliest active duplicate
+ * registration. Late graceful failures and accidental asynchronous hook failures remain observed
+ * through the existing report boundary.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 
@@ -37,14 +33,24 @@ scope.close()
 console.log(scope.dispose(), resource.active)`
 
 /** Provisional resources become permanent only after a successful parent transfer. */
-const provisionalExample = `import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
+const provisionalExample = `import { attachSecondaryErrors } from '@migaia/utils/error'
+import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
 
 const parent = createLifecycleScope()
 const provisional = createProvisionalScope()
 const resource = provisional.own({ active: true }, {
   force: () => { resource.active = false }
 })
-await provisional.commitTo(parent)
+try {
+  await provisional.commitTo(parent)
+} catch (error) {
+  try {
+    await provisional.rollback()
+  } catch (cleanupError) {
+    throw attachSecondaryErrors(error, [cleanupError])
+  }
+  throw error
+}
 await parent.dispose()`
 
 /** A generation token gates acceptance of a result and completion releases its timer. */
@@ -784,8 +790,8 @@ export const lifecycleReference: ILibraryReference = {
     },
     errors: {
       summary: t(
-        'Lifecycle error construction and release error collection. Start with `createErrorCollector()` to preserve raw failures by policy, or use `createLifecycleError()` to create an error with lifecycle source identity.',
-        '提供生命周期错误构造与释放错误收集。从 `createErrorCollector()` 开始按策略保留原始失败，或用 `createLifecycleError()` 创建带有本包来源标识的错误。'
+        'Release error collection and public diagnostics. Start with `createErrorCollector()` to apply a release policy; unclassified failures receive lifecycle identity while existing external identities remain intact.',
+        '提供释放错误收集与公开诊断。从 `createErrorCollector()` 开始应用释放策略；未分类失败附本包身份，已有外部身份保持不变。'
       ),
       example: `import { createErrorCollector } from '@migaia/lifecycle/errors'
 const collector = createErrorCollector('collect', undefined)
@@ -863,8 +869,8 @@ console.log(await wait)`
     boundedWait: {
       role: 'operation',
       purpose: t(
-        'Observes one task until an existing absolute deadline without cancelling that task. A task rejection before timeout remains the original failure; late rejection stays observed even after the deadline wins.',
-        '观察一个任务直到既有绝对截止时刻，不取消任务本身。超时前的任务拒绝保留原始错误；即使截止时刻先到，迟到拒绝仍会被观察。'
+        'Observes one task until an existing absolute deadline without cancelling that task. A task rejection before timeout stays primary even if timer cancellation fails: secondary cleanup is attached through cause/errors. Synchronous timer completion waits for its handle before settling, cancels once, and applies the same cleanup policy. Late rejection remains observed.',
+        '观察一个任务直到既有绝对截止时刻，不取消任务本身。超时前任务拒绝保持主因，计时器取消失败通过原因或错误列表附加。同步计时器回调等待句柄返回后才结算，取消一次并遵守相同清理策略；迟到拒绝仍被观察。'
       ),
       params: {
         task: t(
@@ -918,8 +924,8 @@ console.log(await boundedWait(Promise.resolve(), systemScheduler.now() + 100))`
     createSyncLifecycleScope: {
       role: 'factory',
       purpose: t(
-        'Creates a resource owner whose release is fully synchronous. It accepts only explicit `syncSafe: true` descriptors and rejects asynchronous or provisional scope resources; accidental thenables become synchronization violations.',
-        '创建释放过程完全同步的资源所有者。只接纳显式 `syncSafe: true` 描述器，拒绝异步或临时作用域资源；意外返回异步可等待值会成为同步契约错误。'
+        'Creates a resource owner whose release is fully synchronous. It accepts only explicit `syncSafe: true` descriptors and rejects asynchronous or provisional scope resources; accidental thenables produce synchronous `SCOPE_SYNC_VIOLATION`, with their captured then read once and late rejection sent to `report`, or the shared utils host exception queue without a reporter.',
+        '创建释放过程完全同步的资源所有者。只接纳显式 `syncSafe: true` 描述器，拒绝异步或临时作用域资源；意外返回异步可等待值时同步产生 `SCOPE_SYNC_VIOLATION`，异步入口只读取一次；迟到拒绝交 `report`，缺省交工具包共享宿主异常队列。'
       ),
       options: 'ISyncLifecycleScopeOptions',
       returns: t(
@@ -931,13 +937,13 @@ console.log(await boundedWait(Promise.resolve(), systemScheduler.now() + 100))`
     createProvisionalScope: {
       role: 'factory',
       purpose: t(
-        'Accumulates setup resources until the caller chooses commit or rollback. Pair with `createLifecycleScope()` for a permanent parent: transfer preserves the committed prefix and awaits compensation of every untransferred resource on failure.',
-        '在调用方选择提交或回滚前累积初始化资源。搭配 `createLifecycleScope()` 建立永久父级：转交失败时保留已提交前缀，并等待全部未转交资源完成补偿释放。'
+        'Accumulates setup resources until the caller chooses commit or rollback. Listener-detach failures enter settlement without skipping remaining cleanup. Pair with `createLifecycleScope()` for a permanent parent: transfer preserves the committed prefix and awaits compensation of every untransferred resource on failure.',
+        '在调用方选择提交或回滚前累积初始化资源；移除监听失败进入结算，不跳过剩余清理。搭配 `createLifecycleScope()` 建立永久父级：转交失败时保留已提交前缀，并等待全部未转交资源完成补偿释放。'
       ),
       options: 'IProvisionalScopeOptions',
       returns: t(
-        'An `IProvisionalScope` owning a native abort signal. Commit and rollback are alternative terminal actions; listener setup or missing host support can fail construction.',
-        '一个持有原生中止信号的 `IProvisionalScope`。提交与回滚互为替代的终结动作；监听初始化或宿主能力缺失可使构造失败。'
+        'An `IProvisionalScope` owning a native abort signal. Commit and rollback are alternative terminal actions; parent-listener detach failures join settlement while every resource still receives cleanup. Listener setup or missing host support can fail construction.',
+        '一个持有原生中止信号的 `IProvisionalScope`。提交与回滚互斥；父监听移除失败进入结算，仍清理全部资源。监听初始化或宿主能力缺失可使构造失败。'
       ),
       example: provisionalExample
     },
@@ -1104,8 +1110,8 @@ await tracker.drain()`
     executeReleaseDescriptor: {
       role: 'operation',
       purpose: t(
-        'Executes one explicit descriptor independently of a resource owner. Custom release overrides all phases; otherwise graceful success finishes, while failure or timeout degrades to force without cancelling late graceful work.',
-        '独立于资源所有者执行一个显式描述器。自定义释放接管全部阶段；否则优雅释放成功即结束，失败或超时降级为强制释放，不取消迟到的优雅工作。'
+        'Executes one explicit descriptor independently of a resource owner. Custom release overrides all phases; otherwise graceful success finishes, while failure or timeout degrades to force once without cancelling late graceful work. Even an already-exhausted shared deadline observes started graceful work and sends late rejection to `context.report`.',
+        '独立于资源所有者执行一个显式描述器。自定义释放接管全部阶段；否则优雅释放成功即结束，失败或超时执行一次强制释放，不取消迟到的优雅工作；共享截止时间已过也观察已启动工作，并把迟到拒绝交 `context.report`。'
       ),
       params: {
         descriptor: t(
@@ -1161,13 +1167,13 @@ console.log(errors)`
     createErrorCollector: {
       role: 'factory',
       purpose: t(
-        'Collects caller-labeled release failures and applies one error outcome when finalized. Single failures retain identity, multiple throw-policy failures aggregate, and reporter callbacks cannot replace release results.',
-        '收集调用方标注来源的释放错误，并在结算时应用一种错误交付方式。单错保留身份，抛错策略下多错聚合，上报回调不会替换释放结果。'
+        'Collects release failures by policy. All four policies annotate unclassified native errors with `SCOPE_DISPOSAL_FAILED`, wrap primitives through `cause`, and preserve valid external identity. Multiple throw-policy failures aggregate; reporters cannot replace release results.',
+        '收集释放错误并按策略结算。四种策略均为未分类原生失败原位附 `SCOPE_DISPOSAL_FAILED`；原始值通过 `cause` 包装，已有合法外部身份保留。抛错策略多错聚合，上报失败不替换释放结果。'
       ),
       params: {
         policy: t(
-          'Value from `LifecycleErrorPolicy`; low-level collector construction itself does not require a reporter.',
-          '来自 `LifecycleErrorPolicy` 的取值；此底层收集器构造自身不强制要求上报回调。'
+          'Value from `LifecycleErrorPolicy`; `report` and `firstError` require a reporter at construction; missing reporters throw `INVALID_OPTION`.',
+          '来自 `LifecycleErrorPolicy` 的取值；选择 `report` 或 `firstError` 时必须在构造时提供上报回调，否则抛 `INVALID_OPTION`。'
         ),
         report: t(
           'Synchronous `(error) => void` callback or `undefined`; receives report-policy errors and later first-error failures, ignores its return and contains throws/rejections.',
@@ -1204,145 +1210,6 @@ console.log(collector.finalize('cleanup failed'))`
       ),
       example: `containAsyncRejection(Promise.reject(new Error('failed')), (error) => console.error(error))`
     },
-    createLifecycleError: {
-      role: 'operation',
-      purpose: t(
-        'Constructs a native `Error` carrying lifecycle source and a caller-selected semantic code. Optional primary cause and secondary failures remain reachable; the helper never replaces the engine-generated stack.',
-        '构造带本包来源和调用方语义码的原生 `Error`。可选主原因与次要错误保持可达；此函数不替换引擎生成的调用栈。'
-      ),
-      params: {
-        code: t(
-          'Stable error code chosen by the caller, normally a value from `LifecycleErrorCode`.',
-          '调用方选定的稳定错误码，通常取自 `LifecycleErrorCode`。'
-        ),
-        message: t(
-          'Caller-selected stable diagnostic text, normally from `LifecycleErrorText`.',
-          '调用方选定的稳定诊断文本，通常来自 `LifecycleErrorText`。'
-        ),
-        options: t(
-          'Optional cause, phase, detail and secondary errors; omission adds none of these metadata fields.',
-          '可选原因、阶段、详情和次要错误；省略时不附加这些元数据字段。'
-        )
-      },
-      optionDocs: {
-        cause: {
-          summary: t(
-            'Original thrown value kept as native error cause, including an explicitly supplied undefined.',
-            '作为原生错误原因保留的原始抛出值，包括显式提供的空值。'
-          ),
-          default: t(
-            'Omitted: no native cause property is constructed.',
-            '省略时不构造原生原因属性。'
-          )
-        },
-        phase: {
-          summary: t(
-            'Caller-selected operation phase attached as enumerable diagnostic metadata.',
-            '调用方指定的操作阶段，作为可枚举诊断元数据附加。'
-          ),
-          default: t('Omitted: no phase metadata is attached.', '省略时不附加操作阶段元数据。')
-        },
-        detail: {
-          summary: t(
-            'Caller-owned readonly diagnostic record attached without copying the record.',
-            '调用方持有的只读诊断记录，直接附加而不复制记录。'
-          ),
-          default: t('Omitted: no diagnostic detail is attached.', '省略时不附加诊断详情记录。')
-        },
-        errors: {
-          summary: t(
-            'Secondary failures retained separately from the primary cause in a frozen non-enumerable list.',
-            '与主原因分开保留的次要错误，存放于冻结且不可枚举的列表。'
-          ),
-          default: t(
-            'Omitted: no secondary failure list is attached.',
-            '省略时不附加次要错误列表。'
-          )
-        }
-      },
-      returns: t(
-        'An `ILifecycleError` with source `@migaia/lifecycle`, the supplied code and an unchanged native stack.',
-        '来源为 `@migaia/lifecycle`、包含指定错误码并保留原生调用栈的 `ILifecycleError`。'
-      ),
-      example: `const error = createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
-console.log(error.source, error.code)`
-    },
-    createLifecycleFailure: {
-      role: 'operation',
-      purpose: t(
-        'Converts an arbitrary thrown value into a lifecycle-boundary failure while preserving native error identity whenever tagging is permitted. Frozen, conflicting or primitive values use a wrapper whose cause retains the original.',
-        '把任意抛出值转换为本包边界错误，允许附加标记时保留原生错误身份。冻结、来源冲突或原始值使用包装错误，通过原因链保留原值。'
-      ),
-      params: {
-        code: t(
-          'Semantic boundary code selected from `LifecycleErrorCode` by the owning caller.',
-          '所属调用方从 `LifecycleErrorCode` 选择的边界语义码。'
-        ),
-        message: t(
-          'Fallback message from the caller’s stable text table, used only when wrapping is required.',
-          '来自调用方稳定文本表的后备消息，仅在需要包装时使用。'
-        ),
-        error: t(
-          'Original thrown value captured by the caller; it remains identical or reachable as cause.',
-          '调用方捕获的原始抛出值；保持同一身份或通过原因链可达。'
-        )
-      },
-      returns: t(
-        'An `ILifecycleError`; when safe, it is the exact original object with source/code attached.',
-        '一个 `ILifecycleError`；安全附加标记时就是原对象，另带来源和错误码。'
-      ),
-      example: `import { createLifecycleFailure } from '@migaia/lifecycle/errors'
-const original = new TypeError('invalid resource')
-const error = createLifecycleFailure('INVALID_OPTION', 'invalid resource', original)
-console.log(error === original)`
-    },
-    createLifecycleTypeError: {
-      role: 'operation',
-      purpose: t(
-        'Creates a native `TypeError` carrying lifecycle source and caller-selected code. Use when invalid input must retain a native validation error type and a traceable original cause.',
-        '创建带本包来源与调用方错误码的原生 `TypeError`。适用于无效输入必须保留原生校验错误类型以及可追溯原始原因的情况。'
-      ),
-      params: {
-        code: t(
-          'Caller-selected stable semantic code, usually `LifecycleErrorCode.invalidOption`.',
-          '调用方选择的稳定语义码，通常为 `LifecycleErrorCode.invalidOption`。'
-        ),
-        message: t(
-          'Stable validation message chosen by the owning caller.',
-          '所属调用方选择的稳定校验提示文本。'
-        ),
-        options: t(
-          'Optional original cause and readonly details; omitted fields do not add metadata.',
-          '可选原始原因和只读详情；省略的字段不会附加元数据。'
-        )
-      },
-      optionDocs: {
-        cause: {
-          summary: t(
-            'Original invalid-input failure retained through native `cause`, even when explicitly undefined.',
-            '通过原生 `cause` 保留原始输入失败，即使显式传入空值。'
-          ),
-          default: t(
-            'Omitted: construct without a cause property.',
-            '省略时构造不带原因属性的错误。'
-          )
-        },
-        detail: {
-          summary: t(
-            'Caller-owned readonly record naming the invalid field or related input context.',
-            '调用方持有的只读记录，用于标注无效字段或相关输入上下文。'
-          ),
-          default: t('Omitted: no detail record is attached.', '省略时不附加错误详情记录。')
-        }
-      },
-      returns: t(
-        'A native `TypeError` with lifecycle source/code; its runtime error class is preserved.',
-        '带本包来源和错误码的原生 `TypeError`，保持运行时错误类型。'
-      ),
-      example: `import { createLifecycleTypeError } from '@migaia/lifecycle/errors'
-const error = createLifecycleTypeError('INVALID_OPTION', 'invalid resource')
-console.log(error instanceof TypeError)`
-    },
     snapshotScheduler: {
       role: 'operation',
       purpose: t(
@@ -1356,8 +1223,8 @@ console.log(error instanceof TypeError)`
         )
       },
       returns: t(
-        'An `IScheduler` snapshot or undefined. Forwarded clock reads require finite numbers, delays require finite nonnegative values, and timer handles require callable cancellation.',
-        '一个 `IScheduler` 快照或空值。转发的时钟读取必须有限，延迟必须有限非负，定时器句柄必须提供可调用的取消方法。'
+        'An `IScheduler` snapshot or undefined. Clock reads require finite numbers, delays finite nonnegative values, and handles callable cancellation. Admitted method and cancel/unref failures receive `INVALID_OPTION`; native type and receiver are preserved where possible, otherwise cause retains the original.',
+        '一个 `IScheduler` 快照或空值。时钟读取必须有限、延迟有限非负、句柄提供可调用取消方法。已准入方法及取消或解除引用失败附 `INVALID_OPTION`；尽可能保留原生类型与接收者，否则通过原因保留原错。'
       ),
       example: `import { systemScheduler } from '@migaia/utils/scheduler'
 const scheduler = snapshotScheduler(systemScheduler)
@@ -1416,33 +1283,6 @@ console.log(scheduler.now())`
 const scheduler = resolveSchedulerOption({}, systemScheduler)
 console.log(scheduler.now())`
     },
-    addSchedulerTime: {
-      role: 'operation',
-      purpose: t(
-        'Adds caller-validated clock values and rejects a nonfinite resulting absolute time. It protects deadline composition from arithmetic overflow; it does not independently validate the type or sign of each operand.',
-        '把调用方已校验的时钟值相加，拒绝非有限的绝对时刻结果。用于防止截止时刻计算溢出；本身不独立校验每个操作数的类型或正负。'
-      ),
-      params: {
-        base: t(
-          'Already-validated finite base time from the selected scheduler clock.',
-          '来自所选调度器时钟、已经校验为有限值的基准时刻。'
-        ),
-        delta: t(
-          'Caller-validated finite increment, normally a nonnegative duration in the same clock units.',
-          '调用方已校验的有限增量，通常为相同时钟单位的非负时长。'
-        ),
-        label: t(
-          'Caller-selected field label stored in `error.detail.field` if the sum overflows.',
-          '调用方选定的字段标签；结果溢出时存入 `error.detail.field`。'
-        )
-      },
-      returns: t(
-        'The numeric sum; a nonfinite result throws a native `RangeError` tagged `INVALID_OPTION`.',
-        '数字形式的和；非有限结果抛带 `INVALID_OPTION` 的原生 `RangeError`。'
-      ),
-      example: `const deadlineAt = addSchedulerTime(1000, 250, 'deadlineAt')
-console.log(deadlineAt)`
-    },
     LIFECYCLE_SOURCE: {
       role: 'constant',
       purpose: t(
@@ -1460,15 +1300,6 @@ console.log(deadlineAt)`
       example: `const scope = createLifecycleScope()
 console.log(scope.lifecycle === LifecycleState.open)
 await scope.dispose()`
-    },
-    LifecycleUnitState: {
-      role: 'constant',
-      purpose: t(
-        'Names the independent loading axis for lifecycle units: idle, loading, loaded or failed. These values describe start progress, and never replace a resource owner’s open, closing or terminal state.',
-        '命名生命周期单元独立的加载轴：空闲、加载中、已加载或失败。这些取值描述启动进度，不能替代资源所有者的开放、关闭中或终止状态。'
-      ),
-      example: `const state: IUnitState = LifecycleUnitState.idle
-console.log(state)`
     },
     LifecycleErrorPolicy: {
       role: 'constant',
@@ -1501,8 +1332,7 @@ console.log(await scope.dispose())`
         'Stable public diagnostic messages used when lifecycle constructs or wraps errors. Keys explain scenarios rather than remediation policy; branch on source and code instead of matching these strings.',
         '本包构造或包装错误时使用的稳定公开诊断文本。键表示诊断场景，不决定补救策略；调用方应按来源和错误码分支，避免比较文本。'
       ),
-      example: `const error = createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
-console.log(error.message)`
+      example: `console.log(LifecycleErrorText.scopeClosing)`
     }
   },
   types: {
@@ -1931,8 +1761,8 @@ release()`,
       members: {
         parentSignal: {
           summary: t(
-            'An `IAbortSignal` from the parent owner; cancellation invalidates the active token and forwards its exact reason.',
-            '来自父级所有者的 `IAbortSignal`；取消使有效令牌失效并转发原始原因。'
+            'An `IAbortSignal` from the parent owner; cancellation invalidates the active token. Non-undefined reasons retain identity; undefined is normalized to the host-native AbortError. Parent cleanup failures go to `report` once.',
+            '来自父级所有者的 `IAbortSignal`；取消使有效令牌失效。非空缺原因保留身份，`undefined` 由宿主规整为原生中止错误；父级清理失败只交给 `report` 一次。'
           ),
           default: t(
             'Omitted: generations do not subscribe to an external parent.',
@@ -1942,8 +1772,8 @@ release()`,
         scheduler: schedulerOption,
         onSuperseded: {
           summary: t(
-            'Synchronous `(info) => void` diagnostic called before releasing a stale adopted result. The supplied `ILifecycleError` has `GENERATION_SUPERSEDED`; its return is ignored, synchronous throws are contained and returned thenables are not observed.',
-            '同步 `(info) => void` 诊断回调，在释放过期结果前调用。传入的 `ILifecycleError` 带 `GENERATION_SUPERSEDED`；不使用返回值，同步抛错被隔离，返回的异步可等待值不被观察。'
+            'Synchronous `(info) => void` diagnostic called before releasing a stale adopted result. The supplied `ILifecycleError` has `GENERATION_SUPERSEDED`; its return is ignored, synchronous throws and asynchronous rejections go to the existing `report` boundary. Reporter failures reach the shared utils host exception queue without changing adoption.',
+            '同步 `(info) => void` 诊断回调，在释放过期结果前调用。传入的 `ILifecycleError` 带 `GENERATION_SUPERSEDED`；不使用返回值，同步抛错与异步拒绝进入既有 `report` 通道；上报器失败进入工具包共享宿主异常队列，不改变接纳结果。'
           ),
           default: t(
             'Omitted: discarded adoption produces no superseded diagnostic callback.',
@@ -1956,8 +1786,8 @@ release()`,
             )
           },
           returns: t(
-            'No value is consumed; provide a truly synchronous callback.',
-            '不使用返回值；应提供真正同步的回调。'
+            'No value is consumed; accidental asynchronous rejection is observed through `report`.',
+            '不使用返回值；意外的异步拒绝通过 `report` 观察。'
           ),
           example: `const controller = createGenerationController({ onSuperseded: (info) => console.log(info.code) })
 const old = controller.begin()
@@ -2760,8 +2590,8 @@ console.log(collector.finalize('cleanup failed'))`
         },
         finalize: {
           summary: t(
-            'Applies the chosen failure-delivery outcome without clearing entries. One throw-policy error is thrown unchanged; several become `SCOPE_DISPOSAL_FAILED` aggregate.',
-            '应用所选失败交付方式，不清空条目。抛错策略单错原样抛出，多错成为 `SCOPE_DISPOSAL_FAILED` 聚合。'
+            'Applies the chosen failure-delivery outcome without clearing entries. A single failure keeps its normalized identity; unclassified native errors receive `SCOPE_DISPOSAL_FAILED` and primitive failures remain on cause. Several throw-policy failures aggregate.',
+            '应用所选失败交付方式，不清空条目。单错保留规整后的身份；未分类原生错误附 `SCOPE_DISPOSAL_FAILED`，原始值失败保留在原因。抛错策略多错聚合。'
           ),
           params: {
             message: t(
@@ -2780,8 +2610,8 @@ console.log(collector.finalize('cleanup failed'))`
     },
     ILifecycleError: {
       summary: t(
-        'Native `Error` carrying lifecycle source, semantic code and optional traceable metadata; original runtime type and stack stay authoritative.',
-        '携带本包来源、语义码和可选可追溯元数据的原生 `Error`；原运行时类型和调用栈保持权威。'
+        'Native `Error` carrying lifecycle identity and traceable metadata. If diagnostic message/stack getters fail during normalization, the original thrown value remains cause and getter failures remain secondary errors; they never replace the primary.',
+        '携带本包身份与可追溯元数据的原生错误。规整时若消息或堆栈读取器失败，原抛出值仍保存在原因，读取器失败作为次要错误，不会替换主因。'
       ),
       scenarios: [
         t(
@@ -2789,9 +2619,13 @@ console.log(collector.finalize('cleanup failed'))`
           '检查边界语义身份，同时保留原始主原因和次要清理失败。'
         )
       ],
-      example: `const cause = new Error('connection failed')
-const error = createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing, { cause })
-console.log(error.source, error.code, error.cause === cause)`,
+      example: `const scope = createLifecycleScope()
+scope.close()
+try {
+  scope.own({}, { force: () => undefined })
+} catch (error) {
+  console.error(error)
+}`,
       members: {
         source: {
           summary: t(
@@ -2838,38 +2672,10 @@ console.log(error.source, error.code, error.cause === cause)`,
       ),
       members: {}
     },
-    ILifecycleStateValue: {
-      summary: t(
-        'Value union of the same `LifecycleState` constants for callers consuming the explicit state-value export.',
-        '同一 `LifecycleState` 常量的值联合，供使用显式状态值导出的调用方采用。'
-      ),
-      members: {}
-    },
-    IUnitState: {
-      summary: t(
-        'Loading-state value union from `LifecycleUnitState`, independent of whether a resource owner is closing or terminal.',
-        '来自 `LifecycleUnitState` 的加载状态值联合，与资源所有者是否关闭或终止独立。'
-      ),
-      members: {}
-    },
-    ILifecycleUnitStateValue: {
-      summary: t(
-        'Explicit exported value union for the unit loading axis, sourced from `LifecycleUnitState`.',
-        '单元加载轴显式导出的值联合，取值来自 `LifecycleUnitState`。'
-      ),
-      members: {}
-    },
     IErrorPolicy: {
       summary: t(
         'Release-failure outcome union from `LifecycleErrorPolicy`, consumed by owners, transactions and error collectors.',
         '来自 `LifecycleErrorPolicy` 的释放失败交付联合，供所有者、事务和错误收集器使用。'
-      ),
-      members: {}
-    },
-    ILifecycleErrorPolicy: {
-      summary: t(
-        'Explicit value-union export of `LifecycleErrorPolicy`; its values use the same release-failure outcomes as `IErrorPolicy`.',
-        '`LifecycleErrorPolicy` 的显式值联合导出；各值与 `IErrorPolicy` 采用相同释放失败交付语义。'
       ),
       members: {}
     },
@@ -2913,30 +2719,6 @@ console.log(error.source, error.code, error.cause === cause)`,
         terminal: t(
           'Irreversibly finished; no future registration or restart is allowed.',
           '已经不可逆地完成，不再允许登记或重新启动。'
-        )
-      }
-    },
-    LifecycleUnitState: {
-      summary: t(
-        'Unit loading states independent of the resource-container survival axis.',
-        '独立于资源容器存续轴的单元加载状态。'
-      ),
-      values: {
-        idle: t(
-          'No unit loading has started in the current loading state.',
-          '当前加载状态尚未开始执行单元加载。'
-        ),
-        loading: t(
-          'A start operation is running and its result is not yet committed.',
-          '启动操作正在运行，结果尚未完成提交。'
-        ),
-        loaded: t(
-          'The active start operation succeeded and its loaded result is retained.',
-          '有效启动操作已经成功，并保留其加载结果。'
-        ),
-        failed: t(
-          'A start operation failed; retry requires another start or restart operation.',
-          '启动操作失败，重试需要再次启动或重新启动。'
         )
       }
     },

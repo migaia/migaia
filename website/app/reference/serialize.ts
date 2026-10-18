@@ -1,13 +1,12 @@
 /**
  * Reference for `@migaia/serialize`; contract: `app/reference/contract.ts`. Checked against
- * packages/serialize/src, README and USEGUIDE on 2026-10-17. Source clarifications: `base64ToBytes`
- * drops the lower decoder failure rather than retaining cause, despite its boundary comment.
- * `jsonParser` directly exposes native JSON/decoder throws; registry operations wrap parser
- * failures. Codec factories require positive safe integer versions; the JSON plugin has no version
- * field and follows native JSON rather than codec portable rules. Source defaults differ from
- * contextual README prose: registry operation context is `anonymous`; `registry` is used for
- * missing-codec diagnostics. `collectStream` currently requires an encoder whenever it assembles
- * multiple chunks containing bytes, even if all chunks already carry bytes.
+ * packages/serialize/src, README and USEGUIDE on 2026-10-18. Standalone parser and conversion
+ * failures carry semantic codes and retain their original cause where wrapping is required. Codec
+ * factories require positive safe integer versions; the JSON plugin has no version field and
+ * follows native JSON rather than codec portable rules. Source defaults differ from contextual
+ * README prose: registry operation context is `anonymous`; `registry` is used for missing-codec
+ * diagnostics. `collectStream` currently requires an encoder whenever it assembles multiple chunks
+ * containing bytes, even if all chunks already carry bytes.
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 
@@ -487,8 +486,8 @@ await registry.dispose({ deadlineAt: systemScheduler.now() })`
   },
   report: {
     summary: t(
-      'Synchronous callback receiving each secondary iterator-cleanup or detached late failure as error. No return value is used; reporter throws are contained.',
-      '接收迭代器次要清理失败及脱离排空后的迟到失败的同步回调；参数为原始错误，不使用返回值，回调抛错被限制在观察边界内。'
+      'Callback receiving secondary iterator-cleanup and detached late failures immediately, including after cancellation but before disposal completes; detached `ABORTED` remains observable. No return value changes the operation.',
+      '接收次要迭代器清理与脱离后的迟到失败，取消后即报告，无需等到销毁完成；脱离后的 `ABORTED` 仍可观察，返回值不改变操作结果。'
     ),
     params: {
       error: t(
@@ -669,8 +668,8 @@ const enumDocs = {
   },
   SerializePhase: {
     summary: t(
-      'Identifies which serialization operation owns a failure position.',
-      '标识失败位置属于编码操作还是解码操作，供错误诊断区分处理方向。'
+      'Error-location labels identifying which serialization operation owns a failure position. These constants emit no instrumentation events.',
+      '标识失败位置属于编码操作还是解码操作，供错误诊断区分处理方向；这些常量不会发出监测事件。'
     ),
     values: {
       encode: t(
@@ -826,22 +825,13 @@ export const serializeReference: ILibraryReference = {
 const codec = defineCBORCodec({ version: 1 })
 console.log(codec.decode(codec.encode({ count: 2 })))`
     },
-    'codecs/identity': {
-      summary: t(
-        'Dependency-light identity codec entry for carriers that already preserve values. Use identityCodec; identityCodecV1 is the exact same object for the version-one entry.',
-        '不加载格式运行库的恒等编解码器入口，供已保留值的载体使用；直接使用 `identityCodec`，`identityCodecV1` 与其为同一个对象。'
-      ),
-      example: `import { identityCodec } from '@migaia/serialize/codecs/identity'
-const value = { count: 2 }
-console.log(identityCodec.decode(identityCodec.encode(value)) === value)`
-    },
     'codecs/identity/v1': {
       summary: t(
-        'Version-one compatibility entry reexporting the identical identityCodecV1 object; it does not allocate another codec or change identity semantics.',
-        '第一版兼容入口，重导出同一个 `identityCodecV1` 对象，不会分配另一编解码器或改变恒等语义。'
+        'Canonical version-one identity codec entry. Import `identityCodec` here; it returns each encoded or decoded input unchanged without loading a format runtime.',
+        '第一版恒等编解码器的规范入口。从此导入 `identityCodec`，编解码均原样返回输入，不加载格式运行库。'
       ),
-      example: `import { identityCodecV1 } from '@migaia/serialize/codecs/identity/v1'
-console.log(identityCodecV1.decode(identityCodecV1.encode({ count: 2 })))`
+      example: `import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
+console.log(identityCodec.decode(identityCodec.encode({ count: 2 })))`
     },
     'codecs/json': {
       summary: t(
@@ -938,26 +928,6 @@ console.log(emitOutput({ count: 2 }, SerializeTextFormat.toml))`
 const input: unknown = { count: 2 }
 console.log(asCodecValue(input) === input)`
     },
-    assertCodecVersion: {
-      role: 'operation',
-      purpose: t(
-        'Checks that a format version is a positive safe integer while retaining its generic literal type. Use when defining a codec version before publishing its metadata.',
-        '校验格式版本为正安全整数，同时保留泛型字面量类型；用于在发布编解码器元数据前检查版本。'
-      ),
-      params: {
-        version: t(
-          'Positive safe integer chosen by the codec owner as its wire-format version; zero, fractions and unsafe integers are invalid.',
-          '由编解码器拥有者指定的线格式正安全整数版本；零、小数和不安全整数均非法。'
-        )
-      },
-      returns: t(
-        'The same version value and literal type, or TypeError with INVALID_OPTION for an invalid version.',
-        '返回同一个版本值及其字面量类型；非法版本抛带 `INVALID_OPTION` 的 `TypeError`。'
-      ),
-      example: `import { assertCodecVersion } from '@migaia/serialize/codec'
-const version = assertCodecVersion(1)
-console.log(version)`
-    },
     assertPortableValue: {
       role: 'operation',
       purpose: t(
@@ -1000,34 +970,6 @@ console.log(value)`
         '返回可调用的遍历器，接收值、可选祖先集合、初始深度和原生字节守卫，返回含 `value`、`byteUpperBound`、`hasBinary` 的对象；其 `value` 方法接收同样参数仅返回投影，输入由调用者提供，祖先集合可从外层传入，默认新建集合及深度零；原生字节守卫为可选无参数抛错函数，仅暴露给策略上下文，不自动执行；字节上界为保守估算而非编码实测长度，二进制标记记录内联或原生字节，失败经策略违规回调传播。'
       ),
       example: walkerExample
-    },
-    createCodecError: {
-      role: 'operation',
-      purpose: t(
-        'Constructs a native TypeError tagged with serialize package source and a semantic code. An optional original cause is retained by identity; diagnostic construction does not alter its stack.',
-        '构造带序列化包来源和语义错误码的原生 `TypeError`，可选原始原因按身份保留，诊断构造不会覆盖原始原因的堆栈。'
-      ),
-      params: {
-        code: t(
-          'Semantic failure code selected from SerializeErrorCode.',
-          '从 `SerializeErrorCode` 选择、对应当前失败场景的语义错误码。'
-        ),
-        message: t(
-          'Diagnostic string owned by the caller or selected from CodecErrorText.',
-          '由调用者维护或从 `CodecErrorText` 选择的诊断字符串。'
-        ),
-        cause: t(
-          'Optional original thrown value; omitted by default, otherwise retained as native Error.cause.',
-          '可选原始抛出值，默认省略，提供时保留为原生 `Error.cause`。'
-        )
-      },
-      returns: t(
-        'A tagged native TypeError returned as Error, ready for the caller to throw.',
-        '返回已标记的原生 `TypeError`，静态类型为 `Error`，供调用者抛出。'
-      ),
-      example: `import { createCodecError, CodecErrorText } from '@migaia/serialize/codec'
-import { SerializeErrorCode } from '@migaia/serialize/core'
-console.log(createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed))`
     },
     normalizeCodecFailure: {
       role: 'operation',
@@ -1171,19 +1113,9 @@ console.log(codec.decode(codec.encode(create(FileDescriptorProtoSchema, { name: 
         'Frozen version-one identity codec for carriers that preserve values themselves. Both encode(value) and decode(value) synchronously return exactly that value, including object identity; id is identity and encodedType is unknown.',
         '冻结的第一版恒等编解码器，用于自行保留值的载体；`encode(value)` 和 `decode(value)` 均同步原样返回输入，保留对象身份，标识为 `identity`，编码类型为 `unknown`。'
       ),
-      example: `import { identityCodec } from '@migaia/serialize/codecs/identity'
+      example: `import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 const value = { count: 2 }
 console.log(identityCodec.decode(identityCodec.encode(value)) === value)`
-    },
-    identityCodecV1: {
-      role: 'constant',
-      purpose: t(
-        'Version-one compatibility name for the exact identityCodec object. Both synchronous callbacks return their input unchanged; retaining this name never creates another codec instance or loads a format runtime.',
-        '第一版兼容名称，与 `identityCodec` 指向完全相同的对象；两个同步回调均原样返回输入，使用此名称不会新建实例或加载格式运行库。'
-      ),
-      example: `import { identityCodec, identityCodecV1 } from '@migaia/serialize/codecs/identity'
-console.log(identityCodec === identityCodecV1)
-console.log(identityCodecV1.decode(identityCodecV1.encode(2)))`
     },
     assertSerializeType: {
       role: 'operation',
@@ -1217,11 +1149,12 @@ assertSerializeType('json-v2')`
         )
       },
       returns: t(
-        'A boolean type guard for tuple shape only; true does not prove a valid chunk kind or payload.',
-        '仅针对元组形状的布尔类型守卫；返回真不代表种类或载荷合法。'
+        'Narrows to `readonly [string, unknown]`, not `ISerializeChunk`; use `validateSerializeChunk` to validate the kind and payload.',
+        '只收窄为 `readonly [string, unknown]`，并非 `ISerializeChunk`；种类与载荷须交给 `validateSerializeChunk` 校验。'
       ),
       example: `import { isChunkShape } from '@migaia/serialize/core'
-console.log(isChunkShape(['text', 'hello']), isChunkShape([['text', 'hello']]))`
+const candidate: unknown = ['text', 'hello']
+if (isChunkShape(candidate)) console.log(candidate[0], candidate[1])`
     },
     bytesToBase64: {
       role: 'operation',
@@ -1245,8 +1178,8 @@ console.log(base64ToBytes(bytesToBase64(new Uint8Array([1, 2]))))`
     base64ToBytes: {
       role: 'operation',
       purpose: t(
-        'Decodes canonical padded RFC 4648 Base64. Invalid spelling rejects at the serialize boundary as a native coded TypeError; the lower decoder failure is not attached as cause.',
-        '解码带规范填充的 `RFC 4648` `Base64`；非法拼写在序列化边界变为带码原生 `TypeError`，底层解码失败不会附为原因。'
+        'Decodes canonical padded RFC 4648 Base64. Invalid spelling rejects at the serialize boundary as a native coded TypeError; the original shared decoder failure is retained on `cause`.',
+        '解码带规范填充的 `RFC 4648` `Base64`；非法拼写在序列化边界变为带码原生 `TypeError`，共享底层解码失败保存在 `cause`。'
       ),
       params: {
         text: t(
@@ -1411,8 +1344,8 @@ for await (const rows of sliceByFrameBudget([1, 2, 3], { scheduler: systemSchedu
         )
       },
       returns: t(
-        'Existing text or decoded bytes. Value chunks throw TypeError with INVALID_CHUNK; decoder failures propagate directly.',
-        '返回原文本或解码后的字节文本；值分块抛带 `INVALID_CHUNK` 的 `TypeError`，解码器失败直接传播。'
+        'Existing text or decoded bytes. Value chunks throw TypeError with INVALID_CHUNK; decoder failures receive `DECODE_FAILED` while retaining native identity where possible; wrappers keep the original on `cause`.',
+        '返回原文本或解码后的字节文本；值分块抛带 `INVALID_CHUNK` 的 `TypeError`，解码器失败附 `DECODE_FAILED` 并尽量保留原生身份；需要包装时由 `cause` 保留原错。'
       ),
       example: `import { chunkToText } from '@migaia/serialize/registry'
 console.log(chunkToText(['bytes', new Uint8Array([65])], new TextDecoder()))`
@@ -1434,8 +1367,8 @@ console.log(chunkToText(['bytes', new Uint8Array([65])], new TextDecoder()))`
         )
       },
       returns: t(
-        'New bytes for text or a slice of existing byte storage. Value chunks throw TypeError with INVALID_CHUNK; encoder failures propagate directly.',
-        '文本返回新字节，字节载荷返回存储副本；值分块抛带 `INVALID_CHUNK` 的 `TypeError`，编码器失败直接传播。'
+        'New bytes for text or a slice of existing byte storage. Value chunks throw TypeError with INVALID_CHUNK; encoder failures receive `ENCODE_FAILED` while retaining native identity where possible; wrappers keep the original on `cause`.',
+        '文本返回新字节，字节载荷返回存储副本；值分块抛带 `INVALID_CHUNK` 的 `TypeError`，编码器失败附 `ENCODE_FAILED` 并尽量保留原生身份；需要包装时由 `cause` 保留原错。'
       ),
       example: `import { chunkToBytes } from '@migaia/serialize/registry'
 console.log(chunkToBytes(['text', 'hello'], new TextEncoder()))`
@@ -1462,8 +1395,8 @@ console.log(chunkToBytes(['text', 'hello'], new TextEncoder()))`
     jsonParser: {
       role: 'factory',
       purpose: t(
-        'Creates a native JSON parser. Encoding delegates to JSON.stringify, decoding parses text or bytes, and value chunks pass through unchanged. Direct calls can expose native JSON or decoder errors; a registry adds coded operation context.',
-        '创建原生 `JSON` 解析器；编码调用 `JSON.stringify`，解码解析文本或字节，值分块原样通过；直接调用可暴露原生 `JSON` 或解码器错误，注册表补充带码操作上下文。'
+        'Creates a native JSON parser. Encoding delegates to JSON.stringify, decoding parses text or bytes, and value chunks pass through unchanged. Standalone stringify failures receive `ENCODE_FAILED`; parse and decoder failures receive `DECODE_FAILED`. Annotatable native errors retain identity and type; wrappers retain the original cause. Missing byte decoding capability uses `ENV_UNSUPPORTED`.',
+        '创建原生 `JSON` 解析器；编码调用 `JSON.stringify`，解码解析文本或字节，值分块原样通过；直接调用时，字符串化失败附 `ENCODE_FAILED`，解析与解码器失败附 `DECODE_FAILED`。可附码的原生错误保留身份与类型，需要包装时保留原始原因；缺少字节解码能力使用 `ENV_UNSUPPORTED`。'
       ),
       options: 'IJsonPluginOptions',
       returns: t(
@@ -1488,8 +1421,8 @@ console.log(chunkToBytes(['text', 'hello'], new TextEncoder()))`
     tagSerializeError: {
       role: 'operation',
       purpose: t(
-        'Attaches immutable serialize source, semantic code and optional context to the original native error, retaining identity, stack and runtime type. Matching tags are idempotent; conflicting source or code throws TypeError.',
-        '把不可变序列化来源、语义码及可选上下文附到原生错误，保留身份、堆栈与运行时类型；相同标记幂等，来源或码冲突抛 `TypeError`。'
+        'Attaches immutable serialize source, semantic code and optional context to the original native error, retaining identity, stack and runtime type. Matching tags are idempotent; conflicting source or code delegates to utils and throws `ERROR_IDENTITY_CONFLICT`, retaining the original error on `cause`.',
+        '把不可变序列化来源、语义码及可选上下文附到原生错误，保留身份、堆栈与运行时类型；相同标记幂等，来源或码冲突由工具包抛 `ERROR_IDENTITY_CONFLICT`，并在 `cause` 保留原始错误。'
       ),
       params: {
         error: t(
@@ -2046,14 +1979,6 @@ console.log(codec.schema.id, codec.schema.version)`,
         '只读标签元组，载荷分别为文本、`Uint8Array` 或任意值；元组只读不代表载荷冻结，注册表校验仅复制并冻结元组容器。'
       ),
       example: registryExample,
-      members: {}
-    },
-    ISerializeChunkType: {
-      example: registryExample,
-      summary: t(
-        'Discriminant union from ISerializeChunk index zero: text, bytes or value. Use it to choose tuple payload handling.',
-        '来自 `ISerializeChunk` 第零项的标签联合：文本、字节或值，用于选择相应载荷处理路径。'
-      ),
       members: {}
     },
     ISerializeOutput: {

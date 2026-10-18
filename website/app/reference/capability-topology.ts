@@ -8,7 +8,7 @@ const p = (en: string, zh: string): IMemberDoc => ({ summary: t(en, zh) })
 const setup = `import { createTopologyIndex } from '@migaia/capability/graph/topology'
 const index = createTopologyIndex({
   onCycle: path => { throw new TypeError(path.join(' / ')) },
-  onInvalid: reason => { throw new TypeError(reason) }
+  onInvalid: (reason, _nodeId, failure) => { throw new TypeError(reason, failure) }
 })
 index.add({ id: 'cache', dependencies: [] })
 index.add({ id: 'reader', dependencies: [{ provider: 'cache', required: true }] })`
@@ -65,6 +65,16 @@ const readers: Record<string, IMemberDoc> = {
       '当前视图包含此节点标识时返回真，否则返回假。'
     ),
     `${setup}\nconsole.log(index.has('cache'))`
+  ),
+  registrationOrdinal: method(
+    'Reads the stable registration ordinal owned by this index or open transaction; removals never renumber surviving nodes.',
+    '读取此索引或未结束事务拥有的稳定登记序号；删除节点不会重新编号现存节点。',
+    { id },
+    t(
+      'The admitted node’s ordinal. Unknown IDs invoke onInvalid. Unlike snapshot().ordinal, this number is not densely compacted after removals.',
+      '返回已准入节点的序号，未知标识调用 `onInvalid`；与 `snapshot().ordinal` 不同，删除后此序号不会压缩为连续值。'
+    ),
+    `${setup}\nconsole.log(index.registrationOrdinal('reader'))`
   ),
   dependencies: method(
     'Reads the frozen declared provider edges of one present node.',
@@ -259,10 +269,31 @@ const types: Record<string, ITypeDoc> = {
         'Synchronous (path) callback receives a closed cycle of application node IDs and must throw its owning error; no return is allowed.',
         '同步 `(path)` 回调接收应用节点标识组成的闭合依赖环，必须抛出所属错误，不能正常返回。'
       ),
-      onInvalid: p(
-        'Synchronous (reason, nodeId?) callback receives TopologyInvalidReason and an application ID when attributable; must throw the caller-owned error, which propagates unchanged.',
-        '同步 `(reason, nodeId?)` 回调接收 `TopologyInvalidReason` 与可归因时的应用标识，必须抛出调用方错误，原样传播。'
-      )
+      onInvalid: {
+        summary: t(
+          'Synchronous error adapter for invalid topology input. It must throw; the pure boundary retains the selected native shell, receiver and identity and keeps captured original failures reachable through cause/errors.',
+          '输入拓扑不合法时调用的同步错误适配器，必须抛错；纯拓扑边界保留所选原生外壳、接收者与身份，并沿原因或错误列表保留捕获的原始失败。'
+        ),
+        params: {
+          reason: t(
+            'TopologyInvalidReason selected by the canonical admission boundary.',
+            '规范接纳边界选择的 `TopologyInvalidReason`，说明无效输入场景。'
+          ),
+          nodeId: t(
+            'Application-assigned ID from the offending node when attributable; otherwise undefined.',
+            '可归因时取自问题节点定义的应用标识，否则为空缺值。'
+          ),
+          failure: t(
+            'Optional { cause } from a caught input access failure; cause is the exact original value, including undefined.',
+            '输入访问抛错时提供的可选 `{ cause }`，原因保留精确原值，含空缺值。'
+          )
+        },
+        returns: t(
+          'Never returns normally; throw the caller-owned error. Captured original failures are retained automatically.',
+          '不能正常返回；应抛出调用方拥有的错误，捕获的原始失败会自动保留。'
+        ),
+        example: setup
+      }
     }
   },
   ITopologyIndexNode: {
@@ -313,8 +344,8 @@ const types: Record<string, ITypeDoc> = {
   },
   ICapabilityTopology: {
     summary: t(
-      'Deeply frozen static projection produced by buildCapabilityTopology or index.snapshot.',
-      '由 `buildCapabilityTopology()` 或 `index.snapshot()` 产生的深度冻结静态投影。'
+      'Deeply frozen static projection from buildCapabilityTopology or index.snapshot. ReadonlyMap facades support standard forEach callback arguments and thisArg while exposing no mutation.',
+      '由 `buildCapabilityTopology()` 或 `index.snapshot()` 产生的深度冻结静态投影；只读映射的遍历支持标准回调参数与接收者参数，不暴露修改能力。'
     ),
     scenarios: [
       t(
@@ -702,8 +733,8 @@ const symbols: Record<string, ISymbolDoc> = {
     ),
     params: {
       adapter: t(
-        'Application callbacks onCycle(path) and onInvalid(reason, nodeId?) must synchronously throw caller-owned errors; supplied IDs originate from node definitions.',
-        '应用提供的 `onCycle(path)` 与 `onInvalid(reason, nodeId?)` 必须同步抛出调用方错误，传入标识来自节点定义。'
+        'Application callbacks onCycle(path) and onInvalid(reason, nodeId?, failure?) must synchronously throw caller-owned errors; IDs originate from node definitions and failure.cause is the captured original access failure, automatically retained by the pure owner.',
+        '应用提供的 `onCycle(path)` 与 `onInvalid(reason, nodeId?, failure?)` 必须同步抛出调用方错误；标识来自节点定义，失败元数据的原因是捕获的原始访问失败，纯拓扑拥有者自动保留它。'
       )
     },
     returns: t(
@@ -732,8 +763,8 @@ const symbols: Record<string, ISymbolDoc> = {
         '同步 `(path)` 接收应用标识组成的闭合环，从最小登记序号开始排列，必须抛错。'
       ),
       onInvalid: t(
-        'Synchronous (reason, nodeId?) receives structural TopologyInvalidReason and attributable application node ID, and must throw.',
-        '同步 `(reason, nodeId?)` 接收结构性 `TopologyInvalidReason` 与可归因的应用标识，必须抛错。'
+        'Synchronous (reason, nodeId?, failure?) receives structural TopologyInvalidReason, attributable application node ID and optional { cause } for captured access failures. Must throw; the boundary retains the original cause/errors without replacing the adapter-selected native error.',
+        '同步 `(reason, nodeId?, failure?)` 接收结构性 `TopologyInvalidReason`、可归因应用标识与捕获访问失败的可选 `{ cause }`。必须抛错；边界保留原始原因或错误列表，不替换适配器选定的原生错误。'
       )
     },
     returns: t(
@@ -856,8 +887,8 @@ const symbols: Record<string, ISymbolDoc> = {
       )
     },
     returns: t(
-      'Frozen read-only set in canonical order, including selected members and their in-batch required providers.',
-      '返回按规范顺序排列的冻结只读集合，包含选中成员及同批次必需提供方。'
+      'Frozen read-only set in canonical order, including selected members and in-batch required providers. Standard forEach callbacks receive value/value/set and support thisArg; mutation remains unavailable.',
+      '返回按规范顺序排列的冻结只读集合，包含选中成员及同批次必需提供方。标准遍历回调接收值、重复值与集合，并支持接收者参数，仍不可修改。'
     ),
     example: planExample('resolveInstallSet', "index, ['cache', 'reader'], id => id === 'cache'")
   },

@@ -96,8 +96,8 @@ const members: Record<string, IMemberDoc> = {
   },
   resume: {
     summary: t(
-      'Restarts a suspended provider and reconciles its affected required dependents; a non-suspended target rejects GRAPH_NODE_NOT_SUSPENDED.',
-      '重新启动暂停的提供方并协调受影响的必需消费方，目标未暂停则拒绝为 `GRAPH_NODE_NOT_SUSPENDED`。'
+      'Restores availability of the retained suspended provider instance without rerunning startBatch, then reconciles affected required dependents; a non-suspended target rejects GRAPH_NODE_NOT_SUSPENDED.',
+      '恢复暂停提供方所保留实例的可用性，不重新执行 `startBatch`，再协调受影响的必需消费方，目标未暂停则拒绝为 `GRAPH_NODE_NOT_SUSPENDED`。'
     ),
     params: { id },
     returns: result,
@@ -186,8 +186,8 @@ const members: Record<string, IMemberDoc> = {
   },
   dispose: {
     summary: t(
-      'Immediately closes admission and queues final physical cleanup and binding release; terminal cleanup clears definitions.',
-      '立即关闭接纳并排队最终物理清理与绑定释放，终态清理会清空节点定义。'
+      'Immediately closes admission and queues final physical cleanup and binding release; terminal cleanup clears definitions. Final disposal waits behind admitted predecessors in the same FIFO without mutationAdmissionMs timeout.',
+      '立即关闭接纳并排队最终物理清理与绑定释放，终态清理会清空节点定义。最终释放在同一先进先出队列等待已准入前序，不受 `mutationAdmissionMs` 超时限制。'
     ),
     returns: t(
       'One shared disposal Promise. Composition releaseBatch must honor the lease fence; releaseBinding failures are reported, while releaseBatch failures reject disposal.',
@@ -242,7 +242,7 @@ const types: Record<string, ITypeDoc> = {
       report: {
         ...p(
           'Receives original contained startup, release and late failure as error; return is ignored and own throws/rejections are contained.',
-          '以 `error` 接收受控的原始启动、释放或迟到失败，不消费返回值，其自身抛错与拒绝会隔离。'
+          '以 `error` 接收受控的原始启动、释放或迟到失败，不消费返回值；自身抛错与拒绝进入工具包共享宿主异常队列，不改变修改结果。'
         ),
         default: t(
           'Omitted: no external failure reporter is called.',
@@ -251,8 +251,8 @@ const types: Record<string, ITypeDoc> = {
       },
       mutationAdmissionMs: {
         ...p(
-          'Maximum queued wait in milliseconds before a mutation starts; finite nonnegative values only.',
-          '修改开始前允许在队列中等待的最长毫秒数，仅接纳有限非负值。'
+          'Maximum queued wait before an ordinary mutation starts; finite nonnegative milliseconds only. Final dispose is exempt and waits for preceding admitted work in the same FIFO.',
+          '普通修改开始前允许排队的最长毫秒数，仅接纳有限非负值。最终释放除外，仍在同一先进先出队列等待前序准入工作。'
         ),
         default: t(
           'Omitted: the mutation queue has no admission deadline.',
@@ -327,8 +327,8 @@ const types: Record<string, ITypeDoc> = {
         '本次修改选中的应用节点标识列表，按规范顺序排列。'
       ),
       topologyChanged: p(
-        'Whether this operation changed graph definitions or provider edges, rather than only lifecycle state.',
-        '表示本次是否修改图定义或提供方依赖边，而不只是生命周期状态。'
+        'Whether dependency edges changed. Same-ID replacement of kind, start or binding can return false when edges are unchanged; the graph generation still advances.',
+        '表示依赖边是否变化。同标识替换分类、启动函数或绑定但边不变时可为假，图代数仍会推进。'
       ),
       generation: p(
         'Graph generation captured after this mutation committed.',
@@ -419,10 +419,6 @@ const types: Record<string, ITypeDoc> = {
       )
     }
   },
-  IGraphBindingReleaseReason: alias(
-    'Value union describing why exact binding custody is relinquished after cleanup.',
-    '描述清理后为何交还精确绑定托管职责的原因取值联合。'
-  ),
   IGraphBindingReleaseEntry: {
     summary: t(
       'Exact binding generation supplied to the composition custody release callback.',

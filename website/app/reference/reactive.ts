@@ -356,8 +356,8 @@ const theme = defaultRuntime.signal('light')`
     assertSingleRuntimeCopy: {
       role: 'operation',
       purpose: t(
-        'Throws `COPY_CONFLICT` when more than one copy of this package was loaded in the process (duplicate installs, CDN copies, micro-frontends). Call it once at application start; the library never calls it by itself.',
-        '进程中加载了多份本包副本（重复安装、CDN 副本、微前端各自打包）时抛 `COPY_CONFLICT`。在应用启动时调用一次；库自身不会主动调用它。'
+        'Throws `COPY_CONFLICT` when more than one copy registered at a correctness boundary (duplicate installs, CDN copies, micro-frontends). A cold extension import need not register. Call it once at application start; the library never calls it by itself.',
+        '多份本包副本进入正确性边界登记时（重复安装、CDN 副本、微前端各自打包）抛 `COPY_CONFLICT`；仅冷导入扩展入口不一定登记。在应用启动时调用一次；库自身不会主动调用它。'
       ),
       example: `import { assertSingleRuntimeCopy } from '@migaia/reactive'
 
@@ -366,18 +366,10 @@ assertSingleRuntimeCopy()`
     REACTIVE_SOURCE: {
       role: 'error',
       purpose: t(
-        'The `source` value on every error from this package (`@migaia/reactive`). Compare `error.source` with it, then branch on `error.code`.',
-        '本包抛出的所有错误上都带有的 `source` 值（`@migaia/reactive`）。先比较 `error.source` 确认错误来自本包，再按 `error.code` 分支处理。'
+        'The `source` value on Reactive-owned errors (`@migaia/reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.',
+        '响应式包自身错误所带的 `source` 值（`@migaia/reactive`）。已有外部错误身份与非错误控制对象保持不变。先比较 `error.source` 确认错误来自本包，再按 `error.code` 分支处理。'
       ),
       example: `if ((error as { source?: string }).source === REACTIVE_SOURCE) handle(error)`
-    },
-    ReactiveDependencyKind: {
-      role: 'constant',
-      purpose: t(
-        'Kinds of dependency records kept by the tracker, used by adapter code that inspects captures.',
-        '依赖追踪器记录的依赖种类，供检查捕获结果的适配层代码使用。'
-      ),
-      example: `console.log(ReactiveDependencyKind.capture)`
     },
     ReactiveErrorCode: {
       role: 'error',
@@ -441,8 +433,8 @@ assertSingleRuntimeCopy()`
     assertOwnedBy: {
       role: 'operation',
       purpose: t(
-        'Lenient ownership check: passes for values that were never registered, and throws `CROSS_RUNTIME` only when the value is registered to a different runtime.',
-        '宽松的所有权检查：从未登记过的值直接通过；只有登记在另一个 runtime 名下时才抛 `CROSS_RUNTIME`。'
+        'Lenient ownership check: ordinary unregistered values pass; values owned by another runtime throw `CROSS_RUNTIME`. A foreign-copy brand is detected as `COPY_CONFLICT`, rather than treated as an unregistered value.',
+        '宽松所有权检查：普通未登记值通过，属于另一运行时的值抛 `CROSS_RUNTIME`。具有外部副本品牌的值抛 `COPY_CONFLICT`，不会当作普通未登记值放行。'
       ),
       params: {
         value: t('Value to check.', '要检查的值。'),
@@ -467,8 +459,8 @@ assertSingleRuntimeCopy()`
     claimOwnership: {
       role: 'operation',
       purpose: t(
-        'Registers `value` as owned by `runtime`. Registering the same object to a different runtime throws `OWNERSHIP_CONFLICT`.',
-        '把 `value` 登记为属于 `runtime`。同一个对象再登记到另一个 runtime 时抛 `OWNERSHIP_CONFLICT`。'
+        'Registers `value` as owned by `runtime`. The first claim installs the existing cross-copy brand while the local WeakMap remains authoritative. Registering the same object to a different runtime throws `OWNERSHIP_CONFLICT`; foreign-copy lookup misses throw `COPY_CONFLICT`.',
+        '把 `value` 登记为属于 `runtime`。首次登记安装既有跨副本品牌，本地弱映射仍是所有权权威。同一对象再登记到另一运行时抛 `OWNERSHIP_CONFLICT`；外部副本查询未命中本地登记时抛 `COPY_CONFLICT`。'
       ),
       params: { value: t('Object to register.', '要登记的对象。'), runtime: runtimeParam },
       example: `claimOwnership(collection, runtime)`
@@ -556,8 +548,8 @@ const value = tracked.runTracked(() => source.value)`
     deferRuntimeCleanup: {
       role: 'operation',
       purpose: t(
-        'Schedules a synchronous cleanup task on the runtime idle channel (`scheduleIdle`, microtask by default). A throwing task is reported through `reportError`.',
-        '把同步清理任务排到 runtime 的空闲通道（`scheduleIdle`，默认是微任务）。任务抛错时通过 `reportError` 上报。'
+        'Schedules a synchronous cleanup task on the runtime idle channel (`scheduleIdle`, microtask by default). A throwing task is reported through `reportError`, including tasks deferred through a custom tracked observer; cleanup uses the canonical runtime path.',
+        '把同步清理任务排到 runtime 的空闲通道（`scheduleIdle`，默认是微任务）。任务抛错时通过 `reportError` 上报，含自定义追踪观察者延后执行的任务；清理复用规范运行时通路。'
       ),
       params: { runtime: runtimeParam, task: t('Cleanup to run later.', '稍后执行的清理任务。') },
       example: `deferRuntimeCleanup(runtime, () => cache.clear())`
@@ -676,8 +668,8 @@ console.log(doubled.deps.size, count.version)`,
         },
         onError: {
           summary: t(
-            'Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context.',
-            '接收 runtime 无法抛给调用方的错误（异步冲刷中的 effect 失败、生命周期钩子失败、trace 监听器失败），并附带 `phase` 上下文。'
+            'Receives errors that the runtime cannot throw to a caller (effect failures during an async flush, lifecycle hook failures, trace listener failures) with a `phase` context. Synchronous reporter failures and returned thenable rejections reach the shared utils host exception queue, without changing graph operations.',
+            '接收 runtime 无法抛给调用方的错误（异步冲刷中的 effect 失败、生命周期钩子失败、trace 监听器失败），并附带 `phase` 上下文。上报器同步失败与返回的异步拒绝进入工具包共享宿主异常队列，不改变图操作结果。'
           ),
           default: t(
             'Not set: errors go to `adapter.reportError`.',
@@ -778,8 +770,8 @@ console.log(count.version, count.observed) // 版本号推进，observed 为 tru
             )
           },
           returns: t(
-            'A function that removes only these callbacks. Several failing hooks are combined into `OBSERVER_FAILED`.',
-            '只移除这组回调的函数。多个回调同时失败时合并为 `OBSERVER_FAILED`。'
+            'A function that removes only this registration group, even when another owner supplied the same callbacks. Several failing hooks are combined into `OBSERVER_FAILED`.',
+            '只移除此登记组的函数；即使另一所有者传入相同回调，也不会受影响。多个回调同时失败时合并为 `OBSERVER_FAILED`。'
           ),
           whenToUse: t(
             'Start and stop expensive sources (sockets, polling) with demand.',
@@ -860,7 +852,8 @@ total.dispose()`,
       ],
       example: `const name = runtime.signal('Ada')
 const effect = runtime.effect(() => console.log(name.value)) // 立即输出 'Ada'
-name.value = 'Grace' // 再次输出 'Grace'
+name.value = 'Grace'
+runtime.flush() // 输出 'Grace' 后才释放
 effect.dispose()
 name.value = 'Linus' // 不再输出`,
       members: nodeBase
@@ -1063,8 +1056,8 @@ stop()`,
       members: {
         capture: {
           summary: t(
-            'Runs `read` and records the nodes it read and their versions, without creating any edge.',
-            '执行 `read` 并记录读取到的节点及其当时版本，但不建立任何依赖边。'
+            'Runs `read` with opaque capture and computed previews, without adding edges, advancing versions or scheduling work, including nested computed reads.',
+            '通过不透明捕获与派生值预览执行 `read`，含嵌套派生读取；不建立依赖边、不推进版本、不排程工作。'
           ),
           params: { read: t('Render-time read function.', '渲染阶段的读取函数。') },
           returns: t('An `ICapture` token with `result`.', '带 `result` 的 `ICapture` 令牌。'),
@@ -1087,8 +1080,8 @@ stop()`,
         },
         commit: {
           summary: t(
-            'Installs the captured dependencies on the observer at commit time.',
-            '在提交阶段把捕获到的依赖安装到观察者上。'
+            'Recursively validates the evaluated capture tree, then lets the canonical tracker adopt its dependencies and preview cache. It does not rerun derivations or comparers.',
+            '递归验证已求值的捕获树，再由规范追踪器接纳依赖图与预览缓存；不重新执行派生函数或比较器。'
           ),
           params: {
             capture: t(
@@ -1108,8 +1101,8 @@ stop()`,
             '强制已提交的观察者重新执行一次。'
           ),
           returns: t(
-            '`changed` or `unchanged` (whether its dependency set changed), or `no-observer`.',
-            '`changed` 或 `unchanged`（依赖集合是否变化），没有观察者时为 `no-observer`。'
+            '`changed` or `unchanged` (whether its dependency set or recorded versions changed), or `no-observer`.',
+            '`changed` 或 `unchanged`（依赖集合或记录版本是否变化），没有观察者时为 `no-observer`。'
           ),
           example: `binding.retrack()`
         }
@@ -1125,7 +1118,7 @@ stop()`,
     IObserverRetrackResult: {
       summary: t(
         'Result of `binding.retrack()`: `changed`, `unchanged` or `no-observer`.',
-        '`binding.retrack()` 的结果：`changed`（依赖集合变了）、`unchanged`（未变）或 `no-observer`（尚无观察者）。'
+        '`binding.retrack()` 的结果：`changed`（依赖集合或记录版本变化）、`unchanged`（未变）或 `no-observer`（尚无观察者）。'
       ),
       members: {}
     },
@@ -1172,8 +1165,8 @@ field.notify()`
         },
         commit: {
           summary: t(
-            'Reserves a version, runs `write`, then publishes the change, as one step (same order as assigning a signal).',
-            '先预留版本号、再执行 `write`、最后发布变化，三步作为一个整体完成（与给 signal 赋值的顺序一致）。'
+            'Reserves a version, runs `write`, then publishes using the greater of the reservation and this source’s already-published version. Reentrant notify cannot roll the version backward; callback ordering stays unchanged.',
+            '先预留版本、执行 `write`，再以预留值与此来源已发布版本的较大值发布；重入通知不会使版本回退，回调次序不变。'
           ),
           params: { write: t('Function that changes the external value.', '修改外部值的函数。') },
           returns: t('What `write` returns.', '`write` 的返回值。'),
@@ -1277,8 +1270,8 @@ if (tracked.hasStaleDependencies()) refetch()`,
             '移除反向依赖边，但保留版本快照以便之后重新验证。'
           ),
           returns: t(
-            'Nothing; `isSuspended()` becomes `true`.',
-            '无返回值；之后 `isSuspended()` 为 `true`。'
+            'Nothing; a suspended snapshot is retained only when dependencies existed. Empty dependencies leave `isSuspended()` false.',
+            '无返回值；仅原本有依赖时保留挂起快照。空依赖不会使 `isSuspended()` 变为真。'
           ),
           example: `tracked.suspend()`
         },
@@ -1288,8 +1281,8 @@ if (tracked.hasStaleDependencies()) refetch()`,
             '查询是否保留着挂起时的快照。'
           ),
           returns: t(
-            '`true` after `suspend()` until revalidated or cleared.',
-            '`suspend()` 之后、重新验证或清除之前为 `true`。'
+            '`true` exactly while a private suspended snapshot exists; failed revalidation may retain it until the next tracked run or clear.',
+            '私有挂起快照存在时才为真；重新验证失败可保留快照，直到下一次追踪执行或清除。'
           ),
           example: `if (tracked.isSuspended()) tracked.revalidate()`
         },
@@ -1344,8 +1337,11 @@ if (tracked.hasStaleDependencies()) refetch()`,
           '为外部数据仓库编写适配节点，并用 `createSourceBinding()` 登记。'
         )
       ],
-      example: `const count = runtime.signal(0) // signal 与 computed 都实现了 IObservable
-runtime.effect(() => count.value)
+      example: `import { internalRuntimeOf } from '@migaia/reactive/extension'
+
+const graph = internalRuntimeOf(runtime)
+const count = graph.signal(0)
+runtime.effect(() => { void count.value })
 console.log(count.subs.size, count.version) // 1 个订阅者与当前版本号`,
       members: {
         runtime: nodeBase.runtime!,
@@ -1437,41 +1433,37 @@ console.log(user.deps.has(userId)) // true：userId 变化时 runtime 调用 use
         },
         onDependencyDisconnected: {
           summary: t(
-            'Called by the runtime when a dependency was disposed.',
-            '某个依赖被释放时由 runtime 调用。'
+            'Called by the runtime when a dependency is disconnected by disposal or invalidation; an invalidated node can still be usable.',
+            '依赖因释放或失效而断开时由运行时调用；失效节点仍可能继续使用。'
           ),
-          params: { observable: t('The disposed dependency.', '被释放的依赖节点。') },
+          params: {
+            observable: t(
+              'The disconnected dependency, which may still be usable after invalidation.',
+              '被断开的依赖节点；失效后仍可能可用。'
+            )
+          },
           returns: t(
-            'Nothing; the observer should rerun so the failure becomes visible.',
-            '无返回值；观察者应重新执行，让失败可被观察到。'
+            'Nothing; rerun to reconnect or expose a disposal failure as appropriate.',
+            '无返回值；重新执行以恢复连接，或按实际情况暴露释放失败。'
           ),
           example: `onDependencyDisconnected() {
-  this.rerun() // 重新读取时会得到 NODE_DISPOSED
+  this.rerun() // 重新读取以恢复连接或暴露释放错误
 }`
         }
       }
     }
   },
   enums: {
-    ReactiveDependencyKind: {
-      summary: t('Kinds of dependency records.', '依赖记录的种类，用于区分来源。'),
-      values: {
-        observer: t(
-          '`observer`: the dependency was recorded by a running observer.',
-          '`observer`：依赖由正在执行的观察者记录。'
-        ),
-        capture: t(
-          '`capture`: the dependency was recorded by a render-time capture.',
-          '`capture`：依赖由渲染期捕获记录，尚未建立依赖边。'
-        )
-      }
-    },
     ReactiveErrorCode: {
       summary: t(
         'Codes on errors thrown or reported by this package.',
         '本包抛出或上报的错误上的 `error.code`。'
       ),
       values: {
+        callbackFailed: t(
+          '`CALLBACK_FAILED`: an unclassified callback failure. Writable native errors retain identity; primitive or immutable failures remain on cause, including undefined. Valid external identities and non-Error object control values pass through unchanged, without then probing.',
+          '`CALLBACK_FAILED`：未分类的回调失败。可修改的原生错误保留身份；原始值或不可修改失败通过原因保留，含空缺值。已有合法外部身份与非错误对象控制值原样通过，不在此探测异步入口。'
+        ),
         nodeDisposed: t(
           '`NODE_DISPOSED`: a disposed signal, computed or source was read or written.',
           '`NODE_DISPOSED`：读取或写入了已释放的 signal、computed 或数据源。'
@@ -1493,8 +1485,8 @@ console.log(user.deps.has(userId)) // true：userId 变化时 runtime 调用 use
           '`OWNERSHIP_CONFLICT`：同一个对象被登记到两个不同的 runtime。'
         ),
         copyConflict: t(
-          '`COPY_CONFLICT`: more than one copy of the package is loaded.',
-          '`COPY_CONFLICT`：进程中加载了多份本包副本。'
+          '`COPY_CONFLICT`: multiple copies registered at a correctness boundary, or a foreign branded node crossed a local boundary. Cold imports alone need not register.',
+          '`COPY_CONFLICT`：多份副本进入正确性边界登记，或带外部品牌的节点越过本地边界；仅冷导入不一定登记。'
         ),
         brandCorrupted: t(
           '`BRAND_CORRUPTED`: the cross-copy diagnostic marker has an unexpected shape.',

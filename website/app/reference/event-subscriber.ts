@@ -53,8 +53,8 @@ const terminalReportField: IMemberDoc = {
 /** `style` field shared by channel and hub options. */
 const styleField: IMemberDoc = {
   summary: t(
-    'Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map built with `defineEventApiStyle()`. The canonical methods always stay; aliases are the same function objects and do not change delivery or error semantics.',
-    '在构造时为订阅、发布、退订增加别名方法。可传预设名（`on-emit`、`on-trigger`、`listen-fire`），或用 `defineEventApiStyle()` 定义的自定义名称表。原有的 `subscribe`/`publish` 始终保留；别名与原方法是同一个函数，不改变交付和错误语义。'
+    'Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The canonical methods always stay; aliases are the same function objects and do not change delivery or error semantics.',
+    '在构造时为订阅、发布、退订增加别名方法。可传预设名（`on-emit`、`on-trigger`、`listen-fire`），或用 `as const satisfies IEventApiStyleNames` 检查的自定义名称表。原有的 `subscribe`/`publish` 始终保留；别名与原方法是同一个函数，不改变交付和错误语义。'
   ),
   default: t('`subscribe-publish`: no aliases are added.', '`subscribe-publish`：不增加别名。'),
   values: {
@@ -387,15 +387,11 @@ subscribeOnce(channel, (event) => console.log('只执行一次', event.value))`
         options: t(
           'Channel options; every field is optional. See the options table.',
           'channel 选项，全部字段可选，见下方选项表。'
-        ),
-        projectionPlan: t(
-          'Internal parameter used by `createEventHub()` to share a prepared `valueConfig` plan. Application code never passes it.',
-          '内部参数，供 `createEventHub()` 传递已准备好的 `valueConfig` 读取计划，应用代码不要传入。'
         )
       },
       returns: t(
-        'The channel (`ICanonicalEventChannel`). With a `style` option it also has the alias methods of that style. Invalid options throw a `TypeError` with code `INVALID_OPTIONS` before anything is created.',
-        '创建好的 channel（`ICanonicalEventChannel`）；设置了 `style` 时还带有对应的别名方法。选项不合法时在创建前抛带 `INVALID_OPTIONS` 码的 `TypeError`。'
+        'The channel (`ICanonicalEventChannel`). With a `style` option it also has the alias methods of that style. Malformed options throw `INVALID_OPTIONS`; non-callable report/terminalReport uses `INVALID_REPORTER`, before construction.',
+        '创建好的 channel（`ICanonicalEventChannel`）；设置了 `style` 时还带有对应的别名方法。选项形状不合法时在构造前抛 `INVALID_OPTIONS`；不可调用的上报器使用 `INVALID_REPORTER`。'
       ),
       options: 'IEventChannelOptions',
       example: {
@@ -436,8 +432,8 @@ stop()`
         options: t('Hub options; every field is optional.', 'hub 选项，全部字段可选。')
       },
       returns: t(
-        'The hub (`IEventHub`, or `IStyledEventHub` with alias methods when `style` is set). Invalid options throw `INVALID_OPTIONS`.',
-        '创建好的 hub（`IEventHub`；设置 `style` 时为带别名方法的 `IStyledEventHub`）。选项不合法时抛 `INVALID_OPTIONS`。'
+        'The hub (`IEventHub`, or `IStyledEventHub` with alias methods when `style` is set). Malformed options throw `INVALID_OPTIONS`; non-callable reporters use `INVALID_REPORTER`.',
+        '创建好的 hub（`IEventHub`；设置 `style` 时为带别名方法的 `IStyledEventHub`）。选项形状不合法时抛 `INVALID_OPTIONS`；不可调用的上报器使用 `INVALID_REPORTER`。'
       ),
       options: 'IEventHubOptions',
       example: hubExample,
@@ -448,30 +444,6 @@ stop()`
           '需要 listener 结果：hub 不收集结果，改为每个事件单独用 `createEventChannel<T, R>()`。'
         )
       ]
-    },
-    defineEventApiStyle: {
-      role: 'operation',
-      purpose: t(
-        'Declares a custom alias name map for the `style` option and keeps its literal names for type inference. It returns the same object; validation happens when a channel or hub is created with it.',
-        '声明给 `style` 选项使用的自定义别名表，并保留字面量名称以便类型推导。它原样返回传入的对象；名称是否合法在用它创建 channel 或 hub 时校验。'
-      ),
-      params: {
-        style: t(
-          '`{ subscribe, publish, unsubscribe? }`: the alias names. Names must be non-empty, distinct, and must not reuse `subscribeOnce`, `subscribeUntil`, `filterTaskId`, `clear`, `size` or prototype names.',
-          '`{ subscribe, publish, unsubscribe? }`：三个别名。名称必须非空、互不相同，不能使用 `subscribeOnce`、`subscribeUntil`、`filterTaskId`、`clear`、`size` 或原型上的危险名称。'
-        )
-      },
-      returns: t(
-        'The same `style` object, typed with its literal names.',
-        '传入的同一个 `style` 对象，类型保留字面量名称。'
-      ),
-      example: `import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'
-
-const style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' })
-const events = createEventChannel<number, void, typeof style>({ style })
-const handle = events.observe((event) => console.log(event.value))
-events.dispatch(1)
-handle.dispose()`
     },
     EVENT_SUBSCRIBER_SOURCE: {
       role: 'error',
@@ -532,8 +504,8 @@ handle.dispose()`
     EventSubscriberState: {
       role: 'constant',
       purpose: t(
-        'Status strings used in results: `fulfilled` and `rejected` in `IListenerResult.status`, and `abort` as the abort marker. Compare against these constants instead of literal strings.',
-        '结果中使用的状态字符串：`IListenerResult.status` 的 `fulfilled`、`rejected`，以及表示取消的 `abort`。比较时使用这些常量，不要手写字符串。'
+        'Protocol strings: `fulfilled` and `rejected` in `IListenerResult.status`, and `abort` as the signal event name. Registration `aborted` is a boolean. Compare against these constants instead of literal strings.',
+        '协议字符串：`IListenerResult.status` 的 `fulfilled`、`rejected`，以及信号事件名 `abort`。登记的 `aborted` 是布尔值。比较时使用这些常量，不要手写字符串。'
       ),
       example: `const results = await invokeParallelSettled(channel, value)
 const failed = results.filter((result) => result.status === EventSubscriberState.rejected)`
@@ -541,8 +513,8 @@ const failed = results.filter((result) => result.status === EventSubscriberState
     invokeEachLive: {
       role: 'operation',
       purpose: t(
-        'Low-level, synchronous traversal for framework integrations: hands each registration to `visitor` as an invocation, and registrations added during the traversal are visited too (each at most once). The visitor must finish synchronously. Ordinary publishing should use the snapshot-based `invoke*` functions, whose target set cannot change while they run.',
-        '供框架集成使用的底层同步遍历：把每条登记作为一个调用对象交给 `visitor`，遍历过程中新增的登记也会被访问到（每条最多一次）。`visitor` 必须同步完成。普通发布请使用基于快照的 `invoke*` 函数，它们的目标集合在执行期间不会变化。'
+        'Low-level, synchronous traversal for framework integrations: hands each registration to `visitor` as an invocation, and registrations added during the traversal are visited too (each at most once). The visitor must finish synchronously. A visitor failure receives `VISITOR_FAILED`; native identity is retained where possible, otherwise the original, including undefined, remains on `cause`. Ordinary publishing should use the snapshot-based `invoke*` functions, whose target set cannot change while they run.',
+        '供框架集成使用的底层同步遍历：把每条登记作为一个调用对象交给 `visitor`，遍历过程中新增的登记也会被访问到（每条最多一次）。`visitor` 必须同步完成。访问失败附 `VISITOR_FAILED`；尽量保留原生身份，否则原值（含显式空缺值）保存在 `cause`。普通发布请使用基于快照的 `invoke*` 函数，它们的目标集合在执行期间不会变化。'
       ),
       params: {
         channel: asyncChannelParam,
@@ -669,11 +641,11 @@ if (result.status === 'fulfilled') console.log(result.value)`
         )
       },
       returns: t(
-        'Whatever settles the visitor: `void`, or a Promise when the visitor is async. A visitor error propagates unchanged after invocations are closed.',
-        '随 `visitor` 结束：同步时无返回值，异步时返回 Promise。`visitor` 的错误会在关闭调用对象后原样抛出。'
+        'Whatever settles the visitor: `void`, or a Promise when the visitor is async. After invocations close, visitor throws and rejections receive `VISITOR_FAILED`: writable native errors keep type, identity and stack; conflicting, immutable or primitive failures remain on `cause`, including explicit undefined.',
+        '随 `visitor` 结束：同步时无返回值，异步时返回 Promise。调用对象关闭后，访问回调的抛错与拒绝附 `VISITOR_FAILED`：可修改的原生错误保留类型、身份与堆栈；冲突、不可修改或原始值失败由 `cause` 保留，包含显式空缺值。'
       ),
       example: `await withSnapshotEntries(channel, value, async (entries) => {
-  for (const entry of entries.reverse()) await entry.invoke() // 倒序执行
+  for (const entry of [...entries].reverse()) await entry.invoke() // 倒序执行
 })`
     },
     subscribeOnce: {
@@ -742,8 +714,8 @@ const stop = subscribeSubscriber(numbers, new Counter())`
         options: t('`taskId` for the registration.', '这条登记的 `taskId`。')
       },
       returns: t(
-        'An idempotent unsubscribe function; a no-op function when the signal was already aborted.',
-        '可重复调用的退订函数；信号已取消时返回什么也不做的函数。'
+        'An idempotent synchronous unsubscribe function. Pre-aborted defaults to a no-op with no registration or Promise; strict `throwOnAborted: true` synchronously throws TypeError/`ABORTED`. Projected aliases remain available alongside live abort controls.',
+        '可重复调用的同步退订函数。信号已取消时默认返回空操作，不登记也不返回 Promise；严格设置 `throwOnAborted: true` 时同步抛出 `TypeError` 与 `ABORTED`。投影别名保留，取消控制保持实时。'
       ),
       example: `const controller = new AbortController()
 subscribeUntil(updates, controller.signal, (event) => render(event.value))
@@ -879,8 +851,8 @@ console.log(channel.size) // 1`
         },
         publishBudget: {
           summary: t(
-            'Maximum number of listener calls in one top-level synchronous publish, including calls caused by nested publishes. When the budget runs out the channel stops delivering and throws `PUBLISH_FAILED` with the processed count in `error.detail`, which stops runaway recursive publishing. Must be a positive safe integer.',
-            '一次顶层同步发布中最多调用多少次 listener，嵌套发布引起的调用也计入。预算耗尽时停止继续交付，并抛出 `PUBLISH_FAILED`，`error.detail` 中记录已处理的数量，用来阻止失控的递归发布。必须是正的安全整数。'
+            'Maximum number of listener calls in one top-level synchronous publish, including calls caused by nested publishes. When the budget runs out the channel stops delivering and throws `PUBLISH_FAILED` when snapshot targets or nested values remain, with `processed` and `remaining` in `error.detail`, which stops runaway recursive publishing. Must be a positive safe integer.',
+            '一次顶层同步发布中最多调用多少次 listener，嵌套发布引起的调用也计入。预算耗尽时停止继续交付，并抛出 `PUBLISH_FAILED`，若还有快照目标或嵌套值未交付，`error.detail` 记录 `processed` 与 `remaining`，用来阻止失控的递归发布。必须是正的安全整数。'
           ),
           default: t(
             '`100_000` listener calls per top-level publish.',
@@ -924,9 +896,17 @@ console.log(channel.size) // 1`
     },
     IEventApiStyleNames: {
       summary: t(
-        'A custom alias name map for the `style` option, usually created with `defineEventApiStyle()`.',
-        '`style` 选项使用的自定义别名表，通常用 `defineEventApiStyle()` 创建。'
+        'A custom alias name map for the `style` option, checked with `as const satisfies IEventApiStyleNames`.',
+        '`style` 选项使用的自定义别名表，用 `as const satisfies IEventApiStyleNames` 检查。'
       ),
+      example: `import { createEventChannel } from '@migaia/event-subscriber'
+import type { IEventApiStyleNames } from '@migaia/event-subscriber'
+
+const style = { subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' } as const satisfies IEventApiStyleNames
+const channel = createEventChannel<number, void, typeof style>({ style })
+const subscription = channel.observe(event => console.log(event.value))
+channel.dispatch(1)
+subscription.dispose()`,
       members: {
         subscribe: {
           summary: t(
@@ -1087,7 +1067,7 @@ console.log(channel.size) // 1`
         )
       ],
       example: `const channel = createEventChannel<number, number>()
-channel.subscribe((value) => value * 2)
+channel.subscribe((event) => event.value * 2)
 for (const result of await invokeParallelSettled(channel, 3)) {
   if (result.status === 'fulfilled') console.log(result.value)
   else console.error(result.reason)
@@ -1156,8 +1136,8 @@ for (const result of await invokeParallelSettled(channel, 3)) {
         },
         aborted: {
           summary: t(
-            '`true` once `abort()` was called or the registration was removed; read live.',
-            '调用过 `abort()` 或登记已被移除时为 `true`，读取时反映最新状态。'
+            'Live abort flag set by `abort()` or linked-signal cancellation; normal unsubscription removes the registration without setting it.',
+            '实时取消标志；由 `abort()` 或关联信号取消设置。普通退订只移除登记，不会把它设为真。'
           )
         },
         abortReason: {
@@ -1166,7 +1146,12 @@ for (const result of await invokeParallelSettled(channel, 3)) {
             '调用 `abort()` 时传入的原因；尚未取消时为 `undefined`。'
           )
         },
-        taskId: { summary: t('Current task name of the registration.', '这条登记当前的任务名。') },
+        taskId: {
+          summary: t(
+            'Task label captured for this dispatch snapshot; `setTaskId()` changes only later deliveries.',
+            '本次分发快照捕获的任务标签；`setTaskId()` 只影响之后的交付。'
+          )
+        },
         abort: {
           summary: t(
             'Removes this registration so later publishes no longer call the listener; the current call continues.',
@@ -1306,8 +1291,8 @@ for (const result of await invokeParallelSettled(channel, 3)) {
       ),
       values: {
         invalidListener: t(
-          '`INVALID_LISTENER`: a listener or reporter is not a function. Pass a function.',
-          '`INVALID_LISTENER`：listener 或上报函数不是函数。请传入函数。'
+          '`INVALID_LISTENER`: a listener is not a function. Reporter validation uses `INVALID_REPORTER`.',
+          '`INVALID_LISTENER`：监听者不是函数。上报器校验使用 `INVALID_REPORTER`。'
         ),
         invalidReporter: t(
           '`INVALID_REPORTER`: `report` or `terminalReport` is not a function. Pass a function or omit it.',
@@ -1350,8 +1335,12 @@ for (const result of await invokeParallelSettled(channel, 3)) {
           '`INVALID_OPTIONS`：选项对象或其中某个字段不合法，例如未知的策略值。'
         ),
         publishFailed: t(
-          '`PUBLISH_FAILED`: one or more listeners failed; thrown as an `AggregateError` after all targets were processed.',
-          '`PUBLISH_FAILED`：有 listener 失败；在全部目标处理完后以 `AggregateError` 抛出，原错误在 `errors` 中。'
+          '`PUBLISH_FAILED`: listeners failed, or the publish budget left snapshot targets or queued values undelivered. Budget details carry processed calls and remaining call budget.',
+          '`PUBLISH_FAILED`：监听者失败，或发布预算耗尽后仍有快照目标或排队值未交付。预算详情记录已处理调用数与剩余调用预算。'
+        ),
+        visitorFailed: t(
+          '`VISITOR_FAILED`: a snapshot/live visitor threw or rejected. Native errors keep identity when annotatable; conflicting, immutable or primitive failures, including undefined, remain on cause after invocations close.',
+          '`VISITOR_FAILED`：快照或实时访问回调抛错或拒绝。可附码原生错误保留身份；冲突、不可修改或原始值失败（含空缺值）在调用关闭后保留于原因。'
         ),
         valueProjectionFailed: t(
           '`VALUE_PROJECTION_FAILED`: the `valueConfig` path was missing, blocked or threw; reported, the listener still runs.',
@@ -1383,8 +1372,8 @@ for (const result of await invokeParallelSettled(channel, 3)) {
       summary: t('Status strings of results.', '结果中使用的状态字符串。'),
       values: {
         abort: t(
-          '`abort`: marker for an aborted registration.',
-          '`abort`：表示登记已被取消，之后不会再收到交付。'
+          '`abort`: the event name used when subscribing to an abort signal; it is not a registration state.',
+          '`abort`：订阅中止信号所用的事件名，不是登记状态。'
         ),
         fulfilled: t(
           '`fulfilled`: the listener succeeded; the result has `value`.',

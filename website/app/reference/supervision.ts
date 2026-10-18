@@ -1,8 +1,8 @@
 /**
- * Bilingual reference checked against packages/supervision/src on 2026-10-17. Source wins over
- * prose: omitted budget overflow queues in budget.ts, although its JSDoc says reject; choose
- * `overflow: 'reject'` explicitly for immediate capacity refusal. Coroutine heartbeat.intervalMs
- * defaults to timeoutMs and failureThreshold to 1, not health defaults.
+ * Bilingual reference checked against current packages/supervision/src, README and USEGUIDE on
+ * 2026-10-18. Omitted budget overflow queues; local reservations precede parent acquisition and
+ * parent leases release first. Coroutine heartbeat.intervalMs defaults to timeoutMs and its
+ * failureThreshold defaults to one, distinct from health-check and process-sampling defaults.
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 
@@ -31,8 +31,8 @@ const scheduler = p(
 )
 /** Failure reporting callbacks never own task completion. */
 const report = p(
-  'Application callback receiving each contained launch, health, cleanup or late error; returns void synchronously and must not throw.',
-  '应用提供的上报回调，接收启动、健康、清理及迟到失败的原始错误；同步返回空值，不能抛错。'
+  'Application callback receiving each contained launch, health, cleanup or late error; returns void synchronously and must not throw. Late health-check failure remains reported after monitor closure; only the exact abort reason is suppressed, and passive failures retain the original object.',
+  '应用提供的上报回调，接收启动、健康、清理及迟到失败的原始错误；同步返回空值，不能抛错。健康检查在关闭后迟到失败仍报告，只有精确取消原因不重复上报，被动失败保留原对象。'
 )
 /** A complete cooperative example requires no runtime adapter. */
 const coroutineExample = `import { createUnitBudget } from '@migaia/supervision'
@@ -64,8 +64,8 @@ const base: Record<string, IMemberDoc> = {
     t('Absent: launch completion is readiness.', '默认不设置，启动完成即视为就绪。')
   ),
   startupTimeoutMs: p(
-    'Finite nonnegative launch plus readiness deadline in scheduler milliseconds; zero expires immediately.',
-    '启动加就绪握手的总时限，使用调度器毫秒；须有限且非负，零表示立即到期。',
+    'Finite nonnegative launch-plus-readiness deadline in scheduler milliseconds; zero expires immediately. Expiry retires the attempt and follows normal restart/terminal policy, publishing a stable outcome instead of leaving the supervisor starting.',
+    '启动加就绪握手的调度器毫秒时限，须有限且非负，零立即到期；到期退役尝试并沿正常重启或终止策略发布稳定结果，不停留在启动中。',
     t('`10000` milliseconds for each attempt.', '默认每轮等待 `10000` 毫秒。')
   ),
   restart: p(
@@ -113,8 +113,8 @@ const base: Record<string, IMemberDoc> = {
   ),
   'terminalPolicy.mode': {
     ...p(
-      'Selects permanent terminal admission closure or timed reopening after exhaustion.',
-      '选择耗尽后持续关闭准入，或在冷却时间结束后重新开放。'
+      'Selects a terminal wait until explicit restart or a timed cooldown retry after exhaustion; only disposal permanently closes the supervisor.',
+      '选择耗尽后等候显式重启或冷却后自动重试；只有释放才永久关闭监督器。'
     ),
     values: { enum: 'TerminalPolicyMode' }
   },
@@ -213,14 +213,17 @@ const processFields: Record<string, IMemberDoc> = {
     t('Absent: samples use interval and threshold defaults.', '默认使用下列采样间隔与阈值。')
   ),
   'usage.intervalMs': p(
-    'Finite positive scheduler interval for native process resource samples.',
-    '读取进程原生资源样本的调度器间隔，须为有限正毫秒数。',
+    'Finite positive scheduler interval for native process resource samples. Both supervisor and prewarm pool reject zero/nonfinite intervals and nonpositive or unsafe failure thresholds as RangeError/INVALID_OPTION.',
+    '读取进程资源样本的调度器间隔，须有限且为正；监督器与预热池均以 `RangeError/INVALID_OPTION` 拒绝零或非有限间隔，以及非正或不安全的失败阈值。',
     t('`1000` milliseconds between samples.', '默认每隔 `1000` 毫秒采样。')
   ),
   'usage.failureThreshold': p(
-    'Positive integer consecutive limit violations required before failing the process.',
-    '使进程失败之前必须连续出现的资源越限次数，须为正整数。',
-    t('`3` consecutive resource violations.', '默认连续 `3` 次资源越限。')
+    'Positive safe-integer count of consecutive sampleUsage rejections before the process is unhealthy. A successful sample resets this count; a successful sample exceeding a monitored limit terminates immediately.',
+    '采样连续拒绝后使进程不健康的次数，须为正安全整数；成功样本重置计数，成功样本超过监测限制则立即终止。',
+    t(
+      '`3` consecutive sampleUsage rejections, not three successful over-limit samples.',
+      '默认连续三次资源采样拒绝，并非三次成功越限样本。'
+    )
   ),
   output: p(
     'Bounds diagnostic stdout and stderr tails while launchers continue draining regardless of observers.',
@@ -231,8 +234,8 @@ const processFields: Record<string, IMemberDoc> = {
     )
   ),
   'output.tailBytes': p(
-    'Finite nonnegative integer maximum bytes retained separately for each output stream.',
-    '每条输出流独立保留的最大字节数，须为有限非负整数。',
+    'Positive safe-integer maximum bytes retained separately per output stream; zero is invalid and does not disable tail capture.',
+    '每条输出流独立保留的最大字节数，须为正安全整数；零为非法值，不能用于关闭尾部捕获。',
     t('`65536` bytes for each stream.', '默认每条流保留 `65536` 字节。')
   ),
   'output.onChunk': p(
@@ -254,8 +257,8 @@ const processFields: Record<string, IMemberDoc> = {
     '应用指定的隔离名称；恢复时只列出该命名空间中的记录。'
   ),
   prewarm: p(
-    'Pool from `createPrewarmPool` with matching budget, launcher and spec; transfers idle handle and lease.',
-    '来自 `createPrewarmPool` 且预算、适配器和规格匹配的池；转交空闲句柄及租约。',
+    'Pool from createPrewarmPool with matching budget, launcher and spec; transfers the idle handle and lease. Matching id, registry port and namespace reuse the exact warm durable record and its actual-exit cleanup; different owners create their own records.',
+    '来自 `createPrewarmPool` 且预算、适配器和规格匹配的池，转交空闲句柄与租约。同标识、注册端口及命名空间复用原预热记录与实际退出清理；不同所有者另行登记。',
     t('Absent: launch every admitted process cold.', '默认不设置，每次准入都冷启动进程。')
   ),
   wallClock: p(
@@ -278,8 +281,8 @@ const supervisorMembers: Record<string, IMemberDoc> = {
     '关联命令与事件的尝试世代序号，不能据此推断成功重启次数。'
   ),
   start: m(
-    'Starts or joins readiness for the current supervisor; no native resource is created by construction.',
-    '启动当前监督器或加入既有就绪过程；构造本身不会创建原生资源。',
+    'Starts or joins readiness; construction creates no native unit. Startup timeout follows the configured failure policy, while acquireUnit rejection becomes LAUNCH_FAILED with cause even before a lease exists.',
+    '启动或加入既有就绪过程，构造不创建原生单元；启动超时遵循失败策略，即使尚无租约，预获取拒绝也成为保留原因的 `LAUNCH_FAILED`。',
     {},
     t(
       'An `IReadyOutcome`; disposal rejects with `SCOPE_CLOSED` or `SCOPE_TERMINAL`.',
@@ -339,8 +342,8 @@ const supervisorMembers: Record<string, IMemberDoc> = {
     '用相同或新规格替换活动单元；策略非法时在改变服务单元前抛出 `INVALID_OPTION`。',
     {
       options: t(
-        'Caller replacement options: strategy defaults to stop-then-start; spec defaults to current spec. Start-then-switch needs another budget slot.',
-        '调用方替换选项：`strategy` 默认 `stop-then-start`，`spec` 默认当前规格；`start-then-switch` 需要另一个预算名额。'
+        'Replacement options: default stop-then-start and current spec. Start-then-switch needs another slot; the serving unit remains owned by its active slot after startup attempt completion. Only candidate readiness and the switched event permit cancelling the old task.',
+        '替换默认先停再启并复用当前规格；先启后切需要另一名额。启动尝试完成后，服务单元仍由活动槽位拥有；必须等候候选就绪及切换事件后才取消旧任务。'
       )
     },
     t(
@@ -389,8 +392,8 @@ const budgetMembers: Record<string, IMemberDoc> = {
     '构造预算时指定的单元种类；父预算和监督器的种类必须与其一致。'
   ),
   acquire: m(
-    'Requests a FIFO lease, respecting capacity, rate, parent and cancellation; refusal is returned as data.',
-    '按先进先出请求租约，遵守容量、速率、父预算和取消；拒绝以数据返回。',
+    'Requests a FIFO lease respecting capacity, rate, parent and cancellation. It reserves local capacity before waiting for the parent; reservation is not a started unit. Refusal is data and composite release returns parent before child.',
+    '按先进先出请求租约，遵守容量、速率、父预算及取消；先预留本地再等待父预算，预留不等于启动。拒绝以数据返回，组合租约先释放父再释放子。',
     {
       signal: t(
         'Optional caller cancellation signal; aborted requests return the aborted reason.',
@@ -662,8 +665,8 @@ const domains: Record<string, { summary: IText; values: Record<string, IText> }>
     ),
     values: {
       stay: t(
-        'Keep terminal state until an explicit restart command.',
-        '维持终止状态直到显式执行重启命令。'
+        'Keep terminal state until explicit restart(); this policy does not permanently dispose the supervisor. Only dispose() closes unit-producing admission permanently.',
+        '维持终止状态直到显式 `restart()`，不永久释放监督器；只有 `dispose()` 永久关闭单元创建准入。'
       ),
       cooldown: t(
         'Wait afterMs and allow another generation automatically.',
@@ -718,8 +721,8 @@ const domains: Record<string, { summary: IText; values: Record<string, IText> }>
     ),
     values: {
       required: t(
-        'Reject any required capability below enforced or monitored.',
-        '拒绝强制或监测等级以下的必需能力。'
+        'Accept enforced or monitored termination; reject cooperative or unsupported requirements. Thread heap-limit and exit-observation remain enforced-or-unsupported declarations; a monitored guarantee is not evidence of native enforcement.',
+        '接受强制或监测终止，拒绝协作或不支持的必需能力。线程堆限制与退出观察仍仅声明强制或不支持，监测保证不代表已证明原生强制。'
       ),
       bestEffort: t(
         'Admit weak guarantees and expose their names as degraded.',
@@ -1135,12 +1138,12 @@ const errors: Record<string, IText> = {
     '`CAPABILITY_UNSUPPORTED`：必需能力保证不足；更换启动器或隔离策略。'
   ),
   launchFailed: t(
-    '`LAUNCH_FAILED`: launch, attachment or readiness failed; inspect phase and preserved cause.',
-    '`LAUNCH_FAILED`：启动、附加或就绪失败；检查阶段和保留的原因。'
+    'LAUNCH_FAILED: preacquisition, launch, attachment or readiness failed. An acquireUnit failure before lease acquisition still returns a controlled failed readiness outcome and follows the configured failure policy; inspect phase and preserved cause.',
+    '`LAUNCH_FAILED`：预获取、启动、附加或就绪失败；租约前的预获取失败仍返回受控就绪失败并遵循既定策略，检查阶段及保留原因。'
   ),
   startupTimeout: t(
-    '`STARTUP_TIMEOUT`: startup missed its deadline; the attempt is retired with bounded recovery.',
-    '`STARTUP_TIMEOUT`：启动错过截止时间；该尝试进入有界退役回收。'
+    'STARTUP_TIMEOUT: startup missed its deadline. Bounded retirement advances to the configured backoff, stopped or terminal policy without leaking a temporary terminal event or leaving starting stuck; readiness receives a stable failed result.',
+    '`STARTUP_TIMEOUT`：启动超期，有界退役后进入既定退避、停止或终止策略，不泄露临时终止事件，也不滞留启动中；就绪观察取得稳定失败结果。'
   ),
   exitUnexpected: t(
     '`EXIT_UNEXPECTED`: unexpected actual exit; inspect native status and original cause.',
@@ -1175,8 +1178,8 @@ const errors: Record<string, IText> = {
     '`HEARTBEAT_MISSED`：协程心跳已过期；检查协作任务是否继续推进。'
   ),
   orphanReclaimFailed: t(
-    '`ORPHAN_RECLAIM_FAILED`: fingerprint recovery failed; preserve the durable record for later retry.',
-    '`ORPHAN_RECLAIM_FAILED`：指纹恢复失败；保留持久记录以便稍后重试。'
+    'ORPHAN_RECLAIM_FAILED: registry listing or a per-record probe/termination/removal failed. Listing failure is collected and reported with detail.step=list and original cause; no record is touched. Failed records remain available for retry.',
+    '`ORPHAN_RECLAIM_FAILED`：注册表列举或逐记录探测、终止及删除失败；列举失败经收集和报告，详情步骤为 `list` 并保留原始原因，不触碰任何记录，失败记录留待重试。'
   )
 }
 domains.SupervisionErrorCode = {
@@ -1386,8 +1389,8 @@ export const reference: ILibraryReference = {
         )
       },
       returns: t(
-        'An `IOrphanReclaimResult`; per-record failures are reported with `ORPHAN_RECLAIM_FAILED` and preserved causes.',
-        '返回 `IOrphanReclaimResult`；逐记录失败以 `ORPHAN_RECLAIM_FAILED` 上报并保留原因。'
+        'An IOrphanReclaimResult with terminated/removed IDs and collected failures. Listing rejection returns empty ID lists and a reported ORPHAN_RECLAIM_FAILED carrying detail.step=list and cause; no record is touched. Per-record failures use the same collection.',
+        '返回含已终止、已删除标识及失败集合的恢复结果。列举拒绝时标识列表为空，报告保留原始原因且步骤为 `list` 的恢复错误，不触碰记录；逐记录失败进入相同集合。'
       ),
       example:
         "const result = await reclaimOrphanProcesses({ registry, namespace: 'app', launcher, report: console.error }); console.log(result.removed)"
@@ -1930,8 +1933,8 @@ export const reference: ILibraryReference = {
           '该监测器已经记录的连续检查失败次数。'
         ),
         observedAt: p(
-          'Optional scheduler timestamp of the latest completed health observation.',
-          '最近完成健康观察的可选调度器时间戳。'
+          'Optional scheduler timestamp of the latest health state transition, including entry into checking; it is not limited to completed checks.',
+          '最近健康状态变化的可选调度器时间戳，进入检查中即记录，并非只在检查完成时记录。'
         )
       }
     },
@@ -2114,8 +2117,8 @@ export const reference: ILibraryReference = {
       }
     },
     ICoroutineTask: a(
-      'Callback receives supervisor-created ICoroutineRunContext. Return void, PromiseLike or AsyncIterable; settlement becomes ICoroutineExitStatus, rejection preserves the original error. Cancellation is cooperative.',
-      '回调接收监督器创建的 `ICoroutineRunContext`；返回空值、承诺对象或异步可迭代对象；结算成为 `ICoroutineExitStatus`，拒绝保留原始错误，取消依赖协作。'
+      'Callback receives supervisor-created ICoroutineRunContext. Return void, PromiseLike or AsyncIterable; settlement becomes ICoroutineExitStatus, rejection preserves the original error. Cancellation is cooperative. A custom AsyncIterable may have outstanding next and return concurrently; a rejected return is reported immediately but exited and the lease remain pending until next settles.',
+      '回调接收监督器创建的 `ICoroutineRunContext`，返回空值、承诺对象或异步可迭代对象，结算成为退出状态且拒绝保留原错。取消依赖协作；自定义迭代器可同时存在待定读取与返回，返回拒绝立即报告，但退出及租约须等待原读取结束。'
     ),
     ICoroutineRunContext: {
       summary: t(
@@ -2318,8 +2321,8 @@ export const reference: ILibraryReference = {
           '从池转交的已占用共享预算租约；只在实际退出后释放。'
         ),
         bindOutput: m(
-          'Synchronously replaces the consumer sink for bytes already drained by the launcher.',
-          '同步替换消费方字节接收端；底层字节仍由启动器排空。',
+          'Synchronously replaces the output observer and replays the buffered tail. Buffered replay and live forwarding share observer isolation: a sink throw is reported without interrupting launcher draining or later output delivery.',
+          '同步替换输出观察者并回放已缓冲尾部；回放与实时转发共用观察隔离，接收端抛错经报告而不打断底层排空或后续输出。',
           {
             sink: t(
               'Application synchronous callback receives DrainedStream and Uint8Array; returns void; observer failure is reported.',
@@ -2901,8 +2904,8 @@ export const reference: ILibraryReference = {
     },
     IThreadUsage: {
       summary: t(
-        'Optional isolate-local usage observations; event-loop activity has separate units from CPU time.',
-        '可选隔离域本地用量观察；事件循环活动与处理器时长单位分开。'
+        'Optional resource samples, not a capability map. Isolate-local fields are only meaningful when the adapter can observe them independently; shared process IDs do not establish per-thread usage. Event-loop activity and CPU time have separate units.',
+        '可选资源样本而非能力映射；仅适配器能独立观察时才代表线程本地用量，共享进程编号不能证明线程独立用量，事件循环活动与处理器时长单位不同。'
       ),
       members: {
         sharedPid: p(

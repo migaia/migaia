@@ -329,13 +329,24 @@ await withTimeout(({ signal }) => fetch('/api', { signal }), { timeoutMs: 2000 }
     },
     scheduler: {
       summary: t(
-        'Scheduler contract and implementations: `systemScheduler` (native timers, monotonic clock), `systemWallClock` (epoch timestamps), `createManualScheduler()` for deterministic tests, and `deferTask()`.',
-        '调度器约定及其实现：`systemScheduler`（原生计时器与单调时钟）、`systemWallClock`（纪元时间戳）、用于确定性测试的 `createManualScheduler()`，以及 `deferTask()`。'
+        'Scheduler contract and implementations: `systemScheduler` (native timers, monotonic clock), `systemWallClock` (epoch timestamps), `deferTask()`. Deterministic test support lives at `@migaia/utils/testing`.',
+        '调度器约定及其实现：`systemScheduler`（原生计时器与单调时钟）、`systemWallClock`（纪元时间戳）、以及 `deferTask()`。确定性测试支持位于 `@migaia/utils/testing`。'
       ),
       example: `import { systemScheduler } from '@migaia/utils/scheduler'
 
 const task = systemScheduler.schedule(() => console.log('到时'), 1000)
 task.cancel()`
+    },
+    testing: {
+      summary: t(
+        'Deterministic test support separated from normal scheduling. Import `createManualScheduler()` and `IManualScheduler` here; virtual time advances only through explicit calls.',
+        '与正常调度分离的确定性测试支持。从此入口导入 `createManualScheduler()` 与 `IManualScheduler`，虚拟时间只随显式调用推进。'
+      ),
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+
+const scheduler = createManualScheduler()
+scheduler.schedule(() => console.log('ready'), 100)
+scheduler.advance(100)`
     },
     string: {
       summary: t(
@@ -417,8 +428,8 @@ isEmptyValue(0) // false`
       params: {
         value: t('Base64 text.', '要解码的 Base64 文本。'),
         target: t(
-          'Optional buffer to decode into, avoiding an allocation; must be large enough.',
-          '可选，解码写入的目标缓冲区，用来避免分配；容量必须足够。'
+          'Optional buffer to decode into, avoiding an allocation; must have exactly the decoded byte length; a mismatch throws `INVALID_ARGUMENT`.',
+          '可选，解码写入的目标缓冲区，用来避免分配；长度必须恰好等于解码后的字节数；不相等时抛 `INVALID_ARGUMENT`。'
         )
       },
       returns: t(
@@ -472,7 +483,10 @@ isEmptyValue(0) // false`
           '`fatal: true` 遇到非法字节序列时抛错；默认 `false` 时替换为 U+FFFD。'
         )
       },
-      returns: t('The decoded string.', '解码后的字符串。'),
+      returns: t(
+        'The decoded string; fatal malformed UTF-8 throws `INVALID_ENCODING` with UTF-8 diagnostic text.',
+        '解码后的字符串；严格模式遇到非法 UTF-8 时抛 `INVALID_ENCODING`，诊断文本标明 UTF-8。'
+      ),
       example: `decodeUtf8(bytes, { fatal: true })`
     },
     encodeUtf8: {
@@ -553,8 +567,8 @@ isEmptyValue(0) // false`
     combineConfig: {
       role: 'operation',
       purpose: t(
-        'Merges several owned configurations in order (later wins) into a new owned configuration, with configurable strategies for records, arrays, maps, sets and `undefined`, per-path overrides and a conflict resolver. Sources are not modified.',
-        '按顺序把多份已拥有的配置合并为一份新配置（后者覆盖前者），可分别配置对象、数组、Map、Set 与 `undefined` 的合并策略、按路径覆盖策略以及冲突裁决函数。来源配置不会被修改。'
+        'Merges several owned configurations in order (later wins) into an owned configuration, with configurable strategies for records, arrays, maps, sets and `undefined`, per-path overrides and a conflict resolver. Sources are not modified.',
+        '按顺序把多份已拥有的配置合并为一份配置（后者覆盖前者），可分别配置对象、数组、Map、Set 与 `undefined` 的合并策略、按路径覆盖策略以及冲突裁决函数。来源配置不会被修改。'
       ),
       params: {
         sources: t(
@@ -563,8 +577,8 @@ isEmptyValue(0) // false`
         )
       },
       returns: t(
-        'A new owned configuration; incompatible profiles throw `CONFIG_CONFLICT`.',
-        '一份新的已拥有配置；来源的 profile 不兼容时抛 `CONFIG_CONFLICT`。'
+        'An owned configuration; a single source with no configured options is returned unchanged. Incompatible profiles throw `CONFIG_CONFLICT`.',
+        '一份已拥有配置；仅一个来源且未设置任何选项时原样返回。不兼容的校验档位抛 `CONFIG_CONFLICT`。'
       ),
       options: 'IConfigCombineOptions',
       example: `const merged = combineConfig([defaults, override], { strategies: { record: 'merge', array: 'concat' } })`
@@ -626,8 +640,8 @@ config.retry.attempts // 仍是原值`
       params: {
         base: t('Owned configuration to start from.', '作为起点的已拥有配置。'),
         patch: t(
-          'Partial values to set; nested objects merge, `CONFIG_DELETE` deletes.',
-          '要写入的部分值；嵌套对象会合并，`CONFIG_DELETE` 表示删除。'
+          'Root fields to replace as whole values; nested objects are not merged. `CONFIG_DELETE` deletes a root field.',
+          '逐个整体替换的根字段；不合并嵌套对象，`CONFIG_DELETE` 表示删除根字段。'
         )
       },
       returns: t(
@@ -635,7 +649,9 @@ config.retry.attempts // 仍是原值`
         '新的已拥有配置（补丁为空时直接返回 `base`）。'
       ),
       options: 'IConfigPatchOptions',
-      example: `const next = patchConfig(config, { retries: 3, debug: CONFIG_DELETE })`
+      example: `import { CONFIG_DELETE, patchConfig } from '@migaia/utils/config'
+
+const next = patchConfig(config, { retries: 3, debug: CONFIG_DELETE })`
     },
     readConfigPath: {
       role: 'operation',
@@ -772,8 +788,8 @@ if (failure) throw failure`
     isUtilsError: {
       role: 'operation',
       purpose: t(
-        'Type guard for any error class of this package (`UtilsError` and subclasses).',
-        '本包任意错误类（`UtilsError` 及其子类）的类型守卫，通过后可以安全读取 `code`。'
+        'Diagnostic guard for an error-like shape with utils `source` and a registered utils `code`. It does not require local `instanceof Error` and does not authenticate the origin.',
+        '诊断类型守卫：检查错误形状、工具包 `source` 与已登记的 `code`。不要求本地 `instanceof Error`，也不能认证真实来源。'
       ),
       params: { value: t('A caught value.', '捕获到的值。') },
       returns: t('`true` for errors of this package.', '是本包的错误时返回 `true`。'),
@@ -897,8 +913,8 @@ if (failure) throw failure`
         }
       },
       purpose: t(
-        'Normalises any thrown value to an `Error`: errors are returned unchanged; other values are wrapped with `cause` set to the value (code `NON_ERROR_VALUE`).',
-        '把任意抛出值规整为 `Error`：本来就是错误的原样返回；其它值被包装，`cause` 指向原值（错误码 `NON_ERROR_VALUE`）。'
+        'Normalises a thrown value to an error-like value: error-shaped objects are returned unchanged, including cross-realm objects; other values get an Error wrapper with the original on `cause` (`NON_ERROR_VALUE`). Local `instanceof Error` is not guaranteed.',
+        '把抛出值规整为类错误值：具备错误形状的对象（含跨域对象）原样返回，其余值包装为错误并由 `cause` 保留（`NON_ERROR_VALUE`）。不保证通过本地 `instanceof Error`。'
       ),
       params: {
         value: t('Thrown value.', '抛出的值。'),
@@ -907,7 +923,10 @@ if (failure) throw failure`
           '`message` 覆盖自动推导的信息（默认抛出的字符串会作为信息）。'
         )
       },
-      returns: t('An `Error`.', '一个 `Error` 实例。'),
+      returns: t(
+        'The same error-shaped object, or a native Error wrapper.',
+        '原有类错误对象，或原生错误包装对象。'
+      ),
       example: `catch (value) { report(toError(value)) }`
     },
     tryReadProperty: {
@@ -1057,8 +1076,8 @@ if (probe.kind === 'thenable') await assimilateCapturedThen(probe.thenFn, result
       ),
       params: { value: t('A callback result.', '回调的返回值。') },
       returns: t(
-        '`{ then: undefined }`, `{ then }` or `{ error }`.',
-        '不是 thenable 时为 `{ then: undefined }`，是时为 `{ then }`，读取出错时为 `{ error }`。'
+        'A captured callable `then`, a retained getter `error`, or a result without a callable `then`; do not depend on an exact absent-property object shape.',
+        '包含已捕获的可调用 `then`、保留的读取错误 `error`，或没有可调用 `then` 的结果；不要依赖缺失属性结果的精确对象形状。'
       ),
       example: `const inspection = inspectThenable(hookResult)
 if ('then' in inspection && inspection.then) throw new TypeError('钩子必须同步返回')`
@@ -1083,8 +1102,8 @@ if ('then' in inspection && inspection.then) throw new TypeError('钩子必须�
     observeThenableRejection: {
       role: 'operation',
       purpose: t(
-        'Calls `onRejected` when a captured thenable rejects (or with the inspection error), containing failures of `onRejected` itself.',
-        '在已捕获的 thenable 被拒绝时（或检查本身出错时）调用 `onRejected`，并且 `onRejected` 自身的失败不会外泄。'
+        'Calls `onRejected` when a captured thenable rejects (or with the inspection error), sending synchronous failures of `onRejected` itself to the shared host exception queue. The captured thenable rejection remains observed.',
+        '在已捕获的 thenable 被拒绝时（或检查本身出错时）调用 `onRejected`，并把 `onRejected` 自身的同步失败交给共享宿主异常队列；已捕获的异步拒绝仍被观察。'
       ),
       params: {
         value: t('The callback result.', '回调的返回值。'),
@@ -1109,8 +1128,8 @@ if ('then' in inspection && inspection.then) throw new TypeError('钩子必须�
     onceAsync: {
       role: 'operation',
       purpose: t(
-        'Wraps an async function so it starts once; every caller shares the same Promise, including a rejected one (no automatic retry).',
-        '包装异步函数，使其只启动一次；所有调用者共享同一个 Promise，失败的 Promise 也会被共享（不会自动重试）。'
+        'Wraps a function returning `PromiseLike<T>` so it starts once; every caller shares one native `Promise<T>`, including a rejection (no automatic retry).',
+        '包装返回 `PromiseLike<T>` 的函数，使其只启动一次；所有调用者共享同一个原生 `Promise<T>`，拒绝结果也会共享（不会自动重试）。'
       ),
       params: { functionValue: t('Async function to start once.', '只需启动一次的异步函数。') },
       returns: t('A function returning the shared Promise.', '返回共享 Promise 的函数。'),
@@ -1263,8 +1282,8 @@ if (diagnostics.length) logger.warn(diagnostics)`
     isPlainObject: {
       role: 'operation',
       purpose: t(
-        'Tells whether a value is a plain object (prototype `Object.prototype` or `null`).',
-        '判断某个值是否为普通对象，即原型为 `Object.prototype` 或 `null` 的对象。'
+        'Checks for an object whose prototype is null or whose prototype has a null parent; this is not an equality check against local `Object.prototype`.',
+        '检查对象的原型是否为空，或该原型的父原型是否为空；不是与本地 `Object.prototype` 作等值检查。'
       ),
       params: { value: t('Any value.', '要检查的任意值。') },
       returns: t(
@@ -1384,10 +1403,14 @@ if (probe.kind === 'blocked') console.warn('在', probe.failedKey, '处中断')`
       ),
       params: {
         object: t('Root object to read or write.', '要读写的根对象。'),
-        segments: t('Parsed segment tuple.', '已解析的路径段元组。')
+        segments: t(
+          'Parsed tuple returned by `parseObjectPath()`; strings are not accepted.',
+          '由 `parseObjectPath()` 返回的已解析元组；不接受字符串。'
+        )
       },
       returns: t('An `IPathProbe`.', '一个路径探测结果 `IPathProbe`。'),
-      example: `probeObjectPathSegments(data, ['user', 'name'])`
+      example: `const segments = parseObjectPath('user.name')
+probeObjectPathSegments(data, segments)`
     },
     set: {
       role: 'operation',
@@ -1617,7 +1640,13 @@ await ready.promise`
             '调用方指定的截止时间预算，必须是有限且非负的毫秒数。'
           )
         },
-        report: promiseReportOption,
+        report: {
+          ...promiseReportOption,
+          summary: t(
+            'Receives late operation rejections after another outcome won; late success is discarded. Timer and listener cleanup failures surface through the returned rejection or aggregate, rather than this late-rejection callback.',
+            '接收其他结果胜出后的迟到操作拒绝；迟到成功值会丢弃。定时器与监听清理失败通过返回的拒绝或聚合暴露，而非这个迟到拒绝回调。'
+          )
+        },
         cooperativeCancellation: {
           summary: t(
             'Whether the operation receives an internal abort signal cancelled by timeout or external abort.',
@@ -1650,8 +1679,8 @@ await ready.promise`
         }
       },
       purpose: t(
-        'Runs `operation` with a deadline: the Promise rejects with `UtilsTimeoutError` (scope `operation`) when `timeoutMs` passes, and the operation signal aborts so cooperative code can stop. A late result goes to `report`.',
-        '为 `operation` 设置截止时间：超过 `timeoutMs` 时 Promise 以 `UtilsTimeoutError`（`scope` 为 `operation`）reject，同时操作收到的信号中止，协作式代码可以据此停止。迟到的结果交给 `report`。'
+        'Runs `operation` with a deadline: the Promise rejects with `UtilsTimeoutError` (scope `operation`) when `timeoutMs` passes, and the operation signal aborts so cooperative code can stop. Late rejection goes to `report`; late success is discarded. Cleanup failures surface through rejection or aggregation.',
+        '为 `operation` 设置截止时间：超过 `timeoutMs` 时 Promise 以 `UtilsTimeoutError`（`scope` 为 `operation`）reject，同时操作收到的信号中止，协作式代码可以据此停止。迟到拒绝交给 `report`；迟到成功值丢弃，清理失败通过拒绝或聚合暴露。'
       ),
       params: {
         operation: t(
@@ -1676,7 +1705,9 @@ await ready.promise`
         '创建用于测试的确定性调度器：虚拟时间只随 `advance(ms)` 推进。供本仓库测试与适配器验证使用；其它项目应优先使用测试框架自带的假计时器。'
       ),
       returns: t('An `IManualScheduler`.', '一个手动调度器 `IManualScheduler`。'),
-      example: `const scheduler = createManualScheduler()
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+
+const scheduler = createManualScheduler()
 scheduler.schedule(() => console.log('到期'), 100)
 scheduler.advance(100)`
     },
@@ -1799,10 +1830,6 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       ),
       scenarios: collectorScenarios,
       example: collectorExample,
-      members: collectorMembers
-    },
-    ICollectorActions: {
-      summary: t('Actions shared by every collector stage.', '所有筛选器阶段共有的链式操作。'),
       members: collectorMembers
     },
     IFieldCollector: {
@@ -1928,12 +1955,18 @@ const text = converted.threw ? '[无法显示]' : converted.value`
             'Validation profile of the result; must match the sources.',
             '结果使用的校验档位，必须与来源一致。'
           ),
-          default: t('`data`.', '`data`：纯数据档位。'),
+          default: t(
+            'The first source profile, or `data` when sources are empty.',
+            '继承第一个来源的档位；没有来源时使用 `data`。'
+          ),
           values: { enum: 'ConfigProfile' }
         },
         limits: {
           summary: t('Tighter size limits for the result.', '为结果设置更严格的规模上限。'),
-          default: t('The package default limits.', '使用包级默认上限。')
+          default: t(
+            'The per-field minimum across source limits and package defaults.',
+            '各项分别取来源上限与包级默认上限的最小值。'
+          )
         }
       }
     },
@@ -2621,10 +2654,6 @@ else if (probe.kind === 'failed') console.error(probe.error)`,
         }
       }
     },
-    IThenableProbeKind: alias(
-      'Union of `ThenableProbeKind` values.',
-      '`ThenableProbeKind` 全部取值组成的联合类型。'
-    ),
     INumberFormatOptions: {
       summary: t(
         'Options shared by the number formatting functions.',
@@ -2884,7 +2913,10 @@ console.log(settings.get('theme.mode')) // 'dark'`,
           example: `accessor.set('user.name', 'Grace')`
         },
         probeValue: {
-          summary: t('Explains a read without throwing.', '说明一次读取的结果，且不抛错。'),
+          summary: t(
+            'Returns reflection failures as probe results; invalid path syntax still throws `OBJECT_PATH_INVALID`.',
+            '把反射读取失败作为探测结果返回；路径语法不合法仍抛 `OBJECT_PATH_INVALID`。'
+          ),
           params: { path: t('Path to probe.', '要探测的路径。') },
           returns: t('An `IPathProbe`.', '一个路径探测结果 `IPathProbe`。'),
           example: `accessor.probeValue('user.age').kind // 'missing'`
@@ -3019,32 +3051,21 @@ else console.log(result.kind, result.failedAt)`,
         },
         segments: { summary: t('The parsed path as a segment tuple.', '解析后得到的路径段元组。') },
         probe: {
-          summary: t('Probe result of the value before the write.', '写入前当前值的探测结果。')
+          summary: t(
+            'Synthetic successful probe containing the proposed new value; it does not read the old value.',
+            '携带拟写入新值的合成成功探测结果；不会读取旧值。'
+          )
         },
         value: {
           summary: t('The value about to be written at the path.', '即将写入该路径的新值。')
         },
         replace: {
-          summary: t('Replaces the value that will be written.', '替换即将写入该路径的值。'),
+          summary: t(
+            'Replaces the actual written value without rewriting event.value or the synthetic probe value.',
+            '替换实际写入值，但不回写事件的值或合成探测结果的值。'
+          ),
           params: { value: t('Replacement value.', '替换后的值。') },
           returns: t('Nothing.', '无返回值；实际写入替换后的值。')
-        }
-      }
-    },
-    IAbortControllerLike: {
-      summary: t(
-        'Structural shape of an `AbortController` (no DOM types needed).',
-        '`AbortController` 的结构形状（不依赖 DOM 类型声明）。'
-      ),
-      members: {
-        signal: { summary: t('The signal this controller aborts.', '由该控制器控制的信号。') },
-        abort: {
-          summary: t(
-            'Aborts the signal and notifies its listeners.',
-            '中止该信号，通知所有监听者。'
-          ),
-          params: { reason: t('Reason passed to `abort()`.', '调用 `abort()` 时传入的中止原因。') },
-          returns: t('Nothing.', '无返回值；之后 `signal.aborted` 为 `true`。')
         }
       }
     },
@@ -3224,7 +3245,10 @@ try {
             'Builds the abort reason used when the deadline passes.',
             '构造截止时间到达时使用的中止原因。'
           ),
-          default: t('A `UtilsTimeoutError`.', '一个新的 `UtilsTimeoutError` 错误。')
+          default: t(
+            'No custom reason: host `abort(undefined)` normalizes to its native AbortError.',
+            '不指定原因：宿主 `abort(undefined)` 规整为其原生中止错误。'
+          )
         },
         report: {
           summary: reportText,
@@ -3389,11 +3413,10 @@ await ready.promise`,
           summary: t('Configured maximum attempts.', '重试选项中配置的最大尝试次数。')
         },
         attempt: { summary: t('Number of the attempt that failed.', '刚刚失败的那次尝试的序号。') },
-        signal: { summary: t('Signal of the retry as a whole.', '整个重试过程共用的中止信号。') },
-        remainingMs: {
+        signal: {
           summary: t(
-            'Time left before the total deadline, if set.',
-            '距离总截止时间的剩余毫秒数（设置了时才有）。'
+            'Signal of the attempt that just failed, not a total-retry signal; this context has no remainingMs field.',
+            '刚失败的那次尝试的信号，并非整个重试共用信号；此上下文不提供剩余时间字段。'
           )
         }
       }
@@ -3414,7 +3437,9 @@ await ready.promise`,
       scenarios: [
         t('Test timeouts and retries without real waiting.', '无需真实等待即可测试超时与重试。')
       ],
-      example: `const scheduler = createManualScheduler()
+      example: `import { createManualScheduler } from '@migaia/utils/testing'
+
+const scheduler = createManualScheduler()
 const pending = withTimeout(() => new Promise(() => {}), { timeoutMs: 100, scheduler })
 scheduler.advance(100) // 立即触发超时
 await pending.catch((error) => console.log(error.code))`,

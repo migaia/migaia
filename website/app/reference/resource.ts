@@ -35,8 +35,10 @@ const view = runtime.effect(() => {
 
 userId.value = '2' // replaces the running request with one for user 2
 
-view.dispose()
-user.dispose()`,
+window.addEventListener('pagehide', () => {
+  view.dispose()
+  user.dispose()
+}, { once: true })`,
   zh: `import { Resource, ResourceStatus } from '@migaia/resource'
 import { createRuntime } from '@migaia/reactive'
 
@@ -62,8 +64,10 @@ const view = runtime.effect(() => {
 
 userId.value = '2' // 正在运行的请求被替换为请求用户 2 的新请求
 
-view.dispose()
-user.dispose()`
+window.addEventListener('pagehide', () => {
+  view.dispose()
+  user.dispose()
+}, { once: true })`
 }
 
 /** Scenarios shared by the class symbol and its instance type. */
@@ -103,13 +107,13 @@ export const resourceReference: ILibraryReference = {
     Resource: {
       role: 'factory',
       purpose: t(
-        'Creates one async data source bound to a reactive runtime. Every request gets a generation; only the result of the newest generation is written to `state`, and replaced requests receive an aborted `signal`. With `autoStart` (default) the first request starts in the constructor.',
-        '创建一个绑定到响应式运行时的异步数据源。每次请求都有一个世代编号；只有最新世代的结果会写入 `state`，被替换的请求会收到已中止的 `signal`。默认开启 `autoStart`，构造时就发起第一次请求。'
+        'Creates one async data source bound to a reactive runtime. Every request gets a generation; only the result of the newest generation is written to `state`, and replaced requests receive an aborted `signal`. With `autoStart` (default) the first request starts in the constructor unless `initialSnapshot` is fresh.',
+        '创建一个绑定到响应式运行时的异步数据源。每次请求都有一个世代编号；只有最新世代的结果会写入 `state`，被替换的请求会收到已中止的 `signal`。默认开启 `autoStart`；除非 `initialSnapshot` 仍新鲜，否则构造时就发起第一次请求。'
       ),
       params: {
         fetcher: t(
-          'Function `(context) => value | Promise` that loads the data. `context` comes from the resource for each request: `signal` aborts when the request is replaced, reset, cancelled or disposed; `generation` is the request number; `token` stays the same across retries of one request. Reactive values read synchronously (before the first `await`) become dependencies.',
-          '加载数据的函数 `(context) => value | Promise`。`context` 由资源在每次请求时传入：`signal` 在请求被替换、重置、取消或资源释放时中止；`generation` 是请求编号；`token` 在同一次请求的多次重试之间保持不变。同步读取（第一个 `await` 之前）的响应式值会成为依赖。'
+          'Function `(context) => value | Promise` that loads the data. `context` comes from the resource for each request: `signal` aborts when the request is replaced, reset, cancelled or disposed; `generation` is the request number; `token` stays the same across retries of one request. Reactive values read synchronously (before the first `await`) become dependencies. Final unclassified fetch failures receive `FETCH_FAILED`; existing external error identity stays intact, and immutable errors or primitive failures remain reachable through `cause`.',
+          '加载数据的函数 `(context) => value | Promise`。`context` 由资源在每次请求时传入：`signal` 在请求被替换、重置、取消或资源释放时中止；`generation` 是请求编号；`token` 在同一次请求的多次重试之间保持不变。同步读取（第一个 `await` 之前）的响应式值会成为依赖。最终未分类的加载失败附加 `FETCH_FAILED`；已有外部错误身份不变，不可修改的错误或原始值失败保留在 `cause` 链。'
         ),
         runtime: t(
           'Reactive runtime returned by `createRuntime()` from `@migaia/reactive`; the same runtime must own the signals the fetcher reads and the effects that read `state`. `dispose()` does not dispose it.',
@@ -133,8 +137,8 @@ export const resourceReference: ILibraryReference = {
     RESOURCE_SOURCE: {
       role: 'constant',
       purpose: t(
-        'The `source` value (`@migaia/resource`) attached to every error this package throws; compare `error.source` with it before branching on `error.code`.',
-        '本包抛出的每个错误上附加的 `source` 值（`@migaia/resource`）；先用它比对 `error.source`，再按 `error.code` 分支。'
+        'The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.',
+        '资源自身产生的错误所附加的 `source` 值（`@migaia/resource`）；已有外部错误身份保持不变；先用它比对 `error.source`，再按 `error.code` 分支。'
       ),
       example: `if (error.source === RESOURCE_SOURCE && error.code === ResourceErrorCode.resourceDisposed) return`
     },
@@ -204,8 +208,8 @@ export const resourceReference: ILibraryReference = {
         },
         promise: {
           summary: t(
-            'Promise of the current request, or a resolved Promise of a fresh cached value. All readers get the same Promise; reading it starts a request only when the resource is idle or stale.',
-            '当前请求的 Promise，或新鲜缓存值对应的已兑现 Promise。所有读取方拿到同一个 Promise；只有资源空闲或已过期时，读取它才会发起请求。'
+            'Promise of the current request, or a resolved Promise of a fresh cached value. Readers share the latest published request Promise; a reentrant fetcher cannot overwrite a Promise of a newer request. Reading it starts work only when idle or stale.',
+            '当前请求的 Promise，或新鲜缓存值对应的已兑现 Promise。读取方共享最新发布请求的 Promise；加载函数重入不会让旧请求覆盖新请求的公开 Promise。只有资源空闲或已过期时读取才发起请求。'
           )
         },
         disposed: {
@@ -251,8 +255,8 @@ export const resourceReference: ILibraryReference = {
         },
         peek: {
           summary: t(
-            'Same results as `read()` but without tracking, so the caller does not rerun when the state changes.',
-            '结果与 `read()` 相同，但不会被追踪，状态变化时调用方不会重新执行。'
+            'Materializes the current state without tracking, starting work or revalidating TTL. Pending throws its Promise; normal `autoStart: false` idle with no Promise throws `NO_ACTIVE_PROMISE`. Inspect `peekState()` or explicitly start work first.',
+            '读取当前状态但不追踪、不启动请求、不重验证有效期。等待中抛当前 Promise；合法的 `autoStart: false` 初始空闲状态没有 Promise，直接读取会抛 `NO_ACTIVE_PROMISE`。可先用 `peekState()` 检查或显式启动请求。'
           ),
           returns: t('The data of the current success state.', '当前成功状态中的数据。'),
           example: `const cached = user.peek()`
@@ -292,28 +296,31 @@ await user.invalidate()`
         },
         cancel: {
           summary: t(
-            'Aborts the running request and publishes the `cancelled` state (error code `REQUEST_CANCELLED`); the resource stays usable.',
-            '中止正在运行的请求并发布 `cancelled` 状态（错误码 `REQUEST_CANCELLED`）；资源仍可继续使用。'
+            'With an active request, aborts it and pauses passive restarts. Pending becomes `cancelled` (`REQUEST_CANCELLED`); a stale-while-revalidate refresh keeps its success data. Without active work this is a no-op; explicit `refetch()` resumes work.',
+            '有活跃请求时中止它并暂停被动重启。等待状态变为 `cancelled`（`REQUEST_CANCELLED`）；保留旧数据的后台刷新取消后仍保留成功数据。没有活跃请求时无操作；显式调用 `refetch()` 可恢复请求。'
           ),
-          returns: t('Nothing; the request is aborted.', '无返回值；当前请求已中止。'),
+          returns: t(
+            'Nothing; active work is cancelled while cached success data may remain.',
+            '无返回值；活跃请求已取消，已有成功数据可能继续保留。'
+          ),
           example: `cancelButton.onclick = () => user.cancel()`
         },
         dehydrate: {
           summary: t(
-            'Exports the current success value as a JSON-safe snapshot for server rendering or persistence.',
-            '把当前成功值导出为可 JSON 化的快照，用于服务端渲染或持久化。'
+            'Captures a v2 success snapshot with portable durations and unchanged caller-owned data. Only time metadata is directly JSON-encodable: BigInt or cyclic data needs caller serialization. Use safe transport or HTML-context encoding; never insert raw JSON into a script element.',
+            '导出带可移植时长的第二版成功快照，业务数据原样保留。只有时间元数据可直接编码；大整数或循环数据由调用方序列化。应使用安全传输或适合 HTML 上下文的编码，禁止把原始 JSON 直接拼入脚本元素。'
           ),
           returns: t(
             'An `IResourceCacheSnapshot`, or `undefined` when the state is not `success`.',
             '一个 `IResourceCacheSnapshot`；状态不是 `success` 时为 `undefined`。'
           ),
           example: `const snapshot = user.dehydrate()
-html += \`<script>window.__USER__ = \${JSON.stringify(snapshot)}</script>\``
+const clientUser = new Resource(fetchUser, clientRuntime, { initialSnapshot: snapshot })`
         },
         hydrate: {
           summary: t(
-            'Replaces the state with a success snapshot produced by `dehydrate()`, cancelling any running request. An expired snapshot is revalidated on the next read.',
-            '用 `dehydrate()` 生成的成功快照替换当前状态，并取消正在运行的请求。快照已过期时，下一次读取会重新验证。'
+            'Replaces the state with a success snapshot produced by `dehydrate()`, cancelling any running request. An expired snapshot is revalidated on the next read. Durations are rebased to the receiving scheduler; callers add known transport/storage time to `ageMs` and subtract it from finite `remainingTtlMs` (minimum zero). Old v1 snapshots are rejected.',
+            '用 `dehydrate()` 生成的成功快照替换当前状态，并取消正在运行的请求。快照已过期时，下一次读取会重新验证。时长按接收端调度器重建；调用方把已知传输或存储耗时加到 `ageMs`，并从有限的 `remainingTtlMs` 扣除，最低为零。旧第一版快照被拒绝。'
           ),
           params: {
             snapshot: t(
@@ -352,8 +359,8 @@ html += \`<script>window.__USER__ = \${JSON.stringify(snapshot)}</script>\``
     },
     IResourceCacheSnapshot: {
       summary: t(
-        'JSON-safe success snapshot returned by `dehydrate()` and accepted by `hydrate()` and the `initialSnapshot` option.',
-        '`dehydrate()` 返回、`hydrate()` 与 `initialSnapshot` 选项接受的可 JSON 化成功快照。'
+        'Portable v2 success snapshot from `dehydrate()`, accepted by `hydrate()` and `initialSnapshot`. Durations use the receiving clock; data is neither copied, serialized nor HTML-escaped. The caller owns data encoding and transport elapsed time.',
+        '由 `dehydrate()` 返回、`hydrate()` 与 `initialSnapshot` 接受的第二版可移植成功快照。时长使用接收端时钟重建；数据不复制、不序列化、不做 HTML 转义，数据编码与传输耗时由调用方负责。'
       ),
       scenarios: [
         t(
@@ -365,27 +372,30 @@ html += \`<script>window.__USER__ = \${JSON.stringify(snapshot)}</script>\``
 const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot })`,
       members: {
         version: {
-          summary: t('Snapshot format version; always `1`.', '快照格式的版本号，目前固定为 `1`。')
-        },
-        data: { summary: t('The success data that was cached.', '请求成功后被缓存下来的数据。') },
-        updatedAt: {
           summary: t(
-            'Scheduler time (milliseconds) when the data was received.',
-            '收到数据时的调度器时间（毫秒）。'
+            'Snapshot format version; always `2`. The old absolute-time v1 format is rejected.',
+            '快照格式版本固定为 `2`；旧的绝对时间第一版格式被拒绝。'
           )
         },
-        expiresAt: {
+        data: { summary: t('The success data that was cached.', '请求成功后被缓存下来的数据。') },
+        ageMs: {
           summary: t(
-            'Scheduler time when the data expires; `null` means it never expires (`ttl: Infinity`).',
-            '数据过期时的调度器时间；`null` 表示永不过期（`ttl: Infinity`）。'
+            'Finite non-negative cache age in milliseconds at capture. Add known transport/storage elapsed time before hydration.',
+            '捕获时有限且非负的缓存年龄（毫秒）；恢复前需加上已知传输或存储耗时。'
+          )
+        },
+        remainingTtlMs: {
+          summary: t(
+            'Finite non-negative remaining lifetime in milliseconds, or `null` for no time expiration (`ttl: 0` or `Infinity`). Subtract known transport/storage time, clamping to zero.',
+            '有限且非负的剩余寿命（毫秒）；`null` 表示无时间过期（`ttl: 0` 或 `Infinity`）。应扣除已知传输或存储耗时，最低为零。'
           )
         }
       }
     },
     IResourceError: {
       summary: t(
-        'Shape of every error thrown by this package: the native error object with `source` and `code` added.',
-        '本包抛出的每个错误的形状：在原生错误对象上附加了 `source` 与 `code`。'
+        'Shape of Resource-owned failures: native errors retain their type with `source` and `code` attached where possible; immutable or primitive failures remain on `cause`. Already classified foreign failures keep their original identity.',
+        '资源自身产生的错误形状：尽可能在原生错误上附加 `source` 与 `code` 并保留类型；不可修改或原始值失败保留在 `cause`。已分类的外部错误保持原身份。'
       ),
       members: {
         source: {
@@ -457,8 +467,8 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
         },
         ttl: {
           summary: t(
-            'How long a success value stays fresh, in milliseconds; reading after that starts a revalidation. Must be ≥ 0 or `Infinity`.',
-            '成功值保持新鲜的毫秒数；超过后再读取会触发重新验证。必须不小于 0 或为 `Infinity`。'
+            'Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.',
+            '成功值的有效毫秒数；正的有限值过期后读取会重新验证。`0` 与 `Infinity` 禁用时间过期，但依赖变化（含休眠期间的变化）仍触发新请求。必须不小于 0 或为 `Infinity`。'
           ),
           default: t(
             '`Infinity`: fresh until a dependency changes or `refetch()` is called.',
@@ -470,7 +480,10 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
             'Start the first request in the constructor.',
             '是否在构造时就发起第一次请求。'
           ),
-          default: t('`true`.', '`true`：构造后状态立即变为 `pending`。')
+          default: t(
+            '`true`: starts immediately unless the initial snapshot is fresh.',
+            '`true`：立即启动；若初始快照仍新鲜，则直接保持成功状态，不调用加载函数。'
+          )
         },
         staleWhileRevalidate: {
           summary: t(
@@ -484,15 +497,15 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
         },
         retry: {
           summary: t(
-            'Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure.',
-            '失败后的重试策略：额外尝试次数（非负整数），或逐次决定是否重试的 `(failureCount, error) => boolean`。为 Suspense 抛出的 Promise 不算失败。'
+            'Retry policy after a failure: a non-negative integer of extra attempts, or `(failureCount, error) => boolean` deciding each retry. A Promise thrown for Suspense does not count as a failure. A throwing policy or invalid result yields `INVALID_OPTION`; the triggering fetch failure stays reachable through `cause` or `errors`, and existing external identity is preserved.',
+            '失败后的重试策略：额外尝试次数（非负整数），或逐次决定是否重试的 `(failureCount, error) => boolean`。为 Suspense 抛出的 Promise 不算失败。策略抛错或返回非法值时产生 `INVALID_OPTION`，触发它的加载失败仍可沿 `cause` 或 `errors` 找到；已有外部身份保留。'
           ),
           default: t('`0`: no retry.', '`0`：首次请求失败后不再重试。')
         },
         retryDelay: {
           summary: t(
-            'Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff.',
-            '每次重试前等待的毫秒数，或用于退避的 `(failureCount, error) => 毫秒`。'
+            'Wait before each retry in milliseconds, or `(failureCount, error) => ms` for backoff. Throwing callbacks or invalid results retain the fetch failure in `cause` or `errors`; policy errors receive `INVALID_OPTION` unless already classified externally.',
+            '每次重试前等待的毫秒数，或用于退避的 `(failureCount, error) => 毫秒`。回调抛错或返回非法值时，通过 `cause` 或 `errors` 保留加载失败；策略错误附 `INVALID_OPTION`，已有外部身份除外。'
           ),
           default: t('`0`: retry immediately.', '`0`：立即重试。')
         },
@@ -519,8 +532,8 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
             '用于 `ttl`、`updatedAt`、`expiresAt` 与重试等待的时钟和计时器；测试时可注入手动调度器。'
           ),
           default: t(
-            '`systemScheduler` from `@migaia/lifecycle`.',
-            '使用 `@migaia/lifecycle` 的 `systemScheduler` 提供系统时钟和计时器。'
+            '`systemScheduler` from `@migaia/utils/scheduler`.',
+            '使用 `@migaia/utils/scheduler` 的 `systemScheduler` 提供系统时钟和计时器。'
           )
         }
       }
@@ -559,8 +572,8 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
         },
         error: {
           summary: t(
-            'In `error`: the value the fetcher threw; in `cancelled`: an `AbortError` with code `REQUEST_CANCELLED`.',
-            '在 `error` 状态中是 fetcher 抛出的值；在 `cancelled` 状态中是错误码为 `REQUEST_CANCELLED` 的 `AbortError`。'
+            'In `error`: the classified fetch or policy failure; original failures stay reachable through cause/errors. In `cancelled`: an AbortError with `REQUEST_CANCELLED`.',
+            '在 `error` 状态中是分类后的加载或策略错误，原始失败沿原因或错误列表可达；在 `cancelled` 状态中是带 `REQUEST_CANCELLED` 的原生中止错误。'
           )
         }
       }
@@ -616,8 +629,8 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
           '`RESOURCE_DISPOSED`：在 `dispose()` 之后使用了成员；需要创建新的资源。'
         ),
         requestAborted: t(
-          '`REQUEST_ABORTED`: the `AbortError` used as the reason of a replaced request signal; usually ignored.',
-          '`REQUEST_ABORTED`：被替换请求的信号所携带的 `AbortError`；通常可以忽略。'
+          '`REQUEST_ABORTED`: Resource-initiated cancellation uses the same native AbortError as its signal reason and rejection. Lifecycle replacement can supply a different signal reason, retained on the `cause` of the Resource AbortError.',
+          '`REQUEST_ABORTED`：资源主动取消时，原生中止错误同时作为信号原因与拒绝值。生命周期替换可能提供不同的信号原因，此时保存在资源中止错误的 `cause`。'
         ),
         requestCancelled: t(
           '`REQUEST_CANCELLED`: the `AbortError` stored in the `cancelled` state after `cancel()`.',
@@ -628,16 +641,20 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
           '`CANCELLATION_CLEANUP_FAILED`：取消后计时器或监听清理失败；资源仍视为已取消。'
         ),
         noActivePromise: t(
-          '`NO_ACTIVE_PROMISE`: no request Promise existed where one was required; indicates inconsistent internal state.',
-          '`NO_ACTIVE_PROMISE`：需要请求 Promise 时却不存在；表示内部状态不一致。'
+          '`NO_ACTIVE_PROMISE`: no request Promise is available, including a valid `autoStart: false` idle `peek()`; inspect `peekState()` or explicitly start a request.',
+          '`NO_ACTIVE_PROMISE`：没有可用的请求 Promise，包括合法的 `autoStart: false` 空闲状态直接调用 `peek()`；可检查 `peekState()` 或显式启动请求。'
         ),
         invalidSnapshot: t(
-          '`INVALID_SNAPSHOT`: a snapshot has a wrong `version`, `updatedAt` or `expiresAt`; check how it was produced.',
-          '`INVALID_SNAPSHOT`：快照的 `version`、`updatedAt` 或 `expiresAt` 不合法；检查快照的生成过程。'
+          '`INVALID_SNAPSHOT`: snapshot version is not `2`, durations are negative/non-finite (only remaining lifetime permits `null`), or rebased local timestamps overflow. Getter failures retain their cause.',
+          '`INVALID_SNAPSHOT`：版本不是 `2`、时长为负或非有限值（仅剩余寿命允许 `null`），或重建本地时间戳溢出；读取器失败保留原因。'
         ),
         invalidOption: t(
           '`INVALID_OPTION`: an option such as `ttl`, `retry` or `retryDelay` is invalid; fix the options.',
           '`INVALID_OPTION`：`ttl`、`retry`、`retryDelay` 等选项不合法；需要修正选项。'
+        ),
+        fetchFailed: t(
+          '`FETCH_FAILED`: final unclassified fetch failure after retries. Native errors keep identity when writable; immutable errors and primitive values stay reachable through `cause`. Existing foreign source/code is preserved.',
+          '`FETCH_FAILED`：重试结束后的未分类加载失败。可修改的原生错误保留身份；不可修改错误及原始值保留在 `cause`。已有外部来源与错误码保持不变。'
         ),
         suspenseProbeFailed: t(
           '`SUSPENSE_PROBE_FAILED`: a value thrown by the fetcher has a throwing `then` getter; both errors are kept in `errors`.',

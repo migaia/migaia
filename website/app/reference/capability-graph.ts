@@ -43,8 +43,8 @@ const members: Record<string, IMemberDoc> = {
   },
   ready: {
     summary: t(
-      'Freezes registration and starts providers before consumers; partial failure rolls back provisional and adopted resources.',
-      '冻结节点登记并先启动提供方再启动消费方，部分失败时回滚暂存与已接纳资源。'
+      'Freezes registration and starts providers before consumers; partial failure rolls back provisional and adopted resources. An admitted stale primary is still released if auxiliary rollback fails; failures follow the existing reporter policy.',
+      '冻结节点登记并先启动提供方再启动消费方，部分失败时回滚暂存与已接纳资源；即使辅助资源回滚失败，已准入的过期主资源仍会释放，错误沿既有报告策略处理。'
     ),
     returns: t(
       'The same Promise for every caller. Missing providers, cycles and startup failures reject with graph errors retaining the original cause.',
@@ -317,8 +317,8 @@ const types: Record<string, ITypeDoc> = {
     members: {
       onError: {
         ...p(
-          'Receives (error) for contained or secondary failures. Return is ignored; reporter throws and rejected thenables are contained.',
-          '通过 `(error)` 接收受控或次级失败，不消费返回值，报告函数抛错或类承诺拒绝会被隔离。'
+          'Receives (error) for contained or secondary failures. Return is ignored; reporter throws and rejected thenables reach the shared utils host exception queue without changing graph results.',
+          '通过 `(error)` 接收受控或次级失败，不消费返回值，报告函数抛错或类承诺拒绝进入工具包共享宿主异常队列，不改变图结果。'
         ),
         default: t(
           'Omitted: no external reporting sink is installed.',

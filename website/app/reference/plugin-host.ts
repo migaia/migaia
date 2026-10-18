@@ -1,7 +1,7 @@
 /**
  * Reference documentation of `@migaia/plugin-host`. Rules: `app/reference/contract.ts`. Verified
  * against `packages/plugin-host/src` (typing.ts, core.ts, composition-entry.ts, plugin-handle.ts,
- * cleanup-runtime.ts, state-constants.ts, error-code.ts) and USEGUIDE on 2026-10-17.
+ * cleanup-runtime.ts, state-constants.ts, error-code.ts) and USEGUIDE on 2026-10-18.
  */
 import type { IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
 
@@ -130,8 +130,8 @@ const hostMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   revision: {
     summary: t(
-      'Counter of committed changes; it only changes when an install, removal or replacement is published. Composition owners use it to detect concurrent changes.',
-      '已提交变更的计数；只有安装、卸载或替换真正发布时才变化。组合层用它检测并发修改。'
+      'Counter of committed installation, removal, replacement, configuration, enablement, stage-registration and terminal changes. Composition owners compare revision to detect stale snapshots; it remains readable after disposal.',
+      '已提交安装、卸载、替换、配置、启停、步骤登记及终态变更的计数；组合方据此识别过期快照，释放后仍可读取。'
     )
   },
   config: {
@@ -142,8 +142,8 @@ const hostMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   useSync: {
     summary: t(
-      'Installs plugins synchronously and returns their handles at once. Any Promise returned by `install`, or a declared `setup`, is rejected (`SETUP_REQUIRES_ASYNC_INSTALL`).',
-      '同步安装插件并立即返回句柄。`install` 返回 Promise，或插件声明了 `setup`，都会被拒绝（`SETUP_REQUIRES_ASYNC_INSTALL`）。'
+      'Installs synchronously and returns handles in input order. A declared setup immediately throws SETUP_REQUIRES_ASYNC_INSTALL. A thenable install result rejects as PLUGIN_INSTALL_FAILED with INSTALL_RESULT_THENABLE on cause; its later rejection is reported through the diagnostic third argument, not inserted retroactively into the immediate cause chain.',
+      '同步安装并按输入顺序返回句柄；声明准备钩子时立即抛 `SETUP_REQUIRES_ASYNC_INSTALL`。安装返回异步值时抛 `PLUGIN_INSTALL_FAILED`，原因含 `INSTALL_RESULT_THENABLE`；之后的实际拒绝由诊断第三参数报告，不会补入即时原因链。'
     ),
     params: {
       plugins: t('Plugin definitions with synchronous install.', '安装过程完全同步的插件定义。')
@@ -190,8 +190,8 @@ await api.extensions.fetchUser('u1')`
       )
     },
     returns: t(
-      '`{ ok: true, affected }`, or `{ ok: false, errors, affected }` when cleanup failed (removal still happened); with `dryRun: true` an `IPluginDependencyPlan`.',
-      '成功为 `{ ok: true, affected }`；清理出错为 `{ ok: false, errors, affected }`（插件仍已卸载）；`dryRun: true` 时返回 `IPluginDependencyPlan`。'
+      '{ ok: true, affected }, or { ok: false, errors, affected } after cleanup failure or PIPELINE_DRAIN_TIMEOUT. Ordinary unUse continues bounded cleanup after a drain timeout, records/reports that failure and adds no physicalCompletion protocol. dryRun:true returns IPluginDependencyPlan.',
+      '成功返回 `{ ok: true, affected }`；清理失败或 `PIPELINE_DRAIN_TIMEOUT` 返回 `{ ok: false, errors, affected }`。普通卸载排空超时后仍继续有界清理，收集并报告失败，不提供物理完成协议；仅预演时返回依赖计划。'
     ),
     example: `const plan = await host.unUse('cache', { policy: 'cascade', dryRun: true })
 console.log(plan.order)
@@ -253,8 +253,8 @@ search.extensions.query('migaia')`
   },
   dispose: {
     summary: t(
-      'Closes the host permanently: stops new changes, drains pipelines and releases every plugin (dependents first). Repeated calls return the same Promise.',
-      '永久关闭宿主：停止接收新变更，排空 pipeline，并释放全部插件（依赖者优先）。重复调用返回同一个 Promise。'
+      'Closes permanently: stops new changes, drains pipelines and releases plugins with dependents first. The completion Promise is published before callbacks or abort listeners run; concurrent or reentrant disposal shares it, so cleanup middleware runs once. The lifecycle abort reason and later admission failure can be distinct instances with the same source/code.',
+      '永久关闭宿主，停止新变更、排空管线并按依赖者优先释放插件。回调与中止监听前即发布完成承诺，并发或重入释放共享它，清理中间件仅运行一次；生命周期取消原因与后续准入错误可为同来源及错误码的不同实例。'
     ),
     returns: t(
       'An `IPluginHostDisposalResult`: `cleanupErrors` lists cleanup failures; `cleanupComplete: false` means some cleanup is still running, observe `physicalCompletion`.',
@@ -430,8 +430,8 @@ const [handle] = await host.use(greet)`,
     {
       signature: 'handle.extensions.<name>(...)',
       summary: t(
-        'Every enumerable data property returned by `install()` becomes a typed capability on the handle.',
-        '`install()` 返回的每个可枚举数据属性都成为句柄上的类型化能力。'
+        'Every enumerable own data property returned by install becomes a typed handle capability only when configurable:true. Frozen extension records are rejected; non-enumerable fields are ignored with diagnostics.',
+        '`install()` 返回的自有可枚举数据属性还须允许重配置才可成为句柄能力；冻结扩展对象会被拒绝，不可枚举字段经诊断后忽略。'
       ),
       returns: t(
         'What the plugin function returns. After removal access throws `PLUGIN_NOT_INSTALLED`; an extracted function of a replaced generation throws `REGISTRATION_REVOKED`.',
@@ -711,8 +711,8 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
     defineHost: {
       role: 'factory',
       purpose: t(
-        'Creates a host without writing a class. The handle has the same base API as a `PluginHost` subclass plus `runPipeline`; the domain core, disposal error translation and dispose wrapping are passed as options.',
-        '无需编写类即可创建宿主。返回的句柄具备与 `PluginHost` 子类相同的基础 API，另外提供 `runPipeline`；领域 core、释放错误转换和 dispose 包装都以选项传入。'
+        'Creates one frozen managed handle without subclassing. TPublicSurface, the optional fourth generic, adds domain-owned surface descriptors before freezing; accessors stay live and fluent pipeline registration returns the same handle with its domain members and issued identity. Canonical Host keys take precedence. Domain core and disposal callbacks remain options.',
+        '无需继承即可创建同一个冻结托管句柄。可选第四泛型 `TPublicSurface` 在冻结前加入领域自有属性描述符，访问器保持实时；管线链式登记返回含领域成员及已签发身份的原句柄。规范宿主键优先，领域内核与释放回调仍以选项传入。'
       ),
       params: {
         options: t(
@@ -720,15 +720,21 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
           '宿主选项与领域钩子，见选项表。'
         )
       },
-      returns: t('An `IHostHandle`.', '一个宿主句柄 `IHostHandle`。'),
+      returns: t(
+        'One canonical frozen IHostHandle carrying TPublicSurface (empty by default). Surface option/descriptor reads happen before Runtime acquisition; unclassified read failures carry CALLBACK_FAILED with the original error retained.',
+        '返回携带 `TPublicSurface` 的规范冻结句柄，领域表面默认空。运行时获取前捕获表面选项及自有描述符；读取未分类失败附 `CALLBACK_FAILED` 并保留原错。'
+      ),
       options: 'IDefineHostOptions',
       example: `import { defineHost } from '@migaia/plugin-host'
 
-const host = defineHost<{ send(text: string): void }, string>({
+const surface = { ping: () => 'pong' }
+const host = defineHost<{ send(text: string): void }, string, readonly [], typeof surface>({
   host: { ${execution} },
+  surface,
   domainCore: () => ({ send: (text) => console.log('send', text) })
 })
-host.usePipeline((value, next) => next(value.trim()))
+const same = host.usePipeline((value, next) => next(value.trim()))
+console.log(same === host, same.ping())
 await host.runPipeline('  hello  ', (value) => console.log(value)) // hello
 await host.dispose()`
     },
@@ -798,25 +804,6 @@ const prefix = definePlugin({
         '异步释放所用的键：运行时支持时就是原生 `Symbol.asyncDispose`，否则是本包提供的替代 symbol。把它作为异步资源的方法名，再交给 `core.onDispose()`。'
       ),
       example: `core.onDispose({ [asyncDisposeKey]: async () => await pool.end() })`
-    },
-    createRegistrationView: {
-      role: 'operation',
-      purpose: t(
-        'Returns an extension-only view for one registration receipt (same as `createView()` of the composition entry). The view has no host, config or mutation capabilities and is revoked with the registration.',
-        '根据注册凭证返回只含扩展的视图（与 composition 入口的 `createView()` 相同）。视图不包含宿主、配置或修改能力，随注册撤销而失效。'
-      ),
-      params: {
-        receipt: t(
-          'Receipt returned by `commitPreparedAdmissions()`.',
-          '`commitPreparedAdmissions()` 返回的注册凭证。'
-        )
-      },
-      returns: t(
-        '`{ extensions }` of exactly that registration.',
-        '仅属于该注册的 `{ extensions }`。'
-      ),
-      example: `const view = createRegistrationView(receipt)
-view.extensions.greet('Ada')`
     },
     getPluginRuntimeIntegration: {
       role: 'operation',
@@ -909,8 +896,8 @@ if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇�
         }
       },
       purpose: t(
-        'Error class for host state and protocol errors (as opposed to input validation, which throws native `TypeError` with `INVALID_OPTION`). Branch on `error.code`; `cause` keeps the original error and `detail` carries structured data such as `failedName`.',
-        '宿主状态与协议错误的错误类（参数格式错误则抛原生 `TypeError`，带 `INVALID_OPTION`）。请按 `error.code` 分支；`cause` 保留原始错误，`detail` 携带 `failedName` 等结构化信息。'
+        'Host state/protocol error class, also used for invalid configuration data (INVALID_CONFIG_VALUE) and cycles (CONFIG_CYCLE_REJECTED). Ordinary name/path/stage/extension/domain-core/resource validation uses native TypeError/INVALID_OPTION; retired definition fields use TypeError/PLUGIN_DEFINITION_INVALID. Branch on source/code and native type; cause and detail retain originals and structured context.',
+        '宿主状态及协议错误类，也用于非法配置值与配置循环。普通名称、路径、步骤、扩展、领域内核及资源校验用原生 `TypeError/INVALID_OPTION`，退役定义字段用 `TypeError/PLUGIN_DEFINITION_INVALID`。按来源、错误码与原生类型判断，原因与诊断详情保留原错及上下文。'
       ),
       example: `try {
   await host.use(broken)
@@ -918,11 +905,20 @@ if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇�
   if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') console.error(error.detail?.failedName, error.cause)
 }`
     },
+    ERROR_TEXT: {
+      role: 'constant',
+      purpose: t(
+        'Canonical English error text and message factories exported by the root entry. Downstream diagnostic adapters can reuse stable Host wording; error handling still branches on source/code rather than comparing message text.',
+        '根入口导出的规范英文错误文案及消息工厂，下游诊断适配可复用稳定宿主措辞；错误处理仍按来源及错误码分类，不比较消息文本。'
+      ),
+      example: `import { ERROR_TEXT } from '@migaia/plugin-host'
+console.log(ERROR_TEXT.HOST_DISPOSED)`
+    },
     PluginHostErrorCode: {
       role: 'error',
       purpose: t(
-        'Every error and diagnostic code of the host. Thrown codes come on `PluginHostError` (or a `TypeError` for `INVALID_OPTION`); diagnostic-only codes are passed to the `diagnostic` option instead of being thrown.',
-        '宿主的全部错误码与诊断码。会抛出的码出现在 `PluginHostError` 上（`INVALID_OPTION` 则在 `TypeError` 上）；仅用于诊断的码通过 `diagnostic` 选项上报，不会抛出。'
+        'The 44 Host error and diagnostic codes. Host protocol and configuration-domain failures use PluginHostError; input/definition validation preserves native TypeError. CALLBACK_FAILED classifies otherwise unowned callback or surface-descriptor failures while preserving writable native identity, immutable/non-Error cause and existing foreign ownership. Diagnostic-only codes reach diagnostic instead of being thrown.',
+        '宿主共四十四个错误及诊断码；协议与配置域使用宿主错误，输入及定义校验保留原生类型。`CALLBACK_FAILED` 分类未归属回调或表面描述符失败，可写原生对象保持身份，不可修改或非错误值保留在原因上，外包身份不改写；仅诊断的码经回调报告。'
       ),
       example: `if ((error as { code?: string }).code === PluginHostErrorCode.prerequisiteMissing) await host.use(provider)`
     },
@@ -978,26 +974,6 @@ if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇�
       ),
       example: `for (const error of result.cleanupErrors) console.log(readPluginHostDisposalProvenance(error))`
     },
-    buildManagedPort: {
-      role: 'operation',
-      purpose: t(
-        'Internal construction helper of the composition protocol: wraps a host composition runtime into the frozen port that `openComposition()` returns. Hosts call it once while constructing; composition owners never need it.',
-        'composition 协议的内部构造工具：把宿主的组合运行时包装成 `openComposition()` 返回的冻结端口。宿主在构造时调用一次，组合方不需要使用它。'
-      ),
-      params: {
-        runtime: t('The host composition runtime.', '宿主的组合运行时。'),
-        readRevision: t('Reads the current host revision.', '读取当前宿主修订号的函数。'),
-        readCurrentSnapshot: t(
-          'Reads the current extensions/config snapshot.',
-          '读取当前扩展与配置快照的函数。'
-        )
-      },
-      returns: t(
-        'A frozen `IPluginHostCompositionIntegration`.',
-        '一个冻结的组合端口 `IPluginHostCompositionIntegration`。'
-      ),
-      example: `registerManagedHost(this, buildManagedPort(runtime, () => revision, () => snapshot))`
-    },
     createView: {
       role: 'operation',
       purpose: t(
@@ -1050,18 +1026,6 @@ view.extensions.query('migaia')`
       ),
       example: `const port = openComposition(host)
 const admission = port.createPluginAdmission(plugin)`
-    },
-    registerManagedHost: {
-      role: 'operation',
-      purpose: t(
-        'Records a host and its composition port so that `isManagedHost()` and `openComposition()` recognise it. Hosts call it once at the end of construction.',
-        '登记宿主及其组合端口，使 `isManagedHost()` 与 `openComposition()` 能识别它。宿主在构造结束时调用一次。'
-      ),
-      params: {
-        target: t('The host object.', '宿主对象。'),
-        port: t('The port built by `buildManagedPort()`.', '由 `buildManagedPort()` 构建的端口。')
-      },
-      example: `registerManagedHost(host, port)`
     }
   },
   types: {
@@ -1076,8 +1040,8 @@ const admission = port.createPluginAdmission(plugin)`
     },
     IHostHandle: {
       summary: t(
-        'The handle returned by `defineHost()`: the base host API plus `runPipeline` for its holder.',
-        '`defineHost()` 返回的句柄：基础宿主 API，另外向持有者开放 `runPipeline`。'
+        'Canonical frozen handle returned by defineHost<TDomainCore, TValue, TInstalled, TPublicSurface>. The fourth generic defaults to an empty public surface. Domain members, live accessors and issued identity belong to this same handle; fluent use*Pipeline returns it unchanged.',
+        '函数宿主返回的规范冻结句柄；第四泛型为默认空的领域公开表面，领域成员、实时访问器及已签发身份同属原句柄，管线链式方法返回原对象。'
       ),
       scenarios: [
         t(
@@ -1116,8 +1080,8 @@ await host.dispose()`,
         },
         'execution.mutationTimeoutMs': {
           summary: t(
-            'Maximum time for one install, update or removal hook. When it passes, the operation signal aborts and the change is rolled back with `MUTATION_EXECUTION_TIMEOUT`; `false` waits without limit.',
-            '一次安装、更新或卸载钩子最多可执行的时间。超时后操作信号中止，本次变更以 `MUTATION_EXECUTION_TIMEOUT` 回滚；传 `false` 表示不限时。'
+            'Mutation budget for installation/setup and update hooks; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. Removal hooks and disposers instead use disposeStepTimeoutMs, while pipeline draining uses its separate budget. false disables this mutation deadline.',
+            '安装、准备及更新钩子的变更预算；到期取消操作并以 `MUTATION_EXECUTION_TIMEOUT` 回滚。卸载钩子及释放步骤另用 `disposeStepTimeoutMs`，管线排空使用独立预算；传 `false` 关闭变更期限。'
           )
         },
         'execution.pipelineDrainTimeoutMs': {
@@ -1128,8 +1092,8 @@ await host.dispose()`,
         },
         execution: {
           summary: t(
-            'Required time budgets: `mutationTimeoutMs` limits one install, update or removal hook; `pipelineDrainTimeoutMs` limits waiting for running pipelines before removal continues. `false` waits without limit.',
-            '必填的时间预算：`mutationTimeoutMs` 限制一次安装、更新或卸载钩子的执行时间；`pipelineDrainTimeoutMs` 限制卸载前等待正在运行的 pipeline 的时间。传 `false` 表示不限时。'
+            'Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.',
+            '必填执行预算：变更时限约束准备、安装及更新，排空时限约束管线且作为托管卸载共享清理期限；普通卸载步骤用独立步骤时限，传 `false` 关闭对应期限。'
           )
         },
         pipeline: {
@@ -1201,6 +1165,16 @@ await host.dispose()`,
             '与 `PluginHost` 构造函数相同的宿主选项。'
           )
         },
+        surface: {
+          summary: t(
+            'Domain public members installed on the canonical handle using own descriptors captured once before Runtime creation. Accessors stay live; canonical Host keys, including identity, remain reserved and take precedence. TPublicSurface defaults to an empty object.',
+            '运行时创建前单次捕获领域表面的自有描述符，安装到规范句柄；访问器保持实时，包含身份在内的宿主规范键保留且优先，领域表面泛型默认空对象。'
+          ),
+          default: t(
+            'Absent: the handle has no additional domain public members.',
+            '省略时句柄不增加领域公开成员。'
+          )
+        },
         domainCore: {
           summary: t(
             'Creates the domain core each plugin install receives; replaces `createPluginDomainCore()`.',
@@ -1220,17 +1194,10 @@ await host.dispose()`,
         },
         dispose: {
           summary: t(
-            'Wraps disposal: receives `next` (call it exactly once) to run extra cleanup around the host disposal.',
-            '包装释放过程：收到 `next`（必须恰好调用一次），可在宿主释放前后执行额外清理。'
+            'Wraps disposal: call next exactly once. Completion is published before middleware runs, so reentrant calls share it and middleware runs once. Unclassified callback failures receive CALLBACK_FAILED; native identity or original cause remains reachable.',
+            '包装释放时须恰好调用一次 `next`；中间件执行前发布完成对象，重入调用共享它且中间件仅执行一次。未分类回调失败附 `CALLBACK_FAILED`，原生身份或原始原因可追溯。'
           ),
           default: t('Not set: plain host disposal.', '不设置：直接执行宿主释放。')
-        },
-        receiver: {
-          summary: t(
-            '`this` used when calling published extension functions.',
-            '调用已发布扩展函数时使用的 `this`。'
-          ),
-          default: t('The handle itself.', '句柄本身。')
         }
       }
     },
@@ -1602,8 +1569,8 @@ console.log(paint('info', 'ready'))`
         },
         onDispose: {
           summary: t(
-            'Hands a resource (function, `Symbol.dispose` or async-dispose object) to this registration; released in reverse order on removal. Only during install, otherwise `RESOURCE_OUTSIDE_INSTALL`.',
-            '把资源（函数、`Symbol.dispose` 对象或异步释放对象）交给本次注册，卸载时按逆序释放。只能在安装期间调用，否则抛 `RESOURCE_OUTSIDE_INSTALL`。'
+            'Transfers a resource to the registration during install, for reverse-order cleanup. Outside this core window RESOURCE_OUTSIDE_INSTALL rejects without taking ownership or releasing it; the caller retains ownership. Only a late setup-context onDispose attempts release before rejecting.',
+            '安装期间接管资源并在卸载时逆序释放。普通内核窗口外以 `RESOURCE_OUTSIDE_INSTALL` 拒绝，既不接管也不释放，资源仍归调用者；只有迟到的准备上下文登记会先尝试释放再拒绝。'
           ),
           params: {
             resource: t('Cleanup function or disposable object.', '清理函数或可释放对象。')
@@ -1755,19 +1722,24 @@ console.log(paint('info', 'ready'))`
         '传给插件 `dispose` 的上下文，描述释放的时间预算。'
       ),
       members: {
-        signal: { summary: t('Aborts when the step budget ends.', '清理步骤预算耗尽时中止。') },
+        signal: {
+          summary: t(
+            'Registration lifecycle signal, aborted at logical revocation before disposal; it is not a per-step timeout signal.',
+            '注册生命周期信号，在清理前逻辑撤销时即中止，并非单个步骤的超时信号。'
+          )
+        },
         deadlineAt: {
           summary: t(
-            'When the step budget ends, or `undefined`.',
-            '步骤预算结束的时间；不限时为 `undefined`。'
+            'Absolute cleanup deadline when present; this context value is not the separate per-step disposal budget.',
+            '存在时表示清理绝对截止时刻，不等同于独立的单个释放步骤预算。'
           )
         }
       }
     },
     IPluginFeatureCore: {
       summary: t(
-        'Core seen by Feature factories of a consumer: outputs of its Features and its own `featureExpose`.',
-        '消费者的 Feature 工厂看到的 core：其 Feature 的输出以及自身的 `featureExpose`。'
+        'Plugin-hook core for reading declared Feature outputs and featureExpose. It is not the Feature factory first argument: factories receive only IFeatureCore.featureExpose and receive dependency outputs as their second argument.',
+        '插件钩子读取已声明功能输出及自身暴露值的内核；它不是功能工厂的第一参数。工厂只收到 `IFeatureCore.featureExpose`，依赖输出来自第二参数。'
       ),
       members: {
         features: {
@@ -2460,8 +2432,8 @@ await port.commitPreparedUnUseBatch(removal, {})`
       members: {
         revision: {
           summary: t(
-            'Current committed host revision; commits made from an older revision are refused.',
-            '当前已提交的宿主修订号；基于旧修订号的提交会被拒绝。'
+            'Current Host revision, including configuration, enablement, stage and terminal commits as well as install/remove/replace. Preparation based on an older revision cannot commit.',
+            '当前宿主修订号，除安装、卸载、替换外也含配置、启停、步骤及终态提交；旧修订准备不能提交。'
           )
         },
         getCurrentSnapshot: {
@@ -2546,8 +2518,8 @@ await port.commitPreparedUnUseBatch(removal, {})`
         },
         commitPreparedUnUseBatch: {
           summary: t(
-            'Withdraws the registrations, waits for the `beforeCleanup` fence and running pipelines, then cleans up.',
-            '先撤下这些注册，等待 `beforeCleanup` 屏障和正在运行的 pipeline，再执行清理。'
+            'Rechecks exact registration identity before committing revocation, then waits for beforeCleanup and pipeline draining before cleanup. A registration replaced or removed after preparation rejects PLUGIN_NOT_INSTALLED without cleaning that stale generation twice.',
+            '提交撤销前复核精确注册身份，再等待清理屏障及管线后释放；准备后已替换或卸载的旧代以 `PLUGIN_NOT_INSTALLED` 拒绝，不重复清理旧代。'
           ),
           params: {
             prepared: t('Batch from `prepareUnUseBatch()`.', '`prepareUnUseBatch()` 返回的批次。'),
@@ -2668,10 +2640,6 @@ await view.extensions.query('migaia')`,
       'Opaque, unforgeable token of one registration.',
       '某次注册的不透明、不可伪造的凭证。'
     ),
-    IPluginRegistrationReceipt: alias(
-      'Deprecated alias of `IRegistrationToken`.',
-      '`IRegistrationToken` 的已弃用别名，保留以兼容旧代码。'
-    ),
     IPluginAdmission: alias(
       'Opaque admission snapshot of a plugin definition.',
       '插件定义的不透明准入快照。'
@@ -2706,8 +2674,8 @@ await view.extensions.query('migaia')`,
       '由 `defineFeature()` 创建的 Feature 定义，放进插件的 `features` 中使用。'
     ),
     IFeatureDependency: alias(
-      'One Feature dependency: a reference to a provider Feature.',
-      '单个 Feature 依赖，即指向 provider Feature 的引用。'
+      'One Feature dependency: either a reference to another plugin provider or a local IFeature definition from the same plugin. The factory receives its resolved output in the dependencies argument.',
+      '单个功能依赖，可为其它插件提供者的引用，也可为同一插件内的 `IFeature` 定义；工厂从依赖参数取得解析后的输出。'
     ),
     IFeatureDependencyRecord: alias(
       'Record of named Feature dependencies.',
@@ -2735,8 +2703,8 @@ await view.extensions.query('migaia')`,
       '类型工具：单个 Feature 要求 `featureExpose` 提供的内容。'
     ),
     IPluginAwaitable: alias(
-      'A value or a Promise of it, returned by hooks.',
-      '钩子的返回类型：值本身或它的 Promise。'
+      'Hook result accepting a direct value or any valid PromiseLike, including native Promise. Lifecycle observation assimilates a valid thenable once rather than invoking its then method repeatedly.',
+      '钩子结果接受直接值或任意合法 `PromiseLike`，包含原生承诺；生命周期观察只同化一次合法异步值，不会反复调用其异步方法。'
     ),
     IPluginConfig: alias(
       'Plain-data configuration record of a plugin.',
@@ -2746,7 +2714,10 @@ await view.extensions.query('migaia')`,
       'Type helper that checks a plugin tuple against a host.',
       '检查插件元组能否安装到某宿主的类型工具。'
     ),
-    IPluginDisposer: alias('A cleanup function or disposable object.', '清理函数或可释放对象。'),
+    IPluginDisposer: alias(
+      'A cleanup function returning void or PromiseLike<void>; disposable objects belong to IPluginResource instead.',
+      '返回空值或异步空值的清理函数；可释放对象属于 `IPluginResource`，不属于此函数别名。'
+    ),
     IPluginFeatureName: alias(
       'Names of the Features a plugin declares.',
       '某个插件所声明的 Feature 名称集合。'
@@ -2912,8 +2883,8 @@ await view.extensions.query('migaia')`,
           '`EXTENSION_OBJECT_PROTOTYPE`：扩展的键与 `Object.prototype` 成员冲突（如 `toString`）。'
         ),
         extensionReserved: t(
-          '`EXTENSION_RESERVED`: an extension key is reserved (`then`, dispose symbols).',
-          '`EXTENSION_RESERVED`：扩展的键是保留名（`then`、释放用的 symbol）。'
+          'EXTENSION_RESERVED: a key belongs to the canonical Host protocol, including config/use/dispose, then or disposal symbols. This check precedes duplicate detection; other occupied extension keys use EXTENSION_DUPLICATE. Install failures retain the validation error on cause.',
+          '`EXTENSION_RESERVED`：键属于规范宿主协议，包括 `config/use/dispose`、`then` 及释放符号；保留检查优先于重复检查，其它已占扩展键才用重复错误，安装包装仍以原因保留校验错。'
         ),
         prerequisiteDisabled: t(
           '`PREREQUISITE_DISABLED`: a required provider is disabled; enable it and retry.',
@@ -2996,8 +2967,12 @@ await view.extensions.query('migaia')`,
           '`INSTALL_RESULT_THENABLE`：`install` 返回值带有 `then` 键，会被误当作 Promise。'
         ),
         pipelineDrainTimeout: t(
-          '`PIPELINE_DRAIN_TIMEOUT`: running pipelines did not finish within the drain budget.',
-          '`PIPELINE_DRAIN_TIMEOUT`：正在运行的 pipeline 未在排空预算内结束。'
+          'PIPELINE_DRAIN_TIMEOUT: pipelines did not drain in budget. Ordinary unUse continues bounded cleanup, reports through diagnostic, and returns ok:false with the error in errors; it does not acquire the Host disposal physicalCompletion protocol.',
+          '`PIPELINE_DRAIN_TIMEOUT`：管线未在预算内排空；普通卸载仍继续有界清理，经诊断报告并返回含错误的失败结果，不提供宿主释放的物理完成协议。'
+        ),
+        callbackFailed: t(
+          'CALLBACK_FAILED: an unclassified configuration recipe/update, functional disposal middleware, or domain-surface option/descriptor read failed. Writable native errors keep identity and stack; immutable or non-Error values remain on cause, and complete foreign identities are preserved.',
+          '`CALLBACK_FAILED`：配置变更、函数宿主释放中间件或领域表面选项及描述符读取发生未分类失败；可写原生对象保持身份及堆栈，不可修改或非错误值保留在原因上，完整外包身份不改写。'
         ),
         cleanupIncomplete: t(
           '`CLEANUP_INCOMPLETE`: disposal committed but cleanup failed or is still running.',
@@ -3035,8 +3010,8 @@ await view.extensions.query('migaia')`,
           '`closing`：已开始释放，新的变更会被拒绝。'
         ),
         disposed: t(
-          '`disposed`: terminal; every access fails.',
-          '`disposed`：终态，所有访问都会失败。'
+          'disposed is terminal for work admission and protected capabilities. Identity, revision, plugin.disabled() and the composition revision remain readable for diagnostics.',
+          '`disposed` 为工作准入及受保护能力的终态；身份、修订号、已禁用名称列表及组合修订号仍可读取以供诊断。'
         )
       }
     }
