@@ -782,8 +782,8 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
         )
       ],
       summary: t(
-        'The store methods required by register. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible store; create it with scope.runtime so the request scope can collect and release it.',
-        'register 所需的存储方法。[Store Light 的 createStore](/zh/docs/store-light/api/createStore) 返回兼容的存储；创建时传入 scope.runtime，请求作用域才能收集并释放它。'
+        'A request scope groups the stores used by one server request. This type lists the methods it needs to save state, restore it, and release a store. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible object. Create the store with runtime: scope.runtime, sharing the scope’s execution context, then pass it to scope.register. The scope can then collect its state for a request snapshot and owns cleanup by default. Without registration, the scope does not collect or clean up that store. Using a different runtime makes registration throw CROSS_RUNTIME.',
+        '请求作用域集中管理一次服务端请求使用的存储。这个类型规定保存状态、恢复状态和释放存储时需要的方法。[Store Light 的 createStore](/zh/docs/store-light/api/createStore) 会返回符合要求的对象。创建存储时设置 runtime: scope.runtime，与作用域共用负责执行数据更新的运行时对象，再传给 scope.register。注册后，作用域可以收集这份存储的状态来生成请求快照，并默认负责清理。未注册时，作用域不会收集或清理它；若使用了不同的运行时，注册会抛出 CROSS_RUNTIME。'
       ),
       example: scopeExample,
       members: {
@@ -845,8 +845,8 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
         )
       ],
       summary: t(
-        'The resource methods required by registerResource. [Resource](/en/docs/resource/api/Resource) supplies the cache and cleanup behavior; create it with scope.runtime so the request scope can own its cleanup.',
-        'registerResource 所需的资源方法。[Resource](/zh/docs/resource/api/Resource) 提供缓存及清理行为；创建时传入 scope.runtime，请求作用域才能负责清理。'
+        'The methods needed to manage loaded data within one server request: wait for loading, save or restore cached data, and release the resource. [Resource](/en/docs/resource/api/Resource) provides these methods. Construct it with scope.runtime, the request scope’s execution context, and pass it to scope.registerResource. The scope can then wait for it, ask it for cached data, and clean it up by default. Without registration, the scope does not manage it. A resource using a different runtime makes registration throw CROSS_RUNTIME. Resource itself defines whether cached data is available to save.',
+        '规定在一次服务端请求内管理加载数据所需的方法，包括等待加载、保存或恢复缓存，以及释放资源。[Resource](/zh/docs/resource/api/Resource) 提供这些方法。创建时传入 scope.runtime，也就是请求作用域用来执行和管理数据更新的运行时对象，再传给 scope.registerResource。作用域随后可以等待它、向它收集缓存，并默认负责清理。未注册的资源不会由作用域管理；若使用不同的运行时，注册会抛出 CROSS_RUNTIME。是否有可保存的缓存，由 Resource 自身决定。'
       ),
       example: resourceExample,
       members: {

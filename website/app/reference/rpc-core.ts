@@ -1918,8 +1918,8 @@ types.IRpcFeatureDefinition = typeDoc(
 for (const [name, en, zh] of [
   [
     'IRpcFeature',
-    'A feature token created by [Plugin Host](/en/docs/plugin-host/api/defineFeature). Pass the original token when declaring dependencies so installation can find the matching feature output.',
-    '由 [Plugin Host](/zh/docs/plugin-host/api/defineFeature) 创建的功能令牌。声明依赖时传入原令牌，安装过程才能找到对应功能的输出。'
+    'The definition object for a reusable RPC feature. RPC defineFeature creates it through [Plugin Host](/en/docs/plugin-host/api/defineFeature), which manages feature installation. Pass this original object when selecting a feature or declaring a dependency. Installation uses that object to find the methods or values returned by the feature; a copied object does not preserve that identity.',
+    '表示一项可复用 RPC 功能的定义对象。RPC 的 defineFeature 通过 [Plugin Host](/zh/docs/plugin-host/api/defineFeature) 创建它，由 Plugin Host 管理功能安装。选择功能或声明依赖时，传入最初返回的对象。安装过程用这个对象找到功能返回的方法或数据；复制对象的属性不能保留这种对应关系。'
   ],
   [
     'IRpcFeatureSurface',
@@ -1933,8 +1933,8 @@ for (const [name, en, zh] of [
   ],
   [
     'IRpcNativeMiddleware',
-    'A plugin definition created by [Plugin Host](/en/docs/plugin-host/api/definePlugin). Endpoint composition keeps its identity, dependency types, and published methods when installing it.',
-    '由 [Plugin Host](/zh/docs/plugin-host/api/definePlugin) 创建的插件定义。端点安装它时保留原插件身份、依赖类型和公开方法。'
+    'An RPC middleware definition, represented by a [Plugin Host](/en/docs/plugin-host/api/definePlugin) plugin definition. Create it with defineMiddleware and include it in the endpoint’s middlewares list. The endpoint installs the original definition, resolves its declared feature dependencies, and makes its published methods available. The type retains those dependency and method types for callers.',
+    '表示 RPC 中间件的插件定义，底层采用 [Plugin Host](/zh/docs/plugin-host/api/definePlugin) 的插件定义。用 defineMiddleware 创建后，将它放入端点的 middlewares 列表。端点安装原定义，找到它声明依赖的功能，并提供它公开的方法。这个类型同时保留依赖和方法的类型信息，供调用方检查用法。'
   ]
 ] as const)
   types[name] = typeDoc(en, zh, {}, featureExample)

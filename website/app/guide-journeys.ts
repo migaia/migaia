@@ -11760,7 +11760,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[ReduxDevToolsCommand](/zh/docs/store-middleware/api/ReduxDevToolsCommand)',
-                    '由 [Store Middleware](/zh/docs/store-middleware) 提供六个扩展命令名称。应用仍需把选中的历史编号交给诊断会话；用法见[命令连接](/zh/docs/store-devtools/command-bridge-boundary)。'
+                    '[Store Middleware](/zh/docs/store-middleware) 提供这六个 Redux DevTools 扩展命令名称。名称本身不会恢复状态；应用需要把用户选中的本地历史编号传给 `tools.jumpTo(id)`，才能恢复对应记录。用法见[命令连接](/zh/docs/store-devtools/command-bridge-boundary)。'
                   ]
                 ]
               }
@@ -11890,7 +11890,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[ReduxDevToolsCommand](/en/docs/store-middleware/api/ReduxDevToolsCommand)',
-                    '[Store Middleware](/en/docs/store-middleware) owns these six extension command names. Map the selected history entry to a diagnostic session method; see [command wiring](/en/docs/store-devtools/command-bridge-boundary).'
+                    'These six Redux DevTools extension command names come from [Store Middleware](/en/docs/store-middleware). A command name does not restore state on its own. Pass the selected local history ID to `tools.jumpTo(id)` to restore that entry; see [command wiring](/en/docs/store-devtools/command-bridge-boundary).'
                   ]
                 ]
               }
@@ -13568,7 +13568,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '命令名称由 [Store Middleware](/zh/docs/store-middleware/api/ReduxDevToolsCommand) 提供，需要从该包导入。本例只创建本地命令，把选中的历史编号交给 `jumpTo`，然后恢复那份状态。'
+                text: '假设本地调试面板选中了一份旧记录，需要把计数恢复到修改之前。下面从 [Store Middleware](/zh/docs/store-middleware/api/ReduxDevToolsCommand) 导入命令名称，先记录 `count: 0`，再把计数改成 `3`。应用收到自己创建的命令后，把记录编号传给 `tools.jumpTo`；最后输出的计数回到 `0`。本例无需连接浏览器扩展。'
               },
               {
                 type: 'paragraph',
@@ -13627,7 +13627,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '本包只记录和恢复本地状态，不导出这些命令常量。外部面板的消息解析、连接和编号转换由应用或 [Store Middleware 的扩展适配器](/zh/docs/store-middleware/api/createReduxDevToolsAdapter) 处理。'
+                text: 'Store Devtools 负责记录和恢复本地状态；命令常量需从 Store Middleware 导入。接入浏览器扩展时，还需要连接扩展、读取消息，并把扩展选中的记录对应到应用里的状态。应用可以自己完成这些步骤，也可以使用 [Store Middleware 的扩展适配器](/zh/docs/store-middleware/api/createReduxDevToolsAdapter)。只有命令名称、没有消息处理代码时，状态不会自动改变。'
               }
             ]
           }
@@ -13655,7 +13655,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Import the command names from [Store Middleware](/en/docs/store-middleware/api/ReduxDevToolsCommand), which owns the extension protocol. This example creates a local command and passes its selected history entry to `jumpTo`, restoring that state.'
+                text: 'Suppose a local debugging panel selects an earlier record to undo a counter edit. The example imports command names from [Store Middleware](/en/docs/store-middleware/api/ReduxDevToolsCommand), records `count: 0`, then changes the count to `3`. Application code handles its local command by passing the saved ID to `tools.jumpTo`. The final count is `0`; no browser extension connection is needed for this example.'
               },
               {
                 type: 'paragraph',
@@ -13717,7 +13717,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'This package records and restores local state; it does not export these command constants. Handle external message formats, connections, and entry IDs in your application or use the [Store Middleware extension adapter](/en/docs/store-middleware/api/createReduxDevToolsAdapter).'
+                text: 'Store Devtools records and restores local state. Import the command constants from Store Middleware. To connect a browser extension, application code must also open the connection, read messages, and match the selected extension record to application state. You can write that integration or use the [Store Middleware extension adapter](/en/docs/store-middleware/api/createReduxDevToolsAdapter). Importing command names alone does not change state.'
               }
             ]
           }
@@ -48519,7 +48519,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[assertStorageBackendId](/zh/docs/storage-web/api/host/assertStorageBackendId)',
-                    '检查后端 ID；非法值抛出带 `BACKEND_ID_INVALID` 的 `TypeError`。'
+                    '编写自定义存储插件时，用它检查后端 ID，也就是插件所选的存储标识。有效值必须以 ASCII 英文字母开头，后续只能用字母、数字、点、下划线或连字符，总长为 1 至 64 个字符。通过检查时不返回数据；无效值抛出 `TypeError`，错误码为 `BACKEND_ID_INVALID`。检查本身不会安装插件。'
                   ],
                   [
                     '[prepareIndexedDbStore](/zh/docs/storage-web/api/plugins/indexed-db/prepareIndexedDbStore)',
@@ -48653,7 +48653,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[assertStorageBackendId](/en/docs/storage-web/api/host/assertStorageBackendId)',
-                    'Validate a backend ID; invalid values throw a `TypeError` with `BACKEND_ID_INVALID`.'
+                    'Use this when writing a storage plugin to validate its backend ID, the identifier chosen for that storage implementation. It must start with an ASCII letter, contain only letters, digits, dots, underscores, or hyphens, and have 1 to 64 characters. Valid input returns no value. Invalid input throws `TypeError` with code `BACKEND_ID_INVALID`; validation does not install the plugin.'
                   ],
                   [
                     '[prepareIndexedDbStore](/en/docs/storage-web/api/plugins/indexed-db/prepareIndexedDbStore)',
@@ -50989,7 +50989,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '为自定义插件选择 ID 后，可先调用 `assertStorageBackendId` 检查拼写。Host 在安装时也会检查 ID；若安装失败，`BACKEND_INSTALL_FAILED` 错误的 `cause` 会保留原始配置或插件错误。详细处理见[关闭与排错](/zh/docs/storage-web/cancellation-errors-and-shutdown)。'
+                text: '自定义后端 ID 是区分存储实现的标识，且区分大小写。选好 ID 后，可用 `assertStorageBackendId` 检查格式。它只检查传入的值，不会创建或安装插件；省略调用时，也不会得到这次独立检查。之后如果安装返回的 Promise 以 `BACKEND_INSTALL_FAILED` 拒绝，可从错误的 `cause` 读取最初的配置或插件失败。处理方式见[关闭与排错](/zh/docs/storage-web/cancellation-errors-and-shutdown)。'
               }
             ]
           }
@@ -51247,7 +51247,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Call `assertStorageBackendId` after choosing an ID for a custom plugin to check its spelling before installation. The Host also checks IDs when installing. An installation failure uses `BACKEND_INSTALL_FAILED` and keeps the original configuration or plugin error in `cause`; see [shutdown and troubleshooting](/en/docs/storage-web/cancellation-errors-and-shutdown).'
+                text: 'A backend ID distinguishes a storage implementation and is case-sensitive. After choosing an ID for a custom plugin, call `assertStorageBackendId` to check its format. This helper only checks the supplied value; it does not create or install a plugin. Omit the call if you do not need this separate check. If a later installation Promise rejects with `BACKEND_INSTALL_FAILED`, inspect its `cause` for the original configuration or plugin failure. See [shutdown and troubleshooting](/en/docs/storage-web/cancellation-errors-and-shutdown) for handling details.'
               }
             ]
           }
@@ -70736,7 +70736,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`normalizeCodecFailure()`',
-                    '为自定义格式保留已有错误码，或把外部失败放进新错误的 `cause`。',
+                    '编写自定义编码格式、需要统一处理转换失败时使用。传入值若是 `Error` 对象，且已带有本库来源和字符串错误码，就返回同一个错误对象。其他失败会被放进新 `TypeError` 的 `cause`，新错误使用调用时传入的错误码和消息。这样调用方既能判断错误类别，也能找到原始失败。',
                     '[normalizeCodecFailure](/zh/docs/serialize/api/codec/normalizeCodecFailure)'
                   ],
                   [
@@ -70898,7 +70898,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`normalizeCodecFailure()`',
-                    'Retains an existing codec error or keeps a foreign failure as the cause of a new error.',
+                    'Use this in a custom format implementation to give conversion failures a consistent error shape. An Error already carrying this library’s source and a string code is returned unchanged. Other failures become the `cause` of a new `TypeError` with the code and message you supply. Callers can then classify the failure while retaining access to its original cause.',
                     '[normalizeCodecFailure](/en/docs/serialize/api/codec/normalizeCodecFailure)'
                   ],
                   [
@@ -73510,7 +73510,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`identityCodec`',
-                    "从 `@migaia/serialize/codecs/identity/v1` 导入。它固定为 `version: 1`、`id: 'identity'`。"
+                    "从 `@migaia/serialize/codecs/identity/v1` 导入 `identityCodec`。当调用双方可以直接传递同一个值、不需要转换成文本或字节时，使用这个编解码器。`encode` 和 `decode` 都原样返回输入，不复制或检查内容。`id: 'identity'` 表示这种原值传递格式，`version: 1` 表示它的格式版本。"
                   ],
                   [
                     '`identityCodec.encode<T>(value)` / `decode<T>(value)`',
@@ -73753,7 +73753,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`identityCodec`',
-                    "Import it from `@migaia/serialize/codecs/identity/v1`. Its fixed fields are `version: 1` and `id: 'identity'`."
+                    "Import `identityCodec` from `@migaia/serialize/codecs/identity/v1`. Use it when both sides can pass a value directly without converting it to text or bytes. Both `encode` and `decode` return the original input without copying or validating it. The fixed `id: 'identity'` identifies this pass-through format, and `version: 1` identifies its format version."
                   ],
                   [
                     '`identityCodec.encode<T>(value)` / `decode<T>(value)`',
@@ -95682,7 +95682,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '[TrayInstanceEvent](/zh/docs/tray/api/TrayInstanceEvent) 列出六个事件名称；[TrayInstanceState](/zh/docs/tray/api/TrayInstanceState) 列出五个当前状态。状态和事件分别用于 list 筛选与观察。'
+                text: '[TrayInstanceState](/zh/docs/tray/api/TrayInstanceState) 提供五个实例状态名称，用来表示实例现在处于什么阶段，例如正在启动或已经就绪。调用 `list({ state })` 时用这些名称筛选实例。[TrayInstanceEvent](/zh/docs/tray/api/TrayInstanceEvent) 提供六个事件名称，表示实例发生了什么变化，例如创建或移除。把事件名称传给 `on(event, listener)`，就能在对应变化发生时收到通知。常量本身不会开始监听。'
               },
               {
                 type: 'table',
@@ -95894,7 +95894,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '[TrayInstanceEvent](/en/docs/tray/api/TrayInstanceEvent) lists six event names, while [TrayInstanceState](/en/docs/tray/api/TrayInstanceState) lists five current states. Use states for list filters and events for observation.'
+                text: '[TrayInstanceState](/en/docs/tray/api/TrayInstanceState) supplies five names for an instance’s current condition, such as starting or ready. Pass a state to `list({ state })` to select matching instances. [TrayInstanceEvent](/en/docs/tray/api/TrayInstanceEvent) supplies six names for changes, such as an instance being created or removed. Pass an event name to `on(event, listener)` to receive notifications for that change. The constants alone do not start a subscription.'
               },
               {
                 type: 'table',

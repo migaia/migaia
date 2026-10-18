@@ -996,8 +996,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
     },
     IStoreMiddlewareHost: {
       summary: t(
-        'A frozen store event handle composed with [Plugin Host](/en/docs/plugin-host). Its [IHostHandle](/en/docs/plugin-host/api/IHostHandle) methods install and remove plugins, change configuration, and dispose the host alongside the store event methods. Pipelines always run synchronously.',
-        '与 [Plugin Host](/zh/docs/plugin-host) 组合后得到的冻结存储事件句柄。[IHostHandle](/zh/docs/plugin-host/api/IHostHandle) 方法负责安装和移除插件、更改配置及关闭宿主，与存储事件方法共存。流水线始终同步执行。'
+        'The object returned by createStoreMiddlewareHost for sending store events and managing their plugins. It combines store event methods with [Plugin Host’s IHostHandle](/en/docs/plugin-host/api/IHostHandle) methods for installing and removing plugins, changing configuration, and closing the host. The returned object is frozen, so you cannot add or replace its properties. Its event pipeline, the sequence of steps that handles each event, always runs synchronously.',
+        'createStoreMiddlewareHost 返回的对象，用于发送状态变化事件并管理处理这些事件的插件。它既有存储事件方法，也有 [Plugin Host 的 IHostHandle](/zh/docs/plugin-host/api/IHostHandle) 方法，可安装和移除插件、更改配置及关闭宿主。返回对象本身被冻结，不能再增加或替换属性。处理事件的一系列步骤称为事件流水线，在这里始终同步执行。'
       ),
       scenarios: [
         t(

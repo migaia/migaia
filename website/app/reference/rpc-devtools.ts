@@ -1032,8 +1032,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
     },
     IRpcWireError: {
       summary: t(
-        'An alias of [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError). RPC Contract defines how source, code, stack, causes, and grouped errors cross a connection; Devtools uses that same representation.',
-        '[IRpcSerializedError](/zh/docs/rpc-contract/api/errors/IRpcSerializedError) 的别名。RPC Contract 定义来源、错误码、堆栈、原因和多个错误如何跨连接传递；调试工具复用这份表示。'
+        'The error data stored in a Devtools event when an error must cross a connection. It is another name for [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError), defined by RPC Contract. That format carries source and code for classification, stack for the original call trace, and references to causes or grouped errors. Devtools uses this shared format so error details can be read without inventing a second representation.',
+        '错误需要通过连接传递时，调试事件用这个类型保存错误数据。它是 RPC Contract 定义的 [IRpcSerializedError](/zh/docs/rpc-contract/api/errors/IRpcSerializedError) 的另一个名称。其中 source 和 code 用于区分错误来源及类别，stack 保存原始调用堆栈，其他引用记录原因或一组相关错误。调试工具直接使用这份共同格式，读取事件时无需再转换成另一套错误表示。'
       ),
       example: recordExample,
       members: {}
