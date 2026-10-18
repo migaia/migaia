@@ -2367,7 +2367,7 @@
           "declarationLine": 112,
           "source": "packages/capability/dist/index.d.ts",
           "purpose": "Creates an isolated capability gate around an application context. Register lazy activation factories, grant flags explicitly and let the host own activated handles and cleanup.",
-          "core": "context: Application tenant or service context passed unchanged to activation callbacks.\nCaller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.\nflags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nOmitted: no external reporter; failures remain readable through host.error(name).",
+          "core": "context: Application tenant or service context passed unchanged to activation callbacks.\nCaller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.\nflags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nundefined (no error callback configured); failures remain readable through host.error(name).",
           "advanced": "",
           "parameters": ["context: Context", "options: ICapabilityHostOptions (optional)"],
           "parameterDetails": [
@@ -2441,7 +2441,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "context: Application tenant or service context passed unchanged to activation callbacks.\nCaller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.\nflags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nOmitted: no external reporter; failures remain readable through host.error(name)."
+              "content": "context: Application tenant or service context passed unchanged to activation callbacks.\nCaller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.\nflags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nundefined (no error callback configured); failures remain readable through host.error(name)."
             },
             {
               "id": "advanced-usage",
@@ -4495,7 +4495,7 @@
           "declarationLine": 53,
           "source": "packages/capability/dist/index.d.ts",
           "purpose": "Initial permissions and contained diagnostic reporting for one host.",
-          "core": "flags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nOmitted: no external reporter; failures remain readable through host.error(name).",
+          "core": "flags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nundefined (no error callback configured); failures remain readable through host.error(name).",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -4560,7 +4560,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "flags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nOmitted: no external reporter; failures remain readable through host.error(name)."
+              "content": "flags: Copied complete name-to-boolean mapping; only own data properties exactly true grant permission.\nOmitted: every capability is denied until explicitly enabled by a flag.\nonError: Receives (name, error) for activation or release failure; name comes from registration and error is original. No return is consumed; synchronous or async reporter failure reaches the shared utils host exception queue without changing business state.\nundefined (no error callback configured); failures remain readable through host.error(name)."
             },
             {
               "id": "advanced-usage",

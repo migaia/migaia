@@ -7657,8 +7657,8 @@
           "signature": "export declare const defineFeature: <const TDependencies extends IFeatureDependencyRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;",
           "declarationLine": 44,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
-          "purpose": "Defines a Feature for storage plugins, with optional dependencies on other Features.",
-          "core": "factory: `(core, dependencies) => output`.\ndependencies: Optional dependency references.\nA Feature for `definePlugin(name, factory, features)`.",
+          "purpose": "Defines an optional capability for a storage plugin. A Feature describes how to build that capability; a Plugin is a backend plugin that combines a store with its capabilities and is installed and removed by the Host. Defining the Feature creates no Host and opens no storage. Pass it in the third argument of definePlugin, then install that Plugin with createStorageHost({ plugins }) or host.use(). Each installation gets its own store and Feature output. The Feature output stays inside the plugin unless install returns methods that expose it to callers.",
+          "core": "factory: Synchronous function receiving core.featureExpose for this installed backend and the outputs of declared dependencies; return the capability object for this plugin.\ndependencies: Optional named references to other Features; omit this record when the factory uses only its backend store.\nA Feature for `definePlugin(name, factory, features)`.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -7681,7 +7681,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Defines a Feature for storage plugins, with optional dependencies on other Features."
+              "content": "Defines an optional capability for a storage plugin. A Feature describes how to build that capability; a Plugin is a backend plugin that combines a store with its capabilities and is installed and removed by the Host. Defining the Feature creates no Host and opens no storage. Pass it in the third argument of definePlugin, then install that Plugin with createStorageHost({ plugins }) or host.use(). Each installation gets its own store and Feature output. The Feature output stays inside the plugin unless install returns methods that expose it to callers."
             },
             {
               "id": "getting-started",
@@ -7701,7 +7701,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "factory: `(core, dependencies) => output`.\ndependencies: Optional dependency references.\nA Feature for `definePlugin(name, factory, features)`."
+              "content": "factory: Synchronous function receiving core.featureExpose for this installed backend and the outputs of declared dependencies; return the capability object for this plugin.\ndependencies: Optional named references to other Features; omit this record when the factory uses only its backend store.\nA Feature for `definePlugin(name, factory, features)`."
             },
             {
               "id": "advanced-usage",
