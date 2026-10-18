@@ -459,13 +459,20 @@ function DocsLibrary({
   const symbolName = selection.symbolPath
   /** Selected declarations keep sidebar and mobile menu links aligned with the active article. */
   const api = libraryApis.find((candidate) => candidate.module === moduleName)
-  /** Runtime symbols have independent references; type definitions stay on their owner page. */
+  /** Runtime symbols use their API article; type routes use their own declaration article. */
   const selectedSymbol = api?.symbols.find(
     (symbol) =>
       symbolSlug(symbol, api.symbols) === symbolName &&
       symbol.kind !== 'type' &&
       symbol.kind !== 'interface'
   )
+  /** A semantic type route owns its header and outline independently of its module. */
+  const selectedTypeSymbol =
+    !selectedSymbol && selectedTypeFragment
+      ? api?.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)
+      : undefined
+  /** Runtime and type articles share the same public kind badge and module location. */
+  const selectedPageSymbol = selectedSymbol ?? selectedTypeSymbol
   /** One stable category tree supplies both the desktop sidebar and the existing mobile menu. */
   const pageNavigation = useMemo(
     () => (
@@ -477,9 +484,7 @@ function DocsLibrary({
         libraryApis={libraryApis}
         librarySlug={library.slug}
         locale={locale}
-        selectedSymbol={
-          selectedSymbol ?? api?.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)
-        }
+        selectedSymbol={selectedPageSymbol}
       />
     ),
     [
@@ -490,8 +495,7 @@ function DocsLibrary({
       library.slug,
       libraryApis,
       locale,
-      selectedSymbol,
-      selectedTypeFragment
+      selectedPageSymbol
     ]
   )
   usePageNavigation(pageNavigation)
@@ -535,14 +539,21 @@ function DocsLibrary({
       </main>
     )
   const selectedGuide = selectedSymbol ? guide : undefined
+  /** The type's maintained summary first; its declaration purpose when no reference exists. */
+  const typeLede = selectedTypeSymbol
+    ? (instanceGuideFor(reference, api!.module, selectedTypeSymbol.name)?.summary ??
+      localizedSymbolPurpose(locale, selectedTypeSymbol))
+    : undefined
   /** Public label keeps repository entry filenames out of reader-facing copy. */
   const visibleModuleName = readerFacingModuleName(locale, moduleName)
   /** Exact section inventory shared by the desktop and mobile tables of contents. */
   const onPageSections = selectedSymbol
     ? referenceSections(selectedSymbol, api!, libraryApis, reference, selectedGuide)
-    : api
-      ? moduleReferenceSections(library.documentation, api, reference)
-      : []
+    : selectedTypeSymbol
+      ? typeReferenceSections(selectedTypeSymbol, api!, libraryApis, reference)
+      : api
+        ? moduleReferenceSections(library.documentation, api, reference)
+        : []
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
       <div className="reading-layout">
@@ -551,12 +562,14 @@ function DocsLibrary({
             locale={locale}
             domain="docs"
             library={library.slug}
-            moduleName={selectedSymbol?.name ?? (moduleName === 'index' ? undefined : moduleName)}
+            moduleName={
+              selectedPageSymbol?.name ?? (moduleName === 'index' ? undefined : moduleName)
+            }
           />
-          {selectedSymbol ? (
+          {selectedPageSymbol ? (
             <p className="eyebrow api-eyebrow">
-              <span className="kind-badge" data-kind={selectedSymbol.kind}>
-                {apiKindLabel(locale, selectedSymbol.kind)}
+              <span className="kind-badge" data-kind={selectedPageSymbol.kind}>
+                {apiKindLabel(locale, selectedPageSymbol.kind)}
               </span>
               <span>
                 {library.slug}
@@ -568,16 +581,24 @@ function DocsLibrary({
               {locale === 'zh' ? '模块' : 'Module'} · {library.slug}
             </p>
           )}
-          <h1 className={selectedSymbol ? 'api-title' : undefined}>
-            {selectedSymbol?.name ??
-              api?.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)?.name ??
+          <h1 className={selectedPageSymbol ? 'api-title' : undefined}>
+            {selectedPageSymbol?.name ??
               (moduleName === 'index'
                 ? locale === 'zh'
                   ? `${library.slug} 参考`
                   : `${library.slug} reference`
                 : visibleModuleName)}
           </h1>
-          {!selectedSymbol ? (
+          {selectedTypeSymbol ? (
+            typeLede ? (
+              <ReferenceParagraphs
+                className="lede"
+                library={library.slug}
+                locale={locale}
+                text={typeLede}
+              />
+            ) : null
+          ) : !selectedSymbol ? (
             <p className="lede">
               {openingSentence(libraryReferenceDescription(locale, library.slug))}
             </p>
@@ -618,7 +639,7 @@ function DocsLibrary({
         {api ? (
           <details className="page-toc">
             <summary>{copy.onPage}</summary>
-            <RightRail locale={locale} sections={onPageSections} symbol={selectedSymbol} />
+            <RightRail locale={locale} sections={onPageSections} symbol={selectedPageSymbol} />
           </details>
         ) : null}
       </div>
@@ -1150,13 +1171,38 @@ function RightRail({
                   ? symbol?.guidance.find((candidate) => `guide-${candidate.id}` === section)
                       ?.heading
                   : symbol
-                    ? referenceSectionLabel(locale, section)
+                    ? referenceSectionLabel(
+                        locale,
+                        section,
+                        symbol.kind === 'type' || symbol.kind === 'interface'
+                      )
                     : moduleReferenceSectionLabel(locale, section)}
           </a>
         )
       })}
     </aside>
   )
+}
+
+/** Mirrors only the selected type's usage, declaration and extracted public members. */
+function typeReferenceSections(
+  symbol: IApiSymbol,
+  api: IApi,
+  libraryApis: readonly IApi[],
+  reference?: ILocalizedReference
+): readonly string[] {
+  /** Only this type's maintained usage belongs above its signature. */
+  const guide = instanceGuideFor(reference, api.module, symbol.name)
+  /** Existing surface resolution supplies composed members without inventing type categories. */
+  const surface = instanceSurface(symbol, [
+    ...api.symbols,
+    ...libraryApis.flatMap((entry) => entry.symbols)
+  ])
+  return [
+    ...(guide && (guide.scenarios.length > 0 || guide.example) ? ['usage'] : []),
+    'signature',
+    ...(surface.members.length > 0 ? ['members'] : [])
+  ]
 }
 
 /** Mirrors the rendered package landing-page learning order in both table-of-contents rails. */
@@ -1274,7 +1320,7 @@ function ModuleOverview({
   readonly reference?: ILocalizedReference
   readonly selectedTypeFragment?: string
 }) {
-  /** A type route documents that type's instance surface before the module overview. */
+  /** A type route has its own reading order and never renders its module's overview or index. */
   const selectedType = selectedTypeFragment
     ? api.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)
     : undefined
@@ -1282,6 +1328,68 @@ function ModuleOverview({
   const surfaceSymbols = [...api.symbols, ...libraryApis.flatMap((entry) => entry.symbols)]
   /** Resolved members of the selected type, merged across the types it composes. */
   const selectedSurface = selectedType ? instanceSurface(selectedType, surfaceSymbols) : undefined
+  /** The selected type's own guide supplies usage; its full summary already appears in the lede. */
+  const selectedGuide = selectedType
+    ? instanceGuideFor(reference, api.module, selectedType.name)
+    : undefined
+  if (selectedType && selectedSurface)
+    return (
+      <>
+        {selectedGuide && (selectedGuide.scenarios.length > 0 || selectedGuide.example) ? (
+          <section className="section-block compact" id={`${selectedType.fragment}--usage`}>
+            <h2>{referenceSectionLabel(locale, 'usage', true)}</h2>
+            {selectedGuide.scenarios.length > 0 ? (
+              <ul>
+                {selectedGuide.scenarios.map((scenario) => (
+                  <li key={scenario}>
+                    <InlineText library={api.library} locale={locale} text={scenario} />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {selectedGuide.example ? (
+              <CodeBlock
+                code={selectedGuide.example}
+                label={
+                  locale === 'zh'
+                    ? `${selectedType.name} 用法示例`
+                    : `${selectedType.name} usage example`
+                }
+                locale={locale}
+              />
+            ) : null}
+          </section>
+        ) : null}
+        <section className="api-signature" id={`${selectedType.fragment}--signature`}>
+          <h2>{referenceSectionLabel(locale, 'signature', true)}</h2>
+          <details>
+            <summary>{selectedType.name}</summary>
+            <div className="type-declaration" id={selectedType.fragment}>
+              <CodeBlock
+                code={withoutDocComments(selectedType.signature)}
+                signature
+                label={selectedType.name}
+                locale={locale}
+              />
+            </div>
+          </details>
+        </section>
+        {selectedSurface.members.length > 0 ? (
+          <ClassMemberReference
+            api={api}
+            bases={selectedSurface.bases}
+            eyebrow={referenceSectionLabel(locale, 'members', true)}
+            heading={referenceSectionLabel(locale, 'members', true)}
+            libraryApis={libraryApis}
+            locale={locale}
+            memberDoc={memberDocResolver(reference, api.module, selectedSurface.owners)}
+            members={selectedSurface.members}
+            strict={Boolean(reference)}
+            symbol={selectedType}
+          />
+        ) : null}
+      </>
+    )
   const moduleSymbols = Array.from(
     new Map(api.symbols.map((symbol) => [symbol.fragment, symbol])).values()
   )
@@ -1325,19 +1433,6 @@ function ModuleOverview({
   const isWireErrorSchema = api.library === 'rpc-contract' && api.module === 'schema/wire-error'
   return (
     <>
-      {selectedType && selectedSurface ? (
-        <ClassMemberReference
-          api={api}
-          bases={selectedSurface.bases}
-          libraryApis={libraryApis}
-          locale={locale}
-          guide={surfaceGuideFor(reference, api.module, selectedType, surfaceSymbols)}
-          memberDoc={memberDocResolver(reference, api.module, selectedSurface.owners)}
-          members={selectedSurface.members}
-          strict={Boolean(reference)}
-          symbol={selectedType}
-        />
-      ) : null}
       {reference ? (
         reference.modules[api.module] ? (
           <section className="section-block compact module-reference" id="module-overview">
@@ -1752,6 +1847,7 @@ function InstalledCapabilities({
 function ClassMemberReference({
   api,
   bases = [],
+  eyebrow,
   heading,
   id,
   libraryApis,
@@ -1765,6 +1861,8 @@ function ClassMemberReference({
   readonly api: IApi
   /** Composed types whose members could not be resolved on this page; shown as links. */
   readonly bases?: readonly string[]
+  /** Type articles supply a member label; runtime articles retain the instance capability label. */
+  readonly eyebrow?: React.ReactNode
   /** Section heading; defaults to the generic instance API title. */
   readonly heading?: React.ReactNode
   /** Section anchor; defaults to `<fragment>--members`. */
@@ -1787,7 +1885,7 @@ function ClassMemberReference({
   const label = (en: string, zh: string) => (locale === 'zh' ? zh : en)
   return (
     <section className="section-block compact api-class-members" id={sectionId}>
-      <p className="eyebrow">{label('Instance capabilities', '实例能力')}</p>
+      <p className="eyebrow">{eyebrow ?? label('Instance capabilities', '实例能力')}</p>
       <h2>{heading ?? label('Instance API', '实例 API')}</h2>
       {guide ? (
         <div className="instance-guide">
@@ -4897,8 +4995,8 @@ function localizedSection(locale: ILocale, section: string): string {
   return localizedSections[section] ?? section
 }
 
-/** Names the intentionally small reference outline used by each runtime API page. */
-function referenceSectionLabel(locale: ILocale, section: string): string {
+/** Names runtime and type outlines without describing type members as instances. */
+function referenceSectionLabel(locale: ILocale, section: string, type = false): string {
   const labels: Readonly<Record<string, readonly [string, string]>> = {
     overview: ['Purpose', '作用'],
     'quick-start': ['Minimal example', '最小示例'],
@@ -4907,7 +5005,8 @@ function referenceSectionLabel(locale: ILocale, section: string): string {
     configuration: ['Configuration', '配置参考'],
     errors: ['Errors', '错误'],
     'related-apis': ['Related APIs', '相关 API'],
-    members: ['Instance API', '实例 API'],
+    members: type ? ['Members', '成员'] : ['Instance API', '实例 API'],
+    usage: ['Usage', '用法'],
     installed: ['After installation', '安装后能力'],
     contract: ['Parameters and result', '参数与返回'],
     scenarios: ['When to use', '适用场景'],
