@@ -372,8 +372,8 @@ export const storeWorkerReference: ILibraryReference = {
     },
     'serialize/worker': {
       summary: t(
-        'Serializer factories workerParser, workerPlugin and createSerializeWorkerHandler live only at @migaia/store-worker/serialize/worker. There is no literal wildcard or public transferables helper path. Encode uses bounded-credit frames, decode returns one result, and parser failures travel through the canonical RPC rejection chain. Portable conversion does not establish zero-copy performance.',
-        '工作线程序列化解析器、插件及处理器工厂仅位于具体序列化工作子路径，不存在可直接导入的星号入口或公开转移列表辅助路径；编码采用受额度限制的流帧，解码返回单一结果，解析失败经标准请求拒绝链传递，可移植转换不构成零拷贝性能保证。'
+        'Move encoding and decoding into a worker so the caller can use a serializer without running its work locally. Import this subpath for serializer integration; the package root provides general worker computation APIs.\n\nStart with `workerPlugin()` to register the worker-backed parser in a serialization registry, and `createSerializeWorkerHandler()` to connect an ordinary parser on the worker side. Encoding streams chunks with a limit on unconsumed chunks, while decoding returns one result; byte transfer settings do not promise end-to-end copying avoidance.',
+        '把编码和解码放到工作线程中执行，让调用方通过序列化接口使用它。此子路径负责序列化集成；根入口提供通用的工作线程计算接口。\n\n从 `workerPlugin()` 把工作线程解析器装入序列化注册表，再用 `createSerializeWorkerHandler()` 在工作线程端接入普通解析器。编码分块传回结果，并限制尚未消费的分块数量，解码返回一个结果；字节转移设置不保证整个传输过程都无需复制。'
       ),
       example: codecExample
     }

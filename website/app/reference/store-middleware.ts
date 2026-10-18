@@ -634,8 +634,8 @@ export const storeMiddlewareReference: ILibraryReference = {
     },
     'tolerant-clone': {
       summary: t(
-        'Explicit snapshot strategies: immutable copies independently or throws, opaque preserves identity, diagnostic copies where possible and may alias unsupported subtrees. Start from ClonePolicy on this narrow entry; clone functions are not root exports.',
-        '显式快照策略：不可变复制要求独立否则抛错，不透明保留身份，诊断尽力复制且可共享不支持子树，从此窄入口的策略集合开始；根入口不再导出复制函数。'
+        'Choose how independent a state snapshot must be when recording history or diagnostics. Import this subpath for `ClonePolicy` and the clone functions, which are not exported from the middleware root.\n\nStart with `ClonePolicy.immutable()` for an independent copy that throws when copying is unsupported. For diagnostic recording, `ClonePolicy.diagnostic()` copies what it can and may retain unsupported values by reference; `opaque` deliberately returns the original reference.',
+        '记录历史或诊断数据时，明确选择状态快照需要多大程度的独立性。此子路径提供 `ClonePolicy` 与复制函数，中间件根入口不导出这些工具。\n\n从 `ClonePolicy.immutable()` 开始，取得独立副本；遇到不支持复制的数据时会抛错。诊断记录可用 `ClonePolicy.diagnostic()` 尽量复制，但不支持的值可能仍与原值共享引用；`opaque` 则明确返回原引用。'
       ),
       example: cloneExample
     }

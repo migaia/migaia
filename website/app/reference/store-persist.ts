@@ -442,22 +442,22 @@ export const storePersistReference: ILibraryReference = {
     },
     light: {
       summary: t(
-        'Store-light adapter: persist connects $plain, $hydrate and $subscribe to the shared persistence engine.',
-        '轻量存储适配入口，将普通快照、水合与订阅连接到共享持久化引擎。'
+        'Save and restore a Store-light store without writing snapshot and subscription adapters yourself. Import this subpath for `persist()`; the root entry provides the generic persistence engine for custom state owners.\n\nPass the store, a storage backend and an archive key to `persist()`. It reads `$plain()` snapshots, restores saved fields with `$hydrate()`, and listens through `$subscribe()` so later changes can be saved.',
+        '保存并恢复轻量存储的状态，省去手工连接快照与订阅的工作。此子路径提供 `persist()`；根入口则提供适配自定义状态对象的通用持久化引擎。\n\n向 `persist()` 传入存储、保存数据的后端和存档键。它用 `$plain()` 取得快照，用 `$hydrate()` 恢复已保存字段，再通过 `$subscribe()` 监听后续变化并保存。'
       ),
       example: lightExample
     },
     indexed: {
       summary: t(
-        'Observable collection adapter: persistCollection observes snapshot changes and hydrates through whole-state replace.',
-        '响应式集合适配入口，观察快照变更，并通过整体替换恢复保存状态。'
+        'Save an observable object, array, map or set as one collection snapshot. Choose this subpath for `persistCollection()` rather than implementing the generic snapshot interface exported at the root.\n\nPass the collection, storage backend and archive key to `persistCollection()`. It observes changes by reading `snapshot()` inside a reactive effect and restores saved data through `replace()`, which replaces the complete collection state rather than patching individual entries.',
+        '把可观察的对象、数组、映射或集合作为一份完整快照保存。此子路径提供 `persistCollection()`，无需自行实现根入口通用引擎所需的快照接口。\n\n向 `persistCollection()` 传入集合、保存后端和存档键。它在响应式副作用中读取 `snapshot()` 来观察变化，恢复时调用 `replace()` 替换整个集合状态，而非逐条修补。'
       ),
       example: indexedExample
     },
     keyed: {
       summary: t(
-        'Keyed-state adapter: persistKeyed owns one writable definition archive, while clearFamily removes records by namespace.',
-        '键控状态适配入口，为单个可写定义持有存档，并可按命名空间批量移除记录。'
+        'Persist one writable definition from an atom store under a namespace and an application-chosen identifier. Choose this subpath for keyed state; the root persistence engine does not connect atom-store reads and subscriptions for you.\n\nStart with `persistKeyed()` to restore and watch that definition, or `clearFamily()` to remove saved records whose keys share a namespace prefix. Clearing records does not clear live memory values, and this adapter does not enumerate or persist an entire family automatically.',
+        '按命名空间和应用指定的标识，为原子存储中的一个可写定义保存状态。处理键控状态时选择此子路径；根入口的通用引擎不会替你连接原子存储的读取和订阅。\n\n从 `persistKeyed()` 恢复并监听这个定义，或用 `clearFamily()` 移除键具有同一命名空间前缀的存档。清理存档不会清空内存中的值，此适配器也不会自动枚举并保存整个定义族。'
       ),
       example: keyedExample
     }

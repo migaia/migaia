@@ -580,29 +580,29 @@ export const storeKeyedReference: ILibraryReference = {
     },
     'atom/definition': {
       summary: t(
-        'Runtime-free definition constructors and callback types. Start with atomDef, derivedDef or writableDef, then consume those tokens through an AtomStore; no reactive node is allocated here. Advanced assertNotThenable is exported only from this entry.',
-        '提供不绑定运行时的定义构造及回调类型，从基础、派生或可写定义开始，再经原子存储消费令牌，此层不分配响应节点；高级守卫 `assertNotThenable` 仅从此入口发布。'
+        'Describe reusable pieces of state before choosing where their values will live. Import this subpath for definition constructors and their callback types when you do not need the other helpers collected at the root.\n\nStart with `atomDef()` for an initial value and `derivedDef()` for a value computed by reading other definitions. These functions create descriptions rather than reactive nodes; pass the descriptions to an atom store to read or change actual state.',
+        '先描述可复用的状态单元，再决定在哪里保存它们的值。只需定义构造函数及其回调类型时导入此子路径，无需从根入口选择其他辅助接口。\n\n从 `atomDef()` 声明初始值，用 `derivedDef()` 描述如何读取其他定义并计算结果。这些函数只创建描述，不创建响应式节点；实际状态的读写由消费这些定义的原子存储完成。'
       ),
       example: storeExample
     },
     'atom/store': {
       summary: t(
-        'Instantiates definitions inside an external reactive Runtime. Start with createAtomStore for independent scope state or defaultAtomStore for the shared default associated with one Runtime.',
-        '在外部响应运行时内实例化定义，独立作用域状态使用创建存储，同一运行时关联的共享默认状态使用默认存储。'
+        'Give reusable state definitions a place to hold values, read dependencies and notify subscribers. Choose this subpath when you need store construction and its types, rather than the broader definition and helper exports at the root.\n\nStart with `createAtomStore(runtime)` for independent state within an existing reactive runtime, then read and write definitions through the store. Use `defaultAtomStore(runtime)` only when callers should share the default store associated with that runtime.',
+        '为可复用的状态定义保存实际值、记录读取关系，并通知订阅者。只需存储构造接口及其类型时选择此子路径；根入口还汇集定义与其他辅助接口。\n\n从 `createAtomStore(runtime)` 开始，在已有响应式运行时中创建独立状态，再通过存储读写定义。只有需要多个调用者共享该运行时关联的默认存储时，才使用 `defaultAtomStore(runtime)`。'
       ),
       example: storeExample
     },
     optics: {
       summary: t(
-        'Advanced pure optics primitives from the canonical optics-path owner. Start with readOpticPath/writeOpticPath for immutable paths or KeyedSplitCache and keyed-array helpers for custom splitting. These ten exports live only at @migaia/store-keyed/optics and acquire no Runtime or resource owner.',
-        '规范路径实现发布的高级纯光学原语；不可变路径从 `readOpticPath` 与 `writeOpticPath` 开始，自定义拆分使用 `KeyedSplitCache` 及键数组工具。十个导出仅从 `@migaia/store-keyed/optics` 发布，不取得运行时或资源所有权。'
+        'Build custom operations that read or replace a nested value without mutating its parent data. This subpath exposes the low-level path and keyed-array tools that the package root does not export.\n\nStart with `readOpticPath()` to read along a property path and `writeOpticPath()` to return a replacement with copied containers along that path. Keyed-array helpers are also available for custom splitting; these tools do not create an atom store or own reactive state.',
+        '编写自定义操作，读取或替换嵌套值，同时不修改原有的父级数据。此子路径公开根入口不导出的底层路径操作和按键处理数组的工具。\n\n从 `readOpticPath()` 沿属性路径读取值，用 `writeOpticPath()` 复制路径上的容器并返回更新结果。自定义数组拆分还可使用按键处理工具；这些接口不创建原子存储，也不持有响应式状态。'
       ),
       example: arrayExample
     },
     'reactive/atom': {
       summary: t(
-        'Instance-atom protocol and runtime-bound read/write helpers; no concrete atom implementation is exported. Start with atomGetter and atomSetter only when adapting an object implementing these interfaces.',
-        '提供实例原子协议及绑定运行时的读写辅助函数，不导出具体原子实现，仅适配实现该协议的对象时使用读取及写入辅助函数。'
+        'Adapt an existing object to the readable or writable atom protocol, the shape an adapter uses to access one state value. Choose this subpath for that instance protocol; use definitions and an atom store when creating application state.\n\nStart with `atomGetter(runtime)` to read an atom and `atomSetter(runtime)` to forward a write. Both reject atoms from another runtime, and neither constructs a concrete atom implementation.',
+        '把已有对象接入可读或可写原子协议；该协议规定适配器如何访问一个状态值。适配实例接口时选择此子路径；创建应用状态则使用定义与原子存储。\n\n从 `atomGetter(runtime)` 读取原子值，用 `atomSetter(runtime)` 转交写入。两者都会拒绝属于其他运行时的原子，且都不创建具体原子实现。'
       ),
       example: protocolExample
     }

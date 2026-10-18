@@ -307,8 +307,8 @@ runtime.effect(() => console.log(doubled.value)) // 2`
     },
     extension: {
       summary: t(
-        'Entry point for library authors who build on the graph: store fields (`createFieldSource`), framework adapters with render/commit phases (`createObserverBinding`), custom nodes (`createSourceBinding`, `createTrackedObserver`), ownership checks and read-only queries. Application code does not need it.',
-        '供基于响应式图构建类库的作者使用：Store 字段（`createFieldSource`）、区分渲染与提交阶段的框架适配（`createObserverBinding`）、自定义节点（`createSourceBinding`、`createTrackedObserver`）、所有权检查与只读查询。应用代码不需要它。'
+        'Connect external state or a framework adapter to Reactive so that reads become dependencies and changes can update consumers. Import this subpath for adapter building tools; use the root runtime APIs for ordinary application state.\n\nStart with `createFieldSource()` to track reads and publish changes to a value held outside Reactive. For frameworks that may discard a render, `createObserverBinding()` captures reads during rendering and installs subscriptions only when the render is committed.',
+        '把外部状态或框架适配器接入响应式系统，让系统记录读取关系，并在值变化时更新使用者。编写适配器时选择此子路径；普通应用状态使用根入口的运行时接口即可。\n\n从 `createFieldSource()` 开始，为系统之外的值记录读取并发布变化。若框架可能丢弃一次渲染，使用 `createObserverBinding()` 在渲染时记录读取，到提交渲染结果时才建立订阅。'
       ),
       example: `import { createFieldSource } from '@migaia/reactive/extension'
 

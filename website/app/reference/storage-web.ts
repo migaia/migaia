@@ -666,109 +666,151 @@ try {
     },
     'local-storage': {
       summary: t(
-        '`localStorageHost()`: a namespaced, synchronous `localStorage` store (about 5 MiB, text only).',
-        '`localStorageHost()`：带命名空间、同时支持异步与同步读写的 `localStorage` 存储（约 5 MiB，仅能保存文本）。'
+        'Keep small text settings in browser `localStorage`, with a namespace that separates your keys from other users of the same storage. Import this backend subpath to create a store directly; the package root supplies shared error and key utilities.\n\nStart with `localStorageHost({ namespace })`, then use `get()` and `set()` for asynchronous calls or `sync` for immediate access. This backend stores strings; use the IndexedDB entry for records or transactions.',
+        '将少量文本设置保存在浏览器的 `localStorage` 中，并用命名空间隔离不同用途的键。直接创建存储时导入此后端子路径；包的根入口提供共享的错误与键处理工具。\n\n从 `localStorageHost({ namespace })` 开始，通过 `get()`、`set()` 异步读写，或通过 `sync` 立即读写。此后端只保存字符串；需要记录或事务时选择 IndexedDB 入口。'
       ),
       example: `import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst store = localStorageHost({ namespace: 'settings' })`
     },
     'session-storage': {
       summary: t(
-        '`sessionStorageHost()`: the same API on `sessionStorage`, scoped to the tab.',
-        '`sessionStorageHost()`：在 `sessionStorage` 上提供完全相同的 API，数据只在当前标签页内有效。'
+        'Use browser `sessionStorage` through a namespaced store when that is where your page keeps temporary text values. Choose this subpath for the session-storage backend rather than the shared utilities at the package root.\n\nStart with `sessionStorageHost({ namespace })`; its `get()` and `set()` methods wrap text reads and writes, and `sync` exposes immediate access. Choose the local-storage entry when you intend to use `localStorage` instead.',
+        '通过带命名空间的存储访问浏览器 `sessionStorage`，用于页面保存在该处的临时文本值。此子路径创建会话存储后端，根入口则提供共享工具。\n\n从 `sessionStorageHost({ namespace })` 开始，用 `get()`、`set()` 读写文本，也可通过 `sync` 立即读写。如果目标是 `localStorage`，应选择对应的本地存储入口。'
       ),
       example: `import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst store = sessionStorageHost({ namespace: 'wizard' })`
     },
     cookies: {
       summary: t(
-        '`cookiesHost()`: a `document.cookie` store with a fixed scope; HttpOnly cookies are invisible.',
-        '`cookiesHost()`：具有固定作用域的 `document.cookie` 键值存储，写入与删除都使用同一作用域；HttpOnly cookie 对它不可见。'
+        'Read and write cookies visible through `document.cookie` using the same key-value interface as other stores. Import this subpath for a cookie store; the root entry contains shared utilities rather than backend factories.\n\nStart with `cookiesHost({ scope })` to fix the path and other cookie scope settings used by both writes and removals. Cookies marked `HttpOnly` are hidden from JavaScript, so a missing result does not prove that no such cookie exists.',
+        '通过其他存储也使用的键值接口，读写 `document.cookie` 能看到的浏览器小型数据条目。创建此类存储时使用这个子路径，根入口提供共享工具而非后端工厂。\n\n从 `cookiesHost({ scope })` 开始，固定写入和删除共同使用的路径等作用范围。标有 `HttpOnly` 的条目对脚本不可见，因此读不到并不代表它不存在。'
       ),
       example: `import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })`
     },
     'indexed-db': {
       summary: t(
-        '`indexedDbHost()`: the only browser backend with bytes, records, transactions, iteration and secondary indexes.',
-        '`indexedDbHost()`：唯一同时支持字节、记录、事务、迭代与二级索引的浏览器后端。'
+        'Store browser records and bytes when text storage is too limited, or group related changes in a transaction so they commit together. Choose this subpath for the IndexedDB backend; the root entry does not create stores.\n\nStart with `indexedDbHost({ dbName })`, then use `putRecord()` and `getRecord()` to save and retrieve structured values. It also supports indexes for looking up records by fields other than their primary key; use the entity entry to define typed record operations above the backend.',
+        '当文本存储无法满足需求时，在浏览器中保存记录和字节数据，也可用事务让一组相关修改一起提交。此子路径提供 IndexedDB 后端，根入口不负责创建存储。\n\n从 `indexedDbHost({ dbName })` 开始，用 `putRecord()` 和 `getRecord()` 保存、读取结构化值。此后端还支持索引，即按主键之外的字段查找记录；需要定义带类型的记录操作时，再使用实体入口。'
       ),
       example: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'app-data' })`
     },
     memory: {
       summary: t(
-        '`memoryStorageHost()`: a volatile in-process store for tests, SSR and fallback; no DOM needed.',
-        '`memoryStorageHost()`：进程内的易失存储，用于测试、服务端渲染与降级场景；不依赖任何 DOM 接口。'
+        'Use an isolated in-memory store for tests, server rendering, or an explicit fallback when browser storage is unavailable. Import this subpath for `memoryStorageHost()` without requiring browser document or storage types; the root entry is for shared utilities.\n\nEach call creates a separate store with text, byte and record operations. Values stay in that instance rather than a persistent browser database, and this backend does not provide secondary indexes.',
+        '在测试、服务端渲染或浏览器存储不可用时，用独立的内存存储承接数据。此子路径提供 `memoryStorageHost()`，不要求浏览器文档或存储接口的类型；根入口则提供共享工具。\n\n每次调用都创建一份独立存储，可保存文本、字节和记录。数据只留在该实例中，不会保存到浏览器数据库；此后端不提供按其他字段查找记录的二级索引。'
       ),
       example: `import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()`
     },
     entity: {
       summary: t(
-        '`defineEntity()`: typed records with primary key, schema, versioned migrations and secondary indexes, connected to any store.',
-        '`defineEntity()`：带主键、schema、版本迁移与二级索引的类型化记录，可连接到任意存储。'
+        'Define typed records once and reuse their read and write operations with different storage backends. Choose this subpath for record definitions and repositories, rather than the shared utilities at the package root.\n\nStart with `defineEntity()` to describe the record name, primary key and optional validation or version changes. Its `connect(store)` method returns operations such as `get()` and `put()`; create the actual store through a backend entry first.',
+        '一次定义带类型的记录，再把同一套读写规则用于不同存储后端。此子路径提供记录定义与读写接口，根入口则提供共享工具。\n\n从 `defineEntity()` 开始，声明记录名称、主键，以及可选的数据校验或版本转换规则。调用定义上的 `connect(store)` 后即可使用 `get()`、`put()` 等操作；实际存储仍需先从对应后端入口创建。'
       ),
       example: repositoryExample
     },
     schema: {
       summary: t(
-        'Schema adapters: `passthrough()`, `fromStandardSchema()` (zod, valibot, arktype) and `runMigrations()`.',
-        '实体使用的 Schema 适配工具：不校验的 `passthrough()`、适配标准校验库的 `fromStandardSchema()`（zod、valibot、arktype），以及按版本执行迁移的 `runMigrations()`。'
+        'Adapt record validation and version changes without creating a store or repository. Import this subpath for these data-shape tools; the package root does not export them.\n\nStart with `fromStandardSchema()` to wrap a validator implementing Standard Schema, a shared interface used by validation libraries. Use `runMigrations()` to apply declared conversions between saved versions in order; `passthrough()` is available when validation is deliberately omitted.',
+        '为记录接入数据校验和版本转换，而不在此创建存储或记录读写接口。需要这些数据结构工具时导入本子路径，根入口不导出它们。\n\n从 `fromStandardSchema()` 开始，适配支持标准校验协议的校验器；该协议让不同校验库通过同一接口工作。用 `runMigrations()` 按顺序执行保存版本之间的转换；明确不需要校验时可选 `passthrough()`。'
       ),
       example: `import { fromStandardSchema } from '@migaia/storage-web/schema'\n\nconst schema = fromStandardSchema(UserSchema)`
     },
     serialize: {
       summary: t(
-        'Codecs: `jsonCodec`, `structuredCodec`, `binaryCodec`, and `selectCodec()` that routes a codec by backend capabilities.',
-        '编解码器：`jsonCodec`、`structuredCodec`、`binaryCodec`，以及根据后端能力选择写入路径的 `selectCodec()`，避免静默丢失数据类型。'
+        'Choose how application values become storage data and how they are read back. Import this subpath for storage codecs, the paired encode and decode operations; the package root only exposes shared utilities.\n\nStart with `jsonCodec` for JSON text and `selectCodec()` to match a codec to the store capabilities. A byte codec can use a text encoding on a text-only store, but structured values are rejected there rather than silently converted to JSON.',
+        '决定应用值如何转成可保存的数据，以及如何读回原值。此子路径提供编解码器，也就是成对的编码和解码操作；包的根入口只提供共享工具。\n\n从处理 JSON 文本的 `jsonCodec` 开始，再用 `selectCodec()` 根据存储能力选择写入方式。字节编解码器可在纯文本存储上转成文本保存，但结构化值不能在此被悄悄改成 JSON，而会被拒绝。'
       ),
       example: `import { jsonCodec } from '@migaia/storage-web/serialize'\n\nawait jsonCodec.encode({ a: 1 })`
     },
     host: {
       summary: t(
-        '`createStorageHost({ plugins })`: several backends by id in one host, with optional live queries; plus `definePlugin` / `defineFeature` for custom backends.',
-        '`createStorageHost({ plugins })`：在一个宿主中按 id 管理多个后端，可选实时查询；以及用于自定义后端的 `definePlugin` / `defineFeature`。'
+        'Manage several storage backends together and retrieve each by its configured identifier. Import this subpath for host creation and custom plugin contracts; choose a backend subpath when you only need a standalone store.\n\nStart with `createStorageHost({ plugins })`, then use `host.backend(id)` to access an installed store. Reactive plugins additionally enable `host.liveQuery()`, which refreshes a query as storage changes; ordinary backend plugins do not enable that API.',
+        '集中管理多个存储后端，并按配置的标识取用各自的存储。创建宿主或编写自定义插件时导入此子路径；只需独立存储时直接选择后端入口。\n\n从 `createStorageHost({ plugins })` 开始，再用 `host.backend(id)` 取得已安装的存储。响应式插件还会启用 `host.liveQuery()`，让查询随存储变化而刷新；普通后端插件不启用这个接口。'
       ),
       example: createHostExample
     },
     'reactive-adapter': {
       summary: t(
-        '`defineReactiveAdapterFeature()`: make a custom backend reactive (push, hybrid or polling).',
-        '`defineReactiveAdapterFeature()`：让自定义后端具备响应式能力（推送、混合或轮询）。'
+        'Teach a custom storage backend how to tell the host that a query may need refreshing. Choose this advanced subpath for your own change source; built-in stores already have reactive plugin entries.\n\nStart with `defineReactiveAdapterFeature()` and provide a `subscribe` callback that calls `invalidate()` after a relevant change. Declare whether changes arrive as notifications, periodic checks, or both, and provide a check interval when polling is involved.',
+        '为自定义存储后端接入变化通知，让宿主知道何时需要刷新查询。自行实现变化来源时选择此高级入口；内置后端已有对应的响应式插件入口。\n\n从 `defineReactiveAdapterFeature()` 开始，提供 `subscribe` 回调，在相关变化后调用 `invalidate()`。声明变化来自主动通知、定时检查，还是两者结合；使用定时检查时还须提供检查间隔。'
       ),
       example: `import { defineReactiveAdapterFeature } from '@migaia/storage-web/reactive-adapter'`
     },
     'plugins/reactive': {
       summary: t(
-        'Index of the five reactive backend plugins; import each from its own `plugins/reactive/*` subpath.',
-        '五个响应式后端插件的索引；请从各自的 `plugins/reactive/*` 子路径导入。'
+        'Choose a built-in storage backend and enable queries that refresh when its data changes. This subpath groups all five reactive plugin factories, while the root entry contains shared utilities; individual backend subpaths are also available.\n\nStart with `memoryReactive()` for an isolated memory store, or `indexedDbReactive()` for browser records and indexes. Pass the returned plugin to `createStorageHost({ plugins })` from the host entry to make `host.liveQuery()` available for that backend.',
+        '选择内置存储后端，并启用随数据变化而刷新的查询。此子路径汇集五种响应式插件工厂，根入口则提供共享工具；也可从各后端的独立子路径导入。\n\n从 `memoryReactive()` 创建独立的内存后端，或用 `indexedDbReactive()` 保存浏览器记录并使用索引。把返回的插件交给宿主入口的 `createStorageHost({ plugins })`，即可为该后端使用 `host.liveQuery()`。'
       ),
       example: `import { memoryReactive } from '@migaia/storage-web/plugins/reactive/memory'`
     },
-    ...Object.fromEntries(
-      backends.flatMap(([prefix, module, id, en, zh, , reactive]) => [
-        [
-          `plugins/${module}`,
-          {
-            summary: t(
-              `\`${prefix}BackendPlugin({ id })\`: installs ${en} into a storage host (default id \`${id}\`).`,
-              `\`${prefix}BackendPlugin({ id })\`：把${zh}以指定 id 安装进存储宿主（默认 id 为 \`${id}\`），之后通过该 id 取用。`
-            ),
-            example: hostExample(`${prefix}BackendPlugin`, `plugins/${module}`, id)
-          }
-        ],
-        [
-          `plugins/reactive/${module}`,
-          {
-            summary: t(
-              `\`${prefix === 'cookie' ? 'cookies' : prefix}Reactive({ id })\`: ${en} plus its reactive adapter (${reactive}) for \`liveQuery\`.`,
-              `\`${prefix === 'cookie' ? 'cookies' : prefix}Reactive({ id })\`：安装${zh}并加上其响应式适配器（${reactive}），使宿主可以为该后端创建 \`liveQuery\`。`
-            ),
-            example: hostExample(
-              `${prefix === 'cookie' ? 'cookies' : prefix}Reactive`,
-              `plugins/reactive/${module}`,
-              id
-            )
-          }
-        ]
-      ])
-    )
+    'plugins/memory': {
+      summary: t(
+        'Install an isolated in-memory record store as a named backend in a storage host. Import this subpath for `memoryBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `memory`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
+        '把独立的内存记录存储作为具名后端装入存储宿主。此子路径提供 `memoryBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `memory`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
+      ),
+      example: hostExample('memoryBackendPlugin', 'plugins/memory', 'memory')
+    },
+    'plugins/reactive/memory': {
+      summary: t(
+        'Install an isolated in-memory record store together with change tracking for queries that refresh as data changes. Choose this subpath for `memoryReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. Changes from this isolated store are pushed to the host; other memory instances do not share its data.',
+        '安装独立的内存记录存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `memoryReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。此独立存储将变化主动通知宿主；其他内存实例不共享它的数据。'
+      ),
+      example: hostExample('memoryReactive', 'plugins/reactive/memory', 'memory')
+    },
+    'plugins/local-storage': {
+      summary: t(
+        'Install a namespaced browser text store using `localStorage` as a named backend in a storage host. Import this subpath for `localStorageBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `local`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
+        '把基于 `localStorage`、按命名空间隔离的浏览器文本存储作为具名后端装入存储宿主。此子路径提供 `localStorageBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `local`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
+      ),
+      example: hostExample('localStorageBackendPlugin', 'plugins/local-storage', 'local')
+    },
+    'plugins/reactive/local-storage': {
+      summary: t(
+        'Install a namespaced browser text store using `localStorage` together with change tracking for queries that refresh as data changes. Choose this subpath for `localStorageReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines change notifications with checks every 1000 ms, so updates are not a promise of immediate observation.',
+        '安装基于 `localStorage`、按命名空间隔离的浏览器文本存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `localStorageReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合变化通知与每 1000 毫秒一次的检查，因此不保证变化会被立即观察到。'
+      ),
+      example: hostExample('localStorageReactive', 'plugins/reactive/local-storage', 'local')
+    },
+    'plugins/session-storage': {
+      summary: t(
+        'Install a namespaced browser text store using `sessionStorage` as a named backend in a storage host. Import this subpath for `sessionStorageBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `session`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
+        '把基于 `sessionStorage`、按命名空间隔离的浏览器文本存储作为具名后端装入存储宿主。此子路径提供 `sessionStorageBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `session`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
+      ),
+      example: hostExample('sessionStorageBackendPlugin', 'plugins/session-storage', 'session')
+    },
+    'plugins/reactive/session-storage': {
+      summary: t(
+        'Install a namespaced browser text store using `sessionStorage` together with change tracking for queries that refresh as data changes. Choose this subpath for `sessionStorageReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines change notifications with checks every 1000 ms for the session storage it can access.',
+        '安装基于 `sessionStorage`、按命名空间隔离的浏览器文本存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `sessionStorageReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合变化通知与每 1000 毫秒一次的检查，观察当前可访问的会话存储。'
+      ),
+      example: hostExample('sessionStorageReactive', 'plugins/reactive/session-storage', 'session')
+    },
+    'plugins/cookies': {
+      summary: t(
+        'Install a scoped cookie store using `document.cookie` as a named backend in a storage host. Import this subpath for `cookieBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `cookies`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
+        '把基于 `document.cookie`、固定作用范围的存储作为具名后端装入存储宿主。此子路径提供 `cookieBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `cookies`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
+      ),
+      example: hostExample('cookieBackendPlugin', 'plugins/cookies', 'cookies')
+    },
+    'plugins/reactive/cookies': {
+      summary: t(
+        'Install a scoped cookie store using `document.cookie` together with change tracking for queries that refresh as data changes. Choose this subpath for `cookiesReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines notifications with checks every 1000 ms, and can observe only cookies visible to JavaScript.',
+        '安装基于 `document.cookie`、固定作用范围的存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `cookiesReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合通知与每 1000 毫秒一次的检查，只能观察脚本可见的数据条目。'
+      ),
+      example: hostExample('cookiesReactive', 'plugins/reactive/cookies', 'cookies')
+    },
+    'plugins/indexed-db': {
+      summary: t(
+        'Install a browser record store with indexes and transactions as a named backend in a storage host. Import this subpath for `indexedDbBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `indexed-db`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
+        '把支持索引与事务的浏览器记录存储作为具名后端装入存储宿主。此子路径提供 `indexedDbBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `indexed-db`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
+      ),
+      example: hostExample('indexedDbBackendPlugin', 'plugins/indexed-db', 'indexed-db')
+    },
+    'plugins/reactive/indexed-db': {
+      summary: t(
+        'Install a browser record store with indexes and transactions together with change tracking for queries that refresh as data changes. Choose this subpath for `indexedDbReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines notifications with checks every 1000 ms; the underlying store still supports indexes and transactions.',
+        '安装支持索引与事务的浏览器记录存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `indexedDbReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合通知与每 1000 毫秒一次的检查，底层存储仍支持索引与事务。'
+      ),
+      example: hostExample('indexedDbReactive', 'plugins/reactive/indexed-db', 'indexed-db')
+    }
   },
   symbols: {
     localStorageHost: {
