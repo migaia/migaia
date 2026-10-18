@@ -51,6 +51,8 @@ describe('A3 supervisor startup', () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()
     const reported: unknown[] = []
+    /** Failure policy publishes only after the original bounded teardown has finished. */
+    const backoff = deferred<void>()
     const supervisor = createSupervisor({
       id: 'memory',
       report: (error) => {
@@ -62,6 +64,9 @@ describe('A3 supervisor startup', () => {
       budget: createUnitBudget({ kind: 'memory', maxUnits: 1, launchRate: false, scheduler }),
       scheduler,
       ready: () => new Promise<void>(() => undefined)
+    })
+    supervisor.subscribe((event) => {
+      if (event.type === 'state' && event.to === 'backoff') backoff.resolve()
     })
     const started = supervisor.start()
     await flush()
@@ -75,7 +80,10 @@ describe('A3 supervisor startup', () => {
     expect((supervisor.inspect().lastExit?.error as { source?: string })?.source).toBe(
       SUPERVISION_SOURCE
     )
-    await started
+    await backoff.promise
+    expect(supervisor.state).toBe('backoff')
+    await supervisor.stop()
+    expect(await started).toEqual({ state: 'stopped' })
   })
 
   it('retains a lease for a never-settling launch and reaps its late handle', async () => {

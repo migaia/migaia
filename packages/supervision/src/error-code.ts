@@ -10,7 +10,10 @@ export const SupervisionErrorCode = {
    * mode.
    */
   capabilityUnsupported: 'CAPABILITY_UNSUPPORTED',
-  /** Launch, attachment, or readiness failed; inspect detail.phase and the original cause. */
+  /**
+   * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and
+   * the original cause.
+   */
   launchFailed: 'LAUNCH_FAILED',
   /** Startup did not reach ready within its deadline; inspect the stopped attempt. */
   startupTimeout: 'STARTUP_TIMEOUT',
@@ -30,7 +33,10 @@ export const SupervisionErrorCode = {
   scopeTerminal: 'SCOPE_TERMINAL',
   /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */
   heartbeatMissed: 'HEARTBEAT_MISSED',
-  /** A prior process record could not be reclaimed; retain it and retry recovery after inspection. */
+  /**
+   * Registry listing or a prior process record recovery failed; inspect detail.step, retain
+   * records, and retry after inspection.
+   */
   orphanReclaimFailed: 'ORPHAN_RECLAIM_FAILED'
 } as const
 

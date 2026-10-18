@@ -9,6 +9,20 @@ export type IOutputAttachment = {
   readonly stderrTail: Uint8Array
 }
 
+/** Delivers passive output observations without handing ownership of the drain loop to a sink. */
+export function deliverOutput(
+  sink: IProcessLaunchContext['output'] | undefined,
+  stream: DrainedStream,
+  chunk: Uint8Array,
+  report: (error: unknown) => void
+): void {
+  try {
+    sink?.(stream, chunk)
+  } catch (error) {
+    report(error)
+  }
+}
+
 /** Keeps only the final bytes of each stream while isolating consumer callbacks. */
 export function attachOutput(
   unit: IUnitRuntime,
@@ -44,11 +58,7 @@ export function attachOutput(
       if (!active) return
       if (stream === DrainedStream.stdout) stdoutTail = append(stdoutTail, chunk)
       else if (stream === DrainedStream.stderr) stderrTail = append(stderrTail, chunk)
-      try {
-        onChunk?.(stream, chunk)
-      } catch (error) {
-        report(error)
-      }
+      deliverOutput(onChunk, stream, chunk, report)
     },
     get stdoutTail() {
       return stdoutTail.slice()

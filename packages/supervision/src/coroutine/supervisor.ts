@@ -96,7 +96,7 @@ export function createCoroutineSupervisor<TPort = undefined>(
     ...options,
     scheduler,
     health,
-    launcher: createCoroutineLauncher<TPort>(scheduler),
+    launcher: createCoroutineLauncher<TPort>(scheduler, options.report),
     profile
   })
 }

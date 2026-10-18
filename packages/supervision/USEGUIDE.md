@@ -36,7 +36,7 @@ if (ready.state === 'ready') {
 await supervisor.dispose()
 ```
 
-`expose(port)` may be called once. A second call throws a coded `TypeError` inside the task. If the task ends before exposure, `exposed` remains pending, so the readiness hook waits until the startup deadline. The task's own signal aborts on stop, replacement, and dispose. Async generators also receive one `return()` request. `exited` always fulfills with `{ outcome: 'fulfilled' }` or `{ outcome: 'rejected', error }`.
+`expose(port)` may be called once. A second call throws a coded `TypeError` inside the task. If the task ends before exposure, `exposed` remains pending, so the readiness hook waits until the startup deadline. The task's own signal aborts on stop, replacement, and dispose. Async generators also receive one `return()` request. `exited` always fulfills with `{ outcome: 'fulfilled' }` or `{ outcome: 'rejected', error }`. For a custom AsyncIterable, a rejected return request is reported immediately, but exited remains pending until the outstanding next finishes. Its lease is retained until that actual exit.
 
 Cooperative termination depends on the task settling. A task that ignores cancellation can outlive the 5 second reap deadline. The supervisor reports `REAP_TIMEOUT`, records `abandoned`, and retains its budget lease until the task actually exits. It cannot preempt a synchronous loop or isolate a crash from the event loop. The `fault-isolation` capability is therefore `unsupported`; requests for it are rejected under the default `isolation: 'required'` policy.
 
@@ -92,7 +92,7 @@ The default isolation is `required`; a missing `termination` or `fault-isolation
 guarantee rejects construction with `CAPABILITY_UNSUPPORTED`. A caller may explicitly select
 `best-effort` and inspect `degraded`, but this does not improve the adapter's actual
 guarantees. A monitored memory or CPU limit requires `sampleUsage`; sampling defaults to
-1 second and three consecutive failures. Each output tail keeps the latest 65,536 bytes per
+1 second. Three consecutive sampleUsage rejections mark the unit unhealthy; a successful sample exceeding a monitored limit terminates it immediately. The supervisor and prewarm pool both require a finite positive usage.intervalMs and a positive safe-integer failureThreshold. Each output tail keeps the latest 65,536 bytes per
 stream. The parent-loss guard defaults to a 5 second shutdown grace period; prewarm idle units
 default to 60 seconds.
 
@@ -109,7 +109,7 @@ supervisor or pool. Recovery terminates only a record whose fingerprint still ma
 pids are removed without termination. Each failed record stays available for another attempt.
 An optional prewarm pool uses the same budget, launcher and specification objects as its
 supervisor. It starts idle units but the supervisor still performs readiness after taking one.
-`restart()` and `replace()` bypass stale idle units.
+`restart()` and `replace()` bypass stale idle units. When pool and supervisor use the same id, registry port and namespace, adoption reuses the exact warm durable record and its actual-exit cleanup. Distinct owners register their own records. Output sink exceptions during buffered replay or live forwarding are reported without stopping delivery. A registry list failure is collected and reported as ORPHAN_RECLAIM_FAILED with detail.step set to list; no record is touched.
 
 ## A supervised thread profile
 
@@ -145,7 +145,7 @@ if (outcome.state === 'ready') {
 await supervisor.dispose()
 ```
 
-The launcher must declare `termination: 'enforced'`, `fault-isolation: 'unsupported'`,
+The launcher must declare `termination: 'enforced' | 'monitored' | 'unsupported'` and `fault-isolation: 'unsupported'` truthfully. Required isolation accepts enforced or monitored termination, and rejects unsupported termination; a monitored declaration does not promise native enforcement. It also declares
 `heap-limit: 'enforced' | 'unsupported'`, and `exit-observation: 'enforced' | 'unsupported'`
 truthfully. `heapBytes` is accepted only when `heap-limit` is enforced; `callWallTimeMs` is
 passed unchanged to the launcher for its caller-facing operations. A launcher without enforced

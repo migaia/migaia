@@ -71,6 +71,9 @@ describe('A12 coroutine profile', () => {
     })
     await supervisor.start()
     const stopped = supervisor.stop()
+    // Let the queued lifetime retirement begin before allowing the task to exit naturally.
+    await flush()
+    expect(aborted).toBe(1)
     gate.resolve()
     await stopped
     expect(cleaned).toBe(true)
@@ -78,9 +81,13 @@ describe('A12 coroutine profile', () => {
     expect(supervisor.inspect().lastExit?.reason).toBe('stopped')
   })
 
-  it('turns a synchronous generator return failure into a fulfilled exited status', async () => {
+  it('reports a synchronous iterator return failure and waits for next before exiting', async () => {
     const scheduler = createManualScheduler()
     const boom = new Error('return failed')
+    /** Custom iterators may leave next active even after a return request fails. */
+    const next = deferred<IteratorResult<unknown>>()
+    /** Cleanup failure is observable before actual exit. */
+    const reports: unknown[] = []
     let returns = 0
     let aborts = 0
     let unhandled = 0
@@ -89,7 +96,9 @@ describe('A12 coroutine profile', () => {
     }
     process.on('unhandledRejection', onUnhandled)
     try {
-      const launcher = createCoroutineLauncher<undefined>(scheduler)
+      const launcher = createCoroutineLauncher<undefined>(scheduler, (error) => {
+        reports.push(error)
+      })
       const handle = await launcher.launch(
         {
           task: ({ signal }) => {
@@ -99,7 +108,7 @@ describe('A12 coroutine profile', () => {
             return {
               [Symbol.asyncIterator]() {
                 return {
-                  next: () => new Promise<IteratorResult<unknown>>(() => undefined),
+                  next: () => next.promise,
                   return: (): Promise<IteratorResult<unknown>> => {
                     returns++
                     throw boom
@@ -115,6 +124,9 @@ describe('A12 coroutine profile', () => {
       )
       terminateCoroutineHandle(handle)
       terminateCoroutineHandle(handle)
+      await flush()
+      expect(reports).toEqual([boom])
+      next.resolve({ done: true, value: undefined })
       expect(await handle.exited).toEqual({ outcome: 'rejected', error: boom })
       await flush()
       expect(returns).toBe(1)

@@ -134,7 +134,10 @@ export type IProcessSupervisorOptions<THandle extends IProcessHandle> =
     readonly usage?: {
       /** Scheduler interval between native process memory and CPU usage samples. */
       readonly intervalMs?: number
-      /** Consecutive resource-limit violations required before terminating the process. */
+      /**
+       * Consecutive sampleUsage rejections before declaring the process unhealthy. A successful
+       * sample that exceeds a monitored resource limit terminates immediately.
+       */
       readonly failureThreshold?: number
     }
     /** Policy for bounded stdout and stderr tails and optional streaming chunk observation. */
@@ -193,7 +196,10 @@ export type IPrewarmPoolOptions<THandle extends IProcessHandle> = {
   readonly usage?: {
     /** Scheduler interval between native process memory and CPU usage samples. */
     readonly intervalMs?: number
-    /** Consecutive resource-limit violations required before terminating the process. */
+    /**
+     * Consecutive sampleUsage rejections before declaring the process unhealthy. A successful
+     * sample that exceeds a monitored resource limit terminates immediately.
+     */
     readonly failureThreshold?: number
   }
   /** Maximum launch and readiness time in scheduler milliseconds; defaults to 10000. */

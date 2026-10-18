@@ -17,7 +17,8 @@ import type {
   IProcessSupervisor,
   IProcessSupervisorOptions
 } from './types.js'
-import { startUsageMonitor } from './usage-monitor.js'
+import { startUsageMonitor, validateUsageOptions } from './usage-monitor.js'
+import { readPrewarmRecordOwner } from './prewarm.js'
 
 /** Checks process-only settings before delegating core options to the shared supervisor. */
 export function validateProcessOptions<THandle extends IProcessHandle>(
@@ -39,16 +40,7 @@ export function validateProcessOptions<THandle extends IProcessHandle>(
       options.prewarm.launcher !== options.launcher)
   )
     invalidProcessOption('prewarm')
-  if (
-    options.usage?.intervalMs !== undefined &&
-    (!Number.isFinite(options.usage.intervalMs) || options.usage.intervalMs <= 0)
-  )
-    invalidProcessOption('usage.intervalMs', true)
-  if (
-    options.usage?.failureThreshold !== undefined &&
-    (!Number.isSafeInteger(options.usage.failureThreshold) || options.usage.failureThreshold <= 0)
-  )
-    invalidProcessOption('usage.failureThreshold', true)
+  validateUsageOptions(options.usage)
   if (
     options.output?.tailBytes !== undefined &&
     (!Number.isSafeInteger(options.output.tailBytes) || options.output.tailBytes <= 0)
@@ -126,8 +118,18 @@ export function createProcessSupervisor<THandle extends IProcessHandle>(
     }
     const attachment = outputByGeneration.get(unit.generation)!
     outputByHandle.set(handle, attachment)
-    takenByHandle.get(handle)?.bindOutput(attachment.sink)
-    await registerRecord(handle, unit, options.id, options.registry, options.wallClock)
+    /** A warm entry retains its existing exit-owned record cleanup after transfer. */
+    const taken = takenByHandle.get(handle)
+    taken?.bindOutput(attachment.sink)
+    /** Reuse only the exact record owner; distinct ids, ports or namespaces still register normally. */
+    const recordOwner = taken && readPrewarmRecordOwner(taken)
+    if (
+      !recordOwner ||
+      recordOwner.id !== options.id ||
+      recordOwner.port !== options.registry?.port ||
+      recordOwner.namespace !== options.registry?.namespace
+    )
+      await registerRecord(handle, unit, options.id, options.registry, options.wallClock)
   }
   return createSupervisor({
     ...options,

@@ -215,15 +215,15 @@ export function createSupervisor<
       })
   }
   /**
-   * Turns a failed attempt's provisional `terminal` outcome into the supervisor's stable answer.
-   * When the failure policy armed a backoff, the supervisor is not terminal, so the caller waits
-   * for the backoff attempt's settled outcome instead. Must run outside the command queue, because
-   * the backoff attempt is enqueued on that same queue.
+   * Turns a failed attempt's provisional `terminal` outcome into the supervisor's stable answer. A
+   * backoff or a newer stop command can replace that provisional answer. Read the current stable
+   * outcome, waiting if needed. Must run outside the command queue, because a retry or stop uses
+   * that same queue.
    */
   const settleLaunchOutcome = (
     outcome: IReadyOutcome<THandle>
   ): IReadyOutcome<THandle> | Promise<IReadyOutcome<THandle>> =>
-    outcome.state === SupervisorState.terminal && state === SupervisorState.backoff
+    outcome.state === SupervisorState.terminal && state !== SupervisorState.terminal
       ? whenReady()
       : outcome
   /**
@@ -517,7 +517,21 @@ export function createSupervisor<
   }> => {
     const request = attempts.begin()
     if (promote) transition(SupervisorState.queued)
-    const taken = options.hooks?.acquireUnit?.({ cause, spec: nextSpec })
+    /** Adoption can fail before a lease or slot exists, but still belongs to launch failure policy. */
+    let taken: ReturnType<NonNullable<NonNullable<typeof options.hooks>['acquireUnit']>>
+    try {
+      taken = options.hooks?.acquireUnit?.({ cause, spec: nextSpec })
+    } catch (caught) {
+      /** No unit was acquired, so there is no teardown or lease release to fabricate. */
+      const error = createSupervisionError(
+        Error,
+        SupervisionErrorCode.launchFailed,
+        SupervisionErrorText.launchFailed,
+        { cause: caught, detail: { kind: options.profile.kind, phase: LaunchPhase.launch } }
+      )
+      if (promote && attempts.isCurrent(request.token)) onFailure(error)
+      return { outcome: { state: SupervisorState.terminal }, error }
+    }
     const budget = taken
       ? { kind: 'granted' as const, lease: taken.lease }
       : await options.budget.acquire(request.signal)
@@ -678,6 +692,8 @@ export function createSupervisor<
           onFailure(error)
         })
       })
+      // Startup authority ends at readiness; the serving unit now belongs to its runtime lifetime.
+      attempts.complete(request.token)
       return {
         outcome: { state: SupervisorState.ready, generation: slot.generation, unit: handle },
         slot
@@ -709,7 +725,11 @@ export function createSupervisor<
           withSecondary(error, slot)
         )
       if (candidate === slot) candidate = undefined
-      if (promote && attempts.isCurrent(request.token)) {
+      /** Timeout itself advances the generation once; a later command must still supersede it. */
+      const ownsFailure =
+        attempts.isCurrent(request.token) ||
+        (timeout && attempts.generation === request.generation + 1)
+      if (promote && ownsFailure) {
         if (superseded) transition(SupervisorState.stopped)
         else onFailure(error)
       }

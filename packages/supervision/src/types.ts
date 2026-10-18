@@ -77,9 +77,12 @@ export type IBudgetOutcome =
 export type IUnitBudgetOptions<TKind extends string> = {
   /** Unit kind kept on granted leases so process, thread and coroutine budgets cannot be mixed. */
   readonly kind: TKind
-  /** Maximum simultaneously granted leases; queued requests do not occupy a unit slot. */
+  /**
+   * Maximum occupied local slots, including reservations waiting for a parent. Requests waiting for
+   * local capacity do not occupy a slot.
+   */
   readonly maxUnits: number
-  /** Chooses reject or queue when all unit slots are occupied; defaults to reject. */
+  /** Chooses reject or queue when all unit slots are occupied; defaults to queue. */
   readonly overflow?: BudgetOverflow
   /**
    * Maximum scheduler-time wait for a queued unit request; expiry returns a rejected admission
@@ -95,7 +98,10 @@ export type IUnitBudgetOptions<TKind extends string> = {
         readonly windowMs: number
       }
     | false
-  /** Optional parent budget acquired before the local lease; release returns both occupied slots. */
+  /**
+   * Optional parent budget: acquire reserves a local slot while waiting for the parent. Release
+   * returns the parent slot before the local slot; a reservation is not a launched unit.
+   */
   readonly parent?: IUnitBudget<TKind>
   /** Owns monotonic deadlines, restart delays and health timers; omission uses systemScheduler. */
   readonly scheduler?: IScheduler
@@ -156,10 +162,16 @@ export type ISupervisorBaseOptions<THandle> = {
     /** Sliding scheduler-time window used to count restart attempts; defaults to 60000 milliseconds. */
     readonly windowMs?: number
   }
-  /** Chooses permanent terminal state or an explicit cooldown before allowing another generation. */
+  /**
+   * Chooses whether terminal policy waits for explicit restart or schedules an automatic cooldown
+   * retry.
+   */
   readonly terminalPolicy?:
     | {
-        /** Keeps admission permanently closed after terminal state. */
+        /**
+         * Stays terminal until an explicit restart resets policy; dispose remains permanently
+         * closed.
+         */
         readonly mode: 'stay'
       }
     | {

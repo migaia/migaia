@@ -33,7 +33,30 @@ export async function reclaimOrphanProcesses(options: {
   const terminated: string[] = []
   const removed: string[] = []
   const collector = createErrorCollector('collect', options.report)
-  const records = await options.registry.list(options.namespace)
+  /** Recovery failures at every storage step share the existing collection and report policy. */
+  const recordFailure = (cause: unknown, detail: Readonly<Record<string, unknown>>): void => {
+    /** The recovery error owns its semantic identity while retaining the original storage failure. */
+    const error = createSupervisionError(
+      Error,
+      SupervisionErrorCode.orphanReclaimFailed,
+      SupervisionErrorText.orphanReclaimFailed,
+      { cause, detail: { kind: 'process', ...detail } }
+    )
+    collector.add(SUPERVISION_SOURCE, error)
+    options.report(error)
+  }
+  /** Listing has no per-record identity yet; a failed scan must not touch any record. */
+  let records: Awaited<ReturnType<IProcessRegistry['list']>>
+  try {
+    records = await options.registry.list(options.namespace)
+  } catch (cause) {
+    recordFailure(cause, { step: 'list' })
+    return {
+      terminated,
+      removed,
+      failures: collector.finalize(SupervisionErrorText.orphanReclaimFailed)
+    }
+  }
   for (const record of records) {
     let step = 'probe'
     try {
@@ -47,14 +70,7 @@ export async function reclaimOrphanProcesses(options: {
       await options.registry.remove(record.id)
       removed.push(record.id)
     } catch (cause) {
-      const error = createSupervisionError(
-        Error,
-        SupervisionErrorCode.orphanReclaimFailed,
-        SupervisionErrorText.orphanReclaimFailed,
-        { cause, detail: { kind: 'process', recordId: record.id, step } }
-      )
-      collector.add(SUPERVISION_SOURCE, error)
-      options.report(error)
+      recordFailure(cause, { recordId: record.id, step })
     }
   }
   return {

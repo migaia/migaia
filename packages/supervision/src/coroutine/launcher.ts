@@ -18,7 +18,8 @@ export function terminateCoroutineHandle(handle: ICoroutineHandle<unknown>): voi
 
 /** Constructs a cooperative launcher whose exited promises never reject. */
 export function createCoroutineLauncher<TPort>(
-  scheduler: IScheduler
+  scheduler: IScheduler,
+  report: (error: unknown) => void
 ): IUnitLauncher<ICoroutineSpec<TPort>, ICoroutineHandle<TPort>> {
   let nextIdentity = 0
   return {
@@ -60,7 +61,8 @@ export function createCoroutineLauncher<TPort>(
           void returnTask.then(
             () => undefined,
             (error) => {
-              finish({ outcome: CoroutineOutcome.rejected, error })
+              // A failed return request cannot settle the outstanding next or release its lease.
+              report(error)
             }
           )
         }

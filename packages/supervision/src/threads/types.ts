@@ -35,7 +35,10 @@ export type IThreadIdentity = {
   readonly fingerprint: string
 }
 
-/** Termination requests and actual exit are separate lifecycle events. */
+/**
+ * A thread/isolate resource sample; shared process identity does not imply isolated CPU or memory
+ * ownership.
+ */
 export type IThreadUsage = Readonly<{
   sharedPid?: number
   heapUsedBytes?: number

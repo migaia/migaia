@@ -21,9 +21,23 @@ import type {
   IPrewarmPoolOptions,
   IProcessHandle,
   IProcessLaunchContext,
-  IProcessRecord
+  IProcessRecord,
+  IProcessRegistry
 } from './types.js'
-import { startUsageMonitor } from './usage-monitor.js'
+import { startUsageMonitor, validateUsageOptions } from './usage-monitor.js'
+import { deliverOutput } from './output-tail.js'
+
+/** Provenance of an already-owned record; it does not create or duplicate the durable record. */
+type IPrewarmRecordOwner = Readonly<{ id: string; port: IProcessRegistry; namespace: string }>
+/** Only entries produced by a real pool can reuse that pool's existing record at adoption. */
+const prewarmRecordOwners = new WeakMap<IPrewarmEntry<IProcessHandle>, IPrewarmRecordOwner>()
+
+/** Reads private record handoff metadata without adding a public pool or entry capability. */
+export function readPrewarmRecordOwner(
+  entry: IPrewarmEntry<IProcessHandle>
+): IPrewarmRecordOwner | undefined {
+  return prewarmRecordOwners.get(entry)
+}
 
 /** One idle unit and its ordered cleanup scope. */
 type IIdle<THandle extends IProcessHandle> = {
@@ -47,6 +61,7 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
 ): IPrewarmPool<THandle> {
   validateProcessSpec(options.spec)
   validateCapabilityDeclaration(options.launcher.capabilities)
+  validateUsageOptions(options.usage)
   if (options.budget.kind !== 'process') invalidProcessOption('budget')
   if (!Number.isSafeInteger(options.size) || options.size < 0) invalidProcessOption('size', true)
   if (typeof options.report !== 'function') invalidProcessOption('report')
@@ -143,7 +158,7 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
 
   /** Drops bounded buffered output into a newly attached supervisor sink in source order. */
   const bindOutput = (entry: IIdle<THandle>, sink: IProcessLaunchContext['output']): void => {
-    for (const item of entry.chunks) sink(item.stream, item.chunk)
+    for (const item of entry.chunks) deliverOutput(sink, item.stream, item.chunk, options.report)
     entry.chunks.length = 0
     entry.output = sink
   }
@@ -243,7 +258,7 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
     const output: IProcessLaunchContext['output'] = (stream, chunk) => {
       if (entry.retired) return
       if (entry.output) {
-        entry.output(stream, chunk)
+        deliverOutput(entry.output, stream, chunk, options.report)
         return
       }
       entry.chunks.push({ stream, chunk: chunk.slice() })
@@ -407,6 +422,12 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
         lease: entry.lease,
         bindOutput: (sink) => bindOutput(entry, sink)
       }
+      if (entry.record && options.registry)
+        prewarmRecordOwners.set(result, {
+          id: options.id,
+          port: options.registry.port,
+          namespace: entry.record.namespace
+        })
       refill()
       return result
     },

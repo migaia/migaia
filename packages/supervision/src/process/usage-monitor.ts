@@ -3,7 +3,29 @@ import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
 import type { IUnitRuntime } from '../index.js'
 import { CapabilityLevel } from '../index.js'
 import { ProcessCapability, ProcessLimit } from './constants.js'
-import type { IProcessHandle, IProcessLimits, IProcessUsage } from './types.js'
+import type {
+  IProcessHandle,
+  IProcessLimits,
+  IProcessUsage,
+  IProcessSupervisorOptions
+} from './types.js'
+import { invalidProcessOption } from './spec.js'
+
+/** Both process entry points admit the same finite positive sampling interval and failure count. */
+export function validateUsageOptions(
+  usage: IProcessSupervisorOptions<IProcessHandle>['usage']
+): void {
+  if (
+    usage?.intervalMs !== undefined &&
+    (!Number.isFinite(usage.intervalMs) || usage.intervalMs <= 0)
+  )
+    invalidProcessOption('usage.intervalMs', true)
+  if (
+    usage?.failureThreshold !== undefined &&
+    (!Number.isSafeInteger(usage.failureThreshold) || usage.failureThreshold <= 0)
+  )
+    invalidProcessOption('usage.failureThreshold', true)
+}
 
 /** Polls only monitored limits, with one outstanding sample and a finite failure threshold. */
 export function startUsageMonitor(

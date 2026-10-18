@@ -83,7 +83,8 @@ export function startHealth<THandle>(
           (error) => {
             const current = !decided
             if (current && !closed) recordFailure(error, false)
-            else if (!closed) report(error)
+            else if (!checkController.signal.aborted || error !== checkController.signal.reason)
+              report(error)
             decided = true
             if (current) running = false
             checkDeadline.cancel()
