@@ -2,7 +2,7 @@ import type { IObservable, IObserver, IRuntime } from './types.js'
 import { internalsOf } from './internals.js'
 import { assertReactiveOwnedBy } from './ownership.js'
 import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.js'
-import { createReactiveError } from '../errors.js'
+import { createReactiveError, runReactiveCallback } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 import {
@@ -37,7 +37,11 @@ type ITrackingFrame =
       observer: IObserver
       nextDeps: Set<IObservable>
     }
-  | { kind: typeof ReactiveDependencyKind.capture; nextDeps: Set<IObservable> }
+  | {
+      kind: typeof ReactiveDependencyKind.capture
+      nextDeps: Set<IObservable>
+      derivations: Map<IObservable, ICapturedDerivation>
+    }
 
 // Capture 的依赖与 Tracker 身份只存在于私有 WeakMap；调用者只能读取结果并交回整个 token。
 declare const CAPTURE_TOKEN: unique symbol
@@ -47,6 +51,8 @@ export type ICapture<R> = {
 }
 
 type ICaptureState = {
+  /** Lazy derivations already evaluated in render, admitted only with this token's graph. */
+  derivations: ReadonlyMap<IObservable, ICapturedDerivation>
   dependencies: Map<
     IObservable,
     {
@@ -54,6 +60,16 @@ type ICaptureState = {
       readonly topologyToken: object | undefined
     }
   >
+}
+
+/** One speculative lazy node reuses its existing capture rather than evaluating during commit. */
+type ICapturedDerivation = {
+  readonly observer: IObservable & IObserver
+  readonly capture: ICapture<unknown>
+  readonly state: ICaptureState
+  readonly publish: () => void
+  /** Existing lazy-node idle policy runs after all downstream edges have been admitted. */
+  readonly afterCommit: () => void
 }
 
 // 全局「当前正在追踪的 tracker」——单线程 JS 里同一时刻只有一个求值在进行，用它跨 tracker 检测跨 runtime 依赖。
@@ -112,6 +128,26 @@ export class DependencyTracker {
   /** Whether this tracker is currently collecting dependencies. */
   isTracking(): boolean {
     return activeTracker === this && this.#top !== null
+  }
+
+  /** Whether a lazy value must use its existing speculative evaluator instead of publishing. */
+  isCapturing(): boolean {
+    return activeTracker === this && this.#top?.kind === ReactiveDependencyKind.capture
+  }
+
+  /** Retains an evaluated lazy node with its enclosing render token; no graph is installed here. */
+  stageDerivation(
+    observer: IObservable & IObserver,
+    capture: ICapture<unknown>,
+    publish: () => void,
+    afterCommit: () => void
+  ): void {
+    /** Only the enclosing capture owns speculative graph admission. */
+    const frame = this.#top
+    /** The node's existing token remains authoritative for versions and topology. */
+    const state = this.#captures.get(capture)
+    if (frame?.kind === ReactiveDependencyKind.capture && state)
+      frame.derivations.set(observer, { observer, capture, state, publish, afterCommit })
   }
 
   /** Whether any Runtime is currently collecting a dependency frame. */
@@ -276,7 +312,7 @@ export class DependencyTracker {
     this.#stack.push(frame)
     const prevTracker = swapActiveTracker(this)
     try {
-      const result = fn()
+      const result = runReactiveCallback(fn)
       if (!observer.disposed) this.#commit(observer, frame.nextDeps)
       return result
     } finally {
@@ -292,12 +328,13 @@ export class DependencyTracker {
   capture<R>(fn: () => R): ICapture<R> {
     const frame: ITrackingFrame = {
       kind: ReactiveDependencyKind.capture,
-      nextDeps: new Set()
+      nextDeps: new Set(),
+      derivations: new Map()
     }
     this.#stack.push(frame)
     const prevTracker = swapActiveTracker(this)
     try {
-      const result = fn()
+      const result = runReactiveCallback(fn)
       const dependencies: ICaptureState['dependencies'] = new Map()
       for (const dep of frame.nextDeps) {
         dependencies.set(dep, {
@@ -306,7 +343,7 @@ export class DependencyTracker {
         })
       }
       const capture = { result } as ICapture<R>
-      this.#captures.set(capture, { dependencies })
+      this.#captures.set(capture, { dependencies, derivations: frame.derivations })
       return capture
     } finally {
       this.#stack.pop()
@@ -339,18 +376,55 @@ export class DependencyTracker {
       throw createReactiveError(ReactiveErrorCode.captureInvalid, ReactiveErrorText.captureInvalid)
     }
     this.#captures.delete(capture)
+    if (!this.#validateCapture(state)) return false
+    /** Lazy idle checks must see the complete graph, including when the idle channel is synchronous. */
+    const applied = new Map<IObservable, ICapturedDerivation>()
+    try {
+      this.#applyCapture(observer, state, applied)
+    } finally {
+      for (const derivation of applied.values()) derivation.afterCommit()
+    }
+    return true
+  }
+
+  /** Validates the entire speculative dependency tree before installing any of its edges. */
+  #validateCapture(state: ICaptureState): boolean {
     for (const [dep, recorded] of state.dependencies) {
       if (
         this.#terminalObservables.has(dep) ||
         this.#topologyTokens.get(dep) !== recorded.topologyToken ||
-        dep.isStale?.() ||
         dep.version !== recorded.version
       ) {
         return false
       }
+      if (dep.isStale?.()) {
+        /** A dirty lazy node is admissible only through the exact evaluated child token. */
+        const derivation = state.derivations.get(dep)
+        if (
+          !derivation ||
+          this.#captures.get(derivation.capture) !== derivation.state ||
+          !this.#validateCapture(derivation.state)
+        )
+          return false
+      }
+    }
+    return true
+  }
+
+  /** Adopts validated lazy graphs from leaves upward, then commits the host observer once. */
+  #applyCapture(
+    observer: IObserver,
+    state: ICaptureState,
+    applied: Map<IObservable, ICapturedDerivation>
+  ): void {
+    for (const [dep, derivation] of state.derivations) {
+      if (applied.has(dep) || !dep.isStale?.()) continue
+      applied.set(dep, derivation)
+      this.#captures.delete(derivation.capture)
+      this.#applyCapture(derivation.observer, derivation.state, applied)
+      derivation.publish()
     }
     this.#commit(observer, new Set(state.dependencies.keys()))
-    return true
   }
 
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {

@@ -141,11 +141,15 @@ export class Signal<T> implements IObservable, IDisposable {
         ReactiveErrorCode.invalidOption
       )
     }
-    if (onObserved) this.#observedHooks.add(onObserved)
-    if (onUnobserved) this.#unobservedHooks.add(onUnobserved)
+    /** Each registration owns distinct callbacks even when callers supplied the same function. */
+    const ownedObserved = onObserved ? () => onObserved() : undefined
+    /** The matching unobserved callback shares only this group's removal token. */
+    const ownedUnobserved = onUnobserved ? () => onUnobserved() : undefined
+    if (ownedObserved) this.#observedHooks.add(ownedObserved)
+    if (ownedUnobserved) this.#unobservedHooks.add(ownedUnobserved)
     return () => {
-      if (onObserved) this.#observedHooks.delete(onObserved)
-      if (onUnobserved) this.#unobservedHooks.delete(onUnobserved)
+      if (ownedObserved) this.#observedHooks.delete(ownedObserved)
+      if (ownedUnobserved) this.#unobservedHooks.delete(ownedUnobserved)
     }
   }
   #composeHooks(hooks: Set<() => void>): (() => void) | undefined {

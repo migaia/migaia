@@ -8,6 +8,7 @@ import { ReactiveErrorText } from '../error-text.js'
 import type { IObservable, IObserver } from './types.js'
 import { assertGraphNodeUnregistered, registerDeps, registerDepVersions } from './node-internals.js'
 import { claimOwnership } from './ownership.js'
+import { deferRuntimeCleanup } from './deferred-cleanup.js'
 
 /** Graph participation for one custom observer; the tracker and mutable edge sets stay private. */
 export type ITrackedObserverBinding = Readonly<{
@@ -56,7 +57,7 @@ export function createTrackedObserver(observer: IObserver): ITrackedObserverBind
     isSuspended: () => services.tracker.isSuspended(observer),
     revalidate: () => services.tracker.revalidate(observer),
     hasStaleDependencies: () => services.tracker.hasStaleDependencies(observer),
-    deferIdle: (task: () => void) => services.deferIdle(task)
+    deferIdle: (task: () => void) => deferRuntimeCleanup(runtime, task)
   })
 }
 

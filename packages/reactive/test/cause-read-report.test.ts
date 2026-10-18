@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createRuntime, ReactiveErrorPhase } from '../src/index.js'
 import { ReactiveErrorCode } from '../src/error-code.js'
 import { Scheduler } from '../src/runtime/scheduler.class.js'
@@ -74,6 +74,12 @@ describe('batch cause-read reporting', () => {
   })
 
   it('A2 contains reporter failures without replacing the original error chain', async () => {
+    /** Business aggregation and terminal reporter observation are independent results. */
+    const callbacks: (() => void)[] = []
+    /** Capture only this test's queued host work and inspect it before restoring. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
     const direct = runRuntimeFailure(undefined)
     expect(direct.caught).toBeInstanceOf(AggregateError)
     expect((direct.caught as AggregateError).errors).toEqual([
@@ -99,6 +105,10 @@ describe('batch cause-read reporting', () => {
     }
     await Promise.resolve()
     await Promise.resolve()
+    for (let turn = 0; turn < 8; turn++) await Promise.resolve()
+    expect(callbacks).toHaveLength(2)
+    for (const callback of callbacks) expect(callback).toThrow(reporterError)
+    queue.mockRestore()
 
     const scheduler = new Scheduler(() => {
       throw reporterError

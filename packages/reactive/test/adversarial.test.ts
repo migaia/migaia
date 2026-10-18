@@ -72,24 +72,46 @@ describe('AF-T4 reactive runtime-neutrality', () => {
   })
 
   it('AF-T20: a throwing reporter does not break Runtime construction (copy warning containment)', () => {
+    /** Reporter containment preserves the failure on utils' terminal host queue. */
+    const callbacks: (() => void)[] = []
+    /** Inspect the terminal channel separately from the construction result. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
+    /** Exact secondary failure must remain observable. */
+    const failure = new Error('reporter boom')
     noteRuntimeCopy(Symbol('foreign-copy'))
     expect(() =>
       createRuntime({
         onError: () => {
-          throw new Error('reporter boom')
+          throw failure
         }
       })
     ).not.toThrow()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(failure)
+    queue.mockRestore()
     resetRuntimeCopiesForTest()
   })
 
   it('AF-T20: an async-rejecting reporter is contained without unhandled rejection', async () => {
+    /** Async reporter rejection must use the same terminal channel as a synchronous failure. */
+    const callbacks: (() => void)[] = []
+    /** Capture reporting without crashing the host process. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
+    /** Exact reporter secondary must survive asynchronous observation. */
+    const failure = new Error('async reporter boom')
     noteRuntimeCopy(Symbol('foreign-copy'))
     const runtime = createRuntime({
-      onError: () => Promise.reject(new Error('async reporter boom'))
+      onError: () => Promise.reject(failure)
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(runtime).toBeDefined()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(failure)
+    queue.mockRestore()
     resetRuntimeCopiesForTest()
   })
 

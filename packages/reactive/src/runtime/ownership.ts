@@ -1,5 +1,5 @@
 import type { IRuntime } from './types.js'
-import { assertNoForeignOwnershipBrand } from './copy-check.js'
+import { assertNoForeignOwnershipBrand, brandOwnedValue } from './copy-check.js'
 import { createReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
@@ -13,7 +13,7 @@ import { ReactiveErrorText } from '../error-text.js'
  *
  * 改成一张 WeakMap：谁创建、谁登记，查询只有这一条路。新增节点类型不需要改查询侧， 也不可能因为字段起错名而静默绕过。
  *
- * WeakMap 仍是归属权威。跨副本品牌只在显式诊断边界登记；普通节点构造不触碰全局 Symbol 注册表，避免把部署诊断成本放进热路径。
+ * WeakMap 仍是归属权威。首次登记同时安装已有跨副本品牌，让另一份模块的 WeakMap miss 能区分普通值与 foreign node；重复登记不重复安装。
  */
 const OWNERS = new WeakMap<object, IRuntime>()
 
@@ -29,6 +29,7 @@ export function claimOwnership(value: object, runtime: IRuntime): void {
       ReactiveErrorText.ownershipConflict
     )
   }
+  if (!existing) brandOwnedValue(value)
   OWNERS.set(value, runtime)
 }
 

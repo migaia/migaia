@@ -108,12 +108,40 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   }
   get value(): T {
     this.#internals.tracker.track(this) // computed 亦可被订阅
+    if (this.#internals.tracker.isCapturing()) {
+      if (!this.#dirty) return this.#value
+      /** Render evaluates only the existing preview; graph/cache publication belongs to commit. */
+      const value = this.preview()
+      /** Retain this exact derivation token and result rather than re-running user code later. */
+      const capture = this.#previewCapture
+      if (capture)
+        this.#internals.tracker.stageDerivation(
+          this,
+          capture,
+          () => this.#acceptPreview(value),
+          () => this.#scheduleSuspension()
+        )
+      return value
+    }
     this.pull()
     return this.#value
   }
   peek(): T {
+    if (this.#internals.tracker.isCapturing()) return this.preview()
     this.pull()
     return this.#value
+  }
+  /** Publishes an already-validated render result without invoking the derivation or comparer. */
+  #acceptPreview(value: T): void {
+    /** Preview() retains the committed identity whenever the configured comparer says equal. */
+    const changed = this.#version === 0 || !Object.is(value, this.#value)
+    /** Reserve a version before publishing the corresponding cached value. */
+    const version = changed ? this.#internals.clock.next() : this.#version
+    this.#value = value
+    this.#version = version
+    this.#previewCapture = undefined
+    this.#mustRecompute = false
+    this.#dirty = false
   }
   /**
    * Evaluate a speculative snapshot without publishing a cache or dependency edges. React may

@@ -365,7 +365,7 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
   it('code values are unique within this source, so (source, code) is unique by construction', () => {
     const declared = Object.values(ReactiveErrorCode)
     expect(new Set(declared).size).toBe(declared.length)
-    expect(declared).toHaveLength(17) // Includes extension graph-registration conflict.
+    expect(declared).toHaveLength(18) // Includes public callback failure classification.
   })
 
   it('every tagged error carries source === "@migaia/reactive"', () => {

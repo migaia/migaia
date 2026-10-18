@@ -8,7 +8,13 @@ describe('public-surface convergence', () => {
     /** Published entry names form the supported import boundary. */
     const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
     expect(Object.keys(manifest.exports)).toEqual(['.', './extension'])
-    for (const name of ['Signal', 'Computed', 'Effect', 'ReactiveErrorText']) {
+    for (const name of [
+      'Signal',
+      'Computed',
+      'Effect',
+      'ReactiveErrorText',
+      'ReactiveDependencyKind'
+    ]) {
       expect(publicApi).not.toHaveProperty(name)
     }
     expect(publicApi.assertSingleRuntimeCopy).toBeTypeOf('function')

@@ -14,6 +14,12 @@
  */
 export const ReactiveErrorCode = {
   /**
+   * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable
+   * native errors keep identity and stack; immutable and primitive values remain on cause. Existing
+   * package identities are preserved. Handle the callback failure before retrying the operation.
+   */
+  callbackFailed: 'CALLBACK_FAILED',
+  /**
    * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom
    * source.
    *

@@ -6,8 +6,7 @@ export {
   ReactiveErrorPhase,
   ReactiveTracePhase,
   ReactiveTraceType,
-  ReactiveTraceReason,
-  ReactiveDependencyKind
+  ReactiveTraceReason
 } from './runtime/trace-constants.js'
 export { ReactiveErrorCode, type IReactiveErrorCode } from './error-code.js'
 export { REACTIVE_SOURCE, type IReactiveError } from './errors.js'

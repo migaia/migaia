@@ -28,7 +28,6 @@ import {
   ReactiveTracePhase,
   ReactiveTraceType,
   ReactiveTraceReason,
-  ReactiveDependencyKind,
   type IReactiveSignal,
   type IReactiveComputed,
   type IReactiveEffect,
@@ -80,7 +79,7 @@ count.value // 抛 NODE_DISPOSED
 - 经 `runtime.signal(value, options?)` 创建；返回窄节点视图，不暴露图边或内部方法。
 - `value = next`：`Object.is(next, 之前值)` 为真时短路，不推进版本、不触发下游；否则先向 `VersionClock` 领取新版本号再落值（领取失败——时钟耗尽——保持原子失败，绝不出现"值已变、版本未变"的陈旧状态）。
 - `dispose()` 幂等；释放时先标记 `disposed` 再断开全部下游订阅边（通知顺序：标记优先，确保被迫重跑的 Effect 读到明确的 `NODE_DISPOSED` 而不是重新订阅一个已释放节点）。
-- `addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，单个失败原样抛出，多个失败聚合为携带 `OBSERVER_FAILED` 码的 `AggregateError`。
+- `addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，内部单个失败保留原实例，多个失败聚合为 `OBSERVER_FAILED` AggregateError；公开观察路径捕获并通过 `onError` 的 `lifecycle-hook` phase 报告，创建 Effect 不靠同步 throw 暴露 hook 失败。
 - 跨 `Runtime` 读取/订阅一个 `Signal` 会抛 `CROSS_RUNTIME`。
 
 ### `IReactiveComputed<T>`
@@ -123,7 +122,7 @@ const custom = runtime.computed(
 
 - 经 `runtime.computed(fn, config?)` 创建；配置可以是对象，也可以直接传一个 `equals` 比较函数。
 - `equals`：默认 `Object.is`；比较函数本身抛错会阻止 dirty 落定（下次读取仍会重算，不会陷入"陈旧但标记为干净"的状态）。
-- `keepAlive`：默认 `false`——没有订阅者时会在下一个 idle 时机自动挂起（断开全部依赖、状态回到 dirty），下次读取重新建立依赖并重算；设为 `true` 时禁用自动挂起。
+- `keepAlive`：默认 `false`——普通无人观察读取在 idle 时机挂起；最后观察者离开时同步挂起（断开依赖、保留版本/拓扑快照）。下次读取先重验证，未变化时复用缓存，否则重算；设为 `true` 时禁用自动挂起。
 - 循环自依赖（求值过程中直接或间接又读了自己）抛 `CIRCULAR_DEPENDENCY`，不会栈溢出。
 - 已释放节点的 `value`/`peek` 一律抛 `NODE_DISPOSED`。
 
@@ -153,7 +152,7 @@ effect.dispose() // 释放：清理依赖边 + 跑最后一次 cleanup（untrack
 
 - **构造时立即同步执行一次**，不是等到依赖变化才第一次运行。
 - `fn()` 可选返回一个清理函数（`IDisposer`），会在下次重跑前、以及 `dispose()` 时被调用（`runtime.untracked()` 包裹执行，不建立新依赖）；旧 cleanup 会先被摘掉（置空）再执行，避免新 `fn()` 抛错时下次重跑/dispose 重复执行旧 cleanup。
-- 依赖变化后不会立即重跑，而是被 `Scheduler.enqueue()` 标脏排队，由 `flush()`（自动或手动）驱动 `tick()`；`tick()` 内部会先确认依赖确实变化（`hasStaleDependencies`）才真正 `run()`。
+- 默认微任务策略下依赖变化不会立即重跑，而是被 `Scheduler.enqueue()` 标脏排队，由 `flush()`（自动或手动）驱动 `tick()`；`tick()` 内部会先确认依赖确实变化（`hasStaleDependencies`）才真正 `run()`。注入 `flush => flush()` 这类同步策略时，setter 可在完整 fan-out 后立即重跑 Effect。
 - 依赖节点被 `dispose()`/`disconnectObservable` 断开时，会强制下次 `tick()` 无条件重跑（不看是否真的脏）。
 
 ### `createRuntime` / `defaultRuntime`
@@ -216,9 +215,9 @@ type IRuntime = {
 - `untracked(fn)`：`fn` 执行期间关闭依赖收集，读取任何 `Signal`/`Computed` 都不会建立依赖边。
 - `flush()`：同步冲刷当前队列。**重入语义**：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。
 - `schedulerStrategy` 创建期选项只改变何时 `flush`，不交出 Scheduler 队列。策略须同步返回；返回 thenable 会触发 `INVALID_OPTION` 诊断并回退到已验证的安全策略。Runtime 存活期间不公开替换入口。
-- `runTracedAction(name, fn)`：执行并追踪一段真实 action；`name` 必须是非空字符串，否则抛 `INVALID_OPTION`。未启用 trace（无监听器）时直接等价于 `fn()`，不产生额外开销。
-- `reportError(error, context)`：诊断通道；`context.observer`/`context.observable` 是原始节点对象，内部会先脱敏为 `IRuntimeNodeDescriptor` 再转发给 `onError`。
-- `subscribeTrace(listener)`：只读诊断事件流（节点创建、依赖连接/断开、副作用执行、显式 action），返回取消订阅函数。
+- `runTracedAction(name, fn)`：执行并追踪一段真实 action；`name` 必须是非空字符串，否则抛 `INVALID_OPTION`。未启用 trace（无监听器）时只执行 fn 与同一 callback 错误边界，不创建 trace 事件。
+- `reportError(error, context)`：诊断通道；`context.observer`/`context.observable` 是原始节点对象，内部会先脱敏为 `IRuntimeNodeDescriptor` 再转发给 `onError`。reporter 自身 throw/rejection 交 utils 共享宿主异常队列，不反向破坏图操作。
+- `subscribeTrace(listener)`：只读诊断事件流（值变化、依赖连接/断开、副作用执行、显式 action），返回取消订阅函数。
 
 ---
 
@@ -277,16 +276,16 @@ if (result === 'stale') {
   // 捕获后依赖已变化：调用方应重新求值，不要复用同一个 capture token
 }
 
-binding.retrack() // 强制当前订阅者重跑一次，返回其依赖集合是否发生变化
+binding.retrack() // 强制当前订阅者重跑一次，返回其依赖集合或记录版本是否发生变化
 dispose()
 ```
 
 四个成员逐一说明：
 
-- `capture<R>(read: () => R): ICapture<R>` —— 渲染期捕获：只记录本次读到了哪些依赖节点及其当时版本，**不建立依赖边**——被丢弃的渲染因此不会留下订阅残留。`ICapture<R>` 是带品牌的不透明 token，`result: R` 是 `read()` 的返回值；依赖集合存在 tracker 私有 `WeakMap` 里，拿到 token 既读不出依赖也改不了版本。
+- `capture<R>(read: () => R): ICapture<R>` —— 渲染期捕获：只记录本次读到了哪些依赖节点及其当时版本，**不建立依赖边、不推进版本、不排 idle 工作**。读取 dirty Computed 复用其 speculative preview，所需已求值图保留在同一个 token 内，commit 先验证完整依赖树，再接纳图/缓存，不重跑 derivation 或 comparer；被丢弃的渲染不会留下订阅残留。`ICapture<R>` 是带品牌的不透明 token，`result: R` 是 `read()` 的返回值；依赖集合存在 tracker 私有 `WeakMap` 里，拿到 token 既读不出依赖也改不了版本。
 - `observe(fn, options?): IDisposer` —— 安装绑定持有的内部 `Effect`（具体类保持私有，适配层拿不到它去改 `deps`/版本或调用 `run`/`markDirty`）。同一个 binding **重复调用**（当前订阅者仍处于已观察状态时再次调用）抛 `BINDING_DUPLICATE`。返回的 disposer 幂等。
 - `commit(capture): IObserverCommitResult` —— 提交期安装依赖，把 `capture` 装到**创建绑定时指定的那个 observer** 上。`'committed'`：依赖边已安装；`'stale'`：捕获后依赖已变化，token 已消费，必须重新捕获——调用方只应在此时作废快照并重新取值，**不应该**在 commit 阶段去 pull 脏节点（那会把用户的求值错误抛在 commit 里，绕过 Error Boundary）；`'no-observer'`：提交目标尚不存在（还未 `observe()` 或已 dispose），token 未消费，可在 observer 就绪后重试。
-- `retrack(): IObserverRetrackResult` —— 强制当前已提交的 observer 重跑一次，并报告其依赖集合是否发生变化（`'changed'`/`'unchanged'`），无 observer 时返回 `'no-observer'`。
+- `retrack(): IObserverRetrackResult` —— 强制当前已提交的 observer 重跑一次，并报告其依赖集合或记录版本是否发生变化（`'changed'`/`'unchanged'`），无 observer 时返回 `'no-observer'`。
 
 ### 所有权登记与断言
 
@@ -301,9 +300,9 @@ import {
 
 「某节点属于哪个 `Runtime`」的登记与断言，供在本包之上构建 Store/集合/资源类库的作者使用。
 
-- `claimOwnership(value: object, runtime: IRuntime): void` —— 登记归属；同一对象重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。
-- `ownerOf(value: unknown): IRuntime | undefined` —— 查归属，未登记返回 `undefined`（区分"不归任何图"与"归错图"）。
-- `assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：未登记的值一律放行（第三方可以把普通值注册进 Registry，不涉及图）；只有**登记过且归属不符**才抛 `CROSS_RUNTIME`。
+- `claimOwnership(value: object, runtime: IRuntime): void` —— 登记归属；首次登记安装已有不可枚举、不可写的跨副本品牌，WeakMap 仍为本地权威。同一对象重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。
+- `ownerOf(value: unknown): IRuntime | undefined` —— 查归属，普通未登记值返回 `undefined`；foreign copy 品牌触发 `COPY_CONFLICT`，不作为普通未登记值放行。
+- `assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：普通未登记值放行，foreign copy 品牌先拒绝（第三方可以把普通值注册进 Registry，不涉及图）；只有**登记过且归属不符**才抛 `CROSS_RUNTIME`。
 - `assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void` —— 内核图边界使用的严格断言：未登记直接抛 `NOT_RUNTIME_OWNED`；登记了但不属于当前 `runtime` 抛 `CROSS_RUNTIME`。
 
 ```ts
@@ -396,10 +395,11 @@ import {
 import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 ```
 
-稳定错误码表，**16 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）
+稳定错误码表，**18 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）
 
 | `ReactiveErrorCode` 键 | 码值                    | 触发条件                                                                                                                                       |
 | ---------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `callbackFailed` | `CALLBACK_FAILED` | 未分类 action/batch/untracked/tracked derivation callback 失败；native 尽量原位附码，primitive（含 undefined）/不可变 native 原错保留 cause，已有 semantic identity 不变；非 Error 对象 throw 保留控制身份，供 Resource/Suspense owner 单次准入 |
 | `nodeDisposed`         | `NODE_DISPOSED`         | 在已 dispose 的 `Signal`/`Computed`/自定义 Source 上调用读取或写入方法                                                                         |
 | `circularDependency`   | `CIRCULAR_DEPENDENCY`   | 求值 `Computed` 时检测到它（直接或间接）读取了自己正在求值的结果                                                                               |
 | `crossRuntime`         | `CROSS_RUNTIME`         | 一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验                                                            |
@@ -520,13 +520,13 @@ function useReactiveValue<T>(read: () => T): T {
   const binding = createObserverBinding(runtime)
   const capture = binding.capture(read) // 渲染期：只读捕获，可能被丢弃
   // ……渲染真正提交时：
-  const result = binding.commit(capture)
+  binding.observe(() => {
+    // 订阅变化后触发重渲染；真实 host 在卸载时调用返回的 disposer
+  })
+  const result = binding.commit(capture) // 先安装 observer，再提交 token
   if (result === 'stale') {
     // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）
   }
-  binding.observe(() => {
-    // 订阅变化后触发重渲染
-  })
   return capture.result
 }
 ```

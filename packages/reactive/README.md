@@ -14,7 +14,7 @@
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
 | 自己搭建状态管理/Store 库          | 需要精确控制批处理、调度时机、依赖追踪细节，而不是套用某个框架自带的响应式实现                      |
 | 同一进程需要多个互不干扰的响应式图 | 每个 `Runtime` 完全隔离：SSR 每请求一个、单测每个用例一个、多个 Worker 各一个，互不污染             |
-| 需要给响应式变化接可观测性         | `subscribeTrace` 提供只读事件流（节点创建、依赖连接、副作用执行），可以做 devtools 而不侵入核心逻辑 |
+| 需要给响应式变化接可观测性         | `subscribeTrace` 提供只读事件流（值变化、依赖连接、副作用执行），可以做 devtools 而不侵入核心逻辑 |
 | 需要把响应式图接到某个 UI 框架     | 三段式 `capture`/`commit` 绑定原语（见 USEGUIDE）支持并发渲染安全的适配层实现                       |
 
 不适合的场景：只是想要组件内部的局部状态（等价于 `useState`），不需要跨组件共享的响应式图；需要开箱即用的可观察集合、异步资源状态机——这些是 monorepo 里其它包（如集合、resource 包）在本包之上构建的**上层能力**，`@migaia/reactive` 本身不提供。
@@ -22,8 +22,8 @@
 ## 3. 用了之后能得到什么
 
 - **完全隔离的 Runtime**：不同 `Runtime` 的节点分属不同依赖图和版本时钟，混用会立即抛错，不会有全局单例串状态的问题。
-- **惰性 + 缓存的 Computed**：没有订阅者时不计算；多个下游共享同一个上游变化（diamond 依赖）只重算一次；没人观察的 `Computed` 会在空闲时自动挂起（断开依赖、释放订阅），无需手动管理。
-- **显式生命周期**：`Signal`/`Computed`/`Effect` 都要 `dispose()`；`Scope` 提供集中持有与一次性释放。读取已释放节点会立刻抛出明确错误，不会静默返回陈旧值。
+- **惰性 + 缓存的 Computed**：不被读取时不计算；没有订阅者时的手动读取仍会计算；多个下游共享同一个上游变化（diamond 依赖）只重算一次；普通无人观察读取的 `Computed` 在 idle 挂起，最后观察者离开时同步挂起（断开依赖、保留重验证快照），无需手动管理。
+- **显式生命周期**：`Signal`/`Computed`/`Effect` 都要 `dispose()`；`@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()` 提供集中持有与一次性释放。读取已释放节点会立刻抛出明确错误，不会静默返回陈旧值。
 - **可控的调度**：默认微任务合并触发；创建 Runtime 时可用 `schedulerStrategy` 选项设为 `requestAnimationFrame`/`idle`/自定义策略；`batch()` 显式合并多次写入为一次副作用刷新；`flush()` 手动同步冲刷。
 - **失控保护**：自触发无限循环会在超过 `maxFlushPasses`（默认 100 轮）后抛错并如实报告被丢弃了哪些待办，而不是让标签页卡死。
 - **诊断即观测，不侵入业务**：trace 事件、错误上报都走独立通道，不会成为业务状态的一部分。
@@ -66,7 +66,7 @@ count.dispose()
 
 `count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动 flush；测试、SSR 或需要确定提交边界的代码才显式调用 `flush()`。
 
-释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。这里没有持久化数据、连接或计时器，`dispose()` 的实际作用是断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给 `Scope` 持有并统一释放。
+释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。这里没有持久化数据、连接或计时器，`dispose()` 的实际作用是断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给从 `@migaia/lifecycle` 导入的 `createLifecycleScope()`/`createSyncLifecycleScope()` 持有并统一释放。
 
 不想自己管理 `Runtime` 生命周期时，可以用内置的全局单例 `defaultRuntime`（进程级共享，测试/SSR/Worker 场景不建议用它，见下方注意事项）。
 
@@ -79,13 +79,13 @@ count.dispose()
 | `Computed`            | 惰性求值、带缓存的派生值                                                         |
 | `Effect`              | 读取依赖并执行副作用；依赖变化后被调度重跑；构造时立即跑一次                     |
 | `batch()` / `flush()` | 把多次写入合并成一次副作用刷新 / 手动立即触发一次冲刷                            |
-| trace                 | 只读诊断事件流：节点创建、依赖连接/断开、副作用执行、显式 action，不影响业务状态 |
+| trace                 | 只读诊断事件流：值变化、依赖连接/断开、副作用执行、显式 action，不影响业务状态 |
 
 ## 7. 包内入口一览
 
 应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；自定义source/observer也只取得绑定到自身节点的能力，不取得内部服务或可变图边。三个节点类保持内部实现，不作为值导出。
 
-> 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope`。
+> 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。
 
 ## 8. 生命周期、错误与边界
 
@@ -93,7 +93,7 @@ count.dispose()
 2. **统一经 Runtime 工厂创建节点**：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。
 3. **`runtime.effect(...)` 创建时会同步立即执行一次**，不是等到依赖变化才第一次运行。
 4. **`Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知**，也不会推进版本号。
-5. **没有订阅者的 `Computed` 会被自动挂起**（断开依赖、下次读取重新计算），需要"即使暂时没人订阅也保持热态"时传 `{ keepAlive: true }`。
+5. **没有订阅者的 `Computed` 会被自动挂起**（断开依赖；下次读取先验证版本/拓扑，未变可复用缓存），需要"即使暂时没人订阅也保持热态"时传 `{ keepAlive: true }`。
 6. **`dispose()` 之后的节点读取会立刻抛错**，不会静默返回旧值——这是有意设计，避免"看起来能用但永不更新"的幽灵状态。
 7. **`defaultRuntime` 是进程级单例**，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。
 

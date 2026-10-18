@@ -1,5 +1,7 @@
 /** Stable reactive diagnostics and public error messages owned by this package. */
 export const ReactiveErrorText = {
+  /** Fallback for an unclassified caller failure crossing a public reactive callback boundary. */
+  callbackFailed: 'reactive callback failed',
   /** Rejects a non-callable synchronous cleanup before extension scheduling. */
   cleanupTaskMustBeFunction: 'runtime cleanup task must be a function',
   /** Prevents a second extension binding from replacing a node's live dependency bookkeeping. */

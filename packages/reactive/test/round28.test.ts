@@ -1,5 +1,5 @@
 import { internalRuntimeOf } from '../src/entry/extension.js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createRuntime,
   ReactiveTracePhase,
@@ -135,11 +135,18 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
   })
 
   it('RT28-T03: trace clock, sink, and reporter failures cannot replace setter semantics', () => {
+    /** Collect terminal reporter failures without changing setter/flush results. */
+    const callbacks: (() => void)[] = []
+    /** Runtime flushing is controlled below; queued callbacks therefore belong to terminal reports. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
     const timestampError = new Error('setter timestamp failed')
     const sinkError = new Error('setter trace sink failed')
     const reporterError = new Error('setter reporter failed')
     let failTimestamp = false
     const runtime = createRuntime({
+      schedulerStrategy: () => undefined,
       adapter: {
         timestamp: () => {
           if (failTimestamp) throw timestampError
@@ -174,6 +181,9 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
 
     stop.dispose()
     source.dispose()
+    expect(callbacks.length).toBeGreaterThan(0)
+    for (const callback of callbacks) expect(callback).toThrow(reporterError)
+    queue.mockRestore()
   })
 
   it('RT28-T04: Runtime source publish continues dirty propagation after observable trace failure', () => {

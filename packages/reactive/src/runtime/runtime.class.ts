@@ -5,9 +5,10 @@ import { VersionClock } from './version-clock.class.js'
 import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
 import { internalsOf, registerInternals } from './internals.js'
 import { assertReactiveOwnedBy } from './ownership.js'
-import { setVersion } from './node-internals.js'
+import { readVersion, setVersion } from './node-internals.js'
 import { consumePendingCopyWarning, noteRuntimeCopy } from './copy-check.js'
-import { createReactiveError, tagReactiveError } from '../errors.js'
+import { createReactiveError, runReactiveCallback, tagReactiveError } from '../errors.js'
+import { observeThenableRejection } from '@migaia/utils/function'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 import {
@@ -221,7 +222,7 @@ export class Runtime implements IRuntime {
       // clock slot but never publishes a partial source update.
       const version = clock.next()
       const result = write()
-      publish(source, version)
+      publish(source, Math.max(version, readVersion(source)))
       return result
     }
     // 内部面只经 WeakMap 暴露；拿到 Runtime 的第三方无法沿引用链摸到图。
@@ -278,10 +279,10 @@ export class Runtime implements IRuntime {
     return new Effect(fn, this, options)
   }
   batch<T>(fn: () => T): T {
-    return internalsOf(this).scheduler.runBatched(fn)
+    return runReactiveCallback(() => internalsOf(this).scheduler.runBatched(fn))
   }
   untracked<T>(fn: () => T): T {
-    return internalsOf(this).tracker.untracked(fn)
+    return runReactiveCallback(() => internalsOf(this).tracker.untracked(fn))
   }
   flush(): IFlushResult {
     return internalsOf(this).scheduler.flush()
@@ -294,7 +295,7 @@ export class Runtime implements IRuntime {
       )
     }
     const diagnostics = internalsOf(this)
-    if (!diagnostics.traceEnabled()) return fn()
+    if (!diagnostics.traceEnabled()) return runReactiveCallback(fn)
     const reportTraceFailure = (error: unknown): void => {
       this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
     }
@@ -313,7 +314,7 @@ export class Runtime implements IRuntime {
       })
     )
     try {
-      const result = fn()
+      const result = runReactiveCallback(fn)
       emitTraceSafely(
         {
           timestamp: diagnostics.timestamp,
@@ -357,11 +358,13 @@ export class Runtime implements IRuntime {
       const result: unknown = internalsOf(this).tracker.untracked(() =>
         this.#onError(error, sanitizeErrorContext(context))
       )
-      containDiagnosticRejection(result, () => {
-        // onError itself is the terminal error channel.
+      containDiagnosticRejection(result, (failure) => {
+        throw failure // utils owns the shared terminal host queue for reporter failures.
       })
-    } catch {
-      // 诊断通道不得反向破坏依赖图提交。
+    } catch (error) {
+      observeThenableRejection(undefined, { error }, (failure) => {
+        throw failure
+      })
     }
   }
   subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer {

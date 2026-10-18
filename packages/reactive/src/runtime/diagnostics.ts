@@ -8,7 +8,7 @@ import type {
   IRuntimeTraceEvent
 } from './types.js'
 import { ReactiveTracePhase, ReactiveTraceType } from './trace-constants.js'
-import { assimilateCapturedThen } from '@migaia/utils/function'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
 type INodeRole = 'observable' | 'observer'
 
@@ -50,28 +50,7 @@ export function containDiagnosticRejection(
   value: unknown,
   onRejected: (error: unknown) => void
 ): void {
-  if ((value === null || typeof value !== 'object') && typeof value !== 'function') {
-    return
-  }
-  let then: unknown
-  try {
-    then = (value as { then?: unknown }).then
-  } catch (error) {
-    onRejected(error)
-    return
-  }
-  if (typeof then !== 'function') return
-  // Reuse the `then` we already read — `assimilateThenable` invokes it exactly once with the
-  // thenable as receiver, so we never hand the value back to `Promise.resolve()` to read `.then`
-  // twice (a stateful getter could return a different function or throw on the second read).
-  const settled = assimilateCapturedThen(then as (resolve: unknown, reject: unknown) => void, value)
-  void settled.catch((error: unknown) => {
-    try {
-      onRejected(error)
-    } catch {
-      // This is the terminal diagnostic boundary.
-    }
-  })
+  observeThenableRejection(value, inspectThenable(value), onRejected)
 }
 
 /** Report a diagnostic failure without allowing a failing reporter to escape the boundary. */

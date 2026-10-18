@@ -210,7 +210,6 @@
     "@migaia/reactive": {
       ".": [
         "REACTIVE_SOURCE",
-        "ReactiveDependencyKind",
         "ReactiveErrorCode",
         "ReactiveErrorPhase",
         "ReactiveTracePhase",
