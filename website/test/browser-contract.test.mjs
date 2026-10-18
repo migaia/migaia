@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { chromium } from '/Users/kaeo/workspack/migai/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs'
+import { chromium } from 'playwright'
 
 const apiManifest = JSON.parse(
   readFileSync(new URL('../src/generated/manifests/apis.json', import.meta.url), 'utf8')
