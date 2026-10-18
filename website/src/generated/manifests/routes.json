@@ -15681,6 +15681,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/type-utilities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/wasm",
       "locale": "en",
       "domain": "docs",
@@ -31474,6 +31480,12 @@
     },
     {
       "path": "/zh/docs/utils/strings-and-numbers",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/type-utilities",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

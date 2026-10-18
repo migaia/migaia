@@ -29254,8 +29254,8 @@
           "signature": "export type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = { [K in T[F]]: Extract<T, Record<F, K>>; };",
           "declarationLine": 7,
           "source": "packages/utils/dist/typing.d.ts",
-          "purpose": "Groups a discriminated union by a top-level tag field.",
-          "core": "Groups a discriminated union by a top-level tag field.",
+          "purpose": "Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.",
+          "core": "Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -29283,7 +29283,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Groups a discriminated union by a top-level tag field."
+              "content": "Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member."
             },
             {
               "id": "getting-started",
@@ -29303,7 +29303,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Groups a discriminated union by a top-level tag field."
+              "content": "Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member."
             },
             {
               "id": "advanced-usage",
@@ -29324,8 +29324,8 @@
           "signature": "export type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = { [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>; };",
           "declarationLine": 13,
           "source": "packages/utils/dist/typing.d.ts",
-          "purpose": "Groups a discriminated union by a nested tag path.",
-          "core": "Groups a discriminated union by a nested tag path.",
+          "purpose": "Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.",
+          "core": "Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -29353,7 +29353,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Groups a discriminated union by a nested tag path."
+              "content": "Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys."
             },
             {
               "id": "getting-started",
@@ -29373,7 +29373,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Groups a discriminated union by a nested tag path."
+              "content": "Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys."
             },
             {
               "id": "advanced-usage",
@@ -29396,7 +29396,7 @@
           "source": "packages/utils/dist/url.d.ts",
           "purpose": "Caller-supplied URL input as a string or an object exposing a string href, including native URL objects.",
           "core": "href: URL text supplied by the object-form input; string-form inputs carry their text directly instead.",
-          "advanced": "",
+          "advanced": "Use it in a shared module signature that accepts URL text and native URL objects without requiring DOM or Node type declarations. See the [type utilities guide](/en/docs/utils/type-utilities#shared-signatures).",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -29420,7 +29420,7 @@
           "overloadSignatures": ["export type IUrlLike = string | Readonly<{ href: string; }>;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Use it in a shared module signature that accepts URL text and native URL objects without requiring DOM or Node type declarations. See the [type utilities guide](/en/docs/utils/type-utilities#shared-signatures).",
           "notUse": "",
           "sections": [
             {
@@ -29451,7 +29451,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Use it in a shared module signature that accepts URL text and native URL objects without requiring DOM or Node type declarations. See the [type utilities guide](/en/docs/utils/type-utilities#shared-signatures)."
             }
           ],
           "declaredConfiguration": [],
