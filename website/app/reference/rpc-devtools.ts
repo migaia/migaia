@@ -638,22 +638,22 @@ export const rpcDevtoolsReference: ILibraryReference = {
     },
     contract: {
       summary: t(
-        'Wire query/service types and frozen version-one offline NDJSON format. Start with encodeRpcDevtoolsRecord and decodeRpcDevtoolsRecord; canonical error graph semantics remain in rpc-contract.',
-        '提供线查询与服务类型及固定第一版离线逐行 `JSON` 格式，从记录编码与解码函数开始，规范错误图语义仍归契约包。'
+        'Use this subpath when a tool needs the shared event and service types or reads and writes offline recordings. `encodeRpcDevtoolsRecord()` writes one JSON value per line, and `decodeRpcDevtoolsRecord()` restores the recording, including byte values and errors. These functions convert records; they do not collect live events. Use the root collector to capture activity and `hub` to query several targets together.',
+        '工具需要共用事件和服务类型，或读写离线录制文件时，使用这个子路径。`encodeRpcDevtoolsRecord()` 将记录写成每行一个对象的文本，`decodeRpcDevtoolsRecord()` 则还原记录，包括其中的字节值和错误。它们只转换记录，不采集实时事件。捕获运行情况使用根入口的采集器，合并查询多个目标使用 `hub`。'
       ),
       example: recordExample
     },
     hub: {
       summary: t(
-        'Aggregates already connected service clients or offline records; creates no transport. Start with createRpcDevtoolsHub, then addTarget or importRecord for aligned timeline and explicit interaction queries.',
-        '聚合已有服务客户端或离线记录，不创建传输，从 `createRpcDevtoolsHub` 开始，添加目标或导入记录后查询对齐时间线及显式交互。'
+        'Use this entry when events from several connected services or offline recordings need one timeline. `createRpcDevtoolsHub()` creates the query hub; register an existing client with `addTarget()` or load text with `importRecord()`, then query its timeline and related calls. The hub aligns live target times and groups events using recorded identities. It does not create transports or callable peers; the root collector captures events for each target.',
+        '需要在同一时间线上查看多个已连接服务或离线录制的事件时，使用这个入口。`createRpcDevtoolsHub()` 创建查询中心；通过 `addTarget()` 登记现有客户端，或用 `importRecord()` 导入文本，再查询时间线及相关调用。它会对齐在线目标的时间，并按记录中的身份关联事件。这里不创建载体或可调用对端，各目标的事件由根入口采集器捕获。'
       ),
       example: hubExample
     },
     log: {
       summary: t(
-        'Turns qualifying message and peer observations into calls on a structural logger. Start with createRpcLogProbe and install its probe through Core probePlugin; the logger owns buffering and output.',
-        '将符合条件的消息及连接观察交给结构化日志接收端，从 `createRpcLogProbe` 开始，经核心探针插件安装，缓冲与输出归日志接收端。'
+        "Use this entry to send RPC failures, slow calls and connection lifecycle events to an existing logger. `createRpcLogProbe()` turns the logger into a probe that you install through Core's `probePlugin()`. It selects qualifying events and calls the logger; buffering and output stay with the logger. Unlike the root collector, it does not retain events for later queries.",
+        '需要把远程调用失败、慢调用和连接生命周期事件交给现有日志工具时，使用这个入口。`createRpcLogProbe()` 把日志工具接成探针，再通过核心包的 `probePlugin()` 安装。它筛选需要记录的事件并调用日志工具，缓冲和输出仍由日志工具负责。与根入口的采集器不同，它不保留事件供后续查询。'
       ),
       example: logExample
     }

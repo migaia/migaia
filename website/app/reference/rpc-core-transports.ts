@@ -888,29 +888,29 @@ export const transportReference: ILibraryReference = {
   modules: {
     adapter: {
       summary: t(
-        'Author raw physical message/byte bindings with defineMessageAdapter or defineByteAdapter; Core retains protocol and runtime peer ownership.',
-        '通过消息或字节适配定义编写原物理绑定，核心保留协议及运行对端所有权。'
+        'Use this entry when adding a communication mechanism that the platform packages do not already support. Import `defineMessageAdapter()` for message ports or `defineByteAdapter()` for an ordered byte connection. Each definition accepts your opening operations and exposes factories for a connected peer or a host-managed plugin. Core still handles the RPC protocol and connection cleanup; this is different from wrapping a transport for `createEndpoint()`.',
+        '需要接入平台包尚未支持的通信方式时，使用这个入口。消息端口从 `defineMessageAdapter()` 开始，有序字节连接从 `defineByteAdapter()` 开始。把打开底层连接的操作交给它们，就能创建可互相调用的对端，或由宿主管理的插件。远程调用协议和连接清理仍由核心包负责；如果只是给 `createEndpoint()` 包装消息载体，应使用传输适配器入口。'
       ),
       example: adapterExample
     },
     'adapters/memory': {
       summary: t(
-        'Start with createMemoryTransportPair for same-process queued carriers sharing value identity; close the original pair explicitly.',
-        '从内存载体对开始，在同进程排队交付并共享值身份，显式关闭原载体对。'
+        'Connect two endpoints in the same process without opening a worker or a network connection. Import `createMemoryTransportPair()` from this subpath and give one returned transport to each endpoint. Messages are queued rather than delivered during `send()`, but their values remain shared references. This is a transport pair, not a pair of ready-to-call peers; use `testing` for those and close the original pair when finished.',
+        '需要在同一进程内连接两个端点，又不想打开线程或网络连接时，使用这个入口。从子路径导入 `createMemoryTransportPair()`，把返回的两个载体分别交给两个端点。消息会排队交付，不会在 `send()` 内立即送达，但其中的值仍共享引用。它只创建传输载体；需要可直接调用的双端连接时使用 `testing`，使用完后应关闭原载体对。'
       ),
       example: memoryExample
     },
     'adapters/message-port': {
       summary: t(
-        'Wrap actual browser or Node MessagePorts with their distinct physical cleanup ownership; start with the matching transport factory.',
-        '按不同物理清理所有权包装实际浏览器或节点消息端口，从对应载体工厂开始。'
+        'Use this subpath when you already have a message port and want to supply it to `createEndpoint()`. `createBrowserMessagePortTransport()` wraps a browser-style port; `createNodeMessagePortTransport()` wraps a port with Node event methods. The browser wrapper owns the supplied port by default, with a borrowed option when the caller must close it. These factories adapt existing ports and do not start workers.',
+        '已有消息端口，需要把它交给 `createEndpoint()` 时，从这个子路径选择对应的工厂。`createBrowserMessagePortTransport()` 包装浏览器式端口，`createNodeMessagePortTransport()` 包装使用 Node 事件方法的端口。浏览器工厂默认接管端口，也可选择借用，由调用方负责关闭。两个工厂都只包装现有端口，不负责启动工作线程。'
       ),
       example: browserExample
     },
     'adapters/web-worker': {
       summary: t(
-        'Wrap existing Worker-like event ports through createWebWorkerTransport without taking onmessage or terminating borrowed native resources.',
-        '通过工作者载体工厂包装现有事件端口，不占用消息处理槽，也不终止借用原生资源。'
+        'Use this entry to pass an existing worker or event-based port to `createEndpoint()`. `createWebWorkerTransport()` forwards messages and reports worker or message-decoding failures through the transport error channel. It uses event listeners without replacing `onmessage`, and closing the transport leaves the borrowed worker running. To launch and manage a worker as part of a callable peer, start from `rpc-threads` instead.',
+        '已有工作线程或使用事件监听的端口，需要交给 `createEndpoint()` 时，使用这个入口。`createWebWorkerTransport()` 转发消息，并通过载体错误通道报告工作线程或消息解码失败。它使用事件监听，不覆盖 `onmessage`，关闭载体也不会终止借用的线程。需要创建并管理可调用的工作线程时，应从 `rpc-threads` 开始。'
       ),
       example: workerExample
     }

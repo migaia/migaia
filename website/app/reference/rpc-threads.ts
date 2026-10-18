@@ -786,8 +786,8 @@ const platformModules = Object.fromEntries(
     `adapters/${module}`,
     {
       summary: t(
-        `Explicit ${en} pair for a full \`spawn\` source: \`create${prefix}ThreadLauncher()\` and \`create${prefix}ThreadChannelFactory()\`. Short \`spawn\` forms load the right adapter automatically.`,
-        `为完整 \`spawn\` 来源提供的${zh}组合：\`create${prefix}ThreadLauncher()\` 与 \`create${prefix}ThreadChannelFactory()\`。使用简写 \`spawn\` 时会自动加载对应的适配器。`
+        `Use this subpath for ${en} when building a full \`spawn\` source that explicitly supplies worker launching and communication. \`create${prefix}ThreadLauncher()\` starts the worker, while \`create${prefix}ThreadChannelFactory()\` opens its RPC channel.\n\nPass both to \`createThreadPeer()\` from the root with the rest of the source options. Ordinary URL or path shorthand selects the platform adapter automatically, so it does not need these explicit factories.`,
+        `需要自行指定工作线程的启动方式和通信方式时，使用这个子路径。\`create${prefix}ThreadLauncher()\` 负责启动线程，\`create${prefix}ThreadChannelFactory()\` 负责打开远程调用通道。将两者连同其余来源选项交给根入口的 \`createThreadPeer()\`，即可为 ${zh.replaceAll('Node', '`Node`').replaceAll('Electron', '`Electron`')} 提供完整的 \`spawn\` 配置。普通网址或路径简写会自动选择平台适配器，无须显式使用这两个工厂。`
       ),
       example: fullSpawnExample(
         prefix,

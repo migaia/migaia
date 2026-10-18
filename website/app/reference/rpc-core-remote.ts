@@ -1723,8 +1723,8 @@ export const remoteReference: ILibraryReference = {
   modules: {
     remote: {
       summary: t(
-        'Generation-aware plugin proxies, catalog Host controls and symmetric runtime peers. Start from createRuntimePeer for a negotiated source or createCoroutinePlugin for cooperative tasks.',
-        '提供感知代次的插件代理、目录宿主控制与对称运行时连接。已有协商来源从 `createRuntimePeer()` 开始，协作任务从 `createCoroutinePlugin()` 开始。'
+        'Use this entry when you need callable peers and remote plugin access rather than the lower-level endpoint API at the root. `createRuntimePeer()` opens a peer from a source that supplies a negotiated channel and exposes methods through `request()`, `notify()` and `stream()`. `createRemotePlugin()` exposes a declared remote contract through a plugin host. For ordinary worker or process connections, use the platform package factory so you do not have to supply the channel yourself.',
+        '需要可直接调用的对端或远程插件访问，而不是根入口的底层端点接口时，使用这个入口。`createRuntimePeer()` 从已协商通信能力的通道创建对端，并通过 `request()`、`notify()` 和 `stream()` 调用方法。`createRemotePlugin()` 按声明的远程契约向插件宿主提供访问。普通工作线程或进程连接应优先使用平台包工厂，无须自行提供通道。'
       ),
       example: peerExample
     }

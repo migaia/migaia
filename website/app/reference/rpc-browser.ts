@@ -666,43 +666,43 @@ export const rpcBrowserReference: ILibraryReference = {
     },
     'adapters/window': {
       summary: t(
-        'Low-level Window carrier for a paired Endpoint. Its raw subscriptions preserve message attribution; install `connect({ transport })` so sourceProof rejects another window or origin.',
-        '供双端端点使用的窗口载体，原始订阅保留消息归属；须搭配 `connect({ transport })`，由来源证明拒绝其他窗口或来源域。'
+        'Use this subpath when wiring an existing page, iframe or popup directly to a Core endpoint. `createWindowMessageTransport()` wraps the target window and a message receiver; pass the result to `createEndpoint()` and its `connect()` middleware so the expected window and origin are checked. Raw subscriptions retain source information without doing that admission check themselves. Choose the root `createBrowserPeer()` when you want the ready-made callable peer instead.',
+        '需要把现有页面、内嵌框架或弹窗直接接到核心端点时，使用这个子路径。`createWindowMessageTransport()` 包装目标窗口和消息接收端；将结果同时交给 `createEndpoint()` 及其 `connect()` 中间件，才能核对预期窗口和来源域。直接订阅载体会保留来源信息，但不会自行执行该接纳检查。需要现成的可调用对端时，选择根入口的 `createBrowserPeer()`。'
       ),
       example: windowEndpointExample
     },
     'adapters/shared-worker': {
       summary: t(
-        'Low-level transport over one SharedWorker `MessagePort` for `createEndpoint()`; the port stays owned by the caller.',
-        '供 `createEndpoint()` 使用的、基于单个 SharedWorker `MessagePort` 的底层 transport；端口仍由调用方持有。'
+        'Use this subpath when an existing SharedWorker port needs to connect to a Core endpoint. `createSharedWorkerTransport()` wraps one port for message sending and subscriptions; pass it to `createEndpoint()` with the matching `connect()` middleware. The port remains borrowed, so its creator must close it after endpoint disposal. The root `createBrowserPeer()` handles the higher-level callable connection when you do not need to assemble an endpoint.',
+        '已有共享工作线程端口，需要接到核心端点时，使用这个子路径。`createSharedWorkerTransport()` 将一个端口包装成可发送和订阅消息的载体，交给 `createEndpoint()` 及匹配的 `connect()` 中间件即可接入。端口属于借用资源，端点释放后仍由创建者关闭。不需要自行组装端点时，可用根入口的 `createBrowserPeer()` 创建更高层的可调用连接。'
       ),
       example: sharedEndpointExample
     },
     'adapters/service-worker': {
       summary: t(
-        'Low-level transport between a page and its Service Worker for `createEndpoint()`. No Runtime Peer is offered because the browser may stop a Service Worker at any time.',
-        '供 `createEndpoint()` 使用的、页面与其 Service Worker 之间的底层 transport。因为浏览器随时可能停止 Service Worker，所以不提供 Runtime Peer。'
+        'Use this entry for direct endpoint messaging between a page and its service worker. `createServiceWorkerTransport()` takes the outgoing target and the separate event receiver, and supplies a transport for `createEndpoint()`. Pair it with `connect()` so messages are checked against the expected worker or client identity. The root offers no peer factory for this carrier: the browser can stop the worker, so the application must handle timeouts and reopening.',
+        '页面与服务工作线程需要通过端点互发消息时，使用这个入口。`createServiceWorkerTransport()` 分别接收发送目标和事件接收端，生成供 `createEndpoint()` 使用的载体。搭配 `connect()`，才能按预期工作线程或客户端身份核对消息。根入口不为这种载体提供对端工厂，因为浏览器可能停止线程，应用需处理超时并重新打开连接。'
       ),
       example: serviceExample
     },
     'adapters/broadcast-channel': {
       summary: t(
-        'Low-level transport over a `BroadcastChannel` for `createEndpoint()`: one-to-many between same-origin tabs, so no Runtime Peer.',
-        '供 `createEndpoint()` 使用的、基于 `BroadcastChannel` 的底层 transport：在同源标签页之间一对多广播，因此不提供 Runtime Peer。'
+        'Use this entry when same-origin tabs communicate through a named broadcast channel. `createBroadcastChannelTransport()` wraps your channel for `createEndpoint()`, where endpoint IDs select the logical recipient. The channel still broadcasts to its other participants; IDs do not make it a private point-to-point connection. The root has no peer factory for this carrier, and the caller remains responsible for closing the channel.',
+        '同源标签页需要通过同名广播频道通信时，使用这个入口。`createBroadcastChannelTransport()` 包装已有频道，交给 `createEndpoint()` 后由端点标识选择逻辑接收方。频道仍向其他参与者广播，端点标识不会把它变成私有的一对一连接。根入口不为这种载体提供对端工厂，频道也仍由调用方关闭。'
       ),
       example: broadcastExample
     },
     'adapters/rtc-data-channel': {
       summary: t(
-        'Raw RTC carrier stringifies non-string sends and preserves received values. The paired application example decodes its own JSON; use createBrowserPeer for the canonical Runtime protocol.',
-        '原始数据频道载体把非字符串发送值转换为字符串，并保留接收值；双端应用示例自行解码，规范运行协议请使用运行对端工厂。'
+        'Use this subpath when an application already owns a data channel and needs direct access to its messages. `createRtcDataChannelTransport()` sends strings as-is, converts other outgoing values to text with JSON, and delivers received values without decoding them. The example therefore defines and decodes its own application messages. For typed RPC calls, choose the root `createBrowserPeer()` with a reliable ordered channel; that factory supplies the RPC protocol.',
+        '应用已有数据频道，并需要直接收发其中的消息时，使用这个子路径。`createRtcDataChannelTransport()` 原样发送字符串，把其他发送值转换为文本，收到的值则不经解码直接交给订阅者。因此示例自行定义并解码应用消息。需要带类型的远程调用时，应把可靠有序的频道交给根入口的 `createBrowserPeer()`，由该工厂提供调用协议。'
       ),
       example: rtcTransportExample
     },
     'adapters/web-transport': {
       summary: t(
-        'Raw Uint8Array WebTransport datagrams, with application-owned server protocol and session. No Runtime Peer source or ready-made Core Endpoint/framer combination is supplied; loss and reordering remain possible.',
-        '原始字节数组网页传输数据报，由应用拥有服务器协议及会话；不提供运行对端来源或现成核心端点分帧组合，仍可能丢失乱序。'
+        "Use this entry when an application owns a WebTransport session and exchanges small byte messages with its server. `createWebTransportDatagramTransport()` wraps the session's datagrams and accepts `Uint8Array` values; the application supplies message encoding and the server protocol. Datagrams can be lost or reordered, so the root provides no callable peer for them. Closing the transport closes its acquired writer, while closing the session remains the caller's responsibility.",
+        '应用已有网页传输会话，需要与服务器交换小段字节消息时，使用这个入口。`createWebTransportDatagramTransport()` 包装会话的数据报，只接受 `Uint8Array`，消息编码和服务器协议由应用提供。数据报可能丢失或乱序，因此根入口不提供基于它的可调用对端。关闭载体会关闭它取得的写入端，会话本身仍由调用方关闭。'
       ),
       example: webTransportExample
     }

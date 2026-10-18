@@ -465,8 +465,8 @@ export const kitReference: ILibraryReference = {
   modules: {
     'transport-kit': {
       summary: t(
-        'Adapter-facing transport types and local listener safety helpers. Start with createMessageListenerHub and createListenerFailureState, then preserve physical listener ownership through registration and terminal drain.',
-        '面向适配器的传输类型及本地监听安全辅助能力。从 `createMessageListenerHub()` 和 `createListenerFailureState()` 开始，通过登记与终态排空保持物理监听所有权。'
+        'Use this entry when writing a transport that must share one native event listener among several subscribers and clean it up correctly. `createMessageListenerHub()` attaches the native listener for the first subscriber and removes it after the last one leaves. `createListenerFailureState()` tracks failures raised while reporting listener errors so cleanup can await and report them.\n\nThese are adapter-building helpers, not an endpoint factory; pass the finished transport to the root `createEndpoint()`.',
+        '编写传输载体时，若多个订阅者要共用一个原生事件监听，并在无人订阅后清理它，可使用这个入口。`createMessageListenerHub()` 在首个订阅者加入时挂上原生监听，在最后一个离开时移除。`createListenerFailureState()` 记录上报监听错误时产生的失败，让清理过程能够等待并报告这些失败。这里提供编写适配器的工具，不创建端点；完成的载体可交给根入口的 `createEndpoint()`。'
       ),
       example: hubExample
     }

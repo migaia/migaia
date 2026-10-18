@@ -3534,62 +3534,92 @@ const modules: Record<string, ILibraryReference['modules'][string]> = {
   },
   client: {
     summary: t(
-      'Start with createClientEndpoint for an outbound-only preset with disposal; provider and discovery methods are not implicitly published.',
-      '从客户端端点工厂开始取得含释放的仅出站预设，不隐含发布提供方及发现方法。'
+      'Choose this subpath when an endpoint only needs to call methods on another endpoint. `createClientEndpoint()` gives it sending methods and `dispose()` without adding provider registration or peer-discovery controls. The root `createEndpoint()` selects a fuller preset for two-way use. You still supply the transport and the middleware that connects it.',
+      '端点只需要调用另一端的方法时，选择这个子路径。`createClientEndpoint()` 提供发送方法和 `dispose()`，不附带服务方法登记或对端发现控制。根入口的 `createEndpoint()` 则选择适合双向通信的完整预设。使用客户端预设时，仍需提供载体和负责连接的中间件。'
     ),
     example: symbols.createClientEndpoint.example
   },
   provider: {
     summary: t(
-      'Start with createProviderEndpoint for provider/listener registration together with its required original outbound closure and disposal.',
-      '从提供方端点工厂开始取得提供方、监听登记、必需原出站闭包及释放。'
+      'Choose this subpath when an endpoint must register methods for remote callers and may call back itself. `createProviderEndpoint()` supplies `provide()` and event registration together with sending methods and disposal. It keeps the sending capability because handling requests also requires replies and identity checks. The root full preset additionally selects discovery and control features.',
+      '端点需要为远端登记可调用方法，并可能反向调用时，选择这个子路径。`createProviderEndpoint()` 同时提供 `provide()`、事件登记、发送方法和释放能力。处理请求本身也需要答复及身份核对，因此提供方预设保留发送能力。根入口的完整预设还会选中发现和控制功能。'
     ),
     example: symbols.createProviderEndpoint.example
   },
   full: {
     summary: t(
-      'Use createFullEndpoint for the full scalar projection or createFullOneWayEndpoint when explicit physical one-way completion is required.',
-      '完整标量投影使用完整端点工厂，需要显式物理单向完成时使用完整单向端点工厂。'
+      'Use this entry to explicitly choose the standard two-way endpoint preset. `createFullEndpoint()` combines sending, handler registration, discovery and control; the root also exports it as `createEndpoint()`. `createFullOneWayEndpoint()` adds `sendOneWay()` when you need a promise for local sending without waiting for a reply. Transport and middleware are still supplied by the caller, and ping support depends on the middleware.',
+      '需要明确选择标准双向端点预设时，使用这个入口。`createFullEndpoint()` 组合发送、处理函数登记、发现和控制能力，根入口也以 `createEndpoint()` 导出它。若需要等待本地发送完成而不等待远端答复，可用 `createFullOneWayEndpoint()` 增加 `sendOneWay()`。载体和中间件仍由调用方提供，心跳支持取决于所选中间件。'
     ),
     example: oneWayExample
   },
   composed: {
     summary: t(
-      'Use createComposedEndpoint with actual finite native feature roots; explicit public root selection retains one kernel and private dependency ownership.',
-      '组合端点接收实际有限原生功能根，显式公开根选择保留唯一核心及私有依赖所有权。'
+      'Choose this entry when the endpoint presets do not match the capabilities you want to expose. `createComposedEndpoint()` builds an endpoint from the feature objects you select, such as sending, provider registration or streaming. Reuse the same dependency objects across related features so they share the same sending and connection state. The root `createEndpoint()` chooses the standard full preset for you instead.',
+      '现有端点预设不符合所需能力组合时，选择这个入口。`createComposedEndpoint()` 按你提供的功能对象组装端点，例如发送、服务方法登记或流式结果。相关功能应复用同一组依赖对象，让它们共用发送和连接状态。根入口的 `createEndpoint()` 则替你选择标准完整预设。'
     ),
     example: composedExample
   },
   stream: {
     summary: t(
-      'Compose createCanonicalChunkFeature and createStreamFeature with the same outbound/provider tokens, then register a stream producer and consume its original async iterator.',
-      '将规范分片及流功能与同一出站提供方令牌组合，再登记流生产者并消费原异步迭代器。'
+      'Use this entry when a composed endpoint must return a sequence of values instead of one result. `createCanonicalChunkFeature()` supplies shared message splitting and reassembly, while `createStreamFeature()` adds streaming over the same sending and provider features. Register a producer with `stream.provide()` and read values through the async iterator from `stream.open()`. The root endpoint preset does not automatically add this optional stream surface.',
+      '自行组合的端点需要逐个返回一系列值，而不是只返回一个结果时，使用这个入口。`createCanonicalChunkFeature()` 提供共用的消息拆分与重组，`createStreamFeature()` 在同一组发送和提供方功能上增加流式调用。通过 `stream.provide()` 登记产生数据的函数，再用 `stream.open()` 返回的异步迭代器逐项读取。根入口的端点预设不会自动增加这组流式接口。'
     ),
     example: composedExample
   },
   testing: {
     summary: t(
-      'createPeerPair creates two actual runtime peers for controlled same-process integration; close both peers and do not infer native transfer capability.',
-      '对端对工厂创建两个实际运行对端用于受控同进程集成，用完关闭两端，不推断原生转移能力。'
+      "Use this entry to exercise peer-to-peer calls inside one process without setting up a native communication channel. `createPeerPair()` builds two real peers over the memory transport and infers each side's remote methods from the other side's `provide` value. Close both peers when finished. Unlike the root endpoint factory, it creates both sides together; it does not prove behavior that depends on native ownership transfer.",
+      '需要在一个进程内验证双端调用，又不想准备原生通信通道时，使用这个入口。`createPeerPair()` 在内存载体上创建两个真实对端，并根据各端的 `provide` 推导另一端可调用的方法。使用完后关闭两个对端。与根入口一次创建一个端点不同，它同时创建双端；不能用它证明依赖原生所有权转移的行为。'
     ),
     example: symbols.createPeerPair.example
   },
   'transport-constants': {
     summary: t(
-      'Stable platform, encoding, topology, ownership and operation domains describe actual transport facts without creating or proving capabilities.',
-      '稳定平台、编码、拓扑、所有权及操作域描述实际载体事实，不创建或证明能力。'
+      'Use this entry when an adapter or diagnostic tool needs the shared vocabulary for transport metadata. `RpcPlatform` identifies the communication mechanism, while `RpcTransportOwnership` states whether cleanup closes the resource or only releases borrowed access. The root re-exports these constants too; this subpath makes a metadata-only dependency explicit. Selecting a label does not create a transport or establish its capabilities.',
+      '适配器或诊断工具需要使用一致的载体信息取值时，选择这个入口。`RpcPlatform` 标识通信方式，`RpcTransportOwnership` 则说明清理时应关闭资源，还是只释放对借用资源的使用。根入口也导出这些常量，子路径适合明确只依赖载体信息的代码。填写标签不会创建载体，也不能证明载体支持某种能力。'
     ),
     example: 'console.log(RpcPlatform.memory, RpcTransportOwnership.borrowed)'
   }
 }
-for (const [path, name] of [
-  ['control', 'createControlFeature'],
-  ['discovery', 'createDiscoveryFeature'],
-  ['one-way', 'createOneWayFeature'],
-  ['outbound', 'createOutboundFeature'],
-  ['provider', 'createProviderFeature']
+for (const [path, summary] of [
+  [
+    'control',
+    t(
+      'Use this entry to add liveness checks and close announcements to a composed endpoint. `createControlFeature()` takes the same sending and discovery feature objects used by that endpoint. It supplies controls such as `ping()` only with the corresponding middleware configured; selecting this feature does not make every control available. Choose the full preset when you want the standard combination.',
+      '自行组合的端点需要检查对端是否可响应，或通知对端即将关闭时，使用这个入口。`createControlFeature()` 接收该端点共用的发送和发现功能对象。`ping()` 等控制仍需配置对应中间件，不能只靠选中此功能就启用全部控制。需要标准组合时，可直接选择完整端点预设。'
+    )
+  ],
+  [
+    'discovery',
+    t(
+      'Use this entry when a composed endpoint needs to find peers and select where calls go. `createDiscoveryFeature()` reuses the existing sending feature and adds the `connect` and `discovery` controls. These controls manage peer candidates; they are different from the root `connect()` middleware that wires a transport into an endpoint. The full preset already selects the discovery feature.',
+      '自行组合的端点需要发现对端并选择调用去向时，使用这个入口。`createDiscoveryFeature()` 复用现有发送功能，增加 `connect` 和 `discovery` 控制接口。这些接口管理候选对端，与根入口中负责接入载体的 `connect()` 中间件不同。完整端点预设已经选中发现功能。'
+    )
+  ],
+  [
+    'one-way',
+    t(
+      'Use this subpath to add calls that do not wait for a remote reply to a composed endpoint. `createOneWayFeature()` takes the existing sending feature and adds `sendOneWay()`. Its promise tracks local physical sending, not completion of the remote handler. If you want the standard full endpoint with this extra method, use `createFullOneWayEndpoint()` from `full` instead.',
+      '自行组合的端点需要发送不等待远端答复的调用时，使用这个子路径。`createOneWayFeature()` 接收现有发送功能，并增加 `sendOneWay()`。它返回的 `Promise` 反映本地实际发送的完成情况，不表示远端处理函数已完成。需要带此方法的标准完整端点时，可改用 `full` 中的 `createFullOneWayEndpoint()`。'
+    )
+  ],
+  [
+    'outbound',
+    t(
+      'Import this entry when assembling an endpoint that must send calls and receive their replies. `createOutboundFeature()` creates the sending feature from the feature that splits and reassembles messages for that endpoint. Pass the resulting object to other features that need to send, then select it in `createComposedEndpoint()` if its methods should be public. The client and full presets assemble this for you; creating the feature alone does not open a connection.',
+      '自行组装需要发送调用并接收答复的端点时，导入这个入口。`createOutboundFeature()` 根据同一端点用于拆分和重组消息的功能对象创建发送功能。把返回对象交给其他需要发送的功能；若要公开发送方法，再通过 `createComposedEndpoint()` 选中它。客户端和完整预设会替你完成组装，单独创建功能对象不会打开连接。'
+    )
+  ],
+  [
+    'provider',
+    t(
+      'Use this entry when a composed endpoint must handle incoming calls. `createProviderFeature()` takes the shared sending feature and adds `provide()` for registering handlers. It reuses that sender to check incoming identities and return replies, so it does not create a separate connection. Choose the provider or full preset when you do not need to assemble these features yourself.',
+      '自行组合的端点需要处理传入调用时，使用这个入口。`createProviderFeature()` 接收共用的发送功能，并提供用于登记处理函数的 `provide()`。它复用发送功能来核对传入身份和返回答复，不另建连接。不需要自行组合功能时，可直接选择提供方或完整端点预设。'
+    )
+  ]
 ] as const)
-  modules['features/' + path] = { summary: symbols[name].purpose, example: composedExample }
+  modules['features/' + path] = { summary, example: composedExample }
 /**
  * Middleware examples actually install their specific definition before exercising endpoint
  * behavior.

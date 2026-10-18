@@ -1138,29 +1138,29 @@ export const observationReference: ILibraryReference = {
   modules: {
     probe: {
       summary: t(
-        'Opt-in diagnostic observations start with defineProbe, install through probePlugin, and copy reused views with snapshotProbeEvent.',
-        '可选诊断观察从探针定义开始，经探针插件安装，使用快照复制复用视图。'
+        'Use this entry to observe RPC activity without adding diagnostics to business handlers. `defineProbe()` selects the stages to observe and the callback that receives each event; `probePlugin()` installs it on an endpoint. Event views are reused, so copy an event with `snapshotProbeEvent()` before retaining it. This is the observation mechanism; use `rpc-devtools` when you need collection and queries.',
+        '需要观察远程调用过程，又不想在业务处理函数中加入诊断代码时，使用这个入口。`defineProbe()` 选择观察阶段和接收事件的回调，`probePlugin()` 将其安装到端点。事件视图会复用，保存前应通过 `snapshotProbeEvent()` 复制。这里负责提供观察机制，需要保存和查询事件时使用 `rpc-devtools`。'
       ),
       example: probeExample
     },
     'plugins/flow-control': {
       summary: t(
-        'Connection-local queue contracts and event domains are shared by the send-queue and log features; start with IIpcSendQueueOptions.',
-        '连接本地队列契约及事件域由发送队列与日志功能共用，从发送队列选项开始。'
+        'Import this entry when describing the queue limits or diagnostic events shared by the send-queue and log features. `IIpcSendQueueOptions` defines the limits for one connection; `IIpcSendGate` describes how sends enter that queue and how to wait for it to become idle. These are contracts, not queue factories. Create the queue through `plugins/send-queue` and attach reporting through `plugins/log`.',
+        '需要为发送队列及其日志声明共用的选项或事件类型时，导入这个入口。`IIpcSendQueueOptions` 描述单条连接的队列限额，`IIpcSendGate` 描述发送如何进入队列，以及如何等待队列空闲。这里提供契约，不创建队列。实际创建使用 `plugins/send-queue`，接入报告使用 `plugins/log`。'
       ),
       example: queueExample
     },
     'plugins/send-queue': {
       summary: t(
-        'Bound whole-envelope sends by creating a queue feature and wrapping the same physical transport with its exact gate.',
-        '通过创建队列功能，并以精确门控包装同一物理载体，限制完整信封发送。'
+        "Use this entry when a physical connection needs a bounded queue for complete outgoing messages. `createIpcSendQueueFeature()` creates the queue and its endpoint feature. `createIpcSendQueueTransport()` wraps the transport with that same queue's gate; install the feature on the endpoint using the wrapper. Data and control messages have separate limits, while `plugins/log` only reports queue events.",
+        '一条实际连接需要限制待发送的完整消息数量时，使用这个入口。`createIpcSendQueueFeature()` 创建队列和可安装到端点的功能。再用 `createIpcSendQueueTransport()` 将同一队列的发送控制对象接到载体上，并在使用该载体的端点安装此功能。数据消息和控制消息分别设限，`plugins/log` 只负责报告队列事件。'
       ),
       example: queueExample
     },
     'plugins/log': {
       summary: t(
-        'Observe one existing send gate through createIpcLogFeature and report explicit stderr records without changing business results.',
-        '通过日志功能观察现有发送门控，并上报显式标准错误，不改变业务结果。'
+        "Use this entry to report backlog events from an existing send queue. `createIpcLogFeature()` takes that queue's gate and reporting callbacks, then returns a feature to install on the endpoint. The returned `recordStderr()` also accepts standard-error records supplied by your application. This feature observes the queue; use `plugins/send-queue` to create it, or `rpc-devtools/log` to log RPC observations.",
+        '需要报告现有发送队列的积压情况时，使用这个入口。`createIpcLogFeature()` 接收该队列的发送控制对象和报告回调，返回可安装到端点的功能。返回的 `recordStderr()` 还可接收应用提供的标准错误输出记录。它只观察队列；创建队列使用 `plugins/send-queue`，记录远程调用观察事件使用 `rpc-devtools/log`。'
       ),
       example: queueExample
     }
