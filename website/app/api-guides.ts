@@ -985,24 +985,24 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createAdapterProcessPlugin:registrationOwner',
       'rpc-process:index:createProcessPlugin:registrationOwner'
     ],
-    en: 'Identifies the Host and plugin registration that resilience handling may remove. Supply the exact installing Host and registration name, not another plugin with a similar name.',
-    zh: '指定故障治理可以移除的 Host 及插件登记。应提供实际安装的 Host 和准确登记名，不能指向名称相近的其他插件。'
+    en: 'Installing Host and exact plugin registration that failure handling may remove. A similar plugin name is not sufficient.',
+    zh: '指定故障处理可移除的插件登记。必须提供安装该插件的 Host 和准确登记名，不能使用近似名称。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:registrationOwner.name',
       'rpc-process:index:createProcessPlugin:registrationOwner.name'
     ],
-    en: 'Exact plugin registration name that terminal cleanup may remove. It must equal this plugin options name so resilience handling cannot remove a different registration.',
-    zh: '最终清理可移除的准确插件登记名，必须与当前插件选项中的 name 相等，防止故障处理移除其他登记。'
+    en: 'Name of the registration terminal cleanup may remove. Must equal this plugin options name to protect other registrations.',
+    zh: '最终清理可移除的登记名。必须等于当前插件选项的 name，避免移除其他登记。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:registrationOwner.host',
       'rpc-process:index:createProcessPlugin:registrationOwner.host'
     ],
-    en: 'Dependency-aware Host port whose unUse removes this exact registration. Reuse the installing Host so dependent-plugin removal follows its existing policy.',
-    zh: '能按依赖关系移除当前准确登记的 Host 接口。应复用安装该插件的 Host，让依赖插件的移除沿用其已有规则。'
+    en: "Installing Host port. Its unUse removes this registration using the Host's existing dependency policy.",
+    zh: '安装该插件的 Host 接口。通过 unUse 移除当前登记，依赖插件沿用 Host 已有的移除规则。'
   },
   {
     keys: [
