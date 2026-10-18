@@ -19,15 +19,9 @@ import type { ILoggerRuntimeManager } from './runtime-manager.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
 /**
- * Repository convention: use `type` when interface semantics are unnecessary. Named type aliases
- * begin with `I` to distinguish them from runtime values, classes, and functions. Generic
- * parameters such as `P` and `T` retain conventional names and are exempt.
+ * Local error projection retaining the original for native console inspection; JSON sinks serialize
+ * its full chain.
  */
-
-// ---------------------------------------------------------------------------
-// Log entry contract.
-// ---------------------------------------------------------------------------
-
 export type IErrorInfo = {
   name: string
   message: string
@@ -37,8 +31,9 @@ export type IErrorInfo = {
    * preserve the native error type or its non-enumerable built-in fields. A plain error normally
    * becomes `{}` under `raw`; enumerable custom properties can be serialized. Console and custom
    * sinks use this reference for native stack inspection or APIs such as
-   * `Sentry.captureException()`. The `message` and `stack` fields are serializable projections
-   * instead of the original error.
+   * `Sentry.captureException()`. HTTP and color JSON sinks use the shared bounded
+   * serializeErrorChain projection of raw, preserving source/code/name/message/stack and
+   * cause/aggregate branches without serializing raw.
    */
   raw: Error
 }
@@ -169,8 +164,8 @@ export type ILoggerCore<
   readonly ctx: ILoggerContext
   /**
    * The logger's monotonic clock source (R-9). `flush`, `shutdown`, batch deadlines, and
-   * `boundedWait` use this scheduler. Defaults to lifecycle `systemScheduler`. Plugins use it to
-   * share the host's clock domain.
+   * `boundedWait` use this scheduler. Defaults to utils/scheduler `systemScheduler`. Plugins use it
+   * to share the host's clock domain.
    */
   readonly scheduler: IScheduler
   /** Host capabilities captured by this logger; plugins share the same instance owner. */
@@ -241,6 +236,8 @@ export type ILoggerCore<
   /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */
   onShutdown(fn: IShutdownHandler): IOff
   shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>
+  /** Returns the same terminal completion as shutdown(manual). */
+  dispose(): Promise<IPluginHostDisposalResult>
 
   /**
    * Installs plugins on an existing logger through the same host admission path used by constructor
@@ -296,6 +293,7 @@ export type ILoggerDomainCore<
   TShared extends Record<string, unknown> = Record<string, never>
 > = Omit<
   ILoggerCore<TMode, TShared>,
+  | 'dispose'
   | 'config'
   | 'usePipeline'
   | 'useAsyncPipeline'
@@ -365,8 +363,8 @@ export type ILoggerOptions<
   options?: Record<string, unknown>
   pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode }
   /**
-   * Defaults to lifecycle `systemScheduler`. Flush, shutdown, and batch deadlines share its clock
-   * domain (R-9).
+   * Defaults to utils/scheduler `systemScheduler`. Flush, shutdown, and batch deadlines share its
+   * clock domain (R-9).
    */
   scheduler?: IScheduler
 }

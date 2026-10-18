@@ -67,15 +67,14 @@ const log = new Logger({
 | `dispatchRaw(input, options?)`                                                            | `input: { tag, message, args?, meta?, data?, context?, error?, time? }`；`options.asyncOutput?: boolean` | `input.tag`、`input.message` 必填；其余可选 | `void`                                                  | 同步      | 显式构造结构化 entry；`asyncOutput: true` 时通过 `defer()` 调度输出，但本方法调用本身同步返回。                                 |
 | `raw(text, options?)`                                                                     | `text: string`；`options.asyncOutput?: boolean`                                                          | `text` 必填                                 | `void`                                                  | 同步      | 原样写入 runtime 的 stdout/console，**不经过 pipeline 和 sink**。                                                               |
 | `ctx`                                                                                     | 无                                                                                                       | 只读属性                                    | `ILoggerContext`                                        | 同步      | 冻结的 `id`、业务 `options`、`path`、`topic`、创建时间、环境信息。                                                              |
-| `pipelineMode`                                                                            | 无                                                                                                       | 只读属性                                    | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 同步      | 当前 logger 固定的 pipeline 模式。                                                                                              |
 | `flush()`                                                                                 | 无                                                                                                       | —                                           | `Promise<void>`                                         | 异步      | drain 当前 logger、批处理与 extends 转发下游；并发调用共用同一个 Promise，见 [§7](#7-flush-与-shutdown-精确语义)。              |
-| `shutdown(reason)`                                                                        | `reason: 'signal' \| 'uncaughtException' \| 'unhandledRejection' \| 'manual'`                            | `reason` 必填                               | `Promise<void>`                                         | 异步      | 运行 shutdown handler → flush → 卸载插件；重入调用会 alias 到同一个 in-flight promise，见 [§7](#7-flush-与-shutdown-精确语义)。 |
-| `dispose()`                                                                               | 无                                                                                                       | —                                           | `Promise<void>`                                         | 异步      | `shutdown('manual')` 的别名。                                                                                                   |
+| `shutdown(reason)`                                                                        | `reason: 'signal' \| 'uncaughtException' \| 'unhandledRejection' \| 'manual'`                            | `reason` 必填                               | `Promise<IPluginHostDisposalResult>`                                         | 异步      | 运行 shutdown handler → flush → 卸载插件；重入调用会 alias 到同一个 in-flight promise，见 [§7](#7-flush-与-shutdown-精确语义)。 |
+| `dispose()`                                                                               | 无                                                                                                       | —                                           | `Promise<IPluginHostDisposalResult>`                                         | 异步      | `shutdown('manual')` 的别名。                                                                                                   |
 | `extends(...others)`                                                                      | `others: ILoggerCore[]`                                                                                  | 至少 1 个目标                               | `this`                                                  | 同步      | 把当前 logger 接入目标的完整 pipeline/sink，见 [§10](#10-extends多-logger-转发)。                                               |
 | `unextend(...others)`                                                                     | `others: ILoggerCore[]`                                                                                  | 可为空                                      | `boolean`                                               | 同步      | 按 logger context id 移除转发边；至少移除一条返回 `true`，重复移除返回 `false`。                                                |
-| `use(...plugins)`                                                                         | `plugins: ILoggerPlugin[]`                                                                               | 至少 1 个                                   | `Promise<logger & Extensions>`                          | 异步      | 运行期动态安装插件。                                                                                                            |
+| `use(...plugins)`                                                                         | `plugins: ILoggerPlugin[]`                                                                               | 至少 1 个                                   | `Promise<IPluginHandleTuple<NewP>>`                          | 异步      | 返回输入顺序的 handle tuple；扩展方法在 handle.extensions，原 logger 类型不变。                                                                                                            |
 | `unUse(name)`                                                                             | `name: string`                                                                                           | 必填                                        | `Promise<void>`                                         | 异步      | 卸载指定插件。                                                                                                                  |
-| `config.get(path)`                                                                        | `plugin.key` 或 `plugin.[index].key`                                                                     | 必填                                        | `unknown \| undefined`                                  | 同步      | 读取指定插件的配置嵌套值；直接读插件根配置不合法，见 [§5](#5-配置边界)。                                                        |
+| `config.get(path)`                                                                        | `plugin`、`plugin.key` 或 `plugin.[index].key`                                                                     | 必填                                        | `unknown \| undefined`                                  | 同步      | 读取指定插件根配置或嵌套值；对象/数组递归冻结，见 [§5](#5-配置边界)。                                                        |
 | `config.update(name, recipe)`                                                             | `name: string`；`recipe(previous) => Partial<config>`                                                    | 两项都必填                                  | `Promise<void>`                                         | 异步      | 浅合并 patch 并提交，见 [§5](#5-配置边界)。                                                                                     |
 | `hook(name, fn)`                                                                          | `name: string`；`fn: (entry) => void \| Promise<void>`                                                   | 两项都必填                                  | `() => void`                                            | 同步      | 注册 hook；返回取消订阅函数。                                                                                                   |
 | `fireHook(name, entry)`                                                                   | `name: string`；`entry: ILogEntry`                                                                       | 两项都必填                                  | `void`                                                  | 同步      | 立即触发该名称下的全部 hook。                                                                                                   |
@@ -84,9 +83,8 @@ const log = new Logger({
 | `onFlush(fn)`                                                                             | `fn: () => void \| Promise<void>`                                                                        | 必填                                        | `() => void`                                            | 同步      | 注册每轮 `flush()` 都会调用一次的处理函数。                                                                                     |
 | `onShutdown(fn)`                                                                          | `fn: (reason) => void \| Promise<void>`                                                                  | 必填                                        | `() => void`                                            | 同步      | 注册 shutdown 收尾钩子。                                                                                                        |
 | `useSink(fn)`                                                                             | `fn: (entry) => void \| Promise<void>`                                                                   | 必填                                        | `() => void`                                            | 同步      | 注册一个输出 sink。                                                                                                             |
-| `usePipeline` / `useAsyncPipeline` / `useGeneratorPipeline` / `useAsyncGeneratorPipeline` | 与当前 `pipelineMode` 匹配的 stage                                                                       | 必填                                        | `this`                                                  | 同步      | 注册 pipeline 处理阶段，见 [§4](#4-pipeline-模式与-stage)；注册调用本身同步返回。                                               |
+| `usePipeline` / `useAsyncPipeline` / `useGeneratorPipeline` / `useAsyncGeneratorPipeline` | 符合配置 mode 提升规则的 stage                                                                       | 必填                                        | `this`                                                  | 同步      | 注册 pipeline 处理阶段，见 [§4](#4-pipeline-模式与-stage)；注册调用本身同步返回。                                               |
 | `onDispose(resource)`                                                                     | disposer 函数或 disposable 对象                                                                          | 必填                                        | `void`                                                  | 同步      | 仅插件 `install()` 期间可调用，登记资源清理；应用代码不应直接调用。                                                             |
-| `PluginHost.setLocale(locale)`                                                            | 继承自 `@migaia/plugin-host`                                                                             | —                                           | —                                                       | 同步      | 见 `@migaia/plugin-host` 文档。                                                                                                 |
 
 `shutdown()` 完成后，`log`、`dispatchRaw`、`raw` 都不再产生任何输出（静默忽略，不抛错）。日志管线内部的失败**默认不会**从业务的 `log()` 调用里抛出来——始终应该用 `onFailure()` 接入监控或错误上报，否则失败会无声无息地消失。
 
@@ -103,9 +101,9 @@ const log = new Logger({
 | `generator`       | `useGeneratorPipeline`      | 通过生成器组合处理流程                                                                           |
 | `async-generator` | `useAsyncGeneratorPipeline` | terminal 语义与 `generator` 一致，串行 `await` 耗尽每个 stage（中间 yield 不提前进入下一 stage） |
 
-`useAsyncGeneratorPipeline` 由 `PluginHost` 基类直接提供（`LoggerCore` 未对它做任何包装），能力与 `@migaia/plugin-host` 的 `host.useAsyncGeneratorPipeline` 完全一致，用法见该包文档。
+`useAsyncGeneratorPipeline` 由 LoggerCore 显式委派给唯一的功能 Host（Logger 不继承 PluginHost），能力与 `@migaia/plugin-host` 的 `host.useAsyncGeneratorPipeline` 完全一致，用法见该包文档。
 
-内置的同步插件（`level`、过滤器、`uuid` 等）会由 Logger 自动适配到当前 mode（含 `async-generator`），因此不管选哪种 mode，这些插件行为一致；但**直接注册自定义 stage 时，注册方法必须和当前 mode 匹配**，不匹配会立即抛错——不存在"用错方法但静默降级"这种情况。`ILoggerCore<TMode>` 在 `TMode` 收窄到某个具体 mode 字面量时，会把其余三个 `useXPipeline` 方法在类型层面收窄为 `never`，因此用错方法通常在编译期就会报错，而不必等到运行时才抛 `PIPELINE_MODE_MISMATCH`。
+内置同步插件复用 Host 的模式适配。直接注册 stage 时，同步 `usePipeline` 可用于全部 mode，generator 还可提升到 async-generator；其它异步/生成器 stage 要求相应模式。不兼容方法在具体 mode 类型中为 never，运行时也拒绝；不要求所有注册方法名与 mode 完全相同。
 
 pipeline 执行期间禁止新增 stage，避免修改一条正在执行中的处理链。每个 stage 在一次调用里最多调用一次 `next()`：重复调用抛出 `PIPELINE_NEXT_DUPLICATE`；stage 已经返回后才延迟调用 `next()` 会产生 `PIPELINE_NEXT_LATE` diagnostic（不抛错，只上报）；完全不调用 `next()` 表示这个 stage 主动拦截了这条 entry，不会继续往下传递。四种 mode 使用完全相同的违规检测逻辑。
 
@@ -115,7 +113,7 @@ pipeline 执行期间禁止新增 stage，避免修改一条正在执行中的�
 
 ## 5. 配置边界
 
-应用侧的 `log.config` 是一个统一的配置门面：`get('plugin.key')` 读取指定插件配置的嵌套值，`get('plugin.[index].key')` 读取数组项；`update(name, recipe)` 更新指定插件的配置。配置读取只做**一层浅拷贝**：顶层返回值和存储的配置对象隔离，但嵌套对象/数组仍是共享引用，由调用方自行负责不修改它们——这是有意的设计取舍（深拷贝在高频访问路径上代价不划算），不是遗漏。
+应用侧的 `log.config` 委托给 Plugin Host：`get('plugin')` 可读整份插件配置，`get('plugin.key')` 读取嵌套值，`get('plugin.[index].key')` 读取数组项；`update(name, recipe)` 浅合并 patch 后提交新的所有权快照。配置中的对象和数组递归冻结，读取方不得修改；使用 update 返回 patch。
 
 插件在 `install(core)` 里拿到的 `core.config` 刻意更窄：它只有无参的 `get()`，**只能读取当前插件自己的配置快照**，不能通过这个门面读取或更新其他插件的配置。插件的异步生命周期也不应该通过反复轮询自己的 config 来等待某个外部条件——这不是配置系统设计的用途。
 
@@ -141,7 +139,7 @@ pipeline 执行期间禁止新增 stage，避免修改一条正在执行中的�
 
 `shutdown()` 先原子性地进入关闭流程（同步标记状态并发布一个内部 promise），再依次执行 shutdown handler——handler 内部仍然可以通过 `log()`/`dispatchRaw()` 写收尾日志，这些日志会被后续的 flush 阶段一并等到。`raw()` 从关闭流程开始那一刻起就不再直接写 stdout。收尾钩子跑完后进入 flush，再卸载全部插件，最终进入终态，新日志被静默忽略。
 
-**并发/重入调用 `shutdown()` 会 alias 到同一个进行中的 Promise**——即便某个 shutdown handler 自己又调用了一次 `shutdown()`，也只会拿到当前这一轮已经在进行的同一个 Promise，不会触发第二轮独立的 handler 遍历。`shutdown()` 失败（比如某个插件的 `dispose()` 抛错）时，实例会被标记为终态并停止接收日志——这不是一个可以重试恢复的中间状态；再次调用 `shutdown()` 会得到一个已经 resolve 的 Promise（不会重新抛出之前的失败）。
+**并发/重入调用 `shutdown()` 会 alias 到同一个进行中的 Promise**——即便某个 shutdown handler 自己又调用了一次 `shutdown()`，也只会拿到当前这一轮已经在进行的同一个 Promise，不会触发第二轮独立的 handler 遍历。`shutdown()` 失败（比如某个插件的 `dispose()` 抛错）时，实例会被标记为终态并停止接收日志——这不是一个可以重试恢复的中间状态；后续调用始终返回同一个 Promise，保留其结果或拒绝。结果是宿主 IPluginHostDisposalResult：cleanupErrors/cleanupComplete 描述物理清理，不代表日志已送达；拒绝也不会再次重试关闭。时钟读取失败进入该 Promise 的 INVALID_OPTION/cause，仍尝试宿主清理，附带清理失败不会替换主因。
 
 ---
 
@@ -201,7 +199,7 @@ Hook 名称约定：`before`、`after`、`before:<tag>`、`after:<tag>`，也可
 | `maxSize`              | `number`  | 可选   | `20`   | 攒够这个数量就触发一次发送。                                             |
 | `maxWaitMs`            | `number`  | 可选   | `2000` | 批次里第一项进入后的最长等待时间。                                       |
 | `maxConcurrentBatches` | `number`  | 可选   | `1`    | 同时执行的批次数；必须是正安全整数。                                     |
-| `maxPendingBatches`    | `number`  | 可选   | `1024` | 排队中与执行中的批次总上限；满载时以 `BATCH_OVERFLOW` 失败，不静默丢弃。 |
+| `maxPendingBatches`    | `number`  | 可选   | `1024` | 排队中与执行中的批次总上限；满载时报告 `BATCH_OVERFLOW`；优先丢最老排队批次，若全在执行则丢新批次。 |
 | `asyncOutput`          | `boolean` | 可选   | `true` | 满批次的回调是否走 `defer` 调度。                                        |
 
 Batcher 的 `push(item)` 收集条目，`flush()` 发送剩余条目并等待正在进行的回调完成；这个 batcher 会自动登记进宿主 Logger 的 `flush()` 追踪范围，不需要手动接入。
@@ -219,7 +217,7 @@ Batcher 的 `push(item)` 收集条目，`flush()` 发送剩余条目并等待正
 | `requestTimeoutMs` | `number`                                 | 可选   | `10000` | 单次请求最长等待时间；超时会 abort 当前请求并按网络错误处理。 |
 | `batch`            | `{ maxSize?, maxWaitMs?, asyncOutput? }` | 可选   | 无      | 覆盖传给 `batch()` shared factory 的配置。                    |
 
-4xx 错误（429 除外）会直接失败、不重试；429 优先读取响应的 `Retry-After` 头部作为等待时间，没有该头部时退回指数退避。`shutdown()` 会主动 abort 尚未完成的 HTTP 请求，失败结果可以通过 `onFailure()` 观察到。**需要批量发送必须保证插件顺序是 `plugins: [batch(), http(...)]`**——顺序反了批处理不会生效。
+4xx 错误（429 除外）会直接失败、不重试；429 优先读取响应的 `Retry-After` 头部作为等待时间，没有该头部时退回指数退避。关闭先排空最终日志，再在 HTTP 插件释放时 abort 剩余请求；失败由 `onFailure()` 观察。同一批安装的 batch/http 按 Feature 依赖排序，`[http(...), batch()]` 同样生效；跨 use 调用晚装 provider 不会追溯重绑。没有 batch provider 时，指定 http.batch 仍启用本地有界队列，但强制 maxSize:1、asyncOutput:false。
 
 ### 文件插件（独立子路径）
 
@@ -287,7 +285,7 @@ const api = new Logger({
 })
 api.extends(audit)
 
-api.info('user created') // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit
+api.log('info', 'user created') // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit
 ```
 
 `extends()` 转发的是**完整的处理路径**，不是简单抄送——目标 logger 自己的级别阈值、过滤器同样会对转发过来的日志生效。转发时会把当前 `topic` 追加进一份仅用于展示的 `topicChain`，同时把当前 logger 的 `id` 追加进一份仅用于循环检测的内部路径（两者故意分开维护：循环检测不能依赖可能为空、可能重名的 `topic` 字符串）。`extends()` 注册时会做一次静态循环检测（`a.extends(b); b.extends(a)` 这种直接循环会在调用 `extends()` 那一刻就抛错），转发时还有运行时兜底检测，防止通过外部自定义的 `ILoggerCore` 实现绕过静态检测形成循环转发。
@@ -357,6 +355,7 @@ await log.flush()
 | `LoggerErrorCode`              | 码值                              | 触发条件 / 处理                                                                    |
 | ------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------- |
 | `invalidOption`                | `INVALID_OPTION`                  | 公开配置不可读或结构非法；修正配置，getter 原错误保留在 `cause`                    |
+| `pipelineEntryInvalid` | `PIPELINE_ENTRY_INVALID` | pipeline 替换值的 time 非当前 realm Date；报告后交付原 entry |
 | `runtimeShuttingDown`          | `RUNTIME_SHUTTING_DOWN`           | runtime 已进入 shutdown 后仍安装 process/logger；等待终结或不要安装 process plugin |
 | `pluginConfigConflict`         | `PLUGIN_CONFIG_CONFLICT`          | process plugin 以不同配置重复安装；统一配置或卸载后重装                            |
 | `transportUnavailable`         | `TRANSPORT_UNAVAILABLE`           | http plugin 找不到 `fetch`；注入 runtime fetch 或换宿主                            |
@@ -370,7 +369,7 @@ await log.flush()
 | `hookFailed`                   | `HOOK_FAILED`                     | failure hook 自身失败的诊断码；只走 runtime reporter，不递归抛给业务入口           |
 | `extendsSelf`                  | `EXTENDS_SELF`                    | logger 转发给自身；移除自引用                                                      |
 | `extendsCycle`                 | `EXTENDS_CYCLE`                   | 新 extends 边形成环；拆除环路                                                      |
-| `batchOverflow`                | `BATCH_OVERFLOW`                  | pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃                         |
+| `batchOverflow`                | `BATCH_OVERFLOW`                  | pending 满载：丢最老排队批次，全在途时丢新批次；检查 dropped 并按业务补偿                         |
 | `fileSinkUnavailable`          | `FILE_SINK_UNAVAILABLE`           | file 插件无注入的 `fs` 能力且无 Node 默认能力；注入 `fs` 或选择 Node 条件          |
 
 ## 13. 构建、测试与常见问题排查
@@ -395,16 +394,20 @@ pnpm --filter @migaia/logger test
 不支持——`shutdown()`（无论成功还是失败）都会把 logger 带入终态，之后的日志调用会被静默忽略。需要"可恢复"的场景应该创建一个新的 `Logger` 实例，而不是复用已经 shutdown 的实例。
 
 **Q：批量 HTTP 发送没生效，还是一条一条发。**
-检查插件顺序是不是 `plugins: [batch(), http(...)]`——`http()` 必须排在 `batch()` 之后才能拿到批处理的 shared 能力。
+检查 batch provider 是否与 http 同批安装（该批按 Feature 依赖排序）或已提前安装；跨调用晚装 batch 不会重新绑定已安装的 http。
 
 **Q：同一个插件装在两个 Logger 上，行为很奇怪。**
 不要复用插件实例，见 [§6](#6-插件安装与实例所有权)。每次安装都重新调用一次插件工厂函数（比如两次分别调用 `http({...})`，而不是把同一个 `http({...})` 的返回值装两次）。
 
 **Q：TypeScript 提示某个插件方法不存在。**
-只有插件真正被装上（无论是构造参数里还是 `await log.use(plugin)`），对应方法才会出现在类型上。异步安装的插件如果是根据运行时条件动态选择的，TypeScript 无法静态推导，需要手动标注类型。
+构造参数中静态安装的插件扩展出现在实例类型上；`await log.use(plugin)` 返回输入顺序的 handle tuple，动态扩展通过 handle.extensions 调用，原 log 变量不会扩张。
 
 Pipeline replacements must retain a current-realm `Date` in `entry.time`. An invalid replacement (including serialized timestamps or a foreign-realm Date) reports `PIPELINE_ENTRY_INVALID` through `onFailure` with source `pipeline`, then delivers the original entry. Dispatch remains non-throwing.
 
 `new Logger({ execution, runtimeManager })` captures that host capability owner. If omitted, construction captures the current module default. Built-in console, UUID, HTTP and file plugins use their logger's owner. `createAbortController` is an optional host cancellation factory for alternate AbortSignal implementations; HTTP falls back to native controllers when it is absent. This is the same cancellation boundary in production and tests.
 
 `setLoggerRuntimeManager` now selects the default for **future instances**; it no longer retargets existing loggers. Migrate code that changes a live logger globally to construct it with an explicit `runtimeManager`. The manager object itself is retained by reference. ProcessPlugin still owns one shared set of exit/signal hooks: all participants must agree on process identity, configuration and scheduler domain, or receive `PLUGIN_CONFIG_CONFLICT`. Its late diagnostics use the first installer's captured manager.
+
+公开面收敛：颜色与级别类型统一从根入口导入 `ILoggerColorMode`、`ILoggerLevel`；plugins 不再导出 IColorMode/ILogLevel。Host 装配类型 ILoggerDomainCore 仅留内部，应用/插件使用 ILoggerCore/ILoggerPluginCore。
+
+`hook()` 返回的 off 只移除本次登记，同一函数多次登记互不影响。forward 的 display topicChain 暴露在 sink 私有 data 快照中，循环检测 symbol 仍不外泄。HTTP 与 color JSON 输出使用 Utils 的有界错误链投影，保留 source/code/name/message/stack/cause/errors，且不发送 raw；本地 console/custom sink 仍保留原 Error 引用。原始业务错误没有 semantic identity 时，序列化采用 Utils 的 unknown/UNKNOWN 诊断占位，不将它伪称为包内抛错码。宿主 reporter 自身 throw/rejection 通过既有 host exception queue 可观察，不递归调用 logger reporter，也不替换业务结果。

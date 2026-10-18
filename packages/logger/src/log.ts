@@ -1,7 +1,6 @@
 import { defineHost } from '@migaia/plugin-host'
 import {
   createEventChannel,
-  EventRemovalPolicy,
   invokeEachLive,
   withSnapshotEntries,
   type ICanonicalEventChannel
@@ -49,10 +48,16 @@ type ILoggerInternalState = { extendPath: string[]; topicChain: string[] }
 import { getLoggerRuntimeManager, type ILoggerRuntimeManager } from './runtime-manager.js'
 import { boundedWait, snapshotScheduler } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import { LoggerStatus, type ILoggerStatus } from './state-constants.js'
 import { LoggerErrorText } from './error-text.js'
+import { LoggerEntryDataKey } from './plugin-constants.js'
 import { registerLoggerSchedulerDomain } from './scheduler-domain.js'
-import { captureLoggerPromiseLike, observeLoggerReporterResult } from './thenable.js'
+import {
+  captureLoggerPromiseLike,
+  observeLoggerReporterResult,
+  reportLoggerReporterFailure
+} from './thenable.js'
 
 /**
  * Cross-realm-safe check for "awaitable", so a Promise constructed in another realm (an iframe, a
@@ -174,12 +179,6 @@ class LoggerCore {
 
   #sinks: ICanonicalEventChannel<ILogEntry, void> = createEventChannel()
   #hooks: Map<string, ICanonicalEventChannel<ILogEntry, void>> = new Map()
-  /**
-   * One channel listener per hook function. Hook channels use `listener-all` removal, which matches
-   * by listener identity, so registering the same function twice must reuse the same listener for a
-   * release to remove every registration of that function.
-   */
-  #hookListeners = new WeakMap<ILogHookFn, (event: { readonly value: ILogEntry }) => void>()
   #flushers: ICanonicalEventChannel<undefined, void> = createEventChannel()
   #shutdownHandlers: ICanonicalEventChannel<IShutdownReason, void> = createEventChannel()
   #failureHooks: ICanonicalEventChannel<ILogFailure, void> = createEventChannel()
@@ -354,16 +353,10 @@ class LoggerCore {
   }
 
   hook(name: string, fn: ILogHookFn): () => void {
-    const channel =
-      this.#hooks.get(name) ?? createEventChannel({ removalPolicy: EventRemovalPolicy.listenerAll })
+    const channel = this.#hooks.get(name) ?? createEventChannel<ILogEntry, void>()
     this.#hooks.set(name, channel)
-    /** Stable listener for `fn`; a fresh wrapper per call would defeat `listener-all` removal. */
-    let listener = this.#hookListeners.get(fn)
-    if (!listener) {
-      listener = (event) => fn(event.value)
-      this.#hookListeners.set(fn, listener)
-    }
-    const admission = channel.subscribe(listener)
+    /** Each subscription uses the channel's canonical handle-owned removal. */
+    const admission = channel.subscribe((event) => fn(event.value))
     return () => {
       admission()
       if (channel.size === 0 && this.#hooks.get(name) === channel) this.#hooks.delete(name)
@@ -387,12 +380,12 @@ class LoggerCore {
               (hookError) => {
                 try {
                   this.#reportFailureHookError(hookError)
-                } catch {
-                  // Failure reporting is the terminal boundary; a reporter must never escape it.
+                } catch (reporterError) {
+                  reportLoggerReporterFailure(reporterError)
                 }
               }
             )
-            void observed.catch(() => undefined)
+            void observed.catch(reportLoggerReporterFailure)
           }
         } catch (hookError) {
           this.#reportFailureHookError(hookError)
@@ -414,8 +407,8 @@ class LoggerCore {
         ? runtime.console.error(`[logger] ${labels[source]}:`, error)
         : runtime.write(`[logger] ${labels[source]}: ${String(error)}`)
       observeLoggerReporterResult(result)
-    } catch {
-      // Console/write are the final observer. Their own failure must not escape or recurse.
+    } catch (reporterError) {
+      reportLoggerReporterFailure(reporterError)
     }
   }
 
@@ -432,8 +425,8 @@ class LoggerCore {
         ? runtime.console.error(reported, hookError)
         : runtime.write(`${LoggerErrorText.failureHookThrew} ${String(hookError)}`)
       observeLoggerReporterResult(result)
-    } catch {
-      // This is intentionally the last containment boundary.
+    } catch (reporterError) {
+      reportLoggerReporterFailure(reporterError)
     }
   }
 
@@ -616,43 +609,74 @@ class LoggerCore {
     // also keeps total shutdown latency bounded to ~3s instead of handlers-plus-flush stacking two
     // independent windows. See LG-R5-1 in
     // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
-    const deadlineAt = this.#scheduler.now() + 3000
     ;(async () => {
-      await withSnapshotEntries(this.#shutdownHandlers, reason, async (entries) => {
-        for (const invocation of entries) {
-          try {
-            // Every handler is still invoked (unlike the flusher/extends-target loops, which `break`
-            // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
-            // slow, and changing that would be a public-behavior change this round must not make.
-            // Only the *wait* for each handler is capped at the shared remaining budget.
-            if (
-              !(await boundedWait(Promise.resolve(invocation.invoke()), deadlineAt, {
-                scheduler: this.#scheduler
-              }))
-            ) {
-              this.#reportFailure(
-                'shutdown',
-                createLoggerError(
-                  LoggerErrorCode.lifecycleDeadline,
-                  LoggerErrorText.shutdownHandlerDeadline
-                )
-              )
-            }
-          } catch (error) {
-            this.#reportFailure('shutdown', error)
-          }
+      /** Explicit presence retains even a thrown undefined as the primary shutdown failure. */
+      let failed = false
+      /** Cleanup failures must never replace the failure that stopped draining. */
+      let primary: unknown
+      try {
+        /** Deadline admission belongs inside the already-published completion Promise. */
+        let deadlineAt: number
+        try {
+          deadlineAt = this.#scheduler.now() + 3000
+        } catch (error) {
+          throw createLoggerError(
+            LoggerErrorCode.invalidOption,
+            LoggerErrorText.shutdownClockFailed,
+            { cause: error }
+          )
         }
-      })
-      await this.flush(deadlineAt)
+        await withSnapshotEntries(this.#shutdownHandlers, reason, async (entries) => {
+          for (const invocation of entries) {
+            try {
+              // Every handler is still invoked (unlike the flusher/extends-target loops, which `break`
+              // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
+              // slow, and changing that would be a public-behavior change this round must not make.
+              // Only the *wait* for each handler is capped at the shared remaining budget.
+              if (
+                !(await boundedWait(Promise.resolve(invocation.invoke()), deadlineAt, {
+                  scheduler: this.#scheduler
+                }))
+              ) {
+                this.#reportFailure(
+                  'shutdown',
+                  createLoggerError(
+                    LoggerErrorCode.lifecycleDeadline,
+                    LoggerErrorText.shutdownHandlerDeadline
+                  )
+                )
+              }
+            } catch (error) {
+              this.#reportFailure('shutdown', error)
+            }
+          }
+        })
+        await this.flush(deadlineAt)
+      } catch (error) {
+        failed = true
+        primary = error
+      }
       // Shutdown handlers are allowed to enqueue final work; that work was drained above. Close
       // normal dispatch before PluginHost invokes plugin disposers so disposer-era logs cannot
       // enter a host whose lifecycle is already being torn down and create late #pending work.
       this.#dispatchAdmissionOpen = false
       // Extension edges are owned by this core and must not retain live targets after shutdown.
       this.#extendTargets = []
-      const result = (await this.#handle.dispose()) as IPluginHostDisposalResult
+      /** The same admitted host is disposed once, whether draining succeeded or failed. */
+      let result: IPluginHostDisposalResult | undefined
+      try {
+        result = (await this.#handle.dispose()) as IPluginHostDisposalResult
+      } catch (cleanupError) {
+        primary = failed ? attachSecondaryErrors(primary, [cleanupError]) : cleanupError
+        failed = true
+      }
       this.#status = LoggerStatus.closed
-      return result
+      if (failed) {
+        if (result && result.cleanupErrors.length > 0)
+          primary = attachSecondaryErrors(primary, result.cleanupErrors)
+        throw primary
+      }
+      return result!
     })().then(
       (result) => settle?.(result),
       (error) => {
@@ -671,7 +695,12 @@ class LoggerCore {
   }
 
   raw(text: string, options: ILogDispatchOptions = {}): void {
-    if (!this.#dispatchAdmissionOpen || this.#status === LoggerStatus.closed) return
+    if (
+      !this.#dispatchAdmissionOpen ||
+      this.#status === LoggerStatus.shuttingDown ||
+      this.#status === LoggerStatus.closed
+    )
+      return
     const write = () => {
       this.#runtimeManager.write(text)
     }
@@ -944,7 +973,11 @@ class LoggerCore {
    */
   #snapshotEntry(entry: ILogEntry): ILogEntry {
     const data: Record<PropertyKey, unknown> = { ...entry.data }
+    /** Only display topics cross the public sink boundary; cycle authority stays private. */
+    const internal = data[loggerInternalState] as ILoggerInternalState | undefined
     delete data[loggerInternalState as unknown as string]
+    if (internal && internal.topicChain.length > 0)
+      data[LoggerEntryDataKey.topicChain] = [...internal.topicChain]
     return {
       ...entry,
       time: new Date(entry.time.getTime()),

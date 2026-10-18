@@ -25,7 +25,6 @@ export type {
   ILogDispatchOptions,
   ILogEntry,
   ILoggerCore,
-  ILoggerDomainCore,
   ILogFailure,
   ILogFailureHook,
   ILogFilter,

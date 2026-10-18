@@ -114,17 +114,17 @@ describe('Round24 logger construction admission', () => {
 })
 
 describe('Round24 HTTP shutdown admission', () => {
-  it('does not start a fresh request after shutdown abort when the signal does not replay abort', async () => {
+  it('drains final entries before disposal abort even when the signal does not replay abort', async () => {
     /** Records every controller so request-controller abort state is observable. */
     const controllers: Array<{ readonly signal: { readonly aborted: boolean } }> = []
-    /** Records fetch attempts; shutdown admission must prevent all attempts. */
+    /** Records the final entry sent before transport ownership is disposed. */
     const fetch = vi.fn(async (_url: string, init: { signal?: AbortSignal }) => {
-      if (!init.signal?.aborted) throw new Error('round24-fetch-started-live')
+      expect(init.signal?.aborted).toBe(false)
       return { ok: true, status: 200, headers: { get: () => null } }
     })
     /** Counts shutdown listener registration/removal so terminal cleanup is explicit. */
     const listenerState = { adds: 0, removes: 0 }
-    /** Request-timeout scheduler calls prove no HTTP timer was created after terminal admission. */
+    /** Final delivery gets one timeout before disposal closes admission. */
     let requestScheduleCalls = 0
     const scheduler = {
       now: () => 0,
@@ -202,11 +202,12 @@ describe('Round24 HTTP shutdown admission', () => {
         logicalTerminal: true,
         cleanupComplete: true
       })
-      expect(fetch).not.toHaveBeenCalled()
+      expect(fetch).toHaveBeenCalledOnce()
       expect(controllers.length).toBe(baselineControllerCount + 1)
-      expect(controllers.at(-1)?.signal.aborted).toBe(true)
+      expect(controllers.at(-1)?.signal.aborted).toBe(false)
+      expect(controllers[0]?.signal.aborted).toBe(true)
       expect(listenerState).toEqual({ adds: 1, removes: 1 })
-      expect(requestScheduleCalls).toBe(0)
+      expect(requestScheduleCalls).toBe(1)
       await expect(logger.flush()).resolves.toBeUndefined()
     } finally {
       restore()

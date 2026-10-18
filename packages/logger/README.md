@@ -111,7 +111,7 @@ pnpm add @migaia/logger
 3. **`shutdown()` 之后日志被静默忽略**，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。
 4. **日志系统内部的失败不会从业务调用抛出**。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。
 5. **`pipeline.mode` 构造后不可切换**。sync stage 可提升到任意模式，generator stage 还可提升到 async-generator；其余不兼容组合会立即报 `PIPELINE_MODE_MISMATCH`，详见 USEGUIDE。
-6. **`http()` 批量发送要求插件顺序正确**：`plugins: [batch(), http(...)]`，顺序反了批处理不会生效。
+6. **`http()` 通过 Feature 解析 batch provider**：同批 `[batch(), http(...)]` 或反序均按依赖排序；跨调用晚装 batch 不会追溯重绑。
 7. **`extends()` 只转发运行时输出路径**，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。
 8. **批处理队列有界且不会静默丢日志**：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。
 
@@ -158,3 +158,7 @@ Pipeline replacements must retain a current-realm `Date` in `entry.time`. An inv
 `new Logger({ execution, runtimeManager })` captures that host capability owner. If omitted, construction captures the current module default. Built-in console, UUID, HTTP and file plugins use their logger's owner. `createAbortController` is an optional host cancellation factory for alternate AbortSignal implementations; HTTP falls back to native controllers when it is absent. This is the same cancellation boundary in production and tests.
 
 `setLoggerRuntimeManager` now selects the default for **future instances**; it no longer retargets existing loggers. Migrate code that changes a live logger globally to construct it with an explicit `runtimeManager`. The manager object itself is retained by reference. ProcessPlugin still owns one shared set of exit/signal hooks: all participants must agree on process identity, configuration and scheduler domain, or receive `PLUGIN_CONFIG_CONFLICT`. Its late diagnostics use the first installer's captured manager.
+
+批次过载会报告 BATCH_OVERFLOW，并丢最老排队批次；若容量全被在途批次占用，则丢新批次。关闭先排空 HTTP 最终日志，再在插件释放时取消剩余传输，cleanupComplete 不等于送达回执。
+
+颜色/级别类型统一从根入口使用 ILoggerColorMode/ILoggerLevel，移除 plugins 的 IColorMode/ILogLevel；ILoggerDomainCore 是内部 Host 装配类型，公开调用方使用 ILoggerCore/ILoggerPluginCore。实例 dispose() 与 shutdown(manual) 返回相同的稳定 Promise<IPluginHostDisposalResult>，包括失败结果；时钟失败也进入该完成 Promise 并尝试宿主清理。

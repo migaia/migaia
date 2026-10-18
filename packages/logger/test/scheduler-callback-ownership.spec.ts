@@ -1,3 +1,4 @@
+import { walkErrorCauses } from '@migaia/utils/error'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Logger } from '../src/index.js'
 import { batch } from '../src/plugins/batch.js'
@@ -55,7 +56,8 @@ function createSyncScheduler(options: ISyncSchedulerOptions = {}) {
 async function runHttp(
   scheduler: ReturnType<typeof createSyncScheduler>,
   fetch: IHttpFetch,
-  retries = 0
+  retries = 0,
+  flushFailure?: Error
 ) {
   const failures: unknown[] = []
   const restore = setLoggerRuntimeManager({
@@ -72,7 +74,11 @@ async function runHttp(
     })
     logger.onFailure(({ error }) => failures.push(error))
     logger.log('info', 'round26')
-    await expect(logger.flush()).resolves.toBeUndefined()
+    if (flushFailure) {
+      /** The same hostile scheduler also rejects the lifecycle flush budget admission. */
+      const failure = await logger.flush().catch((error: unknown) => error)
+      expect([...walkErrorCauses(failure)]).toContain(flushFailure)
+    } else await expect(logger.flush()).resolves.toBeUndefined()
     return { failures, logger }
   } finally {
     restore()
@@ -194,7 +200,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
     const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }))
 
-    const result = await runHttp(scheduler, fetch as IHttpFetch, 1)
+    const result = await runHttp(scheduler, fetch as IHttpFetch, 1, callbackScheduleFailure)
 
     expect(fetch).not.toHaveBeenCalled()
     expect(scheduler.schedule).toHaveBeenCalledWith(expect.any(Function), 10000)
@@ -219,7 +225,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
     const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }))
 
-    const result = await runHttp(scheduler, fetch as IHttpFetch)
+    const result = await runHttp(scheduler, fetch as IHttpFetch, 0, getterFailure)
 
     expect(fetch).not.toHaveBeenCalled()
     expect(result.failures[0]).toMatchObject({

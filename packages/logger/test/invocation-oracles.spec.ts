@@ -21,7 +21,7 @@ describe('logger invocation ownership', () => {
     expect(seen).toEqual(['first', 'late'])
   })
 
-  it('MRC-SOL-F02 removes all exact-identity registrations and permits clean re-registration', () => {
+  it('MRC-SOL-F02 removes only its registration and permits additional registration', () => {
     const logger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -34,13 +34,13 @@ describe('logger invocation ownership', () => {
 
     releaseOne()
     logger.fireHook('custom', {} as ILogEntry)
-    expect(seen).toEqual([])
+    expect(seen).toEqual(['hook'])
 
     logger.hook('custom', () => {
       seen.push('replacement')
     })
     logger.fireHook('custom', {} as ILogEntry)
-    expect(seen).toEqual(['replacement'])
+    expect(seen).toEqual(['hook', 'hook', 'replacement'])
   })
 
   it('MRC-SOL-F02 keeps the named hook map as a derived exact-channel route', () => {

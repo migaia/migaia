@@ -4,6 +4,8 @@ export const LoggerErrorText = {
   pipelineEntryInvalid: 'pipeline replacement time must be a current-realm Date',
   /** Public logger option admission failed before any plugin side effect was allowed. */
   invalidOption: 'logger option admission failed',
+  /** Shutdown cannot calculate its deadline; completion still owns cleanup and the original failure. */
+  shutdownClockFailed: 'logger shutdown clock failed',
   /** Deadline reached while draining logger work. */
   flushDeadline: 'flush deadline reached',
   /** Deadline reached while flushing an extends target. */

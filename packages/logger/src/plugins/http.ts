@@ -1,4 +1,5 @@
 import { abortableDelay } from '@migaia/lifecycle'
+import { serializeErrorChain } from '@migaia/utils/error'
 import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
 import {
   createBatcherForCore,
@@ -281,7 +282,8 @@ class HttpPlugin implements ILoggerPlugin<
     this.#scheduler = core.scheduler
     this.#runtime = core.runtimeManager
     this.#controller = this.#createAbortController()
-    core.onDispose(core.onShutdown(() => this.#controller?.abort()))
+    // Logger drains final entries before plugin disposal; abort only after that drain phase.
+    core.onDispose(() => this.#controller?.abort())
 
     const send = (entries: ILogEntry[]): Promise<void> => this.#send(entries)
     const createBatcher = core.features.dependencies.batch?.createBatcher
@@ -326,7 +328,12 @@ class HttpPlugin implements ILoggerPlugin<
 
     let body: string
     try {
-      body = JSON.stringify({ entries })
+      // Local sinks retain raw native errors. Transport uses the shared bounded chain projection.
+      body = JSON.stringify({
+        entries: entries.map((entry) =>
+          entry.error ? { ...entry, error: serializeErrorChain(entry.error.raw) } : entry
+        )
+      })
     } catch (err) {
       throw createLoggerError(
         LoggerErrorCode.serializeFailed,

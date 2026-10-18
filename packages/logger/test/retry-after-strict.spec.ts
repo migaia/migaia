@@ -140,14 +140,16 @@ describe('strict Retry-After HTTP-date admission', () => {
     }
   })
 
-  it('cancels a scheduled Retry-After wait during shutdown without a second request', async () => {
+  it('drains until the shutdown deadline then cancels Retry-After without a second request', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-29T00:00:00.000Z'))
     try {
       const outcome = await startRetryAfter('Sat, 29 Aug 2026 00:00:05 GMT')
       const retry = outcome.schedules.find(({ delayMs }) => delayMs === 5000)
       expect(retry).toBeDefined()
-      await outcome.logger.shutdown('manual')
+      const shutdown = outcome.logger.shutdown('manual')
+      outcome.scheduler.advance(3000)
+      await shutdown
       expect(retry!.cancel).toHaveBeenCalledOnce()
       expect(outcome.fetch).toHaveBeenCalledTimes(1)
       outcome.restore()

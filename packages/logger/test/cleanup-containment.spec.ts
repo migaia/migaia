@@ -235,6 +235,18 @@ describe('Round27 logger runtime reporter containment', () => {
     'LG-T49 / LG-R33 contains hostile console reporter %s with one diagnostic attempt',
     async (mode) => {
       /** Hostile rejection returned by the runtime reporter. */
+      /** Preserve normal thenable microtasks while recording terminal host exceptions. */
+      const hostErrors: unknown[] = []
+      const enqueue = globalThis.queueMicrotask
+      const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+        enqueue(() => {
+          try {
+            callback()
+          } catch (error) {
+            hostErrors.push(error)
+          }
+        })
+      })
       const reporter = createReporterThenable(mode, 'round27-console')
       /** Primary process-exit failure that must remain reachable in the diagnostic. */
       const exitError = new Error('round27-exit')
@@ -299,8 +311,10 @@ describe('Round27 logger runtime reporter containment', () => {
         })
         expect(diagnostic.cause).toBe(exitError)
         expect(unhandled).toEqual([])
+        expect(hostErrors).toEqual([reporter.error])
       } finally {
         process.removeListener('unhandledRejection', onUnhandled)
+        queue.mockRestore()
         restore()
       }
     }
@@ -308,6 +322,18 @@ describe('Round27 logger runtime reporter containment', () => {
 
   it('LG-T50 / LG-R33 contains a thenable returned by write without retrying the diagnostic', async () => {
     /** Hostile write result whose rejection must be observed without a second write. */
+    /** Preserve normal thenable microtasks while recording terminal host exceptions. */
+    const hostErrors: unknown[] = []
+    const enqueue = globalThis.queueMicrotask
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      enqueue(() => {
+        try {
+          callback()
+        } catch (error) {
+          hostErrors.push(error)
+        }
+      })
+    })
     const reporter = createReporterThenable('reject', 'round27-write')
     /** Process listeners registered by ProcessPlugin. */
     const listeners = new Map<string, (...args: any[]) => void>()
@@ -354,8 +380,10 @@ describe('Round27 logger runtime reporter containment', () => {
       expect(reporter.invoked()).toBe(true)
       expect(reporter.receiverMatches()).toBe(true)
       expect(unhandled).toEqual([])
+      expect(hostErrors).toEqual([reporter.error])
     } finally {
       process.removeListener('unhandledRejection', onUnhandled)
+      queue.mockRestore()
       restore()
     }
   })

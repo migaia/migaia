@@ -17,9 +17,9 @@ export type IFilePluginConfig = {
   readonly batch?: IBatchPluginConfig
   /** Per-batch rotation threshold; injected fs supplies the rotation operation. */
   readonly rotate?: {
-    /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */
+    /** Rotate after appending a batch whose UTF-8 diagnostic buffer reaches this byte limit. */
     readonly maxBytes?: number
-    /** Rotate before a write when the buffered diagnostic count reaches this limit. */
+    /** Rotate after appending a batch whose diagnostic count reaches this limit. */
     readonly maxEntries?: number
   }
 }

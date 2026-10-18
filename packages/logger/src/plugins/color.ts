@@ -11,14 +11,14 @@ import type {
   IPaintFn
 } from '../typing.js'
 import type { ILoggerRuntimeManager } from '../runtime-manager.js'
-import { LoggerConsoleTag } from '../plugin-constants.js'
-import { LoggerColorMode } from '../plugin-constants.js'
+import { LoggerConsoleTag, LoggerEntryDataKey } from '../plugin-constants.js'
+import { serializeErrorChain } from '@migaia/utils/error'
+import { LoggerColorMode, type ILoggerColorMode } from '../plugin-constants.js'
 
-export type IColorMode = (typeof LoggerColorMode)[keyof typeof LoggerColorMode]
 export type IOutputFormat = 'auto' | 'pretty' | 'json'
 
 export type IColorPluginConfig = {
-  color?: IColorMode
+  color?: ILoggerColorMode
   format?: IOutputFormat
   timestamp?: boolean
   /**
@@ -161,7 +161,7 @@ class ColorPlugin implements ILoggerPlugin<
       args: entry.args,
       data: entry.data,
       meta: entry.meta,
-      error: entry.error
+      error: entry.error ? serializeErrorChain(entry.error.raw) : undefined
     }
     this.#sink(entry.tag)(JSON.stringify(payload))
   }
@@ -216,7 +216,7 @@ class ColorPlugin implements ILoggerPlugin<
    * 按约定读"的松耦合协作方式
    */
   #formatTopicChain(entry: ILogEntry): string | undefined {
-    const chain = entry.data.topicChain as string[] | undefined
+    const chain = entry.data[LoggerEntryDataKey.topicChain] as string[] | undefined
     if (!chain || chain.length === 0) return undefined
     return chain.join(' -> ')
   }

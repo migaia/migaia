@@ -1,3 +1,4 @@
+import { walkErrorCauses } from '@migaia/utils/error'
 /** Hardening regression cases for logger lifecycle and dispatch invariants. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -798,6 +799,18 @@ describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
   })
 
   it('contains synchronous, asynchronous, console, and write reporter failures', async () => {
+    /** Preserve real microtask progress while observing the final host exception delivery. */
+    const hostErrors: unknown[] = []
+    const enqueue = globalThis.queueMicrotask
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      enqueue(() => {
+        try {
+          callback()
+        } catch (error) {
+          hostErrors.push(error)
+        }
+      })
+    })
     const unhandled: unknown[] = []
     const onUnhandled = (reason: unknown) => unhandled.push(reason)
     process.on('unhandledRejection', onUnhandled)
@@ -841,8 +854,16 @@ describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
     } finally {
       process.off('unhandledRejection', onUnhandled)
+      queue.mockRestore()
     }
     expect(unhandled).toEqual([])
+    expect(hostErrors).toHaveLength(6)
+    expect(
+      hostErrors.filter((error) => (error as Error).message === 'console-failed')
+    ).toHaveLength(3)
+    expect(hostErrors.filter((error) => (error as Error).message === 'writer-failed')).toHaveLength(
+      3
+    )
   })
 })
 
@@ -1503,10 +1524,11 @@ describe('Round20 logger uninstall isolation', () => {
         source: LOGGER_SOURCE,
         code: LoggerErrorCode.pluginUninstallCleanupFailed
       })
-      expect((taggedUninstall as Error & { cause?: AggregateError }).cause?.errors).toEqual([
-        cancelError,
-        cancelError
-      ])
+      /** Lower lifecycle identity remains intact behind each Logger cleanup classification. */
+      const cleanupErrors = (taggedUninstall as Error & { cause?: AggregateError }).cause?.errors
+      expect(cleanupErrors).toHaveLength(2)
+      for (const error of cleanupErrors ?? [])
+        expect([...walkErrorCauses(error)]).toContain(cancelError)
       expect(cancelCalls).toBe(2)
 
       const deferredBeforeLateCallbacks = deferCalls

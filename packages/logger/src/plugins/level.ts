@@ -1,10 +1,8 @@
 import type { ILogFilter, IOff, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import { LoggerLevel } from '../plugin-constants.js'
-
-export type ILogLevel = (typeof LoggerLevel)[keyof typeof LoggerLevel]
+import { LoggerLevel, type ILoggerLevel } from '../plugin-constants.js'
 
 export type ILevelPluginConfig = {
-  level?: ILogLevel
+  level?: ILoggerLevel
   filters?: ILogFilter[]
   /** Defers entries from this plugin until after the current synchronous stack. Defaults to `false`. */
   asyncOutput?: boolean
@@ -16,7 +14,7 @@ export type ILevelPluginExt = {
   warn(...args: unknown[]): void
   error(...args: unknown[]): void
   fatal(...args: unknown[]): void
-  setLevel(level: ILogLevel): void
+  setLevel(level: ILoggerLevel): void
   /** Adds a filter and returns an idempotent removal handle. */
   addFilter(filter: ILogFilter): IOff
   removeFilter(filter: ILogFilter): void
@@ -33,7 +31,7 @@ export const LEVEL_PLUGIN_NAME = 'level' as const
  * 可插拔概念而不是核心内置概念的直接体现。
  */
 class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> {
-  static readonly #LEVEL_ORDER: Record<ILogLevel, number> = {
+  static readonly #LEVEL_ORDER: Record<ILoggerLevel, number> = {
     [LoggerLevel.debug]: 0,
     [LoggerLevel.info]: 1,
     [LoggerLevel.warn]: 2,
@@ -54,12 +52,12 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
     // 走的是同一层，好处是"这个插件当前配置是什么"这件事对 core 本身可见，
     // 不是被插件私下攥在手里。
     const config = core.config.get<ILevelPluginConfig>() ?? {}
-    let minLevel: ILogLevel = config.level ?? LoggerLevel.debug
+    let minLevel: ILoggerLevel = config.level ?? LoggerLevel.debug
     let filters: ILogFilter[] = [...(config.filters ?? [])]
 
     core.usePipeline((entry, next) => {
       const order = LevelPlugin.#LEVEL_ORDER
-      const lvl = entry.tag as ILogLevel
+      const lvl = entry.tag as ILoggerLevel
       // tag 不是标准级别名时（比如 reasoning 插件的 "thinking:start"），
       // 不受级别阈值约束，直接放行，只有真正的级别 tag 才会被拦截
       if (lvl in order && order[lvl] < order[minLevel]) return
@@ -68,7 +66,7 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
     })
 
     const call =
-      (level: ILogLevel) =>
+      (level: ILoggerLevel) =>
       (...args: unknown[]): void => {
         const [message, ...rest] = args
         // 字符串首参保留 console 的 %s/%d/%o 等占位符语义；其它类型移入

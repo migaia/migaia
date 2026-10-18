@@ -11,7 +11,7 @@ export const LoggerErrorCode = {
   /**
    * Logger construction received an unreadable or structurally invalid public option. The caller
    * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when
-   * one exists.
+   * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run.
    */
   invalidOption: 'INVALID_OPTION',
 

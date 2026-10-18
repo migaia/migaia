@@ -34,3 +34,6 @@ export const LoggerConsoleTag = {
 export type ILoggerLevel = (typeof LoggerLevel)[keyof typeof LoggerLevel]
 export type ILoggerColorMode = (typeof LoggerColorMode)[keyof typeof LoggerColorMode]
 export type ILoggerReasoningPhase = (typeof LoggerReasoningPhase)[keyof typeof LoggerReasoningPhase]
+
+/** Public entry.data display key shared by core forwarding snapshots and the color renderer. */
+export const LoggerEntryDataKey = { topicChain: 'topicChain' } as const

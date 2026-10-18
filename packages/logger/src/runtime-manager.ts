@@ -74,8 +74,10 @@ function createDefaultRuntimeManager(): ILoggerRuntimeManager {
 }
 
 type IRuntimeLayer = { manager: ILoggerRuntimeManager; active: boolean }
+/** The default capability owner is captured once and reused after the final override is restored. */
+const defaultRuntimeManager = createDefaultRuntimeManager()
 const runtimeLayers: IRuntimeLayer[] = []
-let runtimeManager: ILoggerRuntimeManager = createDefaultRuntimeManager()
+let runtimeManager: ILoggerRuntimeManager = defaultRuntimeManager
 
 /** Returns the active host capability manager. */
 export const getLoggerRuntimeManager = (): ILoggerRuntimeManager => runtimeManager
@@ -90,7 +92,7 @@ export function setLoggerRuntimeManager(manager: ILoggerRuntimeManager): () => v
     layer.active = false
     while (runtimeLayers.length > 0 && !runtimeLayers[runtimeLayers.length - 1]!.active)
       runtimeLayers.pop()
-    runtimeManager = runtimeLayers.at(-1)?.manager ?? createDefaultRuntimeManager()
+    runtimeManager = runtimeLayers.at(-1)?.manager ?? defaultRuntimeManager
   }
 }
 
