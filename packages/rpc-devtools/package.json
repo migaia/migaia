@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-devtools",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "description": "RPC probe, service and offline record contracts.",
   "license": "MIT",
@@ -9,16 +9,32 @@
     "url": "git@github.com:kimboyeme-maker/migai.git",
     "directory": "packages/rpc-devtools"
   },
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./contract": { "types": "./dist/contract/index.d.ts", "default": "./dist/contract/index.js" },
-    "./hub": { "types": "./dist/hub/index.d.ts", "default": "./dist/hub/index.js" },
-    "./log": { "types": "./dist/log/index.d.ts", "default": "./dist/log/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "default": "./dist/contract/index.js"
+    },
+    "./hub": {
+      "types": "./dist/hub/index.d.ts",
+      "default": "./dist/hub/index.js"
+    },
+    "./log": {
+      "types": "./dist/log/index.d.ts",
+      "default": "./dist/log/index.js"
+    }
   },
   "scripts": {
     "fmt": "oxfmt src test vitest.config.ts",
@@ -36,12 +52,12 @@
     "@migaia/utils": "workspace:^"
   },
   "peerDependencies": {
-    "@migaia/rpc-core": "workspace:*",
-    "@migaia/rpc-contract": "workspace:*"
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*"
   },
   "devDependencies": {
-    "@migaia/rpc-core": "workspace:*",
     "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
     "@types/node": "24.13.2",
     "typescript": "^7.0.2",
     "vitest": "4.1.10"
