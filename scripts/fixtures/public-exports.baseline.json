@@ -867,25 +867,9 @@
         "createNodeThreadChannelFactory",
         "createNodeThreadLauncher"
       ],
-      "./adapters/deno": [
-        "createDenoThreadChannelFactory",
-        "createDenoThreadLauncher"
-      ],
-      "./adapters/bun": [
-        "createBunThreadChannelFactory",
-        "createBunThreadLauncher"
-      ],
       "./adapters/electron-main": [
         "createElectronMainThreadChannelFactory",
         "createElectronMainThreadLauncher"
-      ],
-      "./adapters/electron-renderer": [
-        "createElectronRendererThreadChannelFactory",
-        "createElectronRendererThreadLauncher"
-      ],
-      "./adapters/browser": [
-        "createBrowserThreadChannelFactory",
-        "createBrowserThreadLauncher"
       ]
     },
     "@migaia/serialize": {

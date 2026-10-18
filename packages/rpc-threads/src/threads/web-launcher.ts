@@ -1,4 +1,8 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
+import { attachSecondaryErrors } from '@migaia/utils/error'
+import { createDisposeTransaction, DisposeTransactionKind } from '@migaia/lifecycle'
+import { identifyRpcBoundaryFailure } from '@migaia/rpc-core/transport-kit'
+import { RpcCoreErrorCode } from '@migaia/rpc-core'
 import { createAdapterTransportError } from '@migaia/rpc-core/adapter/internal-advanced'
 import { type IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
@@ -7,7 +11,7 @@ import {
   constructWebThreadChannel,
   openThreadMessageResource
 } from './channel.js'
-import { createThreadRuntimeBootstrap } from './bootstrap.js'
+import { createThreadRuntimeBootstrap, intersectThreadCapabilities } from './bootstrap.js'
 import {
   createEventTargetMessageResource,
   holdAdapterLaunch,
@@ -104,6 +108,7 @@ export function createAdapterWebThreadLauncher(
         if (terminating) return
         terminating = true
         removeBootstrap()
+        worker.removeEventListener(ThreadEvent.error, onError)
         void resource?.close()
         rejectPrepared?.(readAdapterAbortReason(context.signal))
         rejectPrepared = undefined
@@ -118,64 +123,104 @@ export function createAdapterWebThreadLauncher(
         ...(bootstrap ? { runtimeApi: bootstrap } : {}),
         ...(spec.data === undefined ? {} : { data: spec.data })
       }
-      /**
-       * Runtime capture attaches before the original native failure reporter and before initial
-       * write.
-       */
-      if (bootstrap)
-        resource = createEventTargetMessageResource(worker, { exited, terminate, initialMessage })
-      worker.addEventListener(
-        ThreadEvent.error,
-        (event: { preventDefault(): void; error?: unknown }) => {
-          event.preventDefault()
-          /** Core already settled runtime control with this same observed native cause. */
-          if (!bootstrap)
-            rejectPrepared?.(
-              createAdapterTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
-            )
-          rejectPrepared = undefined
-          try {
-            options.report(event.error ?? event)
-          } catch (reporterError) {
-            hostRethrowReporter(reporterError, IpcReporterContext)
-          }
-          terminate()
+      /** The original native error callback has an identity that rollback and terminate can remove. */
+      const onError = (event: { preventDefault(): void; error?: unknown }): void => {
+        event.preventDefault()
+        /** Core already settled runtime control with this same observed native cause. */
+        if (!bootstrap)
+          rejectPrepared?.(
+            createAdapterTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
+          )
+        rejectPrepared = undefined
+        try {
+          options.report(event.error ?? event)
+        } catch (reporterError) {
+          hostRethrowReporter(reporterError, IpcReporterContext)
         }
-      )
-      /** Public runtime readiness is Core's exact original Promise, with no adapter agreement input. */
-      const prepared: Promise<void | readonly string[]> = bootstrap
-        ? resource!.prepareControl(bootstrap.capabilities)
-        : new Promise<void>((resolve, reject) => {
-            rejectPrepared = reject
-            receive = (event) => {
-              if (
-                event.data === null ||
-                typeof event.data !== 'object' ||
-                !('kind' in event.data) ||
-                event.data.kind !== ThreadBootstrap.acknowledged
-              )
-                return
-              removeBootstrap()
-              rejectPrepared = undefined
-              resolve()
-            }
-            worker.addEventListener(ThreadEvent.message, receive)
-          })
-      worker.postMessage(initialMessage, undefined)
-      /** The preparation consumer rethrows; this observer only prevents a late unhandled rejection. */
-      void prepared.catch(() => undefined)
-      /** Retain startup internally and expose only complete resource operations. */
-      const handle: IAdapterWebThreadHandle = {
-        identity: Object.freeze({ fingerprint }),
-        port: worker,
-        prepared,
-        exited,
-        terminate,
-        open: (signal, channelOptions) => openWebThreadHandle(handle, signal, channelOptions)
+        terminate()
       }
-      if (resource && bootstrap)
-        webPreparations.set(handle, { resource, offer: bootstrap.capabilities })
-      return handle
+      try {
+        /** Runtime capture attaches before the original native failure reporter and initial write. */
+        if (bootstrap)
+          resource = createEventTargetMessageResource(worker, { exited, terminate, initialMessage })
+        worker.addEventListener(ThreadEvent.error, onError)
+        /**
+         * Public runtime readiness is Core's exact original Promise, with no adapter agreement
+         * input.
+         */
+        const prepared: Promise<void | readonly string[]> = bootstrap
+          ? resource!.prepareControl(bootstrap.capabilities)
+          : new Promise<void>((resolve, reject) => {
+              rejectPrepared = reject
+              receive = (event) => {
+                if (
+                  event.data === null ||
+                  typeof event.data !== 'object' ||
+                  !('kind' in event.data) ||
+                  event.data.kind !== ThreadBootstrap.acknowledged
+                )
+                  return
+                removeBootstrap()
+                rejectPrepared = undefined
+                resolve()
+              }
+              worker.addEventListener(ThreadEvent.message, receive)
+            })
+        /**
+         * The preparation consumer rethrows; this observer only prevents a late unhandled
+         * rejection.
+         */
+        void prepared.catch(() => undefined)
+        worker.postMessage(initialMessage, undefined)
+        /** Retain startup internally and expose only complete resource operations. */
+        const handle: IAdapterWebThreadHandle = {
+          identity: Object.freeze({ fingerprint }),
+          port: worker,
+          prepared,
+          exited,
+          terminate,
+          open: (signal, channelOptions) => openWebThreadHandle(handle, signal, channelOptions)
+        }
+        if (resource && bootstrap)
+          webPreparations.set(handle, { resource, offer: bootstrap.capabilities })
+        return handle
+      } catch (error) {
+        /** The launcher's rollback keeps the original native primary and every cleanup failure. */
+        const primary = identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          ThreadErrorText.bootstrapFailed
+        )
+        terminating = true
+        rejectPrepared?.(primary)
+        rejectPrepared = undefined
+        /**
+         * Lifecycle attempts all acquired-resource releases; no second cleanup state machine
+         * exists.
+         */
+        const failures = await createDisposeTransaction(
+          { kind: DisposeTransactionKind.plan },
+          { errorPolicy: 'collect' }
+        ).run(
+          [
+            removeBootstrap,
+            () => worker.removeEventListener(ThreadEvent.error, onError),
+            () => resource?.close(),
+            () => worker.terminate()
+          ].map((force, index) => ({
+            source: String(index),
+            descriptor: { force }
+          }))
+        )
+        throw identifyRpcBoundaryFailure(
+          attachSecondaryErrors(
+            primary,
+            failures.map(({ error }) => error)
+          ),
+          RpcCoreErrorCode.transport,
+          ThreadErrorText.bootstrapFailed
+        )
+      }
     }
   }
 }
@@ -192,11 +237,15 @@ async function openWebThreadHandle(
     if (signal.aborted) throw readAdapterAbortReason(signal)
     await awaitThreadPreparation(handle.prepared, signal)
     if (preparation) {
-      /** Open uses our original local offer; received capabilities remain private inside Core. */
+      /** Caller policy only narrows the launcher's real offer; Core retains the peer's actual ACK. */
+      const offer =
+        options.capabilities === undefined
+          ? preparation.offer
+          : intersectThreadCapabilities(preparation.offer, options.capabilities)
       return await openThreadMessageResource(
         preparation.resource,
         handle.identity.fingerprint,
-        { ...options, capabilities: preparation.offer },
+        { ...options, capabilities: offer },
         signal
       )
     }

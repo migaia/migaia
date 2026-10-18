@@ -10,8 +10,19 @@ import {
   createAdapterBindingDrain,
   createAdapterId
 } from '@migaia/rpc-core/adapter/internal-advanced'
-import type { IRemoteBinding, IRemoteRetryPort } from '@migaia/rpc-core/remote'
-import { portableThreadSpec } from './error.js'
+import type {
+  IRemoteBinding,
+  IRemoteRetryPort,
+  IRemoteChannel,
+  IRemoteServeEndpoint
+} from '@migaia/rpc-core/remote'
+import { invalidThreadConfig, portableThreadSpec } from './error.js'
+import { ThreadErrorText } from './error-text.js'
+import { RpcCapability } from '@migaia/rpc-contract'
+import {
+  createAdapterTransportError,
+  readAdapterAbortReason
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { createAdapterSourceConfigurationError } from '@migaia/rpc-core/adapter/internal-advanced'
 import {
   type IRuntimePeerOptions,
@@ -95,6 +106,17 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
   const spec = portableThreadSpec(sourceOptions.spec)
   /** Business drain and native stop retain the original endpoint and request ownership. */
   const drain = createAdapterBindingDrain(sourceOptions.scheduler, sourceOptions.report)
+  /** Only units lacking enforced exit observation need the default RPC liveness probe. */
+  const defaultHealth =
+    sourceOptions.health === undefined &&
+    sourceOptions.launcher.capabilities['exit-observation'] !== 'enforced'
+  /** The actual opened channel identifies its exact supervisor handle across replacement. */
+  const channels = new WeakMap<IRemoteChannel, THandle>()
+  /** A health check uses only the genuine endpoint installed for the same admitted handle. */
+  const readyEndpoints = new WeakMap<
+    THandle,
+    Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
+  >()
   /** The original prepared launcher preserves context, actual lease and caller-selected policy. */
   const supervisor = createThreadSupervisor({
     ...sourceOptions.supervisor,
@@ -104,7 +126,29 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
     budget: sourceOptions.budget,
     scheduler: sourceOptions.scheduler,
     report: sourceOptions.report,
-    health: sourceOptions.health,
+    health:
+      sourceOptions.health ??
+      (defaultHealth
+        ? {
+            async check(unit, signal) {
+              /**
+               * Startup remains governed by the original preparation deadline until binding
+               * completes.
+               */
+              const ready = readyEndpoints.get(unit)
+              if (!ready) return
+              if (
+                await ready.endpoint.endpoint.ping(ready.channel.peerId, undefined, {
+                  timeoutMs: false,
+                  signal
+                })
+              )
+                return
+              if (signal.aborted) throw readAdapterAbortReason(signal)
+              throw createAdapterTransportError(ThreadErrorText.healthPingFailed)
+            }
+          }
+        : undefined),
     stop: {
       ...sourceOptions.supervisor?.stop,
       beforeTerminate: async (unit, signal, remainingMs) => {
@@ -118,12 +162,30 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
   const binding: IRemoteBinding<THandle, IThreadSpec> &
     Readonly<{ bindEndpoint: typeof drain.wrap; drainCurrent: typeof drain.drainCurrent }> = {
     ownership: 'owned',
-    bindEndpoint: drain.wrap,
+    bindEndpoint(channel, endpoint) {
+      if (defaultHealth) {
+        if (
+          !channel.agreement.capabilities.includes(RpcCapability.ping) ||
+          typeof endpoint.endpoint.ping !== 'function'
+        )
+          invalidThreadConfig('health', ThreadErrorText.healthPingUnavailable)
+        readyEndpoints.set(channels.get(channel)!, { channel, endpoint })
+      }
+      return drain.wrap(channel, endpoint)
+    },
     trackRequest: drain.trackCurrent,
     drainCurrent: drain.drainCurrent,
     supervisor,
     scheduler: sourceOptions.scheduler,
-    openChannel: (handle, signal) => sourceOptions.channelFactory.open(handle, signal)
+    openChannel(handle, signal) {
+      /** Existing observed-exit and custom-health paths retain the original factory Promise. */
+      const opening = sourceOptions.channelFactory.open(handle, signal)
+      if (!defaultHealth) return opening
+      return opening.then((channel) => {
+        channels.set(channel, handle)
+        return channel
+      })
+    }
   }
   return captured.managed(
     {

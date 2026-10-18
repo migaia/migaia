@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
-import { createBunThreadLauncher } from '@migaia/rpc-threads/adapters/bun'
-import { createDenoThreadLauncher } from '@migaia/rpc-threads/adapters/deno'
+import { createWebThreadLauncher } from '@migaia/rpc-threads'
 
 /** The fixture runs in each actual platform, with the normal runtime Worker constructor. */
 const deno = typeof Deno === 'object'
@@ -42,7 +41,7 @@ class ObservedWorker extends globalThis.Worker {
   }
 }
 /** Platform factory keeps unsupported termination and exit-observation declarations unchanged. */
-const launcher = (deno ? createDenoThreadLauncher : createBunThreadLauncher)({
+const launcher = createWebThreadLauncher({
   Worker: ObservedWorker,
   report: (error) => reported.push(error)
 })

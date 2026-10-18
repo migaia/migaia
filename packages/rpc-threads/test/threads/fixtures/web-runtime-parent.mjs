@@ -1,10 +1,9 @@
-import { createBunThreadLauncher } from '@migaia/rpc-threads/adapters/bun'
-import { createDenoThreadLauncher } from '@migaia/rpc-threads/adapters/deno'
+import { createWebThreadLauncher } from '@migaia/rpc-threads'
 
 /** This script runs in each actual runtime; results preserve unsupported exit semantics. */
 const runtime = typeof Deno === 'object' ? 'deno' : 'bun'
 /** Evidence never derives capability strength from a close event. */
-const launcher = (runtime === 'deno' ? createDenoThreadLauncher : createBunThreadLauncher)({
+const launcher = createWebThreadLauncher({
   report: (error) => diagnostics.push(String(error?.message ?? error))
 })
 /** Only fixture diagnostics are written to stdout. */

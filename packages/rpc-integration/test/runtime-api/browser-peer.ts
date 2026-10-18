@@ -3,16 +3,15 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { createThreadPeer } from '@migaia/rpc-threads'
 import {
-  createBrowserThreadLauncher,
-  createBrowserThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/browser'
+  createThreadPeer,
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
+} from '@migaia/rpc-threads'
 
 /** Playwright loads this owning-package fixture through the existing Vite scenario entry. */
 globalThis.runAutomaticThreadScenario = async () => {
   /** The actual native Worker handle retains lifecycle capabilities independently from messaging. */
-  let handle:
-    | Awaited<ReturnType<ReturnType<typeof createBrowserThreadLauncher>['launch']>>
-    | undefined
+  let handle: Awaited<ReturnType<ReturnType<typeof createWebThreadLauncher>['launch']>> | undefined
   /** Genuine reverse calls are counted in parent business, independently from child metadata. */
   let reverseCalls = 0
   /** A constructed canonical Peer alone owns endpoint/channel disposal. */
@@ -31,7 +30,7 @@ globalThis.runAutomaticThreadScenario = async () => {
         }
       },
       spawn: async (context) => {
-        const launcher = createBrowserThreadLauncher({
+        const launcher = createWebThreadLauncher({
           runtimeApi: context,
           report: (error) => {
             failures.push(String((error as { code?: string }).code))
@@ -47,7 +46,7 @@ globalThis.runAutomaticThreadScenario = async () => {
         void handle.exited.then(() => {
           exited = true
         })
-        return createBrowserThreadChannelFactory({ scheduler: systemScheduler }).open(
+        return createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
           handle,
           new AbortController().signal
         )

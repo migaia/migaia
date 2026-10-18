@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict'
-import {
-  createDenoThreadLauncher,
-  createDenoThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/deno'
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
 import { runWebBinaryQualification } from '../r14-web-binary.mjs'
 
 /** Actual Deno Workers execute the same canonical/native business path as the Web qualification. */
 const receipt = await runWebBinaryQualification(
-  createDenoThreadLauncher,
-  createDenoThreadChannelFactory
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
 )
 assert.deepEqual(receipt.copy, {
   senderLength: 4,

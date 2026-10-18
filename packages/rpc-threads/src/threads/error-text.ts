@@ -2,6 +2,11 @@ import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 
 /** Stable configuration diagnostics shared by facade and launcher admission. */
 export const ThreadErrorText = {
+  /** The default Web-thread health check requires the negotiated native ping operation. */
+  healthPingUnavailable:
+    'Thread default health requires negotiated ping; supply custom health when ping is disabled',
+  /** A failed actual endpoint ping is a Core transport liveness failure, not native exit evidence. */
+  healthPingFailed: 'Thread health ping failed',
   /** Resource queries retain native diagnostics on cause, never in portable management details. */
   usageSampleFailed: 'thread resource sampling failed',
   invalidData: 'Thread spec.data must be a portable RPC value',

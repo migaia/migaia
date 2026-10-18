@@ -26,25 +26,9 @@
       "types": "./dist/threads/adapters/node.d.ts",
       "default": "./dist/threads/adapters/node.js"
     },
-    "./adapters/deno": {
-      "types": "./dist/threads/adapters/deno.d.ts",
-      "default": "./dist/threads/adapters/deno.js"
-    },
-    "./adapters/bun": {
-      "types": "./dist/threads/adapters/bun.d.ts",
-      "default": "./dist/threads/adapters/bun.js"
-    },
     "./adapters/electron-main": {
       "types": "./dist/threads/adapters/electron-main.d.ts",
       "default": "./dist/threads/adapters/electron-main.js"
-    },
-    "./adapters/electron-renderer": {
-      "types": "./dist/threads/adapters/electron-renderer.d.ts",
-      "default": "./dist/threads/adapters/electron-renderer.js"
-    },
-    "./adapters/browser": {
-      "types": "./dist/threads/adapters/browser.d.ts",
-      "default": "./dist/threads/adapters/browser.js"
     }
   },
   "publishConfig": {

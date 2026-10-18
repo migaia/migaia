@@ -94,17 +94,12 @@ export async function expandThreadSpawn(
   /** Channel construction remains owned by the existing runtime adapter. */
   let channelFactory = source.channelFactory
   if (!launcher || !channelFactory) {
-    if (bun) {
-      /** Bun's adapter preserves its actual Web Worker lifecycle limitations. */
-      const adapter = await import('./adapters/bun.js')
-      launcher ??= adapter.createBunThreadLauncher({ report })
-      channelFactory ??= adapter.createBunThreadChannelFactory({ scheduler })
-    } else if (deno) {
-      /** Deno's adapter preserves its actual Web Worker lifecycle limitations. */
-      const adapter = await import('./adapters/deno.js')
-      launcher ??= adapter.createDenoThreadLauncher({ report })
-      channelFactory ??= adapter.createDenoThreadChannelFactory({ scheduler })
-    } else if (node) {
+    if (bun || deno || !node) {
+      /** The single Web owner preserves every host's unsupported native lifecycle capabilities. */
+      const adapter = await import('./adapters/web.js')
+      launcher ??= adapter.createWebThreadLauncher({ report })
+      channelFactory ??= adapter.createWebThreadChannelFactory({ scheduler })
+    } else {
       /** Node's public adapter keeps native Worker construction and exit observation canonical. */
       const adapter = await import('./adapters/node.js')
       launcher ??=
@@ -114,11 +109,6 @@ export async function expandThreadSpawn(
               execArgv: runtimeFlags
             })
       channelFactory ??= adapter.createNodeThreadChannelFactory({ scheduler })
-    } else {
-      /** Browser URLs stay URLs in the existing native Worker construction path. */
-      const adapter = await import('./adapters/browser.js')
-      launcher ??= adapter.createBrowserThreadLauncher({ report })
-      channelFactory ??= adapter.createBrowserThreadChannelFactory({ scheduler })
     }
   }
   return {

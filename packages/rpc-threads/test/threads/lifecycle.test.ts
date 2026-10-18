@@ -3,10 +3,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/public-host.js'
-import {
-  createBrowserThreadLauncher,
-  createBrowserThreadChannelFactory
-} from '../../src/threads/adapters/browser.js'
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '../../src/threads/index.js'
 import { nativeWorkerFor, nativeFixture, endpointFactory } from './fixture.js'
 
 /** Flush supervisor/remote promise ownership without running a second lifecycle scheduler. */
@@ -44,7 +41,7 @@ describe('thread lifecycle ownership', () => {
       removeEventListener() {}
       terminate = terminate
     }
-    const launcher = createBrowserThreadLauncher({ Worker, report })
+    const launcher = createWebThreadLauncher({ Worker, report })
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler })
     const host = runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -56,7 +53,7 @@ describe('thread lifecycle ownership', () => {
         launcher,
         budget,
         scheduler,
-        channelFactory: createBrowserThreadChannelFactory({ scheduler }),
+        channelFactory: createWebThreadChannelFactory({ scheduler }),
         report,
         health: { check: async () => undefined },
         supervisor: { isolation: 'best-effort', stop: { exitTimeoutMs: 5, reapTimeoutMs: 5 } }

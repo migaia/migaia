@@ -95,9 +95,11 @@ try {
 | `budget` | `createUnitBudget({ kind: 'thread', maxUnits: 1 })`。 |
 | `launcher`、`channelFactory` | 当前运行时对应的既有 adapter；延迟加载。自定义 channel factory 必须使用相同 scheduler。 |
 | `report` | `console.error`；可换成应用的错误收集函数。 |
-| `health` | 可选，复用完整 source 的健康检查策略。 |
+| `health` | 自定义策略优先；缺少 enforced 退出观察时，默认对该真实代次的 Endpoint 做 RPC ping。 |
 | `supervisor` | 既有监督策略，可设置 `ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等。 |
 | `keyFactory`、`retryPort` | 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。 |
+
+默认 ping 沿用监督层的 5000ms 间隔、2000ms 单次上限与连续 3 次失败策略；Endpoint 尚未绑定时由原准备 deadline 管理，绑定后只检查对应真实 handle 的 Endpoint。显式限制掉 ping 时必须提供自定义 health，否则以 Core INVALID_CONFIG 拒绝；自定义 health 保留原引用。Web terminate 后仍无实际 exit 回执，关闭可报告既有 REAP_TIMEOUT 并保留 abandoned lease，不能据此宣称原生执行已停止。
 
 这些默认值只展开为原来的完整 source。预算、握手、监督、代次和信任事实继续由原来的 owner 管理；短形式不接受“已经协商”或“已经信任”的声明。完整 source 仍可传入（第 8 节）。
 
@@ -131,7 +133,7 @@ if (await isThreadChild()) {
 - **TS 入口**：`.ts` 可直接传入。Node 24 的类型剥离不会改写 `./x.js` 到 `./x.ts`。Bun 支持这种映射；本仓库使用 `.js` specifier，所以 Node / Deno 应运行编译输出，或配置能处理映射的 loader。解析失败保留原始 module-resolution `cause`。
 - **浏览器**：只用明确的 URL；`true` 和裸字符串只用于 Node / Bun / Deno。动态 `Worker` 构造不能让 Vite / webpack 发现 Worker 源码。`spawn: new URL('./worker.js', import.meta.url)` 应指向已经构建的模块；需由 bundler 编译 `.ts` Worker 时，预构建 URL，或在自定义 Worker 构造中保留字面量 `new Worker(new URL('./worker.ts', import.meta.url))`（第 8 节）。
 - **Electron**：显式选用第 8 节的 Electron adapter；不使用 self spawn 猜测应用入口。
-- **Web Worker 终止**：浏览器、Bun、Deno 的 launcher 继续把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 后无法确认代码已经停止，监督层保守地视为可能仍在运行；Node 与 Electron 主进程可观察退出。
+- **Web Worker 终止**：浏览器、Bun、Deno 的 launcher 继续把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 后无法确认代码已经停止，监督层保守地视为可能仍在运行；Node adapter 可观察退出；Electron 主进程 adapter 明确保持 unsupported，不由 Node 机制推断宿主能力。
 
 ### 借用已有 MessagePort
 
@@ -374,19 +376,19 @@ export const spawn = {
 | `scheduler` | 计时与调度；channel factory 必须使用同一个 scheduler。 |
 | `launcher`、`channelFactory` | 平台 Worker 创建与协议通道。 |
 | `report` | 必填，接收后台错误。 |
-| `health` | 可选，健康检查策略。 |
+| `health` | 自定义策略优先；无 enforced 退出观察时默认实际 Endpoint ping。 |
 | `supervisor` | 可选，`id`、`ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等监督策略。 |
 
-各平台的显式组合：
+各平台的显式组合（Web 工厂及所有 handle/options 类型从 `@migaia/rpc-threads` root 导入；Node/Electron-main 工厂从各自子路径导入）：
 
 | 平台 | launcher | channelFactory |
 | ---- | -------- | -------------- |
 | Node | `createNodeThreadLauncher()` | `createNodeThreadChannelFactory({ scheduler })` |
-| Bun | `createBunThreadLauncher({ report })` | `createBunThreadChannelFactory({ scheduler })` |
-| Deno | `createDenoThreadLauncher({ report })` | `createDenoThreadChannelFactory({ scheduler })` |
-| 浏览器 | `createBrowserThreadLauncher({ report })` | `createBrowserThreadChannelFactory({ scheduler })` |
+| Bun | `createWebThreadLauncher({ report })` | `createWebThreadChannelFactory({ scheduler })` |
+| Deno | `createWebThreadLauncher({ report })` | `createWebThreadChannelFactory({ scheduler })` |
+| 浏览器 | `createWebThreadLauncher({ report })` | `createWebThreadChannelFactory({ scheduler })` |
 | Electron 主进程 | `createElectronMainThreadLauncher()` | `createElectronMainThreadChannelFactory({ scheduler })` |
-| Electron 渲染进程 | `createElectronRendererThreadLauncher({ report })` | `createElectronRendererThreadChannelFactory({ scheduler })` |
+| Electron 渲染进程 | `createWebThreadLauncher({ report })` | `createWebThreadChannelFactory({ scheduler })` |
 
 Deno Worker 需要相应权限；Bun、Deno、浏览器与 Electron 渲染进程沿用 Web Worker 的终止边界（第 3 节）。
 
@@ -403,7 +405,7 @@ Deno Worker 需要相应权限；Bun、Deno、浏览器与 Electron 渲染进程
 | `createNodeThreadChannel`、`createWebThreadChannel`       | 在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK          |
 | `receiveThreadData`、`readThreadBootstrap`                | 读取并校验 launcher 写入的 bootstrap 数据                                                   |
 
-launcher 返回的 handle 提供 `identity`、`port`、`exited`、`terminate`、`sampleUsage` 与 `open(signal, { scheduler })`。`open` 在该 Worker 的端口上完成能力确认并返回协议通道：
+launcher 返回的 handle 提供 `identity`、`port`、`exited`、`terminate` 与 `open(signal, { scheduler })`；`sampleUsage` 是可选能力，Node handle 提供它，Web handle 不提供。`open` 在该 Worker 的端口上完成能力确认并返回协议通道；`capabilities` 仅缩小原真实 launch offer，不能扩大双方 ACK 能力。自定义 Web Worker 的部分构造失败会释放已取得监听器、接收资源和 Worker；主错原对象或 cause 保留，清理错追加在 errors：
 
 ```ts doc-test=check
 import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'

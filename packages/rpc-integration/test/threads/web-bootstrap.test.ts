@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import {
-  createBrowserThreadLauncher,
-  createBrowserThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/browser'
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
 import { ThreadBootstrap } from '../../../rpc-threads/dist/threads/constants.js'
 
 /** A real launcher owns acknowledgement and failure handling on this controllable Worker port. */
@@ -36,14 +33,14 @@ describe('Web thread bootstrap failure', () => {
     /** No test-created prepared Promise can stand in for the production launcher barrier. */
     const fixture = webFixture()
     /** Bootstrap receives no acknowledgement until the explicit fixture event below. */
-    const handle = await createBrowserThreadLauncher(fixture).launch(
+    const handle = await createWebThreadLauncher(fixture).launch(
       { entry: 'file:///worker.mjs' },
       { signal: new AbortController().signal }
     )
     /** Publishing the channel before acknowledgement would permit premature transport installation. */
     let published = false
     /** The real channel factory must wait on the launcher's own preparation. */
-    const opening = createBrowserThreadChannelFactory({ scheduler: systemScheduler })
+    const opening = createWebThreadChannelFactory({ scheduler: systemScheduler })
       .open(handle, new AbortController().signal)
       .then((channel) => {
         published = true
@@ -70,7 +67,7 @@ describe('Web thread bootstrap failure', () => {
     /** A live launch signal must not become the rejection value for a Worker failure. */
     const controller = new AbortController()
     /** Preparation belongs to the production Web launcher, not a test-created Promise. */
-    const handle = await createBrowserThreadLauncher(fixture).launch(
+    const handle = await createWebThreadLauncher(fixture).launch(
       { entry: 'file:///worker.mjs' },
       { signal: controller.signal }
     )

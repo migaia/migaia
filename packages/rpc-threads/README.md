@@ -22,7 +22,7 @@
 pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
 ```
 
-`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`、`@migaia/lifecycle`、`@migaia/utils`，随包安装。只有使用 `./adapters/electron-main` 或 `./adapters/electron-renderer` 时才需要安装可选 peer `electron` ^44。
+`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.9`）。运行时依赖 `@migaia/supervision`、`@migaia/lifecycle`、`@migaia/utils`，随包安装。使用 `./adapters/electron-main` 时需安装可选 peer `electron` ^44。
 
 ## 入口一览
 
@@ -30,11 +30,9 @@ pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/rpc-threads`          | `createThreadPeer`、`createThreadPlugin`、`isThreadChild`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数 |
 | `./adapters/node`              | `createNodeThreadLauncher`、`createNodeThreadChannelFactory`（Node `worker_threads`）                                |
-| `./adapters/bun`               | `createBunThreadLauncher`、`createBunThreadChannelFactory`                                                           |
-| `./adapters/deno`              | `createDenoThreadLauncher`、`createDenoThreadChannelFactory`                                                         |
-| `./adapters/browser`           | `createBrowserThreadLauncher`、`createBrowserThreadChannelFactory`（Web Worker）                                     |
 | `./adapters/electron-main`     | `createElectronMainThreadLauncher`、`createElectronMainThreadChannelFactory`                                         |
-| `./adapters/electron-renderer` | `createElectronRendererThreadLauncher`、`createElectronRendererThreadChannelFactory`                                 |
+
+Web、Bun、Deno 与 Electron renderer 共用 root 的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 统一从 root 导入。
 
 ## 快速开始
 
@@ -80,7 +78,7 @@ try {
 }
 ```
 
-`spawn` 接受 `true`、`URL`、路径字符串，或以 `entry` 为必填字段的短对象；`base`、`name`、`data`、`limits` 与既有 source 的依赖和监督字段都可覆盖。相对字符串按**主入口文件所在目录**解析；显式 `base: import.meta.url` 可改为当前模块，`URL` 始终按原值使用。短形式只展开为既有 source，仍经过相同的监督、握手和关闭路径。字段详情见 [USEGUIDE 第 3 节](./USEGUIDE.md#3-spawn-短形式)，完整配置见[高阶用法](#高阶用法完整-source)。
+`spawn` 接受 `true`、`URL`、路径字符串，或以 `entry` 为必填字段的短对象；`base`、`name`、`data`、`limits` 与既有 source 的依赖和监督字段都可覆盖。相对字符串按**主入口文件所在目录**解析；显式 `base: import.meta.url` 可改为当前模块，`URL` 始终按原值使用。短形式只展开为既有 source，仍经过相同的监督、握手和关闭路径。缺少 enforced 退出观察且未提供 health 时，绑定使用实际 RPC ping 做健康检查；能力仍保持 unsupported，不把 ping 当作原生退出证据。字段详情见 [USEGUIDE 第 3 节](./USEGUIDE.md#3-spawn-短形式)，完整配置见[高阶用法](#高阶用法完整-source)。
 
 ## 同一个文件作为 Worker
 

@@ -2,13 +2,11 @@ import assert from 'node:assert/strict'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createThreadPeer } from '@migaia/rpc-threads'
 import {
-  createBunThreadLauncher,
-  createBunThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/bun'
-import {
-  createDenoThreadLauncher,
-  createDenoThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/deno'
+  createThreadPeer,
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
+} from '@migaia/rpc-threads'
+
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
 import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'
 import {
@@ -40,7 +38,7 @@ try {
     },
     spawn: async (context) => {
       if (mode === 'thread') {
-        const launcher = (deno ? createDenoThreadLauncher : createBunThreadLauncher)({
+        const launcher = createWebThreadLauncher({
           runtimeApi: context,
           report: () => undefined
         })
@@ -51,7 +49,7 @@ try {
           },
           { signal: new AbortController().signal }
         )
-        return (deno ? createDenoThreadChannelFactory : createBunThreadChannelFactory)({
+        return createWebThreadChannelFactory({
           scheduler: systemScheduler
         }).open(handle, new AbortController().signal)
       }

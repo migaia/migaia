@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict'
-import {
-  createBunThreadLauncher,
-  createBunThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/bun'
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
 import { runWebBinaryQualification } from '../web-binary.ts'
 
 /** Actual Bun Workers execute the same canonical/native business path as the Web qualification. */
 const receipt = await runWebBinaryQualification(
-  createBunThreadLauncher,
-  createBunThreadChannelFactory
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
 )
 assert.deepEqual(receipt.copy, {
   senderLength: 4,

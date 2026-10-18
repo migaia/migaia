@@ -3,9 +3,11 @@ import { peerOptions } from './rpc.mjs'
 import { BrowserBenchText } from './text.mjs'
 import { createThreadPeer } from '@migaia/rpc-threads'
 import {
-  createBrowserThreadLauncher,
-  createBrowserThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/browser'
+  createThreadPeer,
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
+} from '@migaia/rpc-threads'
+
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { readRuntimePeerConnection } from '../../../../../rpc-core/dist/remote/runtime-api/peer.js'
 
@@ -24,7 +26,7 @@ installPage('/worker-rpc.js', async (createWorker, payload, classification) => {
     ...options,
     self: { name: 'page', instanceId: 'page' },
     spawn: async (context) => {
-      const launcher = createBrowserThreadLauncher({
+      const launcher = createWebThreadLauncher({
         Worker: ObservedWorker,
         runtimeApi: context,
         report: options.report
@@ -33,7 +35,7 @@ installPage('/worker-rpc.js', async (createWorker, payload, classification) => {
         { entry: new URL('/worker-rpc.js', location.href).href, name: 'worker' },
         { signal: new AbortController().signal }
       )
-      return createBrowserThreadChannelFactory({ scheduler: systemScheduler }).open(
+      return createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
         handle,
         new AbortController().signal
       )

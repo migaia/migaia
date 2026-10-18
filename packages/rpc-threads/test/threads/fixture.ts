@@ -1,3 +1,4 @@
+import { type INodeThreadHandle } from '@migaia/rpc-threads'
 import { resolve } from 'node:path'
 import { vi } from 'vitest'
 import type { IThreadHandle } from '@migaia/supervision/threads'
@@ -24,8 +25,7 @@ import type { IRemoteContract } from '@migaia/rpc-core/remote'
 import type { IRemoteEndpointFactory } from '@migaia/rpc-core/remote'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '../../src/threads/adapters/node.js'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import type { IRuntimeThreadSpawn } from '../../src/threads/runtime-peer.js'

@@ -15,14 +15,6 @@ import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
-import {
-  createBunThreadLauncher,
-  createBunThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/bun'
-import {
-  createDenoThreadLauncher,
-  createDenoThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/deno'
 
 /** Every receipt is emitted by the actual selected runtime, never by a Node stand-in. */
 const runtime = process.argv[2]
@@ -39,24 +31,17 @@ try {
     self: { name: 'u25-parent', instanceId: 'u25-parent' },
     spawn: async (context) => {
       if (mode === 'thread') {
-        const launcher = (
-          runtime === 'node'
-            ? createNodeThreadLauncher
-            : runtime === 'bun'
-              ? createBunThreadLauncher
-              : createDenoThreadLauncher
-        )({ runtimeApi: context, report: () => undefined })
+        const launcher = (runtime === 'node' ? createNodeThreadLauncher : createWebThreadLauncher)({
+          runtimeApi: context,
+          report: () => undefined
+        })
         const entry = new URL('./runtime-u25-worker.mjs', import.meta.url)
         handle = await launcher.launch(
           { entry: runtime === 'node' ? fileURLToPath(entry) : entry.href, name: 'u25-child' },
           { signal: new AbortController().signal }
         )
         return (
-          runtime === 'node'
-            ? createNodeThreadChannelFactory
-            : runtime === 'bun'
-              ? createBunThreadChannelFactory
-              : createDenoThreadChannelFactory
+          runtime === 'node' ? createNodeThreadChannelFactory : createWebThreadChannelFactory
         )({ scheduler: systemScheduler }).open(handle, new AbortController().signal)
       }
       const launcher = (

@@ -11,11 +11,9 @@ import {
   createWebThreadChannelFactory
 } from '../../src/threads/index.js'
 import { createNodeThreadChannelFactory } from '../../src/threads/adapters/node.js'
-import { createBunThreadChannelFactory } from '../../src/threads/adapters/bun.js'
-import { createDenoThreadChannelFactory } from '../../src/threads/adapters/deno.js'
-import { createBrowserThreadChannelFactory } from '../../src/threads/adapters/browser.js'
+
 import { createElectronMainThreadChannelFactory } from '../../src/threads/adapters/electron-main.js'
-import { createElectronRendererThreadChannelFactory } from '../../src/threads/adapters/electron-renderer.js'
+
 import type { IThreadWebPort } from '../../src/threads/types.js'
 
 /** Structural Node I/O exercises each exported channel's actual borrowed-port branch. */
@@ -95,38 +93,6 @@ const cases: readonly [
     'web factory',
     () =>
       createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
-        handle(webPort()),
-        new AbortController().signal
-      )
-  ],
-  [
-    'Bun factory',
-    () =>
-      createBunThreadChannelFactory({ scheduler: systemScheduler }).open(
-        handle(webPort()),
-        new AbortController().signal
-      )
-  ],
-  [
-    'Deno factory',
-    () =>
-      createDenoThreadChannelFactory({ scheduler: systemScheduler }).open(
-        handle(webPort()),
-        new AbortController().signal
-      )
-  ],
-  [
-    'browser factory',
-    () =>
-      createBrowserThreadChannelFactory({ scheduler: systemScheduler }).open(
-        handle(webPort()),
-        new AbortController().signal
-      )
-  ],
-  [
-    'Electron renderer factory',
-    () =>
-      createElectronRendererThreadChannelFactory({ scheduler: systemScheduler }).open(
         handle(webPort()),
         new AbortController().signal
       )

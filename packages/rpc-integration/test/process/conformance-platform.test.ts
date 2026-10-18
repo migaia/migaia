@@ -10,8 +10,7 @@ import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn
 import { createWindowsJobProcessLauncher } from '@migaia/rpc-process/adapters/windows-job'
 import { createElectronUtilityProcessLauncher } from '@migaia/rpc-process/adapters/electron-utility-process'
 import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
-import { createDenoThreadLauncher } from '@migaia/rpc-threads/adapters/deno'
-import { createBrowserThreadLauncher } from '@migaia/rpc-threads/adapters/browser'
+import { createWebThreadLauncher } from '@migaia/rpc-threads'
 
 /** The same unpackaged admission gate runs before the real business and performance runners. */
 const admission = await import(
@@ -308,8 +307,8 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       'heap-limit': 'enforced'
     })
     for (const launcher of [
-      createDenoThreadLauncher({ report: vi.fn() }),
-      createBrowserThreadLauncher({ report: vi.fn() })
+      createWebThreadLauncher({ report: vi.fn() }),
+      createWebThreadLauncher({ report: vi.fn() })
     ])
       expect(launcher.capabilities).toMatchObject({
         termination: 'unsupported',

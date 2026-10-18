@@ -4,23 +4,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { createThreadPeer } from '../../src/threads/peer.js'
 import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/public-host.js'
-import { createDenoThreadLauncher } from '../../src/threads/adapters/deno.js'
-import { createBunThreadLauncher } from '../../src/threads/adapters/bun.js'
-import { createBrowserThreadLauncher } from '../../src/threads/adapters/browser.js'
-import { createElectronRendererThreadLauncher } from '../../src/threads/adapters/electron-renderer.js'
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '../../src/threads/index.js'
+
 import { createElectronMainThreadLauncher } from '../../src/threads/adapters/electron-main.js'
-import { createBrowserThreadChannelFactory } from '../../src/threads/adapters/browser.js'
+
 import { endpointFactory, nativeFixture, nativeWorkerFor } from './fixture.js'
 
 /** Node fixtures cannot establish Web/Bun/Electron actual-exit enforcement. */
 describe('platform capability admission', () => {
-  it.each([
-    ['deno', createDenoThreadLauncher],
-    ['bun', createBunThreadLauncher],
-    ['browser', createBrowserThreadLauncher],
-    ['electron-renderer', createElectronRendererThreadLauncher]
-  ] as const)(
-    '[A7] %s requires health and rejects default isolation before Worker construction',
+  it.each([['web', createWebThreadLauncher]] as const)(
+    '[A7] %s uses default health and rejects required isolation before Worker construction',
     async (_platform, factory) => {
       const constructor = vi.fn()
       const Worker = class {
@@ -40,7 +33,7 @@ describe('platform capability admission', () => {
         launcher,
         budget,
         scheduler,
-        channelFactory: createBrowserThreadChannelFactory({ scheduler }),
+        channelFactory: createWebThreadChannelFactory({ scheduler }),
         endpointFactory,
         report: vi.fn()
       }
@@ -72,8 +65,7 @@ describe('platform capability admission', () => {
             }) => {
               const native = error.code === 'PLUGIN_INSTALL_FAILED' ? error.cause : error
               expect(native).toMatchObject({
-                code: 'INVALID_OPTION',
-                detail: expect.objectContaining({ field: 'health' })
+                code: 'CAPABILITY_UNSUPPORTED'
               })
               return true
             }

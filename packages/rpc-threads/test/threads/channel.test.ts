@@ -8,10 +8,7 @@ import { createNodeThreadChannel, createWebThreadChannel } from '../../src/threa
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { createThreadPeer } from '../../src/threads/peer.js'
 import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/public-host.js'
-import {
-  createBrowserThreadLauncher,
-  createBrowserThreadChannelFactory
-} from '../../src/threads/adapters/browser.js'
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '../../src/threads/index.js'
 import { receiveThreadData } from '../../src/threads/bootstrap.js'
 import type { IThreadWebPort } from '../../src/threads/types.js'
 import { nativeFixture, endpointFactory } from './fixture.js'
@@ -154,12 +151,12 @@ describe('thread channel ownership and portable boundary', () => {
       expect(data).toEqual({ value: 7 })
       service = createWebThreadChannel(pair.right, 'parent', { scheduler: systemScheduler })
     })
-    const launcher = createBrowserThreadLauncher({ Worker, report: vi.fn() })
+    const launcher = createWebThreadLauncher({ Worker, report: vi.fn() })
     const handle = await launcher.launch(
       { entry: 'file:///worker.mjs', data: { value: 7 } },
       { signal: new AbortController().signal }
     )
-    const channel = await createBrowserThreadChannelFactory({ scheduler: systemScheduler }).open(
+    const channel = await createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
       handle,
       new AbortController().signal
     )

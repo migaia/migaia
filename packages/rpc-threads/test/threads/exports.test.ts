@@ -36,7 +36,7 @@ describe('threads public exports', () => {
     expect(runtime.createThreadPeer).toBeTypeOf('function')
     expect(runtime.createThreadPlugin).toBeTypeOf('function')
   })
-  it('[A8] exports all platform factories through existing public foundations without platform root imports', async () => {
+  it('[A8] exports canonical factories through existing public foundations without platform root imports', async () => {
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
     const base = JSON.parse(
       readFileSync(resolve(root, 'test/threads/fixtures/base-manifest.json'), 'utf8')
@@ -58,12 +58,9 @@ describe('threads public exports', () => {
     expect(manifest.exports['.']).toBeDefined()
     expect(manifest.exports['./threads']).toBeUndefined()
     expect(manifest.exports['./threads/adapters/*']).toBeUndefined()
-    for (const entry of [
-      '.',
-      ...['node', 'deno', 'bun', 'electron-main', 'electron-renderer', 'browser'].map(
-        (name) => `./adapters/${name}`
-      )
-    ]) {
+    for (const platform of ['deno', 'bun', 'electron-renderer', 'browser'])
+      expect(manifest.exports[`./adapters/${platform}`]).toBeUndefined()
+    for (const entry of ['.', ...['node', 'electron-main'].map((name) => `./adapters/${name}`)]) {
       const exported = manifest.exports[entry]
       expect(exported).toBeDefined()
       expect(existsSync(resolve(root, exported.types))).toBe(true)

@@ -276,7 +276,7 @@ export async function createIpcSession({
               }
             }
             /** The Bun adapter supplies real Web bootstrap and retains unsupported exit semantics. */
-            const launcher = (deno ? api.createDenoThreadLauncher : api.createBunThreadLauncher)({
+            const launcher = api.createWebThreadLauncher({
               runtimeApi: context,
               report,
               ...(WorkerConstructor ? { Worker: WorkerConstructor } : {})
@@ -286,9 +286,11 @@ export async function createIpcSession({
               { signal: new AbortController().signal }
             )
             cleanup.push(() => handle.terminate())
-            return (deno ? api.createDenoThreadChannelFactory : api.createBunThreadChannelFactory)({
-              scheduler: systemScheduler
-            }).open(handle, new AbortController().signal)
+            return api
+              .createWebThreadChannelFactory({
+                scheduler: systemScheduler
+              })
+              .open(handle, new AbortController().signal)
           }
         })
         /** This extra control operation is outside timing and is reported separately from bare OOB. */

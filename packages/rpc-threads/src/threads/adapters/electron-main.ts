@@ -17,4 +17,3 @@ export function createElectronMainThreadLauncher() {
 export function createElectronMainThreadChannelFactory(options: IThreadChannelOptions) {
   return createNodeThreadChannelFactory(options)
 }
-export type { INodeThreadHandle } from './node.js'
