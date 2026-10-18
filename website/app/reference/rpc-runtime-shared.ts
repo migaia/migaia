@@ -681,20 +681,20 @@ try {
       },
       health: {
         summary: t(
-          'A local Peer has no aggregate health value; inspect the health of each connection.',
-          '对本地 Peer 不可用，健康状态见各连接。'
+          'A local Peer may have several connections, so this field does not combine them into one health result. It returns an unavailable value. Inspect each connection to see whether that connection is healthy.',
+          '本地 Peer 可以持有多条连接，此字段不会把它们合成为一个健康结果，而是返回不可用值。需要判断通信是否健康时，应查看每条连接各自的健康状态。'
         )
       },
       restartCount: {
         summary: t(
-          'Restart counts belong to individual connections, so this field is unavailable on a local Peer.',
-          '对本地 Peer 不可用，重启次数见各连接。'
+          'Restart counts describe individual connections, not the local Peer as a whole. This field returns an unavailable value. Inspect the relevant connection when you need its restart count.',
+          '重启次数属于每条连接，不属于整个本地 Peer，因此此字段返回不可用值。需要知道某个对端重启过多少次时，应查看对应连接。'
         )
       },
       resources: {
         summary: t(
-          'A local Peer exposes resource usage through its connections rather than this field.',
-          '对本地 Peer 不可用，资源用量见各连接。'
+          'Resource measurements belong to the execution unit behind each connection. The local Peer returns an unavailable value here rather than a combined measurement. Inspect a connection for the resource information its runtime supports.',
+          '资源测量属于每条连接背后的执行单元。本地 Peer 在此返回不可用值，不汇总各连接的用量。需要资源信息时，应查看对应连接及其运行环境实际支持的测量结果。'
         )
       }
     }

@@ -1295,8 +1295,8 @@ domain(
 symbols.RPC_CORE_ERROR_SOURCE = {
   role: 'error',
   purpose: t(
-    'Compare RPC_CORE_ERROR_SOURCE with an error’s source, then inspect code to classify a Core failure. Copying these fields does not give an error the private identity needed to control a local operation.',
-    '先把错误的 source 与 RPC_CORE_ERROR_SOURCE 比较，再按 code 区分核心调用失败。复制这两个字段不会取得控制本地操作所需的内部错误身份。'
+    'Identifies errors attributed to RPC Core for diagnostics. After catching an error, compare its source with RPC_CORE_ERROR_SOURCE before using code to distinguish failure kinds. These public fields describe a failure. Copying them onto another Error does not make Core treat it as an error created by its own local operation.',
+    '在诊断中标识归属 RPC Core 的错误。捕获错误后，先检查 source 是否等于 RPC_CORE_ERROR_SOURCE，再用 code 区分失败种类。这两个公开字段用于描述失败。把它们复制到另一个 Error 上，不会让 Core 把该错误认作自身本地操作创建的错误。'
   ),
   example: 'if (isRpcError(error)) console.log(error.source, error.code)'
 }

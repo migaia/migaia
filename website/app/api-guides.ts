@@ -116,8 +116,8 @@ const configurationOptionDescriptions: readonly {
       'utils:error:deserializeErrorChain:unknownFields',
       'utils:error:normalizeSerializedErrorChain:unknownFields'
     ],
-    en: 'Choose reject to refuse fields outside the accepted error shape, or ignore to discard them. Use ignore only when your receiving boundary permits extra fields.',
-    zh: '选择 reject 会拒绝错误数据中未被允许的字段；选择 ignore 会丢弃这些字段。只有接收边界允许附加字段时，才选择忽略。'
+    en: 'Controls received error data that contains an unrecognized field. Choose reject to refuse that data, or ignore to discard the extra field and continue. Use ignore only when the application permits extra fields at this receiving boundary.',
+    zh: '决定收到的错误数据含有未知字段时如何处理。reject 表示拒绝这份数据，ignore 表示丢弃额外字段后继续。只有应用允许在此处接收额外字段时，才选择 ignore。'
   },
   {
     keys: [
@@ -137,8 +137,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-contract:v1:normalizeRpcEnvelope:onUnknownField',
       'rpc-core:index:deserializeRpcError:onUnknownField'
     ],
-    en: 'Receives the JSON pointer and unknown field name during normalization. Record unexpected peer data here; the callback is synchronous and a throw stops normalization.',
-    zh: '规范化数据时，同步收到 JSON 中的位置和未知字段名。可在这里记录对端的意外数据；回调若抛错，本次规范化会停止。'
+    en: 'Reports an unknown field when the ignore policy allows processing to continue. It receives the field name and a JSON pointer: a path locating that field in the data. Use it to log unexpected peer input. The callback runs synchronously; if it throws, processing stops. The reject policy refuses the data before calling this hook.',
+    zh: '使用 ignore 策略、允许继续处理数据时，报告遇到的未知字段。参数包含字段名和 JSON pointer，即字段在数据中的位置路径。需要记录对端的意外数据时，可提供此回调。回调同步执行，抛错会停止处理。reject 策略会直接拒绝数据，不会先调用此回调。'
   },
   {
     keys: [
@@ -146,8 +146,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-contract:errors:serializeRpcError:report',
       'rpc-core:index:serializeRpcError:report'
     ],
-    en: 'Receives a failed property read with its pointer, field name and original error. Use it to record malformed error data; this callback is synchronous and should not throw.',
-    zh: '读取错误数据的属性失败时，收到数据位置、字段名和原错误。可在此记录损坏的数据；这是同步回调，应避免再次抛错。'
+    en: 'Reports a failure while reading a property of an error object. The callback receives the property name, its path in the data and the original read failure. Provide a synchronous logger when unreadable error data needs investigation. The logger should not throw another error.',
+    zh: '读取错误对象的属性失败时调用。参数包含属性名、属性在数据中的位置和原始读取错误。需要追查无法正常读取的错误数据时，可提供同步日志函数。日志函数应避免再次抛错。'
   },
   {
     keys: ['utils:error:reachErrorChain:report', 'utils:error:serializeErrorChain:report'],
@@ -156,111 +156,111 @@ const configurationOptionDescriptions: readonly {
   },
   {
     keys: ['rpc-contract:index:createRpcUnknownFieldWarner:maxKeysPerConnection'],
-    en: 'Limits remembered warning keys for one connection. Once full, one overflow warning replaces further distinct keys, keeping unexpected-field diagnostics bounded.',
-    zh: '限制每条连接记住的警告标识数量。达到上限后，用一次总括警告代替继续保存新标识，避免未知字段诊断无限占用内存。'
+    en: 'Sets how many distinct unknown-field warning keys one connection can remember. Remembering a key prevents repeated warnings for the same field. Once full, the reporter emits one overflow warning instead of remembering more keys. Lower this limit to bound memory used by unexpected-field history.',
+    zh: '设置每条连接最多记住多少种未知字段警告标识。保存标识可以避免对同一字段反复告警。达到上限后，报告器只发出一次超限警告，不再保存新的标识。需要限制未知字段历史占用的内存时，可调低此项。'
   },
   {
     keys: ['rpc-contract:index:createRpcUnknownFieldWarner:maxConnections'],
-    en: 'Limits connections remembered for unknown-field warnings. When full, the least recently observed connection is removed, so warning history stays bounded.',
-    zh: '限制未知字段警告记住的连接数量。达到上限时，移除最久未观察到的连接，避免警告历史持续增长。'
+    en: 'Sets how many connections retain unknown-field warning history. When another connection would exceed the limit, the least recently observed connection history is removed. Use this to bound history for a service that receives many connections over time; removing history does not close that connection.',
+    zh: '设置最多为多少条连接保留未知字段警告历史。新连接使数量超限时，会移除最久未观察到的连接历史。长期接收大量连接的服务可用它限制历史占用；移除历史不会关闭连接。'
   },
   {
     keys: ['rpc-contract:index:createRpcUnknownFieldWarner:warn'],
-    en: 'Called synchronously with the connection id and normalized field key when a warning is due. Send these to your logger; callback errors propagate.',
-    zh: '需要警告时，同步收到连接标识与规范化后的字段标识。可转交应用日志；回调抛出的错误会继续传播。'
+    en: 'Writes an unknown-field warning to your application logger. It receives the connection id and the field key used to suppress repeated warnings. The callback runs synchronously. If it throws, that failure reaches the caller rather than being hidden.',
+    zh: '把未知字段警告写入应用日志。回调会收到连接标识，以及用于避免重复告警的字段标识。它同步执行；如果抛错，错误会交给调用方，不会被隐藏。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:chunkBytes',
       'rpc-contract:framing:createStringFramer:chunkBytes'
     ],
-    en: 'Positive safe integer limiting each fragment. Binary framing counts bytes; string framing counts UTF-16 code units. Choose it to fit the carrier limit.',
-    zh: '限制每片大小的正安全整数。二进制按字节计数，字符串按 UTF-16 编码单元计数；应根据实际通道可承载的大小设置。'
+    en: 'Sets the largest fragment produced when a message is split for transport. Use a positive safe integer: a whole number JavaScript can represent exactly. Binary framing counts bytes; string framing counts UTF-16 code units, the units used by string.length. Choose a size the underlying channel can carry.',
+    zh: '设置消息拆分后每片的最大大小。值必须是正安全整数，即 JavaScript 能精确表示的正整数。二进制分片按字节计数；字符串分片按 UTF-16 编码单元计数，与 string.length 的计数单位相同。应根据实际通道能承载的大小选择。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:maxMessageBytes',
       'rpc-contract:framing:createStringFramer:maxMessageBytes'
     ],
-    en: 'Positive safe integer limiting each complete message and its reassembly. Binary uses bytes and strings use UTF-16 code units; it cannot exceed maxBufferedBytes.',
-    zh: '限制整条消息及其重组大小的正安全整数。二进制按字节、字符串按 UTF-16 编码单元计数，不能超过 maxBufferedBytes。'
+    en: 'Limits the size of one complete message and the data retained while collecting its fragments. Use a positive whole number JavaScript can represent exactly. Binary messages count bytes; strings count UTF-16 units, as string.length does. This value cannot exceed maxBufferedBytes, the total buffer limit.',
+    zh: '限制一条完整消息的大小，也限制收集分片时为该消息保留的数据。必须设置 JavaScript 能精确表示的正整数。二进制按字节计数，字符串按 string.length 使用的 UTF-16 编码单元计数。此值不能超过总缓冲上限 maxBufferedBytes。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:maxChunks',
       'rpc-contract:framing:createStringFramer:maxChunks'
     ],
-    en: 'Positive safe integer limiting the declared fragment count for one message. Set it to reject messages that would require excessive fragment bookkeeping.',
-    zh: '限制一条消息所声明分片数量的正安全整数。可据此拒绝需要保存过多分片状态的消息。'
+    en: 'Limits how many fragments one message may declare. Use a positive whole number JavaScript can represent exactly. Set it when a peer must not make the receiver track an excessive number of fragments; messages declaring more fragments are rejected.',
+    zh: '限制一条消息可以声明的分片数量。必须是 JavaScript 能精确表示的正整数。需要防止对端让接收端追踪过多分片时设置；消息声明的分片数超过上限，就会被拒绝。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:maxBufferedBytes',
       'rpc-contract:framing:createStringFramer:maxBufferedBytes'
     ],
-    en: 'Positive safe integer bounding all incomplete message data held at once. This shared limit applies across sources and message ids, not separately to each message.',
-    zh: '限制同时保留的全部未完成消息数据，必须是正安全整数。该总额度由所有来源和消息标识共享，不是每条消息各占一份。'
+    en: 'Limits all data currently retained for messages that are missing fragments. Use a positive whole number JavaScript can represent exactly. Every source and message shares this allowance. Set it according to the total memory available for incomplete messages, rather than treating it as an allowance for each message.',
+    zh: '限制同时为尚未收齐的消息保留的数据总量。必须是 JavaScript 能精确表示的正整数。所有来源、所有消息共用这份额度。应按可用于暂存不完整消息的总内存设置，不能把它理解为每条消息各有一份。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:maxConcurrentMessages',
       'rpc-contract:framing:createStringFramer:maxConcurrentMessages'
     ],
-    en: 'Positive safe integer limiting simultaneous incomplete messages. Lower it when a peer must not occupy many reassembly slots with partial messages.',
-    zh: '限制同时尚未收齐的消息数量，必须是正安全整数。需要防止对端用大量不完整消息占用重组位置时，设置此项。'
+    en: 'Limits how many messages may be waiting for missing fragments at once. Use a positive whole number JavaScript can represent exactly. Lower it when the receiver should track fewer partial messages, even if their combined data still fits the byte limit.',
+    zh: '限制同一时刻可以等待剩余分片的消息数量。必须是 JavaScript 能精确表示的正整数。即使数据总量尚未达到缓冲上限，也可以调低此项，让接收端只追踪较少的不完整消息。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:assemblyTimeoutMs',
       'rpc-contract:framing:createStringFramer:assemblyTimeoutMs'
     ],
-    en: 'Positive safe-integer milliseconds allowed after the first fragment arrives. Once this timer expires, that incomplete message is marked expired.',
-    zh: '从第一片到达后开始计算的等待毫秒数，必须是正安全整数。计时器到期后，该条未收齐消息会被标记为过期。'
+    en: 'Sets how long the receiver waits to complete a message after its first fragment arrives. Supply a positive whole number of milliseconds that JavaScript can represent exactly. If fragments are still missing when the timer fires, the message is marked expired.',
+    zh: '设置收到第一片后，还能等待多久以收齐整条消息。单位为毫秒，必须是 JavaScript 能精确表示的正整数。计时器到期时仍有分片缺失，这条消息就会被标记为过期。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:now',
       'rpc-contract:framing:createStringFramer:now'
     ],
-    en: 'Optional clock callback captured at construction. The current framer does not invoke it; supplying it does not replace expiry timers or change timeout behavior.',
-    zh: '构造时可捕获的可选时钟函数。当前分帧器不会调用它，配置它不会替换过期计时器，也不会改变超时行为。'
+    en: 'An optional clock callback accepted when creating the framer. The current implementation stores it but does not call it, so you can omit it. Adding this callback does not control expiry or change timeouts. Configure schedule and cancel when you need to control timers.',
+    zh: '创建分帧器时可以传入的时钟回调。当前实现会保存它，但不会调用它，因此可以省略。提供此函数不会控制过期时刻，也不会改变超时行为。需要控制计时器时，应配置 schedule 和 cancel。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:schedule',
       'rpc-contract:framing:createStringFramer:schedule'
     ],
-    en: 'Starts an expiry timer with a callback and millisecond delay. Return the handle your cancel callback understands; a scheduling failure rejects the framing operation.',
-    zh: '用回调和毫秒延迟启动过期计时器，返回 cancel 能处理的句柄。计时器登记失败时，本次分帧操作会失败。'
+    en: 'Provides timers for expiring incomplete messages. Arrange for the callback to run after the requested delay in milliseconds, and return a timer handle that cancel can receive later. Supply this together with cancel when the application uses its own timers. If creating a timer fails, the framing operation fails too.',
+    zh: '提供让不完整消息过期的计时器。按收到的毫秒延迟安排回调，并返回之后能交给 cancel 的计时器对象。应用需要使用自己的计时器时，与 cancel 配套提供。创建计时器失败会使本次分帧操作失败。'
   },
   {
     keys: [
       'rpc-contract:framing:createBinaryFramer:cancel',
       'rpc-contract:framing:createStringFramer:cancel'
     ],
-    en: 'Cancels the original handle returned by schedule. Cleanup failures are reported through the host error channel while preserving the frame result.',
-    zh: '取消 schedule 最初返回的句柄。取消若失败，会通过宿主错误通道上报，同时保留本次帧处理的结果。'
+    en: 'Stops a timer previously created by schedule. It receives the original timer handle, so pair it with the function that created that handle. If cancellation fails during cleanup, the host error reporter receives the failure while the frame result is preserved.',
+    zh: '停止 schedule 之前创建的计时器。接收的就是原计时器对象，因此必须与创建它的 schedule 配套。清理时取消失败，会交给运行环境的错误报告通道，本次帧处理结果仍会保留。'
   },
   {
     keys: ['rpc-contract:framing/stream:createRpcHandshakeFrameReceiver:role'],
-    en: 'Choose initiator for the side that starts the handshake, or responder for the accepting side. Match the actual connection role so handshake frames are interpreted correctly.',
-    zh: '主动发起握手的一端选择 initiator，接收的一端选择 responder。必须与实际连接角色一致，才能正确解释握手帧。'
+    en: 'Identifies which side of the initial connection exchange this receiver handles. Choose initiator for the side starting the handshake, or responder for the side accepting it. Matching the actual role lets the receiver interpret each handshake frame correctly.',
+    zh: '说明此接收器处于连接建立过程中的哪一端。主动发起握手时选择 initiator，接收握手时选择 responder。必须与实际连接角色一致，接收器才能正确解释双方交换的握手帧。'
   },
   {
     keys: [
       'rpc-contract:framing/stream:createRpcStreamFrameDecoder:onFrame',
       'rpc-contract:framing/stream:createRpcStreamFrameDecoderWithLimit:onFrame'
     ],
-    en: 'Receives each complete byte payload synchronously after decoder assembly state is released. Process or copy the payload here before waiting for another frame.',
-    zh: '解码器释放本次组装状态后，同步交出完整的字节内容。可在回调中处理或复制内容，再继续等待后续帧。'
+    en: 'Receives the bytes of each complete frame. A frame is one length-delimited message collected from the byte stream. The decoder releases its assembly state before calling this function synchronously. Process or copy the bytes in the callback when the application needs the completed message.',
+    zh: '收到一条完整帧后同步调用。帧是从连续字节流中按长度分出的完整消息。解码器会先释放这次组装的状态，再把消息字节交给回调。应用需要使用完整消息时，应在这里处理或复制字节。'
   },
   {
     keys: [
       'rpc-contract:framing/stream:createRpcStreamFrameDecoder:onError',
       'rpc-contract:framing/stream:createRpcStreamFrameDecoderWithLimit:onError'
     ],
-    en: 'Receives the first malformed-frame error synchronously. At this point the decoder has stopped and released retained data; create a new decoder for a new connection.',
-    zh: '同步收到第一次格式错误。此时解码器已停止并释放保留的数据；需要处理新连接时，应创建新的解码器。'
+    en: 'Reports the first frame whose format is invalid. Before the callback runs synchronously, the decoder stops and releases buffered data. Handle or log the error here. The failed decoder cannot continue with another connection; create a new decoder for that connection.',
+    zh: '首次发现帧格式错误时同步调用。在调用回调前，解码器已经停止并释放暂存数据。可在这里处理或记录错误。失败的解码器不能继续处理另一条连接；新连接应使用新建的解码器。'
   },
   {
     keys: [
@@ -269,18 +269,18 @@ const configurationOptionDescriptions: readonly {
       'rpc-contract:stream:checkRpcRuntimeStreamIntent:cancel',
       'rpc-contract:stream:checkRpcRuntimeStreamTransition:cancel'
     ],
-    en: 'The only supported value is before-start. It asks the final provider to arbitrate cancellation before execution begins; it does not promise to stop running business code.',
-    zh: '唯一支持值为 before-start，表示请最终处理端在执行前裁定取消。它不保证能够停止已经运行的业务代码。'
+    en: 'Declares cancellation support with the only accepted value, before-start. This means the final method handler can decide a cancellation request before business execution starts. Use it when callers need that decision. It does not guarantee that already running business code can be stopped.',
+    zh: '声明取消能力，唯一允许的值是 before-start，即在开始执行前处理取消。最终的方法处理端会在业务开始前裁定取消请求。调用方需要这个裁定时使用；它不保证可以停止已经运行的业务代码。'
   },
   {
     keys: ['rpc-contract:runtime:runtimeOperationCapabilities:orderKey'],
-    en: 'Give related operations the same application-issued key when the final provider must order their arrivals. Different keys identify independent ordering lanes.',
-    zh: '最终处理端需要按到达次序处理相关操作时，为它们提供同一个应用标识。不同标识表示独立的排序队列。'
+    en: 'Assign the same application-issued key to operations whose arrival order the final handler must preserve. Different keys define independent ordering groups. Use a key for related updates that must stay in order, rather than sharing one key across unrelated work.',
+    zh: '最终处理端需要保持相关操作的到达顺序时，给这些操作分配同一个应用标识。不同标识表示互相独立的排序组。需要按顺序处理的更新使用同一标识，无关工作应使用不同标识。'
   },
   {
     keys: ['rpc-contract:runtime:runtimeOperationCapabilities:idempotencyKey'],
-    en: 'A stable application key for one intended business effect. Reuse it only for that same effect, allowing the provider to recognize retries of the original operation.',
-    zh: '为一次业务效果提供稳定的应用标识。只有重试同一操作时才复用它，让处理端能识别这是原操作的重试。'
+    en: 'Identifies one intended business operation so the final handler can recognize a retry. Keep this string stable across retries of that same operation. Give a new operation a different key; reusing a key means asking for the original operation again.',
+    zh: '为一次业务操作提供稳定标识，让最终处理端识别重试。同一操作的重试必须使用相同字符串。新的业务操作应使用不同标识；复用标识表示再次请求原操作。'
   },
   {
     keys: [
@@ -297,8 +297,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:self',
       'rpc-threads:index:createThreadPlugin:self'
     ],
-    en: 'Public identity for this peer, with nonempty name and instanceId. Use safe display values; credentials and arbitrary extra properties are not published. Omit it to use the generated identity.',
-    zh: '本端公开身份，包含非空的 name 和 instanceId。只放适合公开的名称；凭据和任意附加属性不会被发布。省略时使用自动生成的身份。'
+    en: 'Sets the public identity this Peer advertises to the other side. Peer is the local object used to call remote methods and offer local methods. Supply nonempty name and instanceId values suitable for display; credentials and arbitrary extra properties are not published. Omit self to use the generated identity.',
+    zh: '设置此 Peer 向对端公开的身份。Peer 是用于调用远端方法、提供本地方法的连接对象。name 和 instanceId 必须非空，并适合公开显示。凭据与任意附加属性不会被发布；省略 self 时使用自动生成的身份。'
   },
   {
     keys: [
@@ -314,8 +314,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:provide',
       'rpc-threads:index:createThreadPlugin:provide'
     ],
-    en: 'Local methods this side offers to the other peer. Each function receives the remote payload; return its result or throw an error. Omit the map to publish no application methods.',
-    zh: '向对端提供的本地方法。每个函数接收远端传入的数据，可返回结果或抛出错误；省略此映射时，不公开应用方法。'
+    en: 'Lists the local methods that the other side may call. Each function receives the remote payload and returns a result or throws an error. Configure this map when the connection must accept application calls as well as send them. Omit it to publish no application methods.',
+    zh: '列出允许对端调用的本地方法。每个函数接收远端传入的数据，可以返回结果或抛出错误。连接除了发送调用，还需要接收业务调用时，配置这份方法表。省略时不公开应用方法。'
   },
   {
     keys: [
@@ -336,8 +336,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:providerLimits',
       'rpc-threads:index:createThreadPlugin:providerLimits'
     ],
-    en: 'Limits admitted provider work through the existing endpoint admission policy. Use it to bound incoming execution; it does not change message framing or client-side queue capacity.',
-    zh: '通过端点已有的准入规则限制处理端工作量。需要限制入站调用执行量时配置；它不改变消息分帧，也不限制客户端队列。'
+    en: 'Limits how much incoming method work the endpoint accepts. Set it when local handlers need a bound on execution load. The endpoint uses its existing admission rules to apply the limits; message splitting and the queue of outgoing client calls are controlled separately.',
+    zh: '限制端点接纳多少入站方法调用。需要控制本地处理函数的执行负载时设置。端点会用已有的接纳规则实施限制；消息如何拆分、客户端出站队列有多大，仍分别由其他配置控制。'
   },
   {
     keys: [
@@ -347,8 +347,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPeer:authentication',
       'rpc-process:index:createProcessPlugin:authentication'
     ],
-    en: 'Signing, verification and optional encryption settings for this endpoint. Configure matching credentials at both ends; invalid credentials reject construction before the peer is exposed.',
-    zh: '此端点的签名、验证及可选加密设置。两端应配置匹配的凭据；凭据无效时，构造会在对外提供连接前失败。'
+    en: 'Configures signing and verification of messages, with optional encryption. Set compatible credentials and functions at both ends when messages need authentication. Invalid authentication configuration fails construction before the Peer becomes available.',
+    zh: '配置消息签名和验证，也可以同时配置加密。需要认证消息时，两端应使用相匹配的凭据和处理函数。认证配置无效会使构造失败，Peer 不会对外提供。'
   },
   {
     keys: [
@@ -357,8 +357,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:contract',
       'rpc-threads:index:createThreadPlugin:contract'
     ],
-    en: 'An explicit method contract declaring input schemas, supported call modes and idempotency rules. Use it when inferred method information is insufficient; it does not expose methods by itself.',
-    zh: '显式的方法契约，声明输入格式、支持的调用方式和幂等规则。自动推导的方法信息不足时使用；仅声明契约不会公开方法。'
+    en: 'Describes the method inputs and supported call forms, such as requests or streams. It also states how repeated operations are recognized. Supply an explicit contract when the information inferred from methods is insufficient. The contract describes methods; it does not publish them by itself.',
+    zh: '说明方法接受的数据格式、支持请求还是流等调用方式，以及如何识别重复操作。根据方法自动推导的信息不足时，可显式提供这份契约。契约只描述方法，本身不会把方法公开给远端。'
   },
   {
     keys: [
@@ -377,8 +377,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:keyFactory',
       'rpc-threads:index:createThreadPlugin:keyFactory'
     ],
-    en: 'Advanced retry support: return a string key for an automatically keyed remote-proxy operation. Direct Peer assembly does not read this option; ordinary calls use their own key options.',
-    zh: '高级重试设置：为远程代理自动加标识的操作返回字符串。直接构造 Peer 时不会读取此项；普通调用使用各自的标识选项。'
+    en: 'Provides a string key when the remote-proxy layer automatically identifies an operation for retry. The proxy is the local object that forwards calls to remote methods. Configure this in that layer when automatic keys are needed. Direct Peer construction does not read this option; individual calls use their own key options.',
+    zh: '远程代理为操作自动生成重试标识时，由此函数返回字符串。远程代理是把本地方法调用转发到远端的对象。需要自动标识时，在代理层配置；直接构造 Peer 不读取此项，单次调用使用自己的标识选项。'
   },
   {
     keys: [
@@ -397,8 +397,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:retryPort',
       'rpc-threads:index:createThreadPlugin:retryPort'
     ],
-    en: 'Advanced retry dispatcher used by remote proxies. It receives the original retry request and returns the chosen dispatch result. Direct Peer assembly does not install a new retry policy from it.',
-    zh: '远程代理使用的高级重试调度对象，接收原重试请求并返回所选调度结果。直接构造 Peer 不会根据它另装一套重试规则。'
+    en: 'Supplies the remote proxy with an object that decides where a retry is sent. It receives the original retry request and returns the selected dispatch result. Use it when the proxy must coordinate retries with connection replacement. Setting it on direct Peer construction does not install a retry policy.',
+    zh: '为远程代理提供决定重试发往哪里的对象。它接收原重试请求，返回所选发送路径的结果。代理需要在连接替换过程中协调重试时使用。直接构造 Peer 时配置它，不会安装重试规则。'
   },
   {
     keys: [
@@ -413,8 +413,8 @@ const configurationOptionDescriptions: readonly {
       'tray:index:createTray:probe',
       'tray:index:serveTrayHost:probe'
     ],
-    en: 'One RPC observer or an array of observers. They receive endpoint events synchronously without changing message handling. Reuse the observer when several connections must share diagnostics.',
-    zh: '一个或多个 RPC 观察器，同步接收端点事件，不改变消息处理。需要汇总多条连接的诊断时，可以复用同一个观察器。'
+    en: 'Attaches one RPC event observer or an array of observers. Observers receive endpoint events synchronously and do not change message handling. Use them to collect diagnostics, and reuse the same observer when several connections should appear in one diagnostic stream.',
+    zh: '接入一个 RPC 事件观察器或观察器数组。观察器同步接收端点事件，不改变消息处理。需要收集诊断信息时使用；多条连接需要汇总到同一份诊断记录时，可以复用同一个观察器。'
   },
   {
     keys: [
@@ -424,8 +424,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:defaultTimeoutMs',
       'rpc-threads:index:createThreadPlugin:defaultTimeoutMs'
     ],
-    en: 'Finite positive milliseconds used as the default wait for request and stream calls. Configure it before opening the source; notify and group keep their existing timeout rules.',
-    zh: 'request 和 stream 默认等待的有限正毫秒数，应在打开来源前配置。notify 与 group 仍沿用各自已有的超时规则。'
+    en: 'Sets the default wait for request and stream calls, in milliseconds. Supply a finite positive value before opening the connection. Use it when those calls need a common timeout. The notify and group operations continue to use their own timeout rules.',
+    zh: '设置 request 请求和 stream 流调用默认等待的毫秒数。需要为这些调用统一超时时间时，在打开连接前配置有限正数。notify 通知和 group 分组调用仍使用各自的超时规则。'
   },
   {
     keys: [
@@ -437,8 +437,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPeer:endpointFactory',
       'rpc-process:index:createProcessPlugin:endpointFactory'
     ],
-    en: 'Advanced callback receiving the acquired channel and construction abort signal. Return a Promise for the endpoint serving that channel; rejection rolls back construction.',
-    zh: '高级构造回调，接收已取得的通道和构造取消信号。返回服务该通道的端点 Promise；若失败，会回滚本次构造。'
+    en: 'Replaces endpoint construction with your callback. It receives the acquired message channel and a signal that can cancel construction. Return a Promise for the endpoint that serves that channel. Use this when the standard endpoint is insufficient; a rejected Promise fails construction and triggers cleanup of acquired resources.',
+    zh: '用自己的回调构造端点。回调接收已取得的消息通道，以及可取消构造的信号，并返回服务该通道的端点 Promise。标准端点不能满足需求时使用；Promise 失败会使构造失败，并清理已取得的资源。'
   },
   {
     keys: [
@@ -452,18 +452,18 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:report',
       'rpc-threads:index:createThreadPlugin:report'
     ],
-    en: 'Receives background or contained failures that cannot reject a current call. Send them to a synchronous application logger. Omit it to use the default RPC console reporter.',
-    zh: '接收无法通过当前调用返回的后台或已隔离错误。请转交同步的应用日志函数；省略时使用 RPC 默认的控制台报告函数。'
+    en: 'Reports background failures that cannot reject an application call, including errors already contained by the connection. Provide a synchronous application logger so these failures remain visible. If omitted, RPC uses its default console reporter.',
+    zh: '接收无法通过业务调用返回的后台错误，也接收已被连接内部隔离的错误。提供同步应用日志函数，可让这些失败仍然可见。省略时，RPC 使用默认控制台报告函数。'
   },
   {
     keys: ['rpc-browser:index:createBrowserPeer:connect'],
-    en: 'Select an existing browser carrier: a window with its trusted origin, a SharedWorker, or an RTCDataChannel. Choose exactly one of connect and listen.',
-    zh: '选择现有的浏览器载体：带可信来源的窗口、SharedWorker 或 RTCDataChannel。connect 与 listen 必须且只能选择一个。'
+    en: 'Connects to an existing browser messaging resource. Choose a window together with its trusted origin, a SharedWorker, or an RTCDataChannel. Use connect when this side initiates the connection. Exactly one of connect and listen is required; supplying both is invalid.',
+    zh: '连接现有的浏览器消息资源。可以选择窗口及其可信来源、SharedWorker，或 RTCDataChannel。需要由本端主动连接时使用 connect。connect 和 listen 必须且只能配置一个，同时配置无效。'
   },
   {
     keys: ['rpc-browser:index:createBrowserPeer:listen'],
-    en: 'Pass the SharedWorker global scope to accept a separate Peer for each incoming port. Choose this instead of connect; binding the same scope twice fails.',
-    zh: '传入 SharedWorker 的全局对象，为每个新端口接收独立 Peer。选择此项时不能同时配置 connect；同一对象不能重复绑定。'
+    en: 'Accepts connections arriving at a SharedWorker. Pass its global scope; every incoming port receives a separate Peer connection object. Use listen for the accepting side instead of connect. A second binding to the same global scope fails.',
+    zh: '接收 SharedWorker 上到达的连接。传入它的全局对象，每个新端口会取得独立的 Peer 连接对象。接收连接的一端选择 listen，不能同时配置 connect；对同一个全局对象重复绑定会失败。'
   },
   {
     keys: [
@@ -473,8 +473,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createAdapterProcessPlugin:spawn',
       'rpc-process:index:createProcessPeer:spawn'
     ],
-    en: 'Choose the child program to start: a URL, entry path, true for the current entry, or a process deployment object. The Peer owns the new child lifetime.',
-    zh: '选择要启动的子程序：URL、入口路径、表示当前入口的 true，或进程部署对象。Peer 负责新子进程的生命周期。'
+    en: 'Starts a child program and connects a Peer to it. Supply a URL, an entry path, true to reuse the current program entry, or a full process deployment object. Choose spawn when the program is not already running. The resulting Peer owns cleanup of the child it starts.',
+    zh: '启动子程序，并建立通往它的 Peer 连接。可以传入 URL、入口路径、表示复用当前程序入口的 true，或完整进程部署对象。子程序尚未运行时选择 spawn；返回的 Peer 负责清理自己启动的子进程。'
   },
   {
     keys: [
@@ -482,8 +482,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:spawn',
       'rpc-threads:index:createThreadPlugin:spawn'
     ],
-    en: 'Choose the Worker entry: a URL, path, true for the current entry, or a thread source object. Each spawned Worker has its own Peer and owned lifetime.',
-    zh: '选择 Worker 入口：URL、路径、表示当前入口的 true，或线程来源对象。每个新 Worker 都有独立 Peer，并由启动方负责生命周期。'
+    en: 'Starts a Worker from a URL, entry path, true for the current entry, or a thread source object. Choose this when the connection should create its own Worker. Each new Worker has a separate Peer connection object and a lifetime managed by its starting owner.',
+    zh: '根据 URL、入口路径、表示当前入口的 true，或线程来源对象启动 Worker。需要由连接创建自己的 Worker 时，选择此项。每个新 Worker 都有独立的 Peer 连接对象，并由启动方管理其生命周期。'
   },
   {
     keys: [
@@ -492,8 +492,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPeer:connect',
       'rpc-process:index:createProcessPlugin:connect'
     ],
-    en: 'Connect to a running service by registered name, loopback TCP URL or local socket path. Choose this instead of spawn or listen when the service already exists.',
-    zh: '按已登记的服务名、回环 TCP 地址或本地套接字路径连接正在运行的服务。服务已存在时选用此项，不能同时配置 spawn 或 listen。'
+    en: 'Opens a connection to a process service that is already running. Identify it by registered service name, loopback TCP URL, or local socket path. Choose connect for an existing service; it cannot be combined with spawn or listen in the same connection configuration.',
+    zh: '连接已经运行的进程服务。可以使用已登记的服务名、回环 TCP 地址或本地套接字路径。服务已经存在时选择 connect；同一连接配置中不能同时选择 spawn 或 listen。'
   },
   {
     keys: [
@@ -502,8 +502,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPeer:listen',
       'rpc-process:index:createProcessPlugin:listen'
     ],
-    en: 'Accept connections at this service name or address. Each accepted session gets its own connection. Select only this source, rather than also spawning or dialing a peer.',
-    zh: '在此服务名或地址接收连接，每个被接纳的会话有独立连接。只能选择这一种来源，不能同时启动或拨号连接对端。'
+    en: 'Accepts incoming connections at the supplied service name or address. Each accepted session gets its own connection. Choose listen when this process serves other processes. Do not combine it with spawn, which starts a child, or connect, which dials an existing service.',
+    zh: '在指定服务名或地址接收传入连接。每个接纳的会话都有独立连接。本进程需要为其他进程提供服务时选择 listen；不能同时选择用于启动子进程的 spawn，或主动连接服务的 connect。'
   },
   {
     keys: [
@@ -514,8 +514,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:connect',
       'rpc-threads:index:createThreadPlugin:connect'
     ],
-    en: 'Supply a source callback that opens a channel to an existing peer. The callback receives the connection context. Choose exactly one of spawn, connect and listen.',
-    zh: '提供用于打开现有对端通道的来源回调，回调接收本次连接上下文。spawn、connect 与 listen 必须且只能选一个。'
+    en: 'Provides the function that opens a message channel to a peer already running. The function receives the connection context for this attempt. Use connect for an existing peer, and select exactly one source: spawn, connect or listen.',
+    zh: '提供打开现有对端消息通道的函数。函数接收本次连接的上下文。对端已经运行时选择 connect；spawn、connect 和 listen 三种来源必须且只能选择一种。'
   },
   {
     keys: [
@@ -527,8 +527,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createThreadPeer:listen',
       'rpc-threads:index:createThreadPlugin:listen'
     ],
-    en: 'Supply a source callback that accepts a peer channel. Use it for the accepting side and do not combine it with spawn or connect.',
-    zh: '提供接收对端通道的来源回调，供接收连接的一端使用。不能同时配置 spawn 或 connect。'
+    en: 'Provides the function that accepts an incoming peer message channel. Use listen on the accepting side of the connection. It is a connection source, so do not combine it with a source that starts a peer or initiates an outgoing connection.',
+    zh: '提供接收对端消息通道的函数。接收连接的一端使用 listen。它本身就是一种连接来源，因此不能再同时配置启动对端或主动连接对端的来源。'
   },
   {
     keys: [
@@ -536,18 +536,18 @@ const configurationOptionDescriptions: readonly {
       'rpc-core:remote:createRuntimePeer:spawn',
       'rpc-core:remote:createRuntimePlugin:spawn'
     ],
-    en: 'Supply a source callback that starts a new peer using the provided local identity and capability offer. Select only this source; keep its resource cleanup with the source owner.',
-    zh: '提供启动新对端的来源回调，使用传入的本端身份与能力声明。只能选择这一种来源；原生资源的清理仍由来源所有者负责。'
+    en: "Provides the function that starts a new peer. It receives this side's identity and the list of communication capabilities it offers. Choose spawn as the only connection source. The code that acquires the native process or thread remains responsible for cleaning that resource up.",
+    zh: '提供启动新对端的函数。函数接收本端身份，以及本端支持的通信能力列表。选择 spawn 后不能再配置其他连接来源。实际取得进程或线程的代码仍负责清理该资源。'
   },
   {
     keys: ['rpc-core:remote:createCoroutinePlugin:connect'],
-    en: 'Pass the child connection token received in the parent coroutine task. This connects that child to its parent; unrelated objects or tokens from another task are rejected.',
-    zh: '传入父协程任务收到的子端连接标识，让该子端连接父端。其他对象或其他任务的标识会被拒绝。'
+    en: 'Connects the child side of a coroutine task to its parent. Pass the child connection token delivered to that task: the original object that identifies its connection. A copied object or a token from another task is rejected.',
+    zh: '把协程任务的子端连接到父端。传入该任务收到的子端连接标识，即代表这次连接的原对象。复制出的对象或其他任务的标识会被拒绝。'
   },
   {
     keys: ['rpc-core:remote:createCoroutinePlugin:task'],
-    en: 'Parent-side coroutine body. It receives a cancellation signal, heartbeat function and child connection token. Its completion ends the unit; rejection preserves the original failure.',
-    zh: '父端运行的协程任务，接收取消信号、心跳函数和子端连接标识。任务完成即表示单元退出；若失败，保留原始错误。'
+    en: 'Provides the coroutine task that runs on the parent side. It receives a cancellation signal, a heartbeat function for reporting progress, and the token its child uses to connect. Finishing the task ends this execution unit. If the task rejects, the original failure is retained.',
+    zh: '提供在父端运行的协程任务。任务收到取消信号、用于报告仍在运行的心跳函数，以及供子端连接的标识。任务完成就表示这个执行单元退出；任务失败时保留原始错误。'
   },
   {
     keys: [
@@ -558,8 +558,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPlugin:name',
       'rpc-threads:index:createThreadPlugin:name'
     ],
-    en: 'Nonempty plugin registration name. Use this same name to address its installed runtime connection; choose distinct names for registrations that must coexist.',
-    zh: '非空的插件登记名称。调用已安装的运行时连接时使用同名；需要同时存在的登记必须使用不同名称。'
+    en: "Names this plugin's registration in the local Host, the object that installs and removes plugins. Use a nonempty name and use that same name to address its installed connection. Registrations that must coexist need distinct names.",
+    zh: '命名此插件在本地 Host 中的登记。Host 是负责安装和移除插件的对象。名称必须非空，调用已安装连接时使用同名。需要同时存在的插件登记必须使用不同名称。'
   },
   {
     keys: [
@@ -569,8 +569,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPlugin:expose',
       'rpc-threads:index:createThreadPlugin:expose'
     ],
-    en: 'List the exact nonempty Host feature or runtime method paths that remote callers may use. Only this captured allowlist becomes callable; omitted paths remain local.',
-    zh: '列出允许远端调用的 Host 功能或运行时方法路径，路径必须非空。只有这份构造时保存的允许列表会公开，未列出的路径保持本地。'
+    en: 'Lists the Host feature or runtime method paths that remote callers may invoke. Supply exact, nonempty paths when publishing local methods. The list is captured during construction; methods missing from it remain local and cannot be called remotely through this exposure.',
+    zh: '列出允许远端调用的 Host 功能或运行时方法路径。需要公开本地方法时，填写准确且非空的路径。构造时会保存这份列表；未列出的方法保持本地，不会通过这份配置向远端公开。'
   },
   {
     keys: [
@@ -582,8 +582,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPlugin:catalog',
       'rpc-threads:index:createThreadPlugin:catalog'
     ],
-    en: 'Catalog of plugin names and contracts permitted through remote Host control. Supply it with an explicitly exposed control entry; listing a plugin does not install it.',
-    zh: '声明远程 Host 控制允许使用的插件名称和契约。与明确公开的控制入口一起使用；列入目录本身不会安装插件。'
+    en: 'Lists the plugin names and method contracts allowed through remote Host control. Host control lets a remote caller request plugin installation or removal. Use this catalog with an explicitly published control entry. Adding a plugin to the list permits its use; it does not install the plugin.',
+    zh: '列出远程 Host 控制允许使用的插件名称和方法契约。远程 Host 控制允许对端请求安装或移除插件。需要这类控制时，应同时明确公开控制入口。把插件列入目录只表示允许使用，不会立即安装它。'
   },
   {
     keys: [
@@ -594,8 +594,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPlugin:resolvePlugin',
       'rpc-threads:index:createThreadPlugin:resolvePlugin'
     ],
-    en: 'Synchronous local resolver called after a plugin name passes catalog checks. Return the local plugin definition for installation by the existing Host; definitions are not sent over the channel.',
-    zh: '插件名称通过目录检查后调用的本地同步查找函数。返回交给现有 Host 安装的本地插件定义；定义本身不会通过通道发送。'
+    en: 'Finds a local plugin definition after the requested name passes the catalog check. Return the definition synchronously so the existing Host can install it. Provide this when remote control may install catalogued plugins. The definition stays local; it is not transferred over the message channel.',
+    zh: '请求的插件名通过目录检查后，由此函数查找本地插件定义。同步返回定义，交给已有 Host 安装。允许远端控制安装目录中的插件时，需要提供此函数。定义始终留在本地，不会通过消息通道传送。'
   },
   {
     keys: [
@@ -617,8 +617,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createWebThreadChannel:scheduler',
       'rpc-threads:index:createWebThreadChannelFactory:scheduler'
     ],
-    en: 'Clock and timers used by this connection owner. Use a shared scheduler for related deadlines; now() supplies monotonic milliseconds, not wall-clock dates.',
-    zh: '当前连接所有者使用的时钟和计时器。相关截止时间应共用时钟；now() 返回单调递增的毫秒数，不是日期时间。'
+    en: 'Supplies the clock and timers used for connection deadlines. Share one scheduler when related operations must measure time consistently. Its now() returns elapsed milliseconds from a clock that does not move backwards; it is not a calendar timestamp.',
+    zh: '提供连接截止时间使用的时钟和计时器。相关操作需要使用一致时间计算时，应共用同一个 scheduler。它的 now() 返回不会倒退的计时毫秒数，不是表示日期的时间戳。'
   },
   {
     keys: [
@@ -630,8 +630,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-core:index:createEndpoint:transport',
       'rpc-core:provider:createProviderEndpoint:transport'
     ],
-    en: 'The actual transport that sends and receives this endpoint message format. Pass the same transport to connect middleware; the adapter retains its source checks and close policy.',
-    zh: '实际发送和接收端点消息的传输对象。应把同一对象交给 connect 中间件；来源检查和关闭规则仍由原适配器负责。'
+    en: 'Supplies the object that actually sends and receives endpoint messages. When using connect middleware to manage connections, pass that middleware the same transport object. The adapter still applies its own source checks and resource-close rules; this option does not replace them.',
+    zh: '提供实际发送和接收端点消息的对象。使用 connect 中间件管理连接时，应把同一个 transport 对象交给它。适配器仍会执行自己的来源检查和资源关闭规则，此选项不会替换这些规则。'
   },
   {
     keys: [
@@ -643,8 +643,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-core:index:createRuntimeApiEndpoint:idempotency.store',
       'rpc-core:provider:createProviderEndpoint:idempotency.store'
     ],
-    en: 'Caller-owned store retaining outcomes for calls with idempotency keys. Share it only across sessions that intentionally share those operation identities.',
-    zh: '调用方持有的结果存储，保存带幂等标识的调用结果。只有确实需要共享操作身份的会话，才应共用同一存储。'
+    en: 'Stores results for operations identified by an idempotency key, a stable key that marks retries of the same business operation. The caller owns this store. Share it across sessions only when those sessions should recognize the same operation keys and reuse their recorded results.',
+    zh: '保存带幂等标识的操作结果。幂等标识是用于识别同一业务操作重试的稳定键。这份存储由调用方持有。只有多个会话应把相同标识识别为同一操作、复用其结果时，才共用存储。'
   },
   {
     keys: [
@@ -656,66 +656,66 @@ const configurationOptionDescriptions: readonly {
       'rpc-core:index:createRuntimeApiEndpoint:idempotency.scope',
       'rpc-core:provider:createProviderEndpoint:idempotency.scope'
     ],
-    en: 'Receives the admitted token and senderId synchronously and returns a stable store scope. Derive it from authenticated admission, so unrelated callers cannot share outcome records.',
-    zh: '同步接收已准入的 token 与 senderId，返回稳定的存储范围标识。应依据已验证的准入身份生成，避免无关调用方共享结果记录。'
+    en: "Chooses which caller's result records an operation may use. The callback receives the admitted token and senderId synchronously and returns a stable scope string. Derive it from the authenticated caller so unrelated callers cannot accidentally reuse one another's stored operation results.",
+    zh: '决定本次操作可以使用哪一组调用方结果记录。回调同步接收已验证接纳的 token 和 senderId，并返回稳定的范围字符串。应根据已认证的调用方生成，避免无关调用方误用彼此保存的操作结果。'
   },
   {
     keys: ['rpc-core:index:connect:discoveryMode'],
-    en: 'Choose automatic discovery or manual connection control for this connect middleware. Manual mode leaves discovery actions to the endpoint owner.',
-    zh: '为 connect 中间件选择自动发现或手动连接控制。选择 manual 后，由端点所有者主动执行发现操作。'
+    en: 'Selects automatic peer discovery or manual connection control for connect. In manual mode, the application must initiate discovery through the endpoint itself. Choose manual only when that explicit control is needed; selecting it leaves discovery actions to the endpoint owner.',
+    zh: '为 connect 选择自动发现对端或手动控制连接。manual 表示手动模式，需要应用通过端点主动执行发现操作。只有确实需要自己控制时才选择它；端点不会替调用方发起这些发现操作。'
   },
   {
     keys: ['rpc-core:index:connect:useBaseIdVerifyOnly'],
-    en: 'True or omission verifies the base id. Set false only with an identifier callback when separate instances sharing a base id need unique identities.',
-    zh: 'true 或省略时只验证基础标识。同一基础标识下需要区分实例时，设置 false，并同时提供 identifier 验证函数。'
+    en: 'Controls whether connection identity checks use only the base id. True, including omission, keeps that check. Set false when separate instances share a base id and must be distinguished, and provide identifier to verify those instance identities.',
+    zh: '决定连接身份检查是否只使用基础标识。设为 true 或省略时保留这种检查。同一基础标识下有多个实例、需要区分它们时，才设为 false，并提供 identifier 验证实例身份。'
   },
   {
     keys: ['rpc-core:index:connect:uniqueTargetId'],
-    en: 'A unique suffix string, or a callback returning one from endpoint and platform context. It takes effect only with useBaseIdVerifyOnly false and an identifier verifier.',
-    zh: '独立实例的后缀字符串，或根据端点与平台上下文返回后缀的回调。仅在 useBaseIdVerifyOnly 为 false 且提供 identifier 时生效。'
+    en: 'Adds a suffix that distinguishes one instance from others using the same base id. Supply a string or a function that derives it from the endpoint and platform context. This has an effect only when useBaseIdVerifyOnly is false and identifier is supplied; otherwise it does not enable instance-level verification.',
+    zh: '为共用基础标识的实例增加区分后缀。可以直接传字符串，也可以根据端点和运行环境上下文生成。只有 useBaseIdVerifyOnly 为 false，且同时提供 identifier 时才生效；单独设置它不会启用实例身份验证。'
   },
   {
     keys: ['rpc-core:index:connect:identifier'],
-    en: 'Verify the actual inbound connection context and return boolean, directly or by Promise. A false result or thrown failure prevents accepting that identity.',
-    zh: '验证实际入站连接上下文，直接或通过 Promise 返回布尔值。返回 false 或抛错时，不接纳该身份。'
+    en: 'Checks the context of an incoming connection and returns true to accept its identity or false to refuse it. The result may be returned directly or by Promise. Supply this when identity needs application-specific verification. A false result or thrown failure prevents acceptance.',
+    zh: '检查传入连接的上下文，返回 true 接纳其身份，返回 false 拒绝。可以直接返回布尔值，也可以返回 Promise。需要按应用规则验证身份时提供。返回 false 或验证过程抛错，都不会接纳该身份。'
   },
   {
     keys: ['rpc-core:index:connect:receiverSelector'],
-    en: 'Choose an existing receiverId from the supplied server list for this operation, or return undefined. Returning an invented id fails with TARGET_UNKNOWN.',
-    zh: '从本次操作提供的服务列表中选择已有 receiverId，或返回 undefined。返回不存在的标识会以 TARGET_UNKNOWN 失败。'
+    en: "Chooses the destination for an operation from the supplied server list. Return one of that list's receiverId values, or undefined if no choice is made. Use this for application-specific selection. Returning an id outside the list fails with TARGET_UNKNOWN, meaning the requested destination is unknown.",
+    zh: '从传入的服务列表中选择本次操作的目标。返回列表中已有的 receiverId，或返回 undefined 表示未作选择。需要按应用规则选择目标时提供。返回列表外的标识会以 TARGET_UNKNOWN 失败，表示目标不存在。'
   },
   {
     keys: ['rpc-core:index:createRpcIdempotencyStore:retentionMs'],
-    en: 'Positive safe-integer milliseconds to retain a settled operation outcome. Pending execution does not expire under this retention policy.',
-    zh: '已完成操作结果保留的毫秒数，必须是正安全整数。尚在执行的操作不会因为此保留时间而过期。'
+    en: "Sets how many milliseconds a completed operation's result remains available for a later retry. Use a positive whole number JavaScript can represent exactly. The retention timer applies after completion; it does not expire an operation that is still executing.",
+    zh: '设置操作完成后，其结果还能保留多少毫秒，供后续重试查询。必须是 JavaScript 能精确表示的正整数。保留时间从完成后生效，不会让仍在执行的操作过期。'
   },
   {
     keys: ['rpc-core:index:createRpcIdempotencyStore:maxEntriesPerScope'],
-    en: 'Positive safe integer limiting entries retained in one idempotency scope. Set it to bound record growth for each independently identified caller scope.',
-    zh: '限制每个幂等范围保留记录数的正安全整数。可据此限制每个独立调用范围的记录增长。'
+    en: 'Limits stored operation records within one caller scope, the group of records that share a scope string. Use a positive whole number JavaScript can represent exactly. Set it when one caller must not consume an excessive share of record capacity.',
+    zh: '限制同一调用范围内保存的操作记录数。调用范围是共用同一 scope 字符串的一组记录。必须是 JavaScript 能精确表示的正整数；需要防止某个调用方占用过多记录容量时设置。'
   },
   {
     keys: ['rpc-core:index:createRpcIdempotencyStore:maxBytes'],
-    en: 'Positive safe integer limiting the total bytes retained for portable outcomes. This is the shared storage budget, separate from each outcome size limit.',
-    zh: '限制可传输调用结果总保留字节数的正安全整数。这是共享存储额度，与单条结果大小限制分别生效。'
+    en: "Limits the total bytes retained for operation results that can be transferred across a connection. Use a positive whole number JavaScript can represent exactly. Set this for the store's overall memory allowance; maxOutcomeBytes separately limits each individual result.",
+    zh: '限制为可跨连接传输的操作结果保留的总字节数。必须是 JavaScript 能精确表示的正整数。它用于设置存储的总体额度；单条结果的大小由 maxOutcomeBytes 单独限制。'
   },
   {
     keys: ['rpc-core:index:createRpcIdempotencyStore:maxOutcomeBytes'],
-    en: 'Positive safe integer limiting one retained outcome. A larger result leaves an unavailable marker instead of retaining its payload, so a later lookup cannot recover that result.',
-    zh: '限制单条结果保留字节数的正安全整数。过大的结果只留下不可用标记，不保留内容，后续查询无法取回该结果。'
+    en: 'Limits the bytes retained for one completed operation result. Use a positive whole number JavaScript can represent exactly. If a result is larger, the store records that it is unavailable instead of keeping the data. A later lookup can see that marker but cannot recover the result.',
+    zh: '限制一条已完成操作结果可以保留的字节数。必须是 JavaScript 能精确表示的正整数。结果超限时，存储只留下结果不可用的标记，不保存数据；后续查询能看到标记，但无法取回原结果。'
   },
   {
     keys: ['rpc-core:index:createRuntimeApiEndpoint:binding'],
-    en: 'The held runtime operations for ready, request, notify, stream and disposal. Pass the binding acquired for this connection; forwarding it only forwards operations already held.',
-    zh: '当前连接持有的就绪、请求、通知、流和释放操作。应传入为此连接取得的绑定对象；转交对象只转交已经持有的操作。'
+    en: 'Supplies the existing operations for this connection: waiting for readiness, requesting results, sending notifications, streaming and disposal. Use the binding acquired for that connection. Passing it onward shares those operations; it does not create another connection or grant operations the binding does not hold.',
+    zh: '提供当前连接已有的操作，包括等待就绪、请求结果、发送通知、流处理和释放。应传入为这条连接取得的绑定对象。转交绑定只会共享这些操作，不会创建另一条连接，也不会增加绑定原本没有的操作。'
   },
   {
     keys: [
       'rpc-core:remote:createRemoteHost:binding',
       'rpc-core:remote:createRemotePlugin:binding'
     ],
-    en: 'Platform binding supplying supervision, clocks, channel acquisition and execution ownership. Reuse the binding for this remote unit so calls and disposal share one owner.',
-    zh: '平台绑定对象，提供单元监督、时钟、通道取得与执行所有权。应复用该远程单元的绑定，让调用和释放由同一个所有者负责。'
+    en: "Connects the remote proxy to the platform objects that manage its execution unit, clock and message channel. The execution manager starts, restarts and closes the process or thread. Reuse that unit's original binding so calls and cleanup use the same resource owner.",
+    zh: '把远程代理接到管理执行单元、时钟和消息通道的平台对象。执行管理对象负责启动、重启和关闭进程或线程。应复用该单元原有的绑定，让调用和清理由同一资源所有者负责。'
   },
   {
     keys: [
@@ -723,24 +723,24 @@ const configurationOptionDescriptions: readonly {
       'rpc-core:remote:createRemoteHost:callDeadlineCapMs',
       'rpc-core:remote:createRemotePlugin:callDeadlineCapMs'
     ],
-    en: 'Optional finite positive ceiling on one logical call, in milliseconds. A call cannot extend beyond this platform limit even when its own requested timeout is longer.',
-    zh: '单次逻辑调用的平台毫秒上限，若配置必须是有限正数。即使调用自身要求更长的超时，也不能延长到此上限之外。'
+    en: 'Caps the total duration of one logical call, including its retry handling, in milliseconds. Supply a positive safe integer when the platform must enforce a shorter limit than the caller requests. Omit it to add no platform cap; individual call timeouts still apply.',
+    zh: '设置一次逻辑调用连同重试处理在内的总时长上限，单位为毫秒。平台需要约束调用方要求的等待时间时，提供正安全整数。省略时不额外增加平台上限，单次调用自己的超时仍然生效。'
   },
   {
     keys: [
       'rpc-core:remote:createRemoteHost:callGuard',
       'rpc-core:remote:createRemotePlugin:callGuard'
     ],
-    en: 'Synchronous admission check run after validation and before choosing the remote generation. Use it to refuse calls that the current application policy does not allow.',
-    zh: '校验完成后、选择远程实例代次前运行的同步准入检查。应用当前规则不允许执行该调用时，可在这里拒绝。'
+    en: 'Checks whether the application currently allows a remote call. It runs synchronously after input validation and before selecting the remote instance that will receive the call. Use it to refuse calls when a registration is unavailable or current application policy forbids them.',
+    zh: '检查应用当前是否允许远程调用。它在输入校验后同步执行，之后才会选择接收调用的远程实例。登记不可用，或当前应用规则不允许调用时，可在此处拒绝。'
   },
   {
     keys: [
       'rpc-core:remote:createRemotePlugin:contract',
       'rpc-core:remote:serveRemotePlugin:contract'
     ],
-    en: 'Normalized plugin contract or Host catalog describing permitted remote operations. Obtain it with the public normalizer before constructing or serving the remote plugin.',
-    zh: '规范化后的插件契约或 Host 目录，描述允许的远程操作。应先使用公开规范化函数取得，再构造或服务远程插件。'
+    en: 'Describes which remote operations are allowed, either for one plugin or for a Host catalog of plugins. First use the public normalizer to validate the definition and produce the normalized contract. Pass that result when constructing or serving the remote plugin.',
+    zh: '描述允许的远程操作，可以是一份插件契约，也可以是包含多份插件契约的 Host 目录。先用公开规范化函数检查定义、得到规范化契约，再把结果交给远程插件的构造或服务函数。'
   },
   {
     keys: [
@@ -750,96 +750,96 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createAdapterProcessPlugin:host',
       'rpc-process:index:createProcessPlugin:host'
     ],
-    en: 'The local Host handle that owns this plugin registration and its installation or removal. Pass the actual installing Host, particularly when remote Host control is exposed.',
-    zh: '拥有当前插件登记及安装、移除操作的本地 Host 句柄。应传入实际安装插件的 Host，尤其是在公开远程 Host 控制时。'
+    en: 'Supplies the local Host object that installs and removes this plugin registration. Pass the actual installing Host, especially when remote callers can use Host control. This lets registration operations act on the Host that owns the plugin rather than an unrelated Host.',
+    zh: '提供在本地安装和移除当前插件登记的 Host 对象。应传入实际安装此插件的 Host，尤其是在允许远端控制 Host 时。这样登记操作会交给持有该插件的 Host，而不是无关宿主。'
   },
   {
     keys: ['rpc-core:remote:createRemoteRetryPort:events'],
-    en: 'Generation events from the remote proxy owner. The retry dispatcher observes these events to follow replacement; use the original event source for that proxy.',
-    zh: '远程代理所有者提供的实例代次事件。重试调度据此跟踪实例替换，应传入该代理原有的事件来源。'
+    en: 'Supplies events describing changes to the remote instance, including replacement by a new instance. The retry dispatcher uses them to follow the current instance. Pass the event source belonging to this proxy so retries follow its own connection changes.',
+    zh: '提供远程实例变化的事件，包括被新实例替换。重试调度对象据此跟踪当前实例。应传入此代理自己的事件来源，让重试跟随这条连接的变化。'
   },
   {
     keys: [
       'rpc-core:remote:serveRemoteHost:endpoint',
       'rpc-core:remote:serveRemotePlugin:endpoint'
     ],
-    en: 'The dedicated endpoint serving this contract and its required call modes. Pass an already assembled endpoint and release the serving registration with its owner.',
-    zh: '专门服务当前契约及其调用方式的端点。应传入已经装配好的端点，并由所属所有者释放服务登记。'
+    en: 'Provides the already constructed endpoint dedicated to this remote contract. It must support the call forms the contract requires. Use it to register remote serving methods, then release that serving registration when its owner closes.',
+    zh: '提供专门服务当前远程契约的已构造端点。端点必须支持契约要求的调用方式。服务函数会在它上面登记远程方法；所属对象关闭时，还需要释放这份服务登记。'
   },
   {
     keys: ['rpc-core:remote:serveRemotePlugin:invocationContext'],
-    en: 'Called for each provider invocation to create local application context from the RPC context. Use it for request-local data needed by your installed plugin.',
-    zh: '每次处理端调用时，根据 RPC 上下文生成本地应用上下文。已安装插件需要本次请求独有的数据时使用。'
+    en: 'Creates application context for each incoming method invocation. The callback receives the RPC call context and returns the local context that the installed plugin needs. Supply it when plugin methods need data belonging to the current request.',
+    zh: '为每次传入的方法调用生成应用上下文。回调接收 RPC 调用上下文，并返回已安装插件需要的本地上下文。插件方法需要本次请求独有的数据时，提供此函数。'
   },
   {
     keys: ['rpc-core:stream:createStreamFeature:capability'],
-    en: 'Connection-owned stream capability object. Its supports(peerId) checks whether streaming was actually agreed with that peer before stream work is admitted.',
-    zh: '连接持有的流能力对象。其 supports(peerId) 在接纳流工作前，检查是否确实已与该对端约定支持流。'
+    en: "Checks whether a connection has agreed to support streaming with a particular peer. Pass the connection's own capability object. Before accepting stream work, the feature calls supports(peerId); declaring stream methods alone does not establish that agreement.",
+    zh: '检查连接是否已与指定对端约定支持流。应传入这条连接自己的能力对象。接纳流调用前，功能会调用 supports(peerId) 检查；仅仅声明流方法，不能代替双方达成该约定。'
   },
   {
     keys: ['rpc-core:full:createFullOneWayEndpoint:features'],
-    en: 'Finite immutable tuple of native Features to add to the endpoint. Select only the public operations you need; dependencies install once without exposing their private methods.',
-    zh: '要加入端点的有限、不可变原生功能元组。只选择需要的公开操作；依赖只安装一次，不会自动公开依赖的私有方法。'
+    en: 'Selects additional public features for this endpoint. Pass a finite readonly tuple of the original feature tokens. A feature token identifies a library feature that endpoint construction installs. Shared dependencies install once, and their private methods are not automatically exposed as public endpoint methods.',
+    zh: '选择要加入端点的额外公开功能。传入由原功能令牌组成的有限只读元组。功能令牌用于标识端点构造时需要安装的库功能。共享依赖只安装一次，其私有方法不会自动成为端点的公开方法。'
   },
   {
     keys: ['rpc-core:full:createFullOneWayEndpoint:provider'],
-    en: 'Map unique method names to provider callbacks installed before construction returns. Each callback handles an incoming method request; duplicate names are not separate registrations.',
-    zh: '将唯一方法名映射到处理回调，在构造返回前安装。每个回调处理相应的入站方法请求；不能依靠重复名称建立独立登记。'
+    en: 'Registers local handlers before endpoint construction returns. Each unique method name maps to the callback that handles its incoming requests. Supply the map when the new endpoint must immediately serve methods. Repeating a name does not create an additional independent registration.',
+    zh: '在端点构造返回前登记本地处理函数。每个唯一方法名对应处理该方法传入请求的回调。新端点需要立即提供方法时，配置这份映射。重复名称不会建立额外的独立登记。'
   },
   {
     keys: ['rpc-core:testing:createPeerPair:a', 'rpc-core:testing:createPeerPair:b'],
-    en: 'Configure this side of the in-memory Peer pair with its local method map and optional timeout, provider limits or contract. Each side advertises its own methods to the other.',
-    zh: '配置内存 Peer 对中这一端的方法映射，以及可选的超时、处理端限制或契约。两端分别向对方声明各自提供的方法。'
+    en: 'Configures one side of the in-memory Peer pair, the two connection objects used to call each other. Set its local method map and, when needed, its timeout, handler limits or method contract. Each side advertises its own methods to the other side.',
+    zh: '配置内存 Peer 对中的一端。这两个连接对象可以互相调用。为这一端设置本地方法表，并按需设置超时、处理函数限制或方法契约。两端分别向对方公布自己提供的方法。'
   },
   {
     keys: ['rpc-core:adapter:defineMessageAdapter:open'],
-    en: 'Open the original messaging resource for one deployment input and return its message port. A rejected Promise fails construction and triggers cleanup of earlier steps.',
-    zh: '根据一次部署输入打开原生消息资源，并返回消息端口。Promise 若失败，会使构造失败并清理此前完成的步骤。'
+    en: "Provides the function that opens a native messaging resource for the supplied deployment input. Return the resource's message port. Use it when adapting an existing messaging system to RPC. If the returned Promise rejects, construction fails and earlier acquired resources are cleaned up.",
+    zh: '提供根据部署输入打开原生消息资源的函数，并返回该资源的消息端口。需要把现有消息系统接入 RPC 时使用。返回的 Promise 失败会使构造失败，并清理此前已取得的资源。'
   },
   {
     keys: ['rpc-core:adapter:defineByteAdapter:dial', 'rpc-core:adapter:defineByteAdapter:open'],
-    en: 'Open the actual ordered byte connection for this input and return its byte I/O object. Use dial for outgoing connections and listen for accepted connections; rejection fails construction.',
-    zh: '根据输入打开真实的有序字节连接，并返回其读写对象。dial 用于主动连接，listen 用于接收连接；若失败，本次构造也失败。'
+    en: 'Provides the function that opens an ordered byte connection and returns its read/write object. Ordered means bytes arrive in the sequence sent. Use dial to initiate a connection and listen to accept one. A rejected open operation fails construction instead of exposing a partial connection.',
+    zh: '提供打开有序字节连接并返回读写对象的函数。有序表示字节按发送顺序到达。dial 用于主动连接，listen 用于接收连接。打开操作失败会使构造失败，不会把只建立一部分的连接交给调用方。'
   },
   {
     keys: ['rpc-core:adapter:defineMessageAdapter:launch'],
-    en: 'Start the native resource and return its messaging resource together with real exit observation and termination operations. Core uses those operations to manage that launched resource.',
-    zh: '启动原生资源，同时返回消息资源、真实退出观察与终止操作。Core 使用这些操作管理本次启动的资源。'
+    en: 'Starts a native resource and returns its messaging interface together with termination and actual-exit observation. Actual-exit observation confirms the process or thread has stopped, rather than merely receiving a stop request. Core uses these operations to manage the resource started by this launch.',
+    zh: '启动原生资源，并一起返回消息接口、终止操作和确认实际退出的能力。确认实际退出表示进程或线程已经停止，不只是收到了停止请求。Core 使用这些操作管理本次启动的资源。'
   },
   {
     keys: ['rpc-core:adapter:defineByteAdapter:diagnostics'],
-    en: 'Adapter-owned error identities and messages for byte-connection failures. Supply the adapter package error catalog so failures keep their real source and code.',
-    zh: '字节连接适配器持有的错误身份与文案。应使用该适配器包自己的错误表，让失败保留真实来源和错误码。'
+    en: "Supplies the adapter package's error source, codes and messages for byte-connection failures. Use that package's existing error definitions when building an adapter. Failures then identify the package and operation that produced them, so callers can classify them without reading message text.",
+    zh: '提供字节连接适配器所属包的错误来源、错误码和文案。编写适配器时，应使用该包已有的错误定义。这样失败会标明实际来源包和失败种类，调用方无需解析消息文本就能分类。'
   },
   {
     keys: ['rpc-core:adapter:defineByteAdapter:presentation'],
-    en: 'Optional platform label and text for an unsupported string representation. These values improve diagnostics; they do not prove that a channel is trusted.',
-    zh: '可选的平台名称与字符串表示不受支持时的文案。它们用于帮助诊断，不会证明某条通道可信。'
+    en: 'Adds a platform label and the error text used when string data is required. Set these when the adapter needs platform-specific diagnostics. They describe the adapter for users; they do not authenticate a channel or establish who owns its resources.',
+    zh: '补充平台名称，以及需要字符串数据时使用的错误文案。适配器需要针对运行环境提供诊断时设置。它们只是帮助用户识别适配器，不会认证通道，也不会决定谁拥有资源。'
   },
   {
     keys: ['rpc-core:adapter:defineByteAdapter:presentation.platform'],
-    en: 'Platform label shown for this byte adapter. Choose the label matching the host; changing the label does not grant trust or resource ownership.',
-    zh: '此字节适配器显示的平台名称。应选择与实际宿主一致的值；更改名称不会授予信任或资源所有权。'
+    en: "Names the platform shown in this byte adapter's diagnostics. Choose the value corresponding to the real host so a failure can be traced to the correct environment. Changing the label does not authenticate the channel or change responsibility for closing resources.",
+    zh: '设置字节适配器诊断中显示的平台名称。应选择与真实运行环境一致的值，方便定位失败发生在哪里。更改名称不会认证通道，也不会改变资源由谁关闭。'
   },
   {
     keys: ['rpc-core:adapter:defineByteAdapter:presentation.expectedStringText'],
-    en: 'Stable adapter error text used when a semantic carrier requires a string. Keep it in the adapter message catalog so the same failure has consistent wording.',
-    zh: '语义载体要求字符串时使用的稳定错误文案。应由适配器文案表统一持有，使同一类失败保持一致表述。'
+    en: "Supplies the stable error message used when the adapter requires a string value. Keep this text in the adapter's existing message catalog. Reusing that message makes the same input failure recognizable across the adapter's call sites.",
+    zh: '提供适配器要求字符串值时使用的稳定错误文案。应放在适配器已有的统一文案表中。各调用位置复用同一文案，才能对同类输入错误保持一致说明。'
   },
   {
     keys: ['rpc-core:plugins/log:createIpcLogFeature:gate'],
-    en: 'Use the exact send gate returned by createIpcSendQueueFeature for this connection. The log feature observes that queue rather than creating another send owner.',
-    zh: '使用当前连接的 createIpcSendQueueFeature 返回的同一个发送闸门。日志功能观察该队列，不会创建另一个发送所有者。'
+    en: 'Connects logging to the send queue already used by this connection. Pass the exact gate object returned by createIpcSendQueueFeature; the gate controls admission to that queue. The log feature observes it and does not create another queue or take over sending.',
+    zh: '把日志接到当前连接已有的发送队列。应传入 createIpcSendQueueFeature 返回的原 gate 对象；gate 用于控制消息能否进入该队列。日志功能只观察它，不会另建队列或接管发送。'
   },
   {
     keys: ['rpc-core:plugins/log:createIpcLogFeature:report'],
-    en: 'Receives each IPC log record and may return a Promise. Send records to your log sink; thrown errors and rejected Promises are forwarded to onReportError.',
-    zh: '接收每条进程通信日志记录，可返回 Promise。将记录交给日志存储；同步抛错或 Promise 失败会转交 onReportError。'
+    en: "Receives every IPC log record, where IPC means messages exchanged between processes. Write each record to your application's log destination; the callback may return a Promise. If it throws or its Promise rejects, onReportError receives that failure.",
+    zh: '接收每条进程间通信日志。需要保存通信过程时，把记录写入应用日志，可返回 Promise。回调同步抛错或返回的 Promise 失败时，会把错误交给 onReportError。'
   },
   {
     keys: ['rpc-core:plugins/log:createIpcLogFeature:onReportError'],
-    en: 'Receives the log sink failure and the same record. Handle or record this diagnostic failure; a further failure goes to the host terminal reporter.',
-    zh: '接收日志写入失败及同一条记录。可处理或记录这次诊断失败；若此回调再失败，会交给宿主最终报告通道。'
+    en: "Handles a failure from the log-writing callback. It receives both the failure and the same log record, so you can record or handle the failed write. If this error handler also fails, the host's final error reporter receives that further failure.",
+    zh: '处理日志写入回调的失败，同时收到错误和原日志记录，便于记录或处理这次写入失败。此错误处理回调如果再次失败，后续错误会交给运行环境最终的错误报告通道。'
   },
   {
     keys: [
@@ -848,8 +848,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.connectionId',
       'rpc-process:index:openProcessObjectChannel:ipc.connectionId'
     ],
-    en: 'Non-secret diagnostic id issued by the owner of this physical connection. Reuse it in related records so one connection can be traced without logging credentials.',
-    zh: '物理连接所有者提供的非秘密诊断标识。相关记录使用同一标识，便于追踪连接，无需记录凭据。'
+    en: 'Labels records belonging to one physical message connection. Use a non-secret id issued by the code that owns that connection, and reuse it in related records. This lets logs trace one connection without including credentials.',
+    zh: '标记属于同一条物理消息连接的记录。使用连接所有者提供的非秘密标识，并在相关记录中复用。这样日志可以追踪同一连接，无需包含凭据。'
   },
   {
     keys: [
@@ -858,8 +858,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.sessionId',
       'rpc-process:index:openProcessObjectChannel:ipc.sessionId'
     ],
-    en: 'Diagnostic id for this logical session. Use it to correlate records within one session; the label is not proof of peer identity.',
-    zh: '当前逻辑会话的诊断标识。用于关联同一会话内的记录；该名称不能作为对端身份的证明。'
+    en: "Labels one logical session so its diagnostic records can be found together. Use a consistent id for that session. The label only connects log records; it does not verify the remote caller's identity.",
+    zh: '为一次逻辑会话命名，便于把该会话的诊断记录放在一起查找。同一会话应使用一致标识。它只用于关联日志，不能验证远端调用方身份。'
   },
   {
     keys: [
@@ -868,8 +868,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.maxPendingData',
       'rpc-process:index:openProcessObjectChannel:ipc.maxPendingData'
     ],
-    en: 'Positive safe-integer capacity for data envelopes, including both running and queued sends. Control messages use their separate capacity even when this data queue is full.',
-    zh: '数据消息的正安全整数容量，同时计入正在发送和排队的消息。数据队列满时，控制消息仍使用独立容量。'
+    en: "Limits data messages currently sending or waiting to send. Use a positive whole number JavaScript can represent exactly. Set this to bound queued application traffic. Control messages have their own allowance, so a full data queue does not consume the control queue's capacity.",
+    zh: '限制正在发送和等待发送的数据消息数量。必须是 JavaScript 能精确表示的正整数。需要限制业务消息积压时设置。控制消息有独立额度，数据队列满载不会占用控制队列的容量。'
   },
   {
     keys: [
@@ -878,34 +878,34 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.maxPendingControl',
       'rpc-process:index:openProcessObjectChannel:ipc.maxPendingControl'
     ],
-    en: 'Positive safe-integer capacity reserved for control envelopes. Keep it separate from data capacity so cancellation and connection control are not blocked by data saturation.',
-    zh: '为控制消息保留的正安全整数容量。与数据容量分开，可避免数据满载时阻塞取消和连接控制。'
+    en: 'Reserves queue capacity for control messages, including cancellation and connection control. Use a positive whole number JavaScript can represent exactly. Set it separately from data capacity so those control operations still have queue space when application data fills its queue.',
+    zh: '为取消、连接控制等控制消息保留队列容量。必须是 JavaScript 能精确表示的正整数。它与数据消息容量分别设置，因此业务数据队列满时，控制操作仍有自己的排队空间。'
   },
   {
     keys: ['rpc-pool:index:createProcessPool:size', 'rpc-pool:index:createThreadPool:size'],
-    en: 'Positive integer number of Peers to prepare before returning the pool. Each member is a separate process or Worker connection, so choose a size within your host resource budget.',
-    zh: '池返回前要准备的 Peer 数量，必须是正整数。每个成员都是独立进程或 Worker 连接，应根据宿主可用资源选择数量。'
+    en: 'Sets the number of Peer connections prepared before pool creation finishes. The value must be a positive integer. Each member uses a separate process or Worker connection, so choose a size the host can support. A larger value prepares more independent members, each with its own resource cost.',
+    zh: '设置池创建完成前要准备的 Peer 连接数量，必须是正整数。每个成员使用独立进程或 Worker 连接，应根据运行环境的可用资源选择。数量越大，预先准备的独立成员越多，也会分别占用资源。'
   },
   {
     keys: ['rpc-pool:index:createProcessPool:maxQueue', 'rpc-pool:index:createThreadPool:maxQueue'],
-    en: 'Nonnegative limit on FIFO waiters while all members are busy. Already assigned work is excluded. Zero rejects new work immediately when no member is available.',
-    zh: '所有成员忙碌时，按先到先得顺序等待的请求数量上限，必须非负。已分配工作不计入；设为 0 时，无空闲成员就立即拒绝。'
+    en: 'Limits requests waiting while every pool member is busy. Waiting requests are assigned in arrival order; work already assigned to a member does not count. Use a nonnegative value. Zero disables waiting, so a new request is rejected immediately if no member is available.',
+    zh: '限制所有池成员忙碌时等待分配的请求数。等待请求按先到先得顺序分配，已交给成员的工作不计入。值必须非负；设为 0 表示不排队，没有空闲成员时立即拒绝新请求。'
   },
   {
     keys: [
       'rpc-pool:index:createProcessPool:idleTimeoutMs',
       'rpc-pool:index:createThreadPool:idleTimeoutMs'
     ],
-    en: 'Finite positive milliseconds before an unused member is closed, at most 2147483647. Later demand recreates missing members up to the target size.',
-    zh: '未使用成员关闭前的有限正毫秒数，最大为 2147483647。之后有新需求时，会重新创建缺少的成员，直到目标数量。'
+    en: 'Sets how many milliseconds an unused pool member stays open. Use a finite positive value no greater than 2147483647. Choose a shorter wait to release idle resources sooner. Later requests recreate missing members up to the configured pool size.',
+    zh: '设置池成员未使用多少毫秒后关闭。必须是有限正数，且不超过 2147483647。需要更早释放闲置资源时，可缩短此值。之后收到新请求，会重新创建缺少的成员，直到配置的池大小。'
   },
   {
     keys: [
       'rpc-pool:index:createProcessPool:scheduler',
       'rpc-pool:index:createThreadPool:scheduler'
     ],
-    en: 'Clock and timers used only for pool idle retirement. Inject a manual scheduler when controlling idle time explicitly; member RPC deadlines still belong to each Peer.',
-    zh: '只用于池内空闲成员回收的时钟和计时器。需要手动控制空闲时间时可注入手动时钟；成员的 RPC 截止时间仍归各自 Peer 管理。'
+    en: "Supplies time and timers for closing idle pool members. Pass a manual scheduler when the application needs to advance idle time explicitly. This clock controls pool retirement only; each member's RPC call deadlines continue to use that Peer connection's clock.",
+    zh: '提供关闭闲置池成员所需的时钟和计时器。应用需要手动推进闲置时间时，可以传入手动时钟。此项只控制池成员回收；成员的 RPC 调用截止时间仍由各自 Peer 连接的时钟管理。'
   },
   {
     keys: [
@@ -915,8 +915,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:adapters/node-child-process:createNodeProcessLauncher:runtimeApiBootstrap',
       'rpc-process:index:createAdapterProcessLaunch:runtimeApiBootstrap'
     ],
-    en: 'Advanced process startup context supplied by the Core source owner. Ordinary short spawn sources arrange it automatically; reuse the acquired context instead of inventing launch identities.',
-    zh: 'Core 来源所有者提供的高级进程启动上下文。普通简写启动来源会自动准备；应复用已取得的上下文，不自行编造启动身份。'
+    en: 'Carries process startup information obtained by the Core connection source. Use this when directly integrating a launcher with that source. Ordinary spawn shorthand prepares the information automatically. Reuse the acquired context so the child receives the identity of the connection actually being opened.',
+    zh: '携带 Core 连接来源取得的进程启动信息。直接把启动器接到该来源时使用。普通 spawn 简写会自动准备这些信息。应复用已取得的上下文，让子端收到实际建立中的连接身份。'
   },
   {
     keys: [
@@ -926,8 +926,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:adapters/node-child-process:createNodeProcessLauncher:runtimeApiBootstrap.name',
       'rpc-process:index:createAdapterProcessLaunch:runtimeApiBootstrap.name'
     ],
-    en: 'Child connection name for advanced startup. A held launch context supplies its child name or local identity name first, so this value does not override that context.',
-    zh: '高级启动使用的子端连接名称。已持有启动上下文时，先使用其中的子端名称或本端身份名称，此值不会覆盖该上下文。'
+    en: 'Supplies a child connection name for direct launcher integration. An acquired launch context takes precedence: its child name, or otherwise its local identity name, is used first. Set this only for startup paths that need the fallback name; it cannot rename an already acquired context.',
+    zh: '为直接接入启动器的场景提供子端连接名称。已经取得启动上下文时，优先使用其中的子端名称，其次使用本端身份名称。只有需要后备名称的启动路径才设置；它不能重命名已取得的上下文。'
   },
   {
     keys: [
@@ -937,8 +937,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:adapters/node-child-process:createNodeProcessLauncher:runtimeApiBootstrap.parentInstanceId',
       'rpc-process:index:createAdapterProcessLaunch:runtimeApiBootstrap.parentInstanceId'
     ],
-    en: 'Parent Peer instance id for advanced startup. Use the owning runtime identity; a held launch context supplies its own parent identity automatically.',
-    zh: '高级启动所用的父端 Peer 实例标识。应使用所属运行时的身份；已有启动上下文会自动提供其父端身份。'
+    en: 'Identifies the parent Peer instance in direct launcher startup. Use the identity of the runtime that owns the launch. If the launch already has an acquired context, that context supplies the parent identity automatically rather than using this as a replacement.',
+    zh: '标明直接接入启动器时的父端 Peer 实例。应使用负责本次启动的运行时身份。如果已经取得启动上下文，其中会自动提供父端身份，此项不能替换它。'
   },
   {
     keys: [
@@ -948,8 +948,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:adapters/node-child-process:createNodeProcessLauncher:runtimeApiBootstrap.generation',
       'rpc-process:index:createAdapterProcessLaunch:runtimeApiBootstrap.generation'
     ],
-    en: 'The supervision-issued generation object for this launch. Keep the original object so startup and later lifecycle events refer to the same launched instance.',
-    zh: '监督器为本次启动分配的实例代次对象。保留原对象，让启动及后续生命周期事件指向同一个实例。'
+    en: 'Identifies the particular process instance being launched. The supervisor, which starts and restarts processes, supplies this generation object. Keep the original object when passing it to the launcher, so startup and later lifecycle events refer to the same instance.',
+    zh: '标识本次启动的具体进程实例。负责启动和重启进程的监督器会提供这个 generation 对象。传给启动器时应保留原对象，让启动及后续生命周期事件始终指向同一实例。'
   },
   {
     keys: [
@@ -959,8 +959,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPeer:token',
       'rpc-process:index:createProcessPlugin:token'
     ],
-    en: 'Shared handshake secret, required for TCP, explicit socket paths and Windows pipes. Generate it for the deployment and configure both ends; never put it in diagnostic logs.',
-    zh: '握手共享密钥，TCP、显式套接字路径和 Windows 管道必须提供。按部署生成并在两端配置，不能写入诊断日志。'
+    en: 'Supplies the shared secret checked while establishing a process connection. TCP, explicit socket paths and Windows pipes require it. Generate a secret for the deployment and configure the same value at both ends. Omitting it on a path that requires it prevents setup; keep it out of diagnostic logs.',
+    zh: '提供建立进程连接时检查的共享密钥。TCP、显式套接字路径和 Windows 管道必须配置。按部署生成密钥，并让两端使用同一个值。需要密钥的路径如果省略它，就无法完成建立；密钥不能写入诊断日志。'
   },
   {
     keys: [
@@ -969,68 +969,68 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessPeer:connectTimeoutMs',
       'rpc-process:index:createProcessPlugin:connectTimeoutMs'
     ],
-    en: 'Milliseconds a named connect waits for the service listener to appear. Increase it for slow service startup; this does not extend later business call deadlines.',
-    zh: '按名称连接时，等待服务监听器出现的毫秒数。服务启动较慢时可增加，但不会延长之后的业务调用截止时间。'
+    en: 'Sets how many milliseconds a named connection waits for the service listener to become available. Increase it when the service takes longer to start. This only affects finding the service listener; later application calls keep their own deadlines.',
+    zh: '设置按名称连接时，最多等待多少毫秒让服务监听器出现。服务启动较慢时可增加。它只影响寻找服务监听器的等待，不延长之后业务调用各自的截止时间。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:deployment',
       'rpc-process:index:createProcessPlugin:deployment'
     ],
-    en: 'The full spawn or connect deployment describing how this plugin reaches its remote process. Choose one actual process source and keep its resource owner with the deployment.',
-    zh: '描述插件如何到达远程进程的完整启动或连接部署。应选择一个真实进程来源，资源所有权随该部署保持。'
+    en: 'Describes how this plugin reaches its remote process: start a new process with spawn, or connect to a running one. Use the full deployment object when those launch or connection details need explicit configuration. Keep the resource owner associated with that deployment so cleanup follows the same source.',
+    zh: '说明此插件如何到达远程进程：spawn 启动新进程，connect 连接已有进程。需要显式配置这些启动或连接细节时，提供完整部署对象。部署应保留对应的资源所有者，让清理仍由取得该资源的一方负责。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:registrationOwner',
       'rpc-process:index:createProcessPlugin:registrationOwner'
     ],
-    en: 'Installing Host and exact plugin registration that failure handling may remove. A similar plugin name is not sufficient.',
-    zh: '指定故障处理可移除的插件登记。必须提供安装该插件的 Host 和准确登记名，不能使用近似名称。'
+    en: 'Identifies the installed plugin registration that failure handling may remove. In the full deployment form, provide both the exact registration name and the Host that installed it. If the process reaches a state from which it cannot recover and its reports remain unhandled, cleanup can ask that Host to remove this registration. The name must equal options.name and the Host must provide unUse; missing or mismatched values reject configuration before process setup.',
+    zh: '指明故障处理可以移除哪一个已安装插件登记。完整部署形式必须提供准确登记名，以及实际安装该插件的 Host。进程无法继续恢复、相关报告又一直无人处理时，清理会请求这个 Host 移除该登记。name 必须等于当前 options.name，host 必须提供 unUse 移除方法；缺少或不匹配会在建立进程连接前被判为无效配置。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:registrationOwner.name',
       'rpc-process:index:createProcessPlugin:registrationOwner.name'
     ],
-    en: 'Name of the registration terminal cleanup may remove. Must equal this plugin options name to protect other registrations.',
-    zh: '最终清理可移除的登记名。必须等于当前插件选项的 name，避免移除其他登记。'
+    en: "Names the specific registration that may be removed after an unrecoverable failure. Set it to the same value as this plugin's options.name before constructing the full deployment. A different name is rejected as invalid configuration, protecting other registrations from being removed by this plugin's failure handling.",
+    zh: '指定不可恢复故障后可以移除的那一个登记。构造完整部署前，必须把它设为与当前插件 options.name 相同的值。名称不一致会被判为无效配置，避免当前插件的故障处理误删其他登记。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:registrationOwner.host',
       'rpc-process:index:createProcessPlugin:registrationOwner.host'
     ],
-    en: "Installing Host port. Its unUse removes this registration using the Host's existing dependency policy.",
-    zh: '安装该插件的 Host 接口。通过 unUse 移除当前登记，依赖插件沿用 Host 已有的移除规则。'
+    en: "Supplies the Host that actually installs this plugin. Its unUse method removes the registration named above, using the Host's existing rules for plugins that depend on it. Provide that original Host before constructing the full deployment; an object without unUse is rejected. Failure cleanup uses this method instead of removing registrations through a separate mechanism.",
+    zh: '提供实际安装此插件的 Host。它的 unUse 方法用于移除上面指定的登记，并按 Host 已有规则处理依赖该登记的插件。构造完整部署前应提供原 Host；没有 unUse 方法的对象会被拒绝。故障清理会使用这个方法，不另建一套登记移除机制。'
   },
   {
     keys: [
       'rpc-process:index:createAdapterProcessPlugin:resilience',
       'rpc-process:index:createProcessPlugin:resilience'
     ],
-    en: 'Caller-owned policy created by createProcessResilience for connection limits and terminal cleanup. This plugin borrows it; plugin disposal does not close the shared policy owner.',
-    zh: '由 createProcessResilience 创建、调用方持有的连接限制及最终清理规则。插件只借用它，释放插件不会关闭共享的治理对象。'
+    en: 'Shares connection limits and unrecoverable-failure handling created by createProcessResilience. Pass the same policy object when multiple plugins should use it. This plugin borrows the object: disposing the plugin does not close a policy supplied by the caller, so its owner must close it separately.',
+    zh: '共享 createProcessResilience 创建的连接限制和不可恢复故障处理规则。多个插件需要共用时，传入同一个规则对象。插件只借用调用方提供的对象，释放插件不会关闭它；所属调用方仍须单独关闭。'
   },
   {
     keys: ['rpc-process:index:createNativeProcessOffer:peer'],
-    en: 'Local peer identity containing id and runtime. It is copied and frozen into the handshake offer; supply the actual connection identity, not remote claims.',
-    zh: '包含 id 与 runtime 的本端身份，会复制并冻结到握手声明中。应提供当前连接真实的本端身份，不能使用远端自报信息代替。'
+    en: "Describes this side of the process handshake with id and runtime. The offer copies these fields and prevents later modification of the copied identity. Supply the real local connection identity. A peer's self-reported identity is not a replacement for this local information.",
+    zh: '用 id 和 runtime 描述进程握手中的本端身份。握手声明会复制这些字段，并禁止之后修改这份副本。应提供当前连接真实的本端身份，不能拿对端自己声明的身份代替。'
   },
   {
     keys: ['rpc-process:index:createNativeProcessOffer:auth'],
-    en: 'Optional credential included in the native handshake offer. The value is forwarded unchanged; obtain it from the authentication policy shared with the receiving peer.',
-    zh: '可加入原生握手声明的凭据，值会原样转交。应从与接收端约定的认证规则取得。'
+    en: 'Adds an optional credential to the process handshake offer. Obtain it from the authentication policy agreed with the receiving side. The offer forwards the value unchanged; it does not generate or verify a credential for you.',
+    zh: '向进程握手声明加入可选凭据。应从与接收端约定的认证规则取得。握手声明会原样转交该值，不会替应用生成或验证凭据。'
   },
   {
     keys: ['rpc-process:index:createNativeProcessOffer:stream'],
-    en: 'Whether the offer advertises streaming. Explicit false also prevents a later runtime default from enabling it; omit it only when the normal runtime default is intended.',
-    zh: '是否在握手声明中公布流支持。显式 false 还会阻止后续运行时默认值启用流；希望使用正常默认规则时才省略。'
+    en: "States whether this handshake offer includes streaming. Set false to explicitly disable it, including any later runtime default that would otherwise enable it. Omit the field only when the runtime's normal default should decide whether streams are offered.",
+    zh: '声明这份握手信息是否包含流支持。显式设为 false 会禁用流，也会阻止后续运行时默认规则把流重新启用。只有希望由运行时的正常默认规则决定时，才省略此项。'
   },
   {
     keys: ['rpc-process:index:createProcessJsonRpcChannel:byte'],
-    en: 'The ordered byte channel acquired from the launcher, socket adapter or stdio wrapper. The JSON-RPC bridge uses that real channel; it does not create another physical connection.',
-    zh: '从启动器、套接字适配器或标准输入输出封装取得的有序字节通道。JSON-RPC 桥接复用这条真实通道，不另建物理连接。'
+    en: 'Supplies the ordered byte channel already opened by a launcher, socket adapter or standard-input/output wrapper. JSON-RPC uses this channel to exchange messages with the process. Pass the acquired channel rather than opening a second connection for the bridge.',
+    zh: '提供由启动器、套接字适配器或标准输入输出封装打开的有序字节通道。JSON-RPC 使用这条通道与进程交换消息。应传入已取得的通道，不需要为桥接再打开一条连接。'
   },
   {
     keys: [
@@ -1038,8 +1038,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc',
       'rpc-process:index:openProcessObjectChannel:ipc'
     ],
-    en: 'Connection and session labels plus the IPC log callback. Use non-secret labels to correlate messages; stderr subscription and separate data/control queue limits are optional.',
-    zh: '连接与会话标识，以及进程通信日志回调。使用非秘密标识关联消息；可另配标准错误订阅及数据、控制队列限制。'
+    en: 'Groups the connection and session labels with the IPC logging callback. IPC means communication between processes. Set non-secret labels when message records need correlation. You can also provide a child standard-error subscription and separate queue limits for data and control messages.',
+    zh: '组合连接标识、会话标识和进程间通信日志回调。需要把消息记录关联起来时，设置不含秘密的标识。还可以提供子进程标准错误输出的订阅方法，并分别限制数据消息与控制消息的队列。'
   },
   {
     keys: [
@@ -1047,8 +1047,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.processId',
       'rpc-process:index:openProcessObjectChannel:ipc.processId'
     ],
-    en: 'Optional process label for correlating IPC records. It is diagnostic data only and cannot authenticate the sender or grant process ownership.',
-    zh: '关联进程通信记录的可选进程名称。仅用于诊断，不能认证发送者，也不会授予进程所有权。'
+    en: "Adds an optional process label to communication log records. Use it when records from several processes need to be distinguished. It remains diagnostic data: it neither verifies the sender nor makes the logger responsible for that process's lifetime.",
+    zh: '向通信日志加入可选进程标识。需要区分来自多个进程的记录时使用。它只是诊断数据，既不能验证发送者，也不会让日志记录方负责该进程的生命周期。'
   },
   {
     keys: [
@@ -1056,8 +1056,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.log',
       'rpc-process:index:openProcessObjectChannel:ipc.log'
     ],
-    en: 'Receives each structured IPC log record and may return a Promise. Log sink throws or rejections go through the existing reporting boundary rather than being silently discarded.',
-    zh: '接收每条结构化进程通信日志，可返回 Promise。日志写入抛错或失败会进入已有报告通道，不会被静默丢弃。'
+    en: "Receives each structured log record for messages exchanged with the process. Write the record to the application's log destination; returning a Promise is allowed. A thrown error or rejected Promise goes through the existing error reporter, so a failed log write remains visible.",
+    zh: '接收每条与进程交换消息的结构化日志。将记录写入应用日志，可以返回 Promise。回调抛错或 Promise 失败会交给已有错误报告通道，因此日志写入失败仍然可见。'
   },
   {
     keys: [
@@ -1065,46 +1065,46 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:ipc.stderr',
       'rpc-process:index:openProcessObjectChannel:ipc.stderr'
     ],
-    en: 'Subscribe the supplied listener to child stderr bytes and return an unsubscribe function. The diagnostic bridge records bounded redacted summaries instead of retaining raw output.',
-    zh: '把提供的监听器订阅到子进程标准错误字节，并返回取消订阅函数。诊断桥只记录有长度限制的脱敏摘要，不保存全部原始输出。'
+    en: "Connects a listener to the child's standard-error byte output. Return a function that removes that subscription during cleanup. Use it to include process output in diagnostics. The bridge keeps only length-limited summaries with sensitive content removed, rather than all raw output.",
+    zh: '把监听器接到子进程标准错误输出的字节流，并返回清理时解除订阅的函数。需要把进程输出纳入诊断时使用。桥接只保留经过长度限制和脱敏的摘要，不保存全部原始输出。'
   },
   {
     keys: ['rpc-process:index:createProcessJsonRpcChannel:target.kind'],
-    en: 'Selects the target shape: plugin requires a plugin contract, while host requires a Host catalog. Supply only the fields for the selected target kind.',
-    zh: '选择目标形态：plugin 要求插件契约，host 要求 Host 目录。只提供所选目标形态对应的字段。'
+    en: "Selects whether this JSON-RPC connection serves one plugin or a Host. The value plugin requires a method contract for that plugin. The value host requires a catalog describing the Host's allowed plugins. Supply the fields for the selected target only.",
+    zh: '选择 JSON-RPC 连接服务单个插件，还是整个 Host。plugin 表示单插件目标，需要该插件的方法契约；host 表示宿主目标，需要声明允许插件的目录。只填写所选目标对应的字段。'
   },
   {
     keys: ['rpc-process:index:createProcessJsonRpcChannel:target.contract'],
-    en: 'Plugin contract for a plugin target. It is normalized before channel effects and must not require streams, which this JSON-RPC bridge does not support.',
-    zh: '插件目标所需的插件契约。在通道产生实际操作前完成规范化；不能要求流，因为此 JSON-RPC 桥接不支持流。'
+    en: 'Describes allowed methods when target.kind is plugin. The bridge validates and normalizes the contract before doing channel work. Use a contract without stream requirements: this JSON-RPC bridge cannot provide streams, and a contract that requires them is rejected.',
+    zh: '在 target.kind 为 plugin 时描述允许的方法。桥接在操作通道前会校验并规范化契约。必须使用不要求流的契约；此 JSON-RPC 桥接无法提供流，要求流的契约会被拒绝。'
   },
   {
     keys: ['rpc-process:index:createProcessJsonRpcChannel:target.catalog'],
-    en: 'Host catalog for a host target. Every included contract is normalized and checked for stream requirements before the bridge opens the channel.',
-    zh: 'Host 目标所需的目录。桥接打开通道前，会规范化其中每份契约，并检查是否要求不受支持的流。'
+    en: 'Lists allowed plugins and their method contracts when target.kind is host. The bridge validates every included contract before channel work begins. Contracts cannot require streams because this JSON-RPC bridge does not support them.',
+    zh: '在 target.kind 为 host 时列出允许的插件及其方法契约。桥接在操作通道前会检查目录中的每份契约。契约不能要求流，因为此 JSON-RPC 桥接不支持流。'
   },
   {
     keys: ['rpc-process:index:createProcessJsonRpcChannel:offer'],
-    en: 'Local handshake offer without auth or codec selection. The JSON-RPC bridge adds the token, JSON codec and required capabilities; supply your local peer information.',
-    zh: '不包含认证和编码选择的本端握手声明。JSON-RPC 桥接会加入密钥、JSON 编码及必需能力；调用方提供本端身份信息。'
+    en: 'Supplies local peer information for the initial handshake, when both sides agree how to communicate. Leave authentication and codec selection to the JSON-RPC bridge: it adds the shared token, JSON encoding and required capabilities itself.',
+    zh: '提供初始握手使用的本端身份信息。握手用于让两端约定如何通信。认证和编码选择由 JSON-RPC 桥接负责，它会自行加入共享密钥、JSON 编码和必需能力。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:offer'],
-    en: 'Local handshake offer supplied by both initiator and responder. Build it from your public protocol policy so both sides can agree on compatible codecs and capabilities.',
-    zh: '主动端和接收端都必须提供的本端握手声明。根据公开协议规则构造，让两端能够约定兼容的编码与能力。'
+    en: "Describes the protocol, encodings and capabilities this side offers during connection setup. Both the initiating and accepting sides provide an offer. Build it from the application's communication policy so both sides can choose compatible message encodings and operations.",
+    zh: '描述本端在建立连接时提供的协议、编码和通信能力。主动连接端和接收端都要提供。应按应用通信规则构造，让两端能够选择兼容的消息编码和操作。'
   },
   {
     keys: ['rpc-process:index:createProcessJsonRpcChannel:wallClock'],
-    en: 'Wall-clock timestamp() source for outgoing message sentAt metadata. Keep it separate from the monotonic scheduler used for deadlines.',
-    zh: '为出站消息 sentAt 元数据提供日期时间戳的 timestamp() 对象。应与计算截止时间的单调时钟分开。'
+    en: 'Provides calendar timestamps through timestamp() for outgoing sentAt message metadata. Use it when messages need a time suitable for logs or display. Keep it separate from the scheduler that measures elapsed time for deadlines; a calendar clock can change when the system time is corrected.',
+    zh: '通过 timestamp() 为出站消息的 sentAt 字段提供日期时间戳。消息需要可用于日志或显示的时间时使用。应与计算截止时间的计时时钟分开；系统校时可能改变日期时间。'
   },
   {
     keys: [
       'rpc-process:adapters/deno-socket:dialProcessByteChannel:signal',
       'rpc-process:adapters/node-socket:dialProcessByteChannel:signal'
     ],
-    en: 'Cancels a pending socket dial and destroys the unconnected socket. Once connected, the returned channel owns its later lifetime; use its close operation for cleanup.',
-    zh: '取消尚未完成的套接字拨号，并销毁尚未连接的套接字。连接成功后，后续生命周期归返回通道管理，应使用通道关闭操作清理。'
+    en: "Cancels an outgoing socket connection attempt. Aborting the signal while dialing destroys the socket that has not yet connected. After connection succeeds, clean up through the returned channel's close operation; this setup signal does not take over the established channel's lifetime.",
+    zh: '取消尚未完成的套接字连接尝试。拨号期间取消信号，会销毁还未连接的套接字。连接成功后，应通过返回通道的 close 操作清理；这个建立阶段的信号不负责已建立通道的生命周期。'
   },
   {
     keys: [
@@ -1112,8 +1112,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:signal',
       'rpc-process:index:openProcessObjectChannel:signal'
     ],
-    en: 'Caller cancellation signal for this channel opening or handshake attempt. Abort it when setup is no longer needed; later connection lifetime belongs to the acquired channel.',
-    zh: '本次通道打开或握手尝试的调用方取消信号。不再需要初始化时可取消；取得通道后的连接生命周期由通道负责。'
+    en: "Lets the caller cancel this attempt to open a channel or complete its handshake. Abort the signal when setup is no longer needed. Once a channel has been acquired, its own close operation manages the established connection's cleanup.",
+    zh: '允许调用方取消本次通道打开或握手尝试。不再需要建立连接时，可以取消信号。通道取得成功后，已建立连接应通过通道自己的关闭操作清理。'
   },
   {
     keys: [
@@ -1121,8 +1121,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:handshakeTimeoutMs',
       'rpc-process:index:openProcessObjectChannel:handshakeTimeoutMs'
     ],
-    en: 'Finite nonnegative milliseconds allowed for the initial handshake. This budget covers connection setup only; later method calls use their own deadlines.',
-    zh: '初始握手允许的有限非负毫秒数。该预算只覆盖连接建立，之后的方法调用使用各自的截止时间。'
+    en: 'Sets the time allowed for the initial handshake, in milliseconds. Use a finite nonnegative number when connection setup needs a specific waiting budget. This controls the setup exchange only; later method calls use their own deadlines.',
+    zh: '设置初始握手允许等待的毫秒数。需要明确限制连接建立的等待时，提供有限非负数。此项只控制建立连接时的信息交换，之后的方法调用使用各自的截止时间。'
   },
   {
     keys: [
@@ -1130,135 +1130,135 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:adapters/node-child-process:openProcessStdioChannel:bootstrapTimeoutMs',
       'rpc-process:index:receiveAdapterBootstrap:bootstrapTimeoutMs'
     ],
-    en: 'Finite nonnegative milliseconds to wait for the initial startup frame. Expiry stops waiting for startup; it does not define the later handshake or call timeout.',
-    zh: '等待初始启动帧的有限非负毫秒数。到期后停止等待启动，不用于规定之后的握手或业务调用超时。'
+    en: 'Sets how many milliseconds to wait for the startup frame, the first message carrying process startup data. Use a finite nonnegative number. Expiry ends that startup wait; it does not set the later handshake timeout or the deadline for application calls.',
+    zh: '设置等待启动帧的毫秒数。启动帧是携带进程启动数据的第一条消息。值必须为有限非负数。到期只会结束这次启动等待，不会规定之后的握手超时或业务调用截止时间。'
   },
   {
     keys: [
       'rpc-process:adapters/deno-command:openProcessStdioChannel:bootstrap',
       'rpc-process:adapters/node-child-process:openProcessStdioChannel:bootstrap'
     ],
-    en: 'Choose stdin to read startup data from standard input, or none when none is required. The public Node and Deno openers reject fd mode.',
-    zh: '选择 stdin 从标准输入读取启动数据，不需要启动数据时选择 none。公开的 Node 与 Deno 打开函数会拒绝 fd 模式。'
+    en: 'Selects where initial process startup data comes from. The value stdin reads it from standard input; none means no startup data is expected. The public Node and Deno openers reject fd, the separate file-descriptor mode, so do not select that mode here.',
+    zh: '选择初始进程启动数据的来源。stdin 表示从标准输入读取，none 表示不需要启动数据。公开的 Node 和 Deno 打开函数会拒绝 fd，即独立文件描述符模式，因此不能在这里选择该模式。'
   },
   {
     keys: [
       'rpc-process:adapters/deno-command:openProcessStdioChannel:fd',
       'rpc-process:adapters/node-child-process:openProcessStdioChannel:fd'
     ],
-    en: 'Declared file-descriptor option for startup data. These public Node and Deno openers reject fd startup mode and do not read this value; use stdin or none instead.',
-    zh: '声明为启动数据文件描述符的选项。公开 Node 与 Deno 打开函数拒绝 fd 启动模式，因此不读取此值；应使用 stdin 或 none。'
+    en: 'Names a file descriptor, an operating-system number for an open input, for the declared fd startup mode. The public Node and Deno openers reject that mode and never read this value. Leave it unused and choose stdin or none for supported startup paths.',
+    zh: '表示 fd 启动模式下的文件描述符，即操作系统为已打开输入分配的编号。公开的 Node 和 Deno 打开函数拒绝该模式，也不会读取此值。这里不应设置它，应选择受支持的 stdin 或 none 启动路径。'
   },
   {
     keys: [
       'rpc-process:adapters/deno-socket:dialProcessByteChannel:address',
       'rpc-process:adapters/node-socket:dialProcessByteChannel:address'
     ],
-    en: 'Loopback TCP address or local Unix socket path to dial. Node also accepts Windows pipes; Deno rejects Windows pipe addresses.',
-    zh: '要连接的回环 TCP 地址或本地 Unix 套接字路径。Node 还接受 Windows 管道；Deno 会拒绝 Windows 管道地址。'
+    en: 'Specifies the socket destination to connect to. Supply a loopback TCP address or a local Unix socket path. Node also supports Windows pipe addresses; Deno rejects them. Choose an address supported by the selected runtime before dialing.',
+    zh: '指定套接字连接的目标。可以传入回环 TCP 地址或本地 Unix 套接字路径。Node 还支持 Windows 管道地址，Deno 会拒绝这类地址。拨号前应选择当前运行时支持的地址形式。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:role'],
-    en: 'Use initiator when starting the handshake and responder when accepting it. The responder must also supply an explicit authentication decision.',
-    zh: '发起握手时使用 initiator，接收握手时使用 responder。接收端还必须提供明确的认证决定。'
+    en: 'Identifies which side starts the connection handshake. Set initiator on the side that sends the first handshake, or responder on the accepting side. A responder must also provide auth to state whether and how it authenticates the peer.',
+    zh: '标明本端在握手中的角色。initiator 表示发送初始握手的主动端，responder 表示接收握手的一端。接收端还必须提供 auth，明确是否认证对端以及怎样认证。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:auth'],
-    en: 'Responder policy: required calls verify with the received credential and peer identity; return a principal string or void. A throw or rejection refuses the handshake. none explicitly skips authentication.',
-    zh: '接收端认证规则：required 会把收到的凭据和对端身份交给 verify，可返回身份字符串或 void。抛错或失败会拒绝握手；none 表示明确跳过认证。'
+    en: "States the accepting side's authentication policy. In required mode, verify receives the peer credential and identity; it may return an authenticated principal string or void. A throw or rejected Promise refuses the handshake. Choose none only to explicitly allow a handshake without authentication.",
+    zh: '声明接收端的认证规则。required 表示要求认证，verify 会收到对端凭据和身份，可以返回已认证的主体字符串或 void。同步抛错或 Promise 失败都会拒绝握手。none 表示明确允许不认证的握手。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:auth.mode'],
-    en: 'Responder authentication choice. required verifies the received credential, while none explicitly allows an unauthenticated handshake. Initiators do not supply this decision object.',
-    zh: '接收端的认证选择。required 验证收到的凭据，none 明确允许未认证握手；主动端不提供这个决定对象。'
+    en: "Selects the accepting side's authentication decision. The value required checks the received credential through verify. The value none explicitly accepts a handshake without authentication. Only the responder supplies this decision object; the initiating side does not.",
+    zh: '选择接收端的认证方式。required 表示通过 verify 检查收到的凭据，none 表示明确允许未认证握手。这个决定对象只由 responder 接收端提供，主动端不提供。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:staticAgreement'],
-    en: 'Fixed local and peer message profiles for an already-framed transport. Both codecs must be identity and capability order must match; this path performs no negotiation.',
-    zh: '已经分帧的传输使用的固定本端、对端消息配置。两端编码必须为 identity，能力顺序也必须一致；此路径不再协商。'
+    en: 'Defines fixed message formats when the transport already delivers complete messages, rather than a byte stream needing a handshake. The local and expected peer codecs must both be identity, meaning message values pass through unchanged. Their capability lists must match in order. No negotiation fills in differences on this path.',
+    zh: '为已经直接传递完整消息的传输声明固定格式。这类传输不需要先从字节流中协商消息格式。本端和预期对端的 codec 都必须是 identity，即原样传递消息值。能力列表及顺序也必须相同；此路径不会通过协商补齐差异。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:staticAgreement.local'],
-    en: 'Local fixed message profile declared before activation. Use identity for codec and the exact capability sequence that the peer profile expects.',
-    zh: '激活前声明的本端固定消息配置。codec 使用 identity，能力顺序应与对端预期的配置完全一致。'
+    en: "States this side's fixed format before the transport is activated. Set codec to identity so message values remain unchanged. List capabilities in exactly the order expected by the peer profile. Use this with the peer profile for a transport that already delivers complete messages.",
+    zh: '在传输启用前声明本端的固定格式。codec 设为 identity，表示保持消息值不变。能力列表的每一项及其顺序必须与对端预期一致。传输已直接交付完整消息时，应与 peer 配置配套使用。'
   },
   {
     keys: ['rpc-process:index:createProcessTransport:staticAgreement.peer'],
-    en: 'Expected peer fixed profile. Its codec and capability order must exactly match the local profile; this declaration does not independently verify the remote process.',
-    zh: '预期的对端固定配置。其编码及能力顺序必须与本端完全一致；这份声明本身不会独立验证远端进程。'
+    en: 'States the fixed format expected from the peer. Its codec and ordered capability list must exactly match the local profile. Use this to check that both message formats agree. The declaration itself does not verify the identity of the remote process.',
+    zh: '声明预期对端使用的固定格式。编码和有序能力列表必须与本端完全相同。它用于检查双方消息格式是否一致，这份声明本身不会验证远端进程的身份。'
   },
   {
     keys: [
       'rpc-process:index:createProcessTransport:staticAgreement.local.codec',
       'rpc-process:index:createProcessTransport:staticAgreement.peer.codec'
     ],
-    en: 'The fixed codec must be identity because this transport already carries framed messages. Another codec value rejects configuration before transport activation.',
-    zh: '此传输已经承载分帧消息，因此固定编码必须是 identity。其他值会在传输激活前使配置被拒绝。'
+    en: 'Must be identity: the transport already carries complete messages, so values pass through without byte encoding. Set this on both the local and peer profiles. Any other codec value rejects configuration before the transport becomes active.',
+    zh: '必须选择 identity，表示原样传递消息值。因为传输已经承载完整消息，不再把值转换成字节。本端和对端配置都要使用此值；其他编码值会在传输启用前导致配置被拒绝。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:idempotencyStore'],
-    en: 'Result store for calls carrying an idempotencyKey. Reuse the intended store so retries can look up the original outcome rather than executing a duplicate effect.',
-    zh: '保存带 idempotencyKey 调用结果的存储。应复用原定存储，让重试查询原结果，避免重复执行业务效果。'
+    en: 'Stores results for calls carrying an idempotencyKey, the key identifying retries of one business operation. Supply a shared store when intended sessions must recover the original result instead of repeating the operation. If omitted, resilience creates its own result store.',
+    zh: '保存带 idempotencyKey 的调用结果，该标识用于识别同一业务操作的重试。相关会话需要找回原结果、避免重复执行时，可以提供共用存储。省略时，治理对象会自行创建结果存储。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:maxConnections'],
-    en: 'Maximum simultaneously accepted connections. Set it to keep the process service within its connection budget; this is separate from calls running on each connection.',
-    zh: '同时接纳的连接数量上限。用于限制进程服务占用的连接资源，与每条连接上的并发调用限制分开生效。'
+    en: 'Limits simultaneously accepted physical connections for this service. Set it according to the number of connections the process can support. When the allowance is full, another connection is refused. This is separate from the limit on calls executing within each connection.',
+    zh: '限制服务同时接纳的物理连接数。应根据进程能承担的连接数量设置。额度已满时，新连接会被拒绝。它与每条连接内部同时执行的调用数量分别限制。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:maxConcurrentCallsPerConnection'],
-    en: 'Maximum calls running at once on one connection. Use this to bound provider execution even when the service still has room for more connections.',
-    zh: '每条连接同时运行的调用数量上限。即使服务还能接纳新连接，也可据此限制处理端执行量。'
+    en: 'Limits calls executing at the same time on one connection. Use it when local method handlers need a concurrency bound, even if the service can accept more connections. This controls running work rather than the rate at which calls arrive.',
+    zh: '限制一条连接上同时执行的调用数。本地处理函数需要控制并发量时使用，即使服务还能接纳新连接，此限制仍然生效。它限制的是运行中的工作，不是调用到达的速率。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:maxCallsPerMinute'],
-    en: 'Maximum calls admitted per connection in one minute. Use it to control arrival rate separately from the number of calls currently executing.',
-    zh: '每条连接一分钟内可接纳的调用数量上限。用于限制到达速率，与当前正在执行的调用数分别控制。'
+    en: 'Limits calls accepted on one connection within a minute. Set it when clients must not send work faster than the service can sustain. This arrival-rate limit is separate from the limit on how many calls are executing simultaneously.',
+    zh: '限制一条连接一分钟内接纳的调用数。需要防止客户端持续以过高速率提交工作时设置。它限制到达速率，与同时执行多少个调用分别控制。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:maxPayloadBytes'],
-    en: 'Largest accepted payload in bytes. Set it according to the service input size budget, so oversized calls are rejected before business execution.',
-    zh: '可接收调用数据的最大字节数。按服务输入大小预算设置，让过大调用在执行业务前被拒绝。'
+    en: 'Limits accepted call data in bytes. Choose it according to the largest input the service should process. A payload above this size is refused before the business handler runs, so raising it permits larger inputs rather than increasing call concurrency.',
+    zh: '按字节限制可接收的调用数据。应根据服务应处理的最大输入设置。数据超限会在业务处理函数运行前被拒绝；提高此值允许更大输入，不会提高调用并发量。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:maxConsecutiveTimeouts'],
-    en: 'Number of consecutive timed-out calls that causes the connection to close. Use it to retire a peer that repeatedly stops answering.',
-    zh: '触发关闭连接的连续调用超时次数。对端反复不再应答时，可据此结束该连接。'
+    en: 'Sets how many consecutive call timeouts trigger closing that connection. Use it to stop keeping a session whose peer repeatedly fails to answer in time. The affected connection closes; this setting is not a deadline for a single request.',
+    zh: '设置连续多少次调用超时后关闭当前连接。对端反复不能及时应答时，可据此结束会话。关闭的是受影响的连接，此项不是单次请求的超时时间。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:idleTimeoutMs'],
-    en: 'Milliseconds a session may remain idle before it closes. Choose it for unused connection cleanup, separately from individual request deadlines.',
-    zh: '会话闲置到关闭前允许的毫秒数。用于清理未使用连接，与单次请求截止时间分别设置。'
+    en: 'Sets how long a session may have no incoming frames and no in-flight calls before closing, in milliseconds. Choose it when unused connections should release resources automatically. It does not replace the deadline for an individual request.',
+    zh: '设置会话在没有入站消息帧、也没有进行中调用的情况下，还能保留多少毫秒。需要自动释放闲置连接资源时使用。它不会替代单次请求的截止时间。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:drainMs'],
-    en: 'Milliseconds already accepted calls may finish during connection shutdown. After this drain budget, shutdown continues rather than accepting more work.',
-    zh: '连接关闭期间，允许已接纳调用完成的毫秒数。耗尽此等待预算后继续关闭，不再接纳新工作。'
+    en: 'Gives already accepted calls a limited time to finish while the connection is closing. Set the budget in milliseconds according to how long shutdown may wait. When it expires, closing continues. This wait does not reopen admission for new calls.',
+    zh: '在连接关闭过程中，给已接纳的调用留出有限的完成时间。单位为毫秒，应按关闭操作允许等待的时长设置。预算耗尽后会继续关闭；等待期间不会因此重新接纳新调用。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:reportAtMs'],
-    en: 'Relative millisecond times at which a terminal registration is reported again. Use spaced reminders when the application must notice a registration that cannot recover.',
-    zh: '对无法继续恢复的登记再次报告的相对毫秒时刻。应用需要持续留意该登记时，可设置间隔提醒。'
+    en: 'Schedules reminders after a registration becomes terminal, meaning its process cannot recover through the current restart policy. Values are millisecond offsets from that transition. Start with 0 and use strictly increasing later offsets. After the final offset, reminders repeat at the last interval until handled or removed.',
+    zh: '设置登记进入 terminal 后的提醒时刻。terminal 表示进程无法通过当前重启规则恢复。数组值是从进入该状态开始计算的毫秒偏移，首项必须为 0，后续严格递增。最后一个时刻之后，按最后两项的间隔继续提醒，直到报告被处理或登记被移除。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:unhandledLimit'],
-    en: 'Maximum unhandled terminal reports before removing the failed registration. Use with the registration owner so cleanup targets the correct plugin.',
-    zh: '未处理的最终失败报告达到多少次后移除故障登记。应与准确的登记所有者配合，确保清理正确插件。'
+    en: 'Sets how many consecutive terminal reports may remain unhandled before cleanup is attempted. Removal starts when the count exceeds this value; with 3, the fourth unhandled report triggers it. Supply the correct registration owner so cleanup can remove the intended plugin through its Host.',
+    zh: '设置允许连续多少次不可恢复故障报告无人处理。计数超过此值才会尝试移除；例如设为 3，第四次未处理报告触发清理。应提供准确的登记所有者，让清理通过其 Host 移除目标插件。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:liquidation'],
-    en: 'Controls removal of a terminal plugin registration. Set cascade only when removing its dependent registrations is also intended.',
-    zh: '控制无法恢复的插件登记如何移除。只有同时需要移除依赖它的登记时，才启用 cascade。'
+    en: 'Controls removal of a plugin registration after an unrecoverable failure. The cascade option decides what happens to plugins that depend on it. Enable cascade only when those dependent registrations should also be removed; otherwise the Host suspends them under its existing dependency rules.',
+    zh: '控制不可恢复故障后怎样移除插件登记。cascade 决定依赖该插件的其他登记如何处理。只有希望一并移除这些依赖方时才启用；否则 Host 会按已有依赖规则挂起它们。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:liquidation.cascade'],
-    en: 'Whether terminal removal also removes plugins that depend on this registration. The existing Host dependency rules perform the removal.',
-    zh: '移除无法恢复的登记时，是否一并移除依赖它的插件。实际移除由 Host 已有的依赖规则执行。'
+    en: 'Chooses how the Host handles plugins that depend on the failed registration. True removes those dependants along with it. False, the default, suspends the dependants instead. Use true only when removing the whole dependent set is intended.',
+    zh: '决定 Host 如何处理依赖故障登记的插件。true 表示一起移除这些依赖方；默认 false 表示挂起依赖方。只有确实要移除整组依赖插件时，才设为 true。'
   },
   {
     keys: ['rpc-process:index:createProcessResilience:report'],
-    en: 'Receives resilience events about connection or terminal registration handling. Record these events in the application so repeated failures and eventual removal remain visible.',
-    zh: '接收连接或无法恢复登记处理过程中的治理事件。应交给应用记录，让连续失败及最终移除过程可追查。'
+    en: 'Receives diagnostics from connection management and handling of plugin registrations that cannot recover. Provide an application reporter when creating resilience. Recording these events makes repeated failures, unanswered reports and eventual removal visible to the operator.',
+    zh: '接收连接管理和不可恢复插件登记处理过程中的诊断。创建治理对象时，应提供应用报告函数。记录这些事件，才能让运行维护人员看到连续失败、无人处理的报告以及最终移除过程。'
   },
   {
     keys: [
@@ -1266,8 +1266,8 @@ const configurationOptionDescriptions: readonly {
       'rpc-process:index:createProcessTransport:report',
       'rpc-process:index:openProcessObjectChannel:report'
     ],
-    en: 'Receives contained channel failures that cannot be returned by a current call. Forward them to your application error log so connection diagnostics remain visible.',
-    zh: '接收无法通过当前调用返回的已隔离通道错误。应转交应用错误日志，让连接诊断可追查。'
+    en: 'Reports channel failures that cannot be returned through a pending call. Forward them to the application error log when connection problems need diagnosis. This keeps background or contained failures visible even when no business caller is waiting for a result.',
+    zh: '接收无法通过待处理调用返回的通道错误。需要诊断连接问题时，应转交应用错误日志。即使没有业务调用方正在等待结果，后台或已隔离的失败仍然可见。'
   },
   {
     keys: [
@@ -1275,26 +1275,26 @@ const configurationOptionDescriptions: readonly {
       'rpc-threads:index:createAdapterNodeThreadLauncher:runtimeApi',
       'rpc-threads:index:createWebThreadLauncher:runtimeApi'
     ],
-    en: 'Advanced source context supplied by the Core owner. Per-launch acquired metadata takes precedence; ordinary thread Peer construction prepares this context automatically.',
-    zh: 'Core 所有者提供的高级来源上下文。每次启动取得的元数据优先；普通线程 Peer 构造会自动准备此上下文。'
+    en: "Supplies startup context when directly integrating a launcher with the Core connection owner. Ordinary thread Peer creation prepares this context automatically. Information acquired for an individual launch takes precedence, so this field does not replace that launch's own connection identity.",
+    zh: '直接把启动器接到 Core 连接所有者时，用此项提供启动上下文。普通线程 Peer 构造会自动准备。单次启动已经取得的信息优先，因此此字段不会替换那次启动自己的连接身份。'
   },
   {
     keys: [
       'rpc-threads:adapters/node:createNodeThreadLauncher:execArgv',
       'rpc-threads:index:createAdapterNodeThreadLauncher:execArgv'
     ],
-    en: 'Runtime flags copied to each native Worker. Supply only flags suitable for the child entry; an empty list prevents inheriting unwanted parent process flags.',
-    zh: '复制给每个原生 Worker 的运行时参数。只提供适合子入口的参数；空数组可避免继承不需要的父进程参数。'
+    en: "Selects runtime flags passed to every new native Worker. Set only flags suitable for the child entry. An empty array prevents inheritance of parent process flags; omitting the option preserves the native runtime's inheritance behavior. Each Worker receives a copy of the configured list.",
+    zh: '选择传给每个新原生 Worker 的运行时参数。只设置适合子入口的参数。空数组表示不继承父进程参数；省略时保留原生运行时的继承行为。每个 Worker 会收到这份参数列表的副本。'
   },
   {
     keys: ['rpc-threads:index:createWebThreadLauncher:Worker'],
-    en: 'Worker constructor used by the web launcher. Supply the host constructor or a compatible adapter; the launcher uses it with a module entry and optional name.',
-    zh: '网页启动器使用的 Worker 构造函数。可传入宿主构造函数或兼容适配器；启动器按模块入口及可选名称创建 Worker。'
+    en: "Supplies the Worker constructor used by the web launcher. Pass the host's constructor or a compatible adapter when the launcher must create browser Workers. It invokes the constructor with a module entry and an optional name, so the supplied constructor must support that form.",
+    zh: '提供网页启动器使用的 Worker 构造函数。需要创建浏览器 Worker 时，传入运行环境的构造函数或兼容适配器。启动器使用模块入口和可选名称调用它，因此所提供的构造函数必须支持这种形式。'
   },
   {
     keys: ['rpc-threads:index:createWebThreadLauncher:report'],
-    en: 'Receives contained Worker launch or cleanup failures. Use a synchronous application error logger so failures outside a pending operation remain visible.',
-    zh: '接收已隔离的 Worker 启动或清理错误。应交给同步应用日志，让没有待处理操作接收的错误也能被发现。'
+    en: 'Reports Worker launch or cleanup failures that have already been contained. Supply a synchronous application logger when these failures must be visible outside a pending operation. Logging them avoids losing failures for which no waiting caller can receive a rejection.',
+    zh: '报告已被内部隔离的 Worker 启动或清理错误。需要在没有待处理操作时仍能发现这些失败，应提供同步应用日志函数。这样没有等待调用方接收的失败也不会失去记录。'
   },
   {
     keys: [

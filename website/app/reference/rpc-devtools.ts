@@ -759,8 +759,8 @@ export const rpcDevtoolsReference: ILibraryReference = {
     RPC_DEVTOOLS_SOURCE: {
       role: 'error',
       purpose: t(
-        'Compare RPC_DEVTOOLS_SOURCE with an error’s source, then use RpcDevtoolsErrorCode to choose a response. Configuration failures retain their native TypeError type; session failures use Error.',
-        '先把错误的 source 与 RPC_DEVTOOLS_SOURCE 比较，再用 RpcDevtoolsErrorCode 选择处理方式。配置错误保留原生 TypeError 类型，会话错误使用 Error。'
+        'Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them.',
+        '标识 RPC 调试工具创建的失败。处理捕获的错误时，先检查 source 是否等于 RPC_DEVTOOLS_SOURCE，再用 RpcDevtoolsErrorCode 比较 code，选择处理方式。配置失败仍然是 TypeError，诊断会话失败使用 Error；分类时无需解析消息文本。'
       ),
       example: `import { RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode } from '@migaia/rpc-devtools/contract'
 console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode.closed)`
@@ -1625,8 +1625,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
     },
     IRpcLogSink: {
       summary: t(
-        'Caller-owned structural logger with four required methods. Methods should enqueue promptly; buffering and I/O are outside the probe, and returned thenable rejections are observed rather than awaited. Throw or promise rejection is routed to onError.',
-        '调用者拥有、含四个必填方法的结构化日志接收端，方法应及时入队，缓冲与输入输出归接收端，返回承诺的拒绝会被观察而非等待。接收端抛错或承诺拒绝时，错误交给 onError。'
+        'The application logger supplied to the log probe, with required debug, info, warn and error methods. The probe forwards matching RPC events to these methods. Each method should accept or queue its record promptly; the logger owns buffering and writing to its destination. The probe does not wait for a returned Promise to finish, but observes its rejection. A thrown error or rejection is passed to onError.',
+        '应用提供给日志探针的日志对象，必须包含 debug、info、warn 和 error 四个方法。探针把符合条件的 RPC 事件转交这些方法。方法应尽快接收记录或将其入队，缓冲和实际写入由日志对象负责。探针不会等待返回的 Promise 完成，但会接收它的失败；同步抛错或 Promise 失败均交给 onError。'
       ),
       example: logExample,
       members: Object.fromEntries(
@@ -1634,8 +1634,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           level,
           {
             summary: t(
-              `Receives one qualifying event assigned to the ${level} level; the original logger receiver is preserved.`,
-              `接收一个被分配到 \`${level}\` 级别的合格事件，保留原始接收者。`
+              `Receives an RPC event that passes the log filter and is assigned to the ${level} level. The method runs with the original logger as its receiver, so it can use that logger's instance state.`,
+              `接收通过日志筛选、被分配到 \`${level}\` 级别的 RPC 事件。调用时仍以原日志对象作为方法的接收者，因此方法可以使用该日志对象的实例状态。`
             ),
             params: {
               message: t(

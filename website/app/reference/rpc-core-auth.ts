@@ -35,8 +35,8 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
       '返回加密值或其承诺，原样传入签名阶段。'
     ),
     t(
-      'Omit encryption only together with decrypt; sign then receives the unencrypted authentication envelope.',
-      '省略加密时也必须省略 decrypt，sign 将直接接收未加密的认证信封。'
+      'Leave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.',
+      '消息只需要签名、不需要加密时，应同时省略 encrypt 和 decrypt。此时 sign 直接接收未加密的认证数据封装，其中包含消息数据和用于识别重复发送的信息。省略加密不会省去签名与验证。'
     )
   ),
   decrypt: transform(
@@ -48,8 +48,8 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
       '返回恢复的重放绑定认证信封或其承诺；抛错或拒绝通常成为保留原始原因的认证失败。'
     ),
     t(
-      'Without decrypt, encrypt must also be absent; the value recovered by verify is checked directly as an authentication envelope.',
-      '不提供 decrypt 时也不能提供 encrypt；verify 恢复的值将直接作为认证信封校验。'
+      'Omit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.',
+      '只有同时省略 encrypt 时，才可以省略 decrypt。verify 验证签名并恢复内部值后，端点会直接检查该值是否符合认证数据封装格式，并检查用于识别重复发送的信息，不再进行解密。'
     )
   ),
   sign: transform(
@@ -64,8 +64,8 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
       '返回签名表示或其承诺；抛错或拒绝通常成为认证失败，输出须符合声明的编码值域。'
     ),
     t(
-      'Required for authentication: omitting sign makes configuration invalid, because encryption also requires signing.',
-      '启用认证必须提供 sign；省略它会使配置非法，因为使用加密同样要求签名。'
+      'There is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.',
+      '没有默认签名函数。启用认证时，必须同时提供 sign 和 verify。即使已经配置 encrypt 和 decrypt，也仍然需要签名；只加密而省略 sign 会使配置被拒绝。'
     )
   ),
   verify: transform(
@@ -80,8 +80,8 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
       '返回认证内部值或其承诺，配置了解密时传给解密；签名非法时应拒绝或抛错，本地报告保留可能敏感的原校验失败，对端只接收净化摘要，其它返回值仍需通过信封及重放校验。'
     ),
     t(
-      'Required counterpart of sign; a signing configuration without verify is rejected before the endpoint is activated.',
-      'verify 是 sign 必须配套的验证阶段；提供签名却缺少验证时，端点会在激活前拒绝配置。'
+      'There is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.',
+      '没有默认验证函数。必须把 verify 与 sign 配套提供，才能检查收到的受保护消息并恢复其内部值。提供 sign 却缺少 verify 时，构造会在端点启用前拒绝配置。'
     )
   ),
   encodedType: {

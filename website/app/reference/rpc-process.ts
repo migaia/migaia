@@ -1856,8 +1856,8 @@ const processPluginOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   contract: { summary: t('Declared remote methods.', '对端远程方法的声明契约。') },
   registrationOwner: {
     summary: t(
-      'Host that owns and may liquidate this registration.',
-      '拥有并可能清算该登记的宿主。'
+      'Identifies the plugin registration that may be removed if its process cannot recover. In the full deployment form, supply the exact registration name and the Host that installs it. When failure reports remain unhandled, cleanup uses this Host to remove that registration. The name must equal options.name and the Host must provide unUse; missing or mismatched values reject configuration before process setup.',
+      '指明进程无法恢复时可以移除的插件登记。完整部署形式必须提供准确登记名，以及实际安装此插件的 Host。故障报告一直无人处理时，清理会通过这个 Host 移除该登记。name 必须等于 options.name，host 必须提供 unUse 移除方法；缺少或不匹配会在建立进程连接前导致配置被拒绝。'
     )
   },
   resilience: {
@@ -2141,14 +2141,14 @@ const processPluginDocs: Readonly<Record<string, IMemberDoc>> = {
   },
   'registrationOwner.name': {
     summary: t(
-      'The exact plugin name whose Host registration the resilience owner may liquidate; must equal the full options name.',
-      '治理拥有者可以清算的精确宿主插件登记名，必须等于完整选项中的名称。'
+      'Names the one registration that failure cleanup may remove. Set it to the value of options.name for this plugin before constructing the full deployment. A different name rejects configuration, preventing failure handling for this plugin from removing another registration.',
+      '指定故障清理可以移除的那一个登记。构造完整部署前，必须设为当前插件的 options.name。名称不同会导致配置被拒绝，避免此插件的故障处理误删其他登记。'
     )
   },
   'registrationOwner.host': {
     summary: t(
-      'Caller-owned dependency Host port with unUse for removing that exact registration and handling dependant policy.',
-      '调用方持有的依赖宿主端口，提供移除方法，用于移除此精确登记并处理依赖策略。'
+      'Supplies the Host that actually installs this plugin. Failure cleanup invokes its unUse method to remove the named registration and apply the Host rules for dependent plugins. Pass that original Host; an object without unUse is rejected before process setup. The caller continues to own the Host.',
+      '提供实际安装此插件的 Host。故障清理调用它的 unUse 方法，移除指定登记，并按 Host 规则处理依赖该登记的插件。应传入原 Host；没有 unUse 方法的对象会在建立进程连接前被拒绝。Host 仍由调用方持有。'
     )
   }
 }
@@ -2307,20 +2307,20 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
         {
           summary: t(
             side === 'local'
-              ? 'The local framed-message transport uses identity to preserve native message values; configuring a byte codec is rejected.'
-              : 'The expected peer profile must also name identity; a different peer codec cannot match this framed-message transport.',
+              ? 'This transport already delivers complete messages. Set the local codec to identity, which passes native message values through without converting them to bytes. A byte codec is rejected during configuration, before the transport is activated.'
+              : 'Set the expected peer codec to identity as well, meaning the peer sends message values without byte encoding. A different peer codec cannot match this complete-message transport and is rejected during configuration.',
             side === 'local'
-              ? '本端的已分帧消息传输使用 identity 保留原生消息值，配置字节编解码器会被拒绝。'
-              : '预期对端配置也必须选择 identity；其他对端编解码器无法与这种已分帧消息传输匹配。'
+              ? '此传输已经直接交付完整消息。本端 codec 必须设为 identity，即原样传递原生消息值，不把它们转换成字节。配置字节编解码器会在传输启用前被拒绝。'
+              : '预期对端 codec 也必须设为 identity，即对端原样发送消息值，不转换成字节。其他对端编码无法匹配这种完整消息传输，会在配置时被拒绝。'
           ),
           values: {
             identity: t(
               side === 'local'
-                ? 'Keep outgoing carrier message values unchanged instead of converting them to bytes.'
-                : 'Require the peer to keep message values unchanged, matching the local representation.',
+                ? 'Sends each original message value unchanged. Choose identity for the local side because the underlying transport already preserves message boundaries.'
+                : 'Requires the peer to send unchanged message values too. This matches the local format; a byte-encoded peer format would not match.',
               side === 'local'
-                ? '本端发送时保持载体消息值，不把消息转换成字节。'
-                : '要求对端也保持消息值，使双方使用相同表示。'
+                ? '原样发送每个消息值。底层传输已经区分每条消息的边界，因此本端使用 identity，不再额外编码为字节。'
+                : '要求对端也原样发送消息值，使双方格式一致；对端若把消息编码为字节，就无法匹配。'
             )
           }
         }
@@ -2330,11 +2330,11 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
         {
           summary: t(
             side === 'local'
-              ? 'Ordered capabilities declared for this local endpoint; the expected peer list must match every entry in this order.'
-              : 'Expected remote capability list, checked against the local list exactly; message transports do not negotiate missing entries.',
+              ? 'Lists the communication capabilities this local endpoint declares, in their fixed order. Use the same entries and order in the expected peer profile. This complete-message path does not negotiate a different list during setup.'
+              : 'Lists the capabilities expected from the peer. Every entry and its position must match the local list. If a capability is missing or differently ordered, this message-transport path cannot negotiate a correction.',
             side === 'local'
-              ? '声明本端能力及其顺序；预期对端列表必须按相同顺序逐项匹配。'
-              : '预期远端提供的能力列表，必须与本端完全相同；消息传输不会通过协商补入缺失能力。'
+              ? '按固定顺序列出本端声明的通信能力。预期对端配置必须使用相同条目和顺序。这条完整消息传输路径不会在建立连接时另行协商一份列表。'
+              : '列出预期对端提供的通信能力。每个条目及其位置必须与本端相同。缺少能力或顺序不同时，此消息传输路径不会通过协商自动修正。'
           )
         }
       ]
@@ -3147,8 +3147,8 @@ console.log(event)`
       members: {
         sessionOptions: {
           summary: t(
-            'Returns the idempotency and limits for one session. The listener example under `listenRegistrations` below shows where the accepted session identity comes from.',
-            '返回某个会话的幂等配置与调用限制。下方 `listenRegistrations` 的监听示例展示了如何取得已接纳连接的会话身份。'
+            'Builds result-deduplication settings and call limits for one accepted session. Result deduplication lets retries of an identified operation reuse its stored outcome. Pass the session identity received by listenRegistrations; its listener example below shows how to obtain that identity.',
+            '为一个已接纳会话生成结果去重配置和调用限制。结果去重让带同一操作标识的重试复用已保存结果。应传入 listenRegistrations 提供的会话身份；下方监听示例展示了如何取得它。'
           ),
           params: {
             identity: t(
@@ -3177,8 +3177,8 @@ console.log(event)`
         },
         attachRegistration: {
           summary: t(
-            'Puts one supervised registration under this governance. The complete usage example above supplies the binding and the owner responsible for cleanup.',
-            '把一个受监督的登记纳入本治理对象管理。上方完整用法示例展示了如何提供登记绑定，以及负责清理的所有者。'
+            'Registers a supervised process with this failure-management object. The supervisor starts and restarts the process; this registration adds reporting and eventual removal if recovery fails. Supply the binding and cleanup owner shown in the complete usage example above.',
+            '把由监督器管理的进程登记到此故障管理对象。监督器负责启动和重启进程；登记后增加故障报告，以及无法恢复时的最终移除处理。上方完整示例展示了需要传入的绑定和清理所有者。'
           ),
           params: {
             name: t('Registration name, the plugin `name`.', '登记名称，即插件的 `name`。'),
@@ -3189,16 +3189,16 @@ console.log(event)`
         },
         callGuard: {
           summary: t(
-            'Returns the guard that rejects calls to unhealthy or terminal registrations. The usage example above calls `guard.beforeDispatch()` before each request.',
-            '返回用于拒绝调用不健康或终态登记的守卫。上方用法示例在每次请求前调用 `guard.beforeDispatch()`，检查该登记能否接受调用。'
+            'Returns a check that can refuse remote calls when this registration is unhealthy or terminal, meaning it cannot recover under the current restart policy. Call guard.beforeDispatch() before each request, as shown above. Calls that bypass the guard do not receive this check.',
+            '返回远程调用前的检查对象。登记不健康，或进入 terminal、无法按当前重启规则恢复时，它可以拒绝调用。应像上方示例一样，在每次请求前调用 guard.beforeDispatch()；绕过它的调用不会执行这项检查。'
           ),
           params: { name: t('Registration name.', '要守卫的登记名称。') },
           returns: t('A remote call guard.', '远程调用守卫对象。')
         },
         inspect: {
           summary: t(
-            'Reads the current snapshot of one registration. Compare this snapshot with `registration.inspect()` in the usage example above.',
-            '读取某个登记的当前快照。上方用法示例同时输出该快照与 `registration.inspect()` 的结果，方便对照登记状态。'
+            'Reads the current state of one registration by id. Use it when an application needs a point-in-time view without retaining the registration object. It returns undefined for an unknown id. The example above compares this view with registration.inspect().',
+            '按 id 读取一个登记的当前状态。应用需要即时查看状态、又没有保留登记对象时使用。id 未找到会返回 undefined。上方示例把它与 registration.inspect() 的结果进行对照。'
           ),
           params: { id: t('Registration id.', '要查询的登记 id。') },
           returns: t(
@@ -3208,16 +3208,16 @@ console.log(event)`
         },
         onTerminal: {
           summary: t(
-            'Observes registrations that entered the terminal state. The usage example above registers this listener and calls the returned unsubscribe function during cleanup.',
-            '观察进入终态、需要处理的登记。上方用法示例先注册监听，再在清理时调用返回的取消订阅函数。'
+            'Subscribes to registrations entering terminal, the state where the current restart policy can no longer recover the process. The listener receives the registration snapshot so the application can respond. The returned function removes the subscription; call it during cleanup as shown above.',
+            '订阅登记进入 terminal 的事件。该状态表示当前重启规则已无法恢复进程。监听器收到登记快照后，应用可以作出处理。返回的函数用于解除订阅，应像上方示例一样在清理时调用。'
           ),
           params: { listener: t('Receives the snapshot.', '接收登记快照的监听函数。') },
           returns: t('An unsubscribe function.', '取消订阅的函数。')
         },
         close: {
           summary: t(
-            'Stops governance, closes its listeners and detaches registrations. Adopters still own accepted endpoints and sessions, and execution owners still dispose their supervisors. The final cleanup block in the usage example above shows these separate close operations.',
-            '停止治理、关闭本对象持有的监听并解除登记附加。接纳方仍负责端点与已接纳会话，执行所有者仍须释放监督器。上方用法示例的最后一个清理块展示了这些各自独立的关闭操作。'
+            'Stops this failure-management object, closes listeners it owns and detaches its registrations. It does not own all resources involved in a connection: the accepting application still closes accepted endpoints and sessions, while the code that started execution still disposes its supervisor. The final cleanup block above shows these separate operations.',
+            '停止当前故障管理对象，关闭它持有的监听并解除登记。连接涉及的资源并非全部由它持有：接收连接的应用仍要关闭已接纳端点和会话，启动执行单元的代码仍要释放监督器。上方最后的清理代码分别执行这些操作。'
           ),
           returns: t(
             'Resolves after owned governance resources close; it does not dispose caller-owned endpoints or supervisors.',
@@ -3429,8 +3429,8 @@ console.log(event)`
       members: {
         replace: {
           summary: t(
-            'Replaces the whole process: `stop-then-start` or `start-then-switch`. The complete deployment example above replaces the child while the host keeps running.',
-            '替换整个子进程，策略为 `stop-then-start` 或 `start-then-switch`。上方完整部署示例展示了如何替换子进程，同时保持宿主运行。'
+            'Replaces the child process while the Host keeps running. Choose stop-then-start to stop the old child before starting its replacement, or start-then-switch to start the replacement before switching over. The complete deployment example above demonstrates replacement; inspect the returned strategy and outcome.',
+            '在 Host 继续运行时替换子进程。stop-then-start 表示先停止旧子进程，再启动新进程；start-then-switch 表示先启动替代进程，再切换过去。上方完整部署示例展示了替换操作，调用后应检查返回的策略和结果。'
           ),
           params: { options: t('`{ spec?, strategy? }`.', '替换选项 `{ spec?, strategy? }`。') },
           returns: t(

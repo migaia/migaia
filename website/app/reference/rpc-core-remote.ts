@@ -180,19 +180,25 @@ const sourceMembers: Readonly<Record<string, IMemberDoc>> = {
     'Application source callback receiving the safe local identity and capability offer; choose exactly one source.',
     '应用来源回调接收安全本端身份及能力提议；只能选择一种来源。',
     t(
-      'No execution unit is launched through spawn when this field is absent.',
-      '省略时不选择启动来源。'
+      'Omitting spawn means this Peer starts no execution unit through that source. Select connect to reach an existing peer, or listen to accept one; exactly one source is required.',
+      '省略 spawn 时，Peer 不会通过此来源启动执行单元。应选择 connect 连接已有对端，或选择 listen 接收对端；三种来源必须且只能选择一种。'
     )
   ),
   connect: p(
     'Application source callback opening a channel to an existing peer; choose exactly one source.',
     '应用来源回调打开通往已有对端的通道；只能选择一种来源。',
-    t('No outgoing connection is opened through connect when omitted.', '省略时不选择连接来源。')
+    t(
+      'Omitting connect means no outgoing connection is opened through this source. Choose spawn to start a peer or listen to accept one instead; exactly one source is required.',
+      '省略 connect 时，不会通过此来源主动打开连接。应改选 spawn 启动对端，或选择 listen 接收连接；三种来源必须且只能选择一种。'
+    )
   ),
   listen: p(
     'Application source callback accepting a negotiated peer channel; choose exactly one source.',
     '应用来源回调接受协商后的对端通道；只能选择一种来源。',
-    t('Without listen, the Peer does not accept incoming connections.', '省略时不选择监听来源。')
+    t(
+      'Omitting listen means this Peer does not accept incoming connections through this source. Choose spawn or connect for the initiating side; exactly one source is required.',
+      '省略 listen 时，Peer 不会通过此来源接收传入连接。主动建立连接的一端应选择 spawn 或 connect；三种来源必须且只能选择一种。'
+    )
   )
 }
 /** Source callbacks receive only safe preparation facts and must return a complete channel. */
@@ -1688,8 +1694,8 @@ for (const [name, en, zh, example] of [
   ],
   [
     'RPC_REMOTE_ERROR_SOURCE',
-    'Compare RPC_REMOTE_ERROR_SOURCE with an error’s source before inspecting code. This identifies errors created by the remote execution layer.',
-    '先把错误的 source 与 RPC_REMOTE_ERROR_SOURCE 比较，再检查 code，确认失败是否由远程执行层创建。',
+    'Identifies the package that created a remote-execution error. When handling a caught error, first compare its source with RPC_REMOTE_ERROR_SOURCE, then inspect code to choose how to respond. The same code text in another package need not mean the same failure.',
+    '标识远程执行错误的来源包。处理捕获的错误时，先比较 source 是否等于 RPC_REMOTE_ERROR_SOURCE，再读取 code 选择处理方式。其他包中的同名错误码不一定表示同一种失败。',
     `if (error.source === RPC_REMOTE_ERROR_SOURCE) console.error(error.code)`
   ],
   [
