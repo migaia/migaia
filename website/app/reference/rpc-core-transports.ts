@@ -134,8 +134,8 @@ export const transportMembers: Record<string, IMemberDoc> = {
       )
     },
     t(
-      'Void or Promise<void> from the physical owner; throws/rejections are original physical failures.',
-      '返回物理所有者的空值或承诺，抛错及拒绝为原物理失败。'
+      'Void or Promise<void> from the physical owner; native message-port and Worker send failures retain native Error/DOMException type and stack. Mutable unclassified errors gain Core TRANSPORT in place; foreign semantic identities stay unchanged, and immutable values remain on cause.',
+      '返回物理所有者的空值或承诺，原生消息端口及工作者发送失败保留原生错误类型及堆栈；可修改且未分类的错误原位附加核心 `TRANSPORT`，外部语义身份保持不变，不可修改的值保留在原因链。'
     ),
     memoryExample
   ),
@@ -433,7 +433,11 @@ types.IWebWorkerPortEvent = type(
       '字符串分类前的原不可信事件来源域。'
     ),
     source: p('Original native event source reference.', '保留原对象身份的原生事件来源引用。'),
-    type: p('Original native event classification when supplied.', '提供时的原生事件分类。')
+    type: p('Original native event classification when supplied.', '提供时的原生事件分类。'),
+    error: p(
+      'Optional original ErrorEvent failure retained as transport cause; it remains reachable with its native type and stack.',
+      '可选原生错误事件失败，保留为载体错误原因；其原生类型及堆栈仍可经原因链追踪。'
+    )
   },
   workerExample
 )
@@ -559,8 +563,8 @@ const adapterPeerOptions: Record<string, IMemberDoc> = {
     )
   ),
   signal: p(
-    'Application cancellation signal retires physical opening and the original directory handshake.',
-    '应用取消信号退役物理打开及原目录握手。',
+    'Application cancellation signal retires physical opening and the original directory handshake, including byte preparation. An existing preparation signal keeps priority.',
+    '应用取消信号退役物理打开及原目录握手，也覆盖字节准备；既有准备信号仍优先。',
     t('Absent: no caller cancellation.', '默认没有调用方取消。')
   ),
   scheduler: p(
@@ -791,8 +795,8 @@ types.IAdapterDefinition = type(
         )
       },
       t(
-        'Promise of IRuntimePeer or typed peer; construction rollback retains original primary failure.',
-        '返回运行对端或类型对端承诺，构造回滚保留原主要失败。'
+        'Promise of IRuntimePeer or typed peer; byte recipes reject transfer options and expose a no-transfer typed peer, while message recipes retain the ordinary typed API. Construction rollback retains the primary failure.',
+        '返回运行对端或类型对端承诺；字节配方拒绝转移选项并提供无转移的类型对端，消息配方保留普通类型接口；构造回滚保留原主要失败。'
       ),
       adapterExample
     ),

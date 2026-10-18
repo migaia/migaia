@@ -12,8 +12,6 @@
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ISymbolDoc } from './contract.js'
 import {
-  runtimeEventEnum,
-  runtimePairedEventSymbol,
   runtimePeerOptionMembers,
   runtimePluginOptionMembers,
   runtimeOutletGrants,
@@ -139,7 +137,16 @@ const threadSpawnMembers: Readonly<Record<string, IMemberDoc>> = {
     params: { error: t('The background failure.', '后台发生的失败。') },
     returns: t('Nothing.', '无返回值；错误已交给上报函数。')
   },
-  health: { summary: t('Optional health-check policy.', '可选的执行单元健康检查策略。') },
+  health: {
+    summary: t(
+      'Custom health policy takes priority. Without enforced native exit observation, the bound generation uses RPC ping every 5000ms, a 2000ms budget and 3 consecutive failures. Before endpoint binding the original startup deadline applies. Disabling ping requires custom health or Core INVALID_CONFIG.',
+      '自定义健康策略优先；缺少原生退出强制观察时，绑定代次默认每 `5000ms` 心跳、单次 `2000ms`、连续三次失败；端点绑定前沿用原启动截止。禁用心跳须提供自定义健康策略，否则核心拒绝配置。'
+    ),
+    default: t(
+      'Native exit observation where enforced; otherwise RPC ping on the actual bound endpoint.',
+      '原生退出可强制观察时使用原生观察，否则对实际绑定端点执行心跳。'
+    )
+  },
   supervisor: {
     summary: t(
       'Supervision policy: `ready`, `startupTimeoutMs`, `restart`, `terminalPolicy`, `stop`, `isolation`.',
@@ -642,16 +649,6 @@ try {
 
 /** Platform pairs: launcher plus channel factory. */
 const platforms = [
-  ['browser', 'Browser', 'browser Web Worker', '浏览器 Web Worker', true],
-  ['bun', 'Bun', 'Bun Worker', 'Bun Worker', true],
-  ['deno', 'Deno', 'Deno Worker (needs permissions)', 'Deno Worker（需要相应权限）', true],
-  [
-    'electron-renderer',
-    'ElectronRenderer',
-    'Electron renderer Web Worker',
-    'Electron 渲染进程中的 Web Worker',
-    true
-  ],
   [
     'electron-main',
     'ElectronMain',
@@ -768,8 +765,8 @@ const platformSymbols: Record<string, ISymbolDoc> = Object.fromEntries(
           ),
           params: {
             options: t(
-              '`{ scheduler, capabilities? }`: use the same `scheduler` as the source; `capabilities` narrows the local proposal.',
-              '`{ scheduler, capabilities? }`：`scheduler` 必须与 source 使用同一个；`capabilities` 用于缩小本端提议的能力。'
+              '`{ scheduler, capabilities? }`: use the same `scheduler` as the source; `capabilities` intersects the actual launch offer; only the peer acknowledgement establishes the agreed result.',
+              '`{ scheduler, capabilities? }`：`scheduler` 必须与 source 使用同一个；`capabilities` 与实际启动提议取交集，最终协商结果仍须由对端确认。'
             )
           },
           returns: t(
@@ -940,8 +937,8 @@ export const rpcThreadsReference: ILibraryReference = {
         )
       },
       returns: t(
-        'An `IRuntimeTypedPeer<TRemote>`; `close()` also terminates a spawned Worker. Bad configuration rejects with `INVALID_CONFIG`.',
-        '一个 `IRuntimeTypedPeer<TRemote>`；`close()` 同时终止 spawn 出来的 Worker。配置错误时以 `INVALID_CONFIG` reject。'
+        'An `IRuntimeTypedPeer<TRemote>`; `close()` also terminates a spawned Worker. Bad configuration rejects with `INVALID_CONFIG`. Web close may report `REAP_TIMEOUT` and retain an abandoned lease because terminate has no actual-exit receipt.',
+        '一个 `IRuntimeTypedPeer<TRemote>`；关闭时请求终止所启动线程，配置错误以核心配置非法码拒绝；网页线程没有实际退出回执，关闭可能报告 `REAP_TIMEOUT` 并保留已放弃租约。'
       ),
       example: peerExample,
       scenarios: [
@@ -1019,7 +1016,6 @@ export const rpcThreadsReference: ILibraryReference = {
       ),
       example: diagnosticExample
     },
-    RuntimeEventName: runtimePairedEventSymbol('thread'),
     createWebThreadLauncher: {
       options: 'IWebThreadLauncherOptions',
       role: 'factory',
@@ -1034,8 +1030,8 @@ export const rpcThreadsReference: ILibraryReference = {
         )
       },
       returns: t(
-        'An `IThreadLauncher` whose handles open channels with `open(signal, options)`.',
-        '一个 `IThreadLauncher`，其句柄通过 `open(signal, options)` 打开通道。'
+        'An `IThreadLauncher` whose handles open channels with `open(signal, options)`. Construction or initial send failure removes acquired listeners and requests termination; original native failures remain reachable, without claiming native exit confirmation.',
+        '一个 `IThreadLauncher`，句柄通过 `open(signal, options)` 打开通道；构造或初始发送失败移除已取得监听并请求终止，原生失败仍可追踪，不宣称确认原生退出。'
       ),
       example: fullSpawnExample('Web', '{ Worker, report }')
     },
@@ -1048,8 +1044,8 @@ export const rpcThreadsReference: ILibraryReference = {
       ),
       params: {
         options: t(
-          '`{ scheduler, capabilities? }`; the same scheduler as the source.',
-          '`{ scheduler, capabilities? }`；必须与 source 使用同一个调度器。'
+          '`{ scheduler, capabilities? }`; use the source scheduler. Capabilities narrow the actual launch offer, and Core retains the peer acknowledgement.',
+          '`{ scheduler, capabilities? }`；使用来源同一调度器，能力仅缩小实际启动提议，核心保留对端实际确认。'
         )
       },
       returns: t(
@@ -1217,6 +1213,16 @@ export const rpcThreadsReference: ILibraryReference = {
     ...platformSymbols
   },
   types: {
+    RuntimeEventName: {
+      summary: t(
+        'Type-only union of supported runtime lifecycle event names. This package re-exports the type; use a literal such as exit when subscribing.',
+        '仅类型导出的运行时生命周期事件名联合；本包不导出同名运行常量，订阅时可使用退出等事件字面量。'
+      ),
+      members: {},
+      example: `import type { RuntimeEventName } from '@migaia/rpc-threads'
+const event: RuntimeEventName = 'exit'
+console.log(event)`
+    },
     ...runtimePairedTypes('thread'),
     IRuntimeThreadPeerOptions: {
       summary: t(
@@ -1264,7 +1270,61 @@ try {
   await worker.close()
 }`),
       members: {
-        ...threadSpawnMembers,
+        launcher: {
+          ...threadSpawnMembers.launcher!,
+          default: t(
+            'Runtime-selected Node or canonical Web launcher.',
+            '默认选择运行环境对应的节点或规范网页线程启动器。'
+          )
+        },
+        budget: {
+          ...threadSpawnMembers.budget!,
+          default: t(
+            'One thread unit, using the source scheduler.',
+            '默认使用来源调度器的单线程执行单元预算。'
+          )
+        },
+        scheduler: {
+          ...threadSpawnMembers.scheduler!,
+          default: t('systemScheduler.', '默认使用系统调度器。')
+        },
+        channelFactory: {
+          ...threadSpawnMembers.channelFactory!,
+          default: t(
+            'Canonical factory matching the selected runtime launcher.',
+            '默认使用匹配运行环境启动器的规范通道工厂。'
+          )
+        },
+        report: {
+          ...threadSpawnMembers.report!,
+          summary: t('Optional source background reporter.', '可选来源后台错误报告函数。'),
+          default: t(
+            'Source report, then Peer report, then defaultRpcReporter.',
+            '依次选用来源报告、对端报告及默认核心报告函数。'
+          )
+        },
+        health: threadSpawnMembers.health!,
+        supervisor: {
+          ...threadSpawnMembers.supervisor!,
+          default: t(
+            'Existing supervision defaults; isolation is best-effort.',
+            '默认使用既有监督策略，隔离采用尽力模式。'
+          )
+        },
+        keyFactory: {
+          ...threadSpawnMembers.keyFactory!,
+          default: t(
+            'Existing runtime key factory; a top-level override takes priority.',
+            '默认使用既有运行时键工厂，顶层覆盖优先。'
+          )
+        },
+        retryPort: {
+          ...threadSpawnMembers.retryPort!,
+          default: t(
+            'Existing runtime retry port; a top-level override takes priority.',
+            '默认使用既有运行时重试端口，顶层覆盖优先。'
+          )
+        },
         entry: {
           summary: t(
             '`true`, a `URL` or a path string of the Worker module.',
@@ -1552,10 +1612,14 @@ try {
     },
     IThreadNativeWorkerConstructor: {
       summary: t(
-        'Constructor of Node `Worker`.',
-        'Node `Worker` 线程的构造函数类型，由适配器调用。'
+        'Node Worker constructor called with the module entry and launch options: required workerData, optional name, execArgv and resourceLimits. It returns IThreadNativeWorker; instance threadId/on/terminate belong to that returned value.',
+        '适配器以模块入口及启动选项调用的线程构造函数；选项必含 `workerData`，可选名称、运行参数及资源限制；返回线程实例，其标识、监听及终止成员属于返回值。'
       ),
-      members: nativeWorkerMembers
+      members: {},
+      example: `import type { IThreadNativeWorkerConstructor } from '@migaia/rpc-threads'
+declare const Worker: IThreadNativeWorkerConstructor
+const worker = new Worker(new URL('./worker.js', import.meta.url), { workerData: { name: 'worker' } })
+await worker.terminate()`
     },
     IThreadParentPort: {
       summary: t(
@@ -1628,7 +1692,6 @@ try {
     }
   },
   enums: {
-    RuntimeEventName: runtimeEventEnum,
     RpcThreadErrorCode: {
       summary: t(
         'Error codes owned by `@migaia/rpc-threads`.',

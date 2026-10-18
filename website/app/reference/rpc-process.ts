@@ -16,8 +16,6 @@
  */
 import type { ICode, ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
 import {
-  runtimeEventEnum,
-  runtimePairedEventSymbol,
   runtimeOutletGrants,
   runtimePeerOptionMembers,
   runtimePairedTypes
@@ -141,14 +139,14 @@ await parent
 // ${zh ? '父端关闭连接后，库结束子进程生命周期。' : 'The parent closes the connection and ends the child lifetime.'}
 
 // ${zh ? `main.ts：${runtime} 父进程；Deno 需要相应的读取、环境和启动权限` : `main.ts: ${runtime} parent; Deno needs read, env and run permissions`}
-import { createProcessPeer, RuntimeEventName } from '@migaia/rpc-process'
+import { createProcessPeer } from '@migaia/rpc-process'
 ${module ? `import { ${factory} } from '@migaia/rpc-process/adapters/${module}'\n` : ''}
 ${processApiCode}
 const service = await createProcessPeer<IServiceApi>({
   spawn: ${module ? `{ entry: new URL('./service.ts', import.meta.url), supervision: { launcher: ${factory}() } }` : `new URL('./service.ts', import.meta.url)`},
   provide: { parent: { prefix: (value: string) => 'main: ' + value } }
 })
-const off = service.on(RuntimeEventName.exit, (event) => console.error(event))
+const off = service.on('exit', (event) => console.error(event))
 try {
   console.log(await service.request('math.double', 21))
   await service.notify('log.note', 'hello')
@@ -867,8 +865,8 @@ const processLoaderCode = `const runtime = {
 const adapterPeerExample = processExampleVariant(peerExample, (code) =>
   code
     .replace(
-      "import { createProcessPeer, RuntimeEventName } from '@migaia/rpc-process'",
-      "import process from 'node:process'\nimport { createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, RuntimeEventName } from '@migaia/rpc-process'\nimport { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'"
+      "import { createProcessPeer } from '@migaia/rpc-process'",
+      "import process from 'node:process'\nimport { createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV } from '@migaia/rpc-process'\nimport { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'"
     )
     .replace(
       'const service = await createProcessPeer<IServiceApi>({',
@@ -921,8 +919,8 @@ const socketIoExample = processExampleVariant(socketExample, (code) =>
 const bootstrapExample = processExampleVariant(adapterPeerExample, (code) =>
   code
     .replace(
-      'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, RuntimeEventName',
-      'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION, PROCESS_RUNTIME_API_BOOTSTRAP_KIND, PROCESS_RUNTIME_API_BOOTSTRAP_VERSION, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS, PROCESS_RUNTIME_API_FINGERPRINT_PREFIX, PROCESS_HANDSHAKE_MAX_FRAME_BYTES, RuntimeEventName'
+      'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV',
+      'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION, PROCESS_RUNTIME_API_BOOTSTRAP_KIND, PROCESS_RUNTIME_API_BOOTSTRAP_VERSION, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS, PROCESS_RUNTIME_API_FINGERPRINT_PREFIX, PROCESS_HANDSHAKE_MAX_FRAME_BYTES'
     )
     .replace(
       "bootstrap: 'stdin', bootstrapTimeoutMs: 10_000",
@@ -1329,102 +1327,6 @@ try {
   return t(code(false), code(true))
 })()
 
-/** Shared authenticated listener fields inherited by reverse host registration. */
-const registrationCommonMembers: Readonly<Record<string, IMemberDoc>> = {
-  listen: {
-    summary: t(
-      'Caller-selected `IListenProcessByteChannel` from a socket adapter; it owns the bound address and supplies pending candidates.',
-      '调用方从套接字适配器选择的 `IListenProcessByteChannel`，持有绑定地址并提供待接纳候选。'
-    )
-  },
-  address: {
-    summary: t(
-      'Caller-selected local rendezvous address; successful listening reports its actual bound address.',
-      '调用方选择的本机会合地址；监听成功后报告实际绑定地址。'
-    )
-  },
-  serviceId: {
-    summary: t(
-      'Stable service owner identity issued by the caller, required for Unix rendezvous ownership.',
-      '调用方签发的稳定服务所有者身份，使用本地会合路径时必需。'
-    ),
-    default: t(
-      'Omitted for addresses without Unix rendezvous ownership; Unix paths require an explicit value.',
-      '没有本地会合所有权的地址可省略；本地路径必须显式提供。'
-    )
-  },
-  offer: {
-    summary: t(
-      'Local `IRpcHandshakeOffer` returned by offer preparation for this listener’s native protocol.',
-      '提议准备过程为此监听者原生协议返回的本地 `IRpcHandshakeOffer`。'
-    )
-  },
-  createConnectionContext: {
-    summary: t(
-      'Synchronous callback receiving each adapter-provided pending connection and returning its local peer identity and IPC diagnostic context; throws reject candidate preparation.',
-      '同步回调，接收适配器提供的每个待处理连接，返回本端对端身份与通信诊断上下文；抛错会拒绝候选准备。'
-    ),
-    params: {
-      pending: t(
-        'Pending byte connection supplied by the selected listener adapter.',
-        '所选监听适配器提供的待处理字节连接。'
-      )
-    },
-    returns: t(
-      'Caller-authored `{ peerId, ipc }` for that one connection, not a promise.',
-      '调用方编写的此连接专属 `{ peerId, ipc }`，不能返回异步结果。'
-    ),
-    example: registrationListenerExample
-  },
-  verifyToken: {
-    summary: t(
-      'Receives the remote portable credential and handshake peer metadata; return a trusted principal string synchronously or asynchronously. Throw or rejection refuses authentication.',
-      '接收远程可移植凭据与握手对端元数据，同步或异步返回可信主体字符串；抛错或拒绝会拒绝认证。'
-    ),
-    params: {
-      auth: t(
-        'Portable credential from the remote handshake, possibly undefined.',
-        '来自远程握手的可移植凭据，可能为空值。'
-      ),
-      peer: t(
-        'Peer identity metadata supplied by the native handshake.',
-        '原生握手提供的对端身份元数据。'
-      )
-    },
-    returns: t(
-      'A verified principal string or its promise; never infer authorization from peer claims alone.',
-      '校验后的主体字符串或其异步结果；不能只凭对端声明推断授权。'
-    ),
-    example: registrationListenerExample
-  },
-  scheduler: {
-    summary: t(
-      'Caller-selected `IScheduler` from `@migaia/utils/scheduler` for handshake timing.',
-      '调用方从 `@migaia/utils/scheduler` 选择、用于握手计时的 `IScheduler`。'
-    ),
-    default: t(
-      'Omitted: the listener uses its selected runtime default scheduler.',
-      '省略时监听者使用所选运行时的默认调度器。'
-    )
-  },
-  handshakeTimeoutMs: {
-    summary: t(
-      'Optional handshake budget in milliseconds for each accepted candidate; this does not extend connection lifetime.',
-      '每个已接受候选的可选握手毫秒预算，不延长连接生命周期。'
-    )
-  },
-  signal: {
-    summary: t(
-      'Caller-owned `IAbortSignal` ending further candidate acceptance when aborted.',
-      '调用方持有的 `IAbortSignal`，中止后结束后续候选接纳。'
-    ),
-    default: t(
-      'Omitted: no external cancellation signal is attached to listening.',
-      '省略时不为监听关联外部取消信号。'
-    )
-  }
-}
-
 /** Doc of a `report(error)` callback member. */
 const reportMember: IMemberDoc = {
   summary: t(
@@ -1472,10 +1374,13 @@ const byteChannelMembers: Readonly<Record<string, IMemberDoc>> = {
     example: stdioExample
   },
   close: {
-    summary: t('Closes the carrier and releases it.', '关闭该字节载体，释放底层资源。'),
+    summary: t(
+      'Closes the byte carrier once. Web Streams close publishes completion before callbacks, notifies every observer and attempts reader cancellation, writer abort and physical close even if an observer throws.',
+      '一次关闭字节载体；网页流在回调前发布完成承诺，通知全部观察者，即使观察者抛错仍尝试取消读取、终止写入及关闭物理资源。'
+    ),
     returns: t(
-      'Nothing or a Promise resolved when closed.',
-      '无返回值，或在关闭后 resolve 的 Promise。'
+      'Nothing or a Promise resolved when closed. Web Streams failures reject this cached Promise with native AggregateError/PROCESS_CHANNEL_CLOSED: cause is the first original failure and errors contains every failure. Reentrant close shares the same result.',
+      '无返回值或关闭后兑现的承诺；网页流失败以原生汇总错误及通道关闭码拒绝缓存承诺，原因指向首项原错，错误列表包含全部原错，重入关闭共享同一结果。'
     ),
     example: stdioExample
   }
@@ -2453,7 +2358,7 @@ export const rpcProcessReference: ILibraryReference = {
         {
           summary: t(
             `Local sockets with ${en}: \`dialProcessByteChannel\` and \`listenProcessByteChannel\` (loopback TCP and Unix socket; Node/Bun also accept Windows pipes).`,
-            `基于${zh}的本机 socket 适配：拨号函数 \`dialProcessByteChannel\` 与监听函数 \`listenProcessByteChannel\`，支持回环 TCP、Unix socket 与 Windows 命名管道。`
+            `基于${zh}的本机 socket 适配：拨号函数 \`dialProcessByteChannel\` 与监听函数 \`listenProcessByteChannel\`，支持回环 TCP、Unix socket；${module === 'deno-socket' ? '此入口拒绝 Windows 命名管道。' : '此入口也支持 Windows 命名管道。'}`
           ),
           example: processSocketExample(
             module,
@@ -2759,7 +2664,10 @@ export const rpcProcessReference: ILibraryReference = {
         readable: t('Incoming bytes.', '接收字节的可读流。'),
         writable: t('Outgoing bytes.', '发送字节的可写流。')
       },
-      returns: t('An `IProcessByteChannel`.', '一个可用于握手的 `IProcessByteChannel`。'),
+      returns: t(
+        'An IProcessByteChannel. If writer acquisition fails, the acquired reader lock is released; the caller keeps its original writer. Native TypeError/stack remains intact under PROCESS_CHANNEL_CONNECT_FAILED.',
+        '返回进程字节通道；写入端获取失败会释放已取得读取锁，原写入端仍归调用方；原生类型错误及堆栈保持，附加通道连接失败语义码。'
+      ),
       example: processStdioExample('web', 'Deno')
     },
     createAdapterProcessLaunch: {
@@ -2818,13 +2726,19 @@ export const rpcProcessReference: ILibraryReference = {
         '高级用法：使用自定义运行时 I/O 加载器的 `createProcessPlugin`，用于尚未支持的运行时。'
       ),
       params: {
-        options: t('Full `IProcessPluginOptions`.', '完整的 `IProcessPluginOptions` 部署选项。'),
+        options: t(
+          'Either complete IProcessPluginOptions with deployment, or symmetric IRuntimeProcessPluginOptions with spawn/connect/listen and provide/expose.',
+          '可选带部署字段的完整进程插件选项，或带启动、连接、监听及提供公开字段的对称运行时进程插件选项。'
+        ),
         runtime: t(
           'Loader whose `load()` returns `{ processRuntimeIO }`.',
           '其 `load()` 返回 `{ processRuntimeIO }` 的加载器。'
         )
       },
-      returns: t('An `IProcessPlugin`.', '一个可安装的 `IProcessPlugin`。'),
+      returns: t(
+        'Full deployment returns IProcessPlugin, including its deployment controls; symmetric source returns the Core runtime plugin for the process slot and does not promise replace.',
+        '完整部署返回含部署控制的进程插件；对称来源返回进程槽位的核心运行时插件，不承诺提供替换方法。'
+      ),
       example: adapterPluginExample
     },
     PROCESS_HANDSHAKE_MAX_FRAME_BYTES: {
@@ -2907,10 +2821,19 @@ export const rpcProcessReference: ILibraryReference = {
       ),
       example: processErrorExample
     },
-    RuntimeEventName: runtimePairedEventSymbol('process'),
     ...adapterSymbols
   },
   types: {
+    RuntimeEventName: {
+      summary: t(
+        'Type-only union of supported runtime lifecycle event names. This package re-exports the type; use a literal such as exit when subscribing.',
+        '仅类型导出的运行时生命周期事件名联合；本包不导出同名运行常量，订阅时可使用退出等事件字面量。'
+      ),
+      members: {},
+      example: `import type { RuntimeEventName } from '@migaia/rpc-process'
+const event: RuntimeEventName = 'exit'
+console.log(event)`
+    },
     ...runtimePairedTypes('process'),
     IRuntimeProcessPeerOptions: {
       summary: t(
@@ -3040,8 +2963,8 @@ export const rpcProcessReference: ILibraryReference = {
         },
         token: {
           summary: t(
-            'Session secret; default a random one per launch.',
-            '会话密钥；默认每次启动随机生成。'
+            'Session secret; shorthand generates it once when the source is normalized and reuses it across supervised generations. A restart does not rotate it.',
+            '会话密钥；简写来源规范化时随机生成一次，由监督代次复用，重启不会轮换。'
           )
         },
         offer: { summary: t('Custom native handshake offer.', '自定义的原生握手提议。') },
@@ -3108,8 +3031,8 @@ export const rpcProcessReference: ILibraryReference = {
         },
         wire: {
           summary: t(
-            '`native` (default) or `jsonrpc`.',
-            '使用的线路协议：`native`（默认）或 `jsonrpc`。'
+            'Full byte spawn requires explicit `native` or `jsonrpc`; message spawn omits wire. Only shorthand and full connect supply their own defaults.',
+            '完整字节启动必须显式选择 `native` 或 `jsonrpc`；消息启动省略协议，简写及完整连接分别提供自己的默认规则。'
           ),
           values: { enum: 'ProcessPluginWire' }
         },
@@ -3389,7 +3312,10 @@ export const rpcProcessReference: ILibraryReference = {
         },
         close: {
           summary: t('Stops listening and frees the address.', '停止监听并释放占用的地址。'),
-          returns: t('Resolves when closed.', '关闭完成后 resolve。'),
+          returns: t(
+            'The cached close Promise; repeated calls return the same reference and completion.',
+            '返回缓存的关闭承诺，重复调用共享同一引用及完成结果。'
+          ),
           example: socketExample
         }
       }
@@ -3596,7 +3522,10 @@ export const rpcProcessReference: ILibraryReference = {
           summary: t('The raw byte channel of the connection.', '该连接上的原始字节通道。')
         },
         close: {
-          summary: t('Closes the dialled connection.', '主动关闭该已拨号的连接。'),
+          summary: t(
+            'Closes this dialled connection under its supervisor.',
+            '通过所属监督器关闭此已拨号连接。'
+          ),
           returns: t('Resolves when closed.', '关闭完成后 resolve。')
         }
       }
@@ -3617,37 +3546,6 @@ export const rpcProcessReference: ILibraryReference = {
             options: t('`{ policy, dryRun? }`.', '移除选项 `{ policy, dryRun? }`。')
           },
           returns: t('The removal or the plan.', '移除结果或移除计划。')
-        }
-      }
-    },
-    IProcessHostRegistrationApproval: {
-      summary: t('Approval of a remote host registration.', '对远程宿主登记的批准信息。'),
-      members: {
-        targetHost: {
-          summary: t('Host the registration is installed into.', '该登记要安装进的宿主。')
-        },
-        name: { summary: t('Name of the approved registration.', '被批准的远程宿主登记名称。') },
-        contract: {
-          summary: t('Accepted contract of the registration.', '该登记被接受的方法契约。')
-        }
-      }
-    },
-    IProcessHostRegistrations: {
-      summary: t(
-        'Listener options that approve remote host registrations by principal.',
-        '按主体批准远程宿主登记的监听选项。'
-      ),
-      members: {
-        ...registrationCommonMembers,
-        resolveRegistration: {
-          summary: t(
-            'Returns the approval for a principal, or `undefined` to refuse.',
-            '返回某个主体的批准信息；返回 `undefined` 表示拒绝。'
-          ),
-          params: {
-            principalId: t('Principal id returned by `verify`.', '由 `verify` 返回的主体 id。')
-          },
-          returns: t('Approval or `undefined`.', '批准信息或 `undefined`。')
         }
       }
     },
@@ -4259,13 +4157,12 @@ export const rpcProcessReference: ILibraryReference = {
     }
   },
   enums: {
-    RuntimeEventName: runtimeEventEnum,
     ProcessPluginWire: {
       summary: t('Wire protocols of process connections.', '进程连接使用的线路协议。'),
       values: {
         native: t(
-          '`native`: this library protocol with streams, cancellation and transfer.',
-          '`native`：本库协议，支持流、取消与转移。'
+          '`native`: this library protocol with streams and cancellation. Process calls reject transfer lists, including empty lists; portable binary data is copied.',
+          '`native`：本库协议，支持流与取消；进程调用拒绝转移列表，包括空列表，可移植二进制数据按复制处理。'
         ),
         jsonrpc: t(
           '`jsonrpc`: JSON-RPC bridge for other languages; no `stream` or `transfer`.',
@@ -4304,12 +4201,12 @@ export const rpcProcessReference: ILibraryReference = {
           '`PROCESS_CHANNEL_CLOSED`：在已关闭的通道上继续工作；重新连接并对账。'
         ),
         connectFailed: t(
-          '`PROCESS_CHANNEL_CONNECT_FAILED`: dial or launch failed; see `cause`.',
-          '`PROCESS_CHANNEL_CONNECT_FAILED`：拨号或启动子进程失败；原因见 `cause`。'
+          '`PROCESS_CHANNEL_CONNECT_FAILED`: dial, launch or partial channel construction failed. Native synchronous spawn and stream acquisition errors retain the original object, native type, stack and other fields; errno code becomes this semantic code and existing wrappers retain cause.',
+          '`PROCESS_CHANNEL_CONNECT_FAILED`：拨号、启动或部分通道构造失败；原生同步启动及流获取错误保留原对象、类型、堆栈及其它字段，原生系统码转为语义码，既有包装保留原因链。'
         ),
         listenFailed: t(
-          '`PROCESS_CHANNEL_LISTEN_FAILED`: the address could not be bound; choose another.',
-          '`PROCESS_CHANNEL_LISTEN_FAILED`：无法绑定该地址；换一个地址。'
+          '`PROCESS_CHANNEL_LISTEN_FAILED`: listener preparation or bind failed; the original native error keeps its type, stack and other fields while receiving package semantic identity. Reporter and rejection retain original cause chains.',
+          '`PROCESS_CHANNEL_LISTEN_FAILED`：监听准备或绑定失败；原生错误保留类型、堆栈及其它字段并附包语义身份，报告与拒绝保留原原因链。'
         ),
         pluginInvalidOption: t(
           '`PROCESS_PLUGIN_INVALID_OPTION`: a plugin or source option is invalid.',

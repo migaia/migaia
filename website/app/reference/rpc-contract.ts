@@ -75,12 +75,11 @@ decoder.push(frame.subarray(2))
 decoder.finish()
 decoder.close()`
 /** String fragments remain owned by one framer and source/message pair. */
-const framerExample = `import { createStringFramer, createReassembler } from '@migaia/rpc-contract/framing'
+const framerExample = `import { createStringFramer } from '@migaia/rpc-contract/framing'
 const framer = createStringFramer({ chunkBytes: 4 })
 const context = { source: 'channel-a', messageId: 'message-1' }
-const receiver = createReassembler(framer)
-for (const frame of framer.frame('hello world', context)) console.log(receiver.accept(frame, context))
-receiver.close()`
+for (const frame of framer.frame('hello world', context)) console.log(framer.accept(frame, context))
+framer.close()`
 /** External portable validator callback has a synchronous boundary. */
 const portableCallback = t(
   'Optional synchronous application normalizer receives one untrusted payload and returns `IRpcPortableValue`; throws reject normalization. Omission uses the canonical portable walker.',
@@ -274,8 +273,8 @@ const fields: Record<string, IMemberDoc> = {
     '原始端点所有者选择的应用变化或控制子类型。'
   ),
   timeoutMs: p(
-    'Optional finite positive relative operation deadline in milliseconds, bounded by RpcWireLimit.',
-    '可选有限正数相对操作截止毫秒数，受线上时长上限约束。',
+    'Optional relative operation deadline in integer milliseconds from `0` through `2147483647`; zero is allowed.',
+    '可选相对操作截止毫秒数，须为 `0` 至 `2147483647` 的整数，允许零。',
     t(
       'Absent: no deadline is declared by this data record.',
       '默认不设置，此数据记录不声明截止时间。'
@@ -923,6 +922,10 @@ domain(
   'Stable semantic codes owned by the runtime-neutral contract package.',
   '运行时中立契约包拥有的稳定语义错误码。',
   {
+    callbackFailed: t(
+      '`CALLBACK_FAILED`: a warning, scheduler or cleanup callback failed without prior semantic identity. Native mutable errors retain identity, type and stack; other values stay on cause. Safe wire summaries do not expose callback text.',
+      '`CALLBACK_FAILED`：警告、计时或清理回调失败且没有既有语义身份；可修改原生错误保留身份、类型及堆栈，其它值保留在原因链；安全线上摘要不泄漏回调文本。'
+    ),
     invalidDescriptor: t(
       '`INVALID_DESCRIPTOR`: invalid stable component identity/version; correct local configuration.',
       '`INVALID_DESCRIPTOR`：稳定组件身份或版本非法，修正本地配置。'
@@ -1538,8 +1541,8 @@ domain(
 )
 scalar(
   'RPC_PORTABLE_MAX_DEPTH',
-  'Portable graph nesting is limited to 48 levels; cyclic, unsupported or nonfinite data is rejected rather than silently converted.',
-  '可移植图嵌套最多为四十八层；循环、不支持或非有限数据会被拒绝，不会被静默转换。'
+  'Portable graph nesting is limited to 64 levels; cyclic, unsupported or nonfinite data is rejected rather than silently converted.',
+  '可移植图嵌套最多为六十四层；循环、不支持或非有限数据会被拒绝，不会被静默转换。'
 )
 domain(
   'RpcStreamEvent',
@@ -2013,8 +2016,8 @@ for (const [name, kind] of [
   symbols[name] = {
     role: 'factory',
     purpose: t(
-      'Creates an ordered bounded fragment framer and receiver. Pair with createReassembler or its own accept method; retention is separated by transport source and message identifier.',
-      '创建有序有界的分片发送及接收器。搭配 `createReassembler` 或自身接收方法；保留状态按载体来源及消息标识隔离。'
+      'Creates an ordered bounded fragment framer and receiver. Call its own accept method; retention is separated by transport source and message identifier.',
+      '创建有序有界的分片发送及接收器。调用自身 `accept` 接收方法；保留状态按载体来源及消息标识隔离。'
     ),
     params: {
       options: t(
@@ -2031,26 +2034,8 @@ for (const [name, kind] of [
     example:
       kind === 'string'
         ? framerExample
-        : 'const framer = createBinaryFramer({ chunkBytes: 4 }); const context = { source: "a", messageId: "1" }; const receiver = createReassembler(framer); for (const frame of framer.frame(new Uint8Array([1,2,3,4,5]), context)) console.log(receiver.accept(frame, context)); receiver.close()'
+        : 'const framer = createBinaryFramer({ chunkBytes: 4 }); const context = { source: "a", messageId: "1" }; for (const frame of framer.frame(new Uint8Array([1,2,3,4,5]), context)) console.log(framer.accept(frame, context)); framer.close()'
   }
-}
-symbols.createReassembler = {
-  role: 'factory',
-  purpose: t(
-    'Projects a framer accept/close pair without adding buffers or another state machine. Pair with createStringFramer or createBinaryFramer to retain the exact original receive owner.',
-    '投影分片器的接收和关闭方法，不增加缓冲或另一套状态机。搭配 `createStringFramer` 或 `createBinaryFramer` 保持原始接收所有者。'
-  ),
-  params: {
-    framer: t(
-      'Existing IRpcFramer returned by a framer constructor; exact original methods are retained.',
-      '来自分片构造器的既有 `IRpcFramer`；保留精确原始方法。'
-    )
-  },
-  returns: t(
-    'IRpcReassembler sharing the original framer resources and close behavior.',
-    '返回共享原分片器资源及关闭行为的 `IRpcReassembler`。'
-  ),
-  example: framerExample
 }
 operation(
   'bindRpcFrameIngress',
@@ -2084,14 +2069,9 @@ for (const [name, en, zh] of [
     '版本入口别名保留规范整帧函数的精确身份，不引入兼容包装。'
   ],
   [
-    'processStringFramer',
-    'Whole-message string framer for carriers whose native byte framing already supplies boundaries; it never fragments text.',
-    '用于原生字节分帧已经提供边界的整消息字符串分片器，不再次拆分文本。'
-  ],
-  [
     'remoteProcessStringFramer',
-    'Whole-message string boundary additionally rejects unknown non-string values with a native coded TypeError before forwarding.',
-    '整消息字符串边界在转交前额外以原生编码类型错误拒绝未知非字符串值。'
+    'Whole-message string boundary rejects unknown non-string values with native TypeError/INVALID_FRAME before forwarding; it never fragments text.',
+    '整消息字符串边界在转交前以原生 `TypeError` 及 `INVALID_FRAME` 拒绝未知非字符串值，不拆分文本。'
   ]
 ] as const)
   scalar(
@@ -2241,16 +2221,16 @@ const binaryParams = {
     '应用选择的内联或原生 `RpcBinaryStorage`，须匹配已协商载体能力。'
   ),
   limit: t(
-    'Optional whole-frame/backing byte ceiling, default 16777216 bytes.',
-    '可选整帧及背板字节上限，默认 `16777216` 字节。'
+    'Optional binary allocation budget, default `16777216` bytes: native storage charges the full backing; inline storage charges offset plus visible bytes. Codec/prehash and the outer carrier own any complete physical-frame limit.',
+    '可选二进制分配预算，默认 `16777216` 字节：原生表示计完整背板，内联表示计偏移加可见字节；编解码器、预散列及外层载体另负责完整物理帧上限。'
   ),
   digest: t(
     'Optional IRpcBinaryDigest; native mode requires it. The asynchronous callback receives each complete original ArrayBuffer and resolves SHA-256 text; rejection fails preparation.',
     '可选摘要函数，原生模式必须提供；异步回调接收完整原始背板并兑现摘要文本，拒绝会使准备失败。'
   ),
   codec: t(
-    'Optional application-held IRpcBinaryDataCodec owns representation encoding and optional inline capture; its throws fail the original preparation.',
-    '应用可选持有的 `IRpcBinaryDataCodec` 负责表示编码及可选内联捕获；抛错使原准备失败。'
+    'Optional application-held IRpcBinaryDataCodec owns representation encoding and optional inline capture; its throws fail the original preparation; the native prehash path checks encoded physical size, while other representations retain their codec or outer-carrier limit responsibility.',
+    '应用可选持有的 `IRpcBinaryDataCodec` 负责表示编码及可选内联捕获；抛错使原准备失败；原生预散列路径检查编码物理大小，其它表示仍由编解码器或外层载体负责该上限。'
   )
 }
 /** Captured binary ownership remains separate from any physical transfer decision. */
@@ -2840,8 +2820,8 @@ const framerOptions: Record<string, IMemberDoc> = {
     t('`16384` units per fragment.', '默认每片 `16384` 个计量单位。')
   ),
   maxMessageBytes: p(
-    'Positive safe-integer complete encoded-size ceiling; cannot exceed maxBufferedBytes.',
-    '完整编码大小的正安全整数上限，不得超过总保留容量。',
+    'Positive safe-integer size ceiling for complete inbound/outbound values and reassembly; string counts UTF-16 code units, binary counts bytes. Cannot exceed maxBufferedBytes.',
+    '完整接收、发送值及重组大小的正安全整数上限；字符串按文本编码单元计，二进制按字节计，不得超过总保留容量。',
     t('`16777216` encoded units per message.', '默认每条消息最多 `16777216` 个编码单位。')
   ),
   maxChunks: p(
@@ -2870,16 +2850,16 @@ const framerOptions: Record<string, IMemberDoc> = {
     t('Absent; current framing does not read this option.', '默认不设置，当前分帧不会读取该选项。')
   ),
   schedule: p(
-    'Optional synchronous timer adapter receives a no-argument expiry callback and delayMs; returns the opaque handle passed to cancel. Throws propagate.',
-    '可选同步计时适配器接收无参数到期回调及延迟毫秒数，返回供取消函数使用的不透明句柄；抛错直接传播。',
+    'Optional synchronous timer adapter receives a no-argument expiry callback and delayMs; returns the opaque handle passed to cancel. A failed scheduler keeps prior semantic identity or gains `CALLBACK_FAILED`; unattachable failures remain on `cause`.',
+    '可选同步计时适配器接收无参数到期回调及延迟毫秒数，返回取消所用句柄；失败保留已有语义身份，否则附加 `CALLBACK_FAILED`，不可附加身份的失败保留在 `cause`。',
     t(
       'Host setTimeout when available; no timer when the host lacks it.',
       '默认使用可用宿主计时器；宿主没有计时器则不安排。'
     )
   ),
   cancel: p(
-    'Optional synchronous timer cancellation receives the original handle returned by schedule; cleanup failure is reported through host reportError when available.',
-    '可选同步计时取消函数接收安排函数返回的原句柄；清理失败通过可用宿主错误报告函数上报。',
+    'Optional synchronous timer cancellation receives the original handle returned by schedule; cleanup failure is observed through host `reportError` or terminal host reporting. A reporter failure stays secondary; the frame result is preserved.',
+    '可选同步计时取消函数接收安排函数返回的原句柄；清理失败经宿主 `reportError` 或终端宿主报告路径观察；报告器失败保留为次级原因，不替换原帧结果。',
     t('Host clearTimeout when available.', '默认使用可用的宿主计时取消函数。')
   )
 }
@@ -2986,8 +2966,8 @@ const framerMembers: Record<string, IMemberDoc> = {
     framerExample
   ),
   close: m(
-    'Idempotently closes reassembly, cancels retained assembly timers and drops incomplete messages.',
-    '幂等关闭重组，取消保留的重组计时器并丢弃不完整消息。',
+    'Idempotently closes reassembly, revoking each timer before cancellation so synchronous reentry cancels it once, and drops incomplete messages.',
+    '幂等关闭重组；取消前撤销计时器所有权，同步重入仍只取消一次，并丢弃不完整消息。',
     {
       reason: t(
         'Optional caller close reason; built-in framers do not encode or transmit it.',
@@ -3042,12 +3022,6 @@ Object.assign(types, {
     'Application-held component descriptor and original frame/accept/close ownership surface.',
     '应用持有的组件描述及原始发送、接收和关闭所有权表面。',
     framerMembers,
-    framerExample
-  ),
-  IRpcReassembler: typeDoc(
-    'Named accept/close facade sharing the exact original framer state and lifecycle.',
-    '具名接收及关闭表面，共享精确原始分片器状态和生命周期。',
-    { accept: framerMembers.accept, close: framerMembers.close },
     framerExample
   ),
   IRpcFrameAcceptResult: typeDoc(
@@ -3245,8 +3219,8 @@ Object.assign(types, {
     '连接持有的解码器，处理任意读取切分及一个有界原生载荷。',
     {
       push: m(
-        'Feeds arbitrary native bytes; complete copied payloads are delivered synchronously to onFrame.',
-        '输入任意原生字节，完整复制载荷同步投递给帧回调。',
+        'Feeds arbitrary native bytes; complete copied payloads are delivered synchronously to onFrame. Closing or finishing inside a callback stops the current chunk without a synthetic malformed-frame error.',
+        '输入任意原生字节，完整复制载荷同步投递给帧回调；回调内关闭或结束会停止本批剩余交付，不生成额外异常帧错误。',
         {
           chunk: t(
             'Genuine Uint8Array received from the caller-owned byte stream.',
@@ -3314,8 +3288,8 @@ Object.assign(types, {
           )
         },
         t(
-          'Business text, original grammar Error, or undefined while consuming control; invalid UTF-8 is handshake/frame failure by phase.',
-          '返回业务文本、原语法错误或消费控制期间的未定义；编码非法按阶段归为握手或帧失败。'
+          'Business text, original grammar Error, or undefined while consuming control; invalid UTF-8 is handshake/frame failure by phase, retaining the actual native decoder error on `cause`.',
+          '返回业务文本、原语法错误或消费控制期间的未定义；编码非法按阶段归为握手或帧失败，原生解码错误保留在 `cause`。'
         ),
         symbols.createRpcHandshakeFrameReceiver.example as string
       ),
@@ -3772,7 +3746,7 @@ Object.assign(types, {
         },
         t(
           'Returns void after deduplication or synchronous warn callback; warn throws propagate.',
-          '去重或同步警告回调后返回空值；警告抛错直接传播。'
+          '去重或同步警告回调后返回空值；警告抛错保留原生类型及既有语义身份，否则附加 `CALLBACK_FAILED`，安全线上摘要不泄漏原回调文本。'
         ),
         symbols.createRpcUnknownFieldWarner.example as string
       ),
@@ -3888,16 +3862,16 @@ types.IRpcResponseSuccess = {
     ...types.IRpcResponseSuccess.members,
     ok: literal('ok', 'true', (fields.ok.values as Readonly<Record<string, IText>>)['true']),
     code: p(
-      'Forbidden in a successful response; omit this property entirely.',
-      '成功响应禁止该属性，必须完全省略。'
+      'TypeScript construction forbids this success property; the unknown-input normalizer observes it as additive data and discards it.',
+      '类型构造约束禁止成功响应设置此属性；未知输入规范化器将它作为新增字段观察后丢弃。'
     ),
     message: p(
-      'Forbidden in a successful response; failure text belongs only to failed responses.',
-      '成功响应禁止该属性，失败文本只属于失败响应。'
+      'TypeScript construction forbids failure text on success; unknown received text is observed as an additive field and discarded.',
+      '类型构造约束禁止成功响应设置失败文本；收到的未知文本按新增字段观察后丢弃。'
     ),
     error: p(
-      'Forbidden in a successful response; no serialized failure may accompany success.',
-      '成功响应禁止该属性，成功不能同时携带序列化失败。'
+      'TypeScript construction forbids serialized failure on success; unknown received failure data is observed as additive and discarded.',
+      '类型构造约束禁止成功响应设置序列化失败；收到的未知失败数据按新增字段观察后丢弃。'
     )
   }
 }
@@ -4145,8 +4119,8 @@ Object.assign(types, {
     {
       ...members(['seq', 'value', 'error', 'reason']),
       value: p(
-        'Portable business item carried only by an item event, under the stream value budget.',
-        '仅条目事件携带的可移植业务条目，受流值字节预算限制。'
+        'Portable item value or optional `end` return value, under the stream value budget.',
+        '条目事件的可移植值或 `end` 的可选结束返回值，受流值字节预算限制。'
       ),
       event: {
         ...p(
@@ -4288,8 +4262,8 @@ Object.assign(types, {
     {
       ...members(['seq', 'value', 'error', 'reason']),
       value: p(
-        'Portable business item carried only by an item event, under the stream value budget.',
-        '仅条目事件携带的可移植业务条目，受流值字节预算限制。'
+        'Portable item value or optional `end` return value, under the stream value budget.',
+        '条目事件的可移植值或 `end` 的可选结束返回值，受流值字节预算限制。'
       ),
       event: {
         ...p(
@@ -4530,12 +4504,12 @@ const byteBootstrapMembers: Record<string, IMemberDoc> = {
     }
   },
   maxBytes: p(
-    'Complete byte-bootstrap JSON data cannot exceed 65536 bytes, including private token and identity fields.',
-    '完整字节引导对象数据不能超过六万五千五百三十六字节，包含私有令牌及身份字段。'
+    'Encoded byte-bootstrap JSON is limited to `65536` bytes, including private token and identity fields; local records receive field validation without this encoded-byte check.',
+    '编码字节引导对象数据最多 `65536` 字节，包含私有令牌及身份字段；本地记录仅接受字段校验，不执行此编码字节检查。'
   ),
   read: m(
-    'Strictly validates a bounded complete byte buffer or local closed record without exposing secret-bearing parser failures.',
-    '严格校验有界完整字节缓冲或本地封闭记录，不暴露含秘密的解析失败。',
+    'Strictly validates a byte-bounded complete buffer or a field-validated local closed record without exposing secret-bearing parser failures.',
+    '严格校验有字节上限的完整缓冲或按字段校验的本地封闭记录，不暴露含秘密的解析失败。',
     {
       input: t(
         'Actual received Uint8Array bootstrap or local record with kind/version/self/parentInstanceId/token and optional generation.',
@@ -4597,7 +4571,6 @@ for (const name of [
   'createBinaryFramer',
   'messageFramerV1',
   'messageFramer',
-  'processStringFramer',
   'remoteProcessStringFramer'
 ])
   types[name] = { ...types.IRpcFramer, surface: 'IRpcFramer', example: symbols[name].example }
@@ -4637,6 +4610,14 @@ for (const name of [
   'checkRpcRuntimeStreamTransition'
 ])
   symbols[name] = { ...symbols[name], optionDocs: { cancel: runtimeOptions.cancel } }
+/** The published JSON entry exports data directly, without a fabricated function signature. */
+scalar(
+  'schema/wire-error:default',
+  'Published JSON Schema object for serialized RPC error structure. Its limit metadata is descriptive: independent validators must also enforce the normalizer limits, canonical byte tags and surrogate rules. It does not normalize values or create runtime state.',
+  '已发布的序列化调用错误结构模式对象；上限元数据属于描述，独立校验器仍须实现规范化器的限制、规范字节标签及代理字符规则；此数据不规范化输入，也不创建运行状态。',
+  `import schema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }
+console.log(schema.$schema)`
+)
 /** Module orientation uses canonical entry points even when other entries are aliases. */
 const modules: ILibraryReference['modules'] = {
   index: {
@@ -4672,7 +4653,9 @@ const modules: ILibraryReference['modules'] = {
       'Lazy binary parser loading preserves original synchronous capture and digest ownership; start with prepareRpcBinary and matching restoreRpcBinary.',
       '按需加载二进制解析器，保留原同步捕获及摘要所有权；从准备及对应恢复函数开始。'
     ),
-    example: binaryExample
+    example:
+      "import { captureRpcBinaryData } from '@migaia/rpc-contract/binary/capture'\nimport { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\n" +
+      binaryExample
   },
   errors: {
     summary: t(
@@ -4725,8 +4708,8 @@ const modules: ILibraryReference['modules'] = {
   },
   runtime: {
     summary: t(
-      'Closed protected runtime task union, generations, operation options and parser selectors; start with normalizeRuntimeEnvelope or createRuntimeCallEnvelope.',
-      '封闭受保护运行任务联合、世代、选项和解析选择器；从运行规范化或调用构造开始。'
+      'Closed protected runtime task union, generations, operation options and parser selectors; start with normalizeRuntimeEnvelope; import createRuntimeCallEnvelope explicitly from the runtime/metadata entry.',
+      '封闭受保护运行任务联合、世代、选项和解析选择器；从运行规范化开始；调用构造函数须显式从 `runtime/metadata` 入口导入。'
     ),
     example: 'const envelope = normalizeRuntimeEnvelope(candidate)'
   },
@@ -4746,8 +4729,8 @@ const modules: ILibraryReference['modules'] = {
   },
   'schema/wire-error': {
     summary: t(
-      'Published JSON Schema for independently validating the bounded serialized error grammar in other languages; it exports data rather than runtime functions.',
-      '供其他语言独立校验有界序列化错误语法的已发布对象结构模式；导出数据而非运行函数。'
+      'Published JSON Schema data for the serialized error shape. Independent validators must also apply the limit metadata, canonical bytes and surrogate rules of the normalizer; the schema alone is not equivalent.',
+      '已发布序列化错误结构模式数据；独立校验器还须应用上限元数据、规范字节及代理字符规则，模式本身不等价于规范化器。'
     )
   },
   stream: {

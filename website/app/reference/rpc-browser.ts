@@ -24,8 +24,8 @@ const listenerPair = (
 ): Readonly<Record<string, IMemberDoc>> => ({
   addEventListener: {
     summary: t(
-      `Registers a \`${event}\` listener on ${owner.en}; the transport calls it once when created.`,
-      `在${owner.zh}上登记 \`${event}\` 监听；transport 创建时调用一次。`
+      `Registers a \`${event}\` listener on ${owner.en}; listening installs it; raw transports wait for the first subscription or error observer.`,
+      `在${owner.zh}上登记 \`${event}\` 监听；原始载体在首次订阅或错误观察开始时安装，监听工厂在开始接纳时安装。`
     ),
     params: {
       type: t(`Event name: ${event}.`, `事件名称：${event}。`),
@@ -36,8 +36,8 @@ const listenerPair = (
   },
   removeEventListener: {
     summary: t(
-      `Removes the listener when the transport or Peer closes.`,
-      `transport 或 Peer 关闭时移除之前登记的监听。`
+      `Removes the native listener after its final corresponding subscription is released; closing its owning Peer or listener also releases those subscriptions.`,
+      `最后一个对应订阅释放后移除原生监听；所属运行对端或接纳监听者关闭时也释放这些订阅。`
     ),
     params: {
       type: t(`Event name: ${event}.`, `事件名称：${event}。`),
@@ -629,8 +629,8 @@ const transportEnhancer = (
 
 /** Behaviour shared by every transport: observation through `observe(probe)`. */
 const observeBehavior = t(
-  '`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier`, `origin`, `transfers` and `rejectedSource` in `detail`.',
-  '`transport.observe(probe)` 为每次物理发送和每次通过来源校验的接收各报告一个事件，`detail` 中包含 `carrier`、`origin`、`transfers` 与 `rejectedSource`。'
+  '`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier` on the event and `origin`, `transfers` and `rejectedSource` in `detail`. `sizeBytes` is exact for known native bytes and `-1` for strings or containers.',
+  '`transport.observe(probe)` 为每次物理发送和每次通过来源校验的接收各报告一个事件，事件自身记录 `carrier`，`detail` 中包含 `origin`、`transfers` 与 `rejectedSource`；已知原生字节的 `sizeBytes` 精确，字符串与容器为 `-1`。'
 )
 
 /** Canonical RTC carrier methods shared by the low-level transport and Runtime Peer source. */
@@ -884,8 +884,8 @@ export const rpcBrowserReference: ILibraryReference = {
         },
         listen: {
           summary: t(
-            'SharedWorker global scope (`self`) that accepts one Peer per `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.',
-            '为每个 `connect` 事件接纳一个 Peer 的 SharedWorker 全局作用域（`self`）；重复绑定同一作用域抛 `LISTENER_ALREADY_BOUND`。'
+            'SharedWorker global scope (`self`) that accepts one Peer per actual port in each `connect` event; binding the same scope twice throws `LISTENER_ALREADY_BOUND`.',
+            '为每个 `connect` 事件中的实际端口分别接纳一个 Peer 的 SharedWorker 全局作用域（`self`）；重复绑定同一作用域抛 `LISTENER_ALREADY_BOUND`。'
           ),
           default: t('Not set: then `connect` is required.', '不设置：此时必须提供 `connect`。')
         },
@@ -1039,8 +1039,8 @@ export const rpcBrowserReference: ILibraryReference = {
       members: {
         target: {
           summary: t(
-            'Window messages are sent to and accepted from.',
-            '消息发往、也只接受来自的窗口。'
+            'Outbound window and the expected source used by `sourceProof`; raw subscriptions still receive every record.',
+            '消息发往的窗口，也是来源证明所期望的来源；原始订阅仍接收全部消息记录。'
           )
         },
         receiver: {
@@ -1055,8 +1055,8 @@ export const rpcBrowserReference: ILibraryReference = {
         },
         targetOrigin: {
           summary: t(
-            'Origin used for sending and checked on receive.',
-            '发送时使用、接收时校验的源。'
+            'Outbound origin and receive proof checked by Endpoint `connect` or the Peer projection.',
+            '发送时使用的源；接收准入由端点 `connect` 或运行对端投影按它检查。'
           ),
           default: t(
             '`window.location.origin` when available (same origin).',
@@ -1309,7 +1309,10 @@ export const rpcBrowserReference: ILibraryReference = {
       serviceExample,
       [
         observeBehavior,
-        t('Messages from other clients are ignored.', '来自其它客户端的消息会被忽略。')
+        t(
+          'Endpoint `connect` checks `sourceProof` to ignore other clients; raw subscriptions retain their records.',
+          '端点 `connect` 按来源证明忽略其它客户端，原始订阅仍保留其消息记录。'
+        )
       ],
       [
         t(
@@ -1327,8 +1330,8 @@ export const rpcBrowserReference: ILibraryReference = {
       [
         observeBehavior,
         t(
-          'Every tab sees every message; do not send private data.',
-          '所有标签页都能看到每条消息；不要发送私密数据。'
+          'Every tab sees every message; do not send private data. A native send failure keeps its type, stack and object identity when mutable; Core attaches `TRANSPORT` unless a full external semantic identity already exists. Unattachable values remain on `cause`.',
+          '所有标签页都能看到每条消息；不要发送私密数据。原生发送失败在可修改时保留类型、堆栈及对象身份；已有完整外部语义身份时保持原身份，否则核心附加 `TRANSPORT`；不可附加身份的值保留在 `cause`。'
         )
       ],
       [t('Keep a shopping cart in sync across tabs.', '在多个标签页之间同步购物车。')]
@@ -1342,8 +1345,8 @@ export const rpcBrowserReference: ILibraryReference = {
       [
         observeBehavior,
         t(
-          'Closing the channel terminates the transport and releases observers.',
-          '频道关闭时 transport 终止并释放观察者。'
+          'Closing the channel terminates the transport and releases observers. An RTC error event retains its original `error` as `cause` under Core `TRANSPORT`.',
+          '频道关闭时载体终止并释放观察者；数据频道错误事件的原 `error` 保留在核心 `TRANSPORT` 错误的 `cause` 中。'
         )
       ],
       [
@@ -1363,8 +1366,8 @@ export const rpcBrowserReference: ILibraryReference = {
       [
         observeBehavior,
         t(
-          'Datagrams may be lost or reordered; only use it for loss-tolerant calls.',
-          '数据报可能丢失或乱序；只适合可以容忍丢失的调用。'
+          'Datagrams may be lost or reordered. Read and write failures use the Core transport boundary: mutable native errors retain type, stack and identity; immutable failures remain on `cause`. The send Promise handles writer rejection and need not equal the native write Promise.',
+          '数据报可能丢失或乱序。读写失败经过核心载体边界：可修改原生错误保留类型、堆栈及身份，不可修改的失败保留在 `cause`；发送返回处理写入拒绝的承诺，不保证与原生写入承诺引用相同。'
         )
       ],
       [

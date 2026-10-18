@@ -45,7 +45,7 @@ const recordExample = `import { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord
 
 const text = encodeRpcDevtoolsRecord({
   header: RpcDevtoolsRecordFormat,
-  events: [{ seq: 1, at: 100, endpointId: 'worker', stage: 'message', direction: 'outbound', method: 'read', senderId: 'worker', messageId: 'm1', trace: 'T1' }]
+  events: [{ seq: 1, at: 100, endpointId: 'worker', stage: 'message', direction: 'outbound', method: 'read', senderId: 'worker', messageId: 'm1', trace: 'T1', content: JSON.stringify({ $bytes: 'AQ==' }) }]
 })
 console.log(decodeRpcDevtoolsRecord(text).events[0])`
 
@@ -256,8 +256,8 @@ const collectorMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'AsyncGenerator<IRpcDevtoolsWatchBatch>; return releases the watcher. Collector close wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.',
-      '返回观察批次异步生成器，结束迭代会释放观察者，关闭采集器使等待读取以 `CLOSED` 失败，远端流取消则正常结束其服务观察者。'
+      'AsyncGenerator<IRpcDevtoolsWatchBatch>; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.',
+      '返回观察批次异步生成器，结束迭代会唤醒本地待定读取并释放观察者，无需关闭采集器；关闭采集器则使等待读取以 `CLOSED` 失败，远端流取消则正常结束其服务观察者。'
     ),
     example: watchExample
   },
@@ -274,8 +274,8 @@ const collectorMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   describe: {
     summary: t(
-      'Reports current wall-clock sample, pause state, known endpoint descriptors, limits and loss counters.',
-      '报告当前墙上时钟采样、暂停状态、已知端点描述、容量限制及丢失计数。'
+      'Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.',
+      '报告当前单调时钟采样、暂停状态、已知端点描述、容量限制及丢失计数。'
     ),
     returns: t(
       'IRpcDevtoolsDescribe snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.',
@@ -545,8 +545,8 @@ const wireMembers: Readonly<Record<string, IMemberDoc>> = {
     '观察载体未暴露细节记录时省略。'
   ),
   content: f(
-    'Opted-in captured reference after redaction; mutating or transferring its backing may affect later reads. Service exposure separately requires exposeContent.',
-    '显式捕获并经脱敏后的引用，修改或转移底层存储可能影响后续读取，服务暴露另需显式开启。',
+    'Opted-in captured reference after redaction; mutating or transferring its backing may affect later reads. Service exposure separately requires exposeContent. The record codec reserves any nested single-key {$bytes: base64} object for byte revival; use JSON text for a same-shaped business object.',
+    '显式捕获并经脱敏后的引用，修改或转移底层存储可能影响后续读取，服务暴露另需显式开启；记录编解码把任意嵌套单键字节标签对象作为字节保留语法，同形业务对象须自行存为对象文本。',
     'Absent in metadata-only mode or after redaction/budget removal.',
     '仅元数据模式、脱敏丢弃或预算移除后省略。'
   )
@@ -584,6 +584,10 @@ const targetName = t(
 
 /** All devtools errors preserve native identity and original causes rather than parsing messages. */
 const errorValues = {
+  targetReleaseFailed: t(
+    'TARGET_RELEASE_FAILED: the hub failed to release a target watch. A native AggregateError retains the first original on cause/errors[0] and all failures on errors; close continues after reporting.',
+    '目标释放失败：聚合器释放目标观察失败；原生汇总错误在原因及首错误中保留首项原错，错误列表保留全部失败，报告后关闭继续完成。'
+  ),
   serviceResultInvalid: t(
     'Service result cannot become portable wire data; inspect the original conversion cause.',
     '服务结果无法转换为可移植线数据，需要检查原始转换原因。'
@@ -713,8 +717,8 @@ export const rpcDevtoolsReference: ILibraryReference = {
     createRpcDevtoolsHub: {
       role: 'factory',
       purpose: t(
-        'Creates a caller-owned multi-target observation hub. Live registration samples describe five times, chooses minimum round-trip alignment, catches up retained pages, then owns one watch. Offline import uses no invented clock metadata; existing clients remain caller-owned.',
-        '创建调用者拥有的多目标观察聚合器，实时注册五次采样描述并选择最小往返对齐，追赶保留页后拥有单个观察流，离线导入不编造时钟元数据，已有客户端仍归调用者。'
+        'Creates a caller-owned multi-target observation hub. Live registration samples describe five times, chooses minimum round-trip alignment, starts the first read of one watch before querying retained pages, then consumes that bounded watch and deduplicates by sequence. Offline import uses no invented clock metadata; existing clients remain caller-owned.',
+        '创建调用者拥有的多目标观察聚合器，实时注册五次采样描述并选择最小往返对齐，先开始唯一观察流的首次读取，再查询保留页，随后消费有界观察并按序号去重，离线导入不编造时钟元数据，已有客户端仍归调用者。'
       ),
       options: 'IRpcDevtoolsHubOptions',
       params: {
@@ -823,8 +827,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           '默认主环保留一万事件。'
         ),
         maxContentBytes: f(
-          'Nonnegative safe integer content byte budget; excess content is discarded while event metadata remains retained.',
-          '非负安全整数内容字节预算，超额时丢弃内容但保留事件元数据。',
+          'Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.',
+          '主查询环保留内容的非负安全整数预算；独立录制、观察引用及不透明对象计量不属于同一字节总量，不是进程总内存上限；超额丢弃内容但保留元数据。',
           '8388608 bytes, or eight mebibytes.',
           '默认 `8388608` 字节，即八兆二进制字节。'
         ),
@@ -997,8 +1001,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           '当前服务观察契约版本字符串，目前为版本一。'
         ),
         now: f(
-          'Fresh Date.now() clock sample read when describe is called.',
-          '调用描述接口时读取的最新墙上时钟采样。'
+          'Fresh systemScheduler monotonic millisecond sample, in the same domain as default Core event at. Custom-clock clients must supply a matching sample; stats.since remains wall-clock time.',
+          '描述调用读取的系统调度器单调毫秒采样，与默认核心事件时间同域；自定义时钟客户端须提供同域采样，统计起点仍为墙上时钟。'
         ),
         paused: f(
           'Whether collector subscriptions are currently paused.',
@@ -1036,8 +1040,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
     },
     IRpcDevtoolsRecord: {
       summary: t(
-        'Offline ordered recording with a frozen format header and event array. Native errors and bytes remain native around codec calls; text serialization occurs only at the explicit record boundary.',
-        '离线有序录制，包含固定格式头及事件数组，编解码调用两侧保留原生错误和字节，仅在显式记录边界执行文本序列化。'
+        'Offline ordered recording with a frozen format header and event array. Native errors and bytes are restored around the record codec. At any event depth, a single-key {$bytes: base64} object is reserved v1 byte syntax and decodes as Uint8Array. Unknown content is not lossless for arbitrary objects; store same-shaped business data as JSON text, with no automatic escaping.',
+        '离线有序录制，包含固定格式头及事件数组，编解码恢复原生错误和字节；事件任意深度的单键字节标签对象是第一版保留语法，解码为字节数组；未知内容不保证任意对象无损，同形业务对象应自行存为对象文本，不自动转义。'
       ),
       scenarios: [
         t(
@@ -1159,8 +1163,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
       members: {
         addTarget: {
           summary: t(
-            'Registers a unique live target, aligns its clock, queries retained pages and acquires one future watch. The client must expose bare describe/query/watch/stats method names.',
-            '注册唯一实时目标，对齐时钟、查询保留页并取得未来观察流，客户端需暴露不含命名空间前缀的描述、查询、观察及统计方法。'
+            'Registers a unique live target, aligns its clock, starts its one watch read before querying history, then consumes the buffered watch with sequence deduplication. The client must expose bare describe/query/watch/stats method names.',
+            '注册唯一实时目标，对齐时钟后先启动唯一观察流读取再查询历史，之后消费缓冲观察并按序号去重，客户端需暴露不含命名空间前缀的描述、查询、观察及统计方法。'
           ),
           params: {
             name: t(
@@ -1173,8 +1177,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
             )
           },
           returns: t(
-            'Promise<void> after setup, retaining the caller client connection. Duplicate names use TARGET_DUPLICATE; invalid input uses INVALID_OPTION; setup failure is reported, marks disconnected and rejects.',
-            '设置后兑现空承诺，保留调用者客户端连接，重名使用 `TARGET_DUPLICATE`，非法输入使用 `INVALID_OPTION`，设置失败会报告、标记断开并拒绝。'
+            'Promise<void> after setup, retaining the caller client connection. Duplicate names use TARGET_DUPLICATE; invalid input uses INVALID_OPTION; setup failure marks disconnected and rejects with the original error after acquired watch rollback; independent cleanup failure is reported separately without replacing the primary.',
+            '设置后兑现空承诺，保留调用者客户端连接，重名使用 `TARGET_DUPLICATE`，非法输入使用 `INVALID_OPTION`，设置失败标记断开，回滚已取得观察后以原错误拒绝，独立清理失败另行报告，不替换主错。'
           ),
           example: liveHubExample
         },
@@ -1230,8 +1234,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
         },
         timeline: {
           summary: t(
-            'Merges retained target sequences by aligned timestamp, then target name and source sequence. Returned elements are stored references and may be realigned later.',
-            '按对齐时间、目标名及来源序号合并保留目标序列，返回元素为已存引用，随后重对齐可能修改包装值。'
+            'Sorts retained events globally by aligned timestamp, then target name and sequence. Ordered targets use a checked merge; legal nonmonotonic records use full sorting before limit. Returned elements are stored references and may be realigned later.',
+            '按对齐时间、目标名及序号全局排序；有序目标先检查后合并，合法非单调记录完整排序后再应用上限，返回元素为已存引用，随后重对齐可能修改包装值。'
           ),
           params: {
             query: t(
@@ -1312,8 +1316,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
         },
         close: {
           summary: t(
-            'Synchronously rejects new operations and detaches target state, then releases all watches concurrently. Each target release failure is reported in registration order as an aggregate.',
-            '同步拒绝新操作并分离目标状态，然后并发释放全部观察流，目标释放失败按注册顺序聚合报告。'
+            'Synchronously rejects new operations and detaches target state, then releases all watches concurrently. Each target release failure is reported in registration order as a native AggregateError with TARGET_RELEASE_FAILED, first cause and all original errors. Application client failures otherwise retain their original identity.',
+            '同步拒绝新操作并分离目标状态，然后并发释放全部观察流，目标释放失败按注册顺序以原生汇总错误及 `TARGET_RELEASE_FAILED` 报告，原因保留首错、错误列表保留全错；应用客户端失败仍保持原身份。'
           ),
           returns: t(
             'Same Promise<void> on repeated calls, resolved after releases and listener cleanup. Release errors are reported instead of rejecting this close promise; client connections stay caller-owned.',

@@ -80,7 +80,7 @@ await parent.notify('ready')
 ${zh ? '// 父端持有派生资源；父端关闭时会释放此连接并终止子端。' : '// The parent owns this spawned resource; its close releases the connection and child.'}
 
 ${zh ? '// 父端文件：main.ts；先将这三个文件编译为同目录的模块。' : '// Parent file: main.ts; compile all three files to modules in the same directory first.'}
-import { create${family}${managed ? 'Plugin' : 'Peer'}, RuntimeEventName } from '@migaia/rpc-${slot === 'thread' ? 'threads' : 'process'}'
+import { create${family}${managed ? 'Plugin' : 'Peer'} } from '@migaia/rpc-${slot === 'thread' ? 'threads' : 'process'}'
 ${managed ? "import { defineHost } from '@migaia/plugin-host'\n" : ''}import type { IWorkerApi, IParentApi } from './api.js'
 const childReady = Promise.withResolvers<void>()
 const provide: IParentApi = {
@@ -107,7 +107,7 @@ console.log(await worker.outcome('double-42'))`,
   describe: `console.log(await worker.request('demo.math.double', 21))
 console.log(await worker.describe())
 console.log(await worker.describe({ format: 'json' }))`,
-  on: `const off = worker.on(RuntimeEventName.exit, event => console.log(event))
+  on: `const off = worker.on('exit', event => console.log(event))
 try { console.log(await worker.request('demo.math.double', 21)) } finally { off() }`,
   close: `console.log(await worker.request('demo.math.double', 21))
 await worker.close()
@@ -178,8 +178,8 @@ const typedPeerMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   describe: {
     summary: t(
-      'Queries the local accepted peer detail asynchronously. Without format returns IRuntimeDetail; json or ndjson returns the admitted text projection. It does not claim unavailable physical metrics.',
-      '异步查询本地已接受的连接详情，不选格式时返回 `IRuntimeDetail`，选择 `json` 或 `ndjson` 时返回允许的文本投影，不编造不可观察的物理指标。'
+      'Queries the local accepted peer detail asynchronously. Without format returns IRuntimeDetail; json, yaml or toml returns the admitted text projection. It does not claim unavailable physical metrics.',
+      '异步查询本地已接受的连接详情，不选格式时返回 `IRuntimeDetail`，选择 `json`、`yaml` 或 `toml` 时返回允许的文本投影，不编造不可观察的物理指标。'
     ),
     params: {
       options: t(
@@ -646,6 +646,12 @@ try {
     ),
     members: {
       ...detailCommon,
+      methods: {
+        summary: t(
+          'Method paths provided by this local Peer; each connection detail separately lists its accepted remote methods.',
+          '此本端对端提供的方法路径；每条连接详情另外列出已接纳远端的方法。'
+        )
+      },
       identity: {
         summary: t(
           'Identity `{ name, instanceId }` of this Peer.',
@@ -932,7 +938,7 @@ export const runtimeEventSymbol: ISymbolDoc = {
     'Names of the lifecycle events passed to `peer.on(name, listener)` and `host.thread.on()` / `host.process.on()`.',
     '传给 `peer.on(name, listener)` 以及 `host.thread.on()` / `host.process.on()` 的生命周期事件名称，用于订阅连接状态变化。'
   ),
-  example: `const off = peer.on(RuntimeEventName.exit, (event) => console.warn(event.name, event.reason))`
+  example: `const off = peer.on('exit', (event) => console.warn(event.name, event.reason))`
 }
 
 /** Platform pages share semantics while showing that platform's own complete child/parent pair. */
@@ -1190,8 +1196,7 @@ console.log(await ${on}!.request('worker', 'demo.math.double', 21))`)
         listener: t('Receives an `IRuntimeEvent`.', '接收一个 `IRuntimeEvent` 事件对象。')
       },
       returns: t('An unsubscribe function.', '取消订阅的函数。'),
-      example:
-        example(`const off = ${on}!.on(RuntimeEventName.exit, event => console.warn(event.name, event.code))
+      example: example(`const off = ${on}!.on('exit', event => console.warn(event.name, event.code))
 try { console.log(await ${on}!.request('worker', 'demo.math.double', 21)) } finally { off() }`)
     },
     {

@@ -213,7 +213,9 @@ for (const name of ['spawn', 'connect', 'listen']) {
 const pluginMembers = { ...sourceMembers, ...runtimePluginOptionMembers }
 /** Parent and child fields are exclusive; never-valued fields forbid the opposite mode. */
 const coroutineMembers: Readonly<Record<string, IMemberDoc>> = {
-  ...pluginMembers,
+  ...Object.fromEntries(
+    Object.entries(pluginMembers).filter(([name]) => name !== 'spawn' && name !== 'listen')
+  ),
   task: p(
     'Parent-only task callback receiving signal, heartbeat and the opaque child connect token; task settlement is unit exit and rejection retains its cause.',
     '仅父模式提供的任务回调，接收取消信号、心跳与不透明子连接令牌；任务结束即执行单元退出，拒绝保留原始原因。',
@@ -1359,8 +1361,8 @@ types.IRemoteServeHostOptions = {
 const symbols: Record<string, ISymbolDoc> = {
   createRuntimePeer: {
     ...op(
-      'Creates one accepted direct Peer on exactly one supplied source; failure rolls resources back before rejecting.',
-      '在唯一提供的来源上创建已接受的直接连接，失败时先回滚资源再拒绝。',
+      'Creates one accepted direct Peer on exactly one supplied source; failure rolls acquired resources back before rejecting, including entropy failure before endpoint construction.',
+      '在唯一提供的来源上创建已接受的直接连接，失败时先回滚已取得资源再拒绝，也覆盖端点构造前的熵源失败。',
       {
         options: t(
           'Application IRuntimePeerOptions selecting one source and provided methods.',
@@ -1411,8 +1413,8 @@ const symbols: Record<string, ISymbolDoc> = {
         )
       },
       t(
-        'Promise of managed IRuntimePeer; close releases its actual generation and binding ownership.',
-        '返回托管连接承诺，关闭时释放其实际代次及绑定所有权。'
+        'Promise of managed IRuntimePeer; close continues channel, owned binding and carrier-listener release even after an earlier cleanup failure. One failure retains identity; multiple failures retain their complete cause/errors graph. Async source wrappers need not return the identical Promise.',
+        '返回托管连接承诺；关闭时即使前项清理失败，仍继续释放通道、所拥有绑定及载体错误监听；单错保持身份，多错保留完整原因及错误图，异步来源包装不承诺承诺引用相同。'
       ),
       `const peer = await createManagedRuntimePeer(options, binding)
 await peer.close()`

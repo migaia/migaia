@@ -183,14 +183,14 @@ const endpointMembers: Record<string, IMemberDoc> = {
       )
     },
     t(
-      'Promise of provider data; remote business failure, cancellation, deadline, transport or lifecycle failure rejects with its native coded error.',
-      '返回提供方数据承诺；远端业务、取消、截止、载体或生命周期失败以原生编码错误拒绝。'
+      'Promise of provider data; remote business failure, cancellation, deadline, transport or lifecycle failure rejects with its native coded error. A synchronous UUID admission failure releases operation signal listeners; ordinary send cancellation keeps RpcAbortError.',
+      '返回提供方数据承诺；远端业务、取消、截止、载体或生命周期失败以原生编码错误拒绝；同步标识生成失败会释放操作信号监听，普通发送取消仍使用 `RpcAbortError`。'
     ),
     endpointExample
   ),
   sendAll: m(
-    'Sends the same scalar method to actual discovered targets and keeps each target success/failure separately.',
-    '向实际发现目标发送同一标量方法，分别保留各目标成功和失败。',
+    'Sends the same scalar method to the statically configured target seeds and keeps each target success/failure separately.',
+    '向静态配置目标种子发送同一标量方法，分别保留各目标成功和失败。',
     {
       method,
       data: t(
@@ -226,8 +226,8 @@ const endpointMembers: Record<string, IMemberDoc> = {
     'const off = server.on("changed", (context) => console.log(context.data)); client.dispatch("server", "changed", 1); off()'
   ),
   dispatchAll: m(
-    'Dispatches one event to actual discovered targets without waiting for business listeners.',
-    '向实际发现目标派发一个事件，不等待业务监听者完成。',
+    'Dispatches one event to the statically configured target seeds without waiting for business listeners.',
+    '向静态配置目标种子派发一个事件，不等待业务监听者完成。',
     {
       method,
       data: t(
@@ -305,14 +305,14 @@ const endpointMembers: Record<string, IMemberDoc> = {
       )
     },
     t(
-      'Promise<boolean> for observed reply; missing middleware or terminal lifecycle fails with its coded error.',
-      '返回所观察响应的布尔承诺，缺中间件或终态以编码错误失败。'
+      'Promise<boolean> for the observed reply; disposal settles an active ping as false. Calling after disposal or without ping capability throws its coded error. Ping cancellation does not require abort middleware.',
+      '返回所观察响应的布尔承诺；进行中的心跳在释放时结算为假，释放后调用或缺心跳能力时抛编码错误；心跳取消不要求安装中止中间件。'
     ),
     'const alive = await client.ping("server")'
   ),
   pingAll: m(
-    'Checks liveness of actual known receivers and retains individual success/failure results.',
-    '检查实际已知接收端存活，并保留各自成功及失败结果。',
+    'Checks liveness of the statically configured target seeds and retains individual success/failure results.',
+    '检查静态配置目标种子存活，并保留各自成功及失败结果。',
     {},
     t(
       'IRpcFanoutResult<boolean> keyed by the selected actual receivers.',
@@ -337,8 +337,8 @@ const endpointMembers: Record<string, IMemberDoc> = {
     '幂等停止准入，排空所属工作，并按规范生命周期顺序释放中间件及适配资源。',
     {},
     t(
-      'Promise resolves after disposal; cleanup failures preserve their original causes, future operations fail ENDPOINT_DISPOSED.',
-      '释放后承诺兑现；清理失败保留原原因，后续操作以端点已释放错误失败。'
+      'Promise resolves after disposal; cleanup failures remain reachable through standard cause/errors traversal, including all failures in the same batch; future operations fail ENDPOINT_DISPOSED.',
+      '释放后承诺兑现；同批全部清理失败均可经标准原因及错误列表遍历，后续操作以端点已释放错误失败。'
     ),
     'await client.dispose()'
   )
@@ -468,8 +468,8 @@ const fields: Record<string, IMemberDoc> = {
     t('Absent: accept the configured application version.', '默认接受已配置的应用版本。')
   ),
   maxIdentifierLength: p(
-    'Optional positive safe-integer application identifier ceiling, within the fixed wire bound.',
-    '可选正安全整数应用标识上限，仍受固定线上边界约束。',
+    'Optional positive safe-integer ceiling for `targetId`, `receiverId`, `uniqueTargetId` and variation IDs; it does not limit method names and remains within the fixed wire bound.',
+    '可选正安全整数上限，作用于 `targetId`、`receiverId`、`uniqueTargetId` 及变体标识，不限制方法名，仍受固定线上边界约束。',
     t('`128` characters at endpoint admission.', '默认端点准入上限为 `128` 个字符。')
   ),
   schemas: p(
@@ -732,8 +732,8 @@ const manualMembers: Record<string, IMemberDoc> = {
       )
     },
     t(
-      'Read-only actual IRpcDiscoveryCandidate array; cancellation or closed endpoint rejects with its original coded error.',
-      '返回只读实际发现候选数组，取消或端点关闭以原编码错误拒绝。'
+      'Read-only actual IRpcDiscoveryCandidate array; cancellation preserves the native abort type and actual reason; closed endpoint rejects with its coded error.',
+      '返回只读实际发现候选数组，取消保留原生中止类型及实际原因，端点关闭以编码错误拒绝。'
     ),
     manualExample
   ),
@@ -822,31 +822,6 @@ Object.assign(types, {
       )
     }
   ),
-  IRpcKernelSurface: typeDoc(
-    'Narrow canonical endpoint lifecycle kernel shared by explicitly selected feature projections.',
-    '显式已选功能投影共用的精简规范端点生命周期核心。',
-    { dispose: endpointMembers.dispose }
-  ),
-  IRecursiveProvideSurface: typeDoc(
-    'Mapped endpoint surface preserves the complete selected endpoint type through chained provide registrations.',
-    '映射端点表面，在链式提供方法登记期间保持完整已选端点类型。',
-    { provide: endpointMembers.provide }
-  ),
-  IRpcRootProjection: typeDoc(
-    'Type-level projection exposes only explicitly selected native feature roots while dependency outputs remain private.',
-    '类型投影只公开显式选中原生功能根，依赖输出保持私有。',
-    {}
-  ),
-  IFactoryDiscoveryMode: typeDoc(
-    'Conditional type selects manual discovery only when an actual middleware contribution declares manual mode.',
-    '条件类型只在实际中间件贡献声明手动模式时选择手动发现。',
-    {}
-  ),
-  IFactoryPingCapability: typeDoc(
-    'Conditional type exposes ping only when the selected actual native middleware tuple requires that capability.',
-    '条件类型只在实际已选原生中间件元组要求该能力时公开心跳。',
-    {}
-  ),
   IRpcPingEndpointSurface: typeDoc(
     'Conditional ping and pingAll methods of endpoints with an actual selected ping middleware.',
     '实际选中相应中间件的端点条件心跳及全体心跳方法。',
@@ -865,7 +840,14 @@ Object.assign(types, {
   IRpcPingOptions: typeDoc(
     'Caller-owned liveness wait deadline and cancellation, separate from provider execution.',
     '调用方拥有的存活等待截止和取消，与提供方执行分开。',
-    { signal, timeoutMs }
+    {
+      signal: p(
+        'Optional caller-owned AbortSignal cancels this ping directly, without requiring abort middleware.',
+        '可选调用方中止信号直接取消本次心跳，不要求安装中止中间件。',
+        signal.default
+      ),
+      timeoutMs
+    }
   ),
   IRpcRuntimeGroupOptions: typeDoc(
     'Native group wire controls plus local timeout, signal and explicit original transfer ownership.',
@@ -930,6 +912,10 @@ Object.assign(types, {
         'route',
         'trace'
       ]),
+      signal: p(
+        'Provider-owned AbortSignal from the admitted execution scope; deadline, caller cancellation and endpoint disposal can retire this lifetime independently of outbound abort middleware.',
+        '已准入执行作用域提供的所属中止信号；截止、调用方取消及端点释放可结束此生命周期，不依赖出站中止中间件。'
+      ),
       timeoutMs: p(
         'Remaining actual provider deadline derived from the original endpoint monotonic clock; absent without a deadline.',
         '由原端点单调时钟得出的实际提供方剩余截止，无截止时省略。'
@@ -948,8 +934,8 @@ Object.assign(types, {
           )
         },
         t(
-          'IRpcProviderResult to return from the provider; after expiry throws PROVIDER_CONTEXT_EXPIRED.',
-          '返回应从提供方返回的结果，过期后抛提供方上下文过期错误。'
+          'IRpcProviderResult to return from the provider; after expiry returns a failure result carrying PROVIDER_CONTEXT_EXPIRED.',
+          '返回应从提供方返回的结果，过期后返回携带提供方上下文过期码的失败值。'
         ),
         'server.provide("echo", (context) => context.success(context.data))'
       ),
@@ -967,8 +953,8 @@ Object.assign(types, {
           )
         },
         t(
-          'IRpcProviderResult to return; after lifetime expiry throws PROVIDER_CONTEXT_EXPIRED.',
-          '返回应交出的提供方结果，生命周期过期抛上下文过期错误。'
+          'IRpcProviderResult to return; after lifetime expiry returns a failure result carrying PROVIDER_CONTEXT_EXPIRED.',
+          '返回应交出的提供方结果，生命周期过期返回携带上下文过期码的失败值。'
         ),
         'server.provide("load", (context) => context.failed("missing", "NOT_FOUND"))'
       ),
@@ -1168,8 +1154,8 @@ function operation(
 /** Core and transport errors preserve native identity and distinct causes. */
 const coreErrors: Record<string, IText> = {
   duplicateModuleInstance: t(
-    'DUPLICATE_MODULE_INSTANCE: another resolved Core owner was loaded in this realm; fix dependency deduplication before constructing resources.',
-    '模块重复错误：同执行域载入了另一份核心所有者，创建资源前应修正依赖去重。'
+    'DUPLICATE_MODULE_INSTANCE: another resolved published Core owner was loaded in this realm; detection covers the exported build, not arbitrary copied src files. Fix dependency deduplication before constructing resources.',
+    '模块重复错误：同执行域载入另一份已发布核心所有者；检测覆盖导出构建，不覆盖任意复制的源码，创建资源前应修正依赖去重。'
   ),
   providerGenerationMismatch: t(
     'PROVIDER_GENERATION_MISMATCH: accepted caller/provider generation no longer matches the task; select the actual binding again.',
@@ -1231,6 +1217,10 @@ const coreErrors: Record<string, IText> = {
     'PROVIDER_NOT_SETTLED: a request provider returned without an explicit success or failed result.',
     '提供方未结算错误：请求提供方返回时没有给出显式成功或失败结果。'
   ),
+  callbackFailed: t(
+    'CALLBACK_FAILED: a construction or diagnostic callback failed; native mutable errors retain type, stack and identity, foreign semantic identities stay unchanged, and other values remain on cause.',
+    '回调失败错误：构造或诊断回调失败；可修改原生错误保留类型、堆栈及身份，外部语义身份保持不变，其它值保留在原因链。'
+  ),
   internal: t(
     'INTERNAL: provider threw unexpectedly; original error stays in local diagnostics while the peer receives a redacted failure.',
     '内部错误：提供方发生意外抛错，原错误保留在本地诊断，对端收到脱敏失败。'
@@ -1260,8 +1250,8 @@ const coreErrors: Record<string, IText> = {
     '提供方上下文过期错误：生命周期结束后调用结果方法，不产生线上效果。'
   ),
   transport: t(
-    'TRANSPORT: actual physical send or terminal channel failed; preserve original transport evidence before choosing recovery.',
-    '载体错误：实际物理发送或通道终止失败，恢复前保留原载体证据。'
+    'TRANSPORT: actual physical send or terminal channel failed; preserve original transport evidence before choosing recovery. The code alone never proves nonexecution; retry requires independent evidence or idempotency/outcome reconciliation.',
+    '载体错误：实际物理发送或通道终止失败，恢复前保留原载体证据；单凭此码不能证明未执行，重试须有独立证据或幂等结果核对。'
   ),
   authenticationFailed: t(
     'AUTHENTICATION_FAILED: signing, verification, encryption, decryption or original replay binding failed; details stay local.',
@@ -1507,8 +1497,8 @@ for (const [name, en, zh] of [
     },
     options: 'IRpcFactoryConfig',
     returns: t(
-      'Promise of the selected endpoint surface; invalid inputs fail before publication, failed construction rolls back and preserves original/cleanup causes.',
-      '返回所选端点表面承诺，非法输入在发布前失败，构造失败会回滚并保留原始及清理原因。'
+      'Promise of the selected endpoint surface; invalid inputs fail before publication, failed construction rolls back and preserves original/cleanup causes. An unclassified middleware install failure gains CALLBACK_FAILED without replacing mutable native type/stack; foreign semantic identities stay intact and immutable values remain on cause.',
+      '返回所选端点表面承诺，非法输入在发布前失败，构造失败会回滚并保留原始及清理原因；未分类中间件安装失败附加回调失败码，可修改原生类型及堆栈保持，外部语义身份不变，不可修改值保留在原因链。'
     ),
     example: endpointExample.replaceAll('createEndpoint', name)
   }
@@ -1536,7 +1526,7 @@ symbols.createComposedEndpoint = {
   },
   options: 'IRpcFactoryConfig',
   returns: t(
-    'Promise of IRpcKernelSurface plus exact selected root/user feature surfaces; no unselected dependency method is exposed.',
+    'Promise of the inferred lifecycle kernel plus exact selected root/user feature surfaces; no unselected dependency method is exposed.',
     '返回核心及精确已选根和用户功能表面承诺，不公开未选依赖方法。'
   ),
   example:
@@ -1549,7 +1539,7 @@ symbols.createComposedEndpoint = {
 symbols.createRuntimeApiEndpoint = {
   role: 'factory',
   purpose: t(
-    'Creates the runtime API boundary over an actual held binding, or config/channel plus original provider admission scope. It never creates a worker or process and repeated disposal joins the original held close.',
+    'Creates the runtime API boundary over an actual held binding, or config/channel plus original provider admission scope. It never creates a worker or process and repeated and synchronously reentrant disposal joins one cached facade Promise; it does not promise identity with the underlying binding Promise.',
     '在实际已有绑定上创建运行接口边界，或使用配置、通道和原提供方准入作用域；不创建线程进程，重复释放加入原持有关闭流程。'
   ),
   params: {
@@ -2223,7 +2213,10 @@ types.IRpcConnectContext = typeDoc(
     targetId: fields.targetId,
     peerId: fields.peerId,
     origin: fields.origin,
-    source: fields.source,
+    source: p(
+      'Actual native inbound source retained by the transport, such as a Window or MessagePort; it is not an error package source.',
+      '载体保留的实际原生入站来源，例如窗口或消息端口，不是错误包来源。'
+    ),
     data: fields.data,
     platform: p('Actual inbound transport platform when available.', '可用时的实际入站载体平台。'),
     topology: {
@@ -2423,7 +2416,10 @@ types.IRpcUuidContext = typeDoc(
         variation: t('Creates a protocol variation identifier.', '创建协议变体所需的唯一标识。')
       }
     },
-    senderId: fields.senderId,
+    senderId: p(
+      'Local endpoint identifier issuing this outbound UUID request; it is not an authenticated inbound sender.',
+      '发起本次出站标识生成的本端端点标识，不是已认证入站发送方。'
+    ),
     targetId: fields.targetId
   }
 )
@@ -2844,7 +2840,6 @@ types.IRpcError = typeDoc(
   '结构公开错误诊断，此类型不证明本地执行或控制所有权。',
   { source: errorMembers.source, code: errorMembers.code, cause: errorMembers.cause }
 )
-types.IRpcPublicError = types.IRpcError
 types.IRpcCoreErrorCode = typeDoc(
   'One stable semantic value from RpcCoreErrorCode; source and code together identify its owning contract.',
   '稳定语义失败码中的一个值，来源及错误码共同标识所属契约。',
@@ -2873,6 +2868,14 @@ for (const name of [
     '公开诊断错误类型保留原生错误名称、消息、堆栈及原原因，本入口只有生命周期错误类作为运行时类导出。',
     {
       ...errorMembers,
+      ...(name === 'RpcLifecycleError'
+        ? {
+            errors: p(
+              'Optional standard error graph retains every original cleanup failure in this batch; inspect it together with cause.',
+              '可选标准错误图保留本批每项原清理失败，须结合原因链检查。'
+            )
+          }
+        : {}),
       ...(['RpcSchemaValidationError', 'RpcRemoteError'].includes(name)
         ? {
             data: p(
@@ -2965,18 +2968,6 @@ for (const [name, en, zh] of [
     ),
     `if (${name}(error)) console.log(error.code)`
   )
-symbols.createAuthenticationNonce = {
-  role: 'operation',
-  purpose: t(
-    'Allocates 16 cryptographic random bytes as exactly 32 lowercase hexadecimal characters; no weak entropy fallback is used.',
-    '分配十六个密码学随机字节，输出精确三十二位小写十六进制字符，不使用弱熵回退。'
-  ),
-  returns: t(
-    'Fresh 128-bit nonce string; missing/failing crypto.getRandomValues throws INVALID_CONFIG with original cause when available.',
-    '返回新的一百二十八位随机字符串，随机源缺失或失败抛配置非法错误，可用时保留原原因。'
-  ),
-  example: 'console.log(createAuthenticationNonce())'
-}
 operation(
   'defaultRpcReporter',
   'Default background-failure sink writes the original failure to console.error. Explicit report callbacks receive the same original diagnostic events.',
@@ -3034,19 +3025,9 @@ symbols.deserializeRpcError = {
 /** Transport constants form value unions without new runtime ownership. */
 for (const [name, en, zh] of [
   [
-    'IRpcPlatform',
-    'Actual platform value from the canonical RpcPlatform domain.',
-    '规范平台域中的实际平台值。'
-  ],
-  [
     'IRpcPlatformValue',
     'One actual adapter platform label used for presentation and diagnostics.',
     '用于展示及诊断的一个实际适配器平台标签。'
-  ],
-  [
-    'IRpcTransportTopology',
-    'Actual transport topology value describing physical peer fan-out.',
-    '描述物理对端扇出的实际载体拓扑值。'
   ],
   [
     'IRpcTransportTopologyValue',
@@ -3502,8 +3483,8 @@ types.IPeerPairOptions = typeDoc(
     ),
     scheduler,
     report: p(
-      'Application synchronous background failure sink receives original unknown errors; a reporter throw goes to hostRethrowReporter.',
-      '应用同步后台失败接收器接收原未知错误，上报者抛错交规范宿主上报。',
+      'Application synchronous background failure sink receives original unknown errors; synchronous report or fallback throws remain observable through hostRethrowReporter without replacing the original operation result.',
+      '应用同步后台失败接收器接收原未知错误；同步报告或回退抛错仍经规范宿主报告可观察，不替换原逻辑结果。',
       t(
         'defaultRpcReporter writes the original error to console.error.',
         '默认上报函数把原错误写入控制台错误输出。'
@@ -3550,8 +3531,8 @@ types.IRpcProviderRejection = {
 const modules: Record<string, ILibraryReference['modules'][string]> = {
   index: {
     summary: t(
-      'Runtime-neutral native RPC endpoint construction starts with createEndpoint and connect; choose actual protocol, codec, framer and transport components or narrower presets.',
-      '运行时中立原生调用端点构造从端点工厂及连接中间件开始，选择实际协议、编解码、分帧及载体，或使用较小预设。'
+      'Runtime-neutral native RPC endpoint construction starts with createEndpoint and connect; choose actual protocol, codec, framer and transport components or narrower presets. The curated user manifest selects common entry points; the full export reference also includes published advanced adapter and transport subpaths.',
+      '运行时中立原生调用端点构造从端点工厂及连接中间件开始，选择实际协议、编解码、分帧及载体，或使用较小预设；用户索引选择常用入口，完整导出参考另含已发布的高级适配器及载体子入口。'
     ),
     example: endpointExample
   },

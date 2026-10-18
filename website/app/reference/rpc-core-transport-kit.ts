@@ -206,6 +206,30 @@ const types: Record<string, ITypeDoc> = {
 
 /** Every exported listener and safe-access operation describes its real failure behavior. */
 const symbols: Record<string, ISymbolDoc> = {
+  identifyRpcBoundaryFailure: op(
+    'Classifies an adapter failure while preserving a mutable native Error or DOMException and a complete foreign semantic identity. Unattachable or primitive failures remain reachable through cause; the original stack is never replaced.',
+    '分类适配器失败，保留可修改原生错误及完整外部语义身份；不可附加身份的错误或原始值经原因链可达，原堆栈不替换。',
+    {
+      error: t('Original failure caught at this adapter boundary.', '此适配器边界捕获的原始失败。'),
+      code: t(
+        'Core-owned semantic value selected from RpcCoreErrorCode for this boundary.',
+        '从核心错误码表选择的本边界语义值。'
+      ),
+      message: t(
+        'Stable adapter-owned fallback text used only when a wrapper is required.',
+        '仅需包装时使用的适配器所有者维护的稳定回退文本。'
+      )
+    },
+    t(
+      'The original Error when it can retain or acquire semantic identity; otherwise a Core Error whose cause retains the original failure.',
+      '可保持或附加语义身份时返回原错误，否则返回以原失败为原因的核心错误。'
+    ),
+    `import { identifyRpcBoundaryFailure } from '@migaia/rpc-core/transport-kit'
+import { RpcCoreErrorCode } from '@migaia/rpc-core'
+const original = new DOMException('Cannot clone payload', 'DataCloneError')
+const failure = identifyRpcBoundaryFailure(original, RpcCoreErrorCode.transport, 'Carrier send failed')
+console.log(failure === original, failure instanceof DOMException)`
+  ),
   createListenerFailureState: {
     ...op(
       'Creates one adapter-local ordered state for reporter failures; retain it with the physical listener owner.',

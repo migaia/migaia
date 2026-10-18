@@ -422,8 +422,8 @@ types.IRpcProbe = type(
         )
       },
       t(
-        'Changed subscriptions are notified synchronously; unchanged masks send no notification.',
-        '同步通知改变的订阅，掩码不变时不通知。'
+        'All changed subscriptions are notified synchronously even if one throws, so emitters adopt the committed mask. Callback failures gain CALLBACK_FAILED unless already classified; unchanged masks send no notification.',
+        '同步通知全部改变的订阅，某项抛错不阻断其它项采用已提交掩码；未分类回调失败附加 `CALLBACK_FAILED`，掩码不变时不通知。'
       ),
       probeExample
     )
@@ -747,8 +747,8 @@ symbols.subscribeProbeStages = {
       '原探针定义结果，只有该所有者拥有私有订阅。'
     ),
     listener: t(
-      'Application zero-argument synchronous callback; return void. It runs after state changes; throws propagate to setStages.',
-      '应用无参同步回调，返回空值，在状态改变后运行，抛错传播到阶段更新调用。'
+      'Application zero-argument synchronous callback; return void. It runs after state changes; failures remain observable after every subscriber has received the committed mask.',
+      '应用无参同步回调，返回空值，在状态改变后运行，全部订阅接收已提交掩码后仍可观察其失败。'
     )
   },
   returns: t('Idempotent release removes this callback only.', '返回幂等移除函数，只移除本回调。'),

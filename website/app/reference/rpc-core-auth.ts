@@ -5,8 +5,8 @@ import type { IMemberDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Every stage receives the same endpoint-owned public context. */
 const context = t(
-  'IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatform.',
-  '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatform`。'
+  'IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.',
+  '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatformValue`。'
 )
 /** Captures a real sync/async transform and the value it must hand to the next stage. */
 const transform = (en: string, zh: string, input: IText, result: IText): IMemberDoc => ({
@@ -61,8 +61,8 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
       '从认证管线边界接收到的受保护值。'
     ),
     t(
-      'Authenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Other returned values still undergo envelope/replay validation.',
-      '返回经过认证的内部值或其承诺，配置了解密时传给解密阶段；签名非法时应拒绝或抛错，其他返回值仍需通过信封及重放校验。'
+      'Authenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.',
+      '返回认证内部值或其承诺，配置了解密时传给解密；签名非法时应拒绝或抛错，本地报告保留可能敏感的原校验失败，对端只接收净化摘要，其它返回值仍需通过信封及重放校验。'
     )
   ),
   encodedType: {
