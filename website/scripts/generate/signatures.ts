@@ -1844,8 +1844,18 @@ function inlinePrivateSurfaces(directory: string, symbols: Array<Record<string, 
     symbol.composes = shape.composes
   }
   /** Private parameter aliases use this same canonical projection without manufacturing exports. */
-  return (expression: string, file: string) =>
-    expand(typeExpressionShape(expression), file, new Set(), true)
+  return (expression: string, file: string) => {
+    /** Declaration emit can qualify constructor options without a separate named import. */
+    const imported = expression
+      .trim()
+      .match(/^import\(['"]([^'"]+)['"]\)\.([A-Za-z_$][\w$]*)(?:<[\s\S]*>)?$/)
+    if (imported) {
+      /** Resolve in the declaring file so a same-named type in another package cannot win. */
+      const importedFile = declarationImportFiles(file, imported[1])[0]
+      if (importedFile) return privateSurface(imported[2], importedFile, new Set(), true)
+    }
+    return expand(typeExpressionShape(expression), file, new Set(), true)
+  }
 }
 
 /** Finds the end of one declaration while respecting nested syntax and comments. */
