@@ -282,10 +282,12 @@ await host.unUse('audit');
 内置的 `loggerMiddleware(sink?)`：
 
 ```ts
-function loggerMiddleware<S>(
+function loggerMiddleware<S = any>(
   sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void
 ): IStoreMiddlewarePlugin<S>;
 ```
+
+日志插件只把状态当作 `unknown` 交给 `sink`，不依赖状态结构，所以 `S` 默认是 `any`：不写类型参数也能安装到任意状态类型的 Host；需要把插件固定到某个 Host 的状态类型时再显式传 `S`。
 
 默认 `sink` 是 `console.log('[store]', event, state)`；插件名固定 `'store-logger'`；每个事件先用 `next(event)` 记录继续值，再在当前 stage 内调用 `sink(event, core.getState())`；下游在当前 stage 返回后才执行——`state` 是调用 `sink` 那一刻的最新快照，不是事件产生时的快照。
 

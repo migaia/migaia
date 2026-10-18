@@ -364,7 +364,14 @@ function createStoreMiddlewareHostCore<S>(
   return host
 }
 
-export function loggerMiddleware<S>(
+/**
+ * Creates the built-in logging plugin. Each event is passed to the next stage first, then `sink`
+ * receives that event and the state read after it; the default sink prints both with the log
+ * prefix. The logger never reads a specific state shape, so `S` defaults to `any`: the plugin
+ * installs into a host of any state type without a type argument. Pass `S` explicitly only to pin
+ * the plugin to one host's state type.
+ */
+export function loggerMiddleware<S = any>(
   sink: (event: IMiddlewareEvent<unknown>, state: unknown) => void = (event, state) => {
     console.log(StoreMiddlewareErrorText.logPrefix, event, state)
   }
