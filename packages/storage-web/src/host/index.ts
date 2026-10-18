@@ -1,15 +1,5 @@
-/** Internal R02 foundations; intentionally absent from package root and public exports. */
-export {
-  assertStorageBackendId,
-  defineFeature,
-  definePlugin,
-  readStorageNativePluginMetadata
-} from './contracts.js'
-export {
-  pluginNameFromBackendId,
-  reactiveAdapterNameFromBackendId,
-  STORAGE_LIVE_QUERY_SERVICE_NAME
-} from './names.js'
+/** Public Host operations; private naming and admission registries stay with their owners. */
+export { assertStorageBackendId, defineFeature, definePlugin } from './contracts.js'
 export { createStorageHost, StorageHostFacade } from './storage-host.js'
 export type { IStoragePluginCore, IStorageNativePluginDescriptor } from './contracts.js'
 export type * from './types.js'

@@ -129,7 +129,9 @@ const expectedRetainedModules = [
   // Host contracts capture thenables through their canonical utils owner.
   '@migaia/utils/dist/function.js',
   '@migaia/utils/dist/object-path.js',
-  '@migaia/utils/dist/scheduler.js',
+  // Canonical Utils host reporting and scheduler are now shared retained chunks.
+  '@migaia/utils/dist/host-report-[chunk].js',
+  '@migaia/utils/dist/scheduler-[chunk].js',
   '@migaia/utils/dist/promise.js',
   'app/bundle-entry.js'
 ] as const

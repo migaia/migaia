@@ -64,9 +64,13 @@ export const fromStandardSchema = <T>(
   return {
     name: `standard-schema:${vendor}`,
     validate: async (value) => {
-      const result: unknown = await (
-        validate as IStandardSchemaV1<unknown, T>['~standard']['validate']
-      )(value)
+      /** The adapter owns classification of both synchronous throws and asynchronous rejection. */
+      let result: unknown
+      try {
+        result = await (validate as IStandardSchemaV1<unknown, T>['~standard']['validate'])(value)
+      } catch (cause) {
+        throw new StorageError(StorageErrorCode.validationFailed, { cause })
+      }
       if (typeof result !== 'object' || result === null || Array.isArray(result))
         throw new StorageError(StorageErrorCode.validationFailed, {
           cause: new TypeError('Standard Schema returned an invalid result')

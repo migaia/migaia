@@ -129,14 +129,14 @@ for await (const [key, value] of db.iterateRecords()) console.log(key, value)
 - `dbName?: string` —— 默认 `'storage-web'`。
 - `kvStoreName?: string` —— 默认 `'kv'`。
 - `bytesStoreName?: string` —— 默认 `'bytes'`。
-- `recordsStoreName?: string` —— 默认 `'records'`。以上三个 store 名必须非空、互不相同，且不能撞上内部保留名（`__storage_web_revisions__`、`storage-web:meta`）。
+- `recordsStoreName?: string` —— 默认 `'records'`。以上三个 store 名必须非空、互不相同，且不能撞上内部保留名（`__storage_web_revisions__`、`storage-web:meta`、`storage-web:index-records`）。
 - `cleanupLegacyRecords?: boolean` —— 默认 `false`；`true` 时在确认旧版 `documents` store 已完整迁移到 `recordsStoreName` 后才真正删除它，只在确认没有客户端还需要回滚时开启。
 - `factory?: IDBFactory` —— 测试/非浏览器环境注入点；默认 `globalThis.indexedDB`，缺失抛 `BACKEND_UNAVAILABLE`。
 - `keyRange?: typeof IDBKeyRange` —— 测试环境（jsdom 无原生 IndexedDB）须与 `factory` 一起从 `fake-indexeddb` 显式传入；默认 `globalThis.IDBKeyRange`。
 
 能力：`syncRead: false`，`binary`/`records`/`transactions`/`iteration`/`secondaryIndexes` 为 `true`，`maxValueBytes: undefined`，`opaqueEntries: false`（无 `sync` 字段，IndexedDB 没有同步 API）。`changeFeed` 只有同源 coordination transport 成功接纳时才为 `true`，否则诚实保持 `false` 并由 reactive plugin polling；二级索引由 entity 声明并落到固定 sidecar，change feed 只在事务提交后发布。
 
-内部维护 schema 版本（当前为 2）与记录 revision，用于事务乐观并发检测；连接只开一次并复用，失败会清空缓存以便下次重连；`onversionchange`/`onblocked` 会主动让路给其他标签页的升级请求。额外暴露 `metadata: { get, set, delete }` 只读附加通道，供 `repository.migrate()` 做可恢复的迁移检查点。
+内部维护 schema 版本（当前为 3）与记录 revision，用于事务乐观并发检测；连接只开一次并复用，失败会清空缓存以便下次重连；`onversionchange` 关闭旧连接让路，`onblocked` 拒绝当前打开请求。额外暴露 `metadata: { get, set, delete }` 独立元数据附加通道（可读、写、删除），供 `repository.migrate()` 做可恢复的迁移检查点。
 
 ---
 
@@ -195,7 +195,7 @@ lengthPrefixedNamespaceCodec.decode('app', 'sw1:3:app:theme') // 'theme'
 
 自定义 `INamespaceCodec` 需实现 `encode(namespace, key): string` 与 `decode(namespace, physicalKey): string | undefined`（不属于该命名空间返回 `undefined`）；自定义 codec 自行承担迁移与防碰撞责任。
 
-关键契约类型（均从根导出，直接标注调用点即可，无需额外导入函数）：`IKeyValueStore`（L0，`get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose`/`backend`/`capabilities`/可选 `sync`）、`IRecordStore<T>`（在 L0 基础上加 `getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`/可选 `metadata`）、`IStorageCapabilities`（`syncRead`/`binary`/`records`/`transactions`/`iteration`/`maxValueBytes`/`opaqueEntries`）、`IOperationContext`（`signal?`/`timeoutMs?`/`pageSize?`）、`IWriteOptions`（`IOperationContext` 叠加 `conflictPolicy?`）。
+关键契约类型从 `@migaia/storage-contract` 直接导入，storage-web 根不转出：`IKeyValueStore`（L0）、`IRecordStore<T>`（L0 加字节/记录/迭代/事务及可选 metadata）、`IStorageCapabilities`（9 个能力字段）、`IOperationContext`（`signal?`/`timeoutMs?`/`pageSize?`）、`IWriteOptions`（上下文叠加 `conflictPolicy?`）。Host 和 memory 也使用各自精确子路径。
 
 ---
 
@@ -357,6 +357,11 @@ await preferences.get('appearance') // { id: 'appearance', theme: 'dark' }
 - `migrate(options?, ctx?)`：`options: IMigrateOptions<TDomain>` 为 `{ batchSize?(默认 100，正安全整数), onInvalid? }`；返回 `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`。IndexedDB 可用 `metadata` 通道持久化检查点、跨调用断点续跑；`memoryStorageHost`/KV-only 后端没有 `metadata` 通道，无法跨调用恢复。
 - `batch(run, ctx?)`：仅结构化后端（有真正事务）支持；`run` 收到 `IEntityTransactionScope<TDomain>`（`get`/`put`/`remove`），KV-only 后端调用会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`。
 
+
+非原生 unique 写入也执行约束：record 后端在既有事务内校验最终草稿；KV 后端在 schema/codec 准备后核对原始文本快照，并通过宿主 Web Locks 串行提交。已有键由另一记录占用时报 `INDEX_UNIQUE_CONFLICT`；准备期间快照发生变化时返回可重试的 `TRANSACTION_CONFLICT`。batch 可先写入再删除旧所有者，按最终草稿判断；失败不提交草稿。
+
+实现边界：无 Web Locks 的注入/隔离端口使用本模块的 Lifecycle 队列。缺少宿主锁时，跨 realm 或跨模块实例共享 KV 的全局唯一性尚未闭合，不能把同一队列的运行证据当作全局保证；该环境策略仍待裁定。此实现没有拒绝某一类 KV 后端。
+
 ---
 
 <a id="错误模块"></a>
@@ -388,7 +393,7 @@ try {
 
 `StorageErrorCode` 覆盖 backend、codec/schema、事务、二级索引、Host/plugin 和 reactive 生命周期失败。常用码包括 `BACKEND_UNAVAILABLE`、`DUPLICATE_KEY`、`TRANSACTION_CONFLICT`、`INDEX_UNIQUE_CONFLICT`、`INDEX_QUERY_INVALIDATED`、`BACKEND_INSTALL_FAILED`、`STORAGE_HOST_DISPOSED`、`LIVE_QUERY_DISPOSED` 与 `REACTIVE_ADAPTER_FAILED`；完整清单和恢复动作见 [USEGUIDE](./USEGUIDE.md#错误模块)。
 
-契约级失败（跨包共享，`@migaia/storage-contract`）经根路径透传：`StorageContractError`（`source: '@migaia/storage-contract'`）、`StorageContractErrorCode`（`invalidArgument`/`invalidKey`/`unsupported`/`disposed`/`aborted`）、`isStorageContractError` 类型守卫。两类错误都保留 `cause` 链。
+契约级错误直接从 `@migaia/storage-contract` 导入，storage-web 根不转出：`StorageContractError`（`source: '@migaia/storage-contract'`）、`StorageContractErrorCode`（`invalidArgument`/`invalidKey`/`unsupported`/`disposed`/`aborted`）、`isStorageContractError` 类型守卫。两类错误都保留 `cause` 链。
 
 ---
 
@@ -559,3 +564,10 @@ pnpm --filter @migaia/storage-web run test:e2e
 ```
 
 `test` 会先执行 `build`（Vite 打包 + `tsc --emitDeclarationOnly`）再跑 `vitest run --coverage`；`test:e2e` 使用 `e2e/playwright.config.ts`，需要本机已安装 Playwright 浏览器依赖。完整 API/配置参考、迁移指南与故障排查，见 [USEGUIDE.md](./USEGUIDE.md)。
+
+
+已有 StorageError 补充 operation/stage 元数据时保留原 message，并将完整原错误置于 cause。高版本 entity 不能省略完整 migrations 图。默认 namespace decoder 将坏编码物理 key 视为不匹配，不阻断本命名空间枚举。
+
+索引 backfill 与失败状态保存同时失败时抛原生 AggregateError，带 @migaia/storage-web / INDEX_BACKFILL_FAILED；cause 为主错，errors 保留全部原始对象。索引 ensure/iterate 接入 deadline；迭代器的一个 deadline 覆盖整个生命周期。
+
+自定义 reactive invalidate() 无参数时刷新同 adapter 的全部查询，不生成 change 元数据。Host 内部登记名与 WeakMap admission metadata 不再公开，应用使用 backend()/reactiveBackend() 与 plugin.id。

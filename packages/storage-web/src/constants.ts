@@ -32,8 +32,15 @@ export const StorageOperation = {
   indexedDbCursor: 'indexeddb.cursor',
   transactionCommit: 'transaction.commit',
   transactionScope: 'transaction.scope',
-  entityOrderBy: 'entity.orderBy'
+  entityOrderBy: 'entity.orderBy',
+  /** Labels an optimistic fallback unique check and its exclusive commit boundary. */
+  entityUniqueWrite: 'entity.unique.write',
+  /** Identifies a user index selector or projection that failed at the shared extension boundary. */
+  entityIndexProjection: 'entity.index.project'
 } as const
+
+/** One origin-wide Web Lock prevents separate KV-backed repositories from racing their commits. */
+export const ENTITY_UNIQUE_WRITE_LOCK = 'migaia:storage-web:entity-unique-write'
 
 /** Record channels used by value and binary storage implementations. */
 export const StorageChannel = { value: 'value', bytes: 'bytes' } as const

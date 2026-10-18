@@ -73,8 +73,8 @@ export const StorageErrorCode = Object.freeze({
   migrationFailed: 'MIGRATION_FAILED',
 
   /**
-   * IndexedDB transaction creation or commit fails, or a transaction callback throws an error
-   * outside the storage error family.
+   * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host
+   * coordination, or a callback error outside the storage error family.
    *
    * The caller checks whether the transaction crosses the automatic commit boundary or its scope
    * escapes. Transient concurrency failures can be retried.
@@ -109,8 +109,8 @@ export const StorageErrorCode = Object.freeze({
   extensionFailed: 'EXTENSION_FAILED',
 
   /**
-   * A read revision or the global epoch changes before transaction commit, causing a concurrent
-   * write conflict.
+   * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive
+   * commit, causing a concurrent write conflict.
    *
    * The caller reads again and retries the entire transaction. This is a retryable concurrency
    * conflict rather than data corruption.
@@ -182,6 +182,13 @@ export const StorageErrorCode = Object.freeze({
    * retry through a fresh repository operation after the current handle is reacquired.
    */
   indexBackfillStale: 'INDEX_BACKFILL_STALE',
+
+  /**
+   * Secondary-index backfill failed and persisting its failed readiness also failed. The caller
+   * inspects the native aggregate's original cause/errors before retrying; neither the primary
+   * failure nor the persistence failure may be discarded.
+   */
+  indexBackfillFailed: 'INDEX_BACKFILL_FAILED',
 
   /**
    * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must

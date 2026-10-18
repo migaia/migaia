@@ -31,8 +31,8 @@ export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKe
   readonly scheduler: IScheduler
   readonly signal: INativeAbortSignal
   readonly report: (error: unknown) => void
-  /** Invalidates Resource-owned query generations after an admitted backend change. */
-  readonly onChange: (change: IStorageChange) => void
+  /** Undefined invalidates all queries on this adapter; a known change permits scope filtering. */
+  readonly onChange: (change?: IStorageChange) => void
 }
 
 /** Reactive consistency and optional D79 source hook retained in private feature metadata. */

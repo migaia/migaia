@@ -11,6 +11,7 @@ import type {
   IRepository
 } from './types.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.js'
 import { snapshotCodec } from '../serialize/registry.js'
 import { snapshotEntityIndexes } from './index-projection.js'
 
@@ -97,7 +98,10 @@ const validateDefinition = <TDomain, TStored>(
     invalidDefinition('entity validateOnRead must be a boolean')
   if (options.defaultOrderBy !== undefined && typeof options.defaultOrderBy !== 'function')
     invalidDefinition('entity defaultOrderBy must be a function')
-  if (options.migrations === undefined) return
+  if (options.migrations === undefined) {
+    if (version > 1) invalidDefinition(StorageErrorText.entityMigrationGraphIncomplete)
+    return
+  }
   if (
     options.migrations === null ||
     typeof options.migrations !== 'object' ||
@@ -106,7 +110,7 @@ const validateDefinition = <TDomain, TStored>(
     invalidDefinition('entity migrations must be an object')
   const migrationEntries = Object.entries(options.migrations)
   if (migrationEntries.length !== version - 1)
-    invalidDefinition('entity migration graph must contain every version step')
+    invalidDefinition(StorageErrorText.entityMigrationGraphIncomplete)
   for (const [rawVersion, migration] of migrationEntries) {
     const migrationVersion = Number(rawVersion)
     if (

@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { createStorageHost, defineFeature, definePlugin } from '../../src/host/index.js'
 import {
   STORAGE_LIVE_QUERY_SERVICE_NAME,
-  createStorageHost,
-  defineFeature,
-  definePlugin,
   pluginNameFromBackendId,
   reactiveAdapterNameFromBackendId
-} from '../../src/host/index.js'
+} from '../../src/host/names.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 import { defineReactiveAdapterFeature } from '../../src/reactive-adapter.js'
 import { type IScheduler } from '@migaia/utils/scheduler'

@@ -10,7 +10,12 @@ import {
 } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { isRecordStore } from '../types/storage.js'
-import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import {
+  StorageError,
+  StorageErrorCode,
+  createStorageTypeError,
+  createStorageAggregateError
+} from '../types/errors.js'
 import { indexBackfillFailureText, StorageErrorText } from '../error-text.js'
 import { runMigrationsWithRuntime } from '../schema/migrate.js'
 import { selectCodec } from '../serialize/registry.js'
@@ -23,7 +28,8 @@ import {
   decodeRepositoryKey,
   flatKeyPrefix,
   repositoryMigrationKey,
-  repositoryEntityRange
+  repositoryEntityRange,
+  repositoryUniqueWriteKey
 } from './key.js'
 import {
   assertStorageKey,
@@ -38,7 +44,7 @@ import {
   createStorageOperationRuntime,
   type IStorageOperationRuntime
 } from '../core/operation-reporter.js'
-import { snapshotOperationContext } from '../core/operation.js'
+import { snapshotOperationContext, withAbort } from '../core/operation.js'
 import type { IOperationContext, IStorageKey } from '../types/context.js'
 import type { IRecordStore, IKeyValueStore } from '../types/storage.js'
 import type { ISchemaAdapter } from '../schema/types.js'
@@ -57,6 +63,8 @@ import type {
 } from './types.js'
 import type { ISnapshotEntityIndexes } from './index-projection.js'
 import { projectEntityIndexes } from './index-projection.js'
+import { collectUniqueIndexOwners } from '../core/unique-index.js'
+import { withExclusiveEntityWrite } from '../backends/entity-write-coordination.js'
 import { safeJsonPayloadByteLength } from '../utils/json.js'
 import {
   asIndexedDbBackfillStore,
@@ -80,6 +88,19 @@ type IStageFailure = Error & {
 }
 
 type IWriteTarget = { readonly documentKey?: IStorageKey; readonly flatKey?: string }
+/** A captured read view reuses the canonical stream decoder under a snapshot or transaction. */
+type IRepositoryReadView = {
+  readonly keys?: () => Promise<string[]>
+  readonly get?: (key: string) => Promise<string | null>
+  readonly getRecord?: (key: IStorageKey) => Promise<unknown | undefined>
+}
+
+/** Final logical row state; an absent projection represents a deletion in the draft. */
+type IEntityUniqueMutation = {
+  readonly id: IStorageKey
+  readonly projection: IRecordIndexProjection | undefined
+}
+
 type IEntityRetryTransactionScope = {
   get(key: IStorageKey): Promise<unknown | undefined>
   put(value: unknown, key: IStorageKey, projection?: IRecordIndexProjection): Promise<IStorageKey>
@@ -99,7 +120,7 @@ const stageFailure = (stage: IStageFailure['stage'], cause: unknown): IStageFail
         attemptedChannel: cause.attemptedChannel,
         operation: cause.operation,
         extensionStage: cause.extensionStage,
-        cause: cause.cause ?? cause
+        cause
       },
       cause.message,
       stage
@@ -234,6 +255,15 @@ export const createRepository = <
   } = config
   const records = isRecordStore(store)
   const recordStore = records ? (store as IRecordStore<unknown>) : undefined
+  /** Non-unique selectors retain their existing write call counts; only constraints need scans. */
+  const uniqueIndexes: ISnapshotEntityIndexes<TDomain> = Object.freeze(
+    Object.fromEntries(
+      Object.entries(config.indexes).filter(([, index]) => index.definition.unique)
+    )
+  )
+  /** Native and fallback commits share the same canonical unique-key ownership rule. */
+  const uniqueDefinitions = Object.values(uniqueIndexes).map((index) => index.definition)
+
   const emitDiagnostic = (message: string): void => {
     try {
       onDiagnostic(message)
@@ -388,9 +418,11 @@ export const createRepository = <
       try {
         await session.fail(cause, ctx)
       } catch (persistFailure) {
-        throw new AggregateError([cause, persistFailure], indexBackfillFailureText(name), {
-          cause
-        })
+        throw createStorageAggregateError(
+          StorageErrorCode.indexBackfillFailed,
+          indexBackfillFailureText(name),
+          [cause, persistFailure]
+        )
       }
       throw cause
     } finally {
@@ -415,7 +447,15 @@ export const createRepository = <
     ctx: IOperationContext | undefined,
     runtime: IStorageOperationRuntime
   ): Promise<void> => {
-    const raw = await encodeEnvelope(envelope, ctx, runtime)
+    await writeEncodedEnvelopeAt(target, await encodeEnvelope(envelope, ctx, runtime), ctx)
+  }
+
+  /** Commit already encoded data so exclusive KV sections never invoke application codecs. */
+  const writeEncodedEnvelopeAt = async (
+    target: IWriteTarget,
+    raw: unknown,
+    ctx: IOperationContext | undefined
+  ): Promise<void> => {
     if (recordStore && target.documentKey !== undefined) {
       await recordStore.putRecord(raw, target.documentKey, ctx)
       return
@@ -822,14 +862,16 @@ export const createRepository = <
     options: IListOptions<TDomain> | undefined,
     ctx: IOperationContext | undefined,
     runtime: IStorageOperationRuntime,
-    applyOrdering = true
+    applyOrdering = true,
+    readView?: IRepositoryReadView
   ) {
     if (options?.limit === 0) return
     const comparator = applyOrdering ? (options?.orderBy ?? defaultOrderBy) : undefined
     if (comparator) {
       const buffered: TDomain[] = []
       const scanOptions = { ...options, orderBy: undefined, limit: undefined }
-      for await (const record of streamImpl(scanOptions, ctx, runtime, false)) buffered.push(record)
+      for await (const record of streamImpl(scanOptions, ctx, runtime, false, readView))
+        buffered.push(record)
       sortRecords(buffered, comparator, options?.direction)
       const limited = options?.limit === undefined ? buffered : buffered.slice(0, options.limit)
       for (const record of limited) yield record
@@ -843,7 +885,7 @@ export const createRepository = <
       let count = 0
       const seenIds = new Set<string>()
       for (const range of ranges) {
-        for await (const [physicalKey, raw] of recordStore.iterateRecords(range, ctx)) {
+        for await (const [physicalKey, scannedRaw] of recordStore.iterateRecords(range, ctx)) {
           const v2RecordId = decodeRepositoryKey(name, physicalKey)
           const recordId =
             v2RecordId ??
@@ -859,6 +901,10 @@ export const createRepository = <
               continue
             if (seenIds.has(identity)) continue
           }
+          /** Transactional validation reads the current draft/read set before decoding once. */
+          const raw =
+            readView?.getRecord === undefined ? scannedRaw : await readView.getRecord(physicalKey)
+          if (raw === undefined) continue
           let value: TDomain | undefined
           try {
             let envelope: IEnvelope
@@ -895,7 +941,9 @@ export const createRepository = <
       `[storage-web] entity "${name}".list/stream on a value-only backend performs a full key scan`
     )
     const prefix = flatKeyPrefix(name)
-    const keys = (await store.keys(ctx))
+    /** Snapshot-backed KV validation enumerates the same captured keys that it will decode. */
+    const rawKeys = readView?.keys === undefined ? await store.keys(ctx) : await readView.keys()
+    const keys = rawKeys
       .filter((rawKey) => rawKey.startsWith(prefix))
       .map((rawKey) => ({ rawKey, id: decodeFlatStorageKey(rawKey.slice(prefix.length)) }))
       .filter((entry): entry is { rawKey: string; id: IStorageKey } => entry.id !== undefined)
@@ -903,7 +951,8 @@ export const createRepository = <
     let count = 0
     for (const { rawKey, id } of keys) {
       if (!isStorageKeyInRange(id, options?.range)) continue
-      const raw = await store.get(rawKey, ctx)
+      const raw =
+        readView?.get === undefined ? await store.get(rawKey, ctx) : await readView.get(rawKey)
       if (raw === null) continue
       let value: TDomain | undefined
       try {
@@ -933,6 +982,160 @@ export const createRepository = <
       }
     }
   }
+
+  /**
+   * New fallback write checks reuse the existing extension boundary without changing native
+   * backfill identity.
+   */
+  const projectUniqueWrite = (value: TDomain): IRecordIndexProjection => {
+    try {
+      return projectEntityIndexes(uniqueIndexes, value, store.backend)
+    } catch (cause) {
+      throw normalizeError(
+        cause,
+        store.backend,
+        StorageErrorCode.extensionFailed,
+        StorageOperation.entityIndexProjection
+      )
+    }
+  }
+
+  /** Validate the final proposed rows through the same projection/ownership owner as native IDB. */
+  const validateUniqueRows = async (
+    changes: ReadonlyMap<string, IEntityUniqueMutation>,
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime,
+    readView: IRepositoryReadView
+  ): Promise<void> => {
+    /**
+     * Unchanged rows come from one canonical decoder; changed rows already have prepared
+     * projections.
+     */
+    const rows: Array<{ readonly key: IStorageKey; readonly projection: IRecordIndexProjection }> =
+      []
+    for await (const value of streamImpl(undefined, ctx, runtime, false, readView)) {
+      /** Normal repository writes bind the domain key to the physical record identity. */
+      const id = idOf(name, keyProp, value, store.backend)
+      rows.push({ key: id, projection: projectUniqueWrite(value) })
+    }
+    for (const change of changes.values())
+      if (change.projection !== undefined)
+        rows.push({ key: change.id, projection: change.projection })
+    collectUniqueIndexOwners(uniqueDefinitions, rows, store.backend)
+  }
+
+  /** Use one normal record revision as a phantom barrier, with no sidecar or duplicate queue. */
+  const validateUniqueRecordCommit = async (
+    tx: IEntityRetryTransactionScope,
+    changes: ReadonlyMap<string, IEntityUniqueMutation>,
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
+  ): Promise<void> => {
+    if (
+      uniqueDefinitions.length === 0 ||
+      ![...changes.values()].some((change) => change.projection !== undefined)
+    )
+      return
+    await withAbort(ctx, async (signal, context) => {
+      /** Additional fallback reads share one deadline, including asynchronous schema work. */
+      const operation = { ...context, signal, timeoutMs: undefined }
+      /** Every fallback indexed writer reads and updates this disjoint reserved marker. */
+      const marker = repositoryUniqueWriteKey(name)
+      await tx.get(marker)
+      /**
+       * Omit changed physical rows before materialization, avoiding replay of their user
+       * migrations.
+       */
+      const replaced = new Set(
+        [...changes.values()].flatMap((change) => [
+          encodeFlatStorageKey(composeRepositoryKey(name, change.id)),
+          encodeFlatStorageKey(composeStructuredKey(name, change.id))
+        ])
+      )
+      await validateUniqueRows(changes, operation, runtime, {
+        getRecord: (key) =>
+          replaced.has(encodeFlatStorageKey(key)) ? Promise.resolve(undefined) : tx.get(key)
+      })
+      await tx.put(true, marker)
+    })
+  }
+
+  /**
+   * Capture only this entity's raw text; exact string equality avoids re-running codecs under a
+   * lock.
+   */
+  const snapshotUniqueValues = async (
+    ctx: IOperationContext | undefined
+  ): Promise<ReadonlyMap<string, string>> => {
+    /** Backend namespace isolation is already owned by its public keys/get methods. */
+    const prefix = flatKeyPrefix(name)
+    /** Missing keys are absent from the snapshot even if enumeration raced their deletion. */
+    const snapshot = new Map<string, string>()
+    for (const key of await store.keys(ctx)) {
+      if (!key.startsWith(prefix)) continue
+      /** Read each stored text once for subsequent schema/projection work. */
+      const raw = await store.get(key, ctx)
+      if (raw !== null) snapshot.set(key, raw)
+    }
+    return snapshot
+  }
+
+  /**
+   * Preserve KV support: validate outside the critical section, then compare-and-commit under its
+   * host owner.
+   */
+  const writeUniqueValue = async (
+    id: IStorageKey,
+    domain: TDomain,
+    envelope: IEnvelope,
+    ctx: IOperationContext | undefined
+  ): Promise<void> =>
+    withAbort(ctx, async (signal, context, runtime) => {
+      /** One deadline covers preparation and lock admission; nested backend calls share its signal. */
+      const operation = { ...context, signal, timeoutMs: undefined }
+      /** All application encoding runs before lock admission, including asynchronous codecs. */
+      const raw = await encodeEnvelope(envelope, operation, runtime)
+      /** Incoming projection is prepared once; the old value at the same primary key is replaced. */
+      const changes = new Map<string, IEntityUniqueMutation>([
+        [
+          encodeFlatStorageKey(id),
+          {
+            id,
+            projection: projectUniqueWrite(domain)
+          }
+        ]
+      ])
+      /** Capture the exact raw values whose materialized projections are checked. */
+      const snapshot = await snapshotUniqueValues(operation)
+      /** The current primary key is not a competing owner. */
+      const targetKey = composeFlatKey(name, id)
+      await validateUniqueRows(changes, operation, runtime, {
+        keys: async () => [...snapshot.keys()].filter((key) => key !== targetKey),
+        get: async (key) => snapshot.get(key) ?? null
+      })
+      await withExclusiveEntityWrite(
+        async () => {
+          /**
+           * A competing commit invalidates this prepared snapshot instead of bypassing its
+           * constraints.
+           */
+          const current = await snapshotUniqueValues(operation)
+          if (
+            current.size !== snapshot.size ||
+            [...snapshot].some(([key, value]) => current.get(key) !== value)
+          )
+            throw new StorageError(StorageErrorCode.transactionConflict, {
+              backend: store.backend,
+              operation: StorageOperation.entityUniqueWrite,
+              cause: new Error(StorageErrorText.entityUniqueSnapshotChanged)
+            })
+          await writeEncodedEnvelopeAt({ flatKey: targetKey }, raw, operation)
+        },
+        store.backend,
+        signal,
+        runtime
+      )
+    })
 
   type IIndexedQueryMatch = {
     readonly id: IStorageKey
@@ -1154,7 +1357,25 @@ export const createRepository = <
         await recordStore.transaction(async (tx) => {
           await tx.put(raw, composeRepositoryKey(name, id))
           await tx.delete(composeStructuredKey(name, id))
+          await validateUniqueRecordCommit(
+            { get: tx.get, put: (value, key) => tx.put(value, key), delete: tx.delete },
+            new Map([
+              [
+                encodeFlatStorageKey(id),
+                {
+                  id,
+                  projection: projectUniqueWrite(prepared.domain)
+                }
+              ]
+            ]),
+            context,
+            runtime
+          )
         }, context)
+        return id
+      }
+      if (uniqueDefinitions.length > 0) {
+        await writeUniqueValue(id, prepared.domain, prepared.envelope, context)
         return id
       }
       const target: IWriteTarget = { flatKey: composeFlatKey(name, id) }
@@ -1360,15 +1581,17 @@ export const createRepository = <
         readonly id: IStorageKey
         readonly legacy: boolean
         readonly migrationRequired: boolean
-        readonly value: TDomain
+        readonly value: TDomain | undefined
       }> = []
       const persistBatch = async (): Promise<void> => {
         if (batch.length === 0) return
         if (!recordStore) {
           for (const entry of batch) {
-            const prepared = await toEnvelope(entry.value, context, runtime)
+            const prepared = await toEnvelope(entry.value!, context, runtime)
             const nextKey = composeFlatKey(name, entry.id)
-            await writeEnvelopeAt({ flatKey: nextKey }, prepared.envelope, context, runtime)
+            if (uniqueDefinitions.length > 0)
+              await writeUniqueValue(entry.id, prepared.domain, prepared.envelope, context)
+            else await writeEnvelopeAt({ flatKey: nextKey }, prepared.envelope, context, runtime)
           }
           migrated += batch.length
         } else {
@@ -1379,7 +1602,83 @@ export const createRepository = <
               Object.keys(config.indexes).length > 0 && isSecondaryIndexRecordStore(recordStore)
                 ? recordStore
                 : undefined
-            let migratedInBatch: number
+            /** Materialize the transaction's current snapshot once, not the earlier scan value. */
+            const executeMigrationBatch = async (
+              tx: IEntityRetryTransactionScope,
+              indexed: boolean
+            ) => {
+              /**
+               * Publish counts only after this transaction commits, including invalid-record
+               * policy.
+               */
+              const counts = { migrated: 0, alreadyCurrent: 0, skipped: 0, invalidEligible: 0 }
+              /**
+               * Written rows supply prepared projections; unchanged rows use the transactional
+               * view.
+               */
+              const uniqueChanges = new Map<string, IEntityUniqueMutation>()
+              for (const entry of batch) {
+                /** Every write is derived from a read tracked by this transaction. */
+                const currentRaw = await tx.get(entry.physicalKey)
+                if (currentRaw === undefined) continue
+                if (entry.legacy) {
+                  /** An authoritative current-layout record wins over an obsolete legacy copy. */
+                  const existingTarget = await tx.get(composeRepositoryKey(name, entry.id))
+                  if (existingTarget !== undefined) {
+                    await tx.delete(entry.physicalKey)
+                    continue
+                  }
+                }
+                /** Keep decoding/migration failures under the existing per-record invalid policy. */
+                let currentValue: TDomain | undefined
+                try {
+                  /** A concurrent current-version update must not be rewritten by this migration. */
+                  const currentEnvelope = await decodeEnvelope(currentRaw, context, runtime)
+                  if (!entry.legacy && currentEnvelope.__v >= version) {
+                    counts.alreadyCurrent += 1
+                    continue
+                  }
+                  currentValue = await materialize(currentEnvelope, context, runtime)
+                } catch (cause) {
+                  /** The issue reports the actual transactional value, not stale scan data. */
+                  const issue: IInvalidRecordIssue<TDomain> = {
+                    key: entry.id,
+                    raw: currentRaw,
+                    stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
+                    cause
+                  }
+                  if (invokeInvalidHandler(onInvalid, issue) === StorageInvalidRecordAction.throw)
+                    throwInvalid(issue)
+                  counts.skipped += 1
+                  if (entry.migrationRequired) counts.invalidEligible += 1
+                  continue
+                }
+                if (currentValue === undefined) {
+                  if (entry.migrationRequired) counts.invalidEligible += 1
+                  continue
+                }
+                /** Preparation retains the existing write-side schema/codec validation boundary. */
+                const prepared = await toEnvelope(currentValue, context, runtime)
+                /** Native and fallback paths write the same current envelope. */
+                const raw = await encodeEnvelope(prepared.envelope, context, runtime)
+                await tx.put(
+                  raw,
+                  composeRepositoryKey(name, entry.id),
+                  indexed
+                    ? projectEntityIndexes(config.indexes, prepared.domain, store.backend)
+                    : undefined
+                )
+                if (entry.legacy) await tx.delete(entry.physicalKey)
+                if (!indexed && uniqueDefinitions.length > 0)
+                  uniqueChanges.set(encodeFlatStorageKey(entry.id), {
+                    id: entry.id,
+                    projection: projectUniqueWrite(prepared.domain)
+                  })
+                if (entry.migrationRequired) counts.migrated += 1
+              }
+              if (!indexed) await validateUniqueRecordCommit(tx, uniqueChanges, context, runtime)
+              return counts
+            }
             if (indexedStore !== undefined) {
               indexedHandle = await indexedStore.ensureRecordIndexes(
                 name,
@@ -1389,77 +1688,38 @@ export const createRepository = <
               const readiness = await indexedStore.getRecordIndexReadiness(indexedHandle, context)
               if (readiness.status !== 'complete') indexedHandle = undefined
             }
-            if (indexedStore !== undefined && indexedHandle !== undefined) {
-              migratedInBatch = await indexedStore.transactionIndexed(
-                indexedHandle,
-                async (tx) => {
-                  let count = 0
-                  for (const entry of batch) {
-                    const currentRaw = await tx.get(entry.physicalKey)
-                    if (currentRaw === undefined) continue
-                    if (entry.legacy) {
-                      const existingTarget = await tx.get(composeRepositoryKey(name, entry.id))
-                      if (existingTarget !== undefined) {
-                        await tx.delete(entry.physicalKey)
-                        continue
-                      }
-                      const currentEnvelope = await decodeEnvelope(currentRaw, context, runtime)
-                      const currentValue = await materialize(currentEnvelope, context, runtime)
-                      if (currentValue === undefined) continue
-                      const prepared = await toEnvelope(currentValue, context, runtime)
-                      const raw = await encodeEnvelope(prepared.envelope, context, runtime)
-                      await tx.put(
-                        raw,
-                        composeRepositoryKey(name, entry.id),
-                        projectEntityIndexes(config.indexes, prepared.domain, store.backend)
-                      )
-                      await tx.delete(entry.physicalKey)
-                      if (entry.migrationRequired) count += 1
-                      continue
-                    }
-                    const prepared = await toEnvelope(entry.value, context, runtime)
-                    const raw = await encodeEnvelope(prepared.envelope, context, runtime)
-                    await tx.put(
-                      raw,
-                      composeRepositoryKey(name, entry.id),
-                      projectEntityIndexes(config.indexes, prepared.domain, store.backend)
-                    )
-                    if (entry.migrationRequired) count += 1
-                  }
-                  return count
-                },
-                context
-              )
-            } else
-              migratedInBatch = await recordStore.transaction(async (tx) => {
-                let count = 0
-                for (const entry of batch) {
-                  const currentRaw = await tx.get(entry.physicalKey)
-                  if (currentRaw === undefined) continue
-                  if (entry.legacy) {
-                    const existingTarget = await tx.get(composeRepositoryKey(name, entry.id))
-                    if (existingTarget !== undefined) {
-                      await tx.delete(entry.physicalKey)
-                      continue
-                    }
-                    const currentEnvelope = await decodeEnvelope(currentRaw, context, runtime)
-                    const currentValue = await materialize(currentEnvelope, context, runtime)
-                    if (currentValue === undefined) continue
-                    const prepared = await toEnvelope(currentValue, context, runtime)
-                    const raw = await encodeEnvelope(prepared.envelope, context, runtime)
-                    await tx.put(raw, composeRepositoryKey(name, entry.id))
-                    await tx.delete(entry.physicalKey)
-                    if (entry.migrationRequired) count += 1
-                    continue
-                  }
-                  const prepared = await toEnvelope(entry.value, context, runtime)
-                  const raw = await encodeEnvelope(prepared.envelope, context, runtime)
-                  await tx.put(raw, composeRepositoryKey(name, entry.id))
-                  if (entry.migrationRequired) count += 1
-                }
-                return count
-              }, context)
-            migrated += migratedInBatch
+            /** One callback owns migration semantics; backend adapters only supply their scope. */
+            const batchOutcome =
+              indexedStore !== undefined && indexedHandle !== undefined
+                ? await indexedStore.transactionIndexed(
+                    indexedHandle,
+                    (tx) =>
+                      executeMigrationBatch(
+                        {
+                          get: tx.get,
+                          put: (value, key, projection) => tx.put(value, key, projection!),
+                          delete: tx.delete
+                        },
+                        true
+                      ),
+                    context
+                  )
+                : await recordStore.transaction(
+                    (tx) =>
+                      executeMigrationBatch(
+                        {
+                          get: tx.get,
+                          put: (value, key) => tx.put(value, key),
+                          delete: tx.delete
+                        },
+                        false
+                      ),
+                    context
+                  )
+            migrated += batchOutcome.migrated
+            alreadyCurrent += batchOutcome.alreadyCurrent
+            skipped += batchOutcome.skipped
+            eligible -= batchOutcome.invalidEligible
           } catch (cause) {
             if (
               isStorageErrorFamily(cause) &&
@@ -1492,6 +1752,25 @@ export const createRepository = <
                       )
                     else await tx.put(nextRaw, composeRepositoryKey(name, entry.id))
                     if (entry.legacy) await tx.delete(entry.physicalKey)
+                    if (indexedStore === undefined || indexedHandle === undefined)
+                      await validateUniqueRecordCommit(
+                        tx,
+                        new Map([
+                          [
+                            encodeFlatStorageKey(entry.id),
+                            {
+                              id: entry.id,
+                              projection: projectEntityIndexes(
+                                uniqueIndexes,
+                                prepared.domain,
+                                store.backend
+                              )
+                            }
+                          ]
+                        ]),
+                        context,
+                        runtime
+                      )
                     return 'migrated' as const
                   }
                   const retryOutcome =
@@ -1583,8 +1862,10 @@ export const createRepository = <
             let envelope: IEnvelope
             try {
               envelope = await decodeEnvelope(raw, context, runtime)
-              const value = await materialize(envelope, context, runtime)
-              if (value === undefined) continue
+              /** Eligible records are materialized only under the commit transaction's read set. */
+              const value =
+                envelope.__v >= version ? await materialize(envelope, context, runtime) : undefined
+              if (envelope.__v >= version && value === undefined) continue
               if (envelope.__v >= version) {
                 alreadyCurrent += 1
                 // A current-version legacy envelope still requires physical relocation before
@@ -1722,6 +2003,8 @@ export const createRepository = <
         },
         indexed: boolean
       ): Promise<Awaited<ReturnType<typeof run>>> => {
+        /** Final row projections include replacements/deletions in callback order. */
+        const uniqueChanges = new Map<string, IEntityUniqueMutation>()
         const scope: IEntityTransactionScope<TDomain> = {
           get: async (id) => {
             assertStorageKey(id, store.backend, `entity "${name}" id`)
@@ -1744,15 +2027,24 @@ export const createRepository = <
               : undefined
             await tx.put(raw, composeRepositoryKey(name, id), projection)
             await tx.delete(composeStructuredKey(name, id))
+            if (!indexed && uniqueDefinitions.length > 0)
+              uniqueChanges.set(encodeFlatStorageKey(id), {
+                id,
+                projection: projectUniqueWrite(prepared.domain)
+              })
             return id
           },
           remove: async (id) => {
             assertStorageKey(id, store.backend, `entity "${name}" id`)
             await tx.delete(composeRepositoryKey(name, id))
             await tx.delete(composeStructuredKey(name, id))
+            if (!indexed) uniqueChanges.set(encodeFlatStorageKey(id), { id, projection: undefined })
           }
         }
-        return (await run(scope)) as Awaited<ReturnType<typeof run>>
+        /** User callbacks finish before the canonical final-draft constraint check. */
+        const result = await run(scope)
+        if (!indexed) await validateUniqueRecordCommit(tx, uniqueChanges, context, runtime)
+        return result as Awaited<ReturnType<typeof run>>
       }
       if (indexedStore !== undefined) {
         const handle = await indexedStore.ensureRecordIndexes(

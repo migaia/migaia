@@ -23,7 +23,7 @@ import {
   createBackendReactiveController,
   registerBackendReactiveController
 } from './reactive-controller.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode, type IStorageChannel } from '../types/errors.js'
 import type { IStorageKey } from '../types/context.js'
 import type { IRecordStore, ISyncCapableStore, ISyncKeyValueStore } from '../types/storage.js'
 import {
@@ -109,18 +109,8 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
     attemptedChannel: 'value' | 'bytes' | 'record',
     conflictPolicy: 'conflict' | 'replace' = 'conflict',
     applyReplace = true,
-    encodedKey = encodeFlatStorageKey(key),
-    /**
-     * A `conflictPolicy: 'replace'` write silently evicts whatever other channel already held this
-     * key — that eviction is itself a commit-worthy mutation and must publish its own `remove`
-     * event on its own channel, not just the attempted channel's `put` event, or a subscriber would
-     * never learn the evicted channel's data is gone. The one caller inside a transaction's commit
-     * loop (`runTransaction`) opts out with `emitEvent: false`: that path already aggregates every
-     * affected record key into one `kind:'batch'` event fired once after the whole transaction
-     * commits, so an eviction there must not additionally fire its own standalone event mid-batch.
-     */
-    emitEvent = true
-  ): void => {
+    encodedKey = encodeFlatStorageKey(key)
+  ): readonly IStorageChannel[] => {
     const stringKey = typeof key === 'string' ? key : undefined
     const existing = new Set<'value' | 'bytes' | 'record'>()
     if (stringKey !== undefined && kv.has(stringKey)) existing.add('value')
@@ -133,23 +123,32 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
       conflictPolicy,
       StorageBackend.memory
     )
-    if (!applyReplace) return
+    if (!applyReplace) return []
     for (const channel of plan.remove) {
       if (channel === StorageChannel.value && stringKey !== undefined) {
-        if (kv.delete(stringKey) && emitEvent)
-          publishChange({ channel: 'value', kind: 'remove', keys: [key] })
+        kv.delete(stringKey)
       }
       if (channel === StorageChannel.bytes && stringKey !== undefined) {
-        if (bytes.delete(stringKey) && emitEvent)
-          publishChange({ channel: 'bytes', kind: 'remove', keys: [key] })
+        bytes.delete(stringKey)
       }
       if (channel === 'record') {
         if (documents.delete(encodedKey)) {
           recordRevisions.set(encodedKey, (recordRevisions.get(encodedKey) ?? 0) + 1)
-          if (emitEvent) publishChange({ channel: 'record', kind: 'remove', keys: [key] })
         }
       }
     }
+    return plan.remove
+  }
+
+  /** Publish eviction then put only after all channel mutations commit; observers may reenter. */
+  const publishCommittedWrite = (
+    key: IStorageKey,
+    channel: IStorageChannel,
+    removed: readonly IStorageChannel[]
+  ): void => {
+    for (const previous of removed)
+      publishChange({ channel: previous, kind: 'remove', keys: [key] })
+    publishChange({ channel, kind: 'put', keys: [key] })
   }
 
   const sync: ISyncKeyValueStore = {
@@ -168,9 +167,10 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
           key,
           cause: new TypeError('storage value must be a string')
         })
-      checkCrossChannel(key, 'value', optionsSnapshot.conflictPolicy)
+      /** Notifications wait until the destination has replaced every conflicting channel. */
+      const removed = checkCrossChannel(key, 'value', optionsSnapshot.conflictPolicy)
       kv.set(key, value)
-      publishChange({ channel: 'value', kind: 'put', keys: [key] })
+      publishCommittedWrite(key, 'value', removed)
     },
     remove: (key) => {
       assertLive()
@@ -316,7 +316,7 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
           committedKeys.push(draftKeys.get(encoded)!)
         }
       } else {
-        checkCrossChannel(entry[0], 'record', entry[2], true, undefined, false)
+        checkCrossChannel(entry[0], 'record', entry[2])
         documents.set(encoded, [entry[0], entry[1]])
         recordRevisions.set(encoded, revisionOf(encoded) + 1)
         committedKeys.push(draftKeys.get(encoded)!)
@@ -394,9 +394,10 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
             cause
           })
         }
-        checkCrossChannel(key, 'bytes', context?.conflictPolicy)
+        /** Capture eviction events without exposing an intermediate empty key. */
+        const removed = checkCrossChannel(key, 'bytes', context?.conflictPolicy)
         bytes.set(key, prepared)
-        publishChange({ channel: 'bytes', kind: 'put', keys: [key] })
+        publishCommittedWrite(key, 'bytes', removed)
       }),
     clearBytes: (ctx) =>
       withAbort(ctx, async () => {
@@ -420,10 +421,17 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
         const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.memory)
         const encoded = encodeFlatStorageKey(keySnapshot)
         const prepared = cloneValue(value, keySnapshot)
-        checkCrossChannel(keySnapshot, 'record', context?.conflictPolicy, true, encoded)
+        /** Record cloning has succeeded; publish only after the synchronous commit. */
+        const removed = checkCrossChannel(
+          keySnapshot,
+          'record',
+          context?.conflictPolicy,
+          true,
+          encoded
+        )
         documents.set(encoded, [keySnapshot, prepared])
         recordRevisions.set(encoded, (recordRevisions.get(encoded) ?? 0) + 1)
-        publishChange({ channel: 'record', kind: 'put', keys: [keySnapshot] })
+        publishCommittedWrite(keySnapshot, 'record', removed)
         return resolvedKey
       }),
     deleteRecord: (key, ctx) =>

@@ -103,7 +103,7 @@ type IWebStorageLike = {
 }
 ```
 
-**返回类型**：`ISyncCapableStore<IKeyValueStore>`，即 `IKeyValueStore` 且 `sync` 字段恒非 `undefined`。所有异步方法（`get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose`）都是对应 `sync.*` 方法的 `withAbort` 包装——先检查 `ctx?.signal`/`ctx?.timeoutMs` 是否已经触发取消，未取消再同步调用底层实现，因此本质上不是"真异步"，只是返回 `Promise`。
+**返回类型**：`ISyncCapableStore<IKeyValueStore>`，即 `IKeyValueStore` 且 `sync` 字段恒非 `undefined`。`get`/`set`/`remove`/`has`/`keys`/`clearValues` 是对应 `sync.*` 方法的 `withAbort` 包装，先检查取消，再同步执行底层操作并返回 `Promise`；`clearAll` 与 `dispose` 是异步专有入口。
 
 `sync` 通道方法：
 
@@ -122,13 +122,13 @@ type ISyncKeyValueStore = {
 - `set(key, value, options?)`：`value` 必须是 `string`，否则抛 `INVALID_CONFIG`（不做隐式 `String()` 转换）。写入失败按上文规则归一化异常。
 - `remove(key)`：物理 key 不存在时静默成功（幂等）。
 - `has(key)`：等价于 `getItem(...) !== null`。
-- `keys()`：枚举该命名空间下全部逻辑键。内部会校验宿主 `length` 是否为非负安全整数、`key(index)` 是否恒返回 `string`、以及是否出现重复物理 key（宿主枚举违反契约或并发不一致时抛 `TypeError`，非归一化 `StorageError`——这是防御性断言，属于宿主契约违规而非正常错误路径）。
+- `keys()`：枚举该命名空间下全部逻辑键。内部校验宿主 `length`、`key(index)` 及重复物理 key；内部 coded `TypeError` 在公开 `sync.keys()` 出口归一化为 `StorageError`，原断言异常保留在 cause。
 - `clearValues()`：只删除该命名空间下的键；先拍一份稳定的物理键快照再逐个删除，若中途某个 `removeItem` 抛错，会带上该键的 `logicalKey` 抛出，暴露精确的部分失败边界。
 
 异步专有方法：
 
 - `clearAll(ctx?)`：与 `clearValues` 等价（本后端没有独立于命名空间之外的额外数据）。
-- `dispose()`：仅置位内部 `disposed` 标志；此后任何方法调用抛 `StorageContractError(STORE_DISPOSED)`。不清空宿主存储数据。
+- `dispose()`：backend reactive controller 封闭新接纳，等待 mutation leases 并清理订阅/资源；此后方法调用抛 `StorageContractError(STORE_DISPOSED)`。不清空宿主存储数据。
 
 **5 秒可运行示例**：
 
@@ -296,7 +296,7 @@ console.log(await jar.get('session')) // null
 源码：`src/backends/indexed-db.ts`。是本包中唯一原生支持字节（bytes）、记录（record，structured clone）、事务（transaction）与游标迭代（iteration）的浏览器后端。实现体量最大，下面按选项、生命周期、能力、L0/L1 方法、事务、迭代分别展开。
 
 ```ts
-function indexedDbHost<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>
+function indexedDbHost<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue> & IChangeFeedStore
 
 type IIndexedDbOptions = {
   readonly dbName?: string
@@ -315,7 +315,7 @@ type IIndexedDbOptions = {
 - `kvStoreName?: string` —— 默认 `'kv'`。
 - `bytesStoreName?: string` —— 默认 `'bytes'`。
 - `recordsStoreName?: string` —— 默认 `'records'`。
-- 以上四个名称必须非空字符串；三个 object store 名（`kvStoreName`/`bytesStoreName`/`recordsStoreName`）必须**互不相同**，且不能撞上内部保留名 `__storage_web_revisions__`（revisions store）与 `storage-web:meta`（meta store），否则抛 `INVALID_CONFIG`。
+- 以上四个名称必须非空字符串；三个 object store 名（`kvStoreName`/`bytesStoreName`/`recordsStoreName`）必须**互不相同**，且不能撞上内部保留名 `__storage_web_revisions__`（revisions）、`storage-web:meta`（meta）与 `storage-web:index-records`（sidecar），否则抛 `INVALID_CONFIG`。
 - `cleanupLegacyRecords?: boolean` —— 默认 `false`；必须是 `boolean`，否则抛 `INVALID_CONFIG`。为 `true` 时，会在确认历史 `documents` object store 已完整迁移到 `recordsStoreName`（即元数据记录 `status: 'complete'` 且 `to === recordsStoreName`）后，在下一次数据库版本升级中真正删除旧 store。只应在确认没有客户端仍需要回滚到旧版本代码时开启。
 - `factory?: IDBFactory` —— 测试/非浏览器环境注入点，默认 `globalThis.indexedDB`。缺失抛 `BACKEND_UNAVAILABLE`；存在但不提供 `open()` 方法抛 `INVALID_CONFIG`。
 - `keyRange?: typeof IDBKeyRange` —— 默认 `globalThis.IDBKeyRange`。jsdom 完全不提供原生 IndexedDB，测试环境**必须**和 `factory` 一起从 `fake-indexeddb` 显式传入；提供了但缺 `bound`/`lowerBound`/`upperBound` 静态方法会抛 `INVALID_CONFIG`。仅在真正需要按 range 查询（`iterateRecords`/`list`/`stream` 带 `range`，或恢复历史迁移游标）时才会被解引用；未提供 `keyRange` 时无 range 的调用仍可正常工作，一旦调用方传了 range 才会因缺失 `IDBKeyRange` 抛 `BACKEND_UNAVAILABLE`。
@@ -326,7 +326,7 @@ type IIndexedDbOptions = {
 - 不写死固定版本号打开：同一个 `dbName` 可能已被其他实例用不同的 store 名建过库，硬编码 `version 1` 不会触发 `upgradeneeded`，之后对缺失 store 的 `transaction()` 会直接抛 `NotFoundError`。实际策略是先按当前版本打开，发现缺少任一必需 store（`kvStoreName`/`recordsStoreName`/`bytesStoreName`/revisions/meta）再升一版补建。
 - `onversionchange`：当另一个标签页请求升级时，当前连接会主动 `close()` 让路，并清空内部缓存，避免对方一直被 `blocked`。
 - `onblocked`（升级请求被现有连接阻塞）会让 `open()` 的 Promise 以 `BACKEND_UNAVAILABLE` reject。
-- 内部维护 schema 版本（源码常量 `CURRENT_SCHEMA_VERSION = 2`），存储在 `meta` store 的 `'schema'` key 下。若读到的持久化 schema 版本号**高于**当前代码所知版本，抛 `StorageError(VERSION_UNSUPPORTED)`（防止旧代码误读/覆盖新版本数据）。
+- 内部维护 schema 版本（源码常量 `CURRENT_SCHEMA_VERSION = 3`），由私有 authority 记录校验，并写 public `'schema'` 镜像；镜像不授予 authority。若读到的持久化 schema 版本号**高于**当前代码所知版本，抛 `StorageError(VERSION_UNSUPPORTED)`（防止旧代码误读/覆盖新版本数据）。
 - **历史迁移**：v1 曾用名为 `documents` 的 object store 存记录；`open()` 会检测该 store 是否存在，若存在且尚未完整迁移，以 `128` 条为一批、可断点续跑地把数据搬到 `recordsStoreName`（迁移进度写入 meta store 的 `'migration:records-v1-to-v2'` key，包含 `status`/`lastKey`）。`cleanupLegacyRecords: true` 时，确认迁移完成后触发一次额外的版本升级来 `deleteObjectStore('documents')`。
 
 ### 能力
@@ -456,7 +456,7 @@ readonly metadata: {
 源码：`src/backends/memory.ts`。
 
 ```ts
-function memoryStorageHost<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>
+function memoryStorageHost<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>> & IChangeFeedStore
 ```
 
 无入参，无选项。每次调用创建一个独立、进程内、易失的存储，天然隔离，不需要命名空间参数。实现全部 L0（值）+ L1（字节/记录/迭代/事务）接口，`record` 通道使用 `structuredClone` 做深拷贝隔离（因此不能存函数、不可克隆的宿主对象等）。
@@ -573,7 +573,7 @@ lengthPrefixedNamespaceCodec.decode('other', 'sw1:3:app:theme') // undefined
 
 自定义 `INamespaceCodec`（传给 `namespaceCodec` 选项）需要保证 `encode`/`decode` 互为逆运算且不同命名空间不产生物理 key 碰撞；自定义 codec 自行承担迁移与防碰撞责任，库不做二次校验（仅校验 `encode`/`decode` 是否为函数、返回值类型是否正确——`encode` 必须返回 `string`，`decode` 必须返回 `string | undefined`，否则经 `normalizeError` 归一化为 `StorageError(EXTENSION_FAILED, { extensionStage: 'codec' })`）。
 
-### 关键契约类型（跨包共享，源自 `@migaia/storage-contract`，从根导出）
+### 关键契约类型（从 `@migaia/storage-contract` 直接导入，storage-web 根不转出）
 
 以下类型无需单独导入函数，直接标注调用点即可：
 
@@ -731,13 +731,13 @@ type ISelectedCodec = {
 
 - `codec`（必填）：经 `snapshotCodec` 校验为合法的 `ICodec` 描述符（`name`/`output`/`encode`/`decode` 齐备），否则抛契约级 `INVALID_ARGUMENT`。
 - `capabilities`（必填）：经 `snapshotStorageCapabilities` 校验为完整的能力描述符，否则抛契约级 `INVALID_ARGUMENT`。
-- `onDiagnostic?`：必须是函数（若提供），否则抛 `StorageError(INVALID_CONFIG)`；调用失败（诊断 sink 自身抛错）被静默吞掉，不影响选路结果。
+- `onDiagnostic?`：必须是函数（若提供），否则抛 `StorageError(INVALID_CONFIG)`；sink 抛错交 canonical Utils reportCleanupError 兜底到 console.error，不影响选路结果。
 
 **选路规则**：
 
-1. `codec.output === 'structured'`：`capabilities.records === false` 时抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`（structured clone 能力无法用 JSON 表达，不做隐式转换以避免丢数据）；否则直连原样返回该 codec。
+1. `codec.output === 'structured'`：`capabilities.records === false` 时抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`（structured clone 能力无法用 JSON 表达，不做隐式转换以避免丢数据）；否则返回四字段 codec 快照，函数引用保持。
 2. `codec.output === 'binary'`：`capabilities.binary === true` 时直连；`false` 时自动降级为 base64 文本（体积 +33%），调用一次 `onDiagnostic(message)` 报告降级，返回一个包装过的 `ISelectedCodec`（`encode` 内部转 `bytesToBase64`，`decode` 内部转 `base64ToBytes` 再交给原 codec）。
-3. 其余情况（`output === 'text'`，或已经匹配能力的 `binary`/`structured`）原样直连返回。
+3. 其余情况（`output === 'text'`，或已经匹配能力的 `binary`/`structured`）返回四字段浅快照；容器不是原 codec，不保留额外字段或旧 receiver 绑定。
 
 ```ts
 import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'
@@ -984,7 +984,7 @@ type IInvalidRecordIssue<TRecord = unknown> = {
 - `range`：作用于原始 `id` 空间（不是编排后的物理 key），经 `snapshotKeyRange` 校验。
 - `limit`：非负安全整数，否则抛 `INVALID_CONFIG`。
 - `orderBy`：未提供时使用 `defineEntity` 的 `defaultOrderBy`（若也未提供，按扫描顺序输出）。提供 `orderBy` 时内部会先缓冲全部符合 `range` 的记录、排序后再应用 `limit`——这意味着带排序的 `list`/`stream` 不是流式内存友好的，会一次性把结果集载入内存。比较函数返回非 `number` 或 `NaN` 会抛 `StorageError(EXTENSION_FAILED, { extensionStage: 'comparator', operation: 'entity.orderBy' })`。
-- `onInvalid`：取 `'skip'`（默认）、`'throw'`，或 `(issue) => 'skip' | 'throw'` 处理器函数；`issue.stage` 标识失败发生在解码（`decode`）、迁移（`migrate`）还是校验（`validate`）阶段。处理器返回非 `'skip'`/`'throw'`，或处理器自身抛错，都会归一化为对应的存储错误码（`decode` → `DESERIALIZE_FAILED`，`migrate` → `MIGRATION_FAILED`，其余 → `VALIDATION_FAILED`）。
+- `onInvalid`：取 `'skip'`（默认）、`'throw'`，或 `(issue) => 'skip' | 'throw'` 处理器函数；`issue.stage` 标识失败发生在解码（`decode`）、迁移（`migrate`）还是校验（`validate`）阶段。处理器返回非 `'skip'`/`'throw'` 为 `INVALID_CONFIG`；handler 自身的普通失败按 `VALIDATION_FAILED` 包装，已有 storage-family 错误保持其码与原因链。issue.stage 是记录失败阶段，不决定 handler 错误码。
 - **扫描策略**：KV-only 后端（local/session/cookie）会对**全部键**做一次 `keys()` 扫描后按 `entityName:` 前缀过滤，并调用一次 `onDiagnostic`（`"...list/stream on a value-only backend performs a full key scan"`）——这不是 bug，是这类后端固有的能力限制。结构化后端（IndexedDB/memory）按 entity 的 v2 前缀 range 高效扫描一遍，**再额外扫描一遍全表**以兼容尚未迁移的历史形态记录（`[entityName, id]`），用 `seenIds` 去重避免同一记录在两次扫描中都被 yield。
 - `list` 是 `stream` 的缓冲版本（`for await` 收集进数组后返回）；两者共享同一套过滤/排序/`onInvalid` 逻辑。
 
@@ -1094,6 +1094,13 @@ for await (const user of users.streamBy('byTag', { lower: 'compiler', upper: 'co
 
 `findBy` 返回第一条或 `undefined`；`findManyBy` 返回数组；`streamBy` 保持异步迭代。`list`/`stream` 也接受带 `index` 的判别式选项。IndexedDB 把投影维护在固定 sidecar 中，并在 record 写入、删除和迁移事务内原子更新；其 `secondaryIndexes` 为 `true`。其他后端使用同一个投影与比较语义做 fallback，不虚报原生能力。unique 冲突在提交前失败，不能留下 record 与 sidecar 不一致的半提交。
 
+fallback 写约束使用与原生 sidecar 相同的逻辑唯一键判定。record 的 put/batch/migrate 在事务最终草稿校验，保留同一 id 替换、删除后复用及事务回滚。每个涉及 unique 的提交还更新保留键 `[REPOSITORY_KEY_PREFIX, entityName]`，用既有 record revision 检测并发新增所有者；它是两段内部标记，不是三段 entity record，不参加实体查询和迁移。原始 record 枚举可以看见该标记。
+
+KV-only 写入先编码并物化原始文本快照，在宿主锁内重新核对快照后提交；应用 schema/codec 回调在锁外执行。准备期间竞争提交导致 `TRANSACTION_CONFLICT`，调用方可重试完整操作；稳定快照中的重复 owner 为 `INDEX_UNIQUE_CONFLICT`。fallback 为约束检查增加全扫描和对应 schema/projection 读取；不增加持久化 sidecar。新写路径中的 selector 普通异常通过既有 `EXTENSION_FAILED` 边界保留原 cause，原生 backfill 的原对象透传保持。
+
+跨页面 KV 提交已验证 Chromium/WebKit 的原生 Web Locks 路径。宿主没有 Web Locks 时，Lifecycle 队列仅协调同一模块实例的调用；这种环境下跨 realm/模块共享 KV 的全局保证仍是未闭合的契约裁定，不能宣称已验证。全部后端仍可使用原有 API，`secondaryIndexes` 能力位不变。
+
+
 ---
 
 <a id="constructor-first-host-初始化"></a>
@@ -1118,7 +1125,7 @@ const host = await createStorageHost({
 host.backend('cache') // 精确推导 memory store
 host.backend('primary') // 精确推导 IndexedDB record store
 host.hasBackend('cache')
-host.backends() // mutation-incapable snapshot
+host.backends() // detached ReadonlyMap；运行时普通 Map，改副本不改 registry
 ```
 
 内置 plugin 子路径及默认 ID：
@@ -1294,6 +1301,7 @@ V4 索引、Host 与 reactive 追加错误码：
 | `indexOrphan`                  | `INDEX_ORPHAN`                    | sidecar 指向的 authoritative record 不存在；修复或重建索引。             |
 | `indexUniqueConflict`          | `INDEX_UNIQUE_CONFLICT`           | unique key 已属于另一记录；修改值或删除竞争记录后重试。                  |
 | `indexQueryInvalidated`        | `INDEX_QUERY_INVALIDATED`         | 分页期间 epoch 改变；从头重启查询。                                      |
+| `indexBackfillFailed` | `INDEX_BACKFILL_FAILED` | 回填与失败状态保存同时失败；检查原生 AggregateError 的 cause/errors 后重试。 |
 | `indexBackfillStale`           | `INDEX_BACKFILL_STALE`            | owner/generation/checkpoint 已过期；重新取得 repository session 后重试。 |
 | `backendIdInvalid`             | `BACKEND_ID_INVALID`              | 修正 backend ID。                                                        |
 | `backendDuplicate`             | `BACKEND_DUPLICATE`               | 使用不同 ID，或等待既有安装完成。                                        |
@@ -1323,7 +1331,7 @@ try {
 }
 ```
 
-### 契约级错误（跨包共享，源自 `@migaia/storage-contract`，经根路径透传）
+### 契约级错误（直接从 `@migaia/storage-contract` 导入，storage-web 根不转出）
 
 ```ts
 class StorageContractError extends Error {
@@ -1453,3 +1461,12 @@ pnpm --filter @migaia/storage-web run test:e2e
 ```
 
 `test` 会先执行 `build`（Vite 打包 + `tsc --emitDeclarationOnly`）再跑 `vitest run --coverage`；`test:e2e` 使用 `e2e/playwright.config.ts`，需要本机已安装 Playwright 浏览器依赖。
+
+
+高版本 entity 即使省略 migrations 也必须提供完整图。已有 StorageError 补充元数据或 stage 时，将完整原错误置于 cause 并保留其 message；Standard Schema validate 的同步抛错与异步 rejection 均为 VALIDATION_FAILED/cause。
+
+默认 namespace decoder 将坏编码物理 key 视为不匹配并返回 undefined，不删除它，也不阻断本命名空间枚举。
+
+自定义 push adapter 的 invalidate() 无参数时粗粒度刷新同 adapter 的全部查询，跳过需要已知 change 的 scope/matches 筛选；带 change 时按既有规则筛选。复用原事件通道与 Resource，不生成虚构 sequence/origin。
+
+Host 只公开应用能力边界；内部登记名、service 名与 native admission metadata 不再转出。使用 backend()/reactiveBackend() 和 plugin.id。

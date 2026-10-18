@@ -1018,15 +1018,11 @@
         "indexedDbHost"
       ],
       "./host": [
-        "STORAGE_LIVE_QUERY_SERVICE_NAME",
         "StorageHostFacade",
         "assertStorageBackendId",
         "createStorageHost",
         "defineFeature",
-        "definePlugin",
-        "pluginNameFromBackendId",
-        "reactiveAdapterNameFromBackendId",
-        "readStorageNativePluginMetadata"
+        "definePlugin"
       ],
       "./plugins/memory": [
         "memoryBackendPlugin"

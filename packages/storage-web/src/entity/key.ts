@@ -15,6 +15,12 @@ export const composeStructuredKey = (entityName: string, id: IStorageKey): IStor
 /** Reserved v2 prefix keeps repository records disjoint from raw record keys. */
 export const REPOSITORY_KEY_PREFIX = '__storage_web_entity_v2__'
 
+/** Transactional conflict marker; its two-part key cannot be mistaken for a three-part entity row. */
+export const repositoryUniqueWriteKey = (entityName: string): IStorageKey => [
+  REPOSITORY_KEY_PREFIX,
+  entityName
+]
+
 /** Stable metadata key shared by repository migration orchestration and the raw-record firewall. */
 export const repositoryMigrationKey = (entityName: string): string =>
   `repository:${entityName}:migration`

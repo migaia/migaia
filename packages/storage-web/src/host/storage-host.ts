@@ -542,7 +542,7 @@ export class StorageHostFacade<
     return this.#registry.has(id)
   }
 
-  /** Returns a mutation-incapable copy of the current store registry. */
+  /** Return a detached Map copy, typed readonly; mutating the copy cannot change this registry. */
   backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]> {
     this.#assertOpen()
     return new Map(this.#registry) as unknown as ReadonlyMap<

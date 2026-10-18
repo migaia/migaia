@@ -12,8 +12,17 @@ import {
   reportCleanupError,
   type IStorageOperationRuntime
 } from '../core/operation-reporter.js'
-import { StorageError, StorageErrorCode, createStorageError } from '../types/errors.js'
-import { indexUniqueConflictText, StorageErrorText } from '../error-text.js'
+import {
+  createStorageAggregateError,
+  StorageError,
+  StorageErrorCode,
+  createStorageError
+} from '../types/errors.js'
+import {
+  indexUniqueConflictText,
+  indexBackfillFailureText,
+  StorageErrorText
+} from '../error-text.js'
 import {
   StorageBackend,
   StorageChannel,
@@ -47,8 +56,9 @@ import { planChannelWrite } from '../core/channel-write.js'
 import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '../entity/key.js'
 import { isArrayBuffer, isUint8Array } from '../core/bytes.js'
 import { normalizeError } from '../core/errors.js'
+import { collectUniqueIndexOwners } from '../core/unique-index.js'
 import { isStorageKeyInRange } from '../core/query.js'
-import { UtilsAbortError, withTimeout } from '@migaia/utils/promise'
+import { UtilsAbortError, withTimeout, raceWithAbort } from '@migaia/utils/promise'
 import { UtilsErrorCode } from '@migaia/utils/error'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import {
@@ -312,7 +322,7 @@ const assertBackfillProjectionLimits = (
 }
 
 /** Preserve contract cancellation identity when `withTimeout` reports through its utils error. */
-const normalizeTransactionCallbackError = (error: unknown): StorageContractError | StorageError => {
+const normalizeIndexedDbOperationError = (error: unknown): StorageContractError | StorageError => {
   if (error instanceof UtilsAbortError)
     return new StorageContractError(StorageContractErrorCode.aborted, {
       backend: StorageBackend.indexedDb,
@@ -826,44 +836,55 @@ export const indexedDbHost = <TValue = unknown>(
     definitions: readonly IRecordIndexDefinition[],
     _ctx?: IOperationContext
   ): Promise<IRecordIndexHandle> =>
-    withMutationLease(async (lease) => {
-      assertLive()
-      const operation = snapshotOperationContext(_ctx)
-      throwIfAborted(operation?.signal)
-      const fingerprint = JSON.stringify(definitions)
-      const runtime = createStorageOperationRuntime()
-      const database = await open(runtime, lease)
-      /** The readwrite metadata transaction is the cross-connection linearization point. */
-      const transaction = createTransaction(database, META_STORE_NAME, 'readwrite')
-      const metadata = transaction.objectStore(META_STORE_NAME)
-      const existing = (await fromIdbRequest(
-        metadata.get(indexMetadataKey(scope)),
-        { signal: operation?.signal },
-        runtime
-      )) as (Record<string, unknown> & { readonly handle?: IRecordIndexHandle }) | undefined
-      const existingReadiness = existing?.readiness as IRecordIndexReadiness | undefined
-      if (
-        isValidIndexGeneration(existing?.handle?.generation) &&
-        existing?.handle?.fingerprint === fingerprint &&
-        existingReadiness?.status !== 'failed'
-      ) {
-        await idbTransactionCommit(transaction, { signal: operation?.signal }, runtime)
-        return existing.handle
-      }
-      const generation = createIndexGeneration()
-      const handle = Object.freeze({ scope, generation, fingerprint })
-      if (existing?.handle !== undefined) archiveIndexGeneration(metadata, existing, generation)
-      metadata.put(
-        {
-          handle,
-          currentGeneration: generation,
-          readiness: { status: 'pending', scanned: 0, indexed: 0 }
-        },
-        indexMetadataKey(scope)
-      )
-      await idbTransactionCommit(transaction, { signal: operation?.signal }, runtime)
-      return handle
-    })
+    withMutationLease((lease) =>
+      withAbort(_ctx, async (signal, _context, runtime) => {
+        assertLive()
+        throwIfAborted(signal)
+        const fingerprint = JSON.stringify(definitions)
+        const database = await (
+          signal === undefined
+            ? open(runtime, lease)
+            : raceWithAbort(() => open(runtime, lease), {
+                signal,
+                cleanupPolicy: 'report',
+                report: runtime.reporter
+              })
+        ).catch((cause: unknown) => {
+          throw normalizeIndexedDbOperationError(cause)
+        })
+        throwIfAborted(signal)
+        /** The readwrite metadata transaction is the cross-connection linearization point. */
+        const transaction = createTransaction(database, META_STORE_NAME, 'readwrite')
+        const metadata = transaction.objectStore(META_STORE_NAME)
+        const existing = (await fromIdbRequest(
+          metadata.get(indexMetadataKey(scope)),
+          { signal },
+          runtime
+        )) as (Record<string, unknown> & { readonly handle?: IRecordIndexHandle }) | undefined
+        const existingReadiness = existing?.readiness as IRecordIndexReadiness | undefined
+        if (
+          isValidIndexGeneration(existing?.handle?.generation) &&
+          existing?.handle?.fingerprint === fingerprint &&
+          existingReadiness?.status !== 'failed'
+        ) {
+          await idbTransactionCommit(transaction, { signal }, runtime)
+          return existing.handle
+        }
+        const generation = createIndexGeneration()
+        const handle = Object.freeze({ scope, generation, fingerprint })
+        if (existing?.handle !== undefined) archiveIndexGeneration(metadata, existing, generation)
+        metadata.put(
+          {
+            handle,
+            currentGeneration: generation,
+            readiness: { status: 'pending', scanned: 0, indexed: 0 }
+          },
+          indexMetadataKey(scope)
+        )
+        await idbTransactionCommit(transaction, { signal }, runtime)
+        return handle
+      })
+    )
 
   /** Open one metadata-owned backfill lease and expose immutable record batches. */
   const openBackfillSession = async (
@@ -1617,7 +1638,11 @@ export const indexedDbHost = <TValue = unknown>(
                 failRuntime
               )
             } catch (persistFailure) {
-              throw new AggregateError([cause, persistFailure])
+              throw createStorageAggregateError(
+                StorageErrorCode.indexBackfillFailed,
+                indexBackfillFailureText(handle.scope),
+                [cause, persistFailure]
+              )
             }
             released = true
           }),
@@ -2726,7 +2751,7 @@ export const indexedDbHost = <TValue = unknown>(
         report: runtime.reporter
       })
     } catch (error) {
-      throw normalizeTransactionCallbackError(error)
+      throw normalizeIndexedDbOperationError(error)
     } finally {
       scopeActive = false
     }
@@ -2965,7 +2990,7 @@ export const indexedDbHost = <TValue = unknown>(
         report: runtime.reporter
       })
     } catch (cause) {
-      throw normalizeTransactionCallbackError(cause)
+      throw normalizeIndexedDbOperationError(cause)
     } finally {
       scopeActive = false
     }
@@ -2990,41 +3015,12 @@ export const indexedDbHost = <TValue = unknown>(
       )
         throw staleIndexHandleError()
       const definitions = JSON.parse(handle.fingerprint) as IRecordIndexDefinition[]
-      const definitionsByName = new Map(
-        definitions.map((definition) => [definition.name, definition])
+      /** Native and fallback writes share one canonical owner/key comparison. */
+      const uniqueOwners = collectUniqueIndexOwners(
+        definitions,
+        [...mutations.values()].filter((mutation) => mutation.kind === 'put'),
+        StorageBackend.indexedDb
       )
-      const uniqueOwners = new Map<
-        string,
-        { readonly indexName: string; readonly indexValue: IStorageKey; readonly owner: string }
-      >()
-      for (const mutation of mutations.values()) {
-        if (mutation.kind !== 'put') continue
-        for (const [indexName, entry] of Object.entries(mutation.projection)) {
-          const definition = definitionsByName.get(indexName)
-          if (definition === undefined)
-            throw new StorageError(StorageErrorCode.invalidConfig, {
-              backend: StorageBackend.indexedDb
-            })
-          if (!definition.unique || entry === undefined) continue
-          const values = entry.kind === 'multiple' ? entry.keys : [entry.key]
-          for (const indexValue of values) {
-            const identity = JSON.stringify([indexName, encodeFlatStorageKey(indexValue)])
-            const recordIdentity = encodeFlatStorageKey(mutation.key)
-            const existingOwner = uniqueOwners.get(identity)
-            if (existingOwner !== undefined && existingOwner.owner !== recordIdentity)
-              throw new StorageError(
-                StorageErrorCode.indexUniqueConflict,
-                { backend: StorageBackend.indexedDb, key: mutation.key },
-                indexUniqueConflictText(indexName)
-              )
-            uniqueOwners.set(identity, {
-              indexName,
-              indexValue,
-              owner: recordIdentity
-            })
-          }
-        }
-      }
       const sidecar = transaction.objectStore(INDEX_RECORDS_STORE_NAME)
       const draftedRecords = new Set(mutations.keys())
       for (const { indexName, indexValue, owner } of uniqueOwners.values()) {
@@ -3164,227 +3160,250 @@ export const indexedDbHost = <TValue = unknown>(
     iterateRecordIndex: async function* (query: IRecordIndexQuery, _ctx?: IOperationContext) {
       assertLive()
       if (!isValidIndexGeneration(query.handle.generation)) throw staleIndexHandleError()
-      const operation = snapshotOperationContext(_ctx)
-      const signal = operation?.signal
-      throwIfAborted(signal)
-      if (!keyRange)
-        throw new StorageError(StorageErrorCode.unavailable, {
-          backend: StorageBackend.indexedDb,
-          cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
-        })
-      const range = snapshotKeyRange(query.range, StorageBackend.indexedDb)
-      const direction: IDBCursorDirection = query.direction === 'prev' ? 'prev' : 'next'
-      const prefix: IDBValidKey[] = [query.handle.scope, query.index, query.handle.generation]
-      /** Bounded per short readonly transaction; keeps SWV2-D26 pages small and predictable. */
-      const pageSize = INDEX_QUERY_PAGE_SIZE
-      /**
-       * `{global, scope}` mutation-epoch vector observed on the first page; every later page must
-       * match.
-       */
-      let expectedEpoch: { readonly global: number; readonly scope: number } | undefined
-      /**
-       * Full sidecar primary key ([scope, indexName, generation, indexValue, recordKey]) of the
-       * last cursor position visited. The `lookup` index key alone ([scope, indexName, generation,
-       * indexValue]) is not unique when an index value is shared by multiple records, so a page
-       * boundary falling inside such a tied group must resume by primary key, not by index key: the
-       * next page's range is bounded _inclusively_ at the boundary group's index key (so remaining
-       * ties are not dropped), and every cursor entry already emitted is then skipped by comparing
-       * full primary keys until this position is passed.
-       */
-      let continuation: IDBValidKey[] | undefined
-      let emitted = 0
-      let exhausted = false
-      while (!exhausted) {
-        assertLive()
+      /** One deadline and abort subscription belong to the entire iterator, including yields. */
+      const runtime = createStorageOperationRuntime()
+      const { signal, dispose: disposeSignal } = mergeSignals(_ctx, runtime.reporter)
+      try {
         throwIfAborted(signal)
-        if (query.limit !== undefined && emitted >= query.limit) break
-        const runtime = createStorageOperationRuntime()
-        const database = await open(runtime)
-        const transaction = createTransaction(
-          database,
-          [recordsStoreName, INDEX_RECORDS_STORE_NAME, META_STORE_NAME, REVISIONS_STORE_NAME],
-          'readonly'
-        )
-        const committed = idbTransactionCommit(transaction, { signal }, runtime)
-        void committed.catch(() => {})
-        const page: Array<[IStorageKey, TValue]> = []
-        let cursorExhausted = true
-        try {
-          const revisionsStore = transaction.objectStore(REVISIONS_STORE_NAME)
-          const globalEpoch =
-            ((await fromIdbRequest(
-              revisionsStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-              { signal },
-              runtime
-            )) as number | undefined) ?? 0
-          const scopeEpoch =
-            ((await fromIdbRequest(
-              revisionsStore.get(indexScopeEpochKey(query.handle.scope)) as IDBRequest<
-                number | undefined
-              >,
-              { signal },
-              runtime
-            )) as number | undefined) ?? 0
-          if (expectedEpoch === undefined)
-            expectedEpoch = { global: globalEpoch, scope: scopeEpoch }
-          else if (expectedEpoch.global !== globalEpoch || expectedEpoch.scope !== scopeEpoch)
-            throw new StorageError(
-              StorageErrorCode.indexQueryInvalidated,
-              { backend: StorageBackend.indexedDb },
-              StorageErrorText.indexQueryInvalidated
-            )
-          const state = (await fromIdbRequest(
-            transaction.objectStore(META_STORE_NAME).get(indexMetadataKey(query.handle.scope)),
-            { signal },
-            runtime
-          )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
-          if (state?.handle?.generation !== query.handle.generation) throw staleIndexHandleError()
-          if (state.readiness?.status !== 'complete')
-            throw new StorageError(StorageErrorCode.unavailable, {
-              backend: StorageBackend.indexedDb,
-              cause: new Error('record index is not complete; caller must use fallback scan')
-            })
-          const index = transaction.objectStore(INDEX_RECORDS_STORE_NAME).index('lookup')
-          /**
-           * The boundary group's index key ([scope, indexName, generation, indexValue]) is bound
-           * inclusively so records tied with the last-visited entry are not dropped;
-           * already-visited ties are skipped below by comparing full primary keys.
-           */
-          const continuationIndexKey = continuation?.slice(0, 4)
-          const cursorRange = toIdbRecordIndexRange(
-            range,
-            prefix,
-            keyRange,
-            direction,
-            continuation
+        if (!keyRange)
+          throw new StorageError(StorageErrorCode.unavailable, {
+            backend: StorageBackend.indexedDb,
+            cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
+          })
+        const range = snapshotKeyRange(query.range, StorageBackend.indexedDb)
+        const direction: IDBCursorDirection = query.direction === 'prev' ? 'prev' : 'next'
+        const prefix: IDBValidKey[] = [query.handle.scope, query.index, query.handle.generation]
+        /** Bounded per short readonly transaction; keeps SWV2-D26 pages small and predictable. */
+        const pageSize = INDEX_QUERY_PAGE_SIZE
+        /**
+         * `{global, scope}` mutation-epoch vector observed on the first page; every later page must
+         * match.
+         */
+        let expectedEpoch: { readonly global: number; readonly scope: number } | undefined
+        /**
+         * Full sidecar primary key ([scope, indexName, generation, indexValue, recordKey]) of the
+         * last cursor position visited. The `lookup` index key alone ([scope, indexName,
+         * generation, indexValue]) is not unique when an index value is shared by multiple records,
+         * so a page boundary falling inside such a tied group must resume by primary key, not by
+         * index key: the next page's range is bounded _inclusively_ at the boundary group's index
+         * key (so remaining ties are not dropped), and every cursor entry already emitted is then
+         * skipped by comparing full primary keys until this position is passed.
+         */
+        let continuation: IDBValidKey[] | undefined
+        let emitted = 0
+        let exhausted = false
+        while (!exhausted) {
+          assertLive()
+          throwIfAborted(signal)
+          if (query.limit !== undefined && emitted >= query.limit) break
+          const database = await (
+            signal === undefined
+              ? open(runtime)
+              : raceWithAbort(() => open(runtime), {
+                  signal,
+                  cleanupPolicy: 'report',
+                  report: runtime.reporter
+                })
+          ).catch((cause: unknown) => {
+            throw normalizeIndexedDbOperationError(cause)
+          })
+          const transaction = createTransaction(
+            database,
+            [recordsStoreName, INDEX_RECORDS_STORE_NAME, META_STORE_NAME, REVISIONS_STORE_NAME],
+            'readonly'
           )
-          const cursorRequest = index.openKeyCursor(cursorRange, direction)
-          let cursor = (await fromIdbRequest(
-            cursorRequest,
-            { signal },
-            runtime
-          )) as IDBCursor | null
-          if (cursor !== null && continuation !== undefined && continuationIndexKey !== undefined) {
-            /**
-             * The inclusive range may land the fresh cursor before, exactly at, or already past the
-             * last-visited entry, and each case needs different handling: `continuePrimaryKey`
-             * throws `DataError` if asked to move to a position at-or-before the cursor's _current_
-             * one (per spec, even requesting the cursor's own exact position is rejected), so an
-             * exact match must use a plain single-step `continue()` instead, and an already-past
-             * position needs no skip at all. When the cursor is still strictly before the previous
-             * continuation (earlier not-yet-skipped ties in the same index-key group),
-             * `continuePrimaryKey` jumps straight past it in one engine-side seek. Either branch is
-             * O(1) regardless of tie-group size, unlike a JS walk over every already-emitted tied
-             * entry, which would be `Θ(G)` per page and quadratic across a group spanning multiple
-             * pages (SWV2-D26/§4.8 require `O(pageSize)` per page; SWV2-SEC06 resource
-             * exhaustion).
-             */
-            const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
-            const comparison = compareStorageKeys(
-              currentPrimaryKey as unknown as IStorageKey,
-              continuation as unknown as IStorageKey
-            )
-            const isBeforeContinuation = direction === 'prev' ? comparison > 0 : comparison < 0
-            if (isBeforeContinuation) {
-              /**
-               * `continuePrimaryKey` finds the first record whose (index key, primary key) is
-               * _inclusive_ of the given pair — it may land exactly back on `continuation` itself
-               * if that sidecar row still exists, not strictly past it. The single `.continue()`
-               * correction below then steps past it deterministically.
-               */
-              cursor.continuePrimaryKey(
-                continuationIndexKey,
-                continuation as unknown as IDBValidKey
-              )
-              cursor = (await fromIdbRequest(
-                cursorRequest,
+          const committed = idbTransactionCommit(transaction, { signal }, runtime)
+          void committed.catch(() => {})
+          const page: Array<[IStorageKey, TValue]> = []
+          let cursorExhausted = true
+          try {
+            const revisionsStore = transaction.objectStore(REVISIONS_STORE_NAME)
+            const globalEpoch =
+              ((await fromIdbRequest(
+                revisionsStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
                 { signal },
                 runtime
-              )) as IDBCursor | null
-            }
-            if (cursor !== null) {
-              const landedPrimaryKey = cursor.primaryKey as IDBValidKey[]
-              const stillAtContinuation =
-                compareStorageKeys(
-                  landedPrimaryKey as unknown as IStorageKey,
-                  continuation as unknown as IStorageKey
-                ) === 0
-              if (stillAtContinuation) {
-                cursor.continue()
+              )) as number | undefined) ?? 0
+            const scopeEpoch =
+              ((await fromIdbRequest(
+                revisionsStore.get(indexScopeEpochKey(query.handle.scope)) as IDBRequest<
+                  number | undefined
+                >,
+                { signal },
+                runtime
+              )) as number | undefined) ?? 0
+            if (expectedEpoch === undefined)
+              expectedEpoch = { global: globalEpoch, scope: scopeEpoch }
+            else if (expectedEpoch.global !== globalEpoch || expectedEpoch.scope !== scopeEpoch)
+              throw new StorageError(
+                StorageErrorCode.indexQueryInvalidated,
+                { backend: StorageBackend.indexedDb },
+                StorageErrorText.indexQueryInvalidated
+              )
+            const state = (await fromIdbRequest(
+              transaction.objectStore(META_STORE_NAME).get(indexMetadataKey(query.handle.scope)),
+              { signal },
+              runtime
+            )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
+            if (state?.handle?.generation !== query.handle.generation) throw staleIndexHandleError()
+            if (state.readiness?.status !== 'complete')
+              throw new StorageError(StorageErrorCode.unavailable, {
+                backend: StorageBackend.indexedDb,
+                cause: new Error('record index is not complete; caller must use fallback scan')
+              })
+            const index = transaction.objectStore(INDEX_RECORDS_STORE_NAME).index('lookup')
+            /**
+             * The boundary group's index key ([scope, indexName, generation, indexValue]) is bound
+             * inclusively so records tied with the last-visited entry are not dropped;
+             * already-visited ties are skipped below by comparing full primary keys.
+             */
+            const continuationIndexKey = continuation?.slice(0, 4)
+            const cursorRange = toIdbRecordIndexRange(
+              range,
+              prefix,
+              keyRange,
+              direction,
+              continuation
+            )
+            const cursorRequest = index.openKeyCursor(cursorRange, direction)
+            let cursor = (await fromIdbRequest(
+              cursorRequest,
+              { signal },
+              runtime
+            )) as IDBCursor | null
+            if (
+              cursor !== null &&
+              continuation !== undefined &&
+              continuationIndexKey !== undefined
+            ) {
+              /**
+               * The inclusive range may land the fresh cursor before, exactly at, or already past
+               * the last-visited entry, and each case needs different handling:
+               * `continuePrimaryKey` throws `DataError` if asked to move to a position at-or-before
+               * the cursor's _current_ one (per spec, even requesting the cursor's own exact
+               * position is rejected), so an exact match must use a plain single-step `continue()`
+               * instead, and an already-past position needs no skip at all. When the cursor is
+               * still strictly before the previous continuation (earlier not-yet-skipped ties in
+               * the same index-key group), `continuePrimaryKey` jumps straight past it in one
+               * engine-side seek. Either branch is O(1) regardless of tie-group size, unlike a JS
+               * walk over every already-emitted tied entry, which would be `Θ(G)` per page and
+               * quadratic across a group spanning multiple pages (SWV2-D26/§4.8 require
+               * `O(pageSize)` per page; SWV2-SEC06 resource exhaustion).
+               */
+              const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
+              const comparison = compareStorageKeys(
+                currentPrimaryKey as unknown as IStorageKey,
+                continuation as unknown as IStorageKey
+              )
+              const isBeforeContinuation = direction === 'prev' ? comparison > 0 : comparison < 0
+              if (isBeforeContinuation) {
+                /**
+                 * `continuePrimaryKey` finds the first record whose (index key, primary key) is
+                 * _inclusive_ of the given pair — it may land exactly back on `continuation` itself
+                 * if that sidecar row still exists, not strictly past it. The single `.continue()`
+                 * correction below then steps past it deterministically.
+                 */
+                cursor.continuePrimaryKey(
+                  continuationIndexKey,
+                  continuation as unknown as IDBValidKey
+                )
                 cursor = (await fromIdbRequest(
                   cursorRequest,
                   { signal },
                   runtime
                 )) as IDBCursor | null
               }
+              if (cursor !== null) {
+                const landedPrimaryKey = cursor.primaryKey as IDBValidKey[]
+                const stillAtContinuation =
+                  compareStorageKeys(
+                    landedPrimaryKey as unknown as IStorageKey,
+                    continuation as unknown as IStorageKey
+                  ) === 0
+                if (stillAtContinuation) {
+                  cursor.continue()
+                  cursor = (await fromIdbRequest(
+                    cursorRequest,
+                    { signal },
+                    runtime
+                  )) as IDBCursor | null
+                }
+              }
             }
-          }
-          let scannedInPage = 0
-          while (cursor !== null && scannedInPage < pageSize) {
-            assertLive()
-            throwIfAborted(signal)
-            scannedInPage += 1
-            const lookupKey = cursor.key
-            if (
-              !Array.isArray(lookupKey) ||
-              lookupKey.length !== 4 ||
-              lookupKey[0] !== prefix[0] ||
-              lookupKey[1] !== prefix[1] ||
-              lookupKey[2] !== prefix[2]
-            ) {
+            let scannedInPage = 0
+            while (cursor !== null && scannedInPage < pageSize) {
+              assertLive()
+              throwIfAborted(signal)
+              scannedInPage += 1
+              const lookupKey = cursor.key
+              if (
+                !Array.isArray(lookupKey) ||
+                lookupKey.length !== 4 ||
+                lookupKey[0] !== prefix[0] ||
+                lookupKey[1] !== prefix[1] ||
+                lookupKey[2] !== prefix[2]
+              ) {
+                cursor.continue()
+                cursor = (await fromIdbRequest(
+                  cursorRequest,
+                  { signal },
+                  runtime
+                )) as IDBCursor | null
+                continue
+              }
+              const primaryKey = cursor.primaryKey as IDBValidKey[]
+              continuation = primaryKey
+              const recordKey = primaryKey[4] as IStorageKey
+              const indexValue = primaryKey[3] as IStorageKey
+              if (isStorageKeyInRange(indexValue, range)) {
+                const value = await fromIdbRequest(
+                  transaction.objectStore(recordsStoreName).get(toIdbKey(recordKey)) as IDBRequest<
+                    TValue | undefined
+                  >,
+                  { signal },
+                  runtime
+                )
+                if (value === undefined)
+                  runtime.reporter(
+                    new StorageError(
+                      StorageErrorCode.indexOrphan,
+                      { backend: StorageBackend.indexedDb, key: recordKey },
+                      StorageErrorText.indexOrphan
+                    )
+                  )
+                else page.push([recordKey, value])
+              }
               cursor.continue()
               cursor = (await fromIdbRequest(
                 cursorRequest,
                 { signal },
                 runtime
               )) as IDBCursor | null
-              continue
             }
-            const primaryKey = cursor.primaryKey as IDBValidKey[]
-            continuation = primaryKey
-            const recordKey = primaryKey[4] as IStorageKey
-            const indexValue = primaryKey[3] as IStorageKey
-            if (isStorageKeyInRange(indexValue, range)) {
-              const value = await fromIdbRequest(
-                transaction.objectStore(recordsStoreName).get(toIdbKey(recordKey)) as IDBRequest<
-                  TValue | undefined
-                >,
-                { signal },
-                runtime
-              )
-              if (value === undefined)
-                runtime.reporter(
-                  new StorageError(
-                    StorageErrorCode.indexOrphan,
-                    { backend: StorageBackend.indexedDb, key: recordKey },
-                    StorageErrorText.indexOrphan
-                  )
-                )
-              else page.push([recordKey, value])
+            cursorExhausted = cursor === null
+            await committed
+          } catch (cause) {
+            try {
+              transaction.abort()
+            } catch {
+              /* transaction already settled */
             }
-            cursor.continue()
-            cursor = (await fromIdbRequest(cursorRequest, { signal }, runtime)) as IDBCursor | null
+            await committed.catch(() => {})
+            throw cause
           }
-          cursorExhausted = cursor === null
-          await committed
-        } catch (cause) {
-          try {
-            transaction.abort()
-          } catch {
-            /* transaction already settled */
+          for (const entry of page) {
+            throwIfAborted(signal)
+            if (query.limit !== undefined && emitted >= query.limit) {
+              exhausted = true
+              break
+            }
+            emitted += 1
+            yield entry
           }
-          await committed.catch(() => {})
-          throw cause
+          if (cursorExhausted) exhausted = true
         }
-        for (const entry of page) {
-          if (query.limit !== undefined && emitted >= query.limit) {
-            exhausted = true
-            break
-          }
-          emitted += 1
-          yield entry
-        }
-        if (cursorExhausted) exhausted = true
+      } finally {
+        disposeSignal()
       }
     },
     transactionIndexed: <T>(

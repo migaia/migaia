@@ -94,7 +94,7 @@ export type IStorageReactiveAdapter = {
   readonly consistency: IStorageReactiveFeatureMetadata
   readonly acquireQuery: (
     terminal?: IStorageReactiveQueryTerminal,
-    onChange?: (change: IStorageChange) => void
+    onChange?: (change?: IStorageChange) => void
   ) => IStorageReactiveQueryLease
   readonly startSource: () => void
   readonly dispose: () => Promise<void>
@@ -208,7 +208,7 @@ export const createStorageReactiveService = (
       report: (error) => report(input.report, error)
     })
     const sourceAbort = createAbortController()
-    const invalidations = createEventChannel<IStorageChange>({
+    const invalidations = createEventChannel<IStorageChange | undefined>({
       dispatchPolicy: 'queued',
       report: (error) => report(input.report, error)
     })
@@ -252,7 +252,7 @@ export const createStorageReactiveService = (
     }
 
     /** Publishes one backend invalidation; event-subscriber owns fanout snapshot/order. */
-    const publishChange = (change: IStorageChange): void => {
+    const publishChange = (change?: IStorageChange): void => {
       try {
         invalidations.publish(change)
       } catch (error) {
@@ -307,7 +307,7 @@ export const createStorageReactiveService = (
     /** Registers one query as a lifecycle-owned resource, never in a terminal registry. */
     const acquireQuery = (
       terminal?: IStorageReactiveQueryTerminal,
-      onChange?: (change: IStorageChange) => void
+      onChange?: (change?: IStorageChange) => void
     ): IStorageReactiveQueryLease => {
       if (adapterScope.lifecycle !== 'open')
         throw new StorageError(
@@ -585,13 +585,14 @@ export const createStorageReactiveService = (
         },
         (change) => {
           if (
+            change !== undefined &&
             input.scope !== undefined &&
             change.scope !== undefined &&
             change.scope !== input.scope
           )
             return
           let related = true
-          if (input.matches !== undefined) {
+          if (change !== undefined && input.matches !== undefined) {
             try {
               related = input.matches(change)
             } catch (error) {

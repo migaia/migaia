@@ -92,7 +92,7 @@ export const defineReactiveAdapterFeature = <TStore extends IKeyValueStore>(
         scheduler: context.scheduler,
         signal: context.signal,
         invalidate: (change) => {
-          if (change !== undefined) context.onChange(change)
+          context.onChange(change)
         },
         report: context.report
       })

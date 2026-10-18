@@ -744,13 +744,13 @@ describe('查询排序与无效记录策略', () => {
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
       extensionStage: 'schema',
-      cause: { message: 'invalid n' }
+      cause: { cause: { message: 'invalid n' } }
     })
     await expect(strictRepo.list({ onInvalid: 'throw' })).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
       extensionStage: 'schema',
-      cause: { message: 'invalid n' }
+      cause: { cause: { message: 'invalid n' } }
     })
   })
 })

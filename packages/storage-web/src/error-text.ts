@@ -1,5 +1,9 @@
 /** Stable diagnostic text for an IndexedDB sidecar row without an authoritative record. */
 export const StorageErrorText = Object.freeze({
+  /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */
+  entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit',
+  /** Entity construction requires every upgrade step, including when the graph is omitted. */
+  entityMigrationGraphIncomplete: 'entity migration graph must contain every version step',
   /** Standard Schema issue arrays must contain object entries with string messages. */
   standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues',
   /** Namespace codecs must encode a physical key as a string. */

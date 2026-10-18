@@ -68,15 +68,19 @@ export const invokeExtension = async <T>(
       })
     if (error instanceof StorageError) {
       if (error.operation !== undefined && error.extensionStage !== undefined) throw error
-      throw new StorageError(error.code, {
-        backend: error.backend ?? backend,
-        key: error.key,
-        existingChannel: error.existingChannel,
-        attemptedChannel: error.attemptedChannel,
-        operation: error.operation ?? operation,
-        extensionStage: error.extensionStage ?? extensionStage,
-        cause: error.cause ?? error
-      })
+      throw new StorageError(
+        error.code,
+        {
+          backend: error.backend ?? backend,
+          key: error.key,
+          existingChannel: error.existingChannel,
+          attemptedChannel: error.attemptedChannel,
+          operation: error.operation ?? operation,
+          extensionStage: error.extensionStage ?? extensionStage,
+          cause: error
+        },
+        error.message
+      )
     }
     if (isStorageContractError(error)) throw error
     throw normalizeError(

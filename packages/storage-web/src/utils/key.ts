@@ -25,7 +25,13 @@ export const lengthPrefixedNamespaceCodec: INamespaceCodec = Object.freeze({
     const encoded = rest.slice(lengthSeparator + 1)
     const namespaceSeparator = encoded.indexOf(':')
     if (namespaceSeparator < 0) return undefined
-    const decodedNamespace = decodeURIComponent(encoded.slice(0, namespaceSeparator))
+    /** Malformed physical keys cannot identify this namespace and are negative admission results. */
+    let decodedNamespace: string
+    try {
+      decodedNamespace = decodeURIComponent(encoded.slice(0, namespaceSeparator))
+    } catch {
+      return undefined
+    }
     if (decodedNamespace !== namespace) return undefined
     if (utf8ByteLength(decodedNamespace) !== byteLength) return undefined
     return encoded.slice(namespaceSeparator + 1)
