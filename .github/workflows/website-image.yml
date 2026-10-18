@@ -58,8 +58,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Read access to the @migaia packages on GitHub Packages for `bun install`.
+          # Classic PAT with read:packages for the @migaia packages on GitHub Packages. GITHUB_TOKEN
+          # cannot read them: they were published locally and are not linked to this repository.
           secrets: |
-            npm_token=${{ secrets.GITHUB_TOKEN }}
+            npm_token=${{ secrets.MIGAIA_PACKAGES_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
