@@ -888,7 +888,7 @@ if (provenance?.kind === PluginHostDisposalNodeKind.aggregate) console.log('汇�
         cause: {
           summary: t(
             'Pass the value caught from an earlier failure when creating a more specific PluginHostError. It is stored unchanged in the native cause property. For an object input, error.cause is that exact object, so callers can inspect the earlier failure without losing its details.',
-            '捕获到先前失败、需要创建更具体的 PluginHostError 时，把捕获值传入这里。原生 cause 属性会原样保留这个值。输入是对象时，error.cause 仍是同一个对象，调用方可以继续查看先前失败的详情。'
+            '此选项保留触发当前错误的原始失败对象。捕获到先前失败、需要创建更具体的 PluginHostError 时，把捕获值传入这里。原生 cause 属性会原样保留这个值。输入是对象时，error.cause 仍是同一个对象，调用方可以继续查看先前失败的详情。'
           ),
           default: t(
             'Omit cause when there is no earlier failure. No original failure is then attached through cause.',

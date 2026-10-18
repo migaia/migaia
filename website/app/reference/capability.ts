@@ -383,8 +383,8 @@ const types: Record<string, ITypeDoc> = {
           '通过 `(name, error)` 接收激活或释放失败；名称来自登记，错误保持原值，不使用返回值；报告函数同步失败与异步拒绝进入工具包共享宿主异常队列，不改变业务状态。'
         ),
         default: t(
-          'Omission installs no error callback. Use host.error(name) to read a recorded failure even when no callback was supplied.',
-          '省略时不设置错误回调。即使没有回调，也能通过 host.error(name) 读取已记录的失败。'
+          'The default is undefined, meaning that no error callback is configured. Omission therefore sends no callback notification, but failures remain recorded. Use host.error(name) to read a recorded failure even when no callback was supplied.',
+          '默认值为 undefined（未配置错误接收回调）。省略时不会通过回调通知失败，但失败仍会被记录。即使没有回调，也能通过 host.error(name) 读取已记录的失败。'
         )
       }
     }
