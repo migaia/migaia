@@ -8,6 +8,7 @@ import {
   createMessageListenerHub,
   drainListenerFailures,
   drainTerminalListenerFailures,
+  identifyRpcBoundaryFailure,
   observeListener,
   reportListenerFailure
 } from '@migaia/rpc-core/transport-kit'
@@ -89,7 +90,13 @@ export function createWebTransportDatagramTransport(
         )
       }
     } catch (error) {
-      transitionTerminal(error)
+      transitionTerminal(
+        identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          BrowserRpcErrorText.carrierOperationFailed
+        )
+      )
     } finally {
       reading = false
       activeReader = undefined
@@ -116,10 +123,16 @@ export function createWebTransportDatagramTransport(
           new TypeError(BrowserRpcErrorText.webTransportRequiresUint8ArrayEncodedMessages),
           { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
         )
-      /** Return the exact native write Promise; observation adds no asynchronous boundary. */
+      /** Classify rejection through Core's shared boundary; mutable native errors keep identity. */
       const probe = observation.probe
       if (probe !== undefined) observation.emit(probe, 0, message)
-      return writer.write(message)
+      return writer.write(message).catch((error) => {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          BrowserRpcErrorText.carrierOperationFailed
+        )
+      })
     },
     /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
     observe(probe) {

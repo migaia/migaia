@@ -1,5 +1,7 @@
 /** Stable browser adapter failure text owned by the browser layer. */
 export const BrowserRpcErrorText = {
+  /** Fallback text for non-native or immutable platform I/O failures classified by Core. */
+  carrierOperationFailed: 'Browser carrier I/O failed',
   /** A synchronous carrier probe failure reports through existing adapter listener channels. */
   carrierObservationFailed: 'Browser carrier observation failed',
   /** The RTC adapter reports setup and rollback failure with this stable aggregate text. */

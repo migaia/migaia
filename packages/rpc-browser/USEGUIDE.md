@@ -241,7 +241,7 @@ export function openClientTransport(
 | `receiver`     | 页面端为 `navigator.serviceWorker`，Worker 端为 `self`。 |
 | `peerId`       | 期望的对端 Client id，默认取 `target.id`。               |
 
-消息 source 必须是 target 本身，或其 id 等于 peerId；其它页面会被忽略。Worker 的空闲终止通常只能由调用超时发现。
+原始 transport 的 subscribe 保留消息记录；connect 中间件或 Peer 投影根据 sourceProof 接纳 target 本身或 id 等于 peerId 的来源，忽略其它页面。直接 raw 订阅者负责来源过滤。Worker 的空闲终止通常只能由调用超时发现。
 
 ## 7. web-transport：不可靠 datagram
 
@@ -328,7 +328,7 @@ try {
 | `INVALID_PEER_SOURCE`    | connect/listen 来源或选项组合非法；选择一个受支持的真实载体。 |
 | `MESSAGE_DECODE_FAILED`  | RTC 消息无法解码；排查双方发送的数据，原失败保留在 cause。    |
 
-Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。
+Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。已有完整外部语义身份的 I/O Error 保持原身份；未分类的可变原生 Error/DOMException 原位附 Core `TRANSPORT`，不可附加身份的值保留在 cause。RTC 错误事件的原 error 保留在 cause。WebTransport send 返回处理写入拒绝后的 Promise，不保证与 native writer.write 的 Promise 引用相同。不要把远端传回的 source/code 当成本地控制权限。
 
 **关闭与竞争：** `close()` 可重复调用；初始化中可用 signal 取消握手并释放已安装的监听器。close 后不再接纳晚到的业务消息。窗口导航/卸载、页面静默关闭 SharedWorker 端口没有可靠的远端关闭事件，pending 调用沿用 Core deadline；未配置有效等待上限时不能承诺及时发现断开。
 

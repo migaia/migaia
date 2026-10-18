@@ -88,7 +88,7 @@ await shared.close()
 worker.port.close()
 ```
 
-SharedWorker 模块为每个 `connect` 事件接纳一个独立 Peer：
+SharedWorker 模块为每个 `connect` 事件中的端口分别接纳独立 Peer：
 
 ```ts doc-test=check file=shared.worker.ts
 import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'
@@ -108,7 +108,7 @@ const server = await createBrowserPeer({
 
 ## 直接使用 Endpoint / transport
 
-六个 transport 均支持 `transport.observe(probe)`：每次物理发送和通过 `sourceProof` 的接收各报告一次事件，`carrier` 为 `window`、`shared-worker`、`service-worker`、`broadcast-channel`、`rtc-data-channel` 或 `web-transport`。`detail` 复用同一个对象，含 `origin`（未知时为空字符串）、`transfers`（本次发送 transfer 列表长度，接收时因原生事件不提供发送方 transfer 选择而为 -1）与 `rejectedSource`（自上次有效接收后的来源拒绝数，仅附在下一次有效接收）。字符串与直接字节载荷提供准确的 `sizeBytes`，其他对象为 `-1`。默认只报告元数据；`probe.capturing` 为 `true` 时内容保留引用，可受调用方后续修改影响；直接字节载荷的 buffer 列入本次 transfer 时，发送前仅复制这些将被 detach 的字节。保留事件时应立即读取 detail。返回的 disposer 可重复调用，旧 disposer 不影响后续注册，即使复用了同一个 probe；RTC 终止与 WebTransport 关闭均释放观察者。探针异常沿现有 listener 错误通道报告 `TRANSPORT`，原异常保留在 `cause`，发送与接收继续。
+六个 transport 均支持 `transport.observe(probe)`：每次物理发送和通过 `sourceProof` 的接收各报告一次事件，`carrier` 为 `window`、`shared-worker`、`service-worker`、`broadcast-channel`、`rtc-data-channel` 或 `web-transport`。`detail` 复用同一个对象，含 `origin`（未知时为空字符串）、`transfers`（本次发送 transfer 列表长度，接收时因原生事件不提供发送方 transfer 选择而为 -1）与 `rejectedSource`（自上次有效接收后的来源拒绝数，仅附在下一次有效接收）。直接字节载荷提供准确的 `sizeBytes`，字符串与其他对象为 `-1`。默认只报告元数据；`probe.capturing` 为 `true` 时内容保留引用，可受调用方后续修改影响；直接字节载荷的 buffer 列入本次 transfer 时，发送前仅复制这些将被 detach 的字节。保留事件时应立即读取 detail。返回的 disposer 可重复调用，旧 disposer 不影响后续注册，即使复用了同一个 probe；RTC 终止与 WebTransport 关闭均释放观察者。探针异常沿现有 listener 错误通道报告 `TRANSPORT`，原异常保留在 `cause`，发送与接收继续。
 
 BroadcastChannel、Service Worker 与 WebTransport datagram 使用这一层。已有 Endpoint 用户也可保留原组合；所有六个 transport 子入口均未移除。
 

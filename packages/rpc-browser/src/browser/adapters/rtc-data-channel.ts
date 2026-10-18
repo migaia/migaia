@@ -154,10 +154,13 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
         })
       }
     } else {
-      error = attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed), {
-        source: RPC_CORE_ERROR_SOURCE,
-        code: RpcCoreErrorCode.transport
-      })
+      /** RTC-style event objects retain their error slot, or the event itself if none is present. */
+      const cause =
+        safeRead<unknown>(event, 'error', ({ error }) => {
+          secondary.push(error)
+          return undefined
+        }) ?? event
+      error = createBrowserTransportError(BrowserRpcErrorText.rtcClosed, cause)
     }
     terminalError = error
     const failure = createListenerFailure([error, ...secondary, ...cleanupErrors], {

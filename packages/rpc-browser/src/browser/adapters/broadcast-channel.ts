@@ -7,12 +7,14 @@ import {
   createListenerFailureState,
   createMessageListenerHub,
   drainListenerFailures,
+  identifyRpcBoundaryFailure,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure
 } from '@migaia/rpc-core/transport-kit'
 import { RpcCoreErrorCode } from '@migaia/rpc-core'
+import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Adapts BroadcastChannel for tab-to-tab and storage-backed coordination. */
 export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport {
@@ -59,7 +61,15 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpc
       /** Broadcast sends have no transfer list and retain captured content by reference. */
       const probe = observation.probe
       if (probe !== undefined) observation.emit(probe, 0, message)
-      channel.postMessage(message)
+      try {
+        channel.postMessage(message)
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          BrowserRpcErrorText.carrierOperationFailed
+        )
+      }
     },
     /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
     observe(probe) {
