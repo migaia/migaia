@@ -938,28 +938,28 @@ const optionTranslations: Readonly<
   'store-worker:index:workerComputed:transfer': {
     en: 'Optional transfer-list selector validated before the worker-backed Resource starts.'
   },
-  'store-worker:serialize:workerParser:worker': {
+  'store-worker:serialize-worker:workerParser:worker': {
     en: 'Worker endpoint that executes parser encode and decode calls on the worker side.'
   },
-  'store-worker:serialize:workerParser:type': {
+  'store-worker:serialize-worker:workerParser:type': {
     en: 'Diagnostic codec type attached to worker Serialize errors. Defaults to the stable worker type.'
   },
-  'store-worker:serialize:workerParser:terminateOnDispose': {
+  'store-worker:serialize-worker:workerParser:terminateOnDispose': {
     en: 'Also terminates the underlying Worker after disposing the RPC endpoint. Both cleanup steps run even if one fails.'
   },
-  'store-worker:serialize:workerParser:ownership': {
+  'store-worker:serialize-worker:workerParser:ownership': {
     en: 'Byte-buffer custody used by worker serialization to decide whether buffers may be transferred or must remain borrowed.'
   },
-  'store-worker:serialize:workerPlugin:worker': {
+  'store-worker:serialize-worker:workerPlugin:worker': {
     en: 'Worker endpoint wrapped as a standard Serialize registry plugin.'
   },
-  'store-worker:serialize:workerPlugin:type': {
+  'store-worker:serialize-worker:workerPlugin:type': {
     en: 'Registry plugin type for worker-backed serialization.'
   },
-  'store-worker:serialize:workerPlugin:terminateOnDispose': {
+  'store-worker:serialize-worker:workerPlugin:terminateOnDispose': {
     en: 'Terminates the supplied Worker after endpoint disposal. Defaults to preserving externally owned workers.'
   },
-  'store-worker:serialize:workerPlugin:ownership': {
+  'store-worker:serialize-worker:workerPlugin:ownership': {
     en: 'Byte-buffer custody used by the worker plugin for transfer versus borrowing.'
   },
   'tray:host:createHost:create': {
@@ -1854,16 +1854,6 @@ const workerParserOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuid
 const wasmArrayOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]>> = {
   en: [
     {
-      name: 'item',
-      description:
-        'Element field builder. The current ABI accepts number() only and stores each value as f64.',
-      defaultValue: 'required',
-      optional: false,
-      type: 'ReturnType<typeof number>',
-      whenToUse: 'Pass number() to declare the element ABI explicitly.',
-      example: 'array(number(), 10_000, 64)'
-    },
-    {
       name: 'length',
       description:
         'Fixed non-negative safe-integer element count allocated as length multiplied by eight bytes.',
@@ -1871,7 +1861,7 @@ const wasmArrayOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]
       optional: false,
       type: 'number',
       whenToUse: 'Choose the maximum stable index domain before Store construction.',
-      example: 'array(number(), 10_000)'
+      example: 'array(10_000)'
     },
     {
       name: 'granularity',
@@ -1881,19 +1871,10 @@ const wasmArrayOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]
       type: 'number',
       whenToUse:
         'Set 1 for per-cell tracking; raise it when readers consume dense ranges and source overhead matters.',
-      example: 'array(number(), 10_000, 16)'
+      example: 'array(10_000, 16)'
     }
   ],
   zh: [
-    {
-      name: 'item',
-      description: '元素 field builder；当前 ABI 只接受 number()，每项以 f64 存储。',
-      defaultValue: '必填',
-      optional: false,
-      type: 'ReturnType<typeof number>',
-      whenToUse: '传入 number()，显式声明 element ABI。',
-      example: 'array(number(), 10_000, 64)'
-    },
     {
       name: 'length',
       description: '固定非负安全整数元素数，按 length × 8 bytes 分配。',
@@ -1901,7 +1882,7 @@ const wasmArrayOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]
       optional: false,
       type: 'number',
       whenToUse: 'Store 构造前确定稳定的最大 index domain。',
-      example: 'array(number(), 10_000)'
+      example: 'array(10_000)'
     },
     {
       name: 'granularity',
@@ -1910,7 +1891,7 @@ const wasmArrayOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]
       defaultValue: '64',
       type: 'number',
       whenToUse: '逐 cell tracking 设为 1；reader 密集读取 range 且 source overhead 更重要时提高。',
-      example: 'array(number(), 10_000, 16)'
+      example: 'array(10_000, 16)'
     }
   ]
 }
@@ -3108,27 +3089,6 @@ const serializePortableWalkerGuide = createSerializeGuide({
 /** Maintained guides for current runtime exports omitted by the older registries. */
 const runtimeCompletionApiGuides = {
   'serialize:codec:createPortableWalker': serializePortableWalkerGuide,
-  'rpc-core:index:createAuthenticationNonce': createStorageContractGuide({
-    purposeEn:
-      'Returns a fresh 128-bit cryptographic nonce for authentication envelopes. It takes no input and rejects unavailable secure randomness instead of falling back to predictable identifiers; a nonce is not a peer identity or secret-key substitute.',
-    purposeZh:
-      '为认证 envelope 返回新的 128-bit 加密随机 nonce，无需参数；安全随机源不可用时拒绝配置，不降级到可预测标识。nonce 不代替 peer 身份、签名或密钥。',
-    quickStart:
-      "import { createAuthenticationNonce } from '@migaia/rpc-core'\n\n// Generate once for this outgoing authentication envelope.\nconst authenticationHeaders = { 'X-Rpc-Nonce': createAuthenticationNonce() }\n// Supply these headers to the authenticated carrier; do not reuse a nonce.\nconsole.log(Object.keys(authenticationHeaders))",
-    scenariosEn: [
-      'Create a fresh nonce while building an authenticated outbound envelope.',
-      'A custom authentication adapter needs the same secure nonce owner as Core.'
-    ],
-    scenariosZh: [
-      '构造已认证出站 envelope 时生成一次新的 nonce。',
-      '自定义鉴权 adapter 需要复用 Core 的安全随机 nonce owner。'
-    ],
-    avoidEn: [
-      'Do not reuse a nonce for a different authenticated message.',
-      'Do not replace authentication, peer admission or a secret key with random labels.'
-    ],
-    avoidZh: ['不要为另一条已认证消息复用旧 nonce。', '不要用随机标签代替鉴权、peer 准入或密钥。']
-  }),
   'rpc-core:index:createRuntimeApiEndpoint': createStorageContractGuide({
     purposeEn:
       'Synchronously returns the runtime endpoint for the actual supplied channel, then installs its canonical provider, outbound and stream kernel behind the stable ready Promise. Await ready before calls and dispose the endpoint after use. The binding overload borrows only the operations and lifecycle already held by that binding.',
@@ -3159,7 +3119,7 @@ const runtimeCompletionApiGuides = {
     purposeZh:
       '从持有的 byte 连接读取可选 framed stdin bootstrap，并把同一 decoder/channel 交给后续 handshake。stdin 模式在 scheduler deadline 内读取 bootstrap，none 模式保留普通连接；业务 data 与 bootstrap metadata 不授予原生执行所有权。',
     quickStart:
-      "import { receiveAdapterBootstrap, createAdapterChannel, type IProcessByteChannel, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** Continue handshake on the same raw reader that consumed stdin bootstrap. */\nexport async function connectBootstrappedStdio(raw: IProcessByteChannel, options: IProcessByteOptions) {\n  const received = await receiveAdapterBootstrap(raw, 'stdin', { bootstrapTimeoutMs: 5_000 })\n  console.log('bootstrap bytes:', received.bootstrap?.byteLength ?? 0)\n  return createAdapterChannel(received.channel, options)\n}",
+      "import { receiveAdapterBootstrap, createProcessTransport, type IProcessByteChannel, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** Continue handshake on the same raw reader that consumed stdin bootstrap. */\nexport async function connectBootstrappedStdio(raw: IProcessByteChannel, options: IProcessByteOptions) {\n  const received = await receiveAdapterBootstrap(raw, 'stdin', { bootstrapTimeoutMs: 5_000 })\n  console.log('bootstrap bytes:', received.bootstrap?.byteLength ?? 0)\n  return createProcessTransport(received.channel, options)\n}",
     scenariosEn: [
       'A launched child receives its bootstrap on stdin before protocol negotiation.',
       'An ordinary byte carrier explicitly chooses none and keeps its existing framing path.'
@@ -3179,11 +3139,11 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-process:adapters-node-child-process:createAdapterChildStdio': createStorageContractGuide({
     purposeEn:
-      'Constructs ordered raw byte I/O from the actual spawned child pipes, then lets createAdapterChannel establish the protocol. Physical pipe lifetime and the exclusive reader are observed on this new channel, without accepting a target transport. The native launcher still owns child termination. The connection owner closes the channel after use.',
+      'Constructs ordered raw byte I/O from the actual spawned child pipes, then lets createProcessTransport establish the protocol. Physical pipe lifetime and the exclusive reader are observed on this new channel, without accepting a target transport. The native launcher still owns child termination. The connection owner closes the channel after use.',
     purposeZh:
-      '从实际已 spawn 的子进程 pipes构造有序 raw byte I/O，随后通过 createAdapterChannel 建立 protocol。该新 channel 观察实际 pipe lifetime 与 exclusive reader，不接受 target transport。子进程终止仍归原生 launcher owner。连接 owner 在使用后关闭 channel。',
+      '从实际已 spawn 的子进程 pipes构造有序 raw byte I/O，随后通过 createProcessTransport 建立 protocol。该新 channel 观察实际 pipe lifetime 与 exclusive reader，不接受 target transport。子进程终止仍归原生 launcher owner。连接 owner 在使用后关闭 channel。',
     quickStart:
-      "import { createAdapterChildStdio } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** The deployment supplies the actual spawned child pipes; no native resource is fabricated here. */\nexport async function establishChildStdio(child: Parameters<typeof createAdapterChildStdio>[0], options: IProcessByteOptions) {\n  const raw = createAdapterChildStdio(child)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
+      "import { createAdapterChildStdio } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createProcessTransport, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** The deployment supplies the actual spawned child pipes; no native resource is fabricated here. */\nexport async function establishChildStdio(child: Parameters<typeof createAdapterChildStdio>[0], options: IProcessByteOptions) {\n  const raw = createAdapterChildStdio(child)\n  const channel = await createProcessTransport(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
     scenariosEn: [
       'A native adapter already holds the actual spawned child pipes and needs framed RPC over it.',
       'Keep one physical reader and the original raw I/O close semantics during handshake.'
@@ -3203,11 +3163,11 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-process:adapters-node-child-process:createAdapterProcessStdio': createStorageContractGuide({
     purposeEn:
-      'Constructs ordered raw byte I/O from the current process stdin/stdout resources, then lets createAdapterChannel establish the protocol. Closing retains the original stdin pause and stdout end behavior. It does not create or terminate a separate child process. The connection owner closes the channel after use.',
+      'Constructs ordered raw byte I/O from the current process stdin/stdout resources, then lets createProcessTransport establish the protocol. Closing retains the original stdin pause and stdout end behavior. It does not create or terminate a separate child process. The connection owner closes the channel after use.',
     purposeZh:
-      '从当前进程实际 stdin/stdout 资源构造有序 raw byte I/O，随后通过 createAdapterChannel 建立 protocol。关闭保留原 stdin pause 与 stdout end 行为。它不会创建或终止另一个子进程。连接 owner 在使用后关闭 channel。',
+      '从当前进程实际 stdin/stdout 资源构造有序 raw byte I/O，随后通过 createProcessTransport 建立 protocol。关闭保留原 stdin pause 与 stdout end 行为。它不会创建或终止另一个子进程。连接 owner 在使用后关闭 channel。',
     quickStart:
-      "import { createAdapterProcessStdio } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** The deployment supplies the current process stdin/stdout resources; no native resource is fabricated here. */\nexport async function establishProcessStdio(io: Parameters<typeof createAdapterProcessStdio>[0], options: IProcessByteOptions) {\n  const raw = createAdapterProcessStdio(io)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
+      "import { createAdapterProcessStdio } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createProcessTransport, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** The deployment supplies the current process stdin/stdout resources; no native resource is fabricated here. */\nexport async function establishProcessStdio(io: Parameters<typeof createAdapterProcessStdio>[0], options: IProcessByteOptions) {\n  const raw = createAdapterProcessStdio(io)\n  const channel = await createProcessTransport(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
     scenariosEn: [
       'A native adapter already holds the current process stdin/stdout resources and needs framed RPC over it.',
       'Keep one physical reader and the original raw I/O close semantics during handshake.'
@@ -3227,11 +3187,11 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-process:adapters-node-socket:createAdapterSocketByteIO': createStorageContractGuide({
     purposeEn:
-      'Constructs ordered raw byte I/O from the held Node duplex socket, then lets createAdapterChannel establish the protocol. Borrowed socket I/O keeps its ordinary profile and does not gain launch/stdio replay qualification from its stream shape. It grants no process launch or termination rights. The connection owner closes the channel after use.',
+      'Constructs ordered raw byte I/O from the held Node duplex socket, then lets createProcessTransport establish the protocol. Borrowed socket I/O keeps its ordinary profile and does not gain launch/stdio replay qualification from its stream shape. It grants no process launch or termination rights. The connection owner closes the channel after use.',
     purposeZh:
-      '从持有的 Node duplex socket构造有序 raw byte I/O，随后通过 createAdapterChannel 建立 protocol。借用 socket I/O 保留普通连接 profile，不因 stream 形状取得 launch/stdio replay 资格。它不授予进程启动或终止权限。连接 owner 在使用后关闭 channel。',
+      '从持有的 Node duplex socket构造有序 raw byte I/O，随后通过 createProcessTransport 建立 protocol。借用 socket I/O 保留普通连接 profile，不因 stream 形状取得 launch/stdio replay 资格。它不授予进程启动或终止权限。连接 owner 在使用后关闭 channel。',
     quickStart:
-      "import { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** The deployment supplies the held Node duplex socket; no native resource is fabricated here. */\nexport async function establishSocketByteIO(socket: Parameters<typeof createAdapterSocketByteIO>[0], options: IProcessByteOptions) {\n  const raw = createAdapterSocketByteIO(socket)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
+      "import { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { createProcessTransport, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** The deployment supplies the held Node duplex socket; no native resource is fabricated here. */\nexport async function establishSocketByteIO(socket: Parameters<typeof createAdapterSocketByteIO>[0], options: IProcessByteOptions) {\n  const raw = createAdapterSocketByteIO(socket)\n  const channel = await createProcessTransport(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
     scenariosEn: [
       'A native adapter already holds the held Node duplex socket and needs framed RPC over it.',
       'Keep one physical reader and the original raw I/O close semantics during handshake.'
@@ -3487,30 +3447,6 @@ const runtimeCompletionApiGuides = {
       '不要把本地 connection close 当作 Worker termination。'
     ]
   }),
-  'rpc-threads:adapters-node:createNodeThreadChannelFactory': createStorageContractGuide({
-    purposeEn:
-      'Creates the Node-style channel factory using the actual injected scheduler and installed capabilities. open(handle, signal) constructs the complete channel from that real launcher handle; arbitrary copies cannot supply private startup acknowledgement or receive-handoff authority. The connection owner closes the opened channel.',
-    purposeZh:
-      '使用实际注入 scheduler 与已安装 capabilities 创建Node-style channel factory。open(handle, signal) 从真实 launcher handle 构造完整 channel；任意副本不能提供私有 startup acknowledgement 或 receive-handoff 权限，连接 owner 关闭打开的 channel。',
-    quickStart:
-      "import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** Handle and signal come from the original launcher/supervisor operation. */\nexport async function openNodeThreadChannelFactory(\n  handle: Parameters<ReturnType<typeof createNodeThreadChannelFactory>['open']>[0],\n  signal: Parameters<ReturnType<typeof createNodeThreadChannelFactory>['open']>[1]\n) {\n  const factory = createNodeThreadChannelFactory({ scheduler: systemScheduler })\n  const channel = await factory.open(handle, signal)\n  console.log(channel.peerId)\n  // Return the exact channel to its owner, which later awaits close().\n  return channel\n}",
-    scenariosEn: [
-      'A supervisor opens a channel for the exact handle returned by its launcher.',
-      'A custom native runtime needs the canonical receive handoff and channel ownership.'
-    ],
-    scenariosZh: [
-      'supervisor 为原 launcher 返回的确切 handle 打开 channel。',
-      '自定义 native runtime 需要规范 receive handoff 与 channel ownership。'
-    ],
-    avoidEn: [
-      'Do not spread or reconstruct launcher handles to claim startup authority.',
-      'Do not open an unrelated execution generation through a stale handle.'
-    ],
-    avoidZh: [
-      '不要展开或重建 launcher handle 来声称 startup 权限。',
-      '不要使用 stale handle 打开无关 execution generation。'
-    ]
-  }),
   'rpc-threads:index:createWebThreadChannelFactory': createStorageContractGuide({
     purposeEn:
       'Creates the EventTarget channel factory using the actual injected scheduler and installed capabilities. open(handle, signal) constructs the complete channel from that real launcher handle; arbitrary copies cannot supply private startup acknowledgement or receive-handoff authority. The connection owner closes the opened channel.',
@@ -3705,11 +3641,11 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-process:index:createAdapterWebByteIO': createStorageContractGuide({
     purposeEn:
-      'Constructs ordered byte I/O from the actual readable and writable Web Streams, keeping the original owned reader/writer scope. createAdapterChannel adds the protocol handshake on this same I/O. Closing releases stream resources; it does not terminate the external execution owner or assert native replay ownership.',
+      'Constructs ordered byte I/O from the actual readable and writable Web Streams, keeping the original owned reader/writer scope. createProcessTransport adds the protocol handshake on this same I/O. Closing releases stream resources; it does not terminate the external execution owner or assert native replay ownership.',
     purposeZh:
-      '从实际 readable 与 writable Web Streams 构造有序 byte I/O，保留原 owned reader/writer scope；createAdapterChannel 在同一 I/O 上加入 protocol handshake。close 释放 stream 资源，不终止外部 execution owner，也不声明 native replay ownership。',
+      '从实际 readable 与 writable Web Streams 构造有序 byte I/O，保留原 owned reader/writer scope；createProcessTransport 在同一 I/O 上加入 protocol handshake。close 释放 stream 资源，不终止外部 execution owner，也不声明 native replay ownership。',
     quickStart:
-      "import { createAdapterWebByteIO } from '@migaia/rpc-process'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** These streams belong to the already established deployment connection. */\nexport async function establishWebStreamAdapter(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>, options: IProcessByteOptions) {\n  const raw = createAdapterWebByteIO(readable, writable)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains this channel and later awaits channel.close().\n  return channel\n}",
+      "import { createAdapterWebByteIO } from '@migaia/rpc-process'\nimport { createProcessTransport, type IProcessByteOptions } from '@migaia/rpc-process'\n\n/** These streams belong to the already established deployment connection. */\nexport async function establishWebStreamAdapter(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>, options: IProcessByteOptions) {\n  const raw = createAdapterWebByteIO(readable, writable)\n  const channel = await createProcessTransport(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains this channel and later awaits channel.close().\n  return channel\n}",
     scenariosEn: [
       'A Web Streams carrier has acquired the real ordered reader and writer.',
       'A custom byte adapter needs canonical stream cleanup and channel framing.'
@@ -12185,7 +12121,7 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Persists one observable object, array, map, or set through its tracked snapshot and atomic replace operations. A Runtime effect observes structural changes and skips its synchronous first run.',
-      quickStart: `import { observableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = observableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
+      quickStart: `import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = new ObservableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'A reactive map or set must survive reloads.',
         'Hydration must atomically replace collection contents.',
@@ -12214,7 +12150,7 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     zh: {
       purpose:
         '通过 tracked snapshot 与 atomic replace 持久化 observable object、array、map 或 set。Runtime effect 观察 structural change，并跳过同步首次执行。',
-      quickStart: `import { observableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = observableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
+      quickStart: `import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = new ObservableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
       scenarios: [
         'reactive map 或 set 需要跨 reload 保留。',
         'hydration 必须原子替换 collection content。',
@@ -14879,7 +14815,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Binds one existing Store Light Store to a Store Middleware Host. It snapshots the binding-time state, emits store:update previous/next events, forwards filtered Runtime action traces without replaying the action, and removes both subscriptions before plugin disposal.',
-      quickStart: `import { createStore } from '@migaia/store-light'\nimport { bindStoreMiddleware, ClonePolicy, createMutationPolicy, loggerMiddleware } from '@migaia/store-middleware'\n\nconst shape = { submitted: false, submit: () => console.log('submit action') }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, mutationPolicy, actionPrefix: 'checkout:', clone: ClonePolicy.diagnostic })\ntry {\n  await host.use(loggerMiddleware<Record<string, unknown>>())\n  store.submit()\n} finally {\n  await host.dispose() // Store remains alive\n}`,
+      quickStart: `import { createStore } from '@migaia/store-light'\nimport { bindStoreMiddleware, createMutationPolicy, loggerMiddleware } from '@migaia/store-middleware'\nimport { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'\n\nconst shape = { submitted: false, submit: () => console.log('submit action') }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, mutationPolicy, actionPrefix: 'checkout:', clone: ClonePolicy.diagnostic })\ntry {\n  await host.use(loggerMiddleware<Record<string, unknown>>())\n  store.submit()\n} finally {\n  await host.dispose() // Store remains alive\n}`,
       scenarios: [
         'An existing Store Light instance needs state and action observability.',
         'DevTools time travel should hydrate the Store plain-state surface.',
@@ -14942,7 +14878,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '把一个既有 Store Light Store 绑定到 Store Middleware Host。它 snapshot binding-time state，发出 store:update previous/next event，按 filter 转发 Runtime action trace 但不重复执行 action，并在 plugin disposal 前移除两个 subscription。',
-      quickStart: `import { createStore } from '@migaia/store-light'\nimport { bindStoreMiddleware, ClonePolicy, createMutationPolicy, loggerMiddleware } from '@migaia/store-middleware'\n\nconst shape = { submitted: false, submit: () => console.log('提交 action') }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, mutationPolicy, actionPrefix: 'checkout:', clone: ClonePolicy.diagnostic })\ntry {\n  await host.use(loggerMiddleware<Record<string, unknown>>())\n  store.submit()\n} finally {\n  await host.dispose() // Store 仍然存活\n}`,
+      quickStart: `import { createStore } from '@migaia/store-light'\nimport { bindStoreMiddleware, createMutationPolicy, loggerMiddleware } from '@migaia/store-middleware'\nimport { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'\n\nconst shape = { submitted: false, submit: () => console.log('提交 action') }\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore(shape, { mutationPolicy })\nconst host = bindStoreMiddleware(store, { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }, mutationPolicy, actionPrefix: 'checkout:', clone: ClonePolicy.diagnostic })\ntry {\n  await host.use(loggerMiddleware<Record<string, unknown>>())\n  store.submit()\n} finally {\n  await host.dispose() // Store 仍然存活\n}`,
       scenarios: [
         '既有 Store Light instance 需要 state/action observability。',
         'DevTools time travel 应 hydrate Store plain-state surface。',
@@ -14997,79 +14933,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           type: '(state: Record<string, unknown>) => Record<string, unknown>',
           whenToUse: '严格历史使用 immutable，韧性 tooling 使用 diagnostic，或传入 domain clone。',
           example: 'ClonePolicy.immutable'
-        }
-      ]
-    }
-  },
-  'store-middleware:index:middlewarePlugin': {
-    en: {
-      purpose:
-        'Adapts the legacy three-argument middleware function into one synchronous Store Middleware plugin. Calling next advances the event exactly once; omitting it stops downstream observation but never rolls back the Store write.',
-      quickStart: `import { middlewarePlugin } from '@migaia/store-middleware'\n\nconst auditSink = (event: unknown, state: unknown) => console.log('audit', event, state)\nconst audit = middlewarePlugin('audit', (event, context, next) => {\n  next()\n  auditSink(event, context.getState())\n})\nexport async function installAudit(host: { use(plugin: unknown): Promise<unknown> }): Promise<void> {\n  await host.use(audit)\n}`,
-      scenarios: [
-        'A small middleware needs only Runtime, getState, and next.',
-        'Legacy function middleware is being migrated into Plugin Host.',
-        'A stage intentionally filters which events reach later plugins.'
-      ],
-      avoidWhen: [
-        'The plugin needs config, shared values, or owned external cleanup.',
-        'The stage is asynchronous.',
-        'Not calling next is expected to undo a business mutation.'
-      ],
-      options: [
-        {
-          name: 'name',
-          description: 'Stable plugin identity used for installation, diagnostics, and removal.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'string',
-          whenToUse: 'Choose a unique domain-readable plugin name.',
-          example: "'audit'"
-        },
-        {
-          name: 'middleware',
-          description:
-            'Synchronous event function receiving event, narrow context, and one-shot next callback.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'IStoreMiddleware<S>',
-          whenToUse: 'Use for simple event observation or filtering.',
-          example: '(event, context, next) => { next(); audit(event, context.getState()) }'
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        '把 legacy 三参数 middleware function 适配为一个 synchronous Store Middleware plugin。调用 next 精确推进一次 event；省略会停止 downstream observation，但绝不会 rollback Store write。',
-      quickStart: `import { middlewarePlugin } from '@migaia/store-middleware'\n\nconst auditSink = (event: unknown, state: unknown) => console.log('audit', event, state)\nconst audit = middlewarePlugin('audit', (event, context, next) => {\n  next()\n  auditSink(event, context.getState())\n})\nexport async function installAudit(host: { use(plugin: unknown): Promise<unknown> }): Promise<void> {\n  await host.use(audit)\n}`,
-      scenarios: [
-        '小型 middleware 只需要 Runtime、getState 与 next。',
-        '正在把 legacy function middleware 迁移到 Plugin Host。',
-        'stage 有意过滤哪些 event 能到达后续 plugin。'
-      ],
-      avoidWhen: [
-        'plugin 需要 config、shared value 或 owned external cleanup。',
-        'stage 是 asynchronous。',
-        '期望不调用 next 会撤销 business mutation。'
-      ],
-      options: [
-        {
-          name: 'name',
-          description: '用于 installation、diagnostic 与 removal 的稳定 plugin identity。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'string',
-          whenToUse: '选择唯一且 domain-readable 的 plugin name。',
-          example: "'audit'"
-        },
-        {
-          name: 'middleware',
-          description: '接收 event、narrow context 与 one-shot next callback 的同步函数。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'IStoreMiddleware<S>',
-          whenToUse: '用于简单 event observation 或 filtering。',
-          example: '(event, context, next) => { next(); audit(event, context.getState()) }'
         }
       ]
     }
@@ -15292,7 +15155,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a truly independent deep snapshot or throws a coded Store Middleware error. It never silently aliases a subtree when structured cloning is unavailable or a value is unsupported.',
-      quickStart: `import { immutableSnapshotClone } from '@migaia/store-middleware'\n\nconst store = { $plain: () => ({ count: 1, user: { name: 'Ada' } }) }\nconst previous = immutableSnapshotClone(store.$plain())\nconsole.log('snapshot:', previous)\n// Later mutations to the store state cannot change previous.`,
+      quickStart: `import { immutableSnapshotClone } from '@migaia/store-middleware/tolerant-clone'\n\nconst store = { $plain: () => ({ count: 1, user: { name: 'Ada' } }) }\nconst previous = immutableSnapshotClone(store.$plain())\nconsole.log('snapshot:', previous)\n// Later mutations to the store state cannot change previous.`,
       scenarios: [
         'A previous-state snapshot must remain immutable in meaning.',
         'Time travel or rollback requires full reference independence.',
@@ -15306,7 +15169,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: [
         {
           name: 'value',
-          description: 'Value that must be fully structured-cloneable into an independent graph.',
+          description:
+            'Data graph of plain objects, arrays and supported cloneable built-ins; class instances and accessors are rejected before cloning.',
           defaultValue: 'required',
           optional: false,
           type: 'T',
@@ -15318,7 +15182,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建真正独立的 deep snapshot，否则抛带 code 的 Store Middleware error。structured cloning 不可用或 value 不受支持时，绝不静默 alias subtree。',
-      quickStart: `import { immutableSnapshotClone } from '@migaia/store-middleware'\n\nconst store = { $plain: () => ({ count: 1, user: { name: 'Ada' } }) }\nconst previous = immutableSnapshotClone(store.$plain())\nconsole.log('snapshot:', previous)\n// 后续 mutation 无法改变 previous。`,
+      quickStart: `import { immutableSnapshotClone } from '@migaia/store-middleware/tolerant-clone'\n\nconst store = { $plain: () => ({ count: 1, user: { name: 'Ada' } }) }\nconst previous = immutableSnapshotClone(store.$plain())\nconsole.log('snapshot:', previous)\n// 后续 mutation 无法改变 previous。`,
       scenarios: [
         'previous-state snapshot 的语义必须保持 immutable。',
         'time travel 或 rollback 要求完整 reference independence。',
@@ -15332,7 +15196,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: [
         {
           name: 'value',
-          description: '必须完整 structured-clone 为独立 graph 的 value。',
+          description: '普通对象、数组及受支持可克隆内建值组成的数据图；复制前拒绝类实例与访问器。',
           defaultValue: '必填',
           optional: false,
           type: 'T',
@@ -15346,7 +15210,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Returns the exact same reference without cloning. The explicit name records that the caller accepts aliasing, live mutation visibility, and zero snapshot independence.',
-      quickStart: `import { opaqueReferenceClone } from '@migaia/store-middleware'\n\nconst hostHandle = { close: () => console.log('closed') }\nconst liveReference = opaqueReferenceClone(hostHandle)\nconsole.log(Object.is(liveReference, hostHandle)) // true：返回同一个 live object`,
+      quickStart: `import { opaqueReferenceClone } from '@migaia/store-middleware/tolerant-clone'\n\nconst hostHandle = { close: () => console.log('closed') }\nconst liveReference = opaqueReferenceClone(hostHandle)\nconsole.log(Object.is(liveReference, hostHandle)) // true：返回同一个 live object`,
       scenarios: [
         'A live host object cannot or must not be cloned.',
         'The caller explicitly accepts observing later mutations.',
@@ -15372,7 +15236,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '不执行 clone，直接返回完全相同的 reference。显式名称记录 caller 接受 aliasing、后续 live mutation 可见与零 snapshot independence。',
-      quickStart: `import { opaqueReferenceClone } from '@migaia/store-middleware'\n\nconst hostHandle = { close: () => console.log('closed') }\nconst liveReference = opaqueReferenceClone(hostHandle)\nconsole.log(Object.is(liveReference, hostHandle)) // true: the same live object is returned`,
+      quickStart: `import { opaqueReferenceClone } from '@migaia/store-middleware/tolerant-clone'\n\nconst hostHandle = { close: () => console.log('closed') }\nconst liveReference = opaqueReferenceClone(hostHandle)\nconsole.log(Object.is(liveReference, hostHandle)) // true: the same live object is returned`,
       scenarios: [
         'live host object 无法或不应 clone。',
         'caller 显式接受观察后续 mutation。',
@@ -15400,7 +15264,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Builds a best-effort diagnostic snapshot that never throws: cloneable arrays and plain objects become independent, while only the unsupported subtree remains an opaque reference.',
-      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst previous = { count: 0, onChange: () => undefined }\nconst store = { $plain: () => ({ count: 1, onChange: previous.onChange }) }\nconst host = { recordState: (event: string, before: unknown, after: unknown) => console.log(event, before, after) }\nconst eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState) // Unsupported functions remain opaque references.`,
+      quickStart: `import { diagnosticClone } from '@migaia/store-middleware/tolerant-clone'\n\nconst previous = { count: 0, onChange: () => undefined }\nconst store = { $plain: () => ({ count: 1, onChange: previous.onChange }) }\nconst host = { recordState: (event: string, before: unknown, after: unknown) => console.log(event, before, after) }\nconst eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState) // Unsupported functions remain opaque references.`,
       scenarios: [
         'Middleware and DevTools availability is more important than strict clone completeness.',
         'Most of a state tree should remain historically independent.',
@@ -15428,7 +15292,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '构建永不 throw 的 best-effort diagnostic snapshot：可 clone 的 array/plain object 保持独立，只有 unsupported subtree 保留 opaque reference。',
-      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst previous = { count: 0, onChange: () => undefined }\nconst store = { $plain: () => ({ count: 1, onChange: previous.onChange }) }\nconst host = { recordState: (event: string, before: unknown, after: unknown) => console.log(event, before, after) }\nconst eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState) // 不可 clone 的函数只保留为 opaque reference`,
+      quickStart: `import { diagnosticClone } from '@migaia/store-middleware/tolerant-clone'\n\nconst previous = { count: 0, onChange: () => undefined }\nconst store = { $plain: () => ({ count: 1, onChange: previous.onChange }) }\nconst host = { recordState: (event: string, before: unknown, after: unknown) => console.log(event, before, after) }\nconst eventState = diagnosticClone(store.$plain())\nhost.recordState('store:update', previous, eventState) // 不可 clone 的函数只保留为 opaque reference`,
       scenarios: [
         'middleware 与 DevTools availability 比严格 clone completeness 更重要。',
         'state tree 的大部分内容应保持历史独立。',
@@ -15456,7 +15320,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Groups the three explicit clone contracts—immutable, opaque, and diagnostic—so configuration chooses guarantees by name instead of relying on a fuzzy generic clone.',
-      quickStart: `import { ClonePolicy } from '@migaia/store-middleware'\n\nconst strictHistory = false\nconst state = { user: { name: 'Ada' } }\nconst clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)\nconsole.log(snapshot)`,
+      quickStart: `import { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'\n\nconst strictHistory = false\nconst state = { user: { name: 'Ada' } }\nconst clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)\nconsole.log(snapshot)`,
       scenarios: [
         'A binding option needs a named clone strategy.',
         'Reviewers must see whether independence or availability wins.',
@@ -15472,7 +15336,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '组合三种显式 clone contract：immutable、opaque、diagnostic，让配置按名称选择 guarantee，而不是依赖含糊的通用 clone。',
-      quickStart: `import { ClonePolicy } from '@migaia/store-middleware'\n\nconst strictHistory = false\nconst state = { user: { name: 'Ada' } }\nconst clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)\nconsole.log(snapshot)`,
+      quickStart: `import { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'\n\nconst strictHistory = false\nconst state = { user: { name: 'Ada' } }\nconst clone = strictHistory ? ClonePolicy.immutable : ClonePolicy.diagnostic\nconst snapshot = clone(state)\nconsole.log(snapshot)`,
       scenarios: [
         'binding option 需要命名 clone strategy。',
         'reviewer 必须看清 independence 与 availability 谁优先。',
@@ -15484,60 +15348,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '准备按 value type 隐式选择 mode。'
       ],
       options: []
-    }
-  },
-  'store-middleware:tolerant-clone:tolerantClone': {
-    en: {
-      purpose:
-        'Deprecated alias of diagnosticClone retained for source compatibility. It has identical best-effort behavior and no separate implementation path; migrate to ClonePolicy.diagnostic or diagnosticClone.',
-      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst state = { user: { name: 'Ada' } }\nconst snapshot = diagnosticClone(state) // preferred replacement for deprecated tolerantClone\nconsole.log(snapshot)`,
-      scenarios: [
-        'Reading legacy code that still imports tolerantClone.',
-        'Performing a bounded source migration to diagnosticClone.',
-        'Confirming the alias does not change clone behavior.'
-      ],
-      avoidWhen: [
-        'Writing new code.',
-        'Strict independence is required.',
-        'The deprecated name would hide the selected guarantee.'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Legacy input forwarded unchanged to diagnosticClone behavior.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'T',
-          whenToUse: 'Only while migrating an existing tolerantClone caller.',
-          example: 'diagnosticClone(state)'
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        '为 source compatibility 保留的 diagnosticClone deprecated alias。它具有完全相同的 best-effort behavior，没有第二条实现路径；应迁移到 ClonePolicy.diagnostic 或 diagnosticClone。',
-      quickStart: `import { diagnosticClone } from '@migaia/store-middleware'\n\nconst state = { user: { name: 'Ada' } }\nconst snapshot = diagnosticClone(state) // tolerantClone 的推荐替代写法\nconsole.log(snapshot)`,
-      scenarios: [
-        '阅读仍 import tolerantClone 的 legacy code。',
-        '执行有边界的 diagnosticClone source migration。',
-        '确认 alias 不改变 clone behavior。'
-      ],
-      avoidWhen: [
-        '编写新代码。',
-        '要求 strict independence。',
-        'deprecated name 会掩盖所选 guarantee。'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: '按 diagnosticClone behavior 原样转发的 legacy input。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'T',
-          whenToUse: '仅在迁移既有 tolerantClone caller 时使用。',
-          example: 'diagnosticClone(state)'
-        }
-      ]
     }
   },
   'store-indexed:index:IndexedOperation': {
@@ -15856,40 +15666,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-indexed:index:observableObject': {
-    en: {
-      purpose:
-        'Creates an explicit string-keyed reactive object without Proxying user data. get tracks one key, has and keys track structure, snapshot tracks the full revision, and peek stays allocation-free and untracked.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('Name:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nruntime.flush()\nstop.dispose()\nprofile.dispose()`,
-      scenarios: [
-        'Independent object properties need fine-grained invalidation.',
-        'Consumers need explicit tracked and untracked read APIs.',
-        'Whole-object snapshots must be frozen, cached by revision, and safe for __proto__ keys.'
-      ],
-      avoidWhen: [
-        'Natural property syntax through a Proxy is required.',
-        'Keys are not strings; use ObservableMap.',
-        'A single atomic object value is simpler and sufficient.'
-      ],
-      options: storeIndexedCollectionOptions.object.en
-    },
-    zh: {
-      purpose:
-        '创建不 Proxy user data 的显式 string-keyed reactive object。get 追踪单 key，has/keys 追踪 structure，snapshot 追踪完整 revision，peek 保持无分配且不追踪。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('姓名:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nruntime.flush()\nstop.dispose()\nprofile.dispose()`,
-      scenarios: [
-        '独立 object property 需要细粒度 invalidation。',
-        'consumer 需要显式 tracked 与 untracked read API。',
-        'whole-object snapshot 必须 frozen、按 revision cache，并安全处理 __proto__ key。'
-      ],
-      avoidWhen: [
-        '要求通过 Proxy 使用自然 property syntax。',
-        'key 不是 string；使用 ObservableMap。',
-        '单一 atomic object value 已经足够简单。'
-      ],
-      options: storeIndexedCollectionOptions.object.zh
-    }
-  },
   'store-indexed:index:ObservableObject': {
     en: {
       purpose:
@@ -15901,7 +15677,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'The owner needs instanceof ObservableObject.'
       ],
       avoidWhen: [
-        'The factory argument order is more readable.',
+        'A single reactive value already satisfies the collection requirement.',
         'Implicit property interception is expected.',
         'The lifecycle cannot guarantee dispose.'
       ],
@@ -15917,45 +15693,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'owner 需要 instanceof ObservableObject。'
       ],
       avoidWhen: [
-        'factory 参数顺序更易读。',
+        '单个响应值已满足集合需求。',
         '期望 implicit property interception。',
         'lifecycle 无法保证 dispose。'
       ],
       options: storeIndexedCollectionOptions.object.zh
-    }
-  },
-  'store-indexed:index:observableArray': {
-    en: {
-      purpose:
-        'Creates an ordered reactive collection with lazy per-index dependencies plus separate length, structure, and snapshot revision tracking. Bulk replace and splice notify only materialized index cells.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nconsole.log('Names in rows:', frozen.map((row) => row.name))\nrows.dispose()`,
-      scenarios: [
-        'A large list has only a small number of observed indices.',
-        'Length and whole-list iteration must react independently from unrelated indexed reads.',
-        'Immutable snapshots are needed at adapter boundaries.'
-      ],
-      avoidWhen: [
-        'Stable business-key identity must survive reordering; use a keyed definition or map.',
-        'Native Array mutation syntax is required.',
-        'Every consumer always reads the entire small list.'
-      ],
-      options: storeIndexedCollectionOptions.array.en
-    },
-    zh: {
-      purpose:
-        '创建有序 reactive collection：惰性 per-index dependency，并分离 length、structure 与 snapshot revision tracking。bulk replace/splice 只通知已 materialize 的 index cell。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nconsole.log('列表姓名:', frozen.map((row) => row.name))\nrows.dispose()`,
-      scenarios: [
-        '大型 list 只有少量 observed index。',
-        'length 与 whole-list iteration 必须和无关 indexed read 独立响应。',
-        'adapter boundary 需要 immutable snapshot。'
-      ],
-      avoidWhen: [
-        '稳定 business-key identity 必须跨 reorder 保留；使用 keyed definition 或 map。',
-        '要求 native Array mutation syntax。',
-        '所有 consumer 总是读取完整小型 list。'
-      ],
-      options: storeIndexedCollectionOptions.array.zh
     }
   },
   'store-indexed:index:ObservableArray': {
@@ -15992,40 +15734,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: storeIndexedCollectionOptions.array.zh
     }
   },
-  'store-indexed:index:observableMap': {
-    en: {
-      purpose:
-        'Creates a reactive Map with per-key value and membership dependencies, a structural key dependency, and an iteration dependency. Untracked peek never materializes a cell.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log('Selected user:', selected?.name)\nusers.dispose()`,
-      scenarios: [
-        'Arbitrary key identity needs fine-grained get and has tracking.',
-        'Key-set readers should ignore value-only changes.',
-        'Iteration readers need one immutable entry snapshot per read.'
-      ],
-      avoidWhen: [
-        'Only string keys and object snapshots are required.',
-        'Insertion order is the primary indexed contract.',
-        'Weak key retention is required.'
-      ],
-      options: storeIndexedCollectionOptions.map.en
-    },
-    zh: {
-      purpose:
-        '创建 reactive Map：per-key value/membership dependency、structural key dependency 与 iteration dependency 相互分离；untracked peek 不 materialize cell。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log('已选用户:', selected?.name)\nusers.dispose()`,
-      scenarios: [
-        '任意 key identity 需要细粒度 get 与 has tracking。',
-        'key-set reader 应忽略只改变 value 的 mutation。',
-        'iteration reader 每次需要 immutable entry snapshot。'
-      ],
-      avoidWhen: [
-        '只需要 string key 与 object snapshot。',
-        'insertion order 是首要 indexed contract。',
-        '需要 weak key retention。'
-      ],
-      options: storeIndexedCollectionOptions.map.zh
-    }
-  },
   'store-indexed:index:ObservableMap': {
     en: {
       purpose:
@@ -16037,7 +15745,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'Per-key and iteration observers must remain separated.'
       ],
       avoidWhen: [
-        'Factory syntax is sufficient.',
+        'One atomic value is sufficient.',
         'Native mutable Map escape is required.',
         'Keys should be weakly retained.'
       ],
@@ -16053,45 +15761,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'per-key 与 iteration observer 必须保持分离。'
       ],
       avoidWhen: [
-        'factory syntax 已足够。',
+        '单个原子值已足够。',
         '要求暴露 native mutable Map。',
         'key 应被 weakly retain。'
       ],
       options: storeIndexedCollectionOptions.map.zh
-    }
-  },
-  'store-indexed:index:observableSet': {
-    en: {
-      purpose:
-        'Creates a reactive membership set with lazy per-value has dependencies and one structural dependency for size, iteration, and snapshots. Duplicate add and missing delete are no-op writes.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nconsole.log('Editor access:', permissions.has('write'))\npermissions.delete('read')\nconsole.log('Current permissions:', permissions.valuesArray())\npermissions.dispose()`,
-      scenarios: [
-        'Membership checks should react only when their queried value changes.',
-        'Size and enumeration need structural tracking.',
-        'Bulk clear or replace should publish one structural revision.'
-      ],
-      avoidWhen: [
-        'Each member has an associated value; use ObservableMap.',
-        'Duplicate members must be retained.',
-        'Weak membership is required.'
-      ],
-      options: storeIndexedCollectionOptions.set.en
-    },
-    zh: {
-      purpose:
-        '创建 reactive membership set：惰性 per-value has dependency，并由一个 structural dependency 服务 size、iteration 与 snapshot。duplicate add 和 missing delete 都是 no-op write。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nconsole.log('可编辑:', permissions.has('write'))\npermissions.delete('read')\nconsole.log('当前权限:', permissions.valuesArray())\npermissions.dispose()`,
-      scenarios: [
-        'membership check 只在其查询 value 改变时响应。',
-        'size 与 enumeration 需要 structural tracking。',
-        'bulk clear 或 replace 只应发布一次 structural revision。'
-      ],
-      avoidWhen: [
-        '每个 member 还有 associated value；使用 ObservableMap。',
-        '必须保留 duplicate member。',
-        '需要 weak membership。'
-      ],
-      options: storeIndexedCollectionOptions.set.zh
     }
   },
   'store-indexed:index:ObservableSet': {
@@ -16105,7 +15779,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'Bulk replacement must avoid per-value structural notifications.'
       ],
       avoidWhen: [
-        'The factory is clearer.',
+        'A native Set without subscriptions is sufficient.',
         'Member order or duplicates are meaningful.',
         'Lifecycle disposal cannot be guaranteed.'
       ],
@@ -16121,7 +15795,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'bulk replacement 必须避免 per-value structural notification。'
       ],
       avoidWhen: [
-        'factory 更清晰。',
+        '无订阅需求的原生 Set 已足够。',
         'member order 或 duplicate 有意义。',
         '无法保证 lifecycle disposal。'
       ],
@@ -17178,7 +16852,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Rejects object and function thenables at synchronous Atom-definition boundaries. The then property is probed once; a hostile getter failure remains reachable as cause.',
-      quickStart: `import { assertNotThenable } from '@migaia/store-keyed'\n\nconst createInitialValue = () => ({ selectedId: null as string | null })\nconst initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')\nconsole.log('sync initial value:', initial)`,
+      quickStart: `import { assertNotThenable } from '@migaia/store-keyed/atom/definition'\n\nconst createInitialValue = () => ({ selectedId: null as string | null })\nconst initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')\nconsole.log('sync initial value:', initial)`,
       scenarios: [
         'A custom definition constructor must remain synchronous.',
         'A generic value may hide a Promise-like then property.',
@@ -17213,7 +16887,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '在同步 Atom-definition boundary 拒绝 object/function thenable。then property 只 probe 一次；hostile getter failure 通过 cause 保持可达。',
-      quickStart: `import { assertNotThenable } from '@migaia/store-keyed'\n\nconst createInitialValue = () => ({ selectedId: null as string | null })\nconst initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')\nconsole.log('同步初值:', initial)`,
+      quickStart: `import { assertNotThenable } from '@migaia/store-keyed/atom/definition'\n\nconst createInitialValue = () => ({ selectedId: null as string | null })\nconst initial = createInitialValue()\nassertNotThenable(initial, 'customDef(initial)')\nconsole.log('同步初值:', initial)`,
       scenarios: [
         '自定义 definition constructor 必须保持同步。',
         'generic value 可能隐藏 Promise-like then property。',
@@ -17355,11 +17029,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:readOpticPath': {
+  'store-keyed:optics:readOpticPath': {
     en: {
       purpose:
         'Reads a property-key path from an object graph using Reflect.get. Every intermediate value must be an object; invalid traversal fails with a labelled Store Keyed TypeError.',
-      quickStart: `import { readOpticPath } from '@migaia/store-keyed'\n\nconst profile = { address: { city: 'Singapore' } }\nconst city = readOpticPath(profile, ['address', 'city'], 'profile lens')\nconsole.log(city) // Singapore：从业务对象读取嵌套字段`,
+      quickStart: `import { readOpticPath } from '@migaia/store-keyed/optics'\n\nconst profile = { address: { city: 'Singapore' } }\nconst city = readOpticPath(profile, ['address', 'city'], 'profile lens')\nconsole.log(city) // Singapore：从业务对象读取嵌套字段`,
       scenarios: [
         'A custom optic needs the same path-read semantics as focusDef.',
         'Symbol or string property keys must be supported.',
@@ -17403,7 +17077,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '使用 Reflect.get 从 object graph 读取 property-key path。每个中间值必须是 object；非法 traversal 会以带 label 的 Store Keyed TypeError 失败。',
-      quickStart: `import { readOpticPath } from '@migaia/store-keyed'\n\nconst profile = { address: { city: 'Singapore' } }\nconst city = readOpticPath(profile, ['address', 'city'], 'profile lens')\nconsole.log(city) // Singapore：从业务对象读取嵌套字段`,
+      quickStart: `import { readOpticPath } from '@migaia/store-keyed/optics'\n\nconst profile = { address: { city: 'Singapore' } }\nconst city = readOpticPath(profile, ['address', 'city'], 'profile lens')\nconsole.log(city) // Singapore：从业务对象读取嵌套字段`,
       scenarios: [
         '自定义 optic 需要与 focusDef 相同的 path-read 语义。',
         '必须支持 Symbol 或 string property key。',
@@ -17445,11 +17119,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:writeOpticPath': {
+  'store-keyed:optics:writeOpticPath': {
     en: {
       purpose:
         'Immutably writes a property-key path by shallow-cloning every traversed object or array. The __proto__ key is defined as data rather than changing the clone prototype.',
-      quickStart: `import { writeOpticPath } from '@migaia/store-keyed'\n\nconst profile = { name: 'Ada', address: { city: 'Cambridge' } }\nconst next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens') as typeof profile\nconsole.log('old:', profile.address.city, 'new:', next.address.city)\n// 只复制路径上的节点，原 profile 保持不变。`,
+      quickStart: `import { writeOpticPath } from '@migaia/store-keyed/optics'\n\nconst profile = { name: 'Ada', address: { city: 'Cambridge' } }\nconst next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens') as typeof profile\nconsole.log('old:', profile.address.city, 'new:', next.address.city)\n// 只复制路径上的节点，原 profile 保持不变。`,
       scenarios: [
         'A custom optic needs immutable path updates with structural sharing.',
         'Arrays and objects occur along the same path.',
@@ -17502,7 +17176,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '通过 shallow clone 每个经过的 object/array 来 immutable 写入 property-key path。__proto__ key 会被定义为普通 data，不会改变 clone prototype。',
-      quickStart: `import { writeOpticPath } from '@migaia/store-keyed'\n\nconst profile = { name: 'Ada', address: { city: 'Cambridge' } }\nconst next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens') as typeof profile\nconsole.log('旧值:', profile.address.city, '新值:', next.address.city)\n// 只复制路径上的节点，原 profile 保持不变。`,
+      quickStart: `import { writeOpticPath } from '@migaia/store-keyed/optics'\n\nconst profile = { name: 'Ada', address: { city: 'Cambridge' } }\nconst next = writeOpticPath(profile, ['address', 'city'], 'London', 'profile lens') as typeof profile\nconsole.log('旧值:', profile.address.city, '新值:', next.address.city)\n// 只复制路径上的节点，原 profile 保持不变。`,
       scenarios: [
         '自定义 optic 需要带 structural sharing 的 immutable path update。',
         '同一路径中同时存在 array 与 object。',
@@ -17553,14 +17227,14 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:findKeyIndex': {
+  'store-keyed:optics:findKeyIndex': {
     en: {
       purpose:
-        'Returns the first array index whose derived key is Object.is-equal to the requested key, or -1 when absent. It is a pure linear scan and does not validate uniqueness.',
-      quickStart: `import { findKeyIndex } from '@migaia/store-keyed'\n\ntype Todo = { id: string; title: string }\nconst todos: readonly Todo[] = [{ id: 'todo-41', title: 'Read docs' }, { id: 'todo-42', title: 'Ship example' }]\nconst index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nconsole.log(index >= 0 ? \`found: \${todos[index].title}\` : 'todo not found')`,
+        'Returns the first array index whose derived key is SameValueZero-equal to the requested key, or -1 when absent. It is a pure linear scan and does not validate uniqueness.',
+      quickStart: `import { findKeyIndex } from '@migaia/store-keyed/optics'\n\ntype Todo = { id: string; title: string }\nconst todos: readonly Todo[] = [{ id: 'todo-41', title: 'Read docs' }, { id: 'todo-42', title: 'Ship example' }]\nconst index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nconsole.log(index >= 0 ? \`found: \${todos[index].title}\` : 'todo not found')`,
       scenarios: [
         'Custom keyed collection logic needs the same lookup semantics as splitDef.',
-        'NaN and signed-zero keys must follow Object.is.',
+        'NaN and signed-zero keys must follow SameValueZero.',
         'Absence is normal control flow represented by -1.'
       ],
       avoidWhen: [
@@ -17589,7 +17263,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         },
         {
           name: 'key',
-          description: 'Requested key compared with Object.is.',
+          description: 'Requested key compared with SameValueZero.',
           defaultValue: 'required',
           optional: false,
           type: 'Key',
@@ -17600,11 +17274,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '返回第一个 derived key 与请求 key 满足 Object.is 的 array index；不存在时返回 -1。它是纯线性 scan，不校验唯一性。',
-      quickStart: `import { findKeyIndex } from '@migaia/store-keyed'\n\ntype Todo = { id: string; title: string }\nconst todos: readonly Todo[] = [{ id: 'todo-41', title: '阅读文档' }, { id: 'todo-42', title: '完善示例' }]\nconst index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nconsole.log(index >= 0 ? \`找到: \${todos[index].title}\` : '未找到待办')`,
+        '返回第一个 derived key 与请求 key 满足 SameValueZero 的 array index；不存在时返回 -1。它是纯线性 scan，不校验唯一性。',
+      quickStart: `import { findKeyIndex } from '@migaia/store-keyed/optics'\n\ntype Todo = { id: string; title: string }\nconst todos: readonly Todo[] = [{ id: 'todo-41', title: '阅读文档' }, { id: 'todo-42', title: '完善示例' }]\nconst index = findKeyIndex(todos, (todo) => todo.id, 'todo-42')\nconsole.log(index >= 0 ? \`找到: \${todos[index].title}\` : '未找到待办')`,
       scenarios: [
         '自定义 keyed collection logic 需要与 splitDef 相同 lookup 语义。',
-        'NaN 与 signed-zero key 必须遵循 Object.is。',
+        'NaN 与 signed-zero key 必须遵循 SameValueZero。',
         '缺失是由 -1 表示的正常 control flow。'
       ],
       avoidWhen: [
@@ -17633,7 +17307,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         },
         {
           name: 'key',
-          description: '使用 Object.is 比较的请求 key。',
+          description: '使用 SameValueZero 比较的请求 key。',
           defaultValue: '必填',
           optional: false,
           type: 'Key',
@@ -17643,11 +17317,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:computeUniqueKeys': {
+  'store-keyed:optics:computeUniqueKeys': {
     en: {
       purpose:
         'Computes and freezes the ordered key list for an array while rejecting the first duplicate under Set key equality.',
-      quickStart: `import { computeUniqueKeys } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a', title: '写文档' }, { id: 'b', title: '发版' }]\nconst keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')\nconsole.log(keys) // ['a', 'b']：后续按稳定 key 建立 item token`,
+      quickStart: `import { computeUniqueKeys } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a', title: '写文档' }, { id: 'b', title: '发版' }]\nconst keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')\nconsole.log(keys) // ['a', 'b']：后续按稳定 key 建立 item token`,
       scenarios: [
         'A custom split kernel needs one ordered unique key snapshot.',
         'Duplicate business keys must fail before item tokens are built.',
@@ -17690,7 +17364,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose: '计算并 freeze array 的有序 key list，同时按 Set key equality 拒绝首个 duplicate。',
-      quickStart: `import { computeUniqueKeys } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a', title: '写文档' }, { id: 'b', title: '发版' }]\nconst keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')\nconsole.log(keys) // ['a', 'b']：后续按稳定 key 建立 item token`,
+      quickStart: `import { computeUniqueKeys } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a', title: '写文档' }, { id: 'b', title: '发版' }]\nconst keys = computeUniqueKeys(todos, (todo) => todo.id, 'todos')\nconsole.log(keys) // ['a', 'b']：后续按稳定 key 建立 item token`,
       scenarios: [
         '自定义 split kernel 需要一份有序唯一 key snapshot。',
         'duplicate business key 必须在构建 item token 前失败。',
@@ -17732,11 +17406,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:requireKeyIndex': {
+  'store-keyed:optics:requireKeyIndex': {
     en: {
       purpose:
         'Performs findKeyIndex and throws a labelled Store Keyed error when the key no longer exists. It is the read/write guard used by stable split-item definitions.',
-      quickStart: `import { requireKeyIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst id = 'b'\nconst index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')\nconsole.log(index) // 1：按最新列表解析稳定 item key`,
+      quickStart: `import { requireKeyIndex } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst id = 'b'\nconst index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')\nconsole.log(index) // 1：按最新列表解析稳定 item key`,
       scenarios: [
         'A stable item token must detect that its source item was removed.',
         'Missing keys are contract failures rather than optional state.',
@@ -17789,7 +17463,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '执行 findKeyIndex，并在 key 已不存在时抛带 label 的 Store Keyed error；这是稳定 split-item definition 的 read/write guard。',
-      quickStart: `import { requireKeyIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst id = 'b'\nconst index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')\nconsole.log(index) // 1：按最新列表解析稳定 item key`,
+      quickStart: `import { requireKeyIndex } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst id = 'b'\nconst index = requireKeyIndex(todos, (todo) => todo.id, id, 'todo was removed')\nconsole.log(index) // 1：按最新列表解析稳定 item key`,
       scenarios: [
         '稳定 item token 必须检测 source item 已被 remove。',
         'missing key 是 contract failure，而非 optional state。',
@@ -17840,11 +17514,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:shallowArrayEquals': {
+  'store-keyed:optics:shallowArrayEquals': {
     en: {
       purpose:
         'Compares two readonly arrays by length and Object.is at each index. It is the identity-preserving equality used for ordered split-definition token lists.',
-      quickStart: `import { shallowArrayEquals } from '@migaia/store-keyed'\n\nconst previousDefs = [{ id: 'a' }]\nconst nextDefs = previousDefs.slice()\nconst unchanged = shallowArrayEquals(previousDefs, nextDefs)\nconsole.log(unchanged) // true：成员 identity 与顺序都没有变化`,
+      quickStart: `import { shallowArrayEquals } from '@migaia/store-keyed/optics'\n\nconst previousDefs = [{ id: 'a' }]\nconst nextDefs = previousDefs.slice()\nconst unchanged = shallowArrayEquals(previousDefs, nextDefs)\nconsole.log(unchanged) // true：成员 identity 与顺序都没有变化`,
       scenarios: [
         'Ordered token arrays should notify only when membership or order changes.',
         'Element identity is the complete equality contract.',
@@ -17879,7 +17553,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '按 length 与每个 index 的 Object.is 比较两个 readonly array；用于 ordered split-definition token list 的 identity-preserving equality。',
-      quickStart: `import { shallowArrayEquals } from '@migaia/store-keyed'\n\nconst previousDefs = [{ id: 'a' }]\nconst nextDefs = previousDefs.slice()\nconst unchanged = shallowArrayEquals(previousDefs, nextDefs)\nconsole.log(unchanged) // true：成员 identity 与顺序都没有变化`,
+      quickStart: `import { shallowArrayEquals } from '@migaia/store-keyed/optics'\n\nconst previousDefs = [{ id: 'a' }]\nconst nextDefs = previousDefs.slice()\nconst unchanged = shallowArrayEquals(previousDefs, nextDefs)\nconsole.log(unchanged) // true：成员 identity 与顺序都没有变化`,
       scenarios: [
         'ordered token array 只在 membership 或 order 变化时通知。',
         'element identity 就是完整 equality contract。',
@@ -17912,11 +17586,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:spliceInsert': {
+  'store-keyed:optics:spliceInsert': {
     en: {
       purpose:
         'Returns a frozen array with one item inserted at a clamped index. The source array is never mutated.',
-      quickStart: `import { spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst newTodo = { id: 'c' }\nconst requestedIndex = 1\nconst next = spliceInsert(todos, newTodo, requestedIndex)\nconsole.log(next) // a、c、b：返回新数组，原 todos 不变`,
+      quickStart: `import { spliceInsert } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst newTodo = { id: 'c' }\nconst requestedIndex = 1\nconst next = spliceInsert(todos, newTodo, requestedIndex)\nconsole.log(next) // a、c、b：返回新数组，原 todos 不变`,
       scenarios: [
         'Custom split logic needs the same immutable insert transform.',
         'Out-of-range indices should clamp to the nearest boundary.',
@@ -17959,7 +17633,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose: '返回在 clamped index 插入一项的 frozen array；绝不 mutation source array。',
-      quickStart: `import { spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst newTodo = { id: 'c' }\nconst requestedIndex = 1\nconst next = spliceInsert(todos, newTodo, requestedIndex)\nconsole.log(next) // a、c、b：返回新数组，原 todos 不变`,
+      quickStart: `import { spliceInsert } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst newTodo = { id: 'c' }\nconst requestedIndex = 1\nconst next = spliceInsert(todos, newTodo, requestedIndex)\nconsole.log(next) // a、c、b：返回新数组，原 todos 不变`,
       scenarios: [
         '自定义 split logic 需要同一 immutable insert transform。',
         '越界 index 应 clamp 到最近 boundary。',
@@ -18001,11 +17675,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:filterOutKey': {
+  'store-keyed:optics:filterOutKey': {
     en: {
       purpose:
-        'Removes every item whose derived key is Object.is-equal to the target. When nothing matches it preserves the original array identity; otherwise it returns a frozen replacement.',
-      quickStart: `import { filterOutKey } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'todo-41' }, { id: 'todo-42' }]\nconst { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')\nconsole.log(removed, next) // true、[{ id: 'todo-41' }]：删除后得到新的 immutable list`,
+        'Removes every item whose derived key is SameValueZero-equal to the target. When nothing matches it preserves the original array identity; otherwise it returns a frozen replacement.',
+      quickStart: `import { filterOutKey } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'todo-41' }, { id: 'todo-42' }]\nconst { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')\nconsole.log(removed, next) // true、[{ id: 'todo-41' }]：删除后得到新的 immutable list`,
       scenarios: [
         'Custom split logic needs immutable removal plus an explicit changed flag.',
         'No-op removal should retain source identity.',
@@ -18037,7 +17711,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         },
         {
           name: 'key',
-          description: 'Target key removed under Object.is equality.',
+          description: 'Target key removed under SameValueZero equality.',
           defaultValue: 'required',
           optional: false,
           type: 'Key',
@@ -18048,8 +17722,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '移除所有 derived key 与 target 满足 Object.is 的 item。无匹配时保留原 array identity；否则返回 frozen replacement。',
-      quickStart: `import { filterOutKey } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'todo-41' }, { id: 'todo-42' }]\nconst { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')\nconsole.log(removed, next) // true、[{ id: 'todo-41' }]：删除后得到新的 immutable list`,
+        '移除所有 derived key 与 target 满足 SameValueZero 的 item。无匹配时保留原 array identity；否则返回 frozen replacement。',
+      quickStart: `import { filterOutKey } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'todo-41' }, { id: 'todo-42' }]\nconst { removed, next } = filterOutKey(todos, (todo) => todo.id, 'todo-42')\nconsole.log(removed, next) // true、[{ id: 'todo-41' }]：删除后得到新的 immutable list`,
       scenarios: [
         '自定义 split logic 需要 immutable removal 与显式 changed flag。',
         'no-op removal 应保留 source identity。',
@@ -18081,7 +17755,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         },
         {
           name: 'key',
-          description: '按 Object.is equality 移除的 target key。',
+          description: '按 SameValueZero equality 移除的 target key。',
           defaultValue: '必填',
           optional: false,
           type: 'Key',
@@ -18091,11 +17765,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:replaceAtIndex': {
+  'store-keyed:optics:replaceAtIndex': {
     en: {
       purpose:
         'Returns a frozen shallow copy with one array slot replaced. It deliberately performs no bounds validation or equality shortcut.',
-      quickStart: `import { replaceAtIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst index = 1\nconst updatedTodo = { id: 'b', done: true }\nconst next = replaceAtIndex(todos, index, updatedTodo)\nconsole.log(next) // 只替换 index=1 的 slot，原 todos 不变`,
+      quickStart: `import { replaceAtIndex } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst index = 1\nconst updatedTodo = { id: 'b', done: true }\nconst next = replaceAtIndex(todos, index, updatedTodo)\nconsole.log(next) // 只替换 index=1 的 slot，原 todos 不变`,
       scenarios: [
         'A caller already validated the index.',
         'Custom split logic needs one immutable slot replacement.',
@@ -18139,7 +17813,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '返回替换一个 array slot 的 frozen shallow copy；刻意不做 bounds validation 或 equality shortcut。',
-      quickStart: `import { replaceAtIndex } from '@migaia/store-keyed'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst index = 1\nconst updatedTodo = { id: 'b', done: true }\nconst next = replaceAtIndex(todos, index, updatedTodo)\nconsole.log(next) // 只替换 index=1 的 slot，原 todos 不变`,
+      quickStart: `import { replaceAtIndex } from '@migaia/store-keyed/optics'\n\nconst todos = [{ id: 'a' }, { id: 'b' }]\nconst index = 1\nconst updatedTodo = { id: 'b', done: true }\nconst next = replaceAtIndex(todos, index, updatedTodo)\nconsole.log(next) // 只替换 index=1 的 slot，原 todos 不变`,
       scenarios: [
         'caller 已校验 index。',
         '自定义 split logic 需要单 slot immutable replacement。',
@@ -18181,11 +17855,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
-  'store-keyed:index:KeyedSplitCache': {
+  'store-keyed:optics:KeyedSplitCache': {
     en: {
       purpose:
         'Owns a stable key-to-item token cache shared by split kernels. of performs get-or-create; prune separates liveness, eviction eligibility, and per-item cleanup; clear only drops cache references.',
-      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ICachedItem = { id: string }\nconst cache = new KeyedSplitCache<string, ICachedItem>()\nconst item = cache.of('todo-1', () => ({ id: 'todo-1' }))\nconsole.log('Cached item:', item.id)\ncache.clear()`,
+      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed/optics'\n\ntype ICachedItem = { id: string }\nconst cache = new KeyedSplitCache<string, ICachedItem>()\nconst item = cache.of('todo-1', () => ({ id: 'todo-1' }))\nconsole.log('Cached item:', item.id)\ncache.clear()`,
       scenarios: [
         'A custom keyed split needs stable item identity.',
         'Eviction must skip observed items and optionally dispose evicted instances.',
@@ -18237,7 +17911,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '拥有 split kernel 共用的稳定 key-to-item token cache。of 执行 get-or-create；prune 分离 liveness、eviction eligibility 与 per-item cleanup；clear 只丢 cache reference。',
-      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ICachedItem = { id: string }\nconst cache = new KeyedSplitCache<string, ICachedItem>()\nconst item = cache.of('todo-1', () => ({ id: 'todo-1' }))\nconsole.log('缓存条目:', item.id)\ncache.clear()`,
+      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed/optics'\n\ntype ICachedItem = { id: string }\nconst cache = new KeyedSplitCache<string, ICachedItem>()\nconst item = cache.of('todo-1', () => ({ id: 'todo-1' }))\nconsole.log('缓存条目:', item.id)\ncache.clear()`,
       scenarios: [
         '自定义 keyed split 需要稳定 item identity。',
         'eviction 必须跳过 observed item，并可选择 dispose 被淘汰 instance。',
@@ -20293,7 +19967,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Declares a fixed-length f64 array with lazy bucket-level Reactive sources. at and setAt track or notify one bucket; setRange validates all values before a batched multi-bucket commit and rolls back written cells if commit fails.',
-      quickStart: `import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ samples: array(number(), 1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}`,
+      quickStart: `import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ samples: array(1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         'A fixed numeric index domain belongs in WASM memory.',
         'Readers consume predictable buckets or ranges.',
@@ -20309,7 +19983,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '声明带惰性 bucket-level Reactive source 的定长 f64 array。at/setAt 追踪或通知一个 bucket；setRange 先校验全部值，再以一次 batch 跨 bucket commit，commit 失败会回滚已写 cell。',
-      quickStart: `import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ samples: array(number(), 1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}`,
+      quickStart: `import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = await createStore({ samples: array(1_024, 32) })\ntry {\n  store.samples.setAt(0, 1)\n  store.samples.setRange(1, 4, [2, 3, 4])\n  const snapshot = store.samples.view()\n  console.log(snapshot)\n} finally {\n  store.$dispose()\n}`,
       scenarios: [
         '固定数值 index domain 应位于 WASM memory。',
         'reader 按可预测 bucket 或 range 消费。',
@@ -20868,11 +20542,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: workerComputedOptions.zh
     }
   },
-  'store-worker:serialize:workerParser': {
+  'store-worker:serialize-worker:workerParser': {
     en: {
       purpose:
         'Offloads encode/decode with bounded stream credits. Copy is default; transfer hands over input. Credit waits and stream stop preserve native AbortError tagged REQUEST_ABORTED; other failures retain their owners.',
-      quickStart: `import { workerParser } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal, context: 'demo' }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
+      quickStart: `import { workerParser } from '@migaia/store-worker/serialize/worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal, context: 'demo' }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
       scenarios: [
         'Encoding produces bytes consumed by persistence or transport without rebuilding a large object graph on the main thread.',
         'Streaming encode output needs bounded producer credits and consumer-driven cancellation.',
@@ -20888,7 +20562,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '把编码和解码放到 Worker，以消费额度限制流。默认 copy，transfer 会交出输入。发送额度等待与主动停止流保留带 REQUEST_ABORTED 的原生 AbortError，其他失败保留实际来源。',
-      quickStart: `import { workerParser } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal, context: 'demo' }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
+      quickStart: `import { workerParser } from '@migaia/store-worker/serialize/worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal, context: 'demo' }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
       scenarios: [
         'encode 生成的 bytes 直接进入 persistence 或 transport，不需要在主线程重建大型 object graph。',
         'streaming encode output 需要有界 producer credit 与 consumer-driven cancellation。',
@@ -20902,11 +20576,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: workerParserOptions.zh
     }
   },
-  'store-worker:serialize:workerPlugin': {
+  'store-worker:serialize-worker:workerPlugin': {
     en: {
       purpose:
         'Wraps workerParser as a Serialize plugin whose type equals the resolved parser name. It adds registry shape only; transport, ownership, streaming, and disposal semantics remain exactly those of workerParser.',
-      quickStart: `import { workerPlugin } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst value = { id: 'demo' }\nconst plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst serializer = { plugin: undefined as typeof plugin | undefined, use(nextPlugin: typeof plugin) { serializer.plugin = nextPlugin }, encode: async (nextValue: unknown) => serializer.plugin?.parser.encode(nextValue, { signal: new AbortController().signal, context: 'demo' }) }\nserializer.use(plugin)\n\ntry {\n  const encoded = await serializer.encode(value)\n  console.log(encoded)\n} finally {\n  await plugin.parser.dispose?.()\n}`,
+      quickStart: `import { workerPlugin } from '@migaia/store-worker/serialize/worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst value = { id: 'demo' }\nconst plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst serializer = { plugin: undefined as typeof plugin | undefined, use(nextPlugin: typeof plugin) { serializer.plugin = nextPlugin }, encode: async (nextValue: unknown) => serializer.plugin?.parser.encode(nextValue, { signal: new AbortController().signal, context: 'demo' }) }\nserializer.use(plugin)\n\ntry {\n  const encoded = await serializer.encode(value)\n  console.log(encoded)\n} finally {\n  await plugin.parser.dispose?.()\n}`,
       scenarios: [
         'A Serialize registry needs a named Worker-backed parser plugin.',
         'Existing composition accepts ISerializePlugin rather than a bare parser.',
@@ -20922,7 +20596,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '把 workerParser 包成 Serialize plugin，plugin type 等于解析后的 parser name。它只增加 registry shape；transport、ownership、streaming 与 disposal 语义完全沿用 workerParser。',
-      quickStart: `import { workerPlugin } from '@migaia/store-worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst value = { id: 'demo' }\nconst plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst serializer = { plugin: undefined as typeof plugin | undefined, use(nextPlugin: typeof plugin) { serializer.plugin = nextPlugin }, encode: async (nextValue: unknown) => serializer.plugin?.parser.encode(nextValue, { signal: new AbortController().signal, context: 'demo' }) }\nserializer.use(plugin)\n\ntry {\n  const encoded = await serializer.encode(value)\n  console.log(encoded)\n} finally {\n  await plugin.parser.dispose?.()\n}`,
+      quickStart: `import { workerPlugin } from '@migaia/store-worker/serialize/worker'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst value = { id: 'demo' }\nconst plugin = workerPlugin({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst serializer = { plugin: undefined as typeof plugin | undefined, use(nextPlugin: typeof plugin) { serializer.plugin = nextPlugin }, encode: async (nextValue: unknown) => serializer.plugin?.parser.encode(nextValue, { signal: new AbortController().signal, context: 'demo' }) }\nserializer.use(plugin)\n\ntry {\n  const encoded = await serializer.encode(value)\n  console.log(encoded)\n} finally {\n  await plugin.parser.dispose?.()\n}`,
       scenarios: [
         'Serialize registry 需要具名 Worker-backed parser plugin。',
         '现有组合只接受 ISerializePlugin，而不是 bare parser。',
@@ -20936,11 +20610,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: workerParserOptions.zh
     }
   },
-  'store-worker:serialize:createSerializeWorkerHandler': {
+  'store-worker:serialize-worker:createSerializeWorkerHandler': {
     en: {
       purpose:
         'Creates the Worker-side managed endpoint for a Serialize parser. Decode returns one response; encode may stream ordered frames under a two-credit producer window, with acknowledgements, cancellation, iterator.return cleanup, and transfer-aware byte replies.',
-      quickStart: `import { jsonParser, type ISerializeChunk } from '@migaia/serialize'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker'\n\nconst handler = createSerializeWorkerHandler(\n  jsonParser(),\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
+      quickStart: `import { jsonParser, type ISerializeChunk } from '@migaia/serialize'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker'\n\nconst handler = createSerializeWorkerHandler(\n  jsonParser(),\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
       scenarios: [
         'A Worker hosts one concrete Serialize parser for a paired workerParser client.',
         'Encoder output may be sync iterable, async iterable, or one chunk.',
@@ -20975,7 +20649,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '为 Serialize parser 创建 Worker 侧 managed endpoint。decode 返回单一 response；encode 可在双 credit producer window 下发送有序 frame，并处理 acknowledgement、cancellation、iterator.return cleanup 与 transfer-aware byte reply。',
-      quickStart: `import { jsonParser, type ISerializeChunk } from '@migaia/serialize'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker'\n\nconst handler = createSerializeWorkerHandler(\n  jsonParser(),\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
+      quickStart: `import { jsonParser, type ISerializeChunk } from '@migaia/serialize'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker'\n\nconst handler = createSerializeWorkerHandler(\n  jsonParser(),\n  (message, transfer) => self.postMessage(message, transfer as Transferable[])\n)\n\nself.onmessage = (event) => void handler(event.data)\nself.addEventListener('close', () => void handler.dispose())`,
       scenarios: [
         'Worker 为配对 workerParser client 托管一个具体 Serialize parser。',
         'encoder output 可以是 sync iterable、async iterable 或单一 chunk。',
@@ -21004,180 +20678,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           type: '(message: unknown, transfer?: readonly unknown[]) => void',
           whenToUse: '把 protocol frame 与零拷贝 byte response 连接到 Worker port。',
           example: '(message, transfer) => self.postMessage(message, transfer as Transferable[])'
-        }
-      ]
-    }
-  },
-  'store-worker:serialize:encodeWorkerValue': {
-    en: {
-      purpose:
-        'Brands a worker input as a Serialize value or byte chunk without copying its payload. Uint8Array keeps byte identity so transfer policy can inspect its backing buffer.',
-      quickStart: `import { encodeWorkerValue } from '@migaia/store-worker/serialize/worker'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = encodeWorkerValue(bytes)\nconsole.log(chunk) // ['bytes', bytes] for Uint8Array; otherwise ['value', input]`,
-      scenarios: [
-        'A custom Worker serializer must use the canonical Serialize chunk shape.',
-        'Uint8Array identity must remain available for transfer-list construction.'
-      ],
-      avoidWhen: [
-        'The value is already a valid ISerializeChunk.',
-        'Deep validation, cloning, or encoding is expected; this helper only applies the chunk brand.'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Input payload wrapped as bytes for Uint8Array and value otherwise.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'unknown',
-          whenToUse: 'Normalize a custom worker request into the canonical chunk union.',
-          example: 'encodeWorkerValue(bytes)'
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        '把 worker input 标记为 Serialize value 或 byte chunk，不复制 payload。Uint8Array 保持 byte identity，供 transfer policy 检查 backing buffer。',
-      quickStart: `import { encodeWorkerValue } from '@migaia/store-worker/serialize/worker'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = encodeWorkerValue(bytes)\nconsole.log(chunk) // Uint8Array 得到 ['bytes', bytes]；其他输入得到 ['value', input]`,
-      scenarios: [
-        '自定义 Worker serializer 必须使用 canonical Serialize chunk shape。',
-        '必须保留 Uint8Array identity 以构建 transfer list。'
-      ],
-      avoidWhen: [
-        '值已经是合法 ISerializeChunk。',
-        '期望 deep validation、clone 或真正编码；该 helper 只施加 chunk brand。'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Uint8Array 包为 bytes，其余输入包为 value 的 payload。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'unknown',
-          whenToUse: '把自定义 worker request 规整成 canonical chunk union。',
-          example: 'encodeWorkerValue(bytes)'
-        }
-      ]
-    }
-  },
-  'store-worker:serialize:decodeWorkerValue': {
-    en: {
-      purpose:
-        'Brands one Worker decode result as a canonical Serialize byte or value chunk while preserving byte payload identity for zero-copy replies.',
-      quickStart: `import { decodeWorkerValue } from '@migaia/store-worker/serialize/worker'\n\nconst decoded: unknown = { id: 1, ok: true }\nconst responseChunk = decodeWorkerValue(decoded)\nconsole.log(responseChunk)`,
-      scenarios: [
-        'A custom worker-side handler returns parser.decode output through Serialize transport.',
-        'Byte output should remain eligible for transfer back to the caller.'
-      ],
-      avoidWhen: [
-        'The result is already a canonical chunk.',
-        'The caller expects validation or conversion beyond Uint8Array discrimination.'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Decoded payload classified as bytes for Uint8Array and value otherwise.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'unknown',
-          whenToUse: 'Normalize a worker decode result before protocol delivery.',
-          example: 'decodeWorkerValue(decoded)'
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        '把一项 Worker decode result 标记为 canonical Serialize byte 或 value chunk，同时保留 byte payload identity 供零拷贝回包。',
-      quickStart: `import { decodeWorkerValue } from '@migaia/store-worker/serialize/worker'\n\nconst decoded: unknown = { id: 1, ok: true }\nconst responseChunk = decodeWorkerValue(decoded)\nconsole.log(responseChunk)`,
-      scenarios: [
-        '自定义 worker 侧 handler 通过 Serialize transport 返回 parser.decode output。',
-        'byte output 应保持可 transfer 回调用方。'
-      ],
-      avoidWhen: [
-        '结果已经是 canonical chunk。',
-        '调用方期望 Uint8Array 判别之外的 validation 或 conversion。'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Uint8Array 分类为 bytes，其余 decoded payload 分类为 value。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'unknown',
-          whenToUse: 'protocol delivery 前规整 worker decode result。',
-          example: 'decodeWorkerValue(decoded)'
-        }
-      ]
-    }
-  },
-  'store-worker:serialize:transferablesOf': {
-    en: {
-      purpose:
-        'Returns a transfer list only for transfer ownership plus a byte chunk backed by an exclusive full ArrayBuffer. Slices, SharedArrayBuffer, value chunks, and copy mode return an empty list.',
-      quickStart: `import { WorkerByteOwnership } from '@migaia/store-worker'\nimport { transferablesOf } from '@migaia/store-worker/serialize/transferables'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\nconsole.log('transferable buffers:', transfer.length)\npostMessage(message, transfer as Transferable[])`,
-      scenarios: [
-        'A custom worker protocol needs the same conservative byte-transfer rule.',
-        'A full-buffer Uint8Array is exclusively owned and may detach.'
-      ],
-      avoidWhen: [
-        'The view is a subarray or shares aliases over the same buffer.',
-        'SharedArrayBuffer is involved; it is shared, not transferable.',
-        'The sender must retain readable bytes.'
-      ],
-      options: [
-        {
-          name: 'chunk',
-          description:
-            'Canonical Serialize chunk inspected for byte kind, Uint8Array payload, and full-buffer coverage.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'ISerializeChunk',
-          whenToUse: 'Pass the exact outbound chunk whose ownership is changing.',
-          example: 'transferablesOf(chunk, ownership)'
-        },
-        {
-          name: 'ownership',
-          description:
-            'Explicit copy or transfer policy; only transfer can produce a non-empty list.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'IByteOwnership',
-          whenToUse:
-            'Keep copy as the default and opt into destructive ownership movement explicitly.',
-          example: 'WorkerByteOwnership.transfer'
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        '只有 transfer ownership 与独占完整 ArrayBuffer 支撑的 byte chunk 同时成立时才返回 transfer list。slice、SharedArrayBuffer、value chunk 与 copy mode 都返回空数组。',
-      quickStart: `import { WorkerByteOwnership } from '@migaia/store-worker'\nimport { transferablesOf } from '@migaia/store-worker/serialize/transferables'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst chunk = ['bytes', bytes] as const\nconst message = { chunk }\nconst transfer = transferablesOf(chunk, WorkerByteOwnership.transfer)\nconsole.log('transferable buffers:', transfer.length)\npostMessage(message, transfer as Transferable[])`,
-      scenarios: [
-        '自定义 worker protocol 需要复用同一保守 byte-transfer 规则。',
-        'full-buffer Uint8Array 独占且允许 detach。'
-      ],
-      avoidWhen: [
-        'view 是 subarray，或同一 buffer 存在其他 alias。',
-        '使用 SharedArrayBuffer；它是 shared，不可 transfer。',
-        '发送方必须继续读取 bytes。'
-      ],
-      options: [
-        {
-          name: 'chunk',
-          description:
-            '检查 byte kind、Uint8Array payload 与完整 buffer coverage 的 canonical Serialize chunk。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'ISerializeChunk',
-          whenToUse: '传入 ownership 即将变化的准确 outbound chunk。',
-          example: 'transferablesOf(chunk, ownership)'
-        },
-        {
-          name: 'ownership',
-          description: '显式 copy 或 transfer policy；只有 transfer 可能产生非空列表。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'IByteOwnership',
-          whenToUse: '默认保留 copy，只显式 opt in 破坏性 ownership movement。',
-          example: 'WorkerByteOwnership.transfer'
         }
       ]
     }

@@ -374,10 +374,6 @@ const rpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = {
             [
               "encodedType?: 'any' | 'string' | 'uint8array'",
               '默认 any，声明认证转换的编码形式；它与 codec 的 unknown 标签不是同一个类型。'
-            ],
-            [
-              'createAuthenticationNonce(): string',
-              '供扩展作者创建认证使用的随机 nonce；普通调用无需自行生成或复用它。'
             ]
           ]
         }
@@ -871,10 +867,6 @@ const rpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = {
             [
               "encodedType?: 'any' | 'string' | 'uint8array'",
               'Defaults to any and declares the transform encoding. It is distinct from the codec unknown tag.'
-            ],
-            [
-              'createAuthenticationNonce(): string',
-              'Creates a random authentication nonce for extension authors; ordinary calls do not generate or reuse one.'
             ]
           ]
         }
@@ -2934,23 +2926,19 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'disposeAsync(): Promise<void>',
-                    '复用同一 Promise，等待范围关闭期间登记的清理。一个错误原样传播，多项汇总 REGISTRY_DISPOSAL_FAILED；可在 dispose 后等待同一次工作。'
+                    '复用同一 Promise 等待范围关闭清理；单错按原生身份与来源分类，多错按清理顺序汇总 REGISTRY_DISPOSAL_FAILED。可在 dispose 后等待同一次工作，分类规则见错误页。'
                   ],
                   [
                     'whenTerminal(): Promise<void>',
                     '只等待清理完成，不重新抛出已记录的清理错误。需要收取失败时使用 disposeAsync；客户端示例只观察无错误的正常关闭。'
                   ],
                   [
-                    'retain(disposeOnRelease, _deferTask?): disposer',
-                    '登记一次保留，返回幂等释放函数。请求关闭且保留数归零后总在 setTimeout(0) 任务检查；新的保留使旧关闭任务失效，_deferTask 当前不改变调度。'
-                  ],
-                  [
-                    'prepareForRender(after?): void',
-                    '当前实现不执行操作；不回收未提交候选，也不因传入 Promise 自动等待资源。'
+                    'retain(disposeOnRelease): disposer',
+                    '登记一次保留，返回幂等释放函数。请求关闭且保留数归零后总在 setTimeout(0) 任务检查；新的保留使旧关闭任务失效。'
                   ],
                   [
                     '单项异步释放',
-                    'remove、replace 和注册退订启动的异步清理不加入后续 disposeAsync 等待。异步失败交 runtime.reportError；同步失败可在条目已修改后原样抛出。'
+                    'remove、replace 和注册退订启动的异步清理不加入后续 disposeAsync 等待。异步失败交 runtime.reportError；同步失败可在条目已修改后按同一清理错误分类抛出。'
                   ],
                   [
                     '释放约定',
@@ -3098,23 +3086,19 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'disposeAsync(): Promise<void>',
-                    'Reuse one Promise for cleanup registered during registry closure. Propagate one original error or aggregate multiple as REGISTRY_DISPOSAL_FAILED; it can join work already started by dispose.'
+                    'Reuse one Promise for scope cleanup. Classify one failure by its native identity and owner; aggregate multiple classified failures in cleanup order as REGISTRY_DISPOSAL_FAILED. It can join work already started by dispose; see the error page for classification.'
                   ],
                   [
                     'whenTerminal(): Promise<void>',
                     'Wait for terminal state without rethrowing recorded cleanup errors. Use disposeAsync to collect failures; the client scene observes normal successful closure.'
                   ],
                   [
-                    'retain(disposeOnRelease, _deferTask?): disposer',
-                    'Retain and return an idempotent release. Requested closure at zero retain count always checks in a setTimeout(0) task; a new retain invalidates the old task. _deferTask currently does not change scheduling.'
-                  ],
-                  [
-                    'prepareForRender(after?): void',
-                    'Currently a no-op; it neither reclaims uncommitted candidates nor automatically waits for resources through the supplied Promise.'
+                    'retain(disposeOnRelease): disposer',
+                    'Retain and return an idempotent release. Requested closure at zero retain count always checks in a setTimeout(0) task; a new retain invalidates the old task.'
                   ],
                   [
                     'Entry-level asynchronous release',
-                    'Async cleanup started by remove/replace/registration disposers is not joined by later disposeAsync. Async failures go to runtime.reportError; synchronous failures can propagate after the registration changed.'
+                    'Async cleanup started by remove/replace/registration disposers is not joined by later disposeAsync. Async failures go to runtime.reportError; synchronous failures can be thrown after the registration changed using the same cleanup-failure classification.'
                   ],
                   [
                     'Cleanup convention',
@@ -3478,12 +3462,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '开发模式的 effect 清理后可能重新保留注册表。最后释放时用下一任务检查计数与版本，重新保留使旧任务失效；本包不关闭 Runtime。'
                   ],
                   [
-                    '渲染中分配',
-                    'prepareForRender 当前为空操作。需要确定清理的资源由应用范围管理，不能承诺从未提交的 Provider 会触发卸载 effect。'
-                  ],
-                  [
                     '收取释放错误',
-                    'dispose 可同步抛出启动阶段错误且继续观察异步清理。disposeAsync 等全部范围清理并传播一个原错或多错汇总；whenTerminal 仅观察完成。'
+                    'dispose 可同步抛出已分类的清理错误，并继续观察异步清理。disposeAsync 等全部范围清理；单错保留原生身份或通过 cause 保留原值，多错按清理顺序汇总；whenTerminal 仅观察完成。'
                   ],
                   [
                     '报告器边界',
@@ -3499,7 +3479,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '[STORE_REACT_SOURCE](/zh/docs/store-react/api/STORE_REACT_SOURCE) 为 `@migaia/store-react`。`StoreReactErrorCode` 声明本包九个码；ready 原 Error、底层 Store 或应用释放错误可能保留其他来源或没有本包码。不要把所有失败统一改写。'
+                text: '[STORE_REACT_SOURCE](/zh/docs/store-react/api/STORE_REACT_SOURCE) 为 `@migaia/store-react`。`StoreReactErrorCode` 声明本包九个码；ready 的原 Error 与底层 Store 失败可保留其他来源。注册表清理对可扩展且无身份的原生 Error 原位附 REGISTRY_DISPOSAL_FAILED；冻结错误或非 Error 用 cause 保留；已有完整 source/code 的外包错误保留其来源。'
               },
               {
                 type: 'table',
@@ -3511,7 +3491,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'REGISTRY_DISPOSAL_FAILED',
-                    '注册表范围关闭出现多个清理错误；AggregateError.errors 保留各原错误。单个错误原样传播。'
+                    '注册表清理失败的本包身份。可扩展且无身份的原生错误原位附码；冻结或非 Error 通过 cause 保留，完整外包身份不改写；多错按清理顺序放入 AggregateError.errors。'
                   ],
                   [
                     'PROVIDER_REQUIRED',
@@ -3617,12 +3597,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Development effect cleanup can be followed by another retention. A next-task count/version check invalidates stale closure when retained again; the package does not dispose Runtime.'
                   ],
                   [
-                    'Allocation during render',
-                    'prepareForRender currently does nothing. Manage resources through application scopes when cleanup is required; an uncommitted Provider is not guaranteed an unmount effect.'
-                  ],
-                  [
                     'Collect cleanup errors',
-                    'dispose can throw synchronous startup cleanup failures while asynchronous cleanup remains observed. disposeAsync joins scope cleanup and propagates one original or an aggregate; whenTerminal only observes completion.'
+                    'dispose can throw classified synchronous cleanup failures while asynchronous cleanup remains observed. disposeAsync joins scope cleanup; one failure keeps its native identity or original value through cause, while multiple failures aggregate in cleanup order. whenTerminal observes completion only.'
                   ],
                   [
                     'Reporter boundary',
@@ -3638,7 +3614,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '[STORE_REACT_SOURCE](/en/docs/store-react/api/STORE_REACT_SOURCE) is `@migaia/store-react`. `StoreReactErrorCode` declares nine codes. Existing readiness Errors, underlying Store failures, and application cleanup failures can retain other sources or lack a package code; do not rewrite all failures.'
+                text: '[STORE_REACT_SOURCE](/en/docs/store-react/api/STORE_REACT_SOURCE) is `@migaia/store-react`. `StoreReactErrorCode` declares nine codes. Readiness Errors and underlying Store failures can retain other owners. Registry cleanup tags extensible untagged native Errors in place as REGISTRY_DISPOSAL_FAILED; frozen Errors or non-Errors remain reachable through cause; complete foreign source/code identities retain their owner.'
               },
               {
                 type: 'table',
@@ -3650,7 +3626,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'REGISTRY_DISPOSAL_FAILED',
-                    'Multiple cleanup failures during scope closure; AggregateError.errors retains originals. A single failure propagates unchanged.'
+                    'Package identity for registry cleanup failures: tag extensible untagged native Errors in place, retain frozen or non-Error values through cause, and preserve complete foreign identities. Multiple classified failures enter AggregateError.errors in cleanup order.'
                   ],
                   [
                     'PROVIDER_REQUIRED',
@@ -3779,10 +3755,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['API、参数或字段', '作用、默认值与返回'],
                 rows: [
                   [
-                    '[SharedWaitMode](/zh/docs/store-shared/api/SharedWaitMode)',
-                    '常量唯一值 async；ISharedWaitMode 是对应值类型，不是 watch 的配置选项。'
-                  ],
-                  [
                     '[STORE_SHARED_SOURCE](/zh/docs/store-shared/api/STORE_SHARED_SOURCE)',
                     '提供本包错误的 source 字符串。'
                   ],
@@ -3898,10 +3870,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['API, parameter, or field', 'Purpose, default, and return'],
                 rows: [
-                  [
-                    '[SharedWaitMode](/en/docs/store-shared/api/SharedWaitMode)',
-                    'Its only value is async, with ISharedWaitMode as its value type; this is not a watch option.'
-                  ],
                   [
                     '[STORE_SHARED_SOURCE](/en/docs/store-shared/api/STORE_SHARED_SOURCE)',
                     'Provides the source string attached to package errors.'
@@ -5122,11 +5090,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'recordObservedVersion(index, version:bigint): void',
-                    '只更新这个实例的数组级版本记录，不修改共享值或自动通知已有单元。用于自己组合写入时与后续 sync 对齐。'
+                    '只更新这个实例的数组级版本记录，不修改共享值或自动通知已有单元。用于显式内部记账；低层写入发布前不要预先复制此游标，应让后续 sync(index) 观察变化。'
                   ],
                   [
                     'notifyWaiters(): void',
-                    '推进共享 64 位 generation，并通知其等待者，同时记录当前实例的 generation。它不是完整 set 替代品，不补齐单元版本或本地通知。'
+                    '推进共享 64 位 generation 并通知等待者，不更新当前实例的扫描游标。低层写入后依次调用 notifyWaiters() 与 sync(index)，不要提前调用 recordObservedVersion，否则会掩盖本地变化。'
                   ]
                 ]
               },
@@ -5232,7 +5200,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'notifyWaiters(): void',
-                    'Advance the shared 64-bit generation, notify waiters, and record that generation locally. This is not a complete set replacement and does not update cell records/local notifications.'
+                    'Advance the shared 64-bit generation and notify waiters without advancing this reader cursor. After a raw write, call notifyWaiters() then sync(index); do not pre-copy recordObservedVersion because it would hide local changes.'
                   ]
                 ]
               },
@@ -5344,10 +5312,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '如果应用确实选择 timer，应用创建并 clearInterval；停止函数不要遗失。没有理由增加独立 timer 时，在已有业务消息到达后调用 sync 即可。'
                   ],
                   [
-                    '[SharedWaitMode](/zh/docs/store-shared/api/SharedWaitMode) / [ISharedWaitMode](/zh/docs/store-shared/api/ISharedWaitMode)',
-                    '唯一公开值 async，只用于命名等待方式；不是 watch 的入参，也不是 watch 的返回结果。'
-                  ],
-                  [
                     '本轮实际环境',
                     '示例在 Node24 真实执行 waitAsync 与 Worker。没有删除宿主能力来模拟不支持情况，也没有验证浏览器隔离策略或其他运行时。'
                   ]
@@ -5455,10 +5419,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'If the application chooses a timer, it creates the timer and clears it with clearInterval, keeping its stop function. Otherwise sync after existing business messages without adding a separate timer.'
                   ],
                   [
-                    '[SharedWaitMode](/en/docs/store-shared/api/SharedWaitMode) / [ISharedWaitMode](/en/docs/store-shared/api/ISharedWaitMode)',
-                    'The sole public value async names the wait mode; it is not a watch argument or return value.'
-                  ],
-                  [
                     'Actual execution environment',
                     'Examples actually execute waitAsync/Worker on Node24. They do not remove host capability to simulate failure or verify browser isolation/other runtimes.'
                   ]
@@ -5564,7 +5524,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'notifyWaiters(): void',
-                    '把共享的 64 位 generation 加一，更新本对象的 generation 记录，再 Atomics.notify 唤醒独立读者。它不自动通知此前因订阅建立的本地下标节点。'
+                    '把共享的 64 位 generation 加一，再 Atomics.notify 唤醒独立读者，不更新本对象扫描游标。成功的 writeCell 后调用 notifyWaiters()，再调用 sync(index) 更新本地下标观察者；不要提前复制已观察版本。'
                   ]
                 ]
               },
@@ -5706,7 +5666,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'notifyWaiters(): void',
-                    'Increment the shared 64-bit generation, update this wrapper’s generation cursor, then Atomics.notify independent readers. This does not itself notify existing local reactive cells.'
+                    'Increment the shared 64-bit generation and Atomics.notify independent readers without updating this wrapper cursor. After successful writeCell, call notifyWaiters() then sync(index) to publish locally; do not pre-copy the observed version.'
                   ]
                 ]
               },
@@ -6352,10 +6312,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '提供错误来源字符串 @migaia/store-wasm。'
                   ],
                   [
-                    '[WasmFieldMode](/zh/docs/store-wasm/api/WasmFieldMode)',
-                    '提供 sync 名称，表示创建字段不等待异步任务。'
-                  ],
-                  [
                     '[WasmReservedKey](/zh/docs/store-wasm/api/WasmReservedKey)',
                     '提供 record 不能用作数据属性的 dispose 与 disposed 名称。'
                   ]
@@ -6510,10 +6466,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Provides the error source string @migaia/store-wasm.'
                   ],
                   [
-                    '[WasmFieldMode](/en/docs/store-wasm/api/WasmFieldMode)',
-                    'Provides sync, indicating synchronous field creation.'
-                  ],
-                  [
                     '[WasmReservedKey](/en/docs/store-wasm/api/WasmReservedKey)',
                     'Provides dispose and disposed, which record cannot use as data keys.'
                   ]
@@ -6655,7 +6607,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '默认容量 256 字节，适合已知最大长度的文字。完整参数见基础字段页。'
                   ],
                   [
-                    '`array(item, length, granularity?)`',
+                    '`array(length, granularity?)`',
                     '数组长度固定，granularity 默认 64。批量写入与限制在数组页说明。'
                   ],
                   ['`record(shape)`', '创建一组固定名称的数值属性。shape 不支持嵌套字段。']
@@ -6802,7 +6754,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Defaults to 256 bytes for text with a known bound. See basic fields for the full parameter description.'
                   ],
                   [
-                    '`array(item, length, granularity?)`',
+                    '`array(length, granularity?)`',
                     'Uses fixed length and a default granularity of 64. The array guide covers bulk writes and limits.'
                   ],
                   [
@@ -6882,7 +6834,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '加载失败',
                     '—',
-                    'Promise 以底层初始化错误结束，缓存随后清除。修复文件地址或内容后，下次调用可重新发起加载。'
+                    '原生 WebAssembly.CompileError、LinkError 与 RuntimeError 原样透传，不附加 source/code；加载失败后清除缓存，修复文件地址或内容后可重试。后续 INSTANCE_POISONED 仍以首次 trap 为 cause。'
                   ],
                   [
                     '字段尚未准备好',
@@ -6944,7 +6896,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'StoreProvider 来自 store-react。在它的 config 中设置下面三个字段，子树就会等待初始化。这里列出配置，完整组件用法见该包的 Provider 指南。'
+                text: '在 React render 外创建应用 owner，先 await ensureWasm()，用 registry.runtime 构造 Store 并在首次渲染前注册为 owned。Provider 借用外部 registry；退出时先 root.unmount()，再 await application.dispose()。下表 readiness 配置只控制子树显示，不替代 Store 所有权。'
+              },
+              {
+                type: 'code',
+                language: 'tsx',
+                code: "import { StoreProvider, createStoreRegistry, createStoreToken, useProvidedStore } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nexport async function createGameApplication() {\n  await ensureWasm()\n  const registry = createStoreRegistry()\n  const store = createStore({ hp: number(), hits: array(1000) }, { runtime: registry.runtime })\n  const token = createStoreToken<typeof store>('game')\n  registry.register(token, store, { owned: true })\n  function Game() {\n    const hp = useProvidedStore(token, (state) => state.hp.value)\n    return <span>HP: {hp}</span>\n  }\n  function App() {\n    return <StoreProvider registry={registry}><Game /></StoreProvider>\n  }\n  return { App, dispose: () => registry.disposeAsync() }\n}"
               },
               {
                 type: 'table',
@@ -7033,7 +6990,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     'Loading failure',
                     '—',
-                    'The Promise fails with the underlying initialization error and its cache is cleared. After fixing the file location or contents, another call can try loading again.'
+                    'Native WebAssembly.CompileError, LinkError and RuntimeError pass through unchanged without source/code. Failed loading clears the cache; fix the asset before retrying. Later INSTANCE_POISONED keeps the first trap as cause.'
                   ],
                   [
                     'Fields not ready',
@@ -7095,7 +7052,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'StoreProvider belongs to store-react. The three config fields below make its subtree wait for initialization. See that package Provider guide for complete component usage.'
+                text: 'Create the application owner outside React render. Await ensureWasm(), construct the Store on registry.runtime, and register it as owned before rendering. Provider borrows that registry; on shutdown call root.unmount() before awaiting application.dispose(). Readiness controls subtree display rather than Store ownership.'
+              },
+              {
+                type: 'code',
+                language: 'tsx',
+                code: "import { StoreProvider, createStoreRegistry, createStoreToken, useProvidedStore } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nexport async function createGameApplication() {\n  await ensureWasm()\n  const registry = createStoreRegistry()\n  const store = createStore({ hp: number(), hits: array(1000) }, { runtime: registry.runtime })\n  const token = createStoreToken<typeof store>('game')\n  registry.register(token, store, { owned: true })\n  function Game() {\n    const hp = useProvidedStore(token, (state) => state.hp.value)\n    return <span>HP: {hp}</span>\n  }\n  function App() {\n    return <StoreProvider registry={registry}><Game /></StoreProvider>\n  }\n  return { App, dispose: () => registry.disposeAsync() }\n}"
               },
               {
                 type: 'table',
@@ -7180,7 +7142,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '数据布局为 4 字节长度加 maxBytes 字节内容。默认 maxBytes 是 256，长度按 UTF-8 计算。'
                   ],
                   [
-                    '`array(number(), length, granularity?)`',
+                    '`array(length, granularity?)`',
                     '保存 length 个连续 f64。索引共享通知的组大小由 granularity 决定，默认 64。长度创建后不能改变。'
                   ],
                   [
@@ -7315,7 +7277,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Uses a 4-byte length followed by maxBytes bytes of content. maxBytes defaults to 256 and counts UTF-8 bytes.'
                   ],
                   [
-                    '`array(number(), length, granularity?)`',
+                    '`array(length, granularity?)`',
                     'Stores length contiguous f64 values. granularity controls how many indices share notifications, defaulting to 64. Length cannot change afterward.'
                   ],
                   [
@@ -7723,7 +7685,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(wasm.number(), 4, 2) })\nconst displayed: number[] = []\nconst observer = store.$runtime.effect(() => {\n  displayed.push(store.samples.at(0))\n})\nstore.samples.setRange(0, 2, [12, 13])\nstore.$runtime.flush()\nstore.samples.setAt(2, 20)\nstore.$runtime.flush()\n\nconsole.log('图表首个采样的显示记录:', displayed.join(', '))\nconsole.log('全部采样:', [...store.samples.view()].join(', '))\nobserver.dispose()\nawait store.$dispose()"
+                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(4, 2) })\nconst displayed: number[] = []\nconst observer = store.$runtime.effect(() => {\n  displayed.push(store.samples.at(0))\n})\nstore.samples.setRange(0, 2, [12, 13])\nstore.$runtime.flush()\nstore.samples.setAt(2, 20)\nstore.$runtime.flush()\n\nconsole.log('图表首个采样的显示记录:', displayed.join(', '))\nconsole.log('全部采样:', [...store.samples.view()].join(', '))\nobserver.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -7763,7 +7725,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['成员与选项', '说明'],
                 rows: [
                   [
-                    '`array(item: ReturnType<typeof number>, length: number, granularity?: number)`',
+                    '`array(length: number, granularity?: number)`',
                     '返回同步字段构造器；放进 `createStore()` 后得到数组字段。本版公开签名只支持 `number()` 元素，不创建独立的 number 字段。'
                   ],
                   [
@@ -7839,7 +7801,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(wasm.number(), 4, 2) })\nconst displayed: number[] = []\nconst observer = store.$runtime.effect(() => {\n  displayed.push(store.samples.at(0))\n})\nstore.samples.setRange(0, 2, [12, 13])\nstore.$runtime.flush()\nstore.samples.setAt(2, 20)\nstore.$runtime.flush()\n\nconsole.log('Displayed first-sample history:', displayed.join(', '))\nconsole.log('All samples:', [...store.samples.view()].join(', '))\nobserver.dispose()\nawait store.$dispose()"
+                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(4, 2) })\nconst displayed: number[] = []\nconst observer = store.$runtime.effect(() => {\n  displayed.push(store.samples.at(0))\n})\nstore.samples.setRange(0, 2, [12, 13])\nstore.$runtime.flush()\nstore.samples.setAt(2, 20)\nstore.$runtime.flush()\n\nconsole.log('Displayed first-sample history:', displayed.join(', '))\nconsole.log('All samples:', [...store.samples.view()].join(', '))\nobserver.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -7879,7 +7841,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Member or option', 'Description'],
                 rows: [
                   [
-                    '`array(item: ReturnType<typeof number>, length: number, granularity?: number)`',
+                    '`array(length: number, granularity?: number)`',
                     'Returns a synchronous field builder. Place it in createStore to obtain the array field. The public signature supports number builders, without creating separate number field instances.'
                   ],
                   [
@@ -8159,7 +8121,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(wasm.number(), 3) })\nstore.samples.setRange(0, 3, [1, 2, 3])\nconst exported = store.samples.view()\nexported[0] = 99\n\nconsole.log('修改后的导出副本:', [...exported].join(', '))\nconsole.log('当前采样:', [...store.samples.view()].join(', '))\nawait store.$dispose()"
+                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(3) })\nstore.samples.setRange(0, 3, [1, 2, 3])\nconst exported = store.samples.view()\nexported[0] = 99\n\nconsole.log('修改后的导出副本:', [...exported].join(', '))\nconsole.log('当前采样:', [...store.samples.view()].join(', '))\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -8207,7 +8169,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '从 `0` 到 `0xffff_ffff - 4` 的安全整数。容量固定，超长写入报错且不会截断。'
                   ],
                   [
-                    '`array(..., length, granularity)`',
+                    '`array(length, granularity)`',
                     '长度上限是 `floor(0xffff_ffff / 8)`。分桶大小使用正安全整数，不改变连续数值内容的容量。'
                   ],
                   [
@@ -8267,7 +8229,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(wasm.number(), 3) })\nstore.samples.setRange(0, 3, [1, 2, 3])\nconst exported = store.samples.view()\nexported[0] = 99\n\nconsole.log('Edited export copy:', [...exported].join(', '))\nconsole.log('Current samples:', [...store.samples.view()].join(', '))\nawait store.$dispose()"
+                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst store = createStore({ samples: wasm.array(3) })\nstore.samples.setRange(0, 3, [1, 2, 3])\nconst exported = store.samples.view()\nexported[0] = 99\n\nconsole.log('Edited export copy:', [...exported].join(', '))\nconsole.log('Current samples:', [...store.samples.view()].join(', '))\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -8315,7 +8277,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Accepts safe integers from zero through 0xffff_ffff minus four. Capacity is fixed; oversized writes fail without truncation.'
                   ],
                   [
-                    '`array(..., length, granularity)`',
+                    '`array(length, granularity)`',
                     'Length is limited to floor of 0xffff_ffff divided by eight. Positive safe-integer bucket size does not change numeric content capacity.'
                   ],
                   [
@@ -8460,7 +8422,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`INIT_ABORTED`',
-                    '字段创建时初始化信号已取消。本包抛普通 Error，不是原生 AbortError，也没有附加 signal.reason 为 cause。'
+                    '字段创建时初始化信号已取消。可扩展无身份的原生原因保留对象并附 INIT_ABORTED（包括 AbortError 类型）；冻结或非 Error 原因通过 cause 保留，完整外包错误身份保持不变。'
                   ],
                   [
                     '`RESERVED_FIELD_NAME`',
@@ -8525,10 +8487,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`createStoreWasmAggregateError(code, errors: readonly unknown[], message): AggregateError`',
                     '构造聚合错误，保留每个原始错误。通常由扩展作者使用，应用处理已有失败即可。'
-                  ],
-                  [
-                    '`WasmFieldMode` / `IWasmFieldMode`',
-                    "当前只有 `sync: 'sync'`，字段创建是同步的，异步加载已由 ensureWasm 提前完成。"
                   ],
                   [
                     '`WasmReservedKey` / `IWasmReservedKey`',
@@ -8658,7 +8616,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`INIT_ABORTED`',
-                    'The initialization signal was already cancelled. This is a package Error, not a native AbortError; signal.reason is not attached as cause.'
+                    'The initialization signal is cancelled. An extensible untagged native reason keeps its identity and type, including AbortError, with INIT_ABORTED attached. Frozen or non-Error reasons remain reachable through cause; complete foreign error identities keep their owner.'
                   ],
                   [
                     '`RESERVED_FIELD_NAME`',
@@ -8725,10 +8683,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Creates an aggregate retaining every original error. Usually used by extension authors; applications handle existing failures.'
                   ],
                   [
-                    '`WasmFieldMode` / `IWasmFieldMode`',
-                    'Contains only sync. Field creation is synchronous after ensureWasm completes asynchronous initialization.'
-                  ],
-                  [
                     '`WasmReservedKey` / `IWasmReservedKey`',
                     'Constants and value type for the record lifecycle names dispose and disposed.'
                   ]
@@ -8775,7 +8729,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst report = createStore({\n  title: 'Daily report',\n  samples: wasm.array(wasm.number(), 4)\n})\nreport.samples.setRange(0, 4, [2.5, 3, 4.5, 6])\nconst csv = [...report.samples.view()].join(',')\n\nconsole.log('报表标题:', report.title)\nconsole.log('采样 CSV:', csv)\nawait report.$dispose()"
+                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst report = createStore({\n  title: 'Daily report',\n  samples: wasm.array(4)\n})\nreport.samples.setRange(0, 4, [2.5, 3, 4.5, 6])\nconst csv = [...report.samples.view()].join(',')\n\nconsole.log('报表标题:', report.title)\nconsole.log('采样 CSV:', csv)\nawait report.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -8865,7 +8819,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst report = createStore({\n  title: 'Daily report',\n  samples: wasm.array(wasm.number(), 4)\n})\nreport.samples.setRange(0, 4, [2.5, 3, 4.5, 6])\nconst csv = [...report.samples.view()].join(',')\n\nconsole.log('Report title:', report.title)\nconsole.log('Sample CSV:', csv)\nawait report.$dispose()"
+                code: "import './load-wasm.ts'\nimport { createStore } from '@migaia/store-light'\nimport * as wasm from '@migaia/store-wasm'\n\nconst report = createStore({\n  title: 'Daily report',\n  samples: wasm.array(4)\n})\nreport.samples.setRange(0, 4, [2.5, 3, 4.5, 6])\nconst csv = [...report.samples.view()].join(',')\n\nconsole.log('Report title:', report.title)\nconsole.log('Sample CSV:', csv)\nawait report.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -9007,7 +8961,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '把 Worker 请求接到响应式 Resource。配置见[计算与缓存](/zh/docs/store-worker/resource-computed-and-cache)。'
                   ],
                   [
-                    '[workerPlugin](/zh/docs/store-worker/api/serialize/workerPlugin)',
+                    '[workerPlugin](/zh/docs/store-worker/api/serialize/worker/workerPlugin)',
                     '把 Worker 编解码注册为序列化插件。用法见[序列化流程](/zh/docs/store-worker/serialization-worker-pipeline)。'
                   ]
                 ]
@@ -9027,11 +8981,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['入口或字段', '说明'],
                 rows: [
                   [
-                    '[workerParser](/zh/docs/store-worker/api/serialize/workerParser)',
+                    '[workerParser](/zh/docs/store-worker/api/serialize/worker/workerParser)',
                     '创建主线程编解码器，独立转发 encode 和 decode。'
                   ],
                   [
-                    '[createSerializeWorkerHandler](/zh/docs/store-worker/api/serialize/createSerializeWorkerHandler)',
+                    '[createSerializeWorkerHandler](/zh/docs/store-worker/api/serialize/worker/createSerializeWorkerHandler)',
                     '把 Worker 内的 parser 接到序列化请求。'
                   ],
                   [
@@ -9044,7 +8998,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[StoreWorkerErrorCode](/zh/docs/store-worker/api)',
-                    '列出本包七个错误码。处理方法见[错误与清理](/zh/docs/store-worker/errors-timeouts-and-cleanup)。'
+                    '列出本包六个错误码。处理方法见[错误与清理](/zh/docs/store-worker/errors-timeouts-and-cleanup)。'
                   ],
                   [
                     '[STORE_WORKER_SOURCE](/zh/docs/store-worker/api/STORE_WORKER_SOURCE)',
@@ -9059,20 +9013,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '提供 Worker 序列化诊断标签 worker。'
                   ],
                   [
-                    '[serialize/worker](/zh/docs/store-worker/api/serialize)',
+                    '[serialize/worker](/zh/docs/store-worker/api/serialize/worker)',
                     '公开序列化工具与类型。字节转换限制见对应指南。'
-                  ],
-                  [
-                    '[transferablesOf](/zh/docs/store-worker/api/serialize/transferablesOf)',
-                    '为字节视图选择传递列表，只有完整覆盖缓冲区时返回候选。'
-                  ],
-                  [
-                    '[encodeWorkerValue](/zh/docs/store-worker/api/serialize/encodeWorkerValue)',
-                    '将序列化请求值转换为内部传递表示。'
-                  ],
-                  [
-                    '[decodeWorkerValue](/zh/docs/store-worker/api/serialize/decodeWorkerValue)',
-                    '从内部传递表示还原序列化结果。'
                   ]
                 ]
               }
@@ -9165,7 +9107,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Connects Worker requests to a reactive Resource. See [computation and caching](/en/docs/store-worker/resource-computed-and-cache).'
                   ],
                   [
-                    '[workerPlugin](/en/docs/store-worker/api/serialize/workerPlugin)',
+                    '[workerPlugin](/en/docs/store-worker/api/serialize/worker/workerPlugin)',
                     'Registers Worker codecs as a serialization plugin. See [serialization](/en/docs/store-worker/serialization-worker-pipeline).'
                   ]
                 ]
@@ -9185,11 +9127,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Entry or field', 'Behavior'],
                 rows: [
                   [
-                    '[workerParser](/en/docs/store-worker/api/serialize/workerParser)',
+                    '[workerParser](/en/docs/store-worker/api/serialize/worker/workerParser)',
                     'Creates a main-thread parser that forwards encode and decode.'
                   ],
                   [
-                    '[createSerializeWorkerHandler](/en/docs/store-worker/api/serialize/createSerializeWorkerHandler)',
+                    '[createSerializeWorkerHandler](/en/docs/store-worker/api/serialize/worker/createSerializeWorkerHandler)',
                     'Connects a parser inside the Worker to serialization requests.'
                   ],
                   [
@@ -9202,7 +9144,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[StoreWorkerErrorCode](/en/docs/store-worker/api)',
-                    'Lists seven package error codes. See [errors and cleanup](/en/docs/store-worker/errors-timeouts-and-cleanup) for handling.'
+                    'Lists six package error codes. See [errors and cleanup](/en/docs/store-worker/errors-timeouts-and-cleanup) for handling.'
                   ],
                   [
                     '[STORE_WORKER_SOURCE](/en/docs/store-worker/api/STORE_WORKER_SOURCE)',
@@ -9217,20 +9159,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Provides worker, the serialization diagnostic type.'
                   ],
                   [
-                    '[serialize/worker](/en/docs/store-worker/api/serialize)',
+                    '[serialize/worker](/en/docs/store-worker/api/serialize/worker)',
                     'Exports serialization tools and types. See that guide for byte conversion limits.'
-                  ],
-                  [
-                    '[transferablesOf](/en/docs/store-worker/api/serialize/transferablesOf)',
-                    'Selects a byte-view transfer list, returning a candidate only for a full-buffer view.'
-                  ],
-                  [
-                    '[encodeWorkerValue](/en/docs/store-worker/api/serialize/encodeWorkerValue)',
-                    'Converts serialization request values to their wire representation.'
-                  ],
-                  [
-                    '[decodeWorkerValue](/en/docs/store-worker/api/serialize/decodeWorkerValue)',
-                    'Restores serialization results from their wire representation.'
                   ]
                 ]
               }
@@ -10736,7 +10666,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { TransferListItem } from 'node:worker_threads'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker'\nimport { gzipParser } from './gzip-parser.ts'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createSerializeWorkerHandler(\n  gzipParser,\n  (message, transfer) => {\n    port.postMessage(message, transfer as TransferListItem[] | undefined)\n  }\n)\nserve(handler)"
+                code: "import type { TransferListItem } from 'node:worker_threads'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker'\nimport { gzipParser } from './gzip-parser.ts'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createSerializeWorkerHandler(\n  gzipParser,\n  (message, transfer) => {\n    port.postMessage(message, transfer as TransferListItem[] | undefined)\n  }\n)\nserve(handler)"
               },
               {
                 type: 'paragraph',
@@ -10745,7 +10675,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { workerPlugin } from '@migaia/store-worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new TextEncoder().encode('Draft saved')\nconst encoded = await registry.encode(input)\nconst restored = await registry.decode(encoded) as Uint8Array\nconsole.log('Worker 恢复的内容:', new TextDecoder().decode(restored))\n\nawait registry.dispose()\nawait stopWorker(host)"
+                code: "import { workerPlugin } from '@migaia/store-worker/serialize/worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new TextEncoder().encode('Draft saved')\nconst encoded = await registry.encode(input)\nconst restored = await registry.decode(encoded) as Uint8Array\nconsole.log('Worker 恢复的内容:', new TextDecoder().decode(restored))\n\nawait registry.dispose()\nawait stopWorker(host)"
               },
               {
                 type: 'paragraph',
@@ -10831,16 +10761,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'table',
                 headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`encodeWorkerValue(value: unknown): ISerializeChunk`',
-                    '位于 /serialize/worker。Uint8Array 返回 bytes 标签与同一份内容；其他值返回 value 标签，不进行格式编码。'
-                  ],
-                  [
-                    '`decodeWorkerValue(value: unknown): ISerializeChunk`',
-                    '同一子路径的结果标记工具，也按 Uint8Array 与其他值选择标签，不负责解析压缩或 JSON 格式。'
-                  ]
-                ]
+                rows: []
               },
               {
                 type: 'paragraph',
@@ -10894,7 +10815,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { TransferListItem } from 'node:worker_threads'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker'\nimport { gzipParser } from './gzip-parser.ts'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createSerializeWorkerHandler(\n  gzipParser,\n  (message, transfer) => {\n    port.postMessage(message, transfer as TransferListItem[] | undefined)\n  }\n)\nserve(handler)"
+                code: "import type { TransferListItem } from 'node:worker_threads'\nimport { createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker'\nimport { gzipParser } from './gzip-parser.ts'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createSerializeWorkerHandler(\n  gzipParser,\n  (message, transfer) => {\n    port.postMessage(message, transfer as TransferListItem[] | undefined)\n  }\n)\nserve(handler)"
               },
               {
                 type: 'paragraph',
@@ -10903,7 +10824,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { workerPlugin } from '@migaia/store-worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new TextEncoder().encode('Draft saved')\nconst encoded = await registry.encode(input)\nconst restored = await registry.decode(encoded) as Uint8Array\nconsole.log('Content restored by worker:', new TextDecoder().decode(restored))\n\nawait registry.dispose()\nawait stopWorker(host)"
+                code: "import { workerPlugin } from '@migaia/store-worker/serialize/worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new TextEncoder().encode('Draft saved')\nconst encoded = await registry.encode(input)\nconst restored = await registry.decode(encoded) as Uint8Array\nconsole.log('Content restored by worker:', new TextDecoder().decode(restored))\n\nawait registry.dispose()\nawait stopWorker(host)"
               },
               {
                 type: 'paragraph',
@@ -10989,16 +10910,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'table',
                 headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`encodeWorkerValue(value: unknown): ISerializeChunk`',
-                    'From /serialize/worker. Tags Uint8Array as bytes while retaining its payload, or tags other input as value; it does not encode a format.'
-                  ],
-                  [
-                    '`decodeWorkerValue(value: unknown): ISerializeChunk`',
-                    'A result-tagging helper from the same subpath, using the same byte/value distinction. It does not decompress or parse JSON.'
-                  ]
-                ]
+                rows: []
               },
               {
                 type: 'paragraph',
@@ -11045,7 +10957,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { workerPlugin } from '@migaia/store-worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('编码后原始字节数:', input.byteLength)\nconsole.log('保存格式:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
+                code: "import { workerPlugin } from '@migaia/store-worker/serialize/worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('编码后原始字节数:', input.byteLength)\nconsole.log('保存格式:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
               },
               {
                 type: 'paragraph',
@@ -11073,7 +10985,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { workerPlugin } from '@migaia/store-worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip', ownership: 'transfer' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('交出后原始字节数:', input.byteLength)\nconsole.log('保存格式:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
+                code: "import { workerPlugin } from '@migaia/store-worker/serialize/worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip', ownership: 'transfer' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('交出后原始字节数:', input.byteLength)\nconsole.log('保存格式:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
               },
               {
                 type: 'paragraph',
@@ -11099,10 +11011,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`IByteOwnership`',
                     '上面两个模式的值类型，只用于序列化配置。通用 request 或 workerComputed 使用单独的 transfer 列表。'
-                  ],
-                  [
-                    '`transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[]`',
-                    '位于 /serialize/transferables。只有 transfer 模式的 bytes 段、且 Uint8Array 覆盖完整普通 ArrayBuffer 时，才返回该缓冲区列表。'
                   ],
                   [
                     '部分视图与共享内存',
@@ -11161,7 +11069,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { workerPlugin } from '@migaia/store-worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('Original bytes after encoding:', input.byteLength)\nconsole.log('Stored chunk kind:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
+                code: "import { workerPlugin } from '@migaia/store-worker/serialize/worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('Original bytes after encoding:', input.byteLength)\nconsole.log('Stored chunk kind:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
               },
               {
                 type: 'paragraph',
@@ -11189,7 +11097,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { workerPlugin } from '@migaia/store-worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip', ownership: 'transfer' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('Original bytes after handoff:', input.byteLength)\nconsole.log('Stored chunk kind:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
+                code: "import { workerPlugin } from '@migaia/store-worker/serialize/worker'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { startWorker, stopWorker } from './launch-worker.ts'\n\nconst host = startWorker(new URL('./gzip.worker.ts', import.meta.url))\nconst plugin = workerPlugin({ worker: host.port, type: 'gzip', ownership: 'transfer' })\nconst registry = createSerializeRegistry([plugin])\nconst input = new Uint8Array([1, 2, 3])\nconst encoded = await registry.encode(input)\nconsole.log('Original bytes after handoff:', input.byteLength)\nconsole.log('Stored chunk kind:', encoded[0])\n\nawait registry.dispose()\nawait stopWorker(host)"
               },
               {
                 type: 'paragraph',
@@ -11215,10 +11123,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`IByteOwnership`',
                     'The two serializer ownership modes. Generic requests and workerComputed use a separate explicit transfer list.'
-                  ],
-                  [
-                    '`transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[]`',
-                    'From /serialize/transferables. Returns a buffer only for a transfer-mode bytes chunk whose Uint8Array covers a complete ordinary ArrayBuffer.'
                   ],
                   [
                     'Partial views and shared memory',
@@ -11358,10 +11262,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ['`INVALID_REQUEST_CHUNK`', 'Worker 收到不符合段形状的输入，检查主端发送逻辑。'],
                   ['`INVALID_RESPONSE_CHUNK`', '主端收到非法段或流序号不匹配，检查 Worker 输出。'],
                   [
-                    '`CHUNK_MERGE_FAILED`',
-                    '保留的公开错误码，当前源文件只有声明，没有实际抛出点。当前编码已逐帧传送，不应据此推断仍有旧的本地合并路径。'
-                  ],
-                  [
                     '`CLEANUP_FAILED`',
                     '主端解析器端点清理与 terminate 都失败时聚合，保留两份错误。只有一步失败时按该步骤的错误返回。'
                   ]
@@ -11381,7 +11281,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`StoreWorkerErrorCode` / `IStoreWorkerErrorCode`',
-                    '七个稳定错误码的常量与值类型，见上表。'
+                    '六个稳定错误码的常量与值类型，见上表。'
                   ],
                   [
                     '`createStoreWorkerError(code, message, options?: { cause?: unknown }): Error`',
@@ -11521,10 +11421,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'The caller received an invalid chunk or frame sequence. Check the worker output.'
                   ],
                   [
-                    '`CHUNK_MERGE_FAILED`',
-                    'A retained public code currently declared without a throw site. Encoding now streams frames; the code does not imply the old worker-local assembly path remains.'
-                  ],
-                  [
                     '`CLEANUP_FAILED`',
                     'Aggregates failures when endpoint cleanup and terminate both fail. A single failed step returns its own failure.'
                   ]
@@ -11544,7 +11440,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`StoreWorkerErrorCode` / `IStoreWorkerErrorCode`',
-                    'Constants and value type for the seven public codes above.'
+                    'Constants and value type for the six public codes above.'
                   ],
                   [
                     '`createStoreWorkerError(code, message, options?: { cause?: unknown }): Error`',
@@ -14253,10 +14149,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '序列化 dehydrateTrusted 的品牌类型，不补做校验。'
                   ],
                   [
-                    '[SsrWorkOutcome](/zh/docs/store-ssr/api/SsrWorkOutcome)',
-                    '提供 value、disposed、timeout 三个等待结果标签。'
-                  ],
-                  [
                     '[SsrWireType](/zh/docs/store-ssr/api/SsrWireType)',
                     '提供 json、text、bytes 编码标签。'
                   ],
@@ -14403,10 +14295,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '[serializeTrustedSSRState](/en/docs/store-ssr/api/serializeTrustedSSRState)',
                     'Serializes the branded dehydrateTrusted result without adding validation.'
-                  ],
-                  [
-                    '[SsrWorkOutcome](/en/docs/store-ssr/api/SsrWorkOutcome)',
-                    'Provides value, disposed, and timeout wait outcome tags.'
                   ],
                   [
                     '[SsrWireType](/en/docs/store-ssr/api/SsrWireType)',
@@ -15352,7 +15240,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'Resource 快照字段',
-                    'version 为 1，data 是 JSON 值，updatedAt 是有限数，expiresAt 是有限数或 null。资源 dehydrate 返回 undefined 时跳过，已销毁对象也跳过。'
+                    '资源快照 version 为 2，data 是 JSON 值，ageMs 为有限非负数，remainingTtlMs 为有限非负数或 null；相对时间不跨宿主复制绝对时钟。dehydrate 返回 undefined 或注册对象已销毁时跳过。'
                   ],
                   [
                     '[IJSONPrimitive](/zh/docs/store-ssr/api/IJSONPrimitive) / [IJSONValue](/zh/docs/store-ssr/api/IJSONValue)',
@@ -15467,7 +15355,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'Resource snapshot fields',
-                    'version is 1, data is JSON, updatedAt is finite, and expiresAt is finite or null. Skip resources whose dehydrate returns undefined and registrations already disposed.'
+                    'Resource snapshots use version 2, JSON data, finite non-negative ageMs and finite non-negative or null remainingTtlMs. Relative durations avoid copying absolute clocks across hosts. Skip undefined dehydrations and disposed registrations.'
                   ],
                   [
                     '[IJSONPrimitive](/en/docs/store-ssr/api/IJSONPrimitive) / [IJSONValue](/en/docs/store-ssr/api/IJSONValue)',
@@ -15557,7 +15445,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[IAwaitResourcesOptions](/zh/docs/store-ssr/api/IAwaitResourcesOptions) / timeoutMs?',
-                    '默认不设超时；接受 0 到 2147483647 的有限数，允许小数。0 不等待本轮 Promise。非法值以带 INVALID_OPTION 的 RangeError 结束返回的 Promise，不是调用点同步 throw。'
+                    '默认不设超时；接受 0 到 2147483647 的有限数，允许小数。0 不等待仍在途的 Promise，但先排空已确定的反应，保留已成功或已拒绝的结局。非法值以带 INVALID_OPTION 的 RangeError 结束返回的 Promise，不是调用点同步 throw。'
                   ],
                   [
                     '同一 key 的 Promise',
@@ -15568,8 +15456,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'key 是登记名，error 保留加载失败原原因、读取 promise 的错误，或本包 RESOURCE_TIMEOUT。返回列表是本次等待的观察，不自动关闭资源。'
                   ],
                   [
-                    '整轮超时',
-                    '实现用整轮 Promise.allSettled 与预算竞速。预算耗尽时给本轮 pending 的全部条目记录超时，其中个别可能已经先完成；不会逐个保留本轮已完成结果。'
+                    '逐项超时分类',
+                    '总预算耗尽时逐个检查本轮 Promise：已成功的不报失败，已拒绝的保留原始原因，只有尚未确定的记录 RESOURCE_TIMEOUT。迟到拒绝仍被观察。'
                   ],
                   [
                     '轮次与关闭',
@@ -15602,10 +15490,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '中断后继续脱水',
                     'awaitResources 可因关闭提前返回；dehydrateAsync 随后仍调用 dehydrate，所以会以 SCOPE_DISPOSED 结束。应用在连接结束时关闭并结束响应，不应依赖它继续生成状态。'
-                  ],
-                  [
-                    '[SsrWorkOutcome](/zh/docs/store-ssr/api/SsrWorkOutcome) / [ISsrWorkOutcome](/zh/docs/store-ssr/api/ISsrWorkOutcome)',
-                    'value、disposed、timeout 是内部等待竞速的公开标签；不是 awaitResources 直接返回的结果对象。业务使用失败列表即可。'
                   ]
                 ]
               },
@@ -15685,7 +15569,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '[IAwaitResourcesOptions](/en/docs/store-ssr/api/IAwaitResourcesOptions) / timeoutMs?',
-                    'Default no timeout; accept finite values from 0 to 2147483647, including fractions. Zero skips waiting for the current round. Invalid values reject the returned Promise with INVALID_OPTION RangeError rather than throwing synchronously at the call site.'
+                    'Default no timeout; accept finite values from 0 to 2147483647, including fractions. Zero skips waiting for in-flight work but drains already-settled reactions and preserves fulfillment/rejection outcomes. Invalid values reject the returned Promise with INVALID_OPTION RangeError rather than throwing synchronously at the call site.'
                   ],
                   [
                     'Promises for the same key',
@@ -15696,8 +15580,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'key is the registration name; error retains the load reason, thrown promise getter, or package RESOURCE_TIMEOUT. The list records this wait and does not close resources automatically.'
                   ],
                   [
-                    'Round timeout',
-                    'Race the whole round’s Promise.allSettled against the budget. On expiry, mark every current pending entry as timed out, including any that settled earlier; individual settled results from that unfinished round are not retained.'
+                    'Per-Promise timeout classification',
+                    'When the shared budget expires, classify each exact Promise: fulfilled entries add no failure, rejected entries retain their original reason, and only unsettled entries receive RESOURCE_TIMEOUT. Late rejections remain observed.'
                   ],
                   [
                     'Rounds and closure',
@@ -15730,10 +15614,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     'Dehydrating after interruption',
                     'awaitResources can return early on closure, but dehydrateAsync still calls dehydrate and ends with SCOPE_DISPOSED. Close/end the response on connection termination rather than relying on continued state generation.'
-                  ],
-                  [
-                    '[SsrWorkOutcome](/en/docs/store-ssr/api/SsrWorkOutcome) / [ISsrWorkOutcome](/en/docs/store-ssr/api/ISsrWorkOutcome)',
-                    'value/disposed/timeout are public labels for internal wait races, not the direct awaitResources result. Business code normally consumes the failure list.'
                   ]
                 ]
               },
@@ -16303,7 +16183,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'resources[key]',
-                    '每项为普通对象，version 为 1，updatedAt 为有限数字，expiresAt 为有限数字或 null；data 再按 JSON 值检查。'
+                    '每项为普通对象，资源快照 version 为 2，ageMs 为有限非负数，remainingTtlMs 为有限非负数或 null；data 按 JSON 值检查。'
                   ],
                   [
                     '[IJSONPrimitive](/zh/docs/store-ssr/api/IJSONPrimitive) / [IJSONValue](/zh/docs/store-ssr/api/IJSONValue)',
@@ -16417,7 +16297,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'resources[key]',
-                    'Each resource snapshot is plain, has version 1, finite updatedAt, and finite-or-null expiresAt; its data is validated as a JSON value.'
+                    'Each resource snapshot is plain and uses version 2, finite non-negative ageMs and finite non-negative or null remainingTtlMs; data is validated as JSON.'
                   ],
                   [
                     '[IJSONPrimitive](/en/docs/store-ssr/api/IJSONPrimitive) / [IJSONValue](/en/docs/store-ssr/api/IJSONValue)',
@@ -19869,8 +19749,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '管理同步 action 范围并检查写入。 [使用页](/zh/docs/store-middleware/actions-and-mutation-boundaries)'
                   ],
                   [
-                    '[middlewarePlugin](/zh/docs/store-middleware/api/middlewarePlugin)',
-                    '把旧式中间件函数装成插件。 [使用页](/zh/docs/store-middleware/events-and-plugins)'
+                    '[IStoreMiddlewarePlugin](/zh/docs/store-middleware/api/IStoreMiddlewarePlugin)',
+                    '直接在 install(core) 中注册同步管道阶段的插件描述类型。 [使用页](/zh/docs/store-middleware/events-and-plugins)'
                   ],
                   [
                     '[loggerMiddleware](/zh/docs/store-middleware/api/loggerMiddleware)',
@@ -19894,7 +19774,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '复制工具同时从根入口和 /tolerant-clone 导出，两个入口使用同一实现。事件常量只定义可选值。'
+                text: '复制工具仅从 /tolerant-clone 入口导出；根入口持有事件常量与宿主操作。事件常量只定义可选值。'
               },
               {
                 type: 'table',
@@ -19911,10 +19791,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '[diagnosticClone](/zh/docs/store-middleware/api/tolerant-clone/diagnosticClone)',
                     '生成诊断用副本，不能复制的部分可能保留引用。'
-                  ],
-                  [
-                    '[tolerantClone](/zh/docs/store-middleware/api/tolerant-clone/tolerantClone)',
-                    '已弃用的 diagnosticClone 同名实现。'
                   ],
                   [
                     '[MiddlewareEventType](/zh/docs/store-middleware/api/MiddlewareEventType)',
@@ -20025,8 +19901,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Tracks synchronous action scopes and checks writes. [Guide](/en/docs/store-middleware/actions-and-mutation-boundaries)'
                   ],
                   [
-                    '[middlewarePlugin](/en/docs/store-middleware/api/middlewarePlugin)',
-                    'Adapts a middleware function into a plugin. [Guide](/en/docs/store-middleware/events-and-plugins)'
+                    '[IStoreMiddlewarePlugin](/en/docs/store-middleware/api/IStoreMiddlewarePlugin)',
+                    'Describes a plugin that registers synchronous stages inside install(core). [Guide](/en/docs/store-middleware/events-and-plugins)'
                   ],
                   [
                     '[loggerMiddleware](/en/docs/store-middleware/api/loggerMiddleware)',
@@ -20050,7 +19926,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Copying tools are available from both the root and /tolerant-clone entries with the same implementations. Event constants define the supported values.'
+                text: 'Copying tools are exported only from /tolerant-clone. The root owns Host operations and event constants.'
               },
               {
                 type: 'table',
@@ -20067,10 +19943,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '[diagnosticClone](/en/docs/store-middleware/api/tolerant-clone/diagnosticClone)',
                     'Produces a diagnostic copy that may retain references for unsupported parts.'
-                  ],
-                  [
-                    '[tolerantClone](/en/docs/store-middleware/api/tolerant-clone/tolerantClone)',
-                    'Deprecated alias of diagnosticClone.'
                   ],
                   [
                     '[MiddlewareEventType](/en/docs/store-middleware/api/MiddlewareEventType)',
@@ -20918,10 +20790,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '登记清理函数，或实现 Symbol.dispose / Symbol.asyncDispose 的对象；插件卸载时由 Host 调用。'
                   ],
                   [
-                    'middlewarePlugin(name, middleware)',
-                    '返回 IStoreMiddlewarePlugin<S>；middleware(event, context, next) 中 context 仅有 runtime 和 getState，next() 继续传递原事件。'
-                  ],
-                  [
                     'loggerMiddleware<S>(sink?)',
                     'sink(event: IMiddlewareEvent<unknown>, state: unknown) => void；缺省把 [store]、event、state 交给 console.log，固定插件名 store-logger。'
                   ]
@@ -20929,7 +20797,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '直接插件可使用完整 core；middlewarePlugin 的简化 context 没有 config 或 onDispose。需要注册资源时使用上面的直接插件形式。loggerMiddleware 的泛型应与目标 Host 状态类型一致。'
+                text: '直接插件在 install(core) 中通过 core.usePipeline 注册同步阶段，使用完整配置与清理上下文；loggerMiddleware 的泛型应与目标 Host 状态类型一致。'
               }
             ]
           },
@@ -21087,10 +20955,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Registers a disposer function or an object implementing Symbol.dispose / Symbol.asyncDispose, invoked by the Host on removal.'
                   ],
                   [
-                    'middlewarePlugin(name, middleware)',
-                    'Returns IStoreMiddlewarePlugin<S>; middleware(event, context, next) receives only runtime and getState in context, and next() forwards the original event.'
-                  ],
-                  [
                     'loggerMiddleware<S>(sink?)',
                     'sink(event: IMiddlewareEvent<unknown>, state: unknown) => void; defaults to console.log with [store], event, and state under the fixed store-logger plugin name.'
                   ]
@@ -21098,7 +20962,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Direct plugins receive the complete core, while middlewarePlugin context has no config or onDispose. Use a direct plugin when registering resources. Match loggerMiddleware generics to the target Host state type.'
+                text: 'Direct plugins register synchronous stages through core.usePipeline in install(core), with full configuration and cleanup context. Match loggerMiddleware generics to the target Host state type.'
               }
             ]
           },
@@ -21378,11 +21242,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'clone-functions',
-            heading: '四个复制入口与函数表',
+            heading: '三个复制函数与函数表',
             blocks: [
               {
                 type: 'paragraph',
-                text: '这些函数从根入口及 /tolerant-clone 子路径公开导出，均同步接收一个 value 并返回结果，没有 transfer、深度或冻结选项。'
+                text: '这些函数仅从 /tolerant-clone 子路径公开导出，均同步接收一个 value 并返回结果，没有 transfer、深度或冻结选项。'
               },
               {
                 type: 'table',
@@ -21390,7 +21254,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '[immutableSnapshotClone](/zh/docs/store-middleware/api/tolerant-clone/immutableSnapshotClone)(value) / ClonePolicy.immutable',
-                    '直接调用宿主 structuredClone；缺少能力报 ENV_UNSUPPORTED，不能复制时报 CLONE_UNSUPPORTED 并保留 cause。不额外校验类原型或共享内存是否完全独立，也不 freeze 结果。'
+                    '复制前递归拒绝类实例与访问器，接受普通数据及受支持可克隆内建值；缺少 structuredClone 报 ENV_UNSUPPORTED，不支持的数据报 CLONE_UNSUPPORTED 并保留 cause，不冻结复制结果。'
                   ],
                   [
                     '[opaqueReferenceClone](/zh/docs/store-middleware/api/tolerant-clone/opaqueReferenceClone)(value) / ClonePolicy.opaque',
@@ -21399,10 +21263,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '[diagnosticClone](/zh/docs/store-middleware/api/tolerant-clone/diagnosticClone)(value) / ClonePolicy.diagnostic',
                     '优先 structuredClone；失败后递归尝试复制可读取部分。无法安全读取的子树可能保留引用，不可读属性可能被跳过，结果不保证完整独立。'
-                  ],
-                  [
-                    '[tolerantClone](/zh/docs/store-middleware/api/tolerant-clone/tolerantClone)(value)',
-                    '已弃用的 diagnosticClone 别名，行为相同；新代码直接选命名策略，不额外创建另一种复制模式。'
                   ],
                   [
                     '[ClonePolicy](/zh/docs/store-middleware/api/tolerant-clone/ClonePolicy) / IClonePolicyMode',
@@ -21484,11 +21344,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'clone-functions',
-            heading: 'Four clone functions and their policy table',
+            heading: 'Three clone functions and the policy table',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'These synchronous functions are exported from root and /tolerant-clone. Each accepts one value and returns a result, with no transfer, depth, or freezing options.'
+                text: 'These synchronous functions are exported only from /tolerant-clone. Each accepts one value and returns a result, with no transfer, depth, or freezing options.'
               },
               {
                 type: 'table',
@@ -21496,7 +21356,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '[immutableSnapshotClone](/en/docs/store-middleware/api/tolerant-clone/immutableSnapshotClone)(value) / ClonePolicy.immutable',
-                    'Delegate to structuredClone. Missing support reports ENV_UNSUPPORTED; failure reports CLONE_UNSUPPORTED with cause. Do not additionally verify prototype/shared-memory independence or freeze output.'
+                    'Reject class instances and accessors before cloning plain data and supported cloneable built-ins. Missing structuredClone reports ENV_UNSUPPORTED; unsupported data reports CLONE_UNSUPPORTED with cause. The copied output is not frozen.'
                   ],
                   [
                     '[opaqueReferenceClone](/en/docs/store-middleware/api/tolerant-clone/opaqueReferenceClone)(value) / ClonePolicy.opaque',
@@ -21505,10 +21365,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '[diagnosticClone](/en/docs/store-middleware/api/tolerant-clone/diagnosticClone)(value) / ClonePolicy.diagnostic',
                     'Try structuredClone first, then recursively project inspectable parts. Unsupported subtrees may remain aliased and unreadable properties may be skipped; output is not guaranteed fully independent.'
-                  ],
-                  [
-                    '[tolerantClone](/en/docs/store-middleware/api/tolerant-clone/tolerantClone)(value)',
-                    'Deprecated alias of diagnosticClone with the same behavior; select a named policy in new code rather than inventing another mode.'
                   ],
                   [
                     '[ClonePolicy](/en/docs/store-middleware/api/tolerant-clone/ClonePolicy) / IClonePolicyMode',
@@ -21952,7 +21808,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '复用[操作范围页](/zh/docs/store-middleware/actions-and-mutation-boundaries)完整展示的 order-state.ts。pipeline.ts 安装真实 middlewarePlugin，放行事件后只记录成功结束的订单操作。'
+                text: '复用[操作范围页](/zh/docs/store-middleware/actions-and-mutation-boundaries)完整展示的 order-state.ts。pipeline.ts 安装真实 IStoreMiddlewarePlugin，在 install(core) 中注册同步阶段，放行事件后只记录成功结束的订单操作。'
               },
               {
                 type: 'paragraph',
@@ -21961,7 +21817,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { middlewarePlugin } from '@migaia/store-middleware'\nimport { host, store } from './order-state.ts'\nconst audit = middlewarePlugin<Record<string, unknown>>(\n  'audit',\n  (event, context, next) => {\n    next()\n    if (event.type === 'action' && event.phase === 'end') {\n      console.log(JSON.stringify(context.getState()))\n    }\n  }\n)\nawait host.use(audit)\ntry {\n  host.runAction('order:update', () => store.quantity = 2)\n} finally {\n  await host.dispose()\n  await store.$dispose()\n}"
+                code: "import type { IStoreMiddlewarePlugin } from '@migaia/store-middleware'\nimport { host, store } from './order-state.ts'\nconst audit: IStoreMiddlewarePlugin<Record<string, unknown>> = {\n  name: 'audit',\n  install(core) {\n    core.usePipeline((event, next) => {\n      next(event)\n      if (event.type === 'action' && event.phase === 'end') {\n        console.log(JSON.stringify(core.getState()))\n      }\n    })\n    return {}\n  }\n}\nawait host.use(audit)\ntry {\n  host.runAction('order:update', () => store.quantity = 2)\n} finally {\n  await host.dispose()\n  await store.$dispose()\n}"
               },
               {
                 type: 'code',
@@ -21982,10 +21838,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['成员 / 配置', '用途与默认处理'],
                 rows: [
-                  [
-                    'middlewarePlugin(name, middleware)',
-                    '把 (event, context, next) => void 转为插件；name 是安装名。context 只有 runtime、getState，next() 不接收参数并继续传当前事件；需要更多插件能力时直接写 IStoreMiddlewarePlugin。'
-                  ],
                   [
                     'core.usePipeline((event, next) => void)',
                     'next(event) 在当前阶段只记录传递值，当前阶段返回后才执行下游。因此 next 后的代码不能假设下游已经完成。'
@@ -22116,7 +21968,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Reuse order-state.ts fully shown on the [action page](/en/docs/store-middleware/actions-and-mutation-boundaries). pipeline.ts installs real middlewarePlugin, continues events, and records successful order actions.'
+                text: 'Reuse order-state.ts fully shown on the [action page](/en/docs/store-middleware/actions-and-mutation-boundaries). pipeline.ts installs a real IStoreMiddlewarePlugin through install(core), continues events, and records successful order actions.'
               },
               {
                 type: 'paragraph',
@@ -22125,7 +21977,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { middlewarePlugin } from '@migaia/store-middleware'\nimport { host, store } from './order-state.ts'\nconst audit = middlewarePlugin<Record<string, unknown>>(\n  'audit',\n  (event, context, next) => {\n    next()\n    if (event.type === 'action' && event.phase === 'end') {\n      console.log(JSON.stringify(context.getState()))\n    }\n  }\n)\nawait host.use(audit)\ntry {\n  host.runAction('order:update', () => store.quantity = 2)\n} finally {\n  await host.dispose()\n  await store.$dispose()\n}"
+                code: "import type { IStoreMiddlewarePlugin } from '@migaia/store-middleware'\nimport { host, store } from './order-state.ts'\nconst audit: IStoreMiddlewarePlugin<Record<string, unknown>> = {\n  name: 'audit',\n  install(core) {\n    core.usePipeline((event, next) => {\n      next(event)\n      if (event.type === 'action' && event.phase === 'end') {\n        console.log(JSON.stringify(core.getState()))\n      }\n    })\n    return {}\n  }\n}\nawait host.use(audit)\ntry {\n  host.runAction('order:update', () => store.quantity = 2)\n} finally {\n  await host.dispose()\n  await store.$dispose()\n}"
               },
               {
                 type: 'code',
@@ -22146,10 +21998,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['Member / setting', 'Purpose and default behavior'],
                 rows: [
-                  [
-                    'middlewarePlugin(name, middleware)',
-                    'Adapt (event,context,next)=>void into a named plugin. context contains only runtime/getState; next() takes no argument and forwards the event. Use IStoreMiddlewarePlugin for richer plugin features.'
-                  ],
                   [
                     'core.usePipeline((event, next) => void)',
                     'next(event) records the forwarded value; downstream runs after this stage returns. Code following next cannot assume downstream has finished.'
@@ -22523,35 +22371,35 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['成员或参数', '作用与返回值'],
                 rows: [
                   [
-                    '[ObservableObject](/zh/docs/store-indexed/api/ObservableObject-class)',
+                    '[ObservableObject](/zh/docs/store-indexed/api/ObservableObject)',
                     '按已知字符串字段读取和更新对象。 [使用页](/zh/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[ObservableArray](/zh/docs/store-indexed/api/ObservableArray-class)',
+                    '[ObservableArray](/zh/docs/store-indexed/api/ObservableArray)',
                     '按索引观察有顺序的列表。 [使用页](/zh/docs/store-indexed/array-index-semantics)'
                   ],
                   [
-                    '[ObservableMap](/zh/docs/store-indexed/api/ObservableMap-class)',
+                    '[ObservableMap](/zh/docs/store-indexed/api/ObservableMap)',
                     '按任意类型 key 保存值。 [使用页](/zh/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[ObservableSet](/zh/docs/store-indexed/api/ObservableSet-class)',
+                    '[ObservableSet](/zh/docs/store-indexed/api/ObservableSet)',
                     '保存不重复成员并观察成员是否存在。 [使用页](/zh/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[observableObject](/zh/docs/store-indexed/api/observableObject-function)',
-                    '以工厂形式创建字段集合。 [使用页](/zh/docs/store-indexed/getting-started)'
+                    '[ObservableObject](/zh/docs/store-indexed/api/ObservableObject)',
+                    '通过类构造器创建字段集合。 [使用页](/zh/docs/store-indexed/getting-started)'
                   ],
                   [
-                    '[observableArray](/zh/docs/store-indexed/api/observableArray-function)',
+                    '[ObservableArray](/zh/docs/store-indexed/api/ObservableArray)',
                     '以初值、选项、Runtime 的顺序创建数组。 [使用页](/zh/docs/store-indexed/getting-started)'
                   ],
                   [
-                    '[observableMap](/zh/docs/store-indexed/api/observableMap-function)',
+                    '[ObservableMap](/zh/docs/store-indexed/api/ObservableMap)',
                     '用键值条目创建 Map 集合。 [使用页](/zh/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[observableSet](/zh/docs/store-indexed/api/observableSet-function)',
+                    '[ObservableSet](/zh/docs/store-indexed/api/ObservableSet)',
                     '用可迭代输入创建成员集合。 [使用页](/zh/docs/store-indexed/choose-a-collection)'
                   ],
                   [
@@ -22659,35 +22507,35 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Member or parameter', 'Purpose and return value'],
                 rows: [
                   [
-                    '[ObservableObject](/en/docs/store-indexed/api/ObservableObject-class)',
+                    '[ObservableObject](/en/docs/store-indexed/api/ObservableObject)',
                     'Reads and updates known string fields. [Guide](/en/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[ObservableArray](/en/docs/store-indexed/api/ObservableArray-class)',
+                    '[ObservableArray](/en/docs/store-indexed/api/ObservableArray)',
                     'Observes an ordered list by index. [Guide](/en/docs/store-indexed/array-index-semantics)'
                   ],
                   [
-                    '[ObservableMap](/en/docs/store-indexed/api/ObservableMap-class)',
+                    '[ObservableMap](/en/docs/store-indexed/api/ObservableMap)',
                     'Stores values under keys of any type. [Guide](/en/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[ObservableSet](/en/docs/store-indexed/api/ObservableSet-class)',
+                    '[ObservableSet](/en/docs/store-indexed/api/ObservableSet)',
                     'Stores distinct members and observes their presence. [Guide](/en/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[observableObject](/en/docs/store-indexed/api/observableObject-function)',
-                    'Creates a field collection through a factory. [Guide](/en/docs/store-indexed/getting-started)'
+                    '[ObservableObject](/en/docs/store-indexed/api/ObservableObject)',
+                    'Creates a field collection through its class constructor. [Guide](/en/docs/store-indexed/getting-started)'
                   ],
                   [
-                    '[observableArray](/en/docs/store-indexed/api/observableArray-function)',
+                    '[ObservableArray](/en/docs/store-indexed/api/ObservableArray)',
                     'Creates an array with initial values, options, then Runtime. [Guide](/en/docs/store-indexed/getting-started)'
                   ],
                   [
-                    '[observableMap](/en/docs/store-indexed/api/observableMap-function)',
+                    '[ObservableMap](/en/docs/store-indexed/api/ObservableMap)',
                     'Creates a Map collection from key/value entries. [Guide](/en/docs/store-indexed/choose-a-collection)'
                   ],
                   [
-                    '[observableSet](/en/docs/store-indexed/api/observableSet-function)',
+                    '[ObservableSet](/en/docs/store-indexed/api/ObservableSet)',
                     'Creates a membership collection from iterable input. [Guide](/en/docs/store-indexed/choose-a-collection)'
                   ],
                   [
@@ -22785,12 +22633,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '把 first-job.ts 放在 ESM 项目中并使用 Node 24 运行。工厂第二个参数是 options，第三个才是 runtime。这个 Effect 读取的是索引 0。'
+                text: '把 first-job.ts 放在 ESM 项目中并使用 Node 24 运行。ObservableArray 构造器第二个参数是 runtime，第三个是 options；这个 Effect 读取索引 0。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { observableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst jobs = observableArray(['queued'], { debugName: 'jobs' }, runtime)\nconst view = runtime.effect(() => {\n  console.log('首个任务:', jobs.at(0))\n})\ntry {\n  jobs.set(0, 'ready')\n  runtime.flush()\n} finally {\n  view.dispose()\n  jobs.dispose()\n}"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst jobs = new ObservableArray(['queued'], runtime, { debugName: 'jobs' })\nconst view = runtime.effect(() => {\n  console.log('首个任务:', jobs.at(0))\n})\ntry {\n  jobs.set(0, 'ready')\n  runtime.flush()\n} finally {\n  view.dispose()\n  jobs.dispose()\n}"
               },
               {
                 type: 'code',
@@ -22841,31 +22689,31 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'factories',
-            heading: '四个工厂的参数顺序',
+            heading: '四个集合构造器的参数顺序',
             blocks: [
               {
                 type: 'table',
                 headers: ['成员或参数', '作用与返回值'],
                 rows: [
                   [
-                    '`observableObject<T>(initial, options?, runtime?)`',
+                    '`new ObservableObject<T>(initial, runtime?, options?)`',
                     '返回 ObservableObject<T>。initial 与类相同，仍没有默认值。'
                   ],
                   [
-                    '`observableArray<T>(initial?, options?, runtime?)`',
+                    '`new ObservableArray<T>(initial?, runtime?, options?)`',
                     '返回 ObservableArray<T>，initial 默认 []。'
                   ],
                   [
-                    '`observableMap<K, V>(initial?, options?, runtime?)`',
+                    '`new ObservableMap<K, V>(initial?, runtime?, options?)`',
                     '返回 ObservableMap<K, V>，initial 默认空条目列表。'
                   ],
                   [
-                    '`observableSet<T>(initial?, options?, runtime?)`',
+                    '`new ObservableSet<T>(initial?, runtime?, options?)`',
                     '返回 ObservableSet<T>，initial 默认 []。'
                   ],
                   [
                     '`options / runtime`',
-                    '工厂第二个参数是 options，第三个是 runtime，默认仍为 {} 与 defaultRuntime；类的第二、三个参数顺序相反。'
+                    '构造器第二个参数是 runtime，默认 defaultRuntime；第三个参数 options 默认 {}。不再提供不同参数顺序的工厂。'
                   ]
                 ]
               }
@@ -22942,12 +22790,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Run first-job.ts with Node 24 in an ESM project. The factory takes options second and runtime third; this Effect reads index zero.'
+                text: 'Run first-job.ts with Node 24 in an ESM project. Construct ObservableArray with runtime second and options third; this Effect reads index zero.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { observableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst jobs = observableArray(['queued'], { debugName: 'jobs' }, runtime)\nconst view = runtime.effect(() => {\n  console.log('First job:', jobs.at(0))\n})\ntry {\n  jobs.set(0, 'ready')\n  runtime.flush()\n} finally {\n  view.dispose()\n  jobs.dispose()\n}"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst jobs = new ObservableArray(['queued'], runtime, { debugName: 'jobs' })\nconst view = runtime.effect(() => {\n  console.log('First job:', jobs.at(0))\n})\ntry {\n  jobs.set(0, 'ready')\n  runtime.flush()\n} finally {\n  view.dispose()\n  jobs.dispose()\n}"
               },
               {
                 type: 'code',
@@ -22998,31 +22846,31 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'factories',
-            heading: 'Factory parameters and order',
+            heading: 'Constructor parameters and order',
             blocks: [
               {
                 type: 'table',
                 headers: ['Member or parameter', 'Purpose and return value'],
                 rows: [
                   [
-                    '`observableObject<T>(initial, options?, runtime?)`',
+                    '`new ObservableObject<T>(initial, runtime?, options?)`',
                     'Returns ObservableObject<T>, with the same required initial object as the class.'
                   ],
                   [
-                    '`observableArray<T>(initial?, options?, runtime?)`',
+                    '`new ObservableArray<T>(initial?, runtime?, options?)`',
                     'Returns ObservableArray<T>, with initial defaulting to [].'
                   ],
                   [
-                    '`observableMap<K, V>(initial?, options?, runtime?)`',
+                    '`new ObservableMap<K, V>(initial?, runtime?, options?)`',
                     'Returns ObservableMap<K, V>, with an empty entry list by default.'
                   ],
                   [
-                    '`observableSet<T>(initial?, options?, runtime?)`',
+                    '`new ObservableSet<T>(initial?, runtime?, options?)`',
                     'Returns ObservableSet<T>, with initial defaulting to [].'
                   ],
                   [
                     '`options / runtime`',
-                    'Factories take options second and runtime third, defaulting to {} and defaultRuntime. Classes take these two parameters in the opposite order.'
+                    'Constructors take runtime second (defaultRuntime by default) and options third ({} by default). No factory with a different argument order is exported.'
                   ]
                 ]
               }
@@ -23091,7 +22939,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { observableMap, observableSet } from '@migaia/store-indexed'\n\nconst prices = observableMap<string, number>([['tea', 12.5], ['coffee', 15]])\nconst selected = observableSet(['tea'])\ntry {\n  selected.add('coffee')\n  const total = selected.valuesArray().reduce((sum, key) => sum + (prices.peek(key) ?? 0), 0)\n  console.log('已选商品:', selected.valuesArray().join(', '))\n  console.log('合计:', total)\n} finally {\n  selected.dispose()\n  prices.dispose()\n}"
+                code: "import { ObservableMap, ObservableSet } from '@migaia/store-indexed'\n\nconst prices = new ObservableMap<string, number>([['tea', 12.5], ['coffee', 15]])\nconst selected = new ObservableSet(['tea'])\ntry {\n  selected.add('coffee')\n  const total = selected.valuesArray().reduce((sum, key) => sum + (prices.peek(key) ?? 0), 0)\n  console.log('已选商品:', selected.valuesArray().join(', '))\n  console.log('合计:', total)\n} finally {\n  selected.dispose()\n  prices.dispose()\n}"
               },
               {
                 type: 'code',
@@ -23297,7 +23145,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '上述方法均从根入口导入对应类或工厂。批量通知与清理详见[批量替换与回收](/zh/docs/store-indexed/bulk-replacement-and-pruning)；数组位置处理见[数组索引](/zh/docs/store-indexed/array-index-semantics)。'
+                text: '上述方法均从根入口导入对应类。批量通知与清理详见[批量替换与回收](/zh/docs/store-indexed/bulk-replacement-and-pruning)；数组位置处理见[数组索引](/zh/docs/store-indexed/array-index-semantics)。'
               }
             ]
           }
@@ -23330,7 +23178,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { observableMap, observableSet } from '@migaia/store-indexed'\n\nconst prices = observableMap<string, number>([['tea', 12.5], ['coffee', 15]])\nconst selected = observableSet(['tea'])\ntry {\n  selected.add('coffee')\n  const total = selected.valuesArray().reduce((sum, key) => sum + (prices.peek(key) ?? 0), 0)\n  console.log('Selected items:', selected.valuesArray().join(', '))\n  console.log('Total:', total)\n} finally {\n  selected.dispose()\n  prices.dispose()\n}"
+                code: "import { ObservableMap, ObservableSet } from '@migaia/store-indexed'\n\nconst prices = new ObservableMap<string, number>([['tea', 12.5], ['coffee', 15]])\nconst selected = new ObservableSet(['tea'])\ntry {\n  selected.add('coffee')\n  const total = selected.valuesArray().reduce((sum, key) => sum + (prices.peek(key) ?? 0), 0)\n  console.log('Selected items:', selected.valuesArray().join(', '))\n  console.log('Total:', total)\n} finally {\n  selected.dispose()\n  prices.dispose()\n}"
               },
               {
                 type: 'code',
@@ -24968,43 +24816,43 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '检查同步初值并标出失败调用点。'
                   ],
                   [
-                    '[readOpticPath](/zh/docs/store-keyed/api/readOpticPath)',
+                    '[readOpticPath](/zh/docs/store-keyed/api/optics/readOpticPath)',
                     '沿字段路径读取普通值。'
                   ],
                   [
-                    '[writeOpticPath](/zh/docs/store-keyed/api/writeOpticPath)',
+                    '[writeOpticPath](/zh/docs/store-keyed/api/optics/writeOpticPath)',
                     '复制路径上的容器并写入新值。'
                   ],
                   [
-                    '[findKeyIndex](/zh/docs/store-keyed/api/findKeyIndex)',
+                    '[findKeyIndex](/zh/docs/store-keyed/api/optics/findKeyIndex)',
                     '查找匹配 key 的首个下标。'
                   ],
                   [
-                    '[requireKeyIndex](/zh/docs/store-keyed/api/requireKeyIndex)',
+                    '[requireKeyIndex](/zh/docs/store-keyed/api/optics/requireKeyIndex)',
                     '要求列表中仍存在目标 key。'
                   ],
                   [
-                    '[shallowArrayEquals](/zh/docs/store-keyed/api/shallowArrayEquals)',
+                    '[shallowArrayEquals](/zh/docs/store-keyed/api/optics/shallowArrayEquals)',
                     '逐项比较两个数组。'
                   ],
                   [
-                    '[computeUniqueKeys](/zh/docs/store-keyed/api/computeUniqueKeys)',
+                    '[computeUniqueKeys](/zh/docs/store-keyed/api/optics/computeUniqueKeys)',
                     '取得列表 key 并检查重复项。'
                   ],
                   [
-                    '[spliceInsert](/zh/docs/store-keyed/api/spliceInsert)',
+                    '[spliceInsert](/zh/docs/store-keyed/api/optics/spliceInsert)',
                     '返回插入元素后的新列表。'
                   ],
                   [
-                    '[filterOutKey](/zh/docs/store-keyed/api/filterOutKey)',
+                    '[filterOutKey](/zh/docs/store-keyed/api/optics/filterOutKey)',
                     '返回过滤匹配 key 后的列表和删除标记。'
                   ],
                   [
-                    '[replaceAtIndex](/zh/docs/store-keyed/api/replaceAtIndex)',
+                    '[replaceAtIndex](/zh/docs/store-keyed/api/optics/replaceAtIndex)',
                     '返回替换指定位置后的列表。'
                   ],
                   [
-                    '[KeyedSplitCache](/zh/docs/store-keyed/api/KeyedSplitCache)',
+                    '[KeyedSplitCache](/zh/docs/store-keyed/api/optics/KeyedSplitCache)',
                     '为自定义拆分逻辑缓存 key 对应的对象。'
                   ],
                   [
@@ -25184,43 +25032,43 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Checks a synchronous initial value and labels its call site.'
                   ],
                   [
-                    '[readOpticPath](/en/docs/store-keyed/api/readOpticPath)',
+                    '[readOpticPath](/en/docs/store-keyed/api/optics/readOpticPath)',
                     'Reads a plain value along a property path.'
                   ],
                   [
-                    '[writeOpticPath](/en/docs/store-keyed/api/writeOpticPath)',
+                    '[writeOpticPath](/en/docs/store-keyed/api/optics/writeOpticPath)',
                     'Copies containers along a path to write a new value.'
                   ],
                   [
-                    '[findKeyIndex](/en/docs/store-keyed/api/findKeyIndex)',
+                    '[findKeyIndex](/en/docs/store-keyed/api/optics/findKeyIndex)',
                     'Finds the first index matching a key.'
                   ],
                   [
-                    '[requireKeyIndex](/en/docs/store-keyed/api/requireKeyIndex)',
+                    '[requireKeyIndex](/en/docs/store-keyed/api/optics/requireKeyIndex)',
                     'Requires the target key to remain in a list.'
                   ],
                   [
-                    '[shallowArrayEquals](/en/docs/store-keyed/api/shallowArrayEquals)',
+                    '[shallowArrayEquals](/en/docs/store-keyed/api/optics/shallowArrayEquals)',
                     'Compares arrays element by element.'
                   ],
                   [
-                    '[computeUniqueKeys](/en/docs/store-keyed/api/computeUniqueKeys)',
+                    '[computeUniqueKeys](/en/docs/store-keyed/api/optics/computeUniqueKeys)',
                     'Collects list keys and detects duplicates.'
                   ],
                   [
-                    '[spliceInsert](/en/docs/store-keyed/api/spliceInsert)',
+                    '[spliceInsert](/en/docs/store-keyed/api/optics/spliceInsert)',
                     'Returns a new list with an inserted item.'
                   ],
                   [
-                    '[filterOutKey](/en/docs/store-keyed/api/filterOutKey)',
+                    '[filterOutKey](/en/docs/store-keyed/api/optics/filterOutKey)',
                     'Returns a filtered list and a removal flag.'
                   ],
                   [
-                    '[replaceAtIndex](/en/docs/store-keyed/api/replaceAtIndex)',
+                    '[replaceAtIndex](/en/docs/store-keyed/api/optics/replaceAtIndex)',
                     'Returns a list with one index replaced.'
                   ],
                   [
-                    '[KeyedSplitCache](/en/docs/store-keyed/api/KeyedSplitCache)',
+                    '[KeyedSplitCache](/en/docs/store-keyed/api/optics/KeyedSplitCache)',
                     'Caches objects by key for custom split logic.'
                   ],
                   [
@@ -26417,7 +26265,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'remove(store, key): boolean',
-                    '过滤匹配键并写回源，返回是否删除。正常业务列表键唯一；当前底层过滤函数会删除全部 Object.is 匹配项。'
+                    '过滤匹配键并写回源，返回是否删除。正常业务列表键唯一；当前底层过滤函数会删除全部 SameValueZero 匹配项（NaN 相等，正负零同键）。'
                   ],
                   [
                     'prune(store): number',
@@ -26436,42 +26284,42 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['成员 / 配置', '用途与默认处理'],
                 rows: [
                   [
-                    '[readOpticPath](/zh/docs/store-keyed/api/readOpticPath)(value, path, label)',
+                    '[readOpticPath](/zh/docs/store-keyed/api/optics/readOpticPath)(value, path, label)',
                     '沿属性数组读取并返回 unknown；label 用于错误信息。中途遇非对象失败；空路径直接返回 value。'
                   ],
                   [
-                    '[writeOpticPath](/zh/docs/store-keyed/api/writeOpticPath)(value, path, next, label)',
+                    '[writeOpticPath](/zh/docs/store-keyed/api/optics/writeOpticPath)(value, path, next, label)',
                     '复制每层对象或数组后写入 next，label 定位错误。应用应提供非空路径；__proto__ 用自有数据属性写入，避免触发原型设置器。'
                   ],
                   [
-                    '[findKeyIndex](/zh/docs/store-keyed/api/findKeyIndex) / [requireKeyIndex](/zh/docs/store-keyed/api/requireKeyIndex)',
-                    '均接收 items、keyOf(item,index)、key，以 Object.is 查找；前者未找到返回 -1，后者额外接收 label，未找到抛 INVALID_OPTION。'
+                    '[findKeyIndex](/zh/docs/store-keyed/api/optics/findKeyIndex) / [requireKeyIndex](/zh/docs/store-keyed/api/optics/requireKeyIndex)',
+                    '均接收 items、keyOf(item,index)、key，以 SameValueZero 查找（NaN 相等，正负零同键）；前者未找到返回 -1，后者额外接收 label，未找到抛 INVALID_OPTION。'
                   ],
                   [
-                    '[computeUniqueKeys](/zh/docs/store-keyed/api/computeUniqueKeys)(items, keyOf, label)',
+                    '[computeUniqueKeys](/zh/docs/store-keyed/api/optics/computeUniqueKeys)(items, keyOf, label)',
                     '计算冻结键数组并按 Set 规则检查重复；label 定位重复错误。它不释放条目，不检查业务字段。'
                   ],
                   [
-                    '[shallowArrayEquals](/zh/docs/store-keyed/api/shallowArrayEquals)(left, right)',
+                    '[shallowArrayEquals](/zh/docs/store-keyed/api/optics/shallowArrayEquals)(left, right)',
                     '长度及逐项 Object.is 都相等才返回 true；不比较嵌套字段。'
                   ],
                   [
-                    '[spliceInsert](/zh/docs/store-keyed/api/spliceInsert)(list, item, index)',
+                    '[spliceInsert](/zh/docs/store-keyed/api/optics/spliceInsert)(list, item, index)',
                     '夹住插入位置并返回新冻结数组，不修改原列表。'
                   ],
                   [
-                    '[filterOutKey](/zh/docs/store-keyed/api/filterOutKey)(list, keyOf, key)',
-                    '返回 removed 与 next；当前实现删除全部 Object.is 匹配项。没有匹配时 next 保留原引用，有删除时返回冻结新数组。'
+                    '[filterOutKey](/zh/docs/store-keyed/api/optics/filterOutKey)(list, keyOf, key)',
+                    '返回 removed 与 next；当前实现删除全部 SameValueZero 匹配项（NaN 相等，正负零同键）。没有匹配时 next 保留原引用，有删除时返回冻结新数组。'
                   ],
                   [
-                    '[replaceAtIndex](/zh/docs/store-keyed/api/replaceAtIndex)(list, index, value)',
+                    '[replaceAtIndex](/zh/docs/store-keyed/api/optics/replaceAtIndex)(list, index, value)',
                     '复制后按下标写入并冻结，不做业务键校验或索引夹取。'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '[KeyedSplitCache](/zh/docs/store-keyed/api/KeyedSplitCache) 是 split 使用的普通缓存工具；一般应用直接调用 splitDef，不需要自己维护它。'
+                text: '[KeyedSplitCache](/zh/docs/store-keyed/api/optics/KeyedSplitCache) 是 split 使用的普通缓存工具；一般应用直接调用 splitDef，不需要自己维护它。'
               },
               {
                 type: 'table',
@@ -26585,7 +26433,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     'remove(store, key): boolean',
-                    'Filter matching keys into the source and return whether removal occurred. Normal business keys are unique; the underlying helper removes all Object.is matches.'
+                    'Filter matching keys into the source and return whether removal occurred. Normal business keys are unique; the underlying helper removes all SameValueZero matches (NaN equals itself; signed zeros share a key).'
                   ],
                   [
                     'prune(store): number',
@@ -26604,42 +26452,42 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Member / setting', 'Purpose and default behavior'],
                 rows: [
                   [
-                    '[readOpticPath](/en/docs/store-keyed/api/readOpticPath)(value, path, label)',
+                    '[readOpticPath](/en/docs/store-keyed/api/optics/readOpticPath)(value, path, label)',
                     'Read a property-array path and return unknown. label identifies errors; nonobject intermediates fail, while an empty read path returns value.'
                   ],
                   [
-                    '[writeOpticPath](/en/docs/store-keyed/api/writeOpticPath)(value, path, next, label)',
+                    '[writeOpticPath](/en/docs/store-keyed/api/optics/writeOpticPath)(value, path, next, label)',
                     'Copy containers along the path before writing next; label locates errors. Supply a nonempty path. __proto__ is written as an own data property to avoid the prototype setter.'
                   ],
                   [
-                    '[findKeyIndex](/en/docs/store-keyed/api/findKeyIndex) / [requireKeyIndex](/en/docs/store-keyed/api/requireKeyIndex)',
-                    'Both take items/keyOf(item,index)/key and compare with Object.is. find returns -1 when absent; require adds a label and throws INVALID_OPTION instead.'
+                    '[findKeyIndex](/en/docs/store-keyed/api/optics/findKeyIndex) / [requireKeyIndex](/en/docs/store-keyed/api/optics/requireKeyIndex)',
+                    'Both take items/keyOf(item,index)/key and compare keys with SameValueZero (NaN equals itself; signed zeros share a key). find returns -1 when absent; require adds a label and throws INVALID_OPTION instead.'
                   ],
                   [
-                    '[computeUniqueKeys](/en/docs/store-keyed/api/computeUniqueKeys)(items, keyOf, label)',
+                    '[computeUniqueKeys](/en/docs/store-keyed/api/optics/computeUniqueKeys)(items, keyOf, label)',
                     'Compute a frozen key array and check duplicates using Set rules. label locates duplicate errors; it neither releases items nor validates business fields.'
                   ],
                   [
-                    '[shallowArrayEquals](/en/docs/store-keyed/api/shallowArrayEquals)(left, right)',
+                    '[shallowArrayEquals](/en/docs/store-keyed/api/optics/shallowArrayEquals)(left, right)',
                     'Return true for equal lengths and elementwise Object.is values, without comparing nested fields.'
                   ],
                   [
-                    '[spliceInsert](/en/docs/store-keyed/api/spliceInsert)(list, item, index)',
+                    '[spliceInsert](/en/docs/store-keyed/api/optics/spliceInsert)(list, item, index)',
                     'Clamp the position and return a new frozen array without mutating the original.'
                   ],
                   [
-                    '[filterOutKey](/en/docs/store-keyed/api/filterOutKey)(list, keyOf, key)',
-                    'Return removed/next, deleting all Object.is matches. With no match, retain the original reference; otherwise return a new frozen array.'
+                    '[filterOutKey](/en/docs/store-keyed/api/optics/filterOutKey)(list, keyOf, key)',
+                    'Return removed/next, deleting all SameValueZero matches (NaN equals itself; signed zeros share a key). With no match, retain the original reference; otherwise return a new frozen array.'
                   ],
                   [
-                    '[replaceAtIndex](/en/docs/store-keyed/api/replaceAtIndex)(list, index, value)',
+                    '[replaceAtIndex](/en/docs/store-keyed/api/optics/replaceAtIndex)(list, index, value)',
                     'Copy, assign the given index, and freeze without business-key validation or index clamping.'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '[KeyedSplitCache](/en/docs/store-keyed/api/KeyedSplitCache) is the cache used by split. Most applications call splitDef without maintaining a separate cache.'
+                text: '[KeyedSplitCache](/en/docs/store-keyed/api/optics/KeyedSplitCache) is the cache used by split. Most applications call splitDef without maintaining a separate cache.'
               },
               {
                 type: 'table',
@@ -27511,10 +27359,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '等待为该 Store 登记的异步初始化。'
                   ],
                   [
-                    '[StoreResourceKind](/zh/docs/store-light/api/StoreResourceKind)',
-                    '标出 StoreResource 当前请求或关闭状态的常量名称。'
-                  ],
-                  [
                     '[createStoreLightError](/zh/docs/store-light/api/createStoreLightError) / [createStoreLightTypeError](/zh/docs/store-light/api/createStoreLightTypeError) / [createStoreLightRangeError](/zh/docs/store-light/api/createStoreLightRangeError) / [createStoreLightAggregateError](/zh/docs/store-light/api/createStoreLightAggregateError)',
                     '为扩展错误附加本包来源和错误码，保留原生错误类型。'
                   ]
@@ -27635,10 +27479,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '[storeReady](/en/docs/store-light/api/storeReady)',
                     'Wait for asynchronous initialization registered for this Store.'
-                  ],
-                  [
-                    '[StoreResourceKind](/en/docs/store-light/api/StoreResourceKind)',
-                    'Names for the current StoreResource request or shutdown state.'
                   ],
                   [
                     '[createStoreLightError](/en/docs/store-light/api/createStoreLightError) / [createStoreLightTypeError](/en/docs/store-light/api/createStoreLightTypeError) / [createStoreLightRangeError](/en/docs/store-light/api/createStoreLightRangeError) / [createStoreLightAggregateError](/en/docs/store-light/api/createStoreLightAggregateError)',
@@ -28897,12 +28737,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '`mode` 为 `async`，通过 `createAsyncStore()` 等待后使用，异步参数与失败处理见初始化页。'
                   ],
                   [
-                    '`ILegacyFieldBuilder<F>`',
-                    '没有 `mode`，`create()` 返回 `Promise<F>`；由 `createAsyncStore()` 接收，不能传给同步 `createStore()`。'
-                  ],
-                  [
                     '`IFieldBuilder<F>`',
-                    '联合上述三种构建器类型，`F` 实现 `IDisposable.dispose()`。'
+                    '联合显式 sync 与 async 两种构建器；两条路径都要求 mode，`F` 实现 IDisposable。'
                   ]
                 ]
               }
@@ -29078,12 +28914,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Uses async mode and is awaited through createAsyncStore; see initialization for asynchronous arguments and failures.'
                   ],
                   [
-                    '`ILegacyFieldBuilder<F>`',
-                    'Has no mode and returns Promise<F> from create. createAsyncStore accepts it; synchronous createStore does not.'
-                  ],
-                  [
                     '`IFieldBuilder<F>`',
-                    'Combines these three builder types, with F implementing IDisposable.dispose.'
+                    'Combines explicit sync and async builders. Both require mode; F implements IDisposable.'
                   ]
                 ]
               }
@@ -29677,10 +29509,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`retainVersion(version): () => void`',
                     '保留 `readSnapshot()` 返回的版本号或 `token`，即使加载新版也不提前清理旧值。'
-                  ],
-                  [
-                    '`retain(version?)`',
-                    '兼容入口，已标为弃用。新代码分别使用资源保留或版本保留方法。'
                   ]
                 ]
               }
@@ -29840,14 +29668,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`createStoreLightAggregateError(code, errors, message)`',
                     '使用原生聚合错误，输入错误仍可从 `errors` 读取。普通业务通常只需要处理错误。'
-                  ],
-                  [
-                    '`StoreResourceKind`',
-                    '提供 `idle`、`loading`、`ready`、`failed`、`closing`、`disposed` 名称。资源没有公开的 `.kind` 字段。'
-                  ],
-                  [
-                    '`ResourceStatus` / `ResourceFetchStatus`',
-                    '原生资源的数据状态与抓取状态来自 [Resource 文档](/zh/docs/resource)，不从 Store Light 导出。StoreResourceKind 仍仅是外观用词，不新增 `.kind` 字段。'
                   ]
                 ]
               }
@@ -29917,10 +29737,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`retainVersion(version): () => void`',
                     'Retains a snapshot’s version number or token, keeping that value alive even after a newer value loads.'
-                  ],
-                  [
-                    '`retain(version?)`',
-                    'Deprecated compatibility entry. New code chooses resource retention or version retention directly.'
                   ]
                 ]
               }
@@ -30092,14 +29908,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`createStoreLightAggregateError(code, errors, message)`',
                     'Creates a native aggregate retaining the supplied errors. Applications usually only need to handle failures.'
-                  ],
-                  [
-                    '`StoreResourceKind`',
-                    'Supplies `idle`, `loading`, `ready`, `failed`, `closing`, and `disposed` names. Resources expose no `.kind` field.'
-                  ],
-                  [
-                    '`ResourceStatus` / `ResourceFetchStatus`',
-                    'Native data/fetch status belongs to [Resource](/en/docs/resource), not Store Light exports. StoreResourceKind remains facade vocabulary and adds no .kind field.'
                   ]
                 ]
               }
@@ -43456,7 +43264,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '选择连接、请求编号和消息处理组件。'
                   ],
                   [
-                    '[authentication](/zh/docs/rpc-core/api/authentication) / [createAuthenticationNonce](/zh/docs/rpc-core/api/createAuthenticationNonce)',
+                    '[authentication](/zh/docs/rpc-core/api/authentication)',
                     '配置认证与认证随机值。'
                   ],
                   [
@@ -43646,7 +43454,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Select connection, request IDs and message processing components.'
                   ],
                   [
-                    '[authentication](/en/docs/rpc-core/api/authentication) / [createAuthenticationNonce](/en/docs/rpc-core/api/createAuthenticationNonce)',
+                    '[authentication](/en/docs/rpc-core/api/authentication)',
                     'Configure authentication and its nonce.'
                   ],
                   [
@@ -77240,7 +77048,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '构造 runtime 调用头和选项，详见运行时消息页。'
                   ],
                   [
-                    '[createStringFramer](/zh/docs/rpc-contract/api/framing/createStringFramer) / [createBinaryFramer](/zh/docs/rpc-contract/api/framing/createBinaryFramer) / [createReassembler](/zh/docs/rpc-contract/api/framing/createReassembler)',
+                    '[createStringFramer](/zh/docs/rpc-contract/api/framing/createStringFramer) / [createBinaryFramer](/zh/docs/rpc-contract/api/framing/createBinaryFramer)',
                     '拆分和重组有限大小的物理消息。'
                   ],
                   [
@@ -77422,7 +77230,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Construct runtime call metadata and options; see the runtime messages page.'
                   ],
                   [
-                    '[createStringFramer](/en/docs/rpc-contract/api/framing/createStringFramer) / [createBinaryFramer](/en/docs/rpc-contract/api/framing/createBinaryFramer) / [createReassembler](/en/docs/rpc-contract/api/framing/createReassembler)',
+                    '[createStringFramer](/en/docs/rpc-contract/api/framing/createStringFramer) / [createBinaryFramer](/en/docs/rpc-contract/api/framing/createBinaryFramer)',
                     'Split and reassemble bounded physical messages.'
                   ],
                   [
@@ -79403,7 +79211,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStringFramer, createReassembler } from '@migaia/rpc-contract/framing'\nconst sender = createStringFramer({ chunkBytes: 8 })\nconst receiver = createStringFramer()\nconst assembler = createReassembler(receiver)\nconst context = { source: 'catalog', messageId: 'description-42' }\nconst frames = sender.frame('A refillable black pen', context)\nconst descriptions: string[] = []\nfor (const frame of frames) {\n  const result = assembler.accept(frame, context)\n  if (result.status === 'complete') descriptions.push(result.value)\n}\nconsole.log(JSON.stringify({ descriptions, fragments: frames.length }))\nsender.close()\nassembler.close()"
+                code: "import { createStringFramer } from '@migaia/rpc-contract/framing'\nconst sender = createStringFramer({ chunkBytes: 8 })\nconst receiver = createStringFramer()\nconst context = { source: 'catalog', messageId: 'description-42' }\nconst frames = sender.frame('A refillable black pen', context)\nconst descriptions: string[] = []\nfor (const frame of frames) {\n  const result = receiver.accept(frame, context)\n  if (result.status === 'complete') descriptions.push(result.value)\n}\nconsole.log(JSON.stringify({ descriptions, fragments: frames.length }))\nsender.close()\nreceiver.close()"
               },
               {
                 type: 'code',
@@ -79439,12 +79247,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'frame 返回帧数组；accept 返回 pending、complete/value 或 rejected/error。需要按片序到达，不负责补发。'
                   ],
                   [
-                    '[createReassembler](/zh/docs/rpc-contract/api/framing/createReassembler)(framer)',
-                    '只投影 accept 与 close(reason?)，复用原分帧器的组装状态；关闭会释放未完成组装。'
-                  ],
-                  [
-                    'messageFramerV1 / processStringFramer / remoteProcessStringFramer',
-                    '分别保留完整任意消息或完整字符串边界，不再次拆片；remoteProcessStringFramer 先检查未知输入是否为字符串。'
+                    'messageFramerV1 / remoteProcessStringFramer',
+                    '分别保留完整任意消息或完整字符串边界，不再次拆片；remoteProcessStringFramer 对非字符串输入抛出带 INVALID_FRAME 的 TypeError。'
                   ],
                   [
                     '[bindRpcFrameIngress](/zh/docs/rpc-contract/api/framing/bindRpcFrameIngress)(accept, frame?)',
@@ -79645,7 +79449,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStringFramer, createReassembler } from '@migaia/rpc-contract/framing'\nconst sender = createStringFramer({ chunkBytes: 8 })\nconst receiver = createStringFramer()\nconst assembler = createReassembler(receiver)\nconst context = { source: 'catalog', messageId: 'description-42' }\nconst frames = sender.frame('A refillable black pen', context)\nconst descriptions: string[] = []\nfor (const frame of frames) {\n  const result = assembler.accept(frame, context)\n  if (result.status === 'complete') descriptions.push(result.value)\n}\nconsole.log(JSON.stringify({ descriptions, fragments: frames.length }))\nsender.close()\nassembler.close()"
+                code: "import { createStringFramer } from '@migaia/rpc-contract/framing'\nconst sender = createStringFramer({ chunkBytes: 8 })\nconst receiver = createStringFramer()\nconst context = { source: 'catalog', messageId: 'description-42' }\nconst frames = sender.frame('A refillable black pen', context)\nconst descriptions: string[] = []\nfor (const frame of frames) {\n  const result = receiver.accept(frame, context)\n  if (result.status === 'complete') descriptions.push(result.value)\n}\nconsole.log(JSON.stringify({ descriptions, fragments: frames.length }))\nsender.close()\nreceiver.close()"
               },
               {
                 type: 'code',
@@ -79681,12 +79485,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'frame returns physical frames; accept returns pending, complete/value, or rejected/error. Fragments must arrive in order; retransmission is not provided.'
                   ],
                   [
-                    '[createReassembler](/en/docs/rpc-contract/api/framing/createReassembler)(framer)',
-                    'Project accept and close(reason?) over the original framer state; close releases incomplete assembly.'
-                  ],
-                  [
-                    'messageFramerV1 / processStringFramer / remoteProcessStringFramer',
-                    'Preserve whole arbitrary-message or string boundaries without splitting again; remoteProcessStringFramer checks unknown inputs for the string domain.'
+                    'messageFramerV1 / remoteProcessStringFramer',
+                    'Preserve whole arbitrary-message or string boundaries without splitting again; remoteProcessStringFramer throws TypeError with INVALID_FRAME for non-string input.'
                   ],
                   [
                     '[bindRpcFrameIngress](/en/docs/rpc-contract/api/framing/bindRpcFrameIngress)(accept, frame?)',
@@ -80987,7 +80787,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '检查不含运行时对象的部署描述，字段见 Plugin 页。'
                   ],
                   [
-                    '[createProcessTransport](/zh/docs/rpc-process/api/createProcessTransport) / [createAdapterChannel](/zh/docs/rpc-process/api/createProcessTransport) / [createNativeProcessOffer](/zh/docs/rpc-process/api/createNativeProcessOffer)',
+                    '[createProcessTransport](/zh/docs/rpc-process/api/createProcessTransport) / [createNativeProcessOffer](/zh/docs/rpc-process/api/createNativeProcessOffer)',
                     '完成协议通道与能力提议，见[协议与启动数据](/zh/docs/rpc-process/protocol-and-bootstrap)。'
                   ],
                   [
@@ -81145,7 +80945,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Check portable deployment descriptions; see the Plugin page for fields.'
                   ],
                   [
-                    '[createProcessTransport](/en/docs/rpc-process/api/createProcessTransport) / [createAdapterChannel](/en/docs/rpc-process/api/createProcessTransport) / [createNativeProcessOffer](/en/docs/rpc-process/api/createNativeProcessOffer)',
+                    '[createProcessTransport](/en/docs/rpc-process/api/createProcessTransport) / [createNativeProcessOffer](/en/docs/rpc-process/api/createNativeProcessOffer)',
                     'Construct protocol channels and offers. See [protocol and bootstrap](/en/docs/rpc-process/protocol-and-bootstrap).'
                   ],
                   [
@@ -83664,7 +83464,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'createProcessTransport(channel, options)',
                     'byte 输入返回 Promise<IRuntimePeerSourceResult>；message 输入返回 Promise<IRemoteChannel>。失败时保留原错误及 cause。'
                   ],
-                  ['createAdapterChannel', '是同一函数的另一个公开名字，参数和结果完全相同。'],
                   [
                     'channel.kind / write(chunk) / onData(listener) / onClose(listener) / close()',
                     'byte 输入按序读写 Uint8Array。write 完成表示宿主写入完成；两个订阅返回取消函数，close 释放实际资源。'
@@ -84269,10 +84068,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     'createProcessTransport(channel, options)',
                     'Byte input returns Promise<IRuntimePeerSourceResult>; message input returns Promise<IRemoteChannel>. Failures preserve the error and its cause.'
-                  ],
-                  [
-                    'createAdapterChannel',
-                    'Another public name for the same function, with identical inputs and results.'
                   ],
                   [
                     'channel.kind / write(chunk) / onData(listener) / onClose(listener) / close()',
@@ -85668,7 +85463,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '异步读取 launcher 的启动数据，用于同文件两支逻辑，不代替认证。'
                   ],
                   [
-                    '[createNodeThreadLauncher](/zh/docs/rpc-threads/api/adapters/node/createNodeThreadLauncher) / [createNodeThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/node/createNodeThreadChannelFactory)',
+                    '`createAdapterNodeThreadLauncher(runtime)` / `handle.open(signal, options)`',
                     '组合 Node Worker 启动与通道，见[原生启动器](/zh/docs/rpc-threads/native-launchers)。'
                   ],
                   [
@@ -85818,7 +85613,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Read launcher bootstrap asynchronously to select self-spawn roles without replacing authentication.'
                   ],
                   [
-                    '[createNodeThreadLauncher](/en/docs/rpc-threads/api/adapters/node/createNodeThreadLauncher) / [createNodeThreadChannelFactory](/en/docs/rpc-threads/api/adapters/node/createNodeThreadChannelFactory)',
+                    '`createAdapterNodeThreadLauncher(runtime)` / `handle.open(signal, options)`',
                     'Compose Node Worker launching and channels; see [native launchers](/en/docs/rpc-threads/native-launchers).'
                   ],
                   [
@@ -87246,7 +87041,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createAdapterNodeThreadLauncher } from '@migaia/rpc-threads'\nimport { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { runtime } from './runtime-resource.ts'\nexport const spawn = {\n  spec: {\n    entry: new URL('./catalog-worker.ts', import.meta.url).href,\n    name: 'catalog'\n  },\n  launcher: createAdapterNodeThreadLauncher(runtime),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  report: console.error\n}"
+                code: "import { createAdapterNodeThreadLauncher, type IThreadChannelFactory, type IAdapterNodeThreadHandle } from '@migaia/rpc-threads'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { runtime } from './runtime-resource.ts'\nexport const spawn = {\n  spec: {\n    entry: new URL('./catalog-worker.ts', import.meta.url).href,\n    name: 'catalog'\n  },\n  launcher: createAdapterNodeThreadLauncher(runtime),\n  channelFactory: { open: (handle, signal) => handle.open(signal, { scheduler: systemScheduler }) } satisfies IThreadChannelFactory<IAdapterNodeThreadHandle>,\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  report: console.error\n}"
               },
               {
                 type: 'paragraph',
@@ -87280,7 +87075,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['成员 / 配置', '用途与默认处理'],
                 rows: [
                   [
-                    '[createNodeThreadLauncher](/zh/docs/rpc-threads/api/adapters/node/createNodeThreadLauncher)(options?)',
+                    '`createAdapterNodeThreadLauncher(runtime, options?)`',
                     '使用本机 node:worker_threads。runtimeApi 省略时不单独增加启动元数据；普通 Peer 会通过原启动上下文提供对应信息。execArgv 省略时保留原生参数继承，提供时每个 Worker 获得副本。'
                   ],
                   [
@@ -87348,7 +87143,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['成员 / 配置', '用途与默认处理'],
                 rows: [
                   [
-                    '[INodeThreadHandle](/zh/docs/rpc-threads/api/adapters/electron-main/INodeThreadHandle) / [IAdapterNodeThreadHandle](/zh/docs/rpc-threads/api/IAdapterNodeThreadHandle)',
+                    '[INodeThreadHandle](/zh/docs/rpc-threads/api/INodeThreadHandle) / [IAdapterNodeThreadHandle](/zh/docs/rpc-threads/api/IAdapterNodeThreadHandle)',
                     '`identity` 含 threadId 与不随线程号复用的 fingerprint；port 是真实消息端口。高级对象增加 open(signal, options)，返回该次 Worker 的完整协议通道。'
                   ],
                   [
@@ -87360,8 +87155,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Node 支持冷查询，返回 sharedPid、堆字节、CPU 微秒和可有的 elu.active/idle/utilization；退出后返回空对象。采样失败报 THREAD_USAGE_SAMPLE_FAILED，不改变 Worker 生命周期。'
                   ],
                   [
-                    '[createNodeThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/node/createNodeThreadChannelFactory)({ scheduler, capabilities? })',
-                    'scheduler 与 spawn 使用同一个调度器。capabilities 缩小本地提案，省略使用原启动能力；返回 open(handle, signal)，不从复制出来的对象字段取得原生启动资格。'
+                    '`handle.open(signal, { scheduler, capabilities? })`',
+                    'scheduler 与 spawn 使用同一个调度器。capabilities 缩小本地提案，省略使用原启动能力；返回该实际句柄的完整来源结果 Promise，不从复制出来的对象字段取得原生启动资格。'
                   ]
                 ]
               }
@@ -87380,7 +87175,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Worker 省略时读取宿主 globalThis.Worker；report 接收原生错误，runtimeApi 使用真实启动上下文。传入的构造器接收 entry 与 { type:module, name? }，返回实际 IWebThreadWorker。'
                   ],
                   [
-                    '[IWebThreadWorker](/zh/docs/rpc-threads/api/IWebThreadWorker) / [IWebThreadLauncherOptions](/zh/docs/rpc-threads/api/adapters/browser/IWebThreadLauncherOptions)',
+                    '[IWebThreadWorker](/zh/docs/rpc-threads/api/IWebThreadWorker) / [IWebThreadLauncherOptions](/zh/docs/rpc-threads/api/IWebThreadLauncherOptions)',
                     'Worker 具有 postMessage/addEventListener/removeEventListener/terminate；错误报告失败交给宿主报告路径。不因自定义构造器而加强退出或堆限制能力。'
                   ],
                   [
@@ -87388,28 +87183,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '返回 open(handle, signal)，使用与启动器对应的真实 Web 端口；scheduler 与来源一致。等待原 prepared 后打开通道，配置能力不能代替实际握手。'
                   ],
                   [
-                    '[IWebThreadHandle](/zh/docs/rpc-threads/api/adapters/browser/IWebThreadHandle) / [IAdapterWebThreadHandle](/zh/docs/rpc-threads/api/IAdapterWebThreadHandle)',
+                    '[IWebThreadHandle](/zh/docs/rpc-threads/api/IWebThreadHandle) / [IAdapterWebThreadHandle](/zh/docs/rpc-threads/api/IAdapterWebThreadHandle)',
                     '含 `identity`、port、prepared、exited、terminate；高级对象再有 open。prepared 表示启动通信准备，不表示代码退出；Web exited 不会完成，不能等待它作为 terminate 成功回执。'
-                  ],
-                  [
-                    '[createBrowserThreadLauncher](/zh/docs/rpc-threads/api/adapters/browser/createBrowserThreadLauncher) / [createBrowserThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/browser/createBrowserThreadChannelFactory)',
-                    '沿用 Web 配置和返回对象；动态构造不能保证 Vite/webpack 发现 Worker 源码，使用已构建 URL 或保留 bundler 识别的实际构造。浏览器未在本轮运行。'
-                  ],
-                  [
-                    '[createBunThreadLauncher](/zh/docs/rpc-threads/api/adapters/bun/createBunThreadLauncher) / [createBunThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/bun/createBunThreadChannelFactory)',
-                    '同 Web 配置，使用 Bun 的实际 Worker；本轮未在 Bun 运行。termination/exit-observation/heap-limit 都是 unsupported。'
-                  ],
-                  [
-                    '[createDenoThreadLauncher](/zh/docs/rpc-threads/api/adapters/deno/createDenoThreadLauncher) / [createDenoThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/deno/createDenoThreadChannelFactory)',
-                    '同 Web 配置，权限由 Deno 宿主提供；三项生命周期能力同样为 unsupported。本轮未在 Deno 运行。'
-                  ],
-                  [
-                    '[createElectronMainThreadLauncher](/zh/docs/rpc-threads/api/adapters/electron-main/createElectronMainThreadLauncher)() / [createElectronMainThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/electron-main/createElectronMainThreadChannelFactory)',
-                    '启动器没有配置参数，复用 worker_threads。当前三项能力仍全部标为 unsupported，不能把 Node 实跑当作 Electron 能力证明；本轮未在 Electron 运行。'
-                  ],
-                  [
-                    '[createElectronRendererThreadLauncher](/zh/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadLauncher) / [createElectronRendererThreadChannelFactory](/zh/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadChannelFactory)',
-                    '同 Web 配置和返回对象，需要 Electron 渲染宿主。termination/exit-observation/heap-limit 全部 unsupported；本轮未运行。'
                   ]
                 ]
               },
@@ -87457,7 +87232,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createAdapterNodeThreadLauncher } from '@migaia/rpc-threads'\nimport { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { runtime } from './runtime-resource.ts'\nexport const spawn = {\n  spec: {\n    entry: new URL('./catalog-worker.ts', import.meta.url).href,\n    name: 'catalog'\n  },\n  launcher: createAdapterNodeThreadLauncher(runtime),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  report: console.error\n}"
+                code: "import { createAdapterNodeThreadLauncher, type IThreadChannelFactory, type IAdapterNodeThreadHandle } from '@migaia/rpc-threads'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { runtime } from './runtime-resource.ts'\nexport const spawn = {\n  spec: {\n    entry: new URL('./catalog-worker.ts', import.meta.url).href,\n    name: 'catalog'\n  },\n  launcher: createAdapterNodeThreadLauncher(runtime),\n  channelFactory: { open: (handle, signal) => handle.open(signal, { scheduler: systemScheduler }) } satisfies IThreadChannelFactory<IAdapterNodeThreadHandle>,\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  report: console.error\n}"
               },
               {
                 type: 'paragraph',
@@ -87491,7 +87266,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Member / setting', 'Purpose and default behavior'],
                 rows: [
                   [
-                    '[createNodeThreadLauncher](/en/docs/rpc-threads/api/adapters/node/createNodeThreadLauncher)(options?)',
+                    '`createAdapterNodeThreadLauncher(runtime, options?)`',
                     'Use native node:worker_threads. Omitted runtimeApi adds no separate startup metadata; ordinary Peers supply it through their original launch context. Omitted execArgv retains native flag inheritance; supplied flags are copied per Worker.'
                   ],
                   [
@@ -87559,7 +87334,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Member / setting', 'Purpose and default behavior'],
                 rows: [
                   [
-                    '[INodeThreadHandle](/en/docs/rpc-threads/api/adapters/electron-main/INodeThreadHandle) / [IAdapterNodeThreadHandle](/en/docs/rpc-threads/api/IAdapterNodeThreadHandle)',
+                    '[INodeThreadHandle](/en/docs/rpc-threads/api/INodeThreadHandle) / [IAdapterNodeThreadHandle](/en/docs/rpc-threads/api/IAdapterNodeThreadHandle)',
                     '`identity` contains threadId and a fingerprint unaffected by numeric ID reuse; port is the real message port. The advanced object adds open(signal,options), returning that Worker’s complete protocol channel.'
                   ],
                   [
@@ -87571,8 +87346,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Node supports cold queries for sharedPid, heap bytes, CPU microseconds, and possible elu.active/idle/utilization. Return an empty object after exit. Sampling failures report THREAD_USAGE_SAMPLE_FAILED without changing execution lifecycle.'
                   ],
                   [
-                    '[createNodeThreadChannelFactory](/en/docs/rpc-threads/api/adapters/node/createNodeThreadChannelFactory)({ scheduler, capabilities? })',
-                    'Use the same scheduler as spawn. capabilities narrows the local offer; omission uses original launch capabilities. Return open(handle,signal), without deriving native startup rights from copied object fields.'
+                    '`handle.open(signal, { scheduler, capabilities? })`',
+                    'Use the same scheduler as spawn. capabilities narrows the local offer; omission uses original launch capabilities. handle.open returns a Promise of the complete source result for that actual handle; copied object fields grant no native startup rights.'
                   ]
                 ]
               }
@@ -87591,7 +87366,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Omitted Worker uses globalThis.Worker. report receives native failures; runtimeApi uses the actual launch context. The constructor takes entry and { type:module,name? }, returning a real IWebThreadWorker.'
                   ],
                   [
-                    '[IWebThreadWorker](/en/docs/rpc-threads/api/IWebThreadWorker) / [IWebThreadLauncherOptions](/en/docs/rpc-threads/api/adapters/browser/IWebThreadLauncherOptions)',
+                    '[IWebThreadWorker](/en/docs/rpc-threads/api/IWebThreadWorker) / [IWebThreadLauncherOptions](/en/docs/rpc-threads/api/IWebThreadLauncherOptions)',
                     'The Worker supplies postMessage/addEventListener/removeEventListener/terminate. Reporter failures go to host reporting. A custom constructor does not strengthen exit or heap-limit capabilities.'
                   ],
                   [
@@ -87599,28 +87374,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Return open(handle,signal) over the launcher’s actual Web port, using the source scheduler. Wait for original prepared before opening; configured capabilities do not replace negotiation.'
                   ],
                   [
-                    '[IWebThreadHandle](/en/docs/rpc-threads/api/adapters/browser/IWebThreadHandle) / [IAdapterWebThreadHandle](/en/docs/rpc-threads/api/IAdapterWebThreadHandle)',
+                    '[IWebThreadHandle](/en/docs/rpc-threads/api/IWebThreadHandle) / [IAdapterWebThreadHandle](/en/docs/rpc-threads/api/IAdapterWebThreadHandle)',
                     'Contain `identity`, port, prepared, exited, and terminate; the advanced handle adds open. prepared concerns startup communication, not execution exit. Web exited never completes and cannot serve as termination confirmation.'
-                  ],
-                  [
-                    '[createBrowserThreadLauncher](/en/docs/rpc-threads/api/adapters/browser/createBrowserThreadLauncher) / [createBrowserThreadChannelFactory](/en/docs/rpc-threads/api/adapters/browser/createBrowserThreadChannelFactory)',
-                    'Use Web options/results. Dynamic construction does not guarantee Vite/webpack Worker discovery; supply built URLs or bundler-recognized native construction. No browser execution is claimed here.'
-                  ],
-                  [
-                    '[createBunThreadLauncher](/en/docs/rpc-threads/api/adapters/bun/createBunThreadLauncher) / [createBunThreadChannelFactory](/en/docs/rpc-threads/api/adapters/bun/createBunThreadChannelFactory)',
-                    'Use Web options with Bun’s actual Worker. Bun was not executed here; termination/exit-observation/heap-limit remain unsupported.'
-                  ],
-                  [
-                    '[createDenoThreadLauncher](/en/docs/rpc-threads/api/adapters/deno/createDenoThreadLauncher) / [createDenoThreadChannelFactory](/en/docs/rpc-threads/api/adapters/deno/createDenoThreadChannelFactory)',
-                    'Use Web options with Deno-granted permissions. The same three lifecycle capabilities remain unsupported; no Deno execution is claimed.'
-                  ],
-                  [
-                    '[createElectronMainThreadLauncher](/en/docs/rpc-threads/api/adapters/electron-main/createElectronMainThreadLauncher)() / [createElectronMainThreadChannelFactory](/en/docs/rpc-threads/api/adapters/electron-main/createElectronMainThreadChannelFactory)',
-                    'The launcher takes no options and reuses worker_threads. All three capabilities remain unsupported; Node execution does not prove Electron capabilities. Electron was not executed here.'
-                  ],
-                  [
-                    '[createElectronRendererThreadLauncher](/en/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadLauncher) / [createElectronRendererThreadChannelFactory](/en/docs/rpc-threads/api/adapters/electron-renderer/createElectronRendererThreadChannelFactory)',
-                    'Use Web options/results within Electron renderer. termination/exit-observation/heap-limit are unsupported; this host was not executed here.'
                   ]
                 ]
               },
@@ -94481,10 +94236,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'strict-drain 发出取消后等待所有当前任务结束；bounded 发出取消后即可返回，cleanupComplete 可能为 false。二者都不强制终止同线程回调。'
                   ],
                   [
-                    'shutdown.quiescenceMs?',
-                    '公开类型允许此字段，但当前 createRuntime 实现未读取，不应依赖它限制等待；它与 createHost 的有效 quiescenceMs 不是同一配置。'
-                  ],
-                  [
                     'run(name, options, execute)',
                     '对当前可用插件取得一次使用权；回调同步返回、Promise 或 thenable 的实际结果决定 run 的完成。旧方法在外部卸载后可能失效。'
                   ],
@@ -94601,10 +94352,6 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     'shutdown.mode',
                     'strict-drain signals cancellation and waits for current tasks; bounded may return with cleanupComplete:false. Neither forcibly terminates same-thread callbacks.'
-                  ],
-                  [
-                    'shutdown.quiescenceMs?',
-                    'Accepted by the public type but unused by the current createRuntime implementation. Do not rely on it to bound waiting; Host quiescenceMs is a separate active setting.'
                   ],
                   [
                     'run(name, options, execute)',
