@@ -383,8 +383,8 @@ const types: Record<string, ITypeDoc> = {
           '通过 `(name, error)` 接收激活或释放失败；名称来自登记，错误保持原值，不使用返回值；报告函数同步失败与异步拒绝进入工具包共享宿主异常队列，不改变业务状态。'
         ),
         default: t(
-          'undefined (no error callback configured); failures remain readable through host.error(name).',
-          'undefined（未配置错误接收回调）；失败仍可通过 `host.error(name)` 查询。'
+          'Omission installs no error callback. Use host.error(name) to read a recorded failure even when no callback was supplied.',
+          '省略时不设置错误回调。即使没有回调，也能通过 host.error(name) 读取已记录的失败。'
         )
       }
     }
@@ -518,13 +518,13 @@ export const capabilityReference: ILibraryReference = {
         '返回调用方拥有的 `ICapabilityHost`，结束后须释放；非法选项在构造完成前抛出附码原生错误。'
       ),
       exampleIntro: t(
-        'Enable persistence separately for each tenant. Register its factory first, then check the enable result before reading the active handle.',
-        '下面按租户启用持久化能力。先登记创建能力的函数，再检查启用结果，确认成功后才读取可用句柄。'
+        'Suppose each tenant can enable its own persistence service. The host keeps tenantId as the context passed to the service factory. Register that factory, call enable(), and check whether activation succeeded before using the service methods.',
+        '假设每个租户可以分别启用自己的持久化服务。宿主保存 tenantId，创建服务时把它传给工厂函数。下面先登记工厂，再调用 enable()，确认启用成功后，才使用服务提供的方法。'
       ),
       example: capabilityHostExample,
       exampleResult: t(
-        'The example prints sync: tenant-42, then disposed: tenant-42. The flag permits activation; enable starts it, and the finally block releases the handle even if sync fails.',
-        '运行后先输出 `sync: tenant-42`，再输出 `disposed: tenant-42`。开关只授予许可，`enable()` 才启动能力；即使 `sync()` 失败，最后的清理仍会释放句柄。'
+        'The output is sync: tenant-42 followed by disposed: tenant-42. flags.persistence permits activation but does not start the service on its own; enable() invokes the factory. The finally block disposes the host and releases the active service even if its sync() method fails.',
+        '运行后先输出 sync: tenant-42，再输出 disposed: tenant-42。flags.persistence 只允许启用，不会自行启动服务；enable() 才调用工厂创建它。finally 中会释放宿主与已启用的服务，即使 sync() 失败也会执行清理。'
       )
     },
     snapshotGraphReadiness: {

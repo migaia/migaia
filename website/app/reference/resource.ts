@@ -333,16 +333,16 @@ const clientUser = new Resource(fetchUser, clientRuntime, { initialSnapshot: sna
         },
         markDirty: {
           summary: t(
-            'Called by the reactive runtime when a dependency changed; schedules one refresh for a batch of changes; application code triggers this by updating the input rather than calling markDirty.',
-            '依赖变化时由响应式运行时调用，同一批变化只安排一次刷新；应用通过修改输入触发更新，无需调用 markDirty。'
+            'The reactive runtime calls this when a value read by the Resource request changes. It schedules a refresh and groups repeated notifications into that scheduled refresh. Application code changes the input, such as userId.value, and lets the runtime send this notification; it does not need to call markDirty().',
+            'Resource 请求读取过的输入发生变化时，响应式运行时会调用此方法。它安排一次刷新，并把刷新执行前收到的多次通知合并到这次刷新中。应用修改 userId.value 等输入即可，由运行时发出通知，无需直接调用 markDirty()。'
           ),
           returns: t('Nothing; a refresh is scheduled.', '无返回值；已安排一次刷新。'),
           example: `// 由运行时调用，例如 userId.value = '2' 之后`
         },
         onDependencyDisconnected: {
           summary: t(
-            'Called by the reactive runtime when a dependency was disposed; forces a re-run so the failure becomes visible; the runtime invokes this hook when the dependency is disposed.',
-            '依赖被释放时由响应式运行时触发，应用无需直接调用；它安排强制重跑，使依赖失效可以被观察到。'
+            'The reactive runtime calls this when an input used by the Resource has been disposed and can no longer supply a value. It schedules another request even without an ordinary input change. If that request fails while reading the disposed input, the failure becomes visible in the Resource error state. Application code disposes the input and lets the runtime call this method.',
+            'Resource 使用的输入被释放、无法继续提供值时，响应式运行时会调用此方法。即使没有普通输入变化，它也会安排重新请求。如果请求因读取已释放的输入而失败，Resource 的错误状态就会显示该失败。应用释放输入即可，由运行时调用此方法。'
           ),
           returns: t('Nothing; a forced refresh is scheduled.', '无返回值；已安排一次强制刷新。'),
           example: `// 由运行时调用，例如 userId.dispose() 之后`

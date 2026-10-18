@@ -526,8 +526,8 @@ await target.shutdown('manual')`
 
 /** Argument interpretation shared by every level method, explained once per owning surface. */
 const levelMessageArguments = t(
-  'For every level method, a string first argument supplies the message with %s placeholders; otherwise all arguments are retained in args.',
-  '所有分级方法都把首个字符串参数作为消息，并支持 %s 占位符；首个参数不是字符串时，全部参数都保存在 args 中。'
+  'For debug(), info(), warn(), error() and fatal(), a string first argument becomes the message, while remaining arguments are kept for output. For example, info("Order %s", orderId) keeps the placeholder and orderId for the output handler. If the first argument is not a string, the message is empty and every argument is retained in the args array.',
+  'debug()、info()、warn()、error() 和 fatal() 都把第一个字符串参数作为消息，后续参数保留给输出处理。例如 info("Order %s", orderId) 会保留占位符与 orderId，交给输出端处理。首个参数不是字符串时，消息为空，所有参数都保存在日志条目的 args 数组中。'
 )
 
 /** Methods added by `level()`, with their call forms. */
@@ -545,8 +545,8 @@ const levelExt: Readonly<Record<string, IMemberDoc & { call: string }>> = Object
     {
       call: '(message, ...args)',
       summary: t(
-        `Logs with tag \`${name}\` when \`${name}\` is not below the current level and every filter passes.`,
-        `以 \`${name}\` 标签记录日志（${zh}），前提是 \`${name}\` 不低于当前级别且所有过滤器都放行。`
+        `Creates a log entry tagged \`${name}\`. The entry reaches output only when its level meets the configured minimum and every installed filter accepts it. Lower-level or rejected entries are discarded.`,
+        `创建带 \`${name}\` 标签的日志条目（${zh}）。只有级别达到设置的最低要求、且所有过滤函数都接受时，才会输出；级别过低或被任一过滤函数拒绝的条目会被丢弃。`
       ),
       params: {
         args: t(
@@ -1731,8 +1731,8 @@ ${create}
     },
     ILevelPluginExt: {
       summary: t(
-        `Methods a logger gains from level(). ${levelMessageArguments.en}`,
-        `logger 安装 level() 插件后获得的分级记录方法。${levelMessageArguments.zh}`
+        `Describes the severity methods added when a Logger installs level(). Use them to record debug, info, warn, error and fatal entries; without the plugin these methods are absent. ${levelMessageArguments.en}`,
+        `描述 Logger 安装 level() 插件后获得的分级记录方法，可按 debug、info、warn、error、fatal 五种级别记录日志。未安装此插件时，这些方法不存在。${levelMessageArguments.zh}`
       ),
       scenarios: [
         t(
@@ -2312,8 +2312,8 @@ log.endResponse()`,
       kind: 'plugin',
       target: 'Logger',
       summary: t(
-        `After installation the logger has debug(), info(), warn(), error(), fatal(), setLevel(), addFilter() and removeFilter(), and a pipeline stage that drops entries below the level or rejected by a filter. ${levelMessageArguments.en}`,
-        `安装后 logger 拥有 debug()、info()、warn()、error()、fatal()、setLevel()、addFilter()、removeFilter()，并增加一个管线阶段，丢弃低于级别或被过滤器拒绝的条目。${levelMessageArguments.zh}`
+        `Installs severity-based logging. debug(), info(), warn(), error() and fatal() create entries with the corresponding level. setLevel() changes the minimum level; addFilter() and removeFilter() manage functions that decide which entries may continue to output. Entries below the minimum or rejected by a filter are discarded. Without this plugin, use the core log() method. ${levelMessageArguments.en}`,
+        `安装按严重程度分级的日志功能。debug()、info()、warn()、error() 和 fatal() 创建对应级别的日志。setLevel() 修改最低级别；addFilter() 与 removeFilter() 管理决定条目能否继续输出的过滤函数。低于最低级别或被过滤函数拒绝的条目会被丢弃。未安装此插件时，使用核心 log() 方法记录。${levelMessageArguments.zh}`
       ),
       install: `import { Logger } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
@@ -2453,8 +2453,8 @@ await log.shutdown('manual')`
       kind: 'adapter',
       target: 'Logger',
       summary: t(
-        'Signals and crashes drain then shut down; captureCrashes controls fatal logging only, while crashes still exit(1). The adapter adds no methods.',
-        '信号与崩溃先排空再关闭，崩溃开关仅控制致命日志，崩溃仍以退出码一结束；`beforeExit` 刷新但不主动关闭，适配器不增加方法。'
+        'Connects process events to Logger cleanup without adding logger methods. SIGINT and SIGTERM start shutdown and wait up to shutdownTimeoutMs before requesting exit. Uncaught exceptions and unhandled Promise rejections use exit code 1 even when captureCrashes is false; that option only controls whether a fatal entry is logged first. beforeExit, emitted when the event loop is about to become idle, flushes accepted logs without starting shutdown.',
+        '把进程事件接入 Logger 清理流程，不增加日志方法。收到 SIGINT 或 SIGTERM 时开始关闭，最多等待 shutdownTimeoutMs 后请求退出。未捕获异常和未处理的 Promise 拒绝始终使用退出码 1，即使 captureCrashes 为 false 也一样；该选项只决定是否先记录 fatal 级别日志。事件循环即将空闲时触发的 beforeExit 只刷新已接收日志，不开始关闭。'
       ),
       install: `import { Logger } from '@migaia/logger'
 import { process } from '@migaia/logger/plugins'

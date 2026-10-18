@@ -66,18 +66,18 @@ const configurationOptionDescriptions: readonly {
 }[] = [
   {
     keys: ['lifecycle:index:boundedWait:reportCleanup'],
-    en: 'Receives an error if cancelling the wait timer fails. Supply a synchronous reporter to keep the task or deadline result; without it, cleanup failure rejects the wait.',
-    zh: '等待结束后，取消计时器若失败，会把原错误传给此同步回调。配置后仍保留任务或截止时间的结果；不配置时，清理失败会使等待被拒绝。'
+    en: 'Use this callback when timer cleanup failures should be logged without changing the wait result. If cancelling the timer fails, the callback receives that error synchronously. The wait still returns true for task completion or false for expiry, or rejects with the task failure. Without this callback, a timer cleanup failure also makes the wait reject.',
+    zh: '希望记录取消计时器的失败、同时保留原等待结果时，设置这个回调。取消计时器失败后，回调会立即收到该错误。任务成功仍返回 true，到期仍返回 false，任务失败仍以原错误拒绝。省略回调时，取消计时器失败也会使等待被拒绝。'
   },
   {
     keys: ['lifecycle:disposal:createDisposeTransaction:pending.drain'],
-    en: 'Called after release items finish. Return a Promise that settles when your remaining work drains; a throw or rejection is recorded as a pending-work failure.',
-    zh: '释放条目执行后调用此函数。返回的 Promise 应在剩余工作结束后完成；同步抛错或 Promise 被拒绝时，事务会记录这次等待失败。'
+    en: 'A disposal transaction runs a group of resource-release operations and gathers their failures. Supply pending.drain when those operations can leave asynchronous work that must finish before run() completes. It is called once after the release items, even if an item failed. Return a Promise for the remaining work. A throw or rejection joins the collected failures and follows errorPolicy; the default policy rejects run(). Omit pending when there is no additional work to wait for.',
+    zh: '释放事务指一次集中执行资源释放、并汇总失败的操作。如果释放条目还会启动需要等待的异步工作，就提供 pending.drain。所有条目执行后会调用它一次，即使某个条目已经失败也会调用。返回的 Promise 应在这些额外工作结束后完成。回调抛错或 Promise 被拒绝时，失败会并入汇总，按 errorPolicy 处理；默认会使 run() 被拒绝。没有额外工作需要等待时，可以省略 pending。'
   },
   {
     keys: ['plugin-host:index:defineHost:surface'],
-    en: 'Adds your domain methods or properties to the returned Host handle before it is frozen. Property getters remain live. Do not reuse reserved Host names such as identity or use.',
-    zh: '在返回的 Host 句柄冻结前，加入应用自己的方法或属性。属性的读取器仍会在读取时执行。不能覆盖 identity、use 等 Host 已保留的名称。'
+    en: 'Provide surface when callers need application methods or properties on the object returned by defineHost. Its own properties are copied before that object is frozen: callers cannot then add, remove or reassign those properties. A getter, declared with get, still runs whenever the property is read, so it can return current application state. Omission adds no application properties. Reserved Host names such as identity and use are kept; a conflicting surface property does not replace them.',
+    zh: '调用方需要直接从 defineHost 返回的宿主对象上访问应用方法或属性时，提供 surface。它自身的属性会复制到宿主对象，再冻结该对象；冻结后不能新增、删除或重新赋值这些属性。用 get 声明的属性读取函数仍会在每次读取时执行，因此可以返回应用的当前状态。省略 surface 时，不添加应用属性。identity、use 等宿主保留名称不会被覆盖；同名的 surface 属性不会替换它们。'
   },
   {
     keys: [
@@ -124,8 +124,8 @@ const configurationOptionDescriptions: readonly {
       'utils:error:deserializeErrorChain:onUnknownField',
       'utils:error:normalizeSerializedErrorChain:onUnknownField'
     ],
-    en: 'In ignore mode, receives the data pointer and discarded field name synchronously. Use it to record unexpected input; a callback throw propagates to the caller.',
-    zh: '在忽略未知字段时，同步收到数据位置与被丢弃的字段名。可用它记录意外输入；若回调抛错，错误会继续交给调用方。'
+    en: 'Set this callback to record fields discarded by unknownFields: ignore. For each discarded field, it receives a pointer describing the object location and the field name before normalization continues. Omission discards those fields without this notification. The callback runs synchronously; if it throws, normalization stops with that error.',
+    zh: '使用 unknownFields: ignore 丢弃未知字段、又需要记录这些输入时，设置此回调。每丢弃一个字段，都会先传入表示对象位置的路径和字段名，再继续整理数据。省略回调时，不会为丢弃的字段发出这类通知。回调同步执行；若它抛错，本次数据整理会停止，并交出该错误。'
   },
   {
     keys: [
@@ -151,8 +151,8 @@ const configurationOptionDescriptions: readonly {
   },
   {
     keys: ['utils:error:reachErrorChain:report', 'utils:error:serializeErrorChain:report'],
-    en: 'Receives the pointer, field and original error when reading an error chain fails. Use a synchronous logger; a throw from this callback propagates to the caller.',
-    zh: '读取错误链失败时，收到数据位置、字段和原错误。请使用同步日志函数；这个回调自身若抛错，错误会继续交给调用方。'
+    en: 'An error chain links a failure to earlier failures through cause or an aggregate errors array. Set report to log failures encountered while reading those objects. Each notification contains the object location, field name and original read error. Without report, a read failure stops the operation with an error that retains the original cause. Reporting is synchronous; a reporter that throws stops the operation with its own error.',
+    zh: '错误链通过 cause 或聚合错误的 errors 数组，把当前失败与更早的失败连接起来。需要记录读取这些对象时发生的错误时，设置 report。每次通知包含对象所在路径、字段名和原始读取错误。省略时，读取失败会停止当前操作，抛出的错误仍保留原始原因。报告同步执行；报告函数自身若抛错，会以该错误停止当前操作。'
   },
   {
     keys: ['rpc-contract:index:createRpcUnknownFieldWarner:maxKeysPerConnection'],
@@ -1538,23 +1538,23 @@ const configurationOptionDescriptions: readonly {
   },
   {
     keys: ['supervision:process:createParentLossGuard:shutdown'],
-    en: 'Application cleanup callback receiving the guard cancellation signal. Return a Promise-like completion; a throw or rejection is reported before forced exit is requested.',
-    zh: '接收守卫取消信号的应用清理回调。应返回表示清理完成的 Promise 一类对象；抛错或失败会先报告，再请求强制退出。'
+    en: 'Required function that cleans up the application when trigger() reports that its parent disappeared. Return a Promise that completes after cleanup. The supplied signal is aborted if graceMs expires, so cleanup can notice that it has run out of time. A throw or rejection is sent to report before exit is called with code 1.',
+    zh: '当 trigger() 通知父进程已消失时，此必填函数负责清理应用。返回的 Promise 应在清理完成后兑现。graceMs 到期时，传入的信号会被取消，清理代码可据此得知等待期限已过。函数抛错或 Promise 被拒绝时，会先把错误交给 report，再以退出码 1 调用 exit。'
   },
   {
     keys: ['supervision:process:createParentLossGuard:exit'],
-    en: 'Synchronous process-exit callback receiving code zero after successful cleanup or one after failure or deadline. Its own thrown errors propagate.',
-    zh: '同步退出回调，清理成功时收到退出码 0，失败或到期时收到 1。回调自身抛出的错误会继续传播。'
+    en: 'Required function that performs the process exit; the guard does not exit the process itself. It receives 0 after cleanup succeeds, or 1 after cleanup fails or graceMs expires. Supply the exit operation appropriate to your runtime. The guard does not contain errors thrown by this function.',
+    zh: '此必填函数负责执行进程退出，守卫本身不会直接退出进程。清理成功时收到退出码 0，清理失败或 graceMs 到期时收到 1。请传入当前运行环境适用的退出操作。守卫不会隔离此函数自身抛出的错误。'
   },
   {
     keys: ['supervision:process:createParentLossGuard:graceMs'],
-    en: 'Finite positive milliseconds allowed for shutdown cleanup. Expiry aborts the cleanup signal before requesting forced process exit.',
-    zh: '关闭清理允许的有限正毫秒数。到期时先取消清理信号，再请求强制退出进程。'
+    en: 'How long trigger() allows shutdown cleanup to run, in milliseconds. Set a finite value greater than zero when the default 5000 ms does not fit your shutdown needs. At expiry, the guard aborts the cleanup signal and calls exit(1); it does not wait indefinitely for shutdown to finish.',
+    zh: 'trigger() 允许关闭清理持续的毫秒数，省略时为 5000。默认等待时间不适合应用时，设置一个有限且大于零的值。到期后，守卫先取消清理信号，再调用 exit(1)，不会无限等待 shutdown 完成。'
   },
   {
     keys: ['supervision:process:reclaimOrphanProcesses:namespace'],
-    en: 'Application isolation name used when listing orphan process records. Choose the namespace owned by this application so recovery does not inspect another application records.',
-    zh: '列举孤儿进程记录所用的应用隔离名称。应选择本应用持有的命名空间，避免恢复过程读取其他应用记录。'
+    en: 'Required application name passed to registry.list() to find process records left by an earlier parent run. Use the same namespace that recorded those processes. This keeps recovery focused on your application; selecting another namespace asks the registry for that other set of records.',
+    zh: '传给 registry.list() 的必填应用分组名称，用来查找上一次父进程运行留下的进程记录。它应与写入这些记录时的 namespace 相同，让恢复操作只处理本应用的记录。选择其他名称，就会请求读取另一组记录。'
   },
   {
     keys: ['tray:index:createTray:hosts'],
@@ -1578,23 +1578,23 @@ const configurationOptionDescriptions: readonly {
   },
   {
     keys: ['utils:bytes:decodeUtf8:fatal'],
-    en: 'Choose whether malformed UTF-8 bytes throw a decoding failure. Disable it when replacement characters are acceptable in the decoded text.',
-    zh: '选择遇到无效 UTF-8 字节时是否抛出解码错误。允许用替换字符保留可读文本时，可关闭此项。'
+    en: 'Set true when malformed UTF-8 bytes must make decoding throw instead of returning damaged text. The default is false: malformed sequences become the replacement character, �, and decoding continues. Leave it false when displaying a best-effort version of the text is acceptable.',
+    zh: '遇到无效 UTF-8 字节必须报错时，设为 true，解码会抛出错误。省略时为 false：无效字节序列会替换成字符 �，然后继续解码。只需要尽量显示可读文本时，可以保留默认值。'
   },
   {
     keys: ['utils:error:toError:message'],
-    en: 'Message for the wrapper created when input is not already error-shaped. Existing error values keep their own message and identity.',
-    zh: '输入不是错误形态时，新建包装错误使用的文案。输入已经是错误值时，保留它原有的文案和身份。'
+    en: 'Supply a message when converting a thrown value such as a number into an Error. It is used only if a new Error is needed; existing errors are returned unchanged. If omitted, a string input becomes the message, and other inputs use the library message for a non-error value. The original input remains on cause.',
+    zh: '把数字等抛出值转换成 Error 时，可以指定新错误的说明文字。只有需要新建错误时才使用它；已有错误会原样返回。省略时，字符串输入本身作为说明文字，其他输入使用库提供的非错误值说明。原始输入仍保留在 cause 上。'
   },
   {
     keys: ['utils:error:walkErrorCauses:maxDepth'],
-    en: 'Largest inclusive depth followed through cause and aggregate errors. The starting value is depth zero; choose a limit when traversing externally supplied chains.',
-    zh: '遍历 cause 和聚合错误时包含的最大深度。起始值为第 0 层；处理外部提供的错误链时，可用此项限制遍历深度。'
+    en: 'Limits how far to follow cause and the errors array of an AggregateError, which groups several failures. The starting value is depth 0, and values at maxDepth are included. Omission uses 32. Lower the limit when only nearby causes are relevant; deeper values are left out of the returned array.',
+    zh: '限制沿 cause 和 AggregateError.errors 数组继续查找的层数；AggregateError 是把多个失败放在一起的错误。输入本身是第 0 层，maxDepth 所在层仍会包含在结果中，省略时最多到第 32 层。只关心临近原因时可以调低；更深的值不会放入返回数组。'
   },
   {
     keys: ['utils:promise:createConcurrencyLimiter:concurrency'],
-    en: 'Positive safe integer limiting simultaneously active tasks. Excess tasks wait in arrival order until a running task releases a slot.',
-    zh: '限制同时执行任务数的正安全整数。超过容量的任务按到达顺序等待，直到运行中的任务释放位置。'
+    en: 'Required maximum number of tasks allowed to run at once. Choose a positive safe integer, such as 4 for up to four active tasks. Additional tasks wait in arrival order until an active task finishes. A missing, fractional or nonpositive value makes construction throw a RangeError.',
+    zh: '同时允许执行的任务数上限，必填。应设为正安全整数，例如 4 表示最多同时运行四个任务。多出的任务按到达顺序等待，直到已有任务结束。缺少此值、使用小数或非正数时，构造会抛出 RangeError。'
   },
   {
     keys: [
@@ -1602,13 +1602,13 @@ const configurationOptionDescriptions: readonly {
       'utils:promise:raceWithAbort:report',
       'utils:promise:withTimeout:report'
     ],
-    en: 'Receives late rejections and cleanup failures after an operation already settled, with operation and phase context. Omission uses the host reporter, which rethrows on a microtask.',
-    zh: '接收操作已经结束后的迟到拒绝与清理失败，附带操作和阶段信息。省略时使用宿主报告函数，在微任务中重新抛出。'
+    en: 'Use report to record diagnostic failures, such as listener cleanup failing or work rejecting after its caller has already received a result. The notification identifies the operation and phase. Omission uses the host reporter, which schedules the error to be thrown in a microtask, after the current synchronous code finishes.',
+    zh: '需要记录诊断失败时设置 report，例如移除监听器失败，或调用方已收到结果后，原工作才被拒绝。通知会说明出错的操作和阶段。省略时使用宿主报告函数，在当前同步代码结束后的微任务中重新抛出错误。'
   },
   {
     keys: ['utils:promise:raceWithAbort:cleanupPolicy'],
-    en: 'Choose reject when listener-removal failure must reject the operation, or report to preserve the winning result and send cleanup failure to the reporter.',
-    zh: '选择 reject 时，移除监听器失败会使操作失败；选择 report 时保留胜出的操作结果，并把清理错误交给报告函数。'
+    en: 'Controls what happens if removing an abort listener fails. The default, reject, rejects the returned Promise with the cleanup failure, keeping any earlier failure in the combined errors. Choose report to send cleanup failures to report and preserve the result already selected by task completion or cancellation.',
+    zh: '决定移除取消监听器失败时如何处理。默认 reject 表示拒绝返回的 Promise；如果已有其他失败，会把它与清理失败一起保留。选择 report 表示把清理失败交给 report，同时保留任务完成或取消时已经确定的结果。'
   },
   {
     keys: [
@@ -1616,8 +1616,8 @@ const configurationOptionDescriptions: readonly {
       'utils:promise:sleep:signal',
       'utils:promise:withTimeout:signal'
     ],
-    en: 'Cancels this wait when the signal aborts, rejecting with UtilsAbortError whose cause is the abort reason. Use signal or signals, never both.',
-    zh: '信号取消时中止本次等待，以 UtilsAbortError 拒绝，其 cause 保留取消原因。signal 与 signals 只能选择一个。'
+    en: 'Pass an AbortSignal to let its owner cancel this wait. Cancellation rejects the returned Promise with UtilsAbortError, whose cause contains the cancellation reason. Without signal or signals, no external cancellation source is attached. Use only one option: supplying both rejects with TypeError.',
+    zh: '传入 AbortSignal，让持有该信号的调用方可以取消本次等待。取消后，返回的 Promise 会以 UtilsAbortError 被拒绝，cause 保留取消原因。signal 和 signals 都省略时，不接入外部取消来源。两项只能选一项；同时提供会以 TypeError 拒绝。'
   },
   {
     keys: [
@@ -1625,28 +1625,28 @@ const configurationOptionDescriptions: readonly {
       'utils:promise:sleep:signals',
       'utils:promise:withTimeout:signals'
     ],
-    en: 'Cancels this wait when any supplied signal aborts. Use it for several cancellation owners; combining it with signal throws TypeError.',
-    zh: '任一传入信号取消时中止本次等待。需要多个取消来源时使用；与 signal 同时配置会抛出 TypeError。'
+    en: 'Use this array when any of several AbortSignals should cancel the wait, such as request cancellation and application shutdown. The first observed cancellation rejects the returned Promise. If there is only one source, signal is simpler. Supplying both options rejects with TypeError; omitting both attaches no external cancellation source.',
+    zh: '需要同时响应请求取消和应用关闭等多个取消来源时，传入 AbortSignal 数组。观察到其中任一信号取消后，返回的 Promise 就会被拒绝。只有一个来源时用 signal 即可。同时提供两项会以 TypeError 拒绝；两项都省略时，不接入外部取消来源。'
   },
   {
     keys: ['utils:promise:sleep:scheduler', 'utils:promise:withTimeout:scheduler'],
-    en: 'Clock and timers used for this delay or deadline. Inject a manual scheduler to advance time explicitly; normal application timing can use systemScheduler.',
-    zh: '此延迟或截止时间使用的时钟和计时器。需要显式推进时间时注入手动时钟；正常应用计时可使用 systemScheduler。'
+    en: 'Provides the clock and timers for this delay or timeout. Omission uses systemScheduler, which follows the current runtime clock. Supply a manual scheduler when a simulation must advance time explicitly; the wait then progresses when you advance that scheduler.',
+    zh: '提供此次延迟或超时使用的时钟和计时器。省略时使用 systemScheduler，按当前运行环境的时间计时。模拟过程需要自行推进时间时，可以传入手动调度器；此后等待是否到期由该调度器的时间决定。'
   },
   {
     keys: ['utils:promise:sleep:unref', 'utils:promise:withTimeout:unref'],
-    en: 'On Node, marks the timer so it does not keep the process running by itself. Use it only when process exit may abandon this pending wait.',
-    zh: '在 Node 中标记计时器，使其自身不阻止进程退出。只有允许进程退出时放弃本次等待，才启用此项。'
+    en: 'Set true to call unref() on the timer when the runtime supports it. In Node, that timer then cannot keep the process alive by itself, so the process may exit before this wait finishes. Omission leaves the timer referenced. Use true only when abandoning the wait at process exit is acceptable.',
+    zh: '设为 true 时，如果计时器支持 unref()，就调用它。在 Node 中，这使计时器自身不再阻止进程退出，因此等待完成前进程就可能结束。省略时不做这一标记。只有允许进程退出时放弃本次等待，才启用此项。'
   },
   {
     keys: ['utils:promise:withTimeout:timeoutMs'],
-    en: 'Finite nonnegative maximum wait in milliseconds. The zeroTimeoutBehavior option decides whether a zero budget starts the operation or skips it.',
-    zh: '允许等待的有限非负毫秒数。预算为 0 时，是否仍启动操作由 zeroTimeoutBehavior 决定。'
+    en: 'Required maximum wait in milliseconds. Supply a finite number at least zero. Expiry rejects with UtilsTimeoutError and requests cooperative cancellation of the operation by default. A negative or non-finite value rejects with RangeError. With 0, the operation is skipped unless zeroTimeoutBehavior is start.',
+    zh: '允许等待的最长毫秒数，必填，必须是有限且不小于零的数值。到期后以 UtilsTimeoutError 拒绝，默认也会向操作发出取消信号，由操作配合停止。负数或非有限值会以 RangeError 拒绝。设为 0 时默认不启动操作，除非 zeroTimeoutBehavior 设为 start。'
   },
   {
     keys: ['utils:promise:withTimeout:zeroTimeoutBehavior'],
-    en: 'With a zero budget, skip avoids starting the operation; start begins it before the zero-delay deadline fires. Choose according to whether the operation may run at all.',
-    zh: '预算为 0 时，skip 不启动操作；start 会先启动，再等待零延迟截止时间触发。应根据是否允许操作开始选择。'
+    en: 'Only affects timeoutMs: 0. Omission or skip rejects with UtilsTimeoutError without calling the operation. Choose start when the operation should still be invoked after a zero-delay deadline timer is registered. Its completion then competes with that timer; start does not guarantee success.',
+    zh: '只影响 timeoutMs 为 0 的情况。省略或设为 skip 时，不调用操作，直接以 UtilsTimeoutError 拒绝。即使等待时间为零仍希望调用操作时，选择 start；它会先登记零延迟计时器，再调用操作。操作完成与计时器到期仍会竞争，start 不保证操作成功。'
   }
 ]
 
@@ -5563,66 +5563,67 @@ const runtimeCompletionApiGuides = {
   }),
   'middleware-pipeline:index:createPipeline': createStorageContractGuide({
     purposeEn:
-      'Creates a reusable runner for a sequence of middleware functions. Choose how the functions execute with mode: sync runs immediately, async lets a function await the next one, and the two generator modes consume values produced with yield by generator functions. Each run keeps its own state; create the runner once and pass the request value to run().',
+      'Creates a runner that passes a value through middleware: functions that can change the value, continue to another function, or stop processing. Create the runner once, then pass functions and an input value to run() for each request. The required mode selects synchronous, asynchronous or generator-based execution; generator functions produce values step by step with yield. Each run keeps its own progress. The example adds one to 2, then doubles the result.',
     purposeZh:
-      '创建一个可复用的执行器，按顺序运行一组中间件函数。mode 决定执行方式：sync 立即执行，async 允许函数等待后续函数，两个生成器模式则读取函数用 yield 逐步产出的值。每次 run() 的状态互相独立，可以先创建执行器，再反复传入不同请求。',
+      '创建一个让数值或请求依次经过多个处理函数的执行器。这些函数称为中间件，可以修改输入、交给下一步，或停止继续处理。执行器只需创建一次，每次请求再把函数列表与输入传给 run()。必填的 mode 决定同步、异步或生成器执行方式；生成器函数用 yield 逐步产出数值。每次运行分别记录自己的进度。下面先给 2 加一，再把结果乘以二。',
     quickStart:
       "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run(\n  [(value, next) => next(value + 1), (value, next) => next(value * 2)],\n  2,\n  result => console.log(result) // 6\n)",
     scenariosEn: [
-      'Run a sequence of synchronous transformations without converting the result into a Promise. A sync stage passes its next value to next(); downstream starts after that stage returns.',
-      'Wrap asynchronous work around later stages, such as timing a request. In async mode, await next(value) to wait for that downstream work.',
-      'Reuse a synchronous stage in another supported mode with pipeline.lift(stage, MiddlewarePipelineMode.sync). The runner checks that the source mode can be adapted to its selected mode.'
+      'Transform a value immediately without waiting for a Promise. In the example, each function calls next() with its new value; after that function returns, the next one runs. The final callback prints 6.',
+      'Measure a request before and after later asynchronous functions run. In async mode, await next(value) waits for those later functions, so code after the await can record the elapsed time.',
+      'Reuse a synchronous function in an async or generator runner. Pass it to pipeline.lift(stage, MiddlewarePipelineMode.sync) before adding it to the function list; lift() returns a function suitable for the selected mode.'
     ],
     scenariosZh: [
-      '连续执行同步转换，且不需要 Promise 结果。同步函数通过 next() 交出新值，当前函数返回后才执行后续函数。',
-      '需要在后续异步任务前后做处理，例如统计请求耗时。在 async 模式中，await next(value) 会等待后续任务结束。',
-      '希望在其他受支持模式中复用同步函数。调用 pipeline.lift(stage, MiddlewarePipelineMode.sync)，执行器会检查是否支持该转换方向。'
+      '需要立即完成一连串数值转换，不等待 Promise。例子中每个函数用 next() 交出新值；当前函数返回后，下一步才执行。最后的回调输出 6。',
+      '需要在后续异步函数执行前后统计请求耗时。在 async 模式中，await next(value) 会等这些函数执行结束，之后就能记录经过的时间。',
+      '需要在异步或生成器执行器中复用已有同步函数。先调用 pipeline.lift(stage, MiddlewarePipelineMode.sync)，把返回的函数放入处理列表，它就能按选定的模式运行。'
     ],
     avoidEn: [
       'A task needs automatic parallel execution. The runner follows the selected middleware order; it does not schedule unrelated jobs.',
       'A request must change the runner mode after creation. Create a separate runner for that mode instead.',
-      'A stage comes from an unsupported mode. lift() rejects unsupported directions rather than silently changing how the stage runs.'
+      'An existing asynchronous function must run synchronously. lift() cannot make asynchronous work synchronous and throws for an unsupported conversion; create a runner that matches the function instead.'
     ],
     avoidZh: [
       '需要自动并行执行独立任务。执行器遵循选定的中间件顺序，不会替调用方调度无关任务。',
-      '需要在创建后更改执行方式。请为另一种 mode 单独创建执行器。',
-      '函数来自不支持转换的模式。lift() 会拒绝该方向，不会悄悄改变函数的执行方式。'
+      '需要在创建后更改执行方式。请为另一种 mode 值单独创建执行器。',
+      '需要把异步函数变成同步函数。lift() 无法让异步工作同步完成，不支持的转换会抛错；应创建与函数执行方式匹配的执行器。'
     ],
     optionsEn: [
       {
         name: 'mode',
         description:
-          'Selects sync, async, generator, or async-generator execution for every run. It is required and cannot change after construction.',
+          'Required execution mode, fixed at construction. sync completes immediately; async lets functions await later work. generator and async-generator consume values yielded by synchronous and asynchronous generators respectively. Omitting mode or passing an unsupported value makes construction throw.',
         defaultValue: 'required',
         optional: false,
         type: 'IMiddlewarePipelineMode',
         whenToUse:
-          'Choose sync for immediate transformations or async when a function must await downstream work.',
+          'Choose sync for immediate transformations. Choose async when a function must wait for the functions it starts through next(). Use a generator mode for functions written with yield.',
         example: 'MiddlewarePipelineMode.sync'
       },
       {
         name: 'onViolation',
         description:
-          'Receives duplicate or late calls to next(). The rejected call does not start a second downstream traversal; without a callback, no violation report is emitted.',
+          'Records a function calling next() twice, or calling it after that function has returned. The invalid call does not run later functions again. Omission leaves these calls unreported. If you supply a callback that throws, that failure is passed back to the code making the invalid call.',
         defaultValue: 'no-op callback',
         type: 'IMiddlewarePipelineViolationHandler',
-        whenToUse: 'Connect middleware protocol mistakes to application diagnostics.',
+        whenToUse:
+          'Send duplicate and late next() calls to your application logger so the faulty function can be located.',
         example: 'violation => console.warn(violation)'
       },
       {
         name: 'assertActive',
         description:
-          'Runs before each stage begins. Throwing stops that stage from starting, so the caller can enforce whether its request is still allowed to run.',
+          'Checks whether work is still allowed before entering each function. Throw from this callback to prevent that function from starting; run() then fails with the check error. Omission adds no application-specific check. It does not stop a function that is already running.',
         defaultValue: 'undefined',
         type: '() => void',
         whenToUse:
-          'The application already owns an admission or shutdown check that must run between stages.',
+          'Use an existing application check, such as refusing new work after shutdown, before each function starts.',
         example: '() => { if (closed) throw closedError }'
       },
       {
         name: 'signal',
         description:
-          'Sets the default cancellation signal. run() can provide a different signal for one request; cancellation prevents further stage entry at the runner checks.',
+          'Pass an AbortSignal when several runs should share a cancellation source. run() can supply another signal for one request. The runner checks it before entering functions; cancellation stops later functions from starting, but does not forcibly stop code already running. Omission attaches no default cancellation source.',
         defaultValue: 'undefined',
         type: 'IAbortSignal',
         whenToUse: 'Tie several runs to a shared shutdown signal, or override it per request.',
@@ -5631,7 +5632,7 @@ const runtimeCompletionApiGuides = {
       {
         name: 'signals',
         description:
-          'Replaces the three generator control symbols: undefined, halt, and continue. They must be distinct symbols; the built-in set is used when this option is omitted.',
+          'Use a custom set only when existing generator functions already share one. The undefined symbol forwards an undefined value, halt stops processing, and continue forwards the last yielded value. All three must be distinct symbols or construction throws. Omission uses MiddlewarePipelineGeneratorSignals.',
         defaultValue: 'MiddlewarePipelineGeneratorSignals',
         type: 'IGeneratorMiddlewareSignals',
         whenToUse: 'Existing generator stages already return a shared custom symbol set.',
@@ -5640,7 +5641,7 @@ const runtimeCompletionApiGuides = {
       {
         name: 'combineStageAndDownstreamError',
         description:
-          'Combines a stage failure with a failure from downstream work that the stage already started. Without this callback, an asynchronous run rejects with an AggregateError containing both originals.',
+          'In async mode, a function and later work started through next() can both fail. This callback receives those two failures and returns the error used to reject run(). Omission uses AggregateError, whose errors array contains both originals. Supply a callback only when your application needs a different error shape, while retaining both failures.',
         defaultValue: 'AggregateError with both failures',
         type: '(stage: unknown, downstream: unknown) => unknown',
         whenToUse:
@@ -5652,35 +5653,36 @@ const runtimeCompletionApiGuides = {
       {
         name: 'mode',
         description:
-          '选择 sync、async、generator 或 async-generator，决定每次调用的执行方式。该参数必填，创建后不能更改。',
+          '必填的执行方式，创建后固定。sync 立即完成；async 允许函数等待后续工作。generator 与 async-generator 分别读取同步和异步生成器用 yield 产出的值。省略或传入不支持的值时，构造会抛错。',
         defaultValue: '必填',
         optional: false,
         type: 'IMiddlewarePipelineMode',
-        whenToUse: '立即完成转换时用 sync；函数需要等待后续任务时用 async。',
+        whenToUse:
+          '立即完成转换时用 sync；函数需要等待 next() 启动的后续工作时用 async；函数使用 yield 产出值时选择对应生成器模式。',
         example: 'MiddlewarePipelineMode.sync'
       },
       {
         name: 'onViolation',
         description:
-          '接收重复或过晚调用 next() 的通知。被拒绝的调用不会再次执行后续函数；省略回调时不会发出这类报告。',
+          '记录同一函数重复调用 next()，或函数已返回后才调用 next() 的错误用法。这些无效调用不会再次执行后续函数。省略时不报告这类调用。提供的回调若抛错，该错误会交给发起无效调用的代码。',
         defaultValue: '不做处理的回调',
         type: 'IMiddlewarePipelineViolationHandler',
-        whenToUse: '需要把中间件使用错误送到应用日志或诊断系统。',
+        whenToUse: '需要把重复或过晚的 next() 调用写入应用日志，以定位使用错误的函数。',
         example: 'violation => console.warn(violation)'
       },
       {
         name: 'assertActive',
         description:
-          '在每个函数开始前执行检查。检查抛错时，该函数不会开始，调用方可以据此阻止已关闭或不再允许的请求继续执行。',
+          '在每个处理函数开始前检查是否仍允许工作。回调抛错会阻止该函数开始，并使 run() 以检查错误失败。省略时不增加应用自己的检查。它不会停止已经运行的函数。',
         defaultValue: 'undefined',
         type: '() => void',
-        whenToUse: '应用已经有请求准入或关闭检查，并要求在函数之间继续检查。',
+        whenToUse: '应用已有关闭后拒绝新工作等检查，需要在每个函数开始前使用。',
         example: '() => { if (closed) throw closedError }'
       },
       {
         name: 'signal',
         description:
-          '设置默认取消信号。单次 run() 可以传入另一个信号覆盖它；执行器检查到取消后，不再进入后续函数。',
+          '多个请求需要共享取消来源时，传入 AbortSignal。单次 run() 也能传入另一个信号覆盖它。执行器在进入处理函数前检查信号；取消后不再启动后续函数，但不会强行停止已运行的代码。省略时不接入默认取消来源。',
         defaultValue: 'undefined',
         type: 'IAbortSignal',
         whenToUse: '多个请求共享关闭信号，或需要在单次请求中使用独立信号。',
@@ -5689,7 +5691,7 @@ const runtimeCompletionApiGuides = {
       {
         name: 'signals',
         description:
-          '替换生成器使用的 undefined、halt、continue 三个控制符号。三者必须是不同的 symbol；省略时使用库提供的默认集合。',
+          '只有既有生成器函数已经共用一套控制符号时，才需要自定义。undefined 符号表示把 undefined 作为值传下去，halt 表示停止，continue 表示传递最后一个 yield 的值。三者必须是不同的 symbol 值，否则构造会抛错。省略时使用 MiddlewarePipelineGeneratorSignals。',
         defaultValue: 'MiddlewarePipelineGeneratorSignals',
         type: 'IGeneratorMiddlewareSignals',
         whenToUse: '既有生成器函数已经返回一套共享的自定义控制符号。',
@@ -5698,7 +5700,7 @@ const runtimeCompletionApiGuides = {
       {
         name: 'combineStageAndDownstreamError',
         description:
-          '当前函数和它已启动的后续任务都失败时，合并两个错误。省略回调时，异步 run() 会以包含两个原始错误的 AggregateError 拒绝，调用方需要捕获它。',
+          '在 async 模式中，当前函数与它通过 next() 启动的后续工作可能都失败。此回调接收这两个失败，返回用于拒绝 run() 的错误。省略时使用 AggregateError，它的 errors 数组保留两个原始失败。只有应用需要其他错误形式时才设置，并保留两个失败供排查。',
         defaultValue: '包含两个失败的 AggregateError',
         type: '(stage: unknown, downstream: unknown) => unknown',
         whenToUse: '应用需要使用自己的错误包装，同时保留两个原始错误。',

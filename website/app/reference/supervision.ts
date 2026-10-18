@@ -442,8 +442,8 @@ const budgetMembers: Record<string, IMemberDoc> = {
 /** Budget constructor configuration. */
 const budgetOptions: Record<string, IMemberDoc> = {
   kind: p(
-    'Select the execution-unit kind admitted by this budget; a parent budget must use the same kind.',
-    '选择此预算允许的执行单元种类；配置父预算时，父预算也必须采用相同种类。'
+    'Choose which kind of work this budget counts: processes, threads or coroutines, where a coroutine is a task running within the current runtime. Set kind when creating the budget so unrelated resource types do not share capacity. If parent is supplied, its kind must match; a mismatch makes construction throw TypeError.',
+    '选择此预算统计哪种工作：进程、线程，或在当前运行环境内执行的协程任务。创建预算时设置 kind，避免不同资源类型共用同一份容量。配置 parent 父预算时，两者种类必须一致；不一致会使构造抛出 TypeError。'
   ),
   maxUnits: p(
     'Finite nonnegative integer local concurrency cap; zero admits no unit.',
@@ -2263,16 +2263,16 @@ export const reference: ILibraryReference = {
           '构造池时应用提供的稳定标识名称。'
         ),
         spec: p(
-          'Launch specification retained from pool construction and used to create warm entries.',
-          '创建池时保留的启动规格，用于创建预热条目。'
+          'The process launch settings supplied when the pool was created, such as the command and its arguments. The pool passes them to its launcher to start idle processes ahead of a request, so a later caller can take an already-started process.',
+          '创建池时提供的进程启动设置，例如命令与参数。池用这些设置调用启动器，提前创建空闲进程，供之后的调用方直接取用已启动的进程。'
         ),
         budget: p(
-          'Shared process budget held by this pool; each idle entry keeps its lease until transfer or actual exit.',
-          '池持有的共享进程预算；每个空闲条目的租约保留到转交消费方或进程实际退出。'
+          'The process-capacity budget supplied to the pool. Each idle process occupies one slot, represented by a lease: an object that records and later releases that capacity. Taking a process transfers its lease to the caller instead of freeing the slot. When the pool closes an idle process, the slot stays occupied until that process actually exits.',
+          '传给池的进程容量预算。每个空闲进程都占用一个名额，由租约对象记录并在之后释放这份占用。取用进程时，租约会一同转交调用方，不会立即空出名额。池关闭空闲进程时，也要等该进程实际退出后才释放名额。'
         ),
         launcher: p(
-          'Runtime adapter retained by the pool for warm launches; exited still waits for execution and resource shutdown.',
-          '池为预热启动保留的运行时适配器；exited 仍须等执行与资源停止后才兑现。'
+          'The runtime adapter that actually starts the pool processes. Its launch() result supplies an exited Promise, which must complete only after execution and associated resources have stopped. The pool uses that completion when deciding that a closed process no longer occupies capacity; merely requesting termination is not enough.',
+          '实际负责启动池中进程的运行环境适配器。其 launch() 返回值提供 exited Promise；只有进程执行与相关资源都停止后，该 Promise 才应完成。池据此确认已关闭进程不再占用容量，只发出终止请求还不够。'
         ),
         idle: p(
           'Current number of ready idle entries still owned by the pool.',
