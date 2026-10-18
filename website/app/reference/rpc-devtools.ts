@@ -1625,8 +1625,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
     },
     IRpcLogSink: {
       summary: t(
-        'The application logger supplied to the log probe, with required debug, info, warn and error methods. The probe forwards matching RPC events to these methods. Each method should accept or queue its record promptly; the logger owns buffering and writing to its destination. The probe does not wait for a returned Promise to finish, but observes its rejection. A thrown error or rejection is passed to onError.',
-        '应用提供给日志探针的日志对象，必须包含 debug、info、warn 和 error 四个方法。探针把符合条件的 RPC 事件转交这些方法。方法应尽快接收记录或将其入队，缓冲和实际写入由日志对象负责。探针不会等待返回的 Promise 完成，但会接收它的失败；同步抛错或 Promise 失败均交给 onError。'
+        "The application logger supplied to the log probe, with required debug, info, warn and error methods. The probe forwards matching RPC events to these methods. Each method runs with the original logger as its receiver, so it can use that logger's instance state. Each method should accept or queue its record promptly; the logger owns buffering and writing to its destination. The probe does not wait for a returned Promise to finish, but observes its rejection. A thrown error or rejection is passed to onError.",
+        '应用提供给日志探针的日志对象，必须包含 debug、info、warn 和 error 四个方法。探针把符合条件的 RPC 事件转交这些方法。调用时仍以原日志对象作为方法的接收者，因此方法可以使用该日志对象的实例状态。方法应尽快接收记录或将其入队，缓冲和实际写入由日志对象负责。探针不会等待返回的 Promise 完成，但会接收它的失败；同步抛错或 Promise 失败均交给 onError。'
       ),
       example: logExample,
       members: Object.fromEntries(
@@ -1634,8 +1634,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           level,
           {
             summary: t(
-              `Receives an RPC event that passes the log filter and is assigned to the ${level} level. The method runs with the original logger as its receiver, so it can use that logger's instance state.`,
-              `接收通过日志筛选、被分配到 \`${level}\` 级别的 RPC 事件。调用时仍以原日志对象作为方法的接收者，因此方法可以使用该日志对象的实例状态。`
+              `Receives an RPC event that passes the log filter and is assigned to the ${level} level.`,
+              `接收通过日志筛选、被分配到 \`${level}\` 级别的 RPC 事件。`
             ),
             params: {
               message: t(

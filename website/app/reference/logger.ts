@@ -524,10 +524,10 @@ await target.shutdown('manual')`
   }
 }
 
-/** Argument interpretation shared by every level method, explained once per owning surface. */
+/** Output rules and argument interpretation explained once per owning level-method surface. */
 const levelMessageArguments = t(
-  'For debug(), info(), warn(), error() and fatal(), a string first argument becomes the message, while remaining arguments are kept for output. For example, info("Order %s", orderId) keeps the placeholder and orderId for the output handler. If the first argument is not a string, the message is empty and every argument is retained in the args array.',
-  'debug()、info()、warn()、error() 和 fatal() 都把第一个字符串参数作为消息，后续参数保留给输出处理。例如 info("Order %s", orderId) 会保留占位符与 orderId，交给输出端处理。首个参数不是字符串时，消息为空，所有参数都保存在日志条目的 args 数组中。'
+  'Entries from debug(), info(), warn(), error() and fatal() reach output only when their level meets the configured minimum and every installed filter accepts them. Entries below the minimum or rejected by any filter are discarded. For all five methods, a string first argument becomes the message, while remaining arguments are kept for output. For example, info("Order %s", orderId) keeps the placeholder and orderId for the output handler. If the first argument is not a string, the message is empty and every argument is retained in the args array.',
+  'debug()、info()、warn()、error() 和 fatal() 创建的条目，只有级别达到设置的最低要求、且所有过滤函数都接受时，才会输出。级别过低或被任一过滤函数拒绝的条目会被丢弃。这五个方法都把第一个字符串参数作为消息，后续参数保留给输出处理。例如 info("Order %s", orderId) 会保留占位符与 orderId，交给输出端处理。首个参数不是字符串时，消息为空，所有参数都保存在日志条目的 args 数组中。'
 )
 
 /** Methods added by `level()`, with their call forms. */
@@ -545,8 +545,8 @@ const levelExt: Readonly<Record<string, IMemberDoc & { call: string }>> = Object
     {
       call: '(message, ...args)',
       summary: t(
-        `Creates a log entry tagged \`${name}\`. The entry reaches output only when its level meets the configured minimum and every installed filter accepts it. Lower-level or rejected entries are discarded.`,
-        `创建带 \`${name}\` 标签的日志条目（${zh}）。只有级别达到设置的最低要求、且所有过滤函数都接受时，才会输出；级别过低或被任一过滤函数拒绝的条目会被丢弃。`
+        `Creates a log entry tagged \`${name}\`.`,
+        `创建带 \`${name}\` 标签的日志条目（${zh}）。`
       ),
       params: {
         args: t(
@@ -2312,8 +2312,8 @@ log.endResponse()`,
       kind: 'plugin',
       target: 'Logger',
       summary: t(
-        `Installs severity-based logging. debug(), info(), warn(), error() and fatal() create entries with the corresponding level. setLevel() changes the minimum level; addFilter() and removeFilter() manage functions that decide which entries may continue to output. Entries below the minimum or rejected by a filter are discarded. Without this plugin, use the core log() method. ${levelMessageArguments.en}`,
-        `安装按严重程度分级的日志功能。debug()、info()、warn()、error() 和 fatal() 创建对应级别的日志。setLevel() 修改最低级别；addFilter() 与 removeFilter() 管理决定条目能否继续输出的过滤函数。低于最低级别或被过滤函数拒绝的条目会被丢弃。未安装此插件时，使用核心 log() 方法记录。${levelMessageArguments.zh}`
+        `Installs severity-based logging. debug(), info(), warn(), error() and fatal() create entries with the corresponding level. setLevel() changes the minimum level; addFilter() and removeFilter() register and remove output filters. Without this plugin, use the core log() method. ${levelMessageArguments.en}`,
+        `安装按严重程度分级的日志功能。debug()、info()、warn()、error() 和 fatal() 创建对应级别的日志。setLevel() 修改最低级别；addFilter() 与 removeFilter() 登记和移除输出过滤函数。未安装此插件时，使用核心 log() 方法记录。${levelMessageArguments.zh}`
       ),
       install: `import { Logger } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'

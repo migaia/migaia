@@ -178,13 +178,13 @@ const inheritedHostMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEn
               name === 'useAsyncPipeline'
                 ? 'Registers a step that can await other work before or after the next event-processing step. This requires async mode. Store event hosts process events synchronously, so this call throws PIPELINE_MODE_MISMATCH, meaning the requested step does not match the host mode. Use usePipeline for synchronous steps.'
                 : name === 'useGeneratorPipeline'
-                  ? 'Registers a generator step that can yield while processing a value. This requires generator or async-generator mode. Store event hosts use synchronous processing instead, so this call throws PIPELINE_MODE_MISMATCH, meaning the step requires a different host mode. Use usePipeline for synchronous store events.'
-                  : 'Registers an asynchronous generator step, which can await work and yield values during processing. This requires async-generator mode. Store event hosts always process events synchronously, so this call throws PIPELINE_MODE_MISMATCH, meaning the step requires a different host mode. Use usePipeline for synchronous store events.',
+                  ? 'Registers a generator function that uses yield to supply a processed value. That form runs only in generator or async-generator mode. On a Store event host, registration throws PIPELINE_MODE_MISMATCH because its event pipeline accepts synchronous next-style steps only. To transform an event here, register usePipeline and pass the resulting event to next before the callback returns.'
+                  : 'Registers a function that combines awaited work with values supplied through yield. Only async-generator mode can execute that combination. Store event hosts cannot await yielded results, so this registration fails with PIPELINE_MODE_MISMATCH, the error for an incompatible step mode. Complete asynchronous preparation before emitting the store event, then use usePipeline for the remaining synchronous handling.',
               name === 'useAsyncPipeline'
                 ? '登记一个可在下个事件处理步骤前后等待异步工作的步骤，需要 async，即异步处理模式。存储事件宿主固定同步处理，因此调用会抛出 PIPELINE_MODE_MISMATCH，表示步骤与宿主模式不匹配。存储事件的同步步骤应使用 usePipeline。'
                 : name === 'useGeneratorPipeline'
-                  ? '登记一个可用 yield 逐步交出处理值的生成器步骤，需要 generator 或 async-generator，即生成器或异步生成器模式。存储事件宿主使用同步处理，调用会抛出 PIPELINE_MODE_MISMATCH，表示步骤要求其他宿主模式。处理同步存储事件应使用 usePipeline。'
-                  : '登记一个可等待异步工作、并用 yield 逐步交出值的异步生成器步骤，需要 async-generator 模式。存储事件宿主固定同步处理，调用会抛出 PIPELINE_MODE_MISMATCH，表示步骤要求其他宿主模式。处理同步存储事件应使用 usePipeline。'
+                  ? '登记一个用 yield 交出处理后值的生成器函数，需要 generator 或 async-generator，即生成器或异步生成器模式。存储事件流水线只接受通过 next 继续传递事件的同步步骤，因此登记会抛出 PIPELINE_MODE_MISMATCH，表示步骤形式与处理模式不匹配。需要转换事件时，改用 usePipeline，在回调返回前把处理后的事件交给 next。'
+                  : '登记一个既等待异步工作、又通过 yield 交出值的函数，这种组合只适用于 async-generator，即异步生成器模式。存储事件宿主不能等待生成器的异步结果，登记会因步骤模式不兼容而抛出 PIPELINE_MODE_MISMATCH。应先完成异步准备，再发出存储事件，并用 usePipeline 处理剩余的同步工作。'
             )
           }
         : {})
