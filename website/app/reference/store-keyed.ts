@@ -1,11 +1,8 @@
 /**
- * Reference for `@migaia/store-keyed`, checked against package source/README on 2026-10-17. Source
- * differences: filterOutKey removes every matching key, not only the first as README says. Family
- * canonical lookup is Map<Key, WeakRef<Definition>>, not the README's WeakMap of scalar keys.
- * KeyedSplitCache.of reuses truthy cached values; falsy cached values call create again.
- * atom/store.ts comments suggesting family.forget releases a store instance are stale: forget only
- * breaks token cache identity; release(definition) owns instance release. reactive/atom.ts mentions
- * a removed atom/legacy.ts implementation; this subpath currently exports only protocol helpers.
+ * Reference for `@migaia/store-keyed`, checked against current package source, README and USEGUIDE
+ * on 2026-10-18. Advanced primitives belong to /optics. Definition identity, scoped state, protocol
+ * implementations and cache retention have separate owners; source controls behavior where existing
+ * package prose remains stale.
  */
 import type { ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 
@@ -76,7 +73,7 @@ totals.clear()
 store.dispose()`
 
 /** The public cache has no resource lifecycle; callers choose any eviction cleanup. */
-const cacheExample = `import { KeyedSplitCache } from '@migaia/store-keyed'
+const cacheExample = `import { KeyedSplitCache } from '@migaia/store-keyed/optics'
 
 const cache = new KeyedSplitCache<string, { count: number }>()
 const item = cache.of('a', () => ({ count: 1 }))
@@ -92,15 +89,21 @@ import { atomGetter, atomSetter, type IWritableAtom } from '@migaia/store-keyed/
 const runtime = createRuntime()
 const store = createAtomStore(runtime)
 const definition = atomDef(1)
+let disposed = false
 const atom: IWritableAtom<number, readonly [number], void> = {
   runtime,
   atomDefinition: definition,
+  get disposed() { return disposed },
   get value() { return store.get(definition) },
   get observed() { return store.isObserved(definition) },
   read: () => store.get(definition),
   peek: () => store.peek(definition),
   write: (value) => store.set(definition, value),
-  dispose: () => { store.release(definition) }
+  dispose: () => {
+    if (disposed) return
+    disposed = true
+    store.release(definition)
+  }
 }
 const get = atomGetter(runtime)
 const set = atomSetter(runtime)
@@ -110,7 +113,7 @@ atom.dispose()
 store.dispose()`
 
 /** Array helper example uses real caller-selected keys rather than generated identities. */
-const arrayExample = `import { computeUniqueKeys, findKeyIndex, requireKeyIndex, spliceInsert, filterOutKey, replaceAtIndex, shallowArrayEquals } from '@migaia/store-keyed'
+const arrayExample = `import { computeUniqueKeys, findKeyIndex, requireKeyIndex, spliceInsert, filterOutKey, replaceAtIndex, shallowArrayEquals } from '@migaia/store-keyed/optics'
 
 const rows = [{ id: 'a', count: 1 }]
 const keyOf = (row: { id: string }) => row.id
@@ -271,6 +274,34 @@ const definitionType = (
   members: Object.fromEntries(keys.map((key) => [key, definitionMembers[key]!]))
 })
 
+/** Standard focus/split writes specialize the generic definition callback to one update and void. */
+const standardDefinitionType = (summary: IText, keys: readonly string[]): ITypeDoc => {
+  /** Shared definition members retain their canonical prose except the specialized writer. */
+  const base = definitionType(summary, keys, opticsExample)
+  return {
+    ...base,
+    members: {
+      ...base.members,
+      write: {
+        ...definitionMembers.write!,
+        params: {
+          get: definitionMembers.write!.params!.get!,
+          set: definitionMembers.write!.params!.set!,
+          args: t(
+            'Exactly one IAtomUpdate<T>: a replacement value or synchronous previous-to-next callback, supplied by store.set for this focused or split definition.',
+            '恰好一个标准更新参数：新值或同步旧值转新值回调，由存储写入接口传给当前焦点或拆分定义。'
+          )
+        },
+        returns: t(
+          'No result; the standard writer commits the focused or split-item update through the owning store and returns void.',
+          '无返回值；标准写入器经所属存储提交焦点或拆分条目的更新。'
+        ),
+        example: opticsExample
+      }
+    }
+  }
+}
+
 /** Real definition source references come from factory calls or family lookup. */
 const definitionParam = t(
   'Definition token returned by atomDef, a derived/optic constructor or family lookup; the store owns its scoped instance.',
@@ -412,8 +443,8 @@ store.dispose()`
   },
   release: {
     summary: t(
-      'Releases only one instantiated definition, preferring its override-resolved target and otherwise the original definition. Other store instances remain intact.',
-      '只释放一个已实例化定义，优先覆盖解析目标，否则尝试原定义，其他存储实例保持不变。'
+      'Releases only one instantiated definition, first trying its override-resolved target and trying the original definition only if the first removes no instance. Other store instances remain intact.',
+      '只释放一个已实例化定义，先尝试覆盖解析目标，仅前者未释放实例时才尝试原定义，其他存储实例保持不变。'
     ),
     params: { definition: definitionParam },
     returns: t(
@@ -424,8 +455,8 @@ store.dispose()`
   },
   dispose: {
     summary: t(
-      'Idempotently marks terminal, clears overrides and releases subscriptions, then drains instance ownership in reverse order.',
-      '幂等标记终态、清空覆盖并释放订阅，然后逆序释放实例所有权。'
+      'Idempotently marks terminal and clears uncommitted preview values plus overrides, releases subscriptions, then drains instance ownership in reverse order. Retaining the disposed store does not retain values through its preview cache.',
+      '幂等标记终态，清除未提交预览值与覆盖，释放订阅后逆序释放实例所有权；保留已销毁存储不会再经预览缓存持有值。'
     ),
     returns: t(
       'No result after cleanup attempts. One collected failure is thrown unchanged; multiple failures throw DISPOSAL_FAILED AggregateError with original errors reachable.',
@@ -505,6 +536,10 @@ const errorValues = {
     'Host capabilities such as WeakRef, FinalizationRegistry or structuredClone are required but unavailable.',
     '当前路径要求的宿主弱引用、终结注册或结构化复制能力缺失。'
   ),
+  opticAccessFailed: t(
+    'An accessor or proxy fails during a pure optic read or immutable copy. Existing foreign identities remain unchanged; mutable native errors retain identity and stack, while fallback cause/errors retain the original.',
+    '纯光学读取或不可变复制中的访问器、代理失败；外包已有身份不变，可修改原生错误保留身份与堆栈，回退经原因或错误列表保留原值。'
+  ),
   invalidOption: t(
     'Definition, family limit, thenable initial value, optic path or keyed-list input violates its supported contract.',
     '定义、族上限、承诺式初始值、光学路径或键列表输入违反支持契约。'
@@ -538,15 +573,15 @@ export const storeKeyedReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Pure definition-based keyed state, scoped AtomStore, family identity caches and immutable optics. Start with atomDef and createAtomStore; definitions are reusable tokens and each store owns its values.',
-        '提供纯定义键状态、作用域原子存储、族身份缓存及不可变光学操作，从基础定义与存储工厂开始，定义是可复用令牌，各存储拥有自身值。'
+        'Pure definition-based keyed state, scoped AtomStore, family identity caches and immutable optics. Start with atomDef and createAtomStore; definitions are reusable tokens and each store owns its values. Runtime dependencies point inward to reactive, lifecycle and utils.',
+        '提供纯定义键状态、作用域原子存储、族身份缓存及不可变光学操作，从基础定义与存储工厂开始，定义是可复用令牌，各存储拥有自身值；运行时依赖向内指向响应式内核、生命周期与基础工具。'
       ),
       example: storeExample
     },
     'atom/definition': {
       summary: t(
-        'Runtime-free definition constructors and callback types. Start with atomDef, derivedDef or writableDef, then consume those tokens through an AtomStore; no reactive node is allocated here.',
-        '提供不绑定运行时的定义构造及回调类型，从基础、派生或可写定义开始，再经原子存储消费令牌，此层不分配响应节点。'
+        'Runtime-free definition constructors and callback types. Start with atomDef, derivedDef or writableDef, then consume those tokens through an AtomStore; no reactive node is allocated here. Advanced assertNotThenable is exported only from this entry.',
+        '提供不绑定运行时的定义构造及回调类型，从基础、派生或可写定义开始，再经原子存储消费令牌，此层不分配响应节点；高级守卫 `assertNotThenable` 仅从此入口发布。'
       ),
       example: storeExample
     },
@@ -556,6 +591,13 @@ export const storeKeyedReference: ILibraryReference = {
         '在外部响应运行时内实例化定义，独立作用域状态使用创建存储，同一运行时关联的共享默认状态使用默认存储。'
       ),
       example: storeExample
+    },
+    optics: {
+      summary: t(
+        'Advanced pure optics primitives from the canonical optics-path owner. Start with readOpticPath/writeOpticPath for immutable paths or KeyedSplitCache and keyed-array helpers for custom splitting. These ten exports live only at @migaia/store-keyed/optics and acquire no Runtime or resource owner.',
+        '规范路径实现发布的高级纯光学原语；不可变路径从 `readOpticPath` 与 `writeOpticPath` 开始，自定义拆分使用 `KeyedSplitCache` 及键数组工具。十个导出仅从 `@migaia/store-keyed/optics` 发布，不取得运行时或资源所有权。'
+      ),
+      example: arrayExample
     },
     'reactive/atom': {
       summary: t(
@@ -664,8 +706,8 @@ export const storeKeyedReference: ILibraryReference = {
     isAtomDefinition: {
       role: 'operation',
       purpose: t(
-        'Checks that a value is a nonnull object with the shared definition brand. This recognizes same-realm duplicate package copies; it does not deep-validate fields or promise that every shape is usable.',
-        '检查值为非空对象且含共享定义品牌，允许同领域重复包副本识别，不深校验字段，也不保证所有形状可用。'
+        'Checks that a value is a nonnull object with the shared definition brand. This recognizes duplicate package copies only within one realm; it provides no worker/realm transport protocol and does not deep-validate fields.',
+        '检查值为非空对象且含共享定义品牌，仅支持同领域重复包副本互认，不提供工作线程或跨领域传输协议，也不深校验字段。'
       ),
       params: {
         value: t(
@@ -674,8 +716,8 @@ export const storeKeyedReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Boolean type guard; property-access errors on hostile candidate objects can propagate unchanged.',
-        '返回布尔类型守卫，候选对象属性访问错误可原样传播。'
+        'Boolean type guard; a brand getter or proxy reflection failure returns false rather than throwing.',
+        '返回布尔类型守卫；品牌访问器或代理反射失败时返回假，不向外抛出。'
       ),
       example: `import { atomDef, isAtomDefinition } from '@migaia/store-keyed'
 console.log(isAtomDefinition(atomDef(1)), isAtomDefinition(1))`
@@ -814,16 +856,16 @@ store.dispose()`
         )
       },
       returns: t(
-        'Writable-derived focused token. Empty runtime paths or inaccessible segments use INVALID_OPTION; native accessor failures can propagate.',
-        '返回焦点可写派生令牌，运行时空路径或不可达段使用 `INVALID_OPTION`，原生访问器失败可传播。'
+        'Writable-derived focused token. Empty runtime paths or inaccessible segments use INVALID_OPTION; unclassified accessor failures use OPTIC_ACCESS_FAILED, retaining original native identity or cause, while existing foreign identities stay unchanged.',
+        '返回焦点可写派生令牌，运行时空路径或不可达段使用 `INVALID_OPTION`，未分类访问器失败使用 `OPTIC_ACCESS_FAILED`，保留原生身份或原始原因，已有外包身份不变。'
       ),
       example: opticsExample
     },
     splitDef: {
       role: 'factory',
       purpose: t(
-        'Splits an array definition into stable per-key writable item tokens and a derived token list. Pair with createAtomStore for source reads and writes; source reordering keeps token identity for unchanged keys.',
-        '把数组定义拆为稳定逐键可写条目令牌及派生令牌列表，搭配 `createAtomStore` 读写源，源重排时未变键保持令牌身份。'
+        'Splits an array definition into stable per-key writable item tokens and a derived token list. Pair with createAtomStore for source reads and writes; source reordering keeps token identity for unchanged keys. Create focusDef and splitDef tokens outside derived callbacks, then reuse them across recalculations.',
+        '把数组定义拆为稳定逐键可写条目令牌及派生令牌列表，搭配 `createAtomStore` 读写源，源重排时未变键保持令牌身份；在派生回调外创建焦点和拆分令牌，并跨重算复用。'
       ),
       params: {
         source: t(
@@ -844,8 +886,8 @@ store.dispose()`
     familyDef: {
       role: 'factory',
       purpose: t(
-        'Creates a callable keyed family of source factory definitions with bounded strong LRU retention and weak canonical identity. Pair with createAtomStore for independent scoped values; forgetting identity never disposes existing state.',
-        '创建可调用源工厂定义族，具有有界强最近使用保留及弱规范身份，搭配 `createAtomStore` 获得独立作用域值，遗忘身份不销毁已有状态。'
+        'Creates a callable keyed family of source factory definitions with bounded strong LRU retention and weak canonical identity in a strong-key Map with weak definition values, not a WeakMap. Pair with createAtomStore for independent scoped values; forgetting identity never disposes existing state.',
+        '创建可调用源工厂定义族，具有有界强最近使用保留，规范表使用强键映射与弱定义值，搭配 `createAtomStore` 获得独立作用域值，遗忘身份不销毁已有状态。'
       ),
       params: {
         initial: t(
@@ -897,10 +939,10 @@ store.dispose()`
         )
       },
       returns: t(
-        'Value at the path, or original root for an empty path. Invalid intermediate containers use INVALID_OPTION; getter failures propagate unchanged.',
-        '返回路径值，空路径返回原根，不可达中间容器使用 `INVALID_OPTION`，访问器失败原样传播。'
+        'Value at the path, or original root for an empty path. Invalid intermediate containers use INVALID_OPTION; unclassified accessor failures use OPTIC_ACCESS_FAILED while existing foreign identities remain unchanged. Mutable native errors retain identity/type/stack; fallback cause/errors retain the original.',
+        '返回路径值，空路径返回原根，不可达中间容器使用 `INVALID_OPTION`，未分类访问失败使用 `OPTIC_ACCESS_FAILED`，外包已有身份保持不变；可修改原生错误保留身份、类型与堆栈，回退通过原因或错误列表保留原值。'
       ),
-      example: `import { readOpticPath, writeOpticPath } from '@migaia/store-keyed'
+      example: `import { readOpticPath, writeOpticPath } from '@migaia/store-keyed/optics'
 const source = { a: { b: 1 } }
 console.log(readOpticPath(source, ['a', 'b'], 'field'))
 console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'))`
@@ -930,10 +972,10 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'))`
         )
       },
       returns: t(
-        'New root with copied containers along the path. Invalid containers use INVALID_OPTION; accessor and native copy failures propagate.',
-        '返回沿路径复制容器的新根，不合法容器使用 `INVALID_OPTION`，访问器及原生复制失败传播。'
+        'New root with copied containers along the path. Invalid containers use INVALID_OPTION; unclassified accessor or native copy failures use OPTIC_ACCESS_FAILED while preserving mutable native errors or retaining the original through cause/errors; foreign identities stay unchanged.',
+        '返回沿路径复制容器的新根，不合法容器使用 `INVALID_OPTION`，未分类访问器或原生复制失败使用 `OPTIC_ACCESS_FAILED` 并保留可修改原生错误，或经原因与错误列表保留原值；外包已有身份不变。'
       ),
-      example: `import { writeOpticPath } from '@migaia/store-keyed'
+      example: `import { writeOpticPath } from '@migaia/store-keyed/optics'
 const source = { a: { b: 1 } }
 console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
     },
@@ -947,8 +989,8 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
         items: t('Application source array in its current order.', '按当前顺序排列的应用源数组。'),
         keyOf: keyOfParam,
         label: t(
-          'Application label used when duplicate keys produce INVALID_OPTION.',
-          '重复键产生选项错误时使用的应用标签。'
+          'Application label used when duplicate keys produce INVALID_OPTION; the implementation adds [store], so do not repeat that prefix.',
+          '重复键产生选项错误时使用的应用标签；实现会添加 `[store]` 前缀，调用方不要重复。'
         )
       },
       returns: t(
@@ -960,8 +1002,8 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
     findKeyIndex: {
       role: 'operation',
       purpose: t(
-        'Linearly finds the first matching extracted key using Object.is equality; does not allocate or mutate the input array.',
-        '以对象同值比较线性查找首个匹配提取键，不分配或修改输入数组。'
+        'Linearly finds the first matching extracted key using SameValueZero equality, so signed zeros share one key and NaN matches itself; does not allocate or mutate the input array.',
+        '按原生映射与集合的键等价规则线性查找首个匹配提取键，正负零共享一键且非数值与自身匹配，不分配或修改输入数组。'
       ),
       params: {
         items: t(
@@ -980,16 +1022,16 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
     requireKeyIndex: {
       role: 'operation',
       purpose: t(
-        'Resolves the same first Object.is key match as findKeyIndex but makes a missing item a coded error.',
-        '解析与普通取键查找相同的首个对象同值匹配，但把条目缺失转为带码错误。'
+        'Resolves the same first SameValueZero key match as findKeyIndex but makes a missing item a coded error.',
+        '解析与 `findKeyIndex` 相同的首个键等价匹配，但把条目缺失转为带码错误。'
       ),
       params: {
         items: t('Application source array to search.', '需要查找的应用源数组。'),
         keyOf: keyOfParam,
         key: keyParam,
         label: t(
-          'Caller-owned message used when the target key is absent.',
-          '目标键缺失时使用的调用者消息。'
+          'Caller-owned message used when the target key is absent; the implementation adds [store], so omit that prefix from this value.',
+          '目标键缺失时使用的调用者消息；实现添加 `[store]` 前缀，传入值不要重复包含它。'
         )
       },
       returns: t(
@@ -1046,8 +1088,8 @@ console.log(writeOpticPath(source, ['a', 'b'], 2, 'field'), source)`
     filterOutKey: {
       role: 'operation',
       purpose: t(
-        'Filters out every item whose extracted key Object.is-matches the requested key. A missing key preserves the original array identity.',
-        '过滤掉每个提取键与请求键对象同值匹配的条目，缺失键保留原数组身份。'
+        'Filters out every item whose extracted key SameValueZero-matches the requested key, including signed-zero equivalence. A missing key preserves the original array identity.',
+        '过滤掉全部提取键与请求键等价匹配的条目，正负零共享一键，缺失键保留原数组身份。'
       ),
       params: {
         list: t('Application list to filter without mutating.', '需要不变式过滤的应用列表。'),
@@ -1204,8 +1246,8 @@ console.log(STORE_KEYED_SOURCE, StoreKeyedErrorCode.invalidOption)`
     StoreKeyedErrorCode: {
       role: 'error',
       purpose: t(
-        'Stable package semantic codes for scoped stores, previews, overrides, runtime access, environment capability and input validation. Native errors preserve original runtime classes and causes.',
-        '提供作用域存储、预览、覆盖、跨运行时、环境能力及输入校验的稳定包语义码，原生错误保留运行时类型及原因。'
+        'Stable package semantic codes for scoped stores, previews, overrides, runtime access, optic access, environment capability and input validation. Native errors preserve original runtime classes and causes.',
+        '提供作用域存储、预览、覆盖、跨运行时、光学访问、环境能力及输入校验的稳定包语义码，原生错误保留运行时类型及原因。'
       ),
       example: `import { StoreKeyedErrorCode } from '@migaia/store-keyed'
 console.log(StoreKeyedErrorCode.previewUnsafe)`
@@ -1213,8 +1255,8 @@ console.log(StoreKeyedErrorCode.previewUnsafe)`
     AtomKind: {
       role: 'constant',
       purpose: t(
-        'Discriminates pure definition token kinds so AtomStore can select source cloning, per-store initialization, derived computation or custom writing. Kind values allocate no state by themselves.',
-        '区分纯定义令牌种类，让原子存储选择源复制、每存储初始化、派生计算或自定义写入，种类值自身不分配状态。'
+        'Discriminates pure definition token kinds so AtomStore can select source cloning, per-store initialization, derived computation or custom writing. Kind values allocate no state by themselves. The object is statically readonly through as const, not frozen at runtime.',
+        '区分纯定义令牌种类，让原子存储选择源复制、每存储初始化、派生计算或自定义写入，种类值自身不分配状态；常量仅在类型上只读，运行时并未冻结。'
       ),
       example: `import { AtomKind, atomDef } from '@migaia/store-keyed'
 console.log(atomDef(1).kind === AtomKind.primitive)`
@@ -1264,21 +1306,19 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
       ),
       ['kind', 'debugLabel', 'read', 'write', 'equals']
     ),
-    ISplitItemDef: definitionType(
+    ISplitItemDef: standardDefinitionType(
       t(
         'Alias of a writable-derived item token with standard value-or-updater writes and void result; tied to the source key rather than a fixed list position.',
         '标准新值或更新回调写入、无返回值的可写派生条目令牌别名，绑定源键而非固定列表位置。'
       ),
-      ['kind', 'debugLabel', 'read', 'write', 'equals'],
-      opticsExample
+      ['kind', 'debugLabel', 'read', 'write', 'equals']
     ),
-    IStandardWritableDef: definitionType(
+    IStandardWritableDef: standardDefinitionType(
       t(
         'Writable definition restricted to one standard IAtomUpdate argument and void result, as required by immutable focus and split operations.',
         '限制为一个标准更新参数及无返回值的可写定义，供不可变焦点及拆分操作使用。'
       ),
-      ['kind', 'debugLabel', 'init', 'create', 'previewSafe', 'read', 'write', 'equals'],
-      opticsExample
+      ['kind', 'debugLabel', 'init', 'create', 'previewSafe', 'read', 'write', 'equals']
     ),
     IAtomStore: {
       summary: t(
@@ -1625,8 +1665,8 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
     },
     IAtomUpdate: {
       summary: t(
-        'Either a new T or a synchronous previous-to-next callback; function forms are interpreted as updaters at the standard primitive write boundary.',
-        '新值或同步旧值转新值回调的联合，标准基础写入边界把函数形式解释为更新回调。'
+        'Either a new T or a synchronous previous-to-next callback; function forms are interpreted as updaters at the standard primitive write boundary. The declaration is owned by atom/definition and type-re-exported by reactive/atom; both import paths remain supported.',
+        '新值或同步旧值转新值回调的联合，标准基础写入边界把函数形式解释为更新回调；定义层持有唯一声明，协议入口仅作类型重导出，两条导入路径均保留。'
       ),
       example: storeExample,
       members: {}
@@ -1682,6 +1722,10 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
       ),
       example: protocolExample,
       members: {
+        disposed: f(
+          'Implementation-owned terminal flag required by the external IDisposable protocol; disposal updates it idempotently.',
+          '外包可销毁协议要求的实现终态标记，释放时幂等更新。'
+        ),
         runtime: f(
           'Implementation-owned IRuntime whose identity atomGetter and atomSetter validate.',
           '实现拥有、由协议读写辅助函数校验身份的运行时。'
@@ -1742,6 +1786,10 @@ console.log(atomDef(1).kind === AtomKind.primitive)`
       ),
       example: protocolExample,
       members: {
+        disposed: f(
+          'Implementation-owned terminal flag required by the external IDisposable protocol; disposal updates it idempotently.',
+          '外包可销毁协议要求的实现终态标记，释放时幂等更新。'
+        ),
         runtime: f(
           'Same external Runtime identity as the readable atom protocol.',
           '与可读原子协议相同的外包运行时身份。'

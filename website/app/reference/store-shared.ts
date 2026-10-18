@@ -1,10 +1,10 @@
 /**
- * Reference for `@migaia/store-shared`, checked against shared-state.ts and README 2026-10-17.
- * Source differences: current shared ABI includes a header and 64-bit seqlocks; a signal requires
- * 32 bytes, not the README's old 8 bytes. readCell/writeCell versions are bigint, not number. peek
- * reads current shared memory consistently without publishing remote changes, rather than reading
- * an old local value. Invalid construction shapes use the native RangeError helper. snapshot
- * guarantees a consistent read per cell, not a transaction across all array elements.
+ * Reference for `@migaia/store-shared`, checked against current source, README and USEGUIDE
+ * 2026-10-18. Source differences: current shared ABI includes a header and 64-bit seqlocks; a
+ * signal requires 32 bytes. readCell/writeCell versions are bigint, not number. peek reads current
+ * shared memory consistently without publishing remote changes, rather than reading an old local
+ * value. Invalid construction shapes use the native RangeError helper. snapshot guarantees a
+ * consistent read per cell, not a transaction across all array elements.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 
@@ -60,7 +60,6 @@ const version = array.writeCell(0, before.value + 1, before.value)
 if (version !== undefined) {
   array.notifyWaiters()
   array.sync(0)
-  array.recordObservedVersion(0, version)
 }
 array.assertActive()
 console.log(array.readCell(0))
@@ -85,8 +84,8 @@ const valueParam = t(
 /** Both classes share explicit asynchronous watcher ownership. */
 const watchDoc: IMemberDoc = {
   summary: t(
-    'Starts one Atomics.waitAsync wake loop that pulls remote changes into the owning Runtime. Repeated calls while active return the same stop handle and retain its first scheduler; no silent polling fallback is installed.',
-    '启动单条原子异步等待唤醒回路，把远端变化拉入所属运行时，活动期间重复调用返回同一停止句柄并保留首个调度器，不静默安装轮询降级。'
+    'Starts one Atomics.waitAsync wake loop that reconciles remote changes before each wait. It captures the expected version before sync, so a write during sync cannot become an unseen baseline. The stop handle is published before reconciliation, allowing reentrant stop/dispose. Active repeated calls retain the first scheduler and stop handle; no silent polling fallback is installed.',
+    '启动单条原子异步等待唤醒回路，每次挂起前先对账远端变化，先捕获期望版本再同步，因此同步期间写入不会成为未见的新基线；对账前发布停止句柄，允许同步重入停止或销毁。活动期间重复调用保留首次调度器及停止句柄，不静默安装轮询降级。'
   ),
   params: {
     scheduler: t(
@@ -138,8 +137,8 @@ const arrayOptions: Readonly<Record<string, IMemberDoc>> = {
   },
   initialValues: {
     summary: t(
-      'Caller-provided iterable of signed int32 values, copied in order only for a new buffer. Excess entries are ignored after the fixed length; iterator errors become INVALID_OPTION with cause.',
-      '调用者提供的三十二位整数迭代源，仅新缓冲区按序复制，固定长度外条目忽略，迭代错误成为带原因的 `INVALID_OPTION`。'
+      'Caller-provided iterable of signed int32 values, consumed only for a new buffer and only through the required length prefix. Zero length does not pull the iterator. Reaching the prefix closes the iterator through native IteratorClose without reading one extra item; iteration failures become native RangeError INVALID_OPTION with the original cause.',
+      '调用者提供的三十二位整数迭代源，仅新缓冲区消费所需长度的前缀；长度零不拉取，到达前缀即经原生迭代结束协议关闭，不额外读取下一项；迭代失败成为保留原始原因的原生范围错误及 `INVALID_OPTION`。'
     ),
     default: t(
       'Omitted; new cells contain zero. Ignored completely when attaching a buffer.',
@@ -173,6 +172,10 @@ const errorValues = {
   envUnsupported: t(
     'Explicit watch requires missing Atomics.waitAsync; callers may choose manual sync instead.',
     '显式观察要求的原子异步等待能力缺失，调用者可改为手动同步。'
+  ),
+  updateFailed: t(
+    'An updater throws outside the lock. Unclassified extensible native errors receive UPDATE_FAILED in place, preserving identity, class and stack. Frozen or non-Error failures remain on cause; complete foreign source/code identities retain their owner.',
+    '更新回调在锁外抛错；未编码且可扩展的原生错误原位附加 `UPDATE_FAILED`，保留身份、类型及堆栈；冻结或非错误值保留在原因链，已有完整外包来源及错误码保持原归属。'
   ),
   invalidOption: t(
     'Length, int32 value, buffer brand, ABI header or array options violate the supported construction/write domain.',
@@ -275,15 +278,6 @@ export const storeSharedReference: ILibraryReference = {
       ),
       example: arrayExample
     },
-    SharedWaitMode: {
-      role: 'constant',
-      purpose: t(
-        'Stable wait vocabulary with one async value representing Atomics.waitAsync. It is a caller-facing annotation/diagnostic identifier and is not an option consumed by sharedInt32 or sharedInt32Array.',
-        '稳定等待词汇中唯一异步值表示原子异步等待，供调用者标注及诊断，不作为共享信号或数组工厂消费的选项。'
-      ),
-      example: `import { SharedWaitMode } from '@migaia/store-shared'
-console.log(SharedWaitMode.async)`
-    },
     STORE_SHARED_SOURCE: {
       role: 'error',
       purpose: t(
@@ -296,8 +290,8 @@ console.log(STORE_SHARED_SOURCE, StoreSharedErrorCode.contentionLimit)`
     StoreSharedErrorCode: {
       role: 'error',
       purpose: t(
-        'Stable package codes for local disposal, memory layout, index/value admission, sustained contention and explicit watch capability. Native error classes and original causes are retained.',
-        '本地销毁、内存布局、下标值接纳、持续争用及显式观察能力的稳定包错误码，保留原生错误类型及原始原因。'
+        'Eight stable package codes for local disposal, memory layout, index/value admission, updater failures, sustained contention and explicit watch capability. Native classes and original causes are retained; complete foreign identities remain with their owner.',
+        '本地销毁、内存布局、下标值接纳、更新失败、持续争用及显式观察能力的八项稳定包错误码，保留原生错误类型及原始原因，完整外包错误身份保持原归属。'
       ),
       example: `import { StoreSharedErrorCode } from '@migaia/store-shared'
 console.log(StoreSharedErrorCode.bufferTooSmall)`
@@ -454,8 +448,8 @@ signal.dispose()`
     },
     SharedInt32Array: {
       summary: t(
-        'Fixed-length shared array with independent local cursors and lazily tracked per-index graph sources. Disposal disconnects local sources without freeing shared backing.',
-        '具有独立本地游标及惰性逐下标图源的定长共享数组，销毁断开本地源而不释放共享底层。'
+        'Fixed-length shared array implementing IDisposable, with independent local cursors and lazily tracked per-index graph sources. The whole array is not an IObservable and has no whole-array isStale. Disposal disconnects local sources without freeing shared backing.',
+        '实现销毁协议、具有独立本地游标及惰性逐下标图源的定长共享数组，数组整体不是可观察图源，也没有整体过期检查；销毁断开本地源而不释放共享底层。'
       ),
       scenarios: [
         t(
@@ -504,8 +498,8 @@ signal.dispose()`
           params: {
             index: indexParam,
             update: t(
-              'Synchronous current-to-next int32 callback, pure and repeatable because contention can invoke it again. Return a valid integer; throwing propagates without leaving a lock held.',
-              '同步当前值转新整数回调，因争用可重调而必须纯净且可重复，返回合法整数，抛错传播且不遗留持锁。'
+              'Synchronous current-to-next int32 callback, pure and repeatable because contention can invoke it again. Return a valid integer. It runs outside the lock; thrown native errors retain identity/class/stack with UPDATE_FAILED when unclassified, complete foreign identities remain unchanged, and other failures remain on cause.',
+              '同步当前值转新整数回调，因争用可重调而须纯净可重复，返回合法整数；回调在锁外执行，未编码原生错误原位附更新失败码并保留身份类型堆栈，完整外包身份不变，其他失败保留在原因链。'
             )
           },
           returns: t(
@@ -597,8 +591,8 @@ signal.dispose()`
         },
         notifyWaiters: {
           summary: t(
-            'Advances the shared 64-bit generation and wakes all independent array waiters. Pair with writeCell after a low-level commit; it does not by itself notify local tracked cells.',
-            '推进共享六十四位代次并唤醒全部独立数组等待者，搭配 `writeCell` 在低层提交后使用，自身不通知本地已追踪格。'
+            'Advances the shared 64-bit generation and wakes independent array waiters without advancing this reader full-scan cursor. Pair writeCell with notifyWaiters then sync(index); sync publishes existing local cells and manages their cursor, so no manual recordObservedVersion is needed.',
+            '推进共享六十四位代次并唤醒独立数组等待者，不提前推进当前读者的完整扫描游标；低层提交后搭配 `writeCell` 依次通知再调用 `sync` 发布已有本地格，同步路径管理游标，无须重复手抄版本。'
           ),
           returns: t(
             'No result; remote watch loops can now pull the new generation.',
@@ -626,14 +620,6 @@ signal.dispose()`
         }
       }
     },
-    ISharedWaitMode: {
-      summary: t(
-        'Value union of SharedWaitMode, currently async only, available for caller annotations rather than a library scheduling option.',
-        '当前仅含异步值的等待模式值联合，供调用者标注而非库调度选项。'
-      ),
-      example: watchExample,
-      members: {}
-    },
     IStoreSharedErrorCode: {
       summary: t(
         'Value union of package shared-state semantic codes, classified together with STORE_SHARED_SOURCE.',
@@ -644,18 +630,6 @@ signal.dispose()`
     }
   },
   enums: {
-    SharedWaitMode: {
-      summary: t(
-        'Stable annotation vocabulary for the explicit asynchronous Atomics wait strategy.',
-        '显式原子异步等待策略的稳定标注词汇。'
-      ),
-      values: {
-        async: t(
-          'Atomics.waitAsync wake strategy used by explicit watch, requiring host support.',
-          '显式等待观察使用、要求宿主支持的原子异步唤醒策略。'
-        )
-      }
-    },
     StoreSharedErrorCode: {
       summary: t(
         'Shared wrapper lifecycle, layout, input, contention and watcher capability failure codes.',

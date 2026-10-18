@@ -1,8 +1,9 @@
 /**
- * Checked against current field/arena source and README (2026-10-17). Root exports builders, not
- * concrete IWasm*Field type names or arena helpers. array does not inspect its item descriptor;
- * record checks branding only, though only number builders are supported and every slot is f64.
- * ensureWasm retains the settled Promise identity; explicit disposal is the ownership path.
+ * Checked against current field/arena source, README and USEGUIDE (2026-10-18). Root exports
+ * builders, not concrete IWasm*Field type names or arena helpers. array(length, granularity?) is
+ * fixed f64; record checks branding only, though only number builders are supported and every slot
+ * is f64. ensureWasm retains the settled Promise identity; explicit disposal is the ownership
+ * path.
  */
 import type { ILibraryReference, IText } from './contract.js'
 
@@ -17,7 +18,7 @@ await wasm.ensureWasm()
 const runtime = createRuntime()
 const store = createStore({
   score: wasm.number(), alive: wasm.boolean(), title: wasm.string(64),
-  samples: wasm.array(wasm.number(), 3, 1),
+  samples: wasm.array(3, 1),
   position: wasm.record({ x: wasm.number(), y: wasm.number() })
 }, { runtime })
 const effect = runtime.effect(() => console.log(
@@ -33,14 +34,15 @@ store.position.x = 4
 const copy = store.samples.view()
 copy[0] = 99
 console.log(store.samples.length, store.samples.at(0), store.score.observed)
+const { score, alive, title, samples, position } = store
 effect.dispose()
 await store.$dispose()
-console.log(store.score.disposed, store.alive.disposed, store.title.disposed,
-  store.samples.disposed, store.position.disposed)`
+console.log(score.disposed, alive.disposed, title.disposed,
+  samples.disposed, position.disposed)`
 /** Store Light supplies the field context and owns deterministic cleanup. */
 const builder = t(
-  'Returns Store Light IFieldBuilder with FIELD_BUILDER true, mode sync and synchronous create(context). After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED; aborted context fails INIT_ABORTED. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal.',
-  '返回轻量状态包字段构造协议，品牌为真、模式为同步，创建方法同步接收含运行时、中止信号及响应源工厂的上下文；先等待初始化再交状态工厂，由状态容器拥有字段，未就绪抛 `NOT_INITIALIZED`，上下文中止抛 `INIT_ABORTED`，回滚保留主失败及清理失败，直接创建须由调用者负责销毁。'
+  'Returns Store Light IFieldBuilder with FIELD_BUILDER true, mode StoreFieldMode.sync from @migaia/store-light and synchronous create(context). A sync-only annotation is typeof StoreFieldMode.sync, not the full IStoreFieldMode union that also permits async. After ensureWasm, pass it to createStore; Store Light supplies {runtime,signal,createSource} and owns the field. Creation before readiness fails NOT_INITIALIZED. An aborted context preserves an unclassified native reason in place with INIT_ABORTED, a complete foreign identity unchanged, or an untaggable reason on cause. Rollback preserves primary and cleanup failures. Direct create requires caller-owned disposal.',
+  '返回轻量状态包字段构造协议，品牌为真、模式复用轻量状态包的同步常量，仅同步类型标注使用 `typeof StoreFieldMode.sync`，不能以还含异步分支的完整模式联合替代；创建方法同步接收含运行时、中止信号及响应源工厂的上下文；先等待初始化再交状态工厂，由状态容器拥有字段，未就绪抛 `NOT_INITIALIZED`；上下文中止为未编码原生原因原位附 `INIT_ABORTED`，完整外包身份不变，无法附码的原因保留在原因链；回滚保留主失败及清理失败，直接创建须由调用者负责销毁。'
 )
 /** Concrete scalar fields share tracking and cleanup while retaining distinct encodings. */
 const scalar = (storage: IText): IText =>
@@ -108,8 +110,8 @@ const errors = {
     '读取或写入已销毁字段，应创建新的字段实例。'
   ),
   initAborted: t(
-    'Field context signal was already aborted; treat as cancellation.',
-    '字段构造上下文信号已中止，应视为合作式取消。'
+    'Field context signal was already aborted. Native reason identity, class and stack remain; unclassified extensible errors receive this code in place, complete foreign identities keep their owner, and frozen/non-Error reasons remain on cause.',
+    '字段构造上下文信号已中止，原生原因保留身份、类型及堆栈；未编码可扩展错误原位附码，完整外包错误保持原归属，冻结或非错误原因保留在原因链。'
   ),
   reservedFieldName: t(
     'Record would shadow dispose/disposed lifecycle keys; rename the field.',
@@ -151,8 +153,8 @@ export const storeWasmReference: ILibraryReference = {
         '只初始化一次原生模块，等待中及成功后保持同一承诺身份，失败清空尝试缓存，允许后续调用重新加载。'
       ),
       returns: t(
-        'Promise<WebAssembly.Memory> for shared memory; initialization failures propagate. Memory is not caller-owned. A later arena trap poisons allocations even though this readiness Promise remains resolved.',
-        '承诺返回非调用者拥有的共享内存，初始化失败传播，后续分配陷阱会使实例不可用而就绪承诺仍保持兑现。'
+        'Promise<WebAssembly.Memory> for shared memory, never caller-owned. Native WebAssembly.CompileError, LinkError and RuntimeError cross unchanged without source/code as the registered native pass-through exception. The original arena trap is rethrown unchanged; only later INSTANCE_POISONED failures carry the first trap on cause. This readiness Promise remains resolved after a later trap.',
+        '承诺返回非调用者拥有的共享内存；原生编译、链接及运行时错误按已登记例外原样跨边界，不附来源或错误码；分配器首次陷阱原样重抛，只有后续 `INSTANCE_POISONED` 失败附码并将首次陷阱保留在原因链，后续陷阱不改变已兑现的就绪承诺。'
       ),
       example: `import { ensureWasm } from '@migaia/store-wasm'
 const ready = ensureWasm()
@@ -210,14 +212,10 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
     array: {
       role: 'factory',
       purpose: t(
-        'Describes fixed zero-filled f64 elements with shared tracking buckets. Only number() items are supported; _item is a type descriptor ignored at runtime.',
-        '描述固定长度、初始零并共享追踪桶的浮点元素，仅支持数字元素构造器，元素描述参数在运行时被忽略。'
+        'Describes fixed zero-filled f64 elements with shared tracking buckets. Call array(length, granularity?); there is no item builder parameter or compatibility overload for the old argument order.',
+        '描述固定长度、初始零并共享追踪桶的浮点元素，参数仅为长度及可选桶粒度，不接收元素构造器，也不保留旧参数顺序的兼容重载。'
       ),
       params: {
-        _item: t(
-          'Builder returned by number(); it is not instantiated once per array element.',
-          '由 `number()` 返回的构造描述，不会逐数组元素实例化。'
-        ),
         length: t(
           'Caller-selected safe integer from 0 through 536870911; immutable element count, invalid values fail RangeError INVALID_OPTION.',
           '调用者选择的零至 `536870911` 安全整数，为固定元素数量，无效值抛范围错误及无效选项码。'
@@ -229,9 +227,9 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
       },
       returns: t(
         builder.en +
-          ' Field exposes readonly length/disposed, idempotent dispose(): void, at(index): number, setAt(index,value): void, setRange(lo,hi,values): void, view(): Float64Array. Indices are safe integers in [0,length); reads track buckets. Writes require number, including NaN/infinities. Range is half-open [lo,hi); all numeric values and exact ArrayLike length are validated before writes. Changed buckets commit once each in a batch, with attempted memory rollback on failure. view returns an independent copy without tracking, never writeback. After disposal data operations fail FIELD_DISPOSED; sources release before allocation.',
+          ' Field exposes readonly length/disposed, idempotent dispose(): void, at(index): number, setAt(index,value): void, setRange(lo,hi,values): void, view(): Float64Array. Indices are safe integers in [0,length); reads track buckets. Writes require number, including NaN/infinities. Range is half-open [lo,hi); all ArrayLike length and element reads finish before writes, so a getter failure leaves memory unchanged. Unclassified native input errors receive INVALID_OPTION in place, foreign identities remain unchanged, and frozen/non-Error failures remain on cause. Changed buckets commit once each in a batch; each commit refreshes the current memory view after owner-triggered memory growth, with attempted memory rollback on failure. view returns an independent copy without tracking, never writeback. After disposal data operations fail FIELD_DISPOSED; sources release before allocation.',
         builder.zh +
-          '产物提供只读长度与销毁状态、幂等无参数销毁、按下标读写、范围写入及浮点视图方法。下标须为零含边界至长度不含边界的安全整数，读取追踪桶，写值须为数字且允许非数及无穷值。范围采用左闭右开，先校验全部数字及精确类数组长度，再批量为每个变化桶提交一次，失败尝试回滚内存。视图返回不追踪的独立拷贝，修改不回写，销毁后数据操作抛字段已销毁错误，清理先释放响应源再释放分配。'
+          '产物提供只读长度与销毁状态、幂等无参数销毁、按下标读写、范围写入及浮点视图方法。下标须为零含边界至长度不含边界的安全整数，读取追踪桶，写值须为数字且允许非数及无穷值。范围采用左闭右开，写入前完成全部类数组长度和元素读取，读取器失败不产生部分写入；未编码原生输入错误原位附 `INVALID_OPTION`，外包完整身份不变，冻结或非错误值保留在原因链。再批量为每个变化桶提交一次，提交回调内刷新当前内存视图，支持所有者在提交边界增长内存，失败尝试回滚内存。视图返回不追踪的独立拷贝，修改不回写，销毁后数据操作抛字段已销毁错误，清理先释放响应源再释放分配。'
       ),
       example
     },
@@ -262,8 +260,8 @@ console.log(ready === ensureWasm(), memory.buffer.byteLength)`
     STORE_WASM_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Exact package error source @migaia/store-wasm; interpret this marker together with code.',
-        '本包错误附加的精确来源标记，应与稳定错误码联合检查来定位实际失败分支。'
+        'Source @migaia/store-wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.',
+        '本包拥有的失败所附精确来源标记，应与稳定错误码联合检查；完整外包身份保持原归属，已登记的原生编译、链接及运行时错误原样透传，不附此来源或错误码。'
       ),
       example: `import { STORE_WASM_SOURCE } from '@migaia/store-wasm'
 console.log(STORE_WASM_SOURCE)`
@@ -276,15 +274,6 @@ console.log(STORE_WASM_SOURCE)`
       ),
       example: `import { StoreWasmErrorCode } from '@migaia/store-wasm'
 console.log(StoreWasmErrorCode.notInitialized)`
-    },
-    WasmFieldMode: {
-      role: 'constant',
-      purpose: t(
-        'Synchronous create discriminant for all WASM builders; asynchronous module loading is handled separately by ensureWasm.',
-        '全部原生字段构造器的同步创建判别值，异步模块加载由初始化方法单独负责。'
-      ),
-      example: `import { WasmFieldMode, number } from '@migaia/store-wasm'
-console.log(WasmFieldMode.sync, number().mode)`
     },
     WasmReservedKey: {
       role: 'constant',
@@ -306,15 +295,6 @@ console.log(WasmReservedKey.dispose, WasmReservedKey.disposed)`
       example: `import { StoreWasmErrorCode, type IStoreWasmErrorCode } from '@migaia/store-wasm'
 const code: IStoreWasmErrorCode = StoreWasmErrorCode.cleanupFailed`
     },
-    IWasmFieldMode: {
-      summary: t(
-        'Only sync is supported; module initialization may be asynchronous but field create remains synchronous.',
-        '仅支持同步模式，模块初始化可以异步而字段创建保持同步。'
-      ),
-      members: {},
-      example: `import { WasmFieldMode, type IWasmFieldMode } from '@migaia/store-wasm'
-const mode: IWasmFieldMode = WasmFieldMode.sync`
-    },
     IWasmReservedKey: {
       summary: t(
         'Union dispose or disposed, the record keys reserved for field lifetime.',
@@ -332,18 +312,6 @@ const key: IWasmReservedKey = WasmReservedKey.dispose`
         '与本包来源联合识别的实际错误分支。'
       ),
       values: errors
-    },
-    WasmFieldMode: {
-      summary: t(
-        'Construction mode for native-backed field builders.',
-        '原生内存字段构造器的创建模式。'
-      ),
-      values: {
-        sync: t(
-          'Field creation returns its instance synchronously after readiness.',
-          '初始化完成后字段创建同步返回实例。'
-        )
-      }
     },
     WasmReservedKey: {
       summary: t(

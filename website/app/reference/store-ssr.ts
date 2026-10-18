@@ -1,8 +1,8 @@
 /**
- * SSR reference checked against ssr.ts, errors.ts and README (2026-10-17). Differences: async APIs
- * reject rather than synchronously throw. dehydrateAsync does not explicitly filter failed keys;
- * resource.dehydrate determines inclusion. Timeout marks the entire pending round. Trusted state
- * retains live references. Document readers require an injected host.
+ * SSR reference checked against current source, README and USEGUIDE (2026-10-18). Async APIs reject
+ * rather than synchronously throw. Resource dehydration decides inclusion, and timeout classifies
+ * each pending Promise by its own settlement. Trusted state retains live references. Document
+ * readers require an injected host. Resource snapshots use the canonical version-2 relative ages.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { reactiveReference } from './reactive.js'
@@ -78,14 +78,14 @@ console.log(text)
 await scope.disposeAsync()`
 /** Stable keys select separate store/resource namespaces. */
 const key = t(
-  'Caller-stable nonempty string other than __proto__; store and resource keys use separate namespaces.',
+  'Caller-stable nonempty string other than `__proto__`; store and resource keys use separate namespaces.',
   '调用者选定的非空稳定字符串，不能是 `__proto__`，状态容器与资源使用独立键空间。'
 )
 /** One wall-clock budget covers all waterfall rounds. */
 const timeout: IMemberDoc = {
   summary: t(
-    'Total milliseconds, finite from 0 through 2147483647; zero expires immediately. Invalid input rejects RangeError INVALID_OPTION. Timeout records RESOURCE_TIMEOUT for every entry of the current pending round without cancelling resources.',
-    '所有轮次的总毫秒预算，须为零至 `2147483647` 的有限数，零立即到期，无效值以 `RangeError` 和 `INVALID_OPTION` 拒绝，超时对当前等待轮次所有条目记录 `RESOURCE_TIMEOUT`，不取消资源。'
+    'Total milliseconds, finite from 0 through 2147483647. Zero waits only for already-settled Promise reactions, never for in-flight work. Invalid input returns a rejected Promise with RangeError INVALID_OPTION. At the deadline only unsettled resources receive RESOURCE_TIMEOUT; fulfilled work is omitted and rejected work keeps its original reason. Resources are not cancelled.',
+    '所有轮次的总毫秒预算，须为零至 `2147483647` 的有限数；零只排空已结算承诺的反应，不等待在途工作。无效值返回以范围错误及 `INVALID_OPTION` 拒绝的承诺；截止时仅未结算资源记录 `RESOURCE_TIMEOUT`，已兑现项跳过，已拒绝项保留原始原因，不取消资源。'
   ),
   default: t(
     'Omitted: no deadline; waits until convergence or scope disposal.',
@@ -96,8 +96,8 @@ const timeout: IMemberDoc = {
 const runtimeMembers: Readonly<Record<string, IMemberDoc>> = {
   runtime: {
     summary: t(
-      'Existing request-owned IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. Sharing a Runtime shares the ownership boundary.',
-      '由响应包创建且专属于请求的已有运行时，与运行时构造选项互斥，共享运行时也共享所有权边界。'
+      'Existing IRuntime from @migaia/reactive createRuntime, mutually exclusive with runtimeOptions. The scope claims its own instance, not exclusive ownership of that Runtime. Applications provide a distinct Runtime and scope per request when isolation is required.',
+      '由响应包创建的已有运行时，与运行时构造选项互斥；作用域仅登记自身实例的归属，不独占运行时，需要请求隔离时由应用为每请求装配独立运行时及作用域。'
     ),
     default: t('Creates an isolated Runtime.', '默认新建隔离运行时。')
   },
@@ -135,8 +135,8 @@ const stateMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   resources: {
     summary: t(
-      'Optional @migaia/resource IResourceCacheSnapshot record: version 1, finite updatedAt, finite expiresAt or null, and JSON data.',
-      '可选资源包缓存快照表，各项版本为 `1`，更新时间有限，过期时间为有限数或空值，数据满足可序列化约束。'
+      'Optional @migaia/resource IResourceCacheSnapshot record: version 2, finite nonnegative ageMs, finite nonnegative remainingTtlMs or null, and JSON data. Relative ages retain their canonical Resource meaning during hydration.',
+      '可选资源包缓存快照表，各项版本为 `2`，缓存年龄为有限非负毫秒，剩余有效期为有限非负毫秒或空值，数据满足可序列化约束；相对年龄的复水语义由资源包拥有。'
     ),
     default: t(
       'Absent means no resource hydration; scope dehydration still emits an empty record when none exist.',
@@ -148,8 +148,8 @@ const stateMembers: Readonly<Record<string, IMemberDoc>> = {
 const scopeMembers: Readonly<Record<string, IMemberDoc>> = {
   runtime: {
     summary: t(
-      'Runtime fixed at construction, identical to the owner of every registered object. An external Runtime is not disposed by the scope.',
-      '构造时固定的运行时，所有注册对象必须归属它，外部运行时不由作用域销毁。'
+      'Runtime fixed at construction, identical to the owner of every registered object. Cleanup releases registered owned objects; the scope does not dispose the Runtime itself.',
+      '构造时固定的运行时，所有注册对象必须归属它；清理释放已注册且由作用域拥有的对象，不销毁运行时本体。'
     )
   },
   disposed: {
@@ -160,8 +160,8 @@ const scopeMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   register: {
     summary: t(
-      'Registers a same-Runtime store. Pending hydration runs before commit; a throw leaves the key free and pending data available. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.',
-      '注册同运行时状态容器，先应用待复水数据再提交，抛错保留空闲键及待复水数据，重复键抛 `INVALID_OPTION`，其他运行时抛 `CROSS_RUNTIME`。'
+      'Registers a same-Runtime store. Pending hydration runs before commit, followed by an active-state recheck. A hydration throw keeps the key free and pending data available; reentrant scope disposal rejects SCOPE_DISPOSED. Neither failure transfers ownership of the candidate, so the caller cleans it up. Duplicates fail INVALID_OPTION, other Runtime fails CROSS_RUNTIME.',
+      '注册同运行时状态容器，待复水回调后重检活动状态再提交；回调抛错保留空闲键及待复水数据，重入销毁作用域则以 `SCOPE_DISPOSED` 拒绝；两种失败均不转移候选对象所有权，须由调用者清理。重复键抛 `INVALID_OPTION`，其他运行时抛 `CROSS_RUNTIME`。'
     ),
     params: {
       key,
@@ -208,8 +208,8 @@ await detached?.$dispose()`
   },
   registerResource: {
     summary: t(
-      'Registers a same-Runtime resource; pending hydration runs before commit. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.',
-      '注册同运行时资源，先应用待复水数据再提交，重复键抛 `INVALID_OPTION`，归属不同抛 `CROSS_RUNTIME`。'
+      'Registers a same-Runtime resource; pending hydration runs before commit and an active-state recheck. A thrown hydrate leaves the candidate unowned and pending data available; reentrant scope disposal rejects SCOPE_DISPOSED without admitting the candidate. Caller cleanup remains required. Duplicates fail INVALID_OPTION and mismatched owner fails CROSS_RUNTIME.',
+      '注册同运行时资源，待复水回调后重检活动状态再提交；回调抛错保留待复水数据且不拥有候选对象，重入销毁作用域以 `SCOPE_DISPOSED` 拒绝且不接纳候选对象，清理仍归调用者；重复键抛 `INVALID_OPTION`，归属不同抛 `CROSS_RUNTIME`。'
     ),
     params: {
       key,
@@ -301,8 +301,8 @@ profile.dispose()`
       )
     },
     returns: t(
-      'Promise of readonly ISSRResourceFailure entries. Timeout marks all entries in the pending allSettled round, without cancelling work.',
-      '承诺返回只读失败条目，超时标记当前等待结算轮次的所有条目，不取消工作。'
+      'Promise of readonly ISSRResourceFailure entries. At timeout only still-pending Promises receive RESOURCE_TIMEOUT; fulfilled entries are omitted and rejected entries retain their original reason. A zero budget recognizes already-settled work without awaiting in-flight resources. Invalid options reject the Promise rather than throwing synchronously.',
+      '承诺返回只读失败条目；超时仅标记仍在途承诺，已兑现项跳过，已拒绝项保留原始原因；零预算仅识别已结算工作，不等待在途资源；无效选项使承诺拒绝而非同步抛错。'
     ),
     example: resourceExample
   },
@@ -337,8 +337,8 @@ await scope.disposeAsync()`
   },
   disposeAsync: {
     summary: t(
-      'Starts disposal if needed and awaits tracked store cleanup. Repeated/concurrent callers share one Promise and replay failures.',
-      '需要时启动销毁并等待已追踪的状态容器清理，重复或并发调用共享同一承诺并重放失败。'
+      'Starts disposal if needed and awaits every tracked owned cleanup. Completion is published before synchronous cleanup callbacks, so reentrant calls from dispose or disposeAsync share the same Promise. It waits for the full cleanup set admitted by the synchronous start pass and replays failures; the Runtime itself is retained.',
+      '需要时启动销毁并等待全部已追踪清理；同步清理回调前发布完成承诺，因此从同步或异步销毁入口重入均共享同一承诺；等待本次同步启动阶段接纳的完整清理集合并重放失败，保留运行时本体。'
     ),
     returns: t(
       'Stable Promise<void>; exact single retained failure or SCOPE_DISPOSAL_FAILED AggregateError for multiple failures.',
@@ -430,16 +430,16 @@ const errors = {
     '多项复水失败，成功条目仍保留变化。'
   ),
   invalidSnapshot: t(
-    'Malformed stores/resources or resource metadata, including entry access errors.',
-    '状态或资源外层、资源元数据无效，或字段读取失败。'
+    'Malformed stores/resources or resource metadata, property-access failures and invalid JSON syntax. Unclassified extensible native errors receive INVALID_SNAPSHOT in place with identity/class/stack preserved; frozen/non-Error failures remain on cause and complete foreign identities keep their owner.',
+    '状态或资源外层、资源元数据无效、属性访问失败或语法无效；未编码且可扩展的原生错误原位附 `INVALID_SNAPSHOT`，保留身份、类型及堆栈；冻结或非错误值保留在原因链，完整外包身份保持原归属。'
   ),
   invalidStateScript: t(
     'Unsupported envelope version or invalid script ID.',
     '不支持的外层版本或无效脚本标识符。'
   ),
   invalidStoreKey: t(
-    'Empty, non-string or __proto__ registration/snapshot key.',
-    '注册或快照键为空、非字符串或保留键。'
+    'Empty, non-string or `__proto__` registration/snapshot key.',
+    '注册或快照键为空、非字符串或精确保留键 `__proto__`。'
   ),
   serializeUnsupported: t(
     'Non-JSON value, cycle, non-finite number, non-plain object, depth over 256 or traversal over one million nodes.',
@@ -459,8 +459,8 @@ const errors = {
     '瀑布资源变化持续超出轮次上限。'
   ),
   resourceTimeout: t(
-    'Pending resource round misses total deadline; choose fallback or client refetch.',
-    '等待资源轮次超过总截止期限，应选择降级或客户端重新获取。'
+    'One resource Promise is still unsettled at the total deadline; completed siblings do not receive this code. Choose fallback or client refetch.',
+    '单个资源承诺在总截止期限时仍未结算，已完成的同轮资源不附此码，应选择降级或客户端重新获取。'
   )
 }
 
@@ -518,16 +518,16 @@ export const storeSsrReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Void with type assertion; tagged validation errors throw. Outer field accessors can also throw directly.',
-        '无返回值并收窄类型，失败抛带身份校验错误，外层字段读取器仍可直接抛错。'
+        'Void with type assertion. Validation errors retain their semantic identity. Unclassified extensible native getter failures receive INVALID_SNAPSHOT in place with class, stack and identity preserved; frozen/non-Error failures remain on cause, while complete foreign source/code identities remain unchanged.',
+        '无返回值并收窄类型，校验错误保留语义身份；未编码且可扩展的原生读取器错误原位附 `INVALID_SNAPSHOT`，保留类型、堆栈及身份；冻结或非错误值保留在原因链，完整外包来源及错误码不变。'
       ),
       example: jsonExample
     },
     serializeSSRState: {
       role: 'operation',
       purpose: t(
-        'Validates then JSON-stringifies, escaping &, <, > and Unicode line separators for non-executable HTML embedding.',
-        '先校验再序列化，转义与号、尖括号及统一码行分隔符以供不可执行页面内联。'
+        'Validates then JSON-stringifies, escaping &, <, > and Unicode line separators as \\u0026, \\u003c, \\u003e, \\u2028 and \\u2029 for non-executable HTML embedding.',
+        '先校验再序列化，将与号、左右尖括号及统一码行分隔符分别转义为 `\\u0026`、`\\u003c`、`\\u003e`、`\\u2028`、`\\u2029`，以供不可执行页面内联。'
       ),
       params: {
         state: t(
@@ -572,8 +572,8 @@ export const storeSsrReference: ILibraryReference = {
         )
       },
       returns: t(
-        'ISSRState; invalid JSON throws native SyntaxError and invalid payload throws validation failures.',
-        '返回状态，无效语法抛原生语法错误，无效载荷抛校验失败。'
+        'ISSRState; invalid JSON keeps its native SyntaxError class, stack and identity with INVALID_SNAPSHOT attached in place. Invalid payloads retain their validation identity; complete foreign identities remain unchanged.',
+        '返回状态，无效语法保留原生语法错误类别、堆栈及身份，并原位附 `INVALID_SNAPSHOT`；无效载荷保留校验身份，完整外包错误身份不变。'
       ),
       example: scopeExample
     },
@@ -652,8 +652,8 @@ export const storeSsrReference: ILibraryReference = {
     STORE_SSR_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Exact package error source @migaia/store-ssr.',
-        '本包错误工厂附加的精确来源标记 `@migaia/store-ssr`，需与错误码联合识别。'
+        'Source @migaia/store-ssr for package-owned failures; complete foreign source/code identities retain their owner.',
+        '本包拥有的失败所附精确来源标记 `@migaia/store-ssr`，须与错误码联合识别，完整外包错误身份保持原归属。'
       ),
       example: `import { STORE_SSR_SOURCE } from '@migaia/store-ssr'
 console.log(STORE_SSR_SOURCE)`
@@ -666,15 +666,6 @@ console.log(STORE_SSR_SOURCE)`
       ),
       example: `import { StoreSsrErrorCode } from '@migaia/store-ssr'
 console.log(StoreSsrErrorCode.resourceTimeout)`
-    },
-    SsrWorkOutcome: {
-      role: 'constant',
-      purpose: t(
-        'Wait race outcomes, not thrown error codes.',
-        '提供资源等待竞速的三种稳定结果标签，表示正常分支而非抛出的错误码。'
-      ),
-      example: `import { SsrWorkOutcome } from '@migaia/store-ssr'
-console.log(SsrWorkOutcome.value, SsrWorkOutcome.disposed, SsrWorkOutcome.timeout)`
     },
     SsrWireType: {
       role: 'constant',
@@ -892,8 +883,8 @@ const value: IJSONValue = { title: 'Ready', flags: [true, null] }`
           summary: t('Synchronously applies external resource snapshot.', '同步应用外包资源快照。'),
           params: {
             snapshot: t(
-              'Version-1 IResourceCacheSnapshot from validated SSR state.',
-              '来自已校验状态的第一版资源缓存快照。'
+              'Version-2 IResourceCacheSnapshot with relative ageMs/remainingTtlMs from validated SSR state.',
+              '来自已校验状态、携带相对缓存年龄及剩余有效期的第二版资源快照。'
             )
           },
           returns: t(
@@ -971,8 +962,8 @@ if (cached) profile.hydrate(cached)`
       members: {
         getElementById: {
           summary: t(
-            'Synchronous host callback; host errors propagate. Element textContent is string/null; getAttribute(name) synchronously returns metadata string/null.',
-            '宿主同步回调，错误直接传播，元素正文为字符串或空值，属性读取同步返回元数据字符串或空值。'
+            'Synchronous host callback; host errors propagate with their existing identity. Element textContent is string/null; getAttribute(name) synchronously returns metadata string/null.',
+            '宿主同步回调，错误保留已有身份传播，元素正文为字符串或空值，属性读取同步返回元数据字符串或空值。'
           ),
           params: {
             elementId: t(
@@ -994,15 +985,6 @@ if (cached) profile.hydrate(cached)`
       example: `import { StoreSsrErrorCode, type IStoreSsrErrorCode } from '@migaia/store-ssr'
 const code: IStoreSsrErrorCode = StoreSsrErrorCode.invalidOption`
     },
-    ISsrWorkOutcome: {
-      members: {},
-      summary: t(
-        'Union value, disposed or timeout from SsrWorkOutcome.',
-        '等待结果表中的完成、销毁或超时值联合。'
-      ),
-      example: `import { SsrWorkOutcome, type ISsrWorkOutcome } from '@migaia/store-ssr'
-const outcome: ISsrWorkOutcome = SsrWorkOutcome.disposed`
-    },
     ISsrWireType: {
       members: {},
       summary: t(
@@ -1014,23 +996,6 @@ const wire: ISsrWireType = SsrWireType.text`
     }
   },
   enums: {
-    SsrWorkOutcome: {
-      summary: t('Three wait-race completion branches.', '等待竞速的三种完成分支。'),
-      values: {
-        value: t(
-          'The work settled before deadline or scope disposal.',
-          '工作先于截止期限或作用域销毁结算。'
-        ),
-        disposed: t(
-          'Scope disposal wins the race and wakes the waiter.',
-          '作用域销毁先发生并唤醒当前资源等待。'
-        ),
-        timeout: t(
-          'The total remaining resource wait budget expired.',
-          '资源等待的整体剩余时间预算已经到期。'
-        )
-      }
-    },
     SsrWireType: {
       summary: t('Codec and chunk labels used for HTML embedding.', '页面内联使用的格式及块标签。'),
       values: {

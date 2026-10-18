@@ -1,12 +1,8 @@
 /**
- * Reference for `@migaia/store-middleware`, checked against package source and README 2026-10-17.
- * Source differences: the host composes plugin-host defineHost rather than inheriting PluginHost.
- * Public emit can propagate pipeline failures; runAction/recordState/recordError use isolated
- * emission. runAction and MutationPolicy scopes cover only synchronous callback execution. Object
- * spread snapshots the inherited revision getter at host construction; it is not a live revision
- * counter on the returned Store handle. Diagnostic clone may preserve uncloneable subtree
- * references, so the README claim of a newly independent snapshot on every binding read is too
- * strong. Invalid Redux state JSON is ignored.
+ * Reference for `@migaia/store-middleware`, checked against source and README/USEGUIDE 2026-10-18.
+ * Store domain members join the canonical managed handle before freezing. Live getters and fluent
+ * return identity remain intact. Sync next records continuation; stage-local sinks run before the
+ * downstream stage. Clone admission and callback failure identity follow their canonical owners.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { pluginHostReference } from './plugin-host.js'
@@ -24,7 +20,7 @@ const f = (en: string, zh: string, defaultEn?: string, defaultZh?: string): IMem
 
 /** A host composition example owns its state and releases the delegated plugin lifecycle. */
 const hostExample = `import { createRuntime } from '@migaia/reactive'
-import { createStoreMiddlewareHost, middlewarePlugin, loggerMiddleware } from '@migaia/store-middleware'
+import { createStoreMiddlewareHost, loggerMiddleware, type IStoreMiddlewarePlugin } from '@migaia/store-middleware'
 
 let state = { count: 0 }
 const host = createStoreMiddlewareHost({
@@ -33,10 +29,17 @@ const host = createStoreMiddlewareHost({
   getState: () => state,
   applyState: (next) => { state = next }
 })
-await host.use(middlewarePlugin('audit', (event, context, next) => {
-  next()
-  console.log(event.type, context.getState())
-}), loggerMiddleware())
+const audit: IStoreMiddlewarePlugin<typeof state> = {
+  name: 'audit',
+  install: (core) => {
+    core.usePipeline((event, next) => {
+      next(event)
+      console.log(event.type, core.getState())
+    })
+    return {}
+  }
+}
+await host.use(audit, loggerMiddleware())
 host.runAction('increment', () => { state = { count: state.count + 1 } })
 host.recordState('updated', { count: 0 }, state)
 console.log(state, host.mutationPolicy.insideAction)
@@ -77,14 +80,15 @@ import { createReduxDevToolsAdapter, createStoreMiddlewareHost, type IReduxDevTo
 
 let state = { count: 0 }
 let receive: (message: IReduxDevToolsMessage) => void = () => {}
+const runtime = createRuntime()
 const adapter = createReduxDevToolsAdapter({
   init: (value: typeof state) => console.log(value),
   send: (action: unknown, value: typeof state) => console.log(action, value),
   subscribe: (listener) => { receive = listener; return () => { receive = () => {} } }
-})
+}, runtime)
 const host = createStoreMiddlewareHost({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  runtime: createRuntime(), getState: () => state, applyState: (next) => { state = next }
+  runtime, getState: () => state, applyState: (next) => { state = next }
 })
 await host.connectDevTools(adapter)
 receive({ type: 'DISPATCH', payload: { type: 'JUMP_TO_STATE' }, state: '{"count":3}' })
@@ -92,14 +96,14 @@ console.log(state)
 await host.dispose()`
 
 /** Snapshot choices expose their exact aliasing behavior. */
-const cloneExample = `import { ClonePolicy, diagnosticClone, tolerantClone } from '@migaia/store-middleware/tolerant-clone'
+const cloneExample = `import { ClonePolicy, diagnosticClone } from '@migaia/store-middleware/tolerant-clone'
 
 const source = { nested: { count: 1 } }
 const independent = ClonePolicy.immutable(source)
 const same = ClonePolicy.opaque(source)
 const diagnostic = ClonePolicy.diagnostic({ nested: source.nested, callback: () => 1 })
 console.log(independent !== source, same === source, diagnostic.nested !== source.nested)
-console.log(tolerantClone === diagnosticClone)`
+console.log(diagnosticClone(source))`
 
 /** Inherited methods use a real store event host rather than an unrelated generic example. */
 const hostWith = (
@@ -155,8 +159,8 @@ const inheritedHostMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEn
       ...(name === 'revision'
         ? {
             summary: t(
-              'Revision snapshot copied from the underlying host at Store handle construction; later plugin commits do not refresh this number.',
-              '存储句柄构造时从底层宿主复制的版本快照，后续插件提交不会刷新此数字。'
+              'Live revision getter from the same canonical managed host; plugin commits update it without replacing the Store domain or fluent handle identity.',
+              '同一规范受管宿主的实时修订读取器；插件提交更新修订，保留存储领域成员及链式句柄身份。'
             )
           }
         : {}),
@@ -180,7 +184,10 @@ const inheritedHostMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEn
   ])
 )
 
-/** Mutation guard methods are shared by the local class and externally reexported policy types. */
+/**
+ * Mutation guard methods belong to the local policy class; structural contracts remain
+ * store-light-owned.
+ */
 const policyMembers: Readonly<Record<string, IMemberDoc>> = {
   insideAction: f(
     'Whether synchronous nested action depth is currently greater than zero.',
@@ -215,8 +222,8 @@ const policyMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'Exact fn result or original throw. Returned promises are not awaited and do not extend the action scope.',
-      '返回精确回调结果或原抛错，返回的承诺不被等待，也不延长动作作用域。'
+      'Exact fn result. A mutable native uncoded callback error keeps its object/type/stack and receives CALLBACK_FAILED; frozen or non-Error values remain reachable through cause/errors. Foreign coded failures keep their owner. Returned promises are not awaited and do not extend action scope.',
+      '返回精确回调结果。可扩展且未编码的原生回调错误保持对象、类型与堆栈，并附 `CALLBACK_FAILED`；冻结错误或非错误值经原因或聚合列表可达，外包带码失败保留拥有者。返回的承诺不被等待，也不延长动作作用域。'
     ),
     example: policyExample
   }
@@ -351,8 +358,8 @@ const domainMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   runAction: {
     summary: t(
-      'Emits isolated start, runs fn inside mutation policy and Runtime batch, then emits isolated end or error. Synchronous business throws are rethrown unchanged; observer failures are reported.',
-      '隔离发射开始，在变更策略及运行时批处理中执行回调，再隔离发射结束或失败，同步业务抛错原样重抛，观察失败被报告。'
+      'Emits isolated start, runs fn inside mutation policy and Runtime batch, then emits isolated end or error. Synchronous business failures retain native identity or remain reachable through cause/errors under the policy callback contract; observer failures are reported.',
+      '隔离发射开始，在变更策略及运行时批处理中执行回调，再隔离发射结束或失败，同步业务失败按策略回调契约保留原生身份或原因、聚合列表可达路径，观察失败被报告。'
     ),
     params: {
       name: t(
@@ -369,8 +376,8 @@ const domainMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'Exact fn return or original synchronous throw; action duration covers synchronous execution only.',
-      '返回精确回调结果或原同步抛错，动作耗时仅覆盖同步执行。'
+      'Exact fn return or policy-classified synchronous failure; foreign Reactive/pipeline errors keep their package identity. Action duration covers synchronous execution only.',
+      '返回精确回调结果或经策略分类的同步失败，外包响应式及流水线错误保留包身份，动作耗时仅覆盖同步执行。'
     ),
     example: hostExample
   },
@@ -427,8 +434,8 @@ const domainMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   connectDevTools: {
     summary: t(
-      'Installs a plugin that initializes an adapter, sends events after downstream completion and subscribes to normalized commands. Pair with createReduxDevToolsAdapter when using a Redux extension-shaped connection.',
-      '安装初始化适配器、在下游完成后发送事件并订阅规范命令的插件，使用扩展形状连接时搭配 `createReduxDevToolsAdapter`。'
+      'Installs a plugin that initializes an adapter, sends events after recording sync continuation and before downstream execution and subscribes to normalized commands. Pair with createReduxDevToolsAdapter when using a Redux extension-shaped connection.',
+      '安装初始化适配器、记录同步继续值后、下游执行前发送事件并订阅规范命令的插件，使用扩展形状连接时搭配 `createReduxDevToolsAdapter`。'
     ),
     params: {
       adapter: t(
@@ -448,8 +455,8 @@ const domainMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   attachBindingDisposer: {
     summary: t(
-      'Registers one synchronous cleanup function to run in reverse order before delegated plugin-host disposal.',
-      '登记一个同步清理函数，在委托插件宿主销毁前按逆序执行。'
+      'While open, registers synchronous cleanup in reverse order before delegated plugin-host disposal. Once closing starts, registration invokes the disposer immediately; a synchronous failure propagates with CALLBACK_FAILED identity or preserves its foreign owner.',
+      '开放期间登记同步清理，在委托插件宿主销毁前逆序执行。关闭开始后登记会立即执行清理，同步失败以 `CALLBACK_FAILED` 身份传播或保留外包拥有者。'
     ),
     params: {
       disposer: t(
@@ -458,8 +465,8 @@ const domainMembers: Readonly<Record<string, IMemberDoc>> = {
       )
     },
     returns: t(
-      'No result; the host retains this cleanup until disposal.',
-      '无返回值，宿主保留此清理直到销毁。'
+      'No result; an open host retains cleanup until disposal, while a closing host finishes it before this call returns.',
+      '无返回值；开放宿主保留清理直到销毁，关闭宿主在本调用返回前完成它。'
     ),
     example: hostWith("host.attachBindingDisposer(() => console.log('released'))")
   },
@@ -477,7 +484,7 @@ const domainMembers: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
-/** Store handles expose only local methods actually copied into the returned handle. */
+/** Store domain members are installed into the canonical handle before publication. */
 const hostDomainMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEntries(
   Object.entries(domainMembers).filter(
     ([name]) => !['runtime', 'getState', 'applyState', 'reportError'].includes(name)
@@ -540,11 +547,46 @@ const commandValues = {
   ),
   reset: t('Apply a supplied reset state inside a host action.', '在宿主动作内应用提供的重置状态。')
 }
+/** Wire commands remain distinct from the normalized middleware command domain. */
+const reduxCommandValues = {
+  dispatch: t(
+    'DISPATCH selects extension control messages; messages with another discriminator are ignored.',
+    '`DISPATCH` 选择扩展控制消息，其他消息判别值会被忽略。'
+  ),
+  commit: t(
+    'COMMIT reinitializes the connection with current host state without reading message state.',
+    '`COMMIT` 用当前宿主状态重新初始化连接，不读取消息状态。'
+  ),
+  jumpToState: t(
+    'JUMP_TO_STATE parses the supplied state and emits a normalized jump command.',
+    '`JUMP_TO_STATE` 解析提供的状态，发出规范跳转命令。'
+  ),
+  jumpToAction: t(
+    'JUMP_TO_ACTION parses the selected action state and emits a normalized jump command.',
+    '`JUMP_TO_ACTION` 解析选中动作状态，发出规范跳转命令。'
+  ),
+  rollback: t(
+    'ROLLBACK parses the saved state and emits a normalized jump command.',
+    '`ROLLBACK` 解析保存状态，发出规范跳转命令。'
+  ),
+  reset: t(
+    'RESET parses the supplied state and emits a normalized reset command.',
+    '`RESET` 解析提供的状态，发出规范重置命令。'
+  )
+}
 /** Package error categories retain their original failure ownership. */
 const errorValues = {
   invalidOption: t(
-    'Host construction options or a DevTools adapter fail supported shape admission.',
-    '宿主构造选项或诊断适配器不符合支持的形状接纳。'
+    'Host options are not objects, or a DevTools adapter lacks callable init/send or supplies non-callable subscribe; inspect cause for failed access.',
+    '宿主选项不是对象，或诊断适配器缺少可调用初始化、发送方法，或提供不可调用订阅；读取失败可查看原因。'
+  ),
+  callbackFailed: t(
+    'A synchronous action or binding disposer fails without another package identity; mutable native errors retain identity and other values remain reachable through cause/errors.',
+    '同步动作或绑定清理失败且没有其他包身份；可扩展原生错误保留身份，其他值经原因或聚合列表可达。'
+  ),
+  devtoolsMessageInvalid: t(
+    'A supported Redux state command has invalid JSON; report its SyntaxError through the selected Runtime and skip only that command.',
+    '支持的扩展状态命令含非法文本；经选定运行时报告原语法错误，仅跳过该命令。'
   ),
   middlewareNotChained: t(
     'A middleware omits continuation; reported to Runtime without undoing an already completed business write.',
@@ -584,8 +626,8 @@ export const storeMiddlewareReference: ILibraryReference = {
     },
     'tolerant-clone': {
       summary: t(
-        'Explicit snapshot strategies: immutable copies independently or throws, opaque preserves identity, diagnostic copies where possible and may alias unsupported subtrees. Start from ClonePolicy; tolerantClone is a deprecated diagnostic alias.',
-        '显式快照策略：不可变复制要求独立否则抛错，不透明保留身份，诊断尽力复制且可共享不支持子树，从策略集合开始，宽容复制为旧诊断别名。'
+        'Explicit snapshot strategies: immutable copies independently or throws, opaque preserves identity, diagnostic copies where possible and may alias unsupported subtrees. Start from ClonePolicy on this narrow entry; clone functions are not root exports.',
+        '显式快照策略：不可变复制要求独立否则抛错，不透明保留身份，诊断尽力复制且可共享不支持子树，从此窄入口的策略集合开始；根入口不再导出复制函数。'
       ),
       example: cloneExample
     }
@@ -635,8 +677,8 @@ export const storeMiddlewareReference: ILibraryReference = {
       ),
       options: 'IStoreMiddlewareHostOptions',
       returns: t(
-        'IStoreMiddlewareHost with domain and inherited host members; dispose returns structured cleanup results. Invalid host options use INVALID_OPTION and delegated lifecycle failures retain plugin-host identity.',
-        '返回带领域及继承宿主成员的句柄，销毁返回结构化清理结果，非法宿主选项使用 `INVALID_OPTION`，委托生命周期失败保留插件宿主身份。'
+        'The canonical frozen managed IStoreMiddlewareHost with domain members, live getters and fluent returns retaining this same handle; dispose returns structured cleanup results. Invalid host options use INVALID_OPTION and delegated lifecycle failures retain plugin-host identity.',
+        '返回规范冻结受管句柄，领域成员、实时读取器及链式返回共用同一句柄，销毁返回结构化清理结果，非法宿主选项使用 `INVALID_OPTION`，委托生命周期失败保留插件宿主身份。'
       ),
       example: hostExample
     },
@@ -648,49 +690,27 @@ export const storeMiddlewareReference: ILibraryReference = {
       ),
       params: {
         store: t(
-          'Existing IReactiveStore from @migaia/store-light createStore; its runtime, plain snapshots, hydrate and subscriptions are reused.',
+          'Existing IReactiveStore<S> from @migaia/store-light createStore; its runtime, plain snapshots, hydrate and subscriptions are reused.',
           '由轻量存储工厂创建的已有响应存储，复用其运行时、普通快照、灌入及订阅能力。'
         )
       },
       options: 'IStoreMiddlewareBindingOptions',
       returns: t(
-        'Frozen IStoreMiddlewareBinding with original store reference. Partial subscription failure rolls back; secondary rollback failures produce CLEANUP_FAILED aggregate with original primary first.',
-        '返回含原存储引用的冻结绑定，部分订阅失败会回滚，次要回滚失败产生主失败在首位的 `CLEANUP_FAILED` 聚合错误。'
+        'The same canonical frozen managed IStoreMiddlewareBinding with original store reference, live revision and fluent returns retaining store/domain members. Partial subscription failure rolls back; secondary rollback failures produce CLEANUP_FAILED aggregate with original primary first.',
+        '返回含原存储引用、实时修订及领域成员的同一规范冻结受管绑定，链式返回保留这些成员，部分订阅失败会回滚，次要回滚失败产生主失败在首位的 `CLEANUP_FAILED` 聚合错误。'
       ),
       example: bindingExample
-    },
-    middlewarePlugin: {
-      role: 'enhancer',
-      purpose: t(
-        'Adapts a legacy synchronous (event, context, next) middleware to a plugin-host plugin. Pair with createStoreMiddlewareHost and install via use; omitting next stops downstream event delivery without reversing Store state.',
-        '把旧式同步事件、上下文及继续回调适配为插件，搭配 `createStoreMiddlewareHost` 并经安装接口使用，省略继续回调停止下游事件交付而不反转存储状态。'
-      ),
-      params: {
-        name: t(
-          'Unique plugin name selected by the application for host registration and later removal.',
-          '应用为宿主注册及后续移除选择的唯一插件名称。'
-        ),
-        middleware: t(
-          'Synchronous callback receiving IMiddlewareEvent, runtime/getState context and a no-argument next callback. Call next() to continue; no result is used, async work is not awaited, and throws follow host pipeline handling.',
-          '同步回调接收领域事件、运行时及读取状态上下文、无参数继续函数，调用继续函数交付下游，不使用结果或等待异步工作，抛错按宿主流水线处理。'
-        )
-      },
-      returns: t(
-        'IStoreMiddlewarePlugin descriptor with no added extension methods; installed behavior observes or filters the event pipeline.',
-        '返回不新增扩展方法的插件描述，安装行为为观察或筛选事件流水线。'
-      ),
-      example: hostExample
     },
     loggerMiddleware: {
       role: 'enhancer',
       purpose: t(
-        'Creates the store-logger plugin, which continues downstream first then calls its sink with the event and current state. Pair with createStoreMiddlewareHost and install using use; creating a descriptor alone produces no logs.',
-        '创建固定名称日志插件，先继续下游再把事件及当前状态交给接收端，搭配 `createStoreMiddlewareHost` 安装，单独创建描述不产生日志。'
+        'Creates the store-logger plugin, which records next(event) then calls its sink before downstream execution; synchronous continuation does not execute downstream inline. Pair with createStoreMiddlewareHost and install using use; creating a descriptor alone produces no logs.',
+        '创建固定名称日志插件，先记录继续值，再于下游执行前把事件及当前状态交给接收端，搭配 `createStoreMiddlewareHost` 安装，单独创建描述不产生日志。'
       ),
       params: {
         sink: t(
-          'Optional synchronous (event, state) callback; event is the delivered middleware event and state is core.getState() after downstream. Defaults to console.log with the stable prefix; no return is used or awaited and throws follow pipeline handling.',
-          '可选同步事件及状态回调，事件为已交付领域事件，状态为下游完成后的当前快照，默认带稳定前缀写控制台，不使用或等待返回值，抛错按流水线处理。'
+          'Optional synchronous (event, state) callback; event is the delivered middleware event and state is core.getState() inside this stage before downstream executes. Defaults to console.log with the stable prefix; no return is used or awaited and throws follow pipeline handling.',
+          '可选同步事件及状态回调，事件为已交付领域事件，状态为当前阶段内、下游执行前的快照，默认带稳定前缀写控制台，不使用或等待返回值，抛错按流水线处理。'
         )
       },
       returns: t(
@@ -702,13 +722,17 @@ export const storeMiddlewareReference: ILibraryReference = {
     createReduxDevToolsAdapter: {
       role: 'factory',
       purpose: t(
-        'Wraps an existing extension-shaped connection as a domain adapter. Converts DISPATCH COMMIT to commit, JUMP_TO_STATE/JUMP_TO_ACTION/ROLLBACK to jump, and RESET to reset; invalid or missing state JSON is ignored. Pair with createStoreMiddlewareHost through connectDevTools.',
-        '把已有扩展形状连接包装为领域适配器，提交转提交，状态跳转、动作跳转及回滚转跳转，重置转重置，非法或缺少状态文本被忽略，搭配 `createStoreMiddlewareHost` 的连接诊断方法使用。'
+        'Wraps an existing extension-shaped connection as a domain adapter. Converts DISPATCH COMMIT to commit, JUMP_TO_STATE/JUMP_TO_ACTION/ROLLBACK to jump, and RESET to reset; missing state is ignored; invalid JSON is skipped and reported as DEVTOOLS_MESSAGE_INVALID through the selected Runtime. Pair with createStoreMiddlewareHost through connectDevTools.',
+        '把已有扩展形状连接包装为领域适配器，提交转提交，状态跳转、动作跳转及回滚转跳转，重置转重置，缺少状态文本时忽略命令，非法文本经选定运行时以 `DEVTOOLS_MESSAGE_INVALID` 报告并跳过，搭配 `createStoreMiddlewareHost` 的连接诊断方法使用。'
       ),
       params: {
         connection: t(
           'Caller-owned IReduxDevToolsConnection with synchronous init/send and subscribe returning a disposer; this adapter never opens or closes a browser extension connection.',
           '调用者拥有的扩展连接，包含同步初始化、发送及返回清理函数的订阅，适配器不会打开或关闭浏览器扩展连接。'
+        ),
+        runtime: t(
+          'Optional IRuntime from createRuntime or the Store runtime; receives invalid Redux JSON reports. Omitted: getDefaultRuntime().',
+          '可选运行时，来自运行时工厂或源存储，用于接收非法扩展文本报告；省略时使用共享默认运行时。'
         )
       },
       returns: t(
@@ -720,8 +744,8 @@ export const storeMiddlewareReference: ILibraryReference = {
     immutableSnapshotClone: {
       role: 'operation',
       purpose: t(
-        'Returns a truly independent snapshot through the shared immutableSnapshot owner or throws explicitly. Missing host structuredClone maps to ENV_UNSUPPORTED; unsupported cloning maps to CLONE_UNSUPPORTED with the original cause.',
-        '通过共享不可变快照拥有者返回真正独立快照，否则显式抛错，缺少宿主结构化复制映射为 `ENV_UNSUPPORTED`，不支持复制映射为 `CLONE_UNSUPPORTED` 并保留原因。'
+        'Admits a strict data-only graph, then delegates independent copying to Utils immutableSnapshot. Supports ordinary/null-prototype records, ordinary arrays, current-realm native Map/Set/Date/RegExp/ArrayBuffer and standard TypedArray/DataView backed by non-shared ArrayBuffer. Rejects custom classes, built-in subclasses and accessors before invoking getters. This narrows former class/getter behavior; migrate unsupported values to data or choose diagnostic/opaque. Missing structuredClone maps to ENV_UNSUPPORTED; clone failures map to CLONE_UNSUPPORTED with the complete Utils error on cause and native failure below it.',
+        '先接纳严格纯数据图，再委托工具包不可变快照复制。支持普通或无原型记录、普通数组、当前领域的原生映射、集合、日期、正则、数组缓冲及基于非共享数组缓冲的标准类型化视图。自定义类、内建子类及访问器在求值前拒绝；这是旧类或读取器行为的收窄，应迁移为支持的数据或选择诊断、不透明策略。缺少宿主结构化复制映射为 `ENV_UNSUPPORTED`，复制失败映射为 `CLONE_UNSUPPORTED`；原因保留完整工具包错误，其下游保留原生失败。'
       ),
       params: {
         value: t(
@@ -756,8 +780,8 @@ export const storeMiddlewareReference: ILibraryReference = {
     diagnosticClone: {
       role: 'operation',
       purpose: t(
-        'Uses structuredDiagnosticSnapshot for best-effort diagnostics: prefer native cloning, otherwise recurse through cloneable arrays and records while retaining unsupported subtrees by reference. It does not promise full independence.',
-        '通过共享诊断快照尽力复制，优先原生复制，否则递归复制可复制数组及记录，对不支持子树保留引用，不承诺完整独立性。'
+        'Uses structuredDiagnosticSnapshot for best-effort diagnostics: prefer native cloning, otherwise recursively copies arrays, records and supported Date/RegExp/Map/Set or buffer subtrees while retaining unsupported classes/functions by reference. It does not promise full independence.',
+        '通过共享诊断快照尽力复制，优先原生复制，否则递归复制数组、记录及支持的日期、正则、映射、集合和缓冲子树，对不支持类或函数保留引用，不承诺完整独立性。'
       ),
       params: {
         value: t(
@@ -768,24 +792,6 @@ export const storeMiddlewareReference: ILibraryReference = {
       returns: t(
         'Best-effort T with cloneable parts copied and unsupported references retained; ordinary uncloneable content does not throw.',
         '返回可复制部分已复制、不支持引用保留的尽力值，普通不可复制内容不抛错。'
-      ),
-      example: cloneExample
-    },
-    tolerantClone: {
-      role: 'operation',
-      purpose: t(
-        'Deprecated alias of the exact diagnosticClone function object; call it with one value for the same best-effort result, and migrate callers to the explicit policy name.',
-        '精确指向诊断复制函数对象的旧别名，单值调用取得相同尽力结果，调用者应改用显式策略名称。'
-      ),
-      params: {
-        value: t(
-          'Caller value forwarded unchanged to diagnosticClone.',
-          '原样转交诊断复制实现的调用者值。'
-        )
-      },
-      returns: t(
-        'Same best-effort snapshot semantics as diagnosticClone; no additional wrapper or policy is applied.',
-        '返回与诊断复制相同的尽力快照，不增加包装或策略。'
       ),
       example: cloneExample
     },
@@ -896,9 +902,25 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         '规范诊断提交、跳转及重置命令，适配器在宿主状态应用前把扩展消息转换为这些值。'
       ),
       example: adapterExample
+    },
+    ReduxDevToolsCommand: {
+      role: 'constant',
+      purpose: t(
+        'Canonical Redux extension wire vocabulary consumed by createReduxDevToolsAdapter and custom bridges. This owner replaces StoreDevtoolsCommand imports from store-devtools; normalized domain commands still use MiddlewareCommandType.',
+        '扩展适配工厂及自定义桥接消费的规范扩展协议词表，替代调试包旧命令导入；规范领域命令仍使用 `MiddlewareCommandType`。'
+      ),
+      example: adapterExample
     }
   },
   types: {
+    IMutationPolicyMode: {
+      summary: t(
+        'Mutation guard mode: off admits writes, while actions-only requires a synchronous action scope in this exact policy instance.',
+        '变更守卫模式：关闭时接纳写入，动作限定时要求此精确策略实例具有同步动作作用域。'
+      ),
+      example: policyExample,
+      members: {}
+    },
     MutationPolicy: {
       summary: t(
         'Caller-owned synchronous mutation guard from its class or factory. No resource disposal is needed; strict Store bindings must reuse this same object.',
@@ -912,33 +934,6 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
       ],
       example: bindingExample,
       members: policyMembers
-    },
-    IMutationGuard: {
-      summary: t(
-        'External structural guard reexported from @migaia/store-light; a Store invokes assertMutationAllowed before supported writes.',
-        '从轻量存储包重导出的外部结构化守卫，存储在支持的写入前调用检查。'
-      ),
-      example: bindingExample,
-      members: { assertMutationAllowed: policyMembers.assertMutationAllowed! }
-    },
-    IMutationPolicy: {
-      summary: t(
-        'External Store guard plus runInAction callback scope, reexported without redefining its ownership in the light Store package.',
-        '外包存储守卫加动作执行回调作用域，重导出且不改写轻量存储包拥有的契约。'
-      ),
-      example: bindingExample,
-      members: {
-        assertMutationAllowed: policyMembers.assertMutationAllowed!,
-        runInAction: policyMembers.runInAction!
-      }
-    },
-    IMutationPolicyMode: {
-      summary: t(
-        'Mode union: off admits mutation without action checks; actions-only requires positive synchronous nesting depth and rejects outside writes.',
-        '模式联合：无约束接纳变更而不检查动作，动作限定要求同步嵌套深度为正并拒绝作用域外写入。'
-      ),
-      example: policyExample,
-      members: {}
     },
     IMiddlewareActionEvent: eventType(
       t(
@@ -970,31 +965,6 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
       ['type', 'phase', 'name', 'timestamp', 'durationMs', 'error', 'previous', 'next', 'metadata'],
       true
     ),
-    IMiddlewareContext: {
-      summary: t(
-        'Legacy middleware callback context issued by middlewarePlugin; new code can use the canonical plugin core instead.',
-        '由旧式中间件适配插件签发的回调上下文，新代码可直接使用规范插件核心。'
-      ),
-      example: hostExample,
-      members: {
-        runtime: domainMembers.runtime!,
-        getState: {
-          ...domainMembers.getState!,
-          summary: t(
-            'Synchronous zero-argument state callback supplied from the host core; failures propagate to pipeline handling.',
-            '由宿主核心提供的同步无参数状态回调，失败传播到流水线处理。'
-          )
-        }
-      }
-    },
-    IStoreMiddleware: {
-      summary: t(
-        'Legacy synchronous callback receiving event, runtime/getState context and no-argument next. Call next() to continue; no return or async result is consumed, and callback failure follows the invoking host boundary.',
-        '旧式同步回调，接收事件、运行时及读取状态上下文、无参数继续函数，调用继续函数才交付下游，不消费返回或异步结果，失败按调用宿主边界处理。'
-      ),
-      example: hostExample,
-      members: {}
-    },
     IStoreMiddlewareCore: {
       summary: t(
         'Store-specific plugin core issued at install time, combined with external IPluginHostCore; runtime/state/error capabilities stay owned by the state host.',
@@ -1032,8 +1002,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
     },
     IStoreMiddlewareBinding: {
       summary: t(
-        'New frozen host handle returned by bindStoreMiddleware, carrying all host capabilities plus the original light Store reference. Releasing this binding leaves the Store alive.',
-        '绑定工厂返回的新冻结宿主句柄，包含全部宿主能力及原轻量存储引用，释放绑定不销毁存储。'
+        'Canonical frozen managed handle returned by bindStoreMiddleware, carrying all host capabilities plus the original light Store reference. Live revision/getters and fluent return identity preserve every Store member. Releasing this binding leaves the Store alive.',
+        '绑定工厂返回的规范冻结受管句柄，包含全部宿主能力及原轻量存储引用；实时修订、读取器与链式返回身份保留全部存储成员，释放绑定不销毁存储。'
       ),
       scenarios: [
         t(
@@ -1084,8 +1054,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         },
         pipeline: {
           summary: t(
-            'External pipeline options are accepted but mode is overwritten with sync before host construction.',
-            '接受外包流水线选项，但宿主构造前会把模式覆盖为同步。'
+            'External pipeline options are captured once, including a non-enumerable pipeline getter, and excluded from the remaining option spread; mode is overwritten with sync before host construction.',
+            '外包流水线选项捕获一次，包含不可枚举读取器，并从其余选项展开中排除；宿主构造前把模式覆盖为同步。'
           ),
           default: t(
             'A sync pipeline is installed even when this option is omitted.',
@@ -1212,8 +1182,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
         },
         send: {
           summary: t(
-            'Sends one event and current state after downstream middleware completes.',
-            '下游中间件完成后发送一个事件及当前状态。'
+            'Sends one event and current state within its stage after recording next(event), before downstream middleware executes.',
+            '在当前阶段记录继续值后、下游中间件执行前发送事件及当前状态。'
           ),
           params: {
             event: t(
@@ -1221,8 +1191,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
               '已交付宿主领域事件，保留原错误及元数据引用。'
             ),
             state: t(
-              'Current snapshot read after downstream event processing.',
-              '下游事件处理后读取的当前快照。'
+              'Current snapshot read inside the sending stage before downstream processing.',
+              '发送阶段内、下游处理前读取的当前快照。'
             )
           },
           returns: t(
@@ -1289,8 +1259,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
               '适配器创建的类型及事件对象，动作标签包含名称与阶段、状态名或错误阶段。'
             ),
             state: t(
-              'Current host snapshot supplied after downstream processing.',
-              '下游处理后提供的当前宿主快照。'
+              'Current host snapshot supplied during the sending stage before downstream processing.',
+              '发送阶段内、下游处理前提供的当前宿主快照。'
             )
           },
           returns: t(
@@ -1306,8 +1276,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
           ),
           params: {
             listener: t(
-              'Synchronous callback receiving IReduxDevToolsMessage from the connection; the adapter ignores unrelated messages or malformed state JSON and does not await return values.',
-              '接收连接原始消息的同步回调，适配器忽略无关消息或损坏状态文本，不等待返回值。'
+              'Synchronous callback receiving IReduxDevToolsMessage from the connection; the adapter ignores unrelated messages, reports malformed state JSON through its Runtime, and does not await return values.',
+              '接收连接原始消息的同步回调，适配器忽略无关消息，经其运行时报告损坏状态文本，不等待返回值。'
             )
           },
           returns: t(
@@ -1352,8 +1322,8 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
           }
         },
         state: f(
-          'JSON state text supplied by the extension; parse failure is ignored and valid parsed S is passed to jump/reset.',
-          '扩展提供的状态文本，解析失败被忽略，有效解析状态转给跳转或重置。',
+          'JSON state text supplied by the extension; parse failure reports DEVTOOLS_MESSAGE_INVALID with original SyntaxError through the adapter Runtime and skips this command; valid parsed S is passed to jump/reset.',
+          '扩展提供的状态文本，解析失败经适配器运行时报告带原语法错误的 `DEVTOOLS_MESSAGE_INVALID` 并跳过此命令，有效解析状态转给跳转或重置。',
           'Absent; stateful commands are ignored while commit still works.',
           '默认省略，有状态命令忽略，提交仍可执行。'
         )
@@ -1391,6 +1361,14 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
       example: adapterExample,
       members: {}
     },
+    IReduxDevToolsCommand: {
+      summary: t(
+        'Value union of the six canonical ReduxDevToolsCommand wire strings, separate from normalized commit/jump/reset middleware commands.',
+        '规范扩展命令表六个协议字符串的值联合，区别于领域层的提交、跳转与重置命令。'
+      ),
+      example: adapterExample,
+      members: {}
+    },
     IStoreMiddlewareErrorCode: {
       summary: t(
         'Value union of StoreMiddlewareErrorCode, classified together with STORE_MIDDLEWARE_SOURCE while retaining original causes.',
@@ -1401,6 +1379,13 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
     }
   },
   enums: {
+    ReduxDevToolsCommand: {
+      summary: t(
+        'Redux extension message and payload commands converted by createReduxDevToolsAdapter before host state application.',
+        '扩展消息及载荷命令，由适配工厂在宿主状态应用前转换。'
+      ),
+      values: reduxCommandValues
+    },
     MiddlewareEventType: {
       summary: t(
         'Domain event families observed by middleware and adapters.',
@@ -1431,35 +1416,12 @@ console.log(StoreMiddlewareErrorCode.actionScopeRequired)`
     }
   },
   enhancers: {
-    middlewarePlugin: {
-      kind: 'middleware',
-      target: 'IStoreMiddlewareHost',
-      summary: t(
-        'Installed using host.use, it inserts the caller legacy stage into the existing synchronous event pipeline. It adds behavior rather than new methods.',
-        '经宿主安装后把调用者旧式阶段放入已有同步事件流水线，增加行为而非新方法。'
-      ),
-      install: hostExample,
-      grants: [],
-      behaviors: [
-        t(
-          'next() delivers the same event downstream; omission filters only observations and is reported as MIDDLEWARE_NOT_CHAINED.',
-          '继续调用交付相同事件到下游，省略仅筛选观察并以未继续错误报告。'
-        )
-      ],
-      scenarios: [
-        t(
-          'Migrate a synchronous audit or observation callback onto the canonical plugin lifecycle.',
-          '把同步审计或观察回调迁移到规范插件生命周期。'
-        )
-      ],
-      example: hostExample
-    },
     loggerMiddleware: {
       kind: 'middleware',
       target: 'IStoreMiddlewareHost',
       summary: t(
-        'Installed using host.use, the fixed store-logger plugin logs each event after downstream processing, without adding extension methods.',
-        '经宿主安装后，固定名称日志插件在下游处理后记录每个事件，不新增扩展方法。'
+        'Installed using host.use, the fixed store-logger plugin logs each event after recording continuation and before downstream processing, without adding extension methods.',
+        '经宿主安装后，固定名称日志插件记录继续值后、下游处理前记录每个事件，不新增扩展方法。'
       ),
       install: hostExample,
       grants: [],

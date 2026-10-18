@@ -1,9 +1,10 @@
 /**
- * Current source reference (2026-10-17). Unlike the old zero-copy/performance prose, the current
- * worker-contract bridge recursively converts bytes to base64url portable values before RPC and
- * forwards transfer lists separately; this is not an end-to-end zero-copy guarantee. Handler
- * timeoutMs is not a compute execution deadline. Managed pendingCount counts message deliveries,
- * not RPC computations. Serializer encode streams frames instead of merging chunks locally.
+ * Current source, README and USEGUIDE reference (2026-10-18). Unlike the old zero-copy/performance
+ * prose, the current worker-contract bridge recursively converts bytes to base64url portable values
+ * before RPC and forwards transfer lists separately; this is not an end-to-end zero-copy guarantee.
+ * Handler timeoutMs is not a compute execution deadline. Managed pendingCount counts message
+ * deliveries, not RPC computations. Serializer encode streams frames instead of merging chunks
+ * locally.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { resourceReference } from './resource.js'
@@ -45,7 +46,7 @@ if (typeof document === 'undefined') {
   }
 }`
 /** Real parser/handler/plugin installation with deterministic registry ownership. */
-const codecExample = `import { createSerializeWorkerHandler, workerPlugin } from '@migaia/store-worker'
+const codecExample = `import { createSerializeWorkerHandler, workerPlugin } from '@migaia/store-worker/serialize/worker'
 import { createSerializeRegistry } from '@migaia/serialize'
 import { jsonParser } from '@migaia/serialize/plugins'
 
@@ -69,16 +70,10 @@ if (typeof document === 'undefined') {
     await registry.dispose()
   }
 }`
-/** Chunk helpers preserve local identity; native transfer requires an actual host send. */
-const chunkExample = `import { encodeWorkerValue, decodeWorkerValue } from '@migaia/store-worker/serialize/worker'
-import { transferablesOf } from '@migaia/store-worker/serialize/transferables'
-import { WorkerByteOwnership } from '@migaia/store-worker'
-const bytes = new Uint8Array([1, 2, 3])
-const chunk = encodeWorkerValue(bytes)
-console.log(chunk[1] === bytes, decodeWorkerValue(bytes)[1] === bytes)
-console.log(transferablesOf(chunk, WorkerByteOwnership.copy))
-console.log(transferablesOf(chunk, WorkerByteOwnership.transfer))
-console.log(transferablesOf(encodeWorkerValue(bytes.subarray(1)), WorkerByteOwnership.transfer))`
+/** Public byte policies select input ownership without exposing private chunk helpers. */
+const ownershipExample = `import { WorkerByteOwnership, type IByteOwnership } from '@migaia/store-worker'
+const policy: IByteOwnership = WorkerByteOwnership.copy
+console.log(policy, WorkerByteOwnership.transfer)`
 
 /** Client identity and deadline are external RPC inputs, not generated instance IDs. */
 const clientOptions: Readonly<Record<string, IMemberDoc>> = {
@@ -338,7 +333,7 @@ const errorDoc = (aggregate = false) => ({
 const error = createStoreWorker${aggregate ? 'AggregateError' : 'Error'}(StoreWorkerErrorCode.${aggregate ? 'cleanupFailed' : 'invalidOption'}, ${aggregate ? '[new Error("release failed")], ' : ''}'Worker operation failed')
 console.log(error)`
 })
-/** Stable semantic errors, including a legacy merge code with no current throwing branch. */
+/** Six public semantic errors; stream failures use the canonical RPC error chain. */
 const errors = {
   invalidOption: t(
     'Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.',
@@ -349,8 +344,8 @@ const errors = {
     '工作适配器关闭或销毁后继续请求，应创建新适配器。'
   ),
   requestAborted: t(
-    'Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; stream credit cancellation retains native DOMException AbortError. Transfer inputs may already be detached.',
-    '序列化取消，解码或预先取消编码可带格式诊断，流额度等待取消保留原生中止异常，转移输入可能已分离。'
+    'Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.',
+    '序列化取消，解码或预先取消编码可带格式诊断，活动编码失败可保留标准请求或原生中止形状；转移策略不证明已经分离，预取消输入尚未发送，重试前应检查实际底层缓冲区。'
   ),
   invalidRequestChunk: t(
     'Worker handler received a malformed serialization chunk.',
@@ -360,13 +355,9 @@ const errors = {
     'Main-side serializer received invalid response chunk or frame sequence.',
     '主端解析器收到无效响应块或不符合顺序的流帧。'
   ),
-  chunkMergeFailed: t(
-    'Published merge-failure identity retained in the table; current frame-stream implementation has no local merge throw site.',
-    '错误表保留的块合并失败身份，当前流帧实现没有本地合并抛错点。'
-  ),
   cleanupFailed: t(
-    'Both endpoint cleanup and requested Worker termination failed; ordered AggregateError retains both.',
-    '端点清理与请求终止工作线程同时失败，有序聚合错误保留二者。'
+    'Both endpoint cleanup and requested Worker termination failed; ordered CLEANUP_FAILED AggregateError retains both. A single cleanup failure keeps its existing identity and does not receive this aggregate code.',
+    '端点清理与请求终止工作线程同时失败，有序 `CLEANUP_FAILED` 聚合错误保留二者；单项清理失败保持原有身份，不附此聚合码。'
   )
 }
 
@@ -374,15 +365,15 @@ export const storeWorkerReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Worker-backed application computation and Resource integration. RPC owns transport/protocol lifecycle, Resource owns dependency/caching/retry; this bridge does not own caller Worker termination. Root also aliases the serializer factories to their canonical subpath.',
-        '工作线程应用计算与资源集成，请求包拥有传输协议生命周期，资源包拥有依赖缓存重试，本桥接不拥有调用者线程终止，根入口也转出序列化工厂的标准子路径。'
+        'Worker-backed application computation and Resource integration. RPC owns transport/protocol lifecycle, Resource owns dependency/caching/retry, and the caller owns Worker termination. Serializer factories are available only from @migaia/store-worker/serialize/worker; root aliases and low-level helper paths are removed.',
+        '工作线程应用计算与资源集成，请求包拥有传输协议生命周期，资源包拥有依赖缓存重试，线程终止归调用者；序列化工厂仅从具体序列化工作子路径导入，根别名及底层辅助路径已收回。'
       ),
       example: computeExample
     },
-    serialize: {
+    'serialize/worker': {
       summary: t(
-        'Worker serialization factories under /serialize/worker and transfer selection under /serialize/transferables. Encode uses bounded-credit frames; decode returns one result. Parser contracts remain owned by serialize, and current portable RPC conversion does not establish zero-copy performance.',
-        '工作线程序列化工厂及转移列表子路径，编码采用受额度限制的流帧，解码返回单一结果，解析契约仍由序列化包拥有，当前可移植请求转换不构成零拷贝性能保证。'
+        'Serializer factories workerParser, workerPlugin and createSerializeWorkerHandler live only at @migaia/store-worker/serialize/worker. There is no literal wildcard or public transferables helper path. Encode uses bounded-credit frames, decode returns one result, and parser failures travel through the canonical RPC rejection chain. Portable conversion does not establish zero-copy performance.',
+        '工作线程序列化解析器、插件及处理器工厂仅位于具体序列化工作子路径，不存在可直接导入的星号入口或公开转移列表辅助路径；编码采用受额度限制的流帧，解码返回单一结果，解析失败经标准请求拒绝链传递，可移植转换不构成零拷贝性能保证。'
       ),
       example: codecExample
     }
@@ -470,8 +461,8 @@ export const storeWorkerReference: ILibraryReference = {
       ),
       params: {
         parser: t(
-          'ISerializeParser from @migaia/serialize/plugins or a compatible implementation. encode(value,{signal,context}) may return chunk, iterable or async iterable; decode(chunk,context) returns a value or Promise. Worker sets context to serialize-worker; parser failures become RPC/frame errors.',
-          '序列化插件包或兼容实现的解析器，编码接值及信号上下文并可返回块、可迭代或异步可迭代，解码接块及上下文并返回值或承诺，工作端固定上下文标签，解析失败转请求或流帧错误。'
+          'ISerializeParser from @migaia/serialize/plugins or a compatible implementation. encode(value,{signal,context}) may return chunk, iterable or async iterable; decode(chunk,context) returns a value or Promise. Worker sets context to serialize-worker; parser failures use only canonical RPC rejection, retaining name, message, stack, source, code, cause and aggregate errors. Already-delivered chunks remain available before the stream reports failure.',
+          '序列化插件包或兼容实现的解析器，编码接值及信号上下文并可返回块、可迭代或异步可迭代，解码接块及上下文并返回值或承诺，工作端固定上下文标签，解析失败仅经标准请求拒绝传递，保留名称、消息、堆栈、来源、错误码、原因及聚合子项，流失败前已投递的数据块仍可读取。'
         ),
         post: t(
           'Synchronous host callback receiving raw message and optional readonly transfer list; return void, normally forward to worker-global postMessage. Native send failures follow RPC transport policy.',
@@ -479,8 +470,8 @@ export const storeWorkerReference: ILibraryReference = {
         )
       },
       returns: t(
-        'IManagedRpcHandler callable with raw host event.data, plus close/dispose/pendingCount/disposed. Encode uses two initial credits and acknowledgements; premature exit calls iterator.return best-effort. Handler disposal does not call parser.dispose.',
-        '返回接收宿主原始消息的可调用句柄及关闭、销毁、待投递数量和状态，编码初始两份额度并等待确认，提前结束尽力调用迭代器归还，处理器销毁不调用解析器销毁。'
+        'IManagedRpcHandler callable with raw host event.data, plus close/dispose/pendingCount/disposed. Invalid or inaccessible factory parser members are INVALID_OPTION: native failures retain identity/class/stack, complete foreign identities remain unchanged, and untaggable failures remain on cause. Encode uses two initial credits and acknowledgements. Stream failure is a canonical RPC rejection; an iterator.return failure is attached with the primary first in the reachable error chain. Handler disposal does not call parser.dispose.',
+        '返回接收宿主原始消息的可调用句柄及关闭、销毁、待投递数量和状态；工厂解析成员无效或不可访问时使用 `INVALID_OPTION`，原生失败保留身份类型堆栈，完整外包身份不变，无法附码的失败保留在原因链。编码初始两份额度并等待确认；流失败经标准请求拒绝，迭代器归还失败附入可达错误链且主失败在首位，处理器销毁不调用解析器销毁。'
       ),
       example: codecExample.replace(
         'createSerializeWorkerHandler, workerPlugin',
@@ -495,8 +486,8 @@ export const storeWorkerReference: ILibraryReference = {
       ),
       options: 'IWorkerPluginOptions',
       returns: t(
-        'ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.',
-        '返回序列化包解析协议，含名称、接值及上下文返回异步块流的编码、接块及上下文异步返回载荷的解码，以及稳定异步销毁；信号透传请求，解码及预先取消编码包装取消诊断并保留原始原因，流错误可能保留原生请求或中止形状。销毁失败活动队列、关闭端点，再按需终止线程，端点失败仍尝试终止，二者失败聚合。'
+        'ISerializeParser from serialize: name, encode(value,context) -> AsyncIterable chunks, async decode(chunk,context) -> result payload, and stable dispose(): Promise<void>. No parser timeoutMs option exists; use context.signal for cancellation. Context signal is forwarded to RPC; decode/pre-aborted encode wrap abort diagnostics with original reason cause, streaming errors may retain native RPC/AbortError shape. Dispose fails active queues, closes endpoint, then optionally terminates Worker even after endpoint failure; both failures aggregate CLEANUP_FAILED.',
+        '返回序列化包解析协议，含名称、接值及上下文返回异步块流的编码、接块及上下文异步返回载荷的解码，以及稳定异步销毁；解析器没有超时选项，取消使用上下文信号；信号透传请求，解码及预先取消编码包装取消诊断并保留原始原因，流错误可能保留原生请求或中止形状。销毁失败活动队列、关闭端点，再按需终止线程，端点失败仍尝试终止，二者失败聚合。'
       ),
       example: codecExample
         .replace(
@@ -520,61 +511,6 @@ export const storeWorkerReference: ILibraryReference = {
         '返回序列化包插件协议，包含本地格式标签及解析器，不额外检测格式、协商或取得线程所有权。'
       ),
       example: codecExample
-    },
-    encodeWorkerValue: {
-      role: 'operation',
-      purpose: t(
-        'Locally wraps Uint8Array as a bytes chunk and every other value as a value chunk; it does not encode text, copy, validate portable shape or detach memory.',
-        '本地将字节数组包装为字节块，其他值包装为值块，不进行文本编码、复制、可移植校验或内存分离。'
-      ),
-      params: {
-        value: t(
-          'Caller input to the serialization worker bridge.',
-          '调用者交给序列化工作桥接的输入。'
-        )
-      },
-      returns: t(
-        'ISerializeChunk retaining the exact payload reference. This helper differs from the private portable conversion inside worker-contract.',
-        '返回保留精确载荷引用的数据块，与请求桥接内部私有可移植转换不同。'
-      ),
-      example: chunkExample
-    },
-    decodeWorkerValue: {
-      role: 'operation',
-      purpose: t(
-        'Wraps a decoded worker result using the same byte/value classification; despite its name it performs no wire decoding by itself.',
-        '使用相同字节与值分类包装工作端解码结果，此名称不表示函数自身进行传输解码。'
-      ),
-      params: {
-        value: t('Result returned by worker-side parser.decode.', '工作端解析器解码返回的结果。')
-      },
-      returns: t(
-        'ISerializeChunk with original payload identity; only Uint8Array becomes bytes, ArrayBuffer remains a value chunk here.',
-        '返回保留原始载荷身份的数据块，此处仅字节数组成为字节块，普通缓冲区仍是值块。'
-      ),
-      example: chunkExample
-    },
-    transferablesOf: {
-      role: 'operation',
-      purpose: t(
-        'Selects the whole ordinary ArrayBuffer of an exclusive byte view for transfer policy; selection itself never sends or detaches anything.',
-        '按转移策略选择完整字节视图的普通缓冲区，选择动作自身不发送或分离任何内存。'
-      ),
-      params: {
-        chunk: t(
-          'ISerializeChunk from encodeWorkerValue or a parser output.',
-          '来自包装辅助或解析器输出的序列化块。'
-        ),
-        ownership: t(
-          'Caller-selected WorkerByteOwnership copy or transfer; both are explained in the runtime table.',
-          '调用者选择所有权常量表中的复制或转移策略，具体见常量取值说明。'
-        )
-      },
-      returns: t(
-        'Fresh unknown[]: one full ArrayBuffer only for transfer+bytes with zero offset/full length, otherwise empty. SharedArrayBuffer and partial views always produce empty list.',
-        '返回新列表，仅转移策略下字节块零偏移且全长覆盖普通缓冲区时含一个条目，否则为空，共享缓冲区及局部视图总是空列表。'
-      ),
-      example: chunkExample
     },
     createStoreWorkerError: errorDoc(),
     createStoreWorkerAggregateError: errorDoc(true),
@@ -602,7 +538,7 @@ console.log(StoreWorkerErrorCode.invalidResponseChunk)`
         'Input byte transfer-list policy constants. Native transfer ownership risks remain even though current portable conversion does not promise zero-copy.',
         '输入字节转移列表策略常量，当前可移植转换不承诺零拷贝而原生转移所有权风险仍然存在。'
       ),
-      example: chunkExample
+      example: ownershipExample
     },
     WorkerDiagnosticType: {
       role: 'constant',
@@ -650,8 +586,8 @@ console.log(WorkerDiagnosticType.worker)`
             )
           },
           returns: t(
-            'Promise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. close alone does not cancel admitted requests.',
-            '承诺返回结果，已关闭适配器以 `ADAPTER_DISPOSED` 拒绝，端点、请求及计算失败保持标准身份，仅关闭不会取消已接纳请求。'
+            'Promise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.',
+            '承诺返回结果，已关闭适配器以 `ADAPTER_DISPOSED` 拒绝，端点、请求及计算失败保持标准身份；通用请求取消检查 `RPC_CORE_ERROR_SOURCE` 与 `RpcCoreErrorCode.cancelled`，不使用序列化取消码，仅关闭不会取消已接纳请求。'
           ),
           example: computeExample
         },
@@ -757,7 +693,7 @@ const event: IWorkerFailureEvent = 'messageerror'`
         '所有权常量中的复制或转移值联合，选择策略不证明缓冲区确由单方独占。'
       ),
       members: {},
-      example: chunkExample
+      example: ownershipExample
     },
     IWorkerDiagnosticType: {
       summary: t(

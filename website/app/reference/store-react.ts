@@ -1,10 +1,8 @@
 /**
- * Source-verified React adapter reference, 2026-10-17. Source overrides stale USEGUIDE claims: new
- * ready-array identity selects a new Provider generation rather than warning/ignoring it; retain
- * always schedules a task and ignores _deferTask; prepareForRender is a no-op. Only the
- * experimental feature dictionary is frozen, not the whole normalized config. Defaults are exposed
- * data and never forwarded to createStore. One disposal error is rethrown unchanged; multiple
- * errors form AggregateError. Provider/Registry never dispose the Runtime itself.
+ * Source-verified React 19 adapter reference, 2026-10-18. Provider generations follow ready-array
+ * identity. Registry admission closes before owned callbacks and publishes stable async completion
+ * for reentrancy. Cleanup failures retain native identity or original cause with their owning code.
+ * Defaults remain readable application data; Provider/Registry never dispose the Runtime itself.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
 
@@ -64,17 +62,27 @@ console.log(registry.require(settingsToken).theme)
 unregister()
 await registry.disposeAsync()`
 /** Injection example registers before the consumer renders and uses the Registry runtime. */
-const injectionExample = `import { createStore } from '@migaia/store-light'
-import { StoreProvider, createStoreRegistry, createStoreToken, useProvidedStore } from '@migaia/store-react'
+const injectionExample = `import { Suspense } from 'react'
+import { createStore } from '@migaia/store-light'
+import { Resource } from '@migaia/resource'
+import { StoreProvider, createStoreRegistry, createStoreToken, useProvidedStore, useStoreFromProvider, useResourceValue } from '@migaia/store-react'
 const registry = createStoreRegistry()
 const settings = createStore({ theme: 'light' }, { runtime: registry.runtime })
 const settingsToken = createStoreToken<typeof settings>('settings')
 registry.register(settingsToken, settings, { owned: true })
+const profile = new Resource(async () => ({ name: 'Ada' }), registry.runtime)
+const profileToken = createStoreToken<typeof profile>('profile')
+registry.register(profileToken, profile, { owned: true })
 function Theme() {
   const theme = useProvidedStore(settingsToken, state => state.theme)
   return <span>{theme}</span>
 }
-function App() { return <StoreProvider registry={registry} disposeOnUnmount><Theme /></StoreProvider> }`
+function Profile() {
+  const profile = useResourceValue(useStoreFromProvider(profileToken))
+  return <span>{profile.name}</span>
+}
+function App() { return <StoreProvider registry={registry}><Theme /><Suspense fallback={null}><Profile /></Suspense></StoreProvider> }
+const application = { App, dispose: () => registry.disposeAsync() }`
 /** Config inspection starts from the same normalizer as the Provider. */
 const configExample = `const config = normalizeStoreConfig({ features: { experimental: { charts: true } } })
 console.log(readStoreFeature(config, 'experimental.charts'))
@@ -134,8 +142,8 @@ const configOptions: Readonly<Record<string, IMemberDoc>> = {
   },
   ready: {
     summary: t(
-      'Promises or zero-argument synchronous/async factories. Normalization invokes uncached factories, caches results by factory identity within the scope and waits for all results; throws become rejections. A changed array identity selects a new Provider generation.',
-      '承诺或无参数同步、异步工厂；归一化调用未缓存工厂，按作用域与工厂身份缓存并等待全部结果，抛错转为拒绝；数组身份变化会选择新的提供者代次。'
+      'Promises or zero-argument synchronous/async factories. Normalization eagerly invokes uncached factories before returning, caches factory results by scope plus factory identity, and separately caches each list Promise by scope plus array identity. Rejected factory results leave the factory cache; scopes are isolated. A changed array identity selects a new Provider generation and ReadyBoundary, so an old generation cannot release the new one; changing only the array does not rerun a successful cached factory.',
+      '承诺或无参数同步、异步工厂。归一化返回前即调用未缓存工厂，按作用域加工厂身份缓存结果，列表承诺另按作用域加数组身份缓存。拒绝的工厂结果从工厂缓存删除，不同作用域隔离。数组身份变化会选择新的提供者代次及就绪边界，旧代不能放行新代；仅换数组不会重跑成功缓存的工厂。'
     ),
     returns: t(
       'Factory result is awaited and discarded; rejection blocks the subtree and reaches its outer Error Boundary.',
@@ -306,14 +314,14 @@ const registryMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   lifecycle: {
     summary: t(
-      'Canonical lifecycle ILifecycleState: open before closing and terminal only after every tracked disposer settles.',
-      '规范生命周期状态：关闭前为开放，全部受跟踪释放操作完成后才进入终态。'
+      'Canonical ILifecycleState: public admission enters closing before any owned disposer runs, then reaches terminal only after every tracked disposer settles.',
+      '规范生命周期状态：任何自持有清理回调执行前，公开接纳已进入关闭；全部受跟踪释放操作完成后才进入终态。'
     )
   },
   disposed: {
     summary: t(
-      'True when lifecycle has left open, including cleanup still in progress; use whenTerminal for physical completion.',
-      '生命周期离开开放状态时为真，包括清理仍在进行；物理完成需等待终态承诺。'
+      'True as soon as whole-registry disposal starts, including during the first owned callback; register/replace/get/require/has/remove and retain reject. Use whenTerminal for physical completion.',
+      '整个登记表开始释放即为真，包括首个自持有清理回调期间；此时登记、替换、查询、移除与持有均拒绝。物理完成需等待终态承诺。'
     )
   },
   whenTerminal: method(
@@ -410,16 +418,12 @@ const registryMembers: Readonly<Record<string, IMemberDoc>> = {
     "const registry = createStoreRegistry(); const token = createStoreToken<number>('count'); registry.register(token, 1); registry.remove(token); registry.dispose()"
   ),
   retain: method(
-    'Acquires one Provider retention. Its release function schedules disposal on a later task only if requested and the registry still has zero owners in that generation.',
-    '取得一次提供者持有；释放函数仅在要求释放且同代次仍为零持有者时，于后续任务调度登记表释放。',
+    'Acquires one Provider retention. Its release function schedules disposal via setTimeout(0) only if requested and the registry still has zero owners in that generation.',
+    '取得一次提供者持有；释放函数仅在要求释放且同代次仍为零持有者时，经零毫秒定时任务调度登记表释放。',
     {
       disposeOnRelease: t(
         'True requests terminal registry disposal after the last owner releases; false only drops this retention.',
         '真值请求最后持有者释放后终止登记表；假值仅减少本次持有。'
-      ),
-      _deferTask: t(
-        'Compatibility parameter ignored by current source; release always uses a task rather than a microtask.',
-        '当前源码忽略的兼容参数；释放始终使用任务而非微任务。'
       )
     },
     t(
@@ -428,25 +432,13 @@ const registryMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     'const registry = createStoreRegistry()\nconst release = registry.retain(true)\nrelease()\nawait registry.whenTerminal()'
   ),
-  prepareForRender: method(
-    'Compatibility no-op: it does not schedule candidate reclamation because abandoned React renders have no reliable public cleanup event.',
-    '兼容空操作，不调度候选回收，因为被放弃渲染没有可靠的公开清理事件。',
-    {
-      after: t(
-        'Optional readiness Promise accepted but ignored by this implementation.',
-        '当前实现接收但忽略的可选就绪承诺。'
-      )
-    },
-    t('Nothing; no lifecycle or timer state changes.', '无返回值，不改变生命周期或定时器状态。'),
-    'const registry = createStoreRegistry(); registry.prepareForRender(); registry.dispose()'
-  ),
   dispose: method(
-    'Starts reverse-registration-order owned cleanup, then atomStore cleanup. Synchronous failures propagate; thenables stay observed and tracked until terminal completion.',
-    '按登记逆序启动自持有值清理，再清理原子存储；同步失败传播，可等待结果持续被观察和跟踪直至终态。',
+    'Closes public admission before callbacks, starts reverse-registration-order owned cleanup, then atomStore cleanup. The shared async completion is published first, so reentrant disposeAsync returns the same Promise. Every cleanup is attempted; thenables stay observed and tracked until terminal completion.',
+    '回调前关闭公开接纳，按登记逆序启动自持有值清理，再清理原子存储。先发布共享异步完成承诺，重入异步释放取得同一对象；尝试全部清理，可等待结果持续被观察和跟踪直至终态。',
     {},
     t(
-      'Nothing; idempotent after the first start. One failure preserves identity, multiple failures form REGISTRY_DISPOSAL_FAILED AggregateError.',
-      '无返回值，首次开始后幂等；单个失败保留身份，多个失败形成登记表释放聚合错误。'
+      'Nothing; idempotent after the first start. One mutable native uncoded failure retains object/type/stack and gains REGISTRY_DISPOSAL_FAILED; frozen or non-Error failures remain on cause/errors. Complete foreign identity stays unchanged; multiple failures form AggregateError in cleanup order.',
+      '无返回值，首次开始后幂等。单个可扩展未编码原生失败保留对象、类型与堆栈并附 `REGISTRY_DISPOSAL_FAILED`；冻结错误或非错误值经原因、聚合列表可达。完整外包身份不变，多个失败按清理顺序形成聚合错误。'
     ),
     'const registry = createStoreRegistry(); registry.dispose(); await registry.disposeAsync()'
   ),
@@ -455,8 +447,8 @@ const registryMembers: Readonly<Record<string, IMemberDoc>> = {
     '按需启动释放并返回稳定共享完成承诺，包括先前同步释放已经启动的可等待结果。',
     {},
     t(
-      'Promise resolving at cleanup completion; one failure rejects unchanged and multiple failures reject as AggregateError.',
-      '清理完成后承诺完成；单个失败原样拒绝，多个失败以聚合错误拒绝。'
+      'One stable Promise resolving at cleanup completion, including reentrant calls. Failures use the same native identity/cause/foreign-owner policy as dispose; multiple failures reject as ordered AggregateError.',
+      '返回稳定共享承诺，包括重入调用，清理完成后兑现。失败遵循同步释放相同的原生身份、原因链及外包拥有者策略，多个失败以有序聚合错误拒绝。'
     ),
     'const registry = createStoreRegistry(); await registry.disposeAsync()'
   )
@@ -466,8 +458,8 @@ export const storeReactReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'React subscriptions and scoped injection for external Store, Atom, Signal and Resource models. Start with useStore/useSignal for direct sources or StoreProvider with definition hooks for per-subtree state.',
-        '为外部存储、原子、信号与资源模型提供组件订阅及作用域注入；直接源从订阅钩子开始，子树隔离状态使用提供者与定义钩子。'
+        'React 19/react-dom 19 or later subscriptions and scoped injection for external Store, Atom, Signal and Resource models. This pure ESM library exposes only its root entry; package.json sets type: module. Start with useStore/useSignal for direct sources or StoreProvider with definition hooks for per-subtree state.',
+        '要求十九或更高版本的组件框架及其渲染器，为外部存储、原子、信号与资源模型提供组件订阅及作用域注入；本库为纯标准模块，仅发布根入口，模块类型设为标准模块；直接源从订阅钩子开始，子树隔离状态使用提供者与定义钩子。'
       ),
       example: definitionExample
     }
@@ -806,8 +798,8 @@ export const storeReactReference: ILibraryReference = {
     normalizeStoreConfig: {
       role: 'factory',
       purpose: t(
-        'Normalizes feature booleans, defaults and eagerly started readiness tracking within a caller cache scope. Experimental flags become a frozen data-only dictionary.',
-        '在调用方缓存作用域内归一化特性、默认值并立即启动就绪追踪；实验开关成为仅含数据属性的冻结字典。'
+        'Normalizes features and defaults before eagerly starting readiness factories within a caller cache scope. Top-level and nested defaults getter failures throw INVALID_CONFIG with original cause before any ready factory runs. Experimental flags become a frozen data-only dictionary.',
+        '在调用方缓存作用域内先归一化特性与默认值，再立即启动就绪工厂；顶层及嵌套默认值读取失败在任何工厂执行前抛带原始原因的 `INVALID_CONFIG`。实验开关成为仅含数据属性的冻结字典。'
       ),
       params: {
         config: t(
@@ -1173,8 +1165,8 @@ export const storeReactReference: ILibraryReference = {
           '登记表离开开放生命周期后仍进行查询或写入。'
         ),
         registryDisposalFailed: t(
-          'Multiple registry cleanup failures combined in a native AggregateError; a single failure is rethrown unchanged.',
-          '多个登记表清理失败组合成原生聚合错误，单个失败原样抛出。'
+          'Owned cleanup failed: a mutable native uncoded error keeps identity and gains this code; frozen or non-Error values remain on cause/errors. Foreign coded errors keep their owner; multiple failures form an ordered native AggregateError.',
+          '自持有清理失败：可扩展未编码原生错误保留身份并附此码，冻结错误或非错误值经原因、聚合列表可达。外包带码错误保留拥有者，多个失败形成有序原生聚合错误。'
         ),
         providerRequired: t(
           'Provider-dependent hook or feature assertion has no Provider configuration.',

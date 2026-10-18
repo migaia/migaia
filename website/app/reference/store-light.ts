@@ -2,7 +2,7 @@
  * Reference documentation of `@migaia/store-light`. Rules: `app/reference/contract.ts`. Verified
  * against `packages/store-light/src` (reactive-store.ts, store-protocol.ts, store-resource*.ts,
  * field-mode-constants.ts, resource-state-constants.ts, error-code.ts), README and USEGUIDE on
- * 2026-10-17.
+ * 2026-10-18.
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 
@@ -82,14 +82,14 @@ await user.whenTerminal()`
 const storeMembers: Readonly<Record<string, IMemberDoc>> = {
   $runtime: {
     summary: t(
-      'Reactive runtime the store lives in (the `runtime` option or the shared default).',
-      '该 Store 所在的响应式运行时（`runtime` 选项或共享的默认运行时）。'
+      'Reactive runtime captured at construction. This public data property is writable; assigning it does not migrate the closed-over Runtime owner.',
+      '构造时捕获的响应式运行时；此公开数据属性可写，改写不会迁移闭包内的运行时所有者。'
     )
   },
   $async: {
     summary: t(
-      '`true` when the store has asynchronous fields (created with `createAsyncStore`).',
-      '含有异步字段（由 `createAsyncStore` 创建）时为 `true`。'
+      'Initially `true` when asynchronous fields were admitted. This public data property is writable and does not control initialization.',
+      '初值表示是否接纳过异步字段；此公开数据属性可写，改写不控制初始化。'
     )
   },
   $snapshot: {
@@ -102,8 +102,8 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   $subscribe: {
     summary: t(
-      'Runs `fn` whenever a signal or custom field changes (computed values are not read).',
-      '每当普通字段或自定义字段变化时调用 `fn`（不会主动读取计算值）。'
+      'Reads signal, computed and custom sources when subscribing, evaluating computed getters to capture dependencies outside this store. Later changes call `fn`; listener throws/rejections go to the Runtime reporter.',
+      '建立订阅时读取普通字段、计算值及自定义来源，并求值计算访问器以捕获仓库外依赖。后续变化调用 `fn`；监听者抛错或拒绝交给运行时报告。'
     ),
     params: {
       fn: t(
@@ -158,8 +158,8 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   $hydrate: {
     summary: t(
-      'Writes saved values back into plain fields (for restoring persisted state).',
-      '把保存的值写回普通字段（用于恢复持久化的状态）。'
+      'Writes saved values back into plain fields through the mutation policy and one notification batch. It is not a rollback transaction: earlier writes survive a later failure.',
+      '经写入策略在一次通知批处理中把保存值写回普通字段；这不是回滚事务，后续失败不会撤销先前写入。'
     ),
     params: {
       partial: t('Saved object, usually from `$plain()`.', '保存的对象，通常来自 `$plain()`。'),
@@ -174,13 +174,13 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
   $disposed: {
     summary: t(
       '`true` after `$dispose()` was called.',
-      '调用过 `$dispose()` 之后为 `true`，此后不可再用。'
+      '调用过 `$dispose()` 之后为 `true`；这是只读终态查询，释放后仍可读取。'
     )
   },
   $own: {
     summary: t(
-      'Adds an external disposable (a collection, a timer wrapper) to this store, so `$dispose()` releases it too.',
-      '把外部可释放资源（集合、计时器包装等）纳入该 Store，使 `$dispose()` 一并释放它。'
+      'Adds an external disposable to this live store so `$dispose()` releases it too. After disposal, `$own` rejects with STORE_DISPOSED.',
+      '把外部可释放资源纳入存活的仓库，由 `$dispose()` 一并释放；仓库释放后 `$own` 抛 `STORE_DISPOSED`。'
     ),
     params: {
       resource: t(
@@ -193,8 +193,8 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   $dispose: {
     summary: t(
-      'Releases fields, subscriptions and owned resources (last registered first); afterwards any use throws `STORE_DISPOSED`.',
-      '释放字段、订阅与所拥有的资源（后登记的先释放）；之后的任何使用都会抛 `STORE_DISPOSED`。'
+      'Releases fields, subscriptions and owned resources in reverse registration order. Reentrant and later calls return the same completion Promise. Field access and guarded methods reject with STORE_DISPOSED; disposal and terminal metadata remain available.',
+      '按登记逆序释放字段、订阅和拥有的资源；重入与后续调用返回同一完成承诺。字段访问与受守卫方法抛 `STORE_DISPOSED`，重复释放和终态信息仍可使用。'
     ),
     returns: t(
       'Always the same Promise, resolved when cleanup finished.',
@@ -229,8 +229,8 @@ const resourceOptionFields: Readonly<Record<string, IMemberDoc>> = {
   },
   dispose: {
     summary: t(
-      'Cleans up a value when it is evicted; requires an object or function value.',
-      '值被逐出时用来清理它；要求值是对象或函数。'
+      'Cleans up an evicted object/function value; returns void or PromiseLike<void>. Physical cleanup may finish after logical disposal; await whenTerminal for completion.',
+      '清理被逐出的对象或函数值，返回无值或可同化的异步清理结果；物理清理可能晚于逻辑释放，等待 `whenTerminal` 才确认完成。'
     ),
     default: t(
       'Not set: a value with `$dispose()` (such as a store) is disposed automatically.',
@@ -249,8 +249,8 @@ const resourceOptionFields: Readonly<Record<string, IMemberDoc>> = {
   },
   onTerminal: {
     summary: t(
-      'Called once when the resource reaches `disposed`.',
-      '资源到达终态 `disposed` 时调用一次。'
+      'Called once at logical terminal disposal; asynchronous value cleanup may still be running. Await whenTerminal for physical completion.',
+      '资源到达逻辑终态时调用一次，异步值清理可能仍在执行；物理完成须等待 `whenTerminal`。'
     ),
     default: t('Not set.', '不设置：不做额外处理。')
   }
@@ -261,8 +261,8 @@ export const storeLightReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Reactive plain-object state: `createStore({...})` turns plain fields into signals, `get` accessors into cached computed values and methods into batched actions; `$` methods snapshot, subscribe, persist and dispose. `createStoreResource()` is a separate Suspense-safe async value container.',
-        '响应式的普通对象状态：`createStore({...})` 把普通字段变为信号、`get` 访问器变为带缓存的计算值、方法变为自动批量的 action；`$` 开头的方法用于快照、订阅、持久化与释放。`createStoreResource()` 是独立的、可安全配合 Suspense 的异步值容器。'
+        'Reactive plain-object state: `createStore({...})` turns plain fields into signals, `get` accessors into cached computed values and methods into batched actions; `$` methods snapshot, subscribe, persist and dispose. `createStoreResource()` is a Suspense-safe adapter over @migaia/resource. Dependencies point inward to reactive, resource, lifecycle, event-subscriber and utils; no UI or host layer is required.',
+        '响应式的普通对象状态：`createStore({...})` 把普通字段变为信号、`get` 访问器变为带缓存的计算值、方法变为自动批量的 action；`$` 开头的方法用于快照、订阅、持久化与释放。`createStoreResource()` 是资源包上的安全挂起适配器；依赖向内指向响应式内核、资源、生命周期、事件订阅与基础工具，不依赖界面或宿主层。'
       ),
       example: storeExample
     }
@@ -276,8 +276,8 @@ export const storeLightReference: ILibraryReference = {
       ),
       params: {
         shape: t(
-          'Object literal with fields, getters, methods, `raw(...)` values and sync field builders.',
-          '包含字段、getter、方法、`raw(...)` 值以及同步字段构建器的对象字面量。'
+          'Object literal with fields, getters, methods, raw values and explicit sync field builders. Keys must not collide with built-in $ APIs; a collision throws INVALID_OPTION TypeError and rolls back construction.',
+          '包含字段、访问器、方法、原样值及显式同步字段构建器的对象字面量；键不得与内置接口重名，冲突以 `INVALID_OPTION` 类型错误拒绝并回收同次构造资源。'
         ),
         options: t(
           '`ICreateStoreOptions`: `runtime`, `debugName`, `warnAsyncActions`, `mutationPolicy`.',
@@ -324,8 +324,8 @@ export const storeLightReference: ILibraryReference = {
         )
       },
       returns: t(
-        'A Promise of the ready store; a failing field rejects (with cleanup errors in an `AggregateError`).',
-        '就绪 Store 的 Promise；某个字段失败时 reject（清理也失败时以 `AggregateError` 汇总）。'
+        'A Promise of the ready store. Unclassified initialization errors receive INITIALIZATION_FAILED while retaining native identity or the original cause. Cleanup failures attach through cause to a writable primary Error; otherwise INIT_AND_CLEANUP_FAILED aggregates the original first. Late field disposal failures reach the Runtime as FIELD_DISPOSE_FAILED, preserving the original.',
+        '返回就绪仓库的承诺。未分类初始化错误附 `INITIALIZATION_FAILED` 并保留原生身份或原始原因。清理失败附到可写主错误的原因链，否则以 `INIT_AND_CLEANUP_FAILED` 聚合且原错在先；晚到字段清理失败以 `FIELD_DISPOSE_FAILED` 交运行时报告并保留原错。'
       ),
       options: 'ICreateStoreOptions',
       example: `const store = await createAsyncStore({ count: 0, buffer: wasmNumber(0) })`
@@ -343,8 +343,8 @@ export const storeLightReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Resolves when ready; other objects throw `NO_ASYNC_INIT`.',
-        'Store 就绪后 resolve；传入其它对象时抛 `NO_ASYNC_INIT`。'
+        'Returns the registered readiness Promise for synchronous and asynchronous stores from this package instance. Only unregistered objects throw NO_ASYNC_INIT.',
+        '同步与异步仓库都返回本包实例登记的就绪承诺；仅未登记对象抛 `NO_ASYNC_INIT`。'
       ),
       example: `await storeReady(store)`
     },
@@ -375,8 +375,8 @@ form.onSubmit = (data) => save(data)`
     isFieldBuilder: {
       role: 'operation',
       purpose: t(
-        'Tells whether a value is a field builder (marked with `FIELD_BUILDER`), sync, async or legacy.',
-        '判断某个值是否为字段构建器（带 `FIELD_BUILDER` 标记），包括同步、异步与旧形式。'
+        'Checks the FIELD_BUILDER brand without admitting construction. Supported builders select explicit sync or async mode; construction rejects a missing or invalid mode.',
+        '检查字段构建器品牌，不代表构造已获接纳；受支持构建器须显式选择同步或异步模式，缺失或非法模式在构造时拒绝。'
       ),
       params: { value: t('Any value.', '要检查的任意值。') },
       returns: t('`true` for field builders.', '是字段构建器时返回 `true`。'),
@@ -438,19 +438,11 @@ form.onSubmit = (data) => save(data)`
 const profile = scope.resource(({ signal }) => fetchProfile(signal))
 scope.dispose()`
     },
-    StoreResourceKind: {
-      role: 'constant',
-      purpose: t(
-        'Lifecycle states of a store resource: `idle`, `loading`, `ready`, `failed`, `closing`, `disposed`.',
-        '资源容器在加载与释放过程中的生命周期状态：`idle`、`loading`、`ready`、`failed`、`closing`、`disposed`。'
-      ),
-      example: `if (resource.readSnapshot) console.log(StoreResourceKind.ready)`
-    },
     STORE_LIGHT_SOURCE: {
       role: 'constant',
       purpose: t(
-        'The `source` value (`@migaia/store-light`) of every error of this package.',
-        '本包每个错误上的 `source` 值（`@migaia/store-light`），用于按来源识别和过滤错误。'
+        'The source value for failures owned by this package. Errors already classified by Reactive or Resource retain their actual owner; no blanket source rewrite occurs.',
+        '本包拥有的失败所使用的来源值；响应式内核或资源包已分类的错误保留实际所有者，不统一改写来源。'
       ),
       example: `if (error.source === STORE_LIGHT_SOURCE && error.code === StoreLightErrorCode.storeDisposed) return`
     },
@@ -579,8 +571,8 @@ scope.dispose()`
       members: {
         runtime: {
           summary: t(
-            'Reactive runtime to use, for isolation per SSR request or test.',
-            '使用的响应式运行时，用于按 SSR 请求或测试隔离。'
+            'Registered createRuntime result from the same owning @migaia/reactive instance, for SSR or application isolation. An arbitrary structural IRuntime object is not supported.',
+            '由同一 `@migaia/reactive` 实例的 `createRuntime` 登记创建，用于隔离请求或应用；不支持任意结构相同的运行时对象。'
           ),
           default: t(
             'The shared `defaultRuntime`.',
@@ -675,8 +667,8 @@ scope.dispose()`
       '`$set` 接受的可写字段部分对象。'
     ),
     IFieldBuilder: alias(
-      'Custom field builder: sync, async or legacy.',
-      '自定义字段构建器：同步、异步或旧形式。'
+      'Union of explicit sync and async field builders; a missing mode has no compatibility path.',
+      '显式同步或异步字段构建器的联合，不保留无模式的兼容路径。'
     ),
     ISyncFieldBuilder: {
       summary: t(
@@ -724,19 +716,6 @@ scope.dispose()`
               '`{ runtime, signal, createSource }`；期间 Store 被释放时 `signal` 中止。'
             )
           },
-          returns: t('A Promise of the field.', '字段对象的 Promise。')
-        }
-      }
-    },
-    ILegacyFieldBuilder: {
-      summary: t(
-        'Older field builder without `mode`; treated as async.',
-        '没有 `mode` 的旧形式字段构建器；按异步处理。'
-      ),
-      members: {
-        create: {
-          summary: t('Creates the field asynchronously.', '异步创建并返回字段对象。'),
-          params: { context: t('Field context.', '字段创建上下文。') },
           returns: t('A Promise of the field.', '字段对象的 Promise。')
         }
       }
@@ -896,8 +875,8 @@ scope.dispose()`
         },
         retainVersion: {
           summary: t(
-            'Keeps one specific version alive even after `retry()` produced a newer one.',
-            '保持某个特定版本存活，即使 `retry()` 已产生更新的版本。'
+            'Keeps one existing visible, stale or retained version alive after retry. An evicted version cannot be revived and throws UNKNOWN_VERSION.',
+            '在重新加载后保持某个现存可见、过期或已持有版本；已逐出的版本不能复活，会抛 `UNKNOWN_VERSION`。'
           ),
           params: {
             version: t(
@@ -908,24 +887,10 @@ scope.dispose()`
           returns: t('A release function.', '释放该版本租约的函数。'),
           example: `const release = userResource.retainVersion(userResource.readSnapshot().version)`
         },
-        retain: {
-          summary: t(
-            'Deprecated combination of `retainResource` / `retainVersion`; use those instead.',
-            '已废弃的 `retainResource` / `retainVersion` 组合入口；请改用这两个方法。'
-          ),
-          params: {
-            version: t(
-              'Optional version to retain; omitted retains the resource.',
-              '可选的要保持的版本；省略时保持整个资源。'
-            )
-          },
-          returns: t('A release function.', '释放该租约的函数。'),
-          example: `const release = userResource.retain()`
-        },
         captureVersion: {
           summary: t(
-            'Render phase: takes a provisional capture of a version (expires after 4000 ms unless committed).',
-            '渲染阶段：对某个版本建立临时捕获（未提交时 4000 毫秒后过期）。'
+            'Render phase: directly captures an existing version without an expiry timer. Only pending captures resolved to a version receive the 4000 ms provisional window. Evicted versions throw UNKNOWN_VERSION.',
+            '渲染阶段直接捕获现存版本，不设置到期计时器；仅从等待中加载解析出的临时捕获使用 4000 毫秒窗口。已逐出版本抛 `UNKNOWN_VERSION`。'
           ),
           params: {
             version: t(
@@ -962,14 +927,17 @@ scope.dispose()`
           example: `userResource.dispose()`
         },
         forceDispose: {
-          summary: t('Releases immediately, ignoring holders.', '无视持有者，立即释放资源。'),
+          summary: t(
+            'Ends logical ownership immediately, ignoring holders; asynchronous physical cleanup can remain pending.',
+            '无视持有者立即结束逻辑所有权；异步物理清理仍可能等待完成。'
+          ),
           returns: t('Nothing; the resource is disposed.', '无返回值；资源已释放。'),
           example: `userResource.forceDispose()`
         },
         whenTerminal: {
           summary: t(
-            'Resolves when the resource reached `disposed`; does not depend on GC.',
-            '资源到达 `disposed` 时 resolve；不依赖垃圾回收。'
+            'Resolves after logical disposal and all registered asynchronous physical cleanup settle; does not depend on garbage collection. Cleanup failures are reported rather than replacing completion.',
+            '在逻辑释放且已登记异步物理清理结束后完成，不依赖垃圾回收；清理失败经报告通道处理，不替换完成结果。'
           ),
           returns: t('A Promise resolved at termination.', '在终止时 resolve 的 Promise。'),
           example: `await userResource.whenTerminal()`
@@ -1102,10 +1070,6 @@ scope.dispose()`,
       'Argument of the loader: `{ signal, generation, token }`.',
       '加载函数收到的上下文参数：`{ signal, generation, token }`。'
     ),
-    IStoreResourceKind: alias(
-      'Union of `StoreResourceKind` values.',
-      '`StoreResourceKind` 全部取值组成的联合类型。'
-    ),
     IResourceCapture: alias(
       'Token returned by `captureVersion()` and consumed by `commitCapture()`.',
       '由 `captureVersion()` 返回、并被 `commitCapture()` 消费的一次性令牌。'
@@ -1133,29 +1097,6 @@ scope.dispose()`,
         )
       }
     },
-    StoreResourceKind: {
-      summary: t('Lifecycle states of a store resource.', '资源容器的生命周期状态。'),
-      values: {
-        idle: t('`idle`: not loaded yet, or evicted.', '`idle`：尚未加载，或缓存已被逐出。'),
-        loading: t(
-          '`loading`: the loader runs; a previous value may still be readable.',
-          '`loading`：加载函数正在运行；之前的值可能仍可读取。'
-        ),
-        ready: t('`ready`: a value is available.', '`ready`：已经有可以直接读取的值。'),
-        failed: t(
-          '`failed`: loading failed and there is no older value.',
-          '`failed`：加载失败，且没有可回退的旧值。'
-        ),
-        closing: t(
-          '`closing`: `dispose()` waits for the last holder.',
-          '`closing`：`dispose()` 正在等待最后一个持有者释放。'
-        ),
-        disposed: t(
-          '`disposed`: terminal; `whenTerminal()` resolved.',
-          '`disposed`：已到达不可恢复的终态，`whenTerminal()` 已经 resolve。'
-        )
-      }
-    },
     StoreLightErrorCode: {
       summary: t(
         'Stable error codes of `@migaia/store-light`.',
@@ -1175,24 +1116,32 @@ scope.dispose()`,
           '`CAPTURE_INVALID`：捕获令牌无效或已被使用过。'
         ),
         unknownVersion: t(
-          '`UNKNOWN_VERSION`: the version is unknown; read it from the current snapshot.',
-          '`UNKNOWN_VERSION`：版本不存在；请从当前快照读取版本。'
+          'UNKNOWN_VERSION: the version is unknown or already evicted; retaining or capturing it cannot revive it. Read a current snapshot instead.',
+          '`UNKNOWN_VERSION`：版本未知或已逐出，重新持有或捕获不能复活它；应读取当前快照。'
         ),
         identityRequired: t(
           '`IDENTITY_REQUIRED`: a resource with `dispose` returned a primitive value.',
           '`IDENTITY_REQUIRED`：带 `dispose` 的资源返回了原始类型的值。'
         ),
         noAsyncInit: t(
-          '`NO_ASYNC_INIT`: `storeReady()` got an object that is not a store.',
-          '`NO_ASYNC_INIT`：`storeReady()` 收到的对象不是本模块创建的 Store。'
+          'NO_ASYNC_INIT: storeReady received an object without readiness registered by this package instance. Both synchronous and asynchronous stores created here are registered.',
+          '`NO_ASYNC_INIT`：`storeReady` 收到未由本包实例登记就绪状态的对象；本实例创建的同步与异步仓库均已登记。'
         ),
         storeNotReady: t(
           '`STORE_NOT_READY`: async fields read before the store was ready; await `storeReady()`.',
           '`STORE_NOT_READY`：在 Store 就绪前读取了异步字段；请先等待 `storeReady()`。'
         ),
         initAndCleanupFailed: t(
-          '`INIT_AND_CLEANUP_FAILED`: initialisation and its cleanup both failed; see `errors`.',
-          '`INIT_AND_CLEANUP_FAILED`：初始化及其清理都失败了；查看 `errors`。'
+          'INIT_AND_CLEANUP_FAILED: initialization and cleanup both fail and cleanup cannot attach to the primary Error. Aggregate errors retain the original first; writable primary errors retain identity and receive cleanup through cause instead.',
+          '`INIT_AND_CLEANUP_FAILED`：初始化和清理均失败，且无法把清理失败附到主错误；聚合列表保留原错在先，可写主错误则保留身份并经原因链附清理失败。'
+        ),
+        fieldDisposeFailed: t(
+          'FIELD_DISPOSE_FAILED: a late field disposer throws or rejects after initialization is abandoned or the store closes. The Runtime reports the original native error or a coded fallback retaining it.',
+          '`FIELD_DISPOSE_FAILED`：初始化放弃或仓库关闭后，晚到字段清理同步抛错或异步拒绝；运行时报告原生原错，或经带码回退保留它。'
+        ),
+        initializationFailed: t(
+          'INITIALIZATION_FAILED: an unclassified field initialization fails; native mutable errors retain identity and stack, while fallback errors retain the original cause. Already classified foreign errors retain their owner.',
+          '`INITIALIZATION_FAILED`：未分类字段初始化失败；可修改原生错误保留身份与堆栈，回退错误保留原始原因；外包已分类错误保留实际所有者。'
         ),
         syncFieldRequired: t(
           '`SYNC_FIELD_REQUIRED`: an async field builder was passed to `createStore`.',
@@ -1207,8 +1156,8 @@ scope.dispose()`,
           '`ENV_UNSUPPORTED`：宿主环境缺少所需的 `WeakRef` 或 `FinalizationRegistry` 能力。'
         ),
         invalidOption: t(
-          '`INVALID_OPTION`: an option, `$set` key or `$hydrate` field is invalid.',
-          '`INVALID_OPTION`：选项、`$set` 的 key 或 `$hydrate` 的字段不合法。'
+          'INVALID_OPTION: an option, reserved built-in API key, $set target or $hydrate field is invalid; correct the named input.',
+          '`INVALID_OPTION`：选项、内置接口保留键、`$set` 目标或 `$hydrate` 字段不合法，应修正指明的输入。'
         )
       }
     }

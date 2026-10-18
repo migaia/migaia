@@ -1,9 +1,10 @@
 /**
  * Bilingual reference verified against packages/store-indexed/src, README and USEGUIDE on
- * 2026-10-17. Clarifications: Map/Set snapshots are independent native copies, not frozen;
+ * 2026-10-18. Clarifications: Map/Set snapshots are independent native copies, not frozen;
  * object/array snapshots are shallow-frozen and cached. Array has no prune(). Cross-runtime
  * protection is checked by value reads/snapshots using isTrackingIn; structural reads directly use
- * their owning signal. Constructor argument order differs from factory argument order.
+ * their owning signal. Class constructors are the sole creation entry points, ordered
+ * initial/runtime/options.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
 
@@ -32,14 +33,14 @@ const lifecycle: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   dispose: method(
-    'Idempotently disconnects every collection-owned reactive signal without disposing the caller Runtime.',
-    '幂等断开集合持有的全部响应式信号，不释放调用方运行时。',
+    'Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.',
+    '幂等断开集合持有的响应式信号并释放信号池引用，不释放调用方运行时；不会清空底层应用数据或已有快照。',
     {},
     t(
       'Nothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.',
       '无返回值；集合进入终态，后续数据访问抛出集合已释放错误。'
     ),
-    'const rows = observableArray([1]); rows.dispose(); rows.dispose()'
+    'const rows = new ObservableArray([1]); rows.dispose(); rows.dispose()'
   )
 }
 /** Key selected from the caller-owned data domain. */
@@ -61,14 +62,14 @@ const prune = method(
     'Number of stale cells actually released, not the number of deleted data entries.',
     '实际释放的过期信号格数量，不是已删除数据条目数。'
   ),
-  "const users = observableMap([['a', 1]]); users.delete('a'); console.log(users.prune()); users.dispose()"
+  "const users = new ObservableMap([['a', 1]]); users.delete('a'); console.log(users.prune()); users.dispose()"
 )
 /** Shared collection construction options. */
 const options: Readonly<Record<string, IMemberDoc>> = {
   mutationGuard: {
     summary: t(
-      'Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. A throw propagates and prevents that mutation.',
-      '调用方持有的 `@migaia/store-light` 变更守卫；每次写入前用操作名称调用许可检查，抛错原样传播并阻止该次写入。'
+      'Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.',
+      '调用方持有的 `@migaia/store-light` 变更守卫；每次写入前用操作名称调用许可检查，已有外包来源与错误码保持不变；未分类且可扩展的原生错误在原对象上附 `CALLBACK_FAILED`，冻结错误与其他值经原因或聚合列表保留。失败阻止本次外层写入，不回滚回调自己的副作用。'
     ),
     default: t(
       'Omitted: mutations have no additional policy guard.',
@@ -87,44 +88,43 @@ const options: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 /** Object example shows tracked reading and explicit lifecycle ownership. */
-const objectExample = `const user = observableObject({ name: 'Ada', age: 30 })
+const objectExample = `const user = new ObservableObject({ name: 'Ada', age: 30 })
 const watch = user.runtime.effect(() => console.log(user.get('name')))
 user.set('name', 'Grace')
 watch.dispose()
 user.dispose()`
 /** Array example preserves index semantics. */
-const arrayExample = `const rows = observableArray([10, 20])
+const arrayExample = `const rows = new ObservableArray([10, 20])
 const watch = rows.runtime.effect(() => console.log(rows.at(0)))
 rows.set(1, 21)
 rows.splice(0, 1)
 watch.dispose()
 rows.dispose()`
 /** Map example distinguishes keys and values. */
-const mapExample = `const users = observableMap<string, number>([['a', 1]])
+const mapExample = `const users = new ObservableMap<string, number>([['a', 1]])
 const watch = users.runtime.effect(() => console.log(users.get('a')))
 users.set('a', 2)
 console.log(users.entries())
 watch.dispose()
 users.dispose()`
 /** Set example observes one membership. */
-const setExample = `const tags = observableSet(['a'])
+const setExample = `const tags = new ObservableSet(['a'])
 const watch = tags.runtime.effect(() => console.log(tags.has('a')))
 tags.delete('a')
 watch.dispose()
 tags.dispose()`
-/** Factory and constructor docs preserve their different parameter order. */
+/** Documents the sole class construction path and its ownership. */
 const factory = (
   name: string,
   kind: string,
   zhKind: string,
   example: string,
-  initial: IText,
-  constructor = false
+  initial: IText
 ): ISymbolDoc => ({
   role: 'factory',
   purpose: t(
-    `Creates an explicit reactive ${kind} with lazy per-entry signals and collection-owned disposal. ${constructor ? 'Constructor order is initial, runtime, options.' : 'Factory order is initial, options, runtime.'}`,
-    `创建显式响应式${zhKind}，按需建立条目信号并由集合持有释放责任。${constructor ? '构造参数依次为初值、运行时、选项。' : '工厂参数依次为初值、选项、运行时。'}`
+    `Creates an explicit reactive ${kind} with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options.`,
+    `创建显式响应式${zhKind}，按需建立条目信号并由集合持有释放责任。构造参数依次为初值、运行时、选项。`
   ),
   params: {
     initial,
@@ -144,8 +144,8 @@ const factory = (
 const errorFactory = (native: string, withCause: boolean): ISymbolDoc => ({
   role: 'operation',
   purpose: t(
-    `Constructs a native ${native} with this package source and selected stable code, preserving the original stack. The helper returns rather than throws the error.`,
-    `构造带本包来源与所选稳定错误码的原生错误，保留原始堆栈；辅助函数只返回错误，不主动抛出。`
+    `Constructs a native ${native} with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.`,
+    `构造带本包来源与所选稳定错误码的原生错误，保留原始堆栈，不保证堆栈字符串含原因消息全文；辅助函数只返回错误，不主动抛出。`
   ),
   params: {
     code: t(
@@ -181,96 +181,52 @@ export const storeIndexedReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Explicit reactive Object, Array, Map and Set collections without user-object proxies. Start with observableObject, observableArray, observableMap or observableSet, then read and mutate through named methods.',
-        '提供无需代理用户对象的显式响应式对象、数组、映射与集合；从对应小写工厂开始，通过命名方法读取和写入。'
+        'Explicit reactive Object, Array, Map and Set collections without user-object proxies. Start with ObservableObject, ObservableArray, ObservableMap or ObservableSet, then read and mutate through named methods. Ordinary dependencies are reactive, store-light and utils, with no peerDependencies; store-light supplies only the mutation-guard type to this layer.',
+        '提供无需代理用户对象的显式响应式对象、数组、映射与集合；从 `ObservableObject`、`ObservableArray`、`ObservableMap` 或 `ObservableSet` 类构造开始，通过命名方法读取和写入。普通依赖为响应式内核、轻量仓库与基础工具，没有对等依赖；轻量仓库仅提供变更守卫类型。'
       ),
-      example: `import { observableArray } from '@migaia/store-indexed'\n${arrayExample}`
+      example: `import { ObservableArray } from '@migaia/store-indexed'\n${arrayExample}`
     }
   },
   symbols: {
-    observableObject: factory(
+    ObservableObject: factory(
       'ObservableObject',
       'string-keyed object',
       '字符串键对象',
       objectExample,
       t(
-        'Required non-null object; enumerable own string keys and their values are copied before runtime ownership is claimed.',
-        '必填非空对象；取得运行时所有权前复制自有可枚举字符串键及其值。'
-      )
-    ),
-    ObservableObject: factory(
-      'ObservableObject',
-      'string-keyed object',
-      '字符串键对象',
-      objectExample.replace('observableObject(', 'new ObservableObject('),
-      t(
         'Required initial object; key types are inferred from its declared shape.',
         '必填初始对象，键类型从声明形状推导。'
-      ),
-      true
-    ),
-    observableArray: factory(
-      'ObservableArray',
-      'index-based array',
-      '索引数组',
-      arrayExample,
-      t(
-        'Iterable copied before ownership; omitted uses an empty array. Strings produce character elements.',
-        '取得所有权前复制的可迭代值；省略时为空数组，字符串按字符产生元素。'
       )
     ),
     ObservableArray: factory(
       'ObservableArray',
       'index-based array',
       '索引数组',
-      arrayExample.replace('observableArray(', 'new ObservableArray('),
+      arrayExample,
       t(
         'Initial iterable or omitted for an empty array; strings are accepted.',
         '初始可迭代值，省略时为空数组，也接受字符串。'
-      ),
-      true
-    ),
-    observableMap: factory(
-      'ObservableMap',
-      'key/value map',
-      '键值映射',
-      mapExample,
-      t(
-        'ReadonlyMap or iterable of key/value pairs; omitted uses an empty map. Primitive strings are rejected.',
-        '只读映射或键值对可迭代值；省略时为空映射，拒绝原始字符串。'
       )
     ),
     ObservableMap: factory(
       'ObservableMap',
       'key/value map',
       '键值映射',
-      mapExample.replace('observableMap<string, number>(', 'new ObservableMap<string, number>('),
+      mapExample,
       t(
-        'Initial map or entry iterable, omitted for an empty map.',
-        '初始映射或条目可迭代值，省略时为空映射。'
-      ),
-      true
-    ),
-    observableSet: factory(
-      'ObservableSet',
-      'membership set',
-      '成员集合',
-      setExample,
-      t(
-        'Initial iterable deduplicated using native Set semantics; omitted uses an empty set and strings produce characters.',
-        '按原生成员集合语义去重的初始可迭代值；省略时为空集合，字符串按字符展开。'
+        'Initial map or entry iterable, omitted for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw INVALID_OPTION and preserve the old collection.',
+        '初始映射或条目可迭代值，省略时为空映射；构造与替换均先按原生映射规则验证条目，再取得所有权或改写数据，非法条目抛 `INVALID_OPTION` 且旧集合不变。'
       )
     ),
     ObservableSet: factory(
       'ObservableSet',
       'membership set',
       '成员集合',
-      setExample.replace('observableSet(', 'new ObservableSet('),
+      setExample,
       t(
         'Initial iterable or omitted for an empty membership set.',
         '初始可迭代值，省略时为空成员集合。'
-      ),
-      true
+      )
     ),
     createStoreIndexedError: errorFactory('Error', true),
     createStoreIndexedRangeError: errorFactory('RangeError', false),
@@ -294,8 +250,8 @@ export const storeIndexedReference: ILibraryReference = {
     StoreIndexedErrorCode: {
       role: 'constant',
       purpose: t(
-        'Stable semantic codes distinguishing invalid inputs, disposed collections, invalid array indexes and reads across runtime graphs.',
-        '稳定语义错误码，区分非法输入、已释放集合、非法数组下标及跨运行时依赖图读取。'
+        'Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs.',
+        '稳定语义错误码，区分非法输入、已释放集合、回调失败、非法数组下标及跨运行时依赖图读取。'
       ),
       example: 'console.log(StoreIndexedErrorCode.collectionDisposed)'
     }
@@ -303,8 +259,8 @@ export const storeIndexedReference: ILibraryReference = {
   types: {
     IObservableCollectionOptions: {
       summary: t(
-        'Construction policy shared by all explicit collection classes and factories; it adds diagnostics and optional mutation admission.',
-        '所有显式集合类与工厂共用的构造策略，提供诊断命名与可选写入接纳。'
+        'Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission.',
+        '所有显式集合类共用的构造策略，提供诊断命名与可选写入接纳。'
       ),
       members: options
     },
@@ -344,7 +300,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Stored value, or undefined for an absent key; cross-runtime tracked value reads reject.',
             '返回保存值，缺失键返回空值；跨运行时的追踪值读取会拒绝。'
           ),
-          "const user = observableObject({ age: 30 }); console.log(user.get('age')); user.dispose()"
+          "const user = new ObservableObject({ age: 30 }); console.log(user.get('age')); user.dispose()"
         ),
         peek: method(
           'Reads one key without tracking or allocating a reactive cell, even during an active effect.',
@@ -354,7 +310,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Current value, or undefined when absent, without creating a dependency.',
             '返回当前值，缺失时为空值，不建立依赖。'
           ),
-          "const user = observableObject({ age: 30 }); console.log(user.peek('age')); user.dispose()"
+          "const user = new ObservableObject({ age: 30 }); console.log(user.peek('age')); user.dispose()"
         ),
         has: method(
           'Reads key existence through the shared structure signal; changing only a value does not invalidate it.',
@@ -364,7 +320,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Whether the object currently contains the string key.',
             '返回对象当前是否含有所选字符串键。'
           ),
-          "const user = observableObject({ age: 30 }); console.log(user.has('age')); user.dispose()"
+          "const user = new ObservableObject({ age: 30 }); console.log(user.has('age')); user.dispose()"
         ),
         set: method(
           'Runs the mutation guard, then assigns one key in a Runtime batch; Object.is-equal existing values do not bump the snapshot revision.',
@@ -374,7 +330,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; value observers update and insertion also updates structure.',
             '无返回值；值观察者更新，插入新键还会更新结构。'
           ),
-          "const user = observableObject({ age: 30 }); user.set('age', 31); user.dispose()"
+          "const user = new ObservableObject({ age: 30 }); user.set('age', 31); user.dispose()"
         ),
         update: method(
           'After mutation admission, synchronously calls updater with the untracked current value and commits its result. A thrown updater leaves this outer assignment unapplied.',
@@ -382,15 +338,15 @@ export const storeIndexedReference: ILibraryReference = {
           {
             key,
             updater: t(
-              'Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited and throws propagate.',
-              '同步回调接收当前值并返回替换值；不会等待承诺，抛错原样传播。'
+              'Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited. Existing error identity is preserved; otherwise CALLBACK_FAILED is attached to the original native error or retains the original through cause/errors.',
+              '同步回调接收当前值并返回替换值；不会等待承诺；保留已有错误身份，否则在原生错误上附 `CALLBACK_FAILED`，或经原因与聚合列表保留原值。'
             )
           },
           t(
             'Nothing; the returned replacement value has been committed in a Runtime batch.',
             '无返回值；更新函数返回的替换值已在运行时批处理中提交。'
           ),
-          "const user = observableObject({ age: 30 }); user.update('age', age => age + 1); user.dispose()"
+          "const user = new ObservableObject({ age: 30 }); user.update('age', age => age + 1); user.dispose()"
         ),
         delete: method(
           'Removes one admitted key and updates value, structure and revision signals; observed deleted cells retain an absent tombstone.',
@@ -400,7 +356,7 @@ export const storeIndexedReference: ILibraryReference = {
             'True only when a stored key was removed; false if already absent.',
             '仅实际移除已保存键时为真，原本缺失时为假。'
           ),
-          "const user = observableObject({ age: 30 }); console.log(user.delete('age')); user.dispose()"
+          "const user = new ObservableObject({ age: 30 }); console.log(user.delete('age')); user.dispose()"
         ),
         keys: method(
           'Enumerates current string keys and tracks only the object structure.',
@@ -410,7 +366,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Fresh key array in insertion order; its readonly type does not freeze the returned array.',
             '返回按插入顺序排列的新键数组；只读类型不冻结返回数组。'
           ),
-          'const user = observableObject({ age: 30 }); console.log(user.keys()); user.dispose()'
+          'const user = new ObservableObject({ age: 30 }); console.log(user.keys()); user.dispose()'
         ),
         snapshot: method(
           'Returns a shallow-frozen null-prototype object snapshot, cached until actual membership or value changes.',
@@ -420,11 +376,11 @@ export const storeIndexedReference: ILibraryReference = {
             'Readonly top-level copy; nested values retain identity and tracked reads depend on all revisions.',
             '返回顶层只读副本；嵌套值保留身份，追踪读取依赖全部修订。'
           ),
-          'const user = observableObject({ age: 30 }); console.log(user.snapshot()); user.dispose()'
+          'const user = new ObservableObject({ age: 30 }); console.log(user.snapshot()); user.dispose()'
         ),
         replace: method(
-          'Reads all enumerable own entries before mutation and replaces keys in one batch; failed input getters leave existing data unchanged.',
-          '变更前读取全部自有可枚举条目，再在一次批处理中替换键集；输入访问器失败时原数据不变。',
+          'Reads all enumerable own entries before mutation and replaces keys in one batch; failed input getters leave existing data unchanged. The guard runs once at replace admission; internal deletion/insertion does not call public delete/set per key.',
+          '变更前读取全部自有可枚举条目，再在一次批处理中替换键集；输入访问器失败时原数据不变；守卫仅在替换入口调用一次，内部删除与写入不会逐键调用公开删除或设置方法。',
           {
             next: t(
               'Caller-authored complete replacement object; omitted keys are deleted.',
@@ -435,12 +391,12 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; deleted, inserted and changed keys are committed together.',
             '无返回值；删除、插入与值变更已一并提交。'
           ),
-          'const user = observableObject({ age: 30 }); user.replace({ age: 31 }); user.dispose()'
+          'const user = new ObservableObject({ age: 30 }); user.replace({ age: 31 }); user.dispose()'
         ),
         prune: {
           ...prune,
           example:
-            "const user = observableObject({ age: 30 }); user.delete('age'); console.log(user.prune()); user.dispose()"
+            "const user = new ObservableObject({ age: 30 }); user.delete('age'); console.log(user.prune()); user.dispose()"
         }
       }
     },
@@ -477,7 +433,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Element or undefined outside bounds; owning Runtime tracking observes that index.',
             '返回元素，越界时为空值；所属运行时追踪会观察该下标。'
           ),
-          'const rows = observableArray([1, 2]); console.log(rows.at(-1)); rows.dispose()'
+          'const rows = new ObservableArray([1, 2]); console.log(rows.at(-1)); rows.dispose()'
         ),
         snapshot: method(
           'Reads the revision and caches a shallow-frozen array until length or element values change.',
@@ -487,7 +443,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Readonly shallow array snapshot; nested values retain identity.',
             '返回浅只读数组快照，嵌套值保留身份。'
           ),
-          'const rows = observableArray([1]); console.log(rows.snapshot()); rows.dispose()'
+          'const rows = new ObservableArray([1]); console.log(rows.snapshot()); rows.dispose()'
         ),
         peek: method(
           'Makes a fresh shallow-frozen array copy without any dependency tracking.',
@@ -497,11 +453,11 @@ export const storeIndexedReference: ILibraryReference = {
             'Untracked readonly shallow copy, independent of snapshot caching.',
             '返回不追踪的浅只读副本，与快照缓存独立。'
           ),
-          'const rows = observableArray([1]); console.log(rows.peek()); rows.dispose()'
+          'const rows = new ObservableArray([1]); console.log(rows.peek()); rows.dispose()'
         ),
         set: method(
-          'Replaces an existing nonnegative index after guard admission; Object.is-equal values do not notify.',
-          '通过守卫接纳后替换已有非负下标；同值比较相等时不通知。',
+          'Replaces an existing nonnegative index after guard admission; changed cell and revision commit in one Runtime batch, including synchronous schedulers. Object.is-equal values do not notify.',
+          '通过守卫接纳后替换已有非负下标；信号格与修订在一次运行时批处理中提交，同步调度器也不见中间旧快照。同值比较相等时不通知。',
           {
             index: t(
               'Integer within [0, length); nonintegers throw INVALID_INDEX and other positions INDEX_OUT_OF_RANGE.',
@@ -513,7 +469,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; the selected cell and revision update when the value changes.',
             '无返回值；值变化时更新所选信号格与修订。'
           ),
-          'const rows = observableArray([1]); rows.set(0, 2); rows.dispose()'
+          'const rows = new ObservableArray([1]); rows.set(0, 2); rows.dispose()'
         ),
         push: method(
           'Appends values in one batch; an empty argument list leaves revisions unchanged.',
@@ -525,7 +481,7 @@ export const storeIndexedReference: ILibraryReference = {
             )
           },
           t('New array length after the append operation.', '返回追加操作完成后的数组长度。'),
-          'const rows = observableArray([1]); console.log(rows.push(2, 3)); rows.dispose()'
+          'const rows = new ObservableArray([1]); console.log(rows.push(2, 3)); rows.dispose()'
         ),
         pop: method(
           'Removes the final element, marks any observed index absent and updates structure in one batch.',
@@ -535,7 +491,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Removed final value, or undefined when already empty.',
             '返回被移除的末尾值，原本为空时返回空值。'
           ),
-          'const rows = observableArray([1]); console.log(rows.pop()); rows.dispose()'
+          'const rows = new ObservableArray([1]); console.log(rows.pop()); rows.dispose()'
         ),
         splice: method(
           'Applies native splice positioning and integer coercion to a copied array, then commits changed indexes in one batch.',
@@ -558,11 +514,11 @@ export const storeIndexedReference: ILibraryReference = {
             'Shallow-frozen array of removed elements; inserted values keep identity.',
             '返回被移除元素的浅冻结数组；插入值保留身份。'
           ),
-          'const rows = observableArray([1, 2]); console.log(rows.splice(0, 1, 3)); rows.dispose()'
+          'const rows = new ObservableArray([1, 2]); console.log(rows.splice(0, 1, 3)); rows.dispose()'
         ),
         replace: method(
-          'Materializes the entire iterable before replacing data, then updates only materialized index cells in one batch.',
-          '先完整物化可迭代值，再替换数据，并在一次批处理中更新已物化的下标信号格。',
+          'Materializes the entire iterable before replacing data, then updates only materialized index cells in one batch. Equal-length inputs still require a full value comparison; this is not a constant-time replacement.',
+          '先完整物化可迭代值，再替换数据，并在一次批处理中更新已物化的下标信号格；等长输入仍需逐值比较，不保证恒定替换成本。',
           {
             values: t(
               'Complete replacement iterable; strings are accepted as characters.',
@@ -573,7 +529,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; values and changed length/revision are committed.',
             '无返回值；数据及变化的长度与修订已提交。'
           ),
-          'const rows = observableArray([1]); rows.replace([2, 3]); rows.dispose()'
+          'const rows = new ObservableArray([1]); rows.replace([2, 3]); rows.dispose()'
         ),
         clear: method(
           'Replaces the array with an empty array through the same guarded replacement path.',
@@ -583,7 +539,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; the array is empty and affected observations are invalidated.',
             '无返回值；数组已清空，受影响观察已失效。'
           ),
-          'const rows = observableArray([1]); rows.clear(); rows.dispose()'
+          'const rows = new ObservableArray([1]); rows.clear(); rows.dispose()'
         )
       }
     },
@@ -612,7 +568,7 @@ export const storeIndexedReference: ILibraryReference = {
           '读取键值，仅在所属运行时上下文内按需追踪该键。',
           { key },
           t('Current value or undefined for an absent key.', '返回当前保存值，缺失键返回空值。'),
-          "const users = observableMap([['a', 1]]); console.log(users.get('a')); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.get('a')); users.dispose()"
         ),
         peek: method(
           'Reads the backing Map directly without tracking or creating any key cell.',
@@ -622,7 +578,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Current stored value or undefined without dependency admission.',
             '返回当前值，缺失时为空值，不建立依赖。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.peek('a')); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.peek('a')); users.dispose()"
         ),
         has: method(
           'Tracks the selected key cell for membership; updates to unrelated keys do not invalidate this observation.',
@@ -632,7 +588,7 @@ export const storeIndexedReference: ILibraryReference = {
             'True when the backing Map contains this key, even if its value is undefined.',
             '内部映射含有所选键时为真，即使保存的值为空值。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.has('a')); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.has('a')); users.dispose()"
         ),
         set: method(
           'Writes a key after admission; an unchanged existing value is a no-op, while insertion updates structure and iteration.',
@@ -642,7 +598,7 @@ export const storeIndexedReference: ILibraryReference = {
             'This same ObservableMap for chaining; values retain original identity.',
             '返回同一响应式映射以继续链式写入，值保留原始身份。'
           ),
-          "const users = observableMap<string, number>(); users.set('a', 1).set('b', 2); users.dispose()"
+          "const users = new ObservableMap<string, number>(); users.set('a', 1).set('b', 2); users.dispose()"
         ),
         delete: method(
           'Removes one key in a batch and retains its missing cell while still observed.',
@@ -652,7 +608,7 @@ export const storeIndexedReference: ILibraryReference = {
             'True if an entry was removed; false when the key was absent.',
             '实际移除条目时为真，键原本缺失时为假。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.delete('a')); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.delete('a')); users.dispose()"
         ),
         clear: method(
           'Clears stored entries and invalidates materialized cells, with one structure and iteration update.',
@@ -662,11 +618,11 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; all entries are removed while observed tombstones survive.',
             '无返回值；全部条目已移除，受观察的缺失标记仍保留。'
           ),
-          "const users = observableMap([['a', 1]]); users.clear(); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); users.clear(); users.dispose()"
         ),
         replace: method(
-          'Materializes all entries before a batched swap; key-set changes update structure, and value changes update iteration.',
-          '先物化全部条目再批量交换；键集改变更新结构，值变化更新迭代依赖。',
+          'Materializes all entries before a batched swap; key membership or insertion-order changes update structure and iteration, and value changes update iteration. Only identical entries in identical order avoid notification.',
+          '先物化全部条目再批量交换；键成员或插入顺序改变时更新结构与迭代，值变化更新迭代依赖；仅条目及顺序均不变时不通知。',
           {
             next: t(
               'Complete map or entry iterable to replace existing entries.',
@@ -677,7 +633,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; the replacement is committed atomically after input preparation.',
             '无返回值；输入准备后原子提交替换。'
           ),
-          "const users = observableMap([['a', 1]]); users.replace([['b', 2]]); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); users.replace([['b', 2]]); users.dispose()"
         ),
         keys: method(
           'Returns insertion-ordered keys while tracking membership structure only.',
@@ -687,7 +643,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Fresh key array; readonly typing does not freeze the array.',
             '返回新的键数组，只读类型不会冻结该数组。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.keys()); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.keys()); users.dispose()"
         ),
         valuesArray: method(
           'Reads value iteration and returns a shallow-frozen values array.',
@@ -697,7 +653,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Frozen top-level values in current Map iteration order.',
             '返回按当前映射迭代顺序排列的顶层冻结值数组。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.valuesArray()); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.valuesArray()); users.dispose()"
         ),
         entries: method(
           'Reads value iteration and returns a frozen array of frozen entry pairs.',
@@ -707,7 +663,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Readonly key/value pairs; nested keys and values keep identity.',
             '返回只读键值对，嵌套键和值保持原有身份。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.entries()); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.entries()); users.dispose()"
         ),
         snapshot: method(
           'Reads value iteration and creates a new independent native Map copy on each call.',
@@ -717,7 +673,7 @@ export const storeIndexedReference: ILibraryReference = {
             'ReadonlyMap-typed shallow copy; the native Map itself is not frozen and changes to it do not mutate the collection.',
             '返回只读映射类型的浅副本；原生映射本身未冻结，对副本的修改不改变原集合。'
           ),
-          "const users = observableMap([['a', 1]]); console.log(users.snapshot()); users.dispose()"
+          "const users = new ObservableMap([['a', 1]]); console.log(users.snapshot()); users.dispose()"
         ),
         prune
       }
@@ -750,14 +706,14 @@ export const storeIndexedReference: ILibraryReference = {
             'Whether native Set semantics find the selected member.',
             '返回按原生成员集合语义是否存在所选成员。'
           ),
-          "const tags = observableSet(['a']); console.log(tags.has('a')); tags.dispose()"
+          "const tags = new ObservableSet(['a']); console.log(tags.has('a')); tags.dispose()"
         ),
         add: method(
           'Adds an admitted member and notifies its cell and structure; existing membership is unchanged.',
           '添加获准成员并通知其信号格与结构；已有成员保持不变。',
           { value },
           t('This same ObservableSet for chaining.', '返回同一响应式集合，以便继续链式添加。'),
-          "const tags = observableSet(['a']); tags.add('b').add('c'); tags.dispose()"
+          "const tags = new ObservableSet(['a']); tags.add('b').add('c'); tags.dispose()"
         ),
         delete: method(
           'Removes an admitted member, updates structure and retains observed missing-membership cells.',
@@ -767,7 +723,7 @@ export const storeIndexedReference: ILibraryReference = {
             'True only when the member existed before removal.',
             '仅移除前确实存在所选成员时返回真。'
           ),
-          "const tags = observableSet(['a']); console.log(tags.delete('a')); tags.dispose()"
+          "const tags = new ObservableSet(['a']); console.log(tags.delete('a')); tags.dispose()"
         ),
         clear: method(
           'Removes all members in one batch and updates materialized membership cells plus structure.',
@@ -777,11 +733,11 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; membership is empty and affected observations are invalidated.',
             '无返回值；成员已清空，受影响观察已失效。'
           ),
-          "const tags = observableSet(['a']); tags.clear(); tags.dispose()"
+          "const tags = new ObservableSet(['a']); tags.clear(); tags.dispose()"
         ),
         replace: method(
-          'Materializes the iterable before swapping membership in one batch; equivalent membership does not bump structure.',
-          '先物化可迭代值，再在一次批处理中交换成员；成员等价时不提升结构修订。',
+          'Materializes the iterable before swapping membership in one batch; only identical membership in identical iteration order avoids a structure update.',
+          '先物化可迭代值，再在一次批处理中交换成员；仅成员与迭代顺序均相同时不提升结构修订。',
           {
             next: t(
               'Complete replacement iterable; duplicate values collapse using native Set semantics.',
@@ -792,7 +748,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Nothing; replacement membership is committed after input preparation.',
             '无返回值；输入准备完成后已提交替换成员集。'
           ),
-          "const tags = observableSet(['a']); tags.replace(['b', 'c']); tags.dispose()"
+          "const tags = new ObservableSet(['a']); tags.replace(['b', 'c']); tags.dispose()"
         ),
         valuesArray: method(
           'Reads structure and returns a shallow-frozen array in Set iteration order.',
@@ -802,7 +758,7 @@ export const storeIndexedReference: ILibraryReference = {
             'Frozen top-level member list; nested objects retain identity.',
             '返回顶层冻结成员列表，嵌套对象保留身份。'
           ),
-          "const tags = observableSet(['a']); console.log(tags.valuesArray()); tags.dispose()"
+          "const tags = new ObservableSet(['a']); console.log(tags.valuesArray()); tags.dispose()"
         ),
         snapshot: method(
           'Reads structure and creates a fresh independent native Set copy.',
@@ -812,12 +768,12 @@ export const storeIndexedReference: ILibraryReference = {
             'ReadonlySet-typed shallow copy; the native Set is not frozen, and mutating it does not affect the source collection.',
             '返回只读集合类型的浅副本；原生集合未冻结，修改副本不影响源集合。'
           ),
-          "const tags = observableSet(['a']); console.log(tags.snapshot()); tags.dispose()"
+          "const tags = new ObservableSet(['a']); console.log(tags.snapshot()); tags.dispose()"
         ),
         prune: {
           ...prune,
           example:
-            "const tags = observableSet(['a']); tags.delete('a'); console.log(tags.prune()); tags.dispose()"
+            "const tags = new ObservableSet(['a']); tags.delete('a'); console.log(tags.prune()); tags.dispose()"
         }
       }
     }
@@ -850,12 +806,16 @@ export const storeIndexedReference: ILibraryReference = {
       ),
       values: {
         invalidOption: t(
-          'Invalid constructor options, input shape, object key or updater; fix the supplied value.',
-          '构造选项、输入形状、对象键或更新函数非法，应修正传入值。'
+          'Invalid constructor options, input/iterator shape, debugName, object key or updater; fix the supplied value.',
+          '构造选项、输入或迭代器形状、诊断名、对象键或更新函数非法，应修正传入值。'
         ),
         collectionDisposed: t(
           'Data access after terminal collection disposal; create a new collection.',
           '集合终态释放后继续访问数据，应创建新的集合。'
+        ),
+        callbackFailed: t(
+          'An unclassified synchronous mutation guard or updater fails; existing foreign identities stay unchanged, and original values remain reachable. The outer mutation is not committed.',
+          '同步变更守卫或更新函数发生未分类失败；已有外包身份保持不变，原始值仍可追溯；本次外层写入不提交。'
         ),
         indexOutOfRange: t(
           'Array set index falls outside existing nonnegative positions.',

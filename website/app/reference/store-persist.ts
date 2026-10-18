@@ -1,11 +1,9 @@
 /**
- * Verified against packages/store-persist/src plus README/USEGUIDE on 2026-10-17. Source
- * clarifications: persistKeyed returns all handle fields, not only value/dispose; its object spread
- * snapshots disposed=false and value before hydration. Default plain-object reconciliation
- * preserves fields changed since the original startup snapshot; other shapes replace completely.
- * dispose may start an unawaited final debounced write. Interrupted initial hydration can settle
- * ready without setting hydrated=true. The default codec delegates to collectionsJsonCodec and only
- * reads the old Map/Set tags; it does not emit those legacy tags.
+ * Verified against packages/store-persist/src plus README/USEGUIDE on 2026-10-18. All facades
+ * retain the complete engine handle and live disposal getter; keyed value alone is an initial
+ * snapshot. Initial readiness rejects on cancellation, strict flush observes the actual write
+ * drain, and the default codec reads exact legacy markers while writing the canonical collections
+ * representation.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
 
@@ -224,8 +222,8 @@ const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   ),
   namespace: {
     summary: t(
-      'Application-selected archive prefix; the full key is namespace followed by a colon and the caller id. clearFamily filters that exact prefix.',
-      '应用指定的存档前缀；完整键由前缀、冒号与调用方标识组成，批量清理按此精确前缀过滤。'
+      'Required application-selected string prefix; the full key is namespace followed by a colon and the caller id. Missing or nonstring values throw INVALID_OPTION at runtime; clearFamily filters that exact prefix.',
+      '应用必须指定的字符串存档前缀；完整键由前缀、冒号与调用方标识组成。缺失或非字符串值在运行时抛 `INVALID_OPTION`，批量清理按此精确前缀过滤。'
     )
   },
   partialize: {
@@ -238,7 +236,7 @@ const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
     }
   }
 }
-/** Shared live handle surface; keyed disposal property is overridden below. */
+/** Shared live engine handle surface retained by every facade. */
 const handleMembers: Readonly<Record<string, IMemberDoc>> = {
   status: {
     summary: t(
@@ -284,8 +282,8 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   ready: {
     summary: t(
-      'Original initial-hydration Promise: rejects on hydration failure and otherwise resolves. Disposal can interrupt hydration without rejection, so inspect hydrated as well; retries do not replace this Promise.',
-      '原始初次水合承诺，水合失败时拒绝，否则完成；释放可能中断水合而不拒绝，因此还需查看水合成功信号；重试不替换此承诺。'
+      'Original first-hydration-attempt Promise: resolves only on success and rejects on failure or disposal before completion with AbortError/ABORTED_BY_DISPOSE. Retries do not replace this Promise.',
+      '原始首次水合尝试的承诺；仅成功时完成，失败或完成前释放时以 `AbortError`／`ABORTED_BY_DISPOSE` 拒绝。重试不替换此承诺。'
     )
   },
   settled: {
@@ -311,8 +309,8 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     'try { await handle.ready } catch { await handle.retryHydrate() }'
   ),
   flush: method(
-    'Cancels the debounce window, waits for initial hydration and pending writes, then requests a strict immediate serialized write.',
-    '取消防抖窗口，等待初次水合及待完成写入，再请求严格的立即串行写入。',
+    'Cancels the debounce window, waits for initial hydration and the actual pending write drain, then requests a strict immediate serialized write. Concurrent callers observe the same original drain failure; the scheduling recovery chain never replaces its result.',
+    '取消防抖窗口，等待初次水合及实际待完成写入，再请求严格的立即串行写入。并发调用者均观察同一写入的原始失败，调度恢复链不会替代实际结果。',
     {},
     t(
       'Promise resolving after the write; hydration/write failures reject, and disposal during the wait produces AbortError.',
@@ -331,8 +329,8 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     'await handle.ready\nawait handle.clear()'
   ),
   dispose: method(
-    'Idempotently stops the subscription, cancels the debounce timer and aborts active adapter operations. A pending debounce window starts one unawaited final snapshot write.',
-    '幂等停止订阅、取消防抖定时器并中止活跃适配器操作；存在待执行防抖窗口时，会启动一次不等待的最终快照写入。',
+    'Idempotently stops persistence subscriptions, cancels the debounce timer and aborts active adapter operations. A pending debounce window starts one unawaited final snapshot write. It does not clear business values or dispose the source state.',
+    '幂等停止持久化订阅、取消防抖定时器并中止活跃适配器操作；存在待执行防抖窗口时，启动一次不等待的最终快照写入。不清业务值或释放源状态。',
     {},
     t(
       'Nothing; scheduling is terminal. An adapter ignoring abort can still complete, and final-write failure remains in writeError.',
@@ -427,8 +425,8 @@ const adapter = (
   params,
   options,
   returns: t(
-    'Caller-owned persistence handle; invalid configuration throws synchronously, hydration failures reject ready and remain observable through status.',
-    '返回调用方持有的持久化句柄；非法配置同步抛错，水合失败拒绝初始承诺并通过状态可见。'
+    'Complete caller-owned persistence handle. Facades capture option getters once with their original options receiver; inaccessible options throw INVALID_OPTION with cause before engine construction. Hydration failures reject ready and remain observable through status.',
+    '返回调用方持有的完整持久化句柄。各适配入口以原选项对象为读取器接收者捕获一次，选项读取失败在引擎构造前抛带原因的 `INVALID_OPTION`。水合失败拒绝初始承诺并通过状态可见。'
   ),
   example
 })
@@ -437,8 +435,8 @@ export const storePersistReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Generic persistence engine and envelope/codec tools independent of concrete Store packages. Start with persistUnit for a custom synchronous snapshot/restore/subscribe boundary.',
-        '独立于具体状态包的通用持久化引擎与信封、编解码工具；自定义同步快照、恢复、订阅边界从核心工厂开始。'
+        'Generic persistence engine and envelope/codec tools independent of concrete Store packages. Start with persistUnit for a custom synchronous snapshot/restore/subscribe boundary. Runtime dependencies are reactive, storage-contract, utils and lifecycle; concrete state adapters and storage-web are selected separately.',
+        '独立于具体状态包的通用持久化引擎与信封、编解码工具；自定义同步快照、恢复、订阅边界从 `persistUnit` 开始。运行时依赖响应式、存储契约、工具及生命周期基础包，具体状态适配与网页存储实现按需选择。'
       ),
       example: coreExample
     },
@@ -554,8 +552,8 @@ export const storePersistReference: ILibraryReference = {
         key
       },
       returns: t(
-        'A new version/state envelope retaining the original state reference; invalid shape throws PersistEnvelopeError.',
-        '返回保留原状态引用的新版本状态信封；形状非法抛本包信封错误。'
+        'A new envelope retaining the original state reference, with version and state read once. Invalid shape, a revoked proxy or failed property reflection throws PersistEnvelopeError/ENVELOPE_INVALID with the original access failure on cause.',
+        '返回保留原状态引用的新信封，版本与状态分别读取一次。非法形状、已撤销代理或属性反射失败抛 `PersistEnvelopeError`／`ENVELOPE_INVALID`，原访问失败保留在原因链中。'
       ),
       example:
         "const envelope = assertEnvelope<{ count: number }>({ version: 0, state: { count: 1 } }, 'counter')"
@@ -563,8 +561,8 @@ export const storePersistReference: ILibraryReference = {
     defaultJsonCodec: {
       role: 'constant',
       purpose: t(
-        'Frozen storage-contract ICodec using collectionsJsonCodec text encoding, including Map/Set round trips. Decode also recognizes the two legacy persistence tags; invalid JSON and encode failures retain causes.',
-        '冻结的存储契约编解码器，使用集合文本编码支持映射与成员集合往返；解码还识别两种旧持久化标签，非法文本与编码失败保留原因。'
+        'Frozen ICodec named migaia-collections-json-v1, delegating current writes to collectionsJsonCodec versioned tuples for Map/Set round trips. Decode recognizes only sole-own-key array markers __migaia_persist_map__ and __migaia_persist_set__; an archive containing either uses the legacy reviver and preserves ordinary application arrays. Extra-field lookalikes remain ordinary records and use canonical decoding. Invalid JSON and encode failures retain causes.',
+        '名称为 `migaia-collections-json-v1` 的冻结编解码器，当前写入委托集合编解码器的版本元组，支持映射与成员集合往返。解码仅把唯一自有键为 `__migaia_persist_map__` 或 `__migaia_persist_set__` 且值为数组的对象视为旧标签；含精确旧标签的存档沿用旧恢复逻辑，保留普通应用数组。多字段同名对象仍为普通记录并走规范解码。非法文本与编码失败保留原因。'
       ),
       example:
         "const raw = await defaultJsonCodec.encode({ version: 0, state: new Set(['a']) })\nconst value = await defaultJsonCodec.decode(raw)"
@@ -657,6 +655,15 @@ export const storePersistReference: ILibraryReference = {
           'Caller-authored concrete envelope validation failure.',
           '调用方编写的具体信封校验失败说明。'
         )
+      },
+      optionDocs: {
+        cause: {
+          summary: t(
+            'Original property-access or reflection failure retained by identity on the native TypeError cause.',
+            '按身份保留在原生类型错误原因属性上的原始属性访问或反射失败。'
+          ),
+          default: t('Omitted: no original cause is attached.', '省略时不附加原始原因。')
+        }
       },
       returns: t(
         'An error instance with native TypeError behavior and stable source/code.',
@@ -753,8 +760,8 @@ export const storePersistReference: ILibraryReference = {
     IPersistKeyedHandle: {
       ...handleType,
       summary: t(
-        'Full persistence handle plus the value captured before initial hydration. Read live values through AtomStore; this wrapper copies the original disposed getter into an initial false value.',
-        '完整持久化句柄及初次水合前采样的值；实时值从原子存储读取，本包装把原始释放读取器复制成初始假值。'
+        'The actual complete engine handle extended with value captured before initial hydration. Live status and disposed getters retain their original owner; read live business values through AtomStore.',
+        '在实际完整引擎句柄上增加初次水合前采样的值，实时状态及释放读取器保留原拥有者；业务实时值从原子存储读取。'
       ),
       example: keyedExample,
       members: {
@@ -763,12 +770,6 @@ export const storePersistReference: ILibraryReference = {
           summary: t(
             'Initial atomStore.get(def) result captured before persistence construction; not a live getter and not refreshed by hydration.',
             '持久化构造前读取的原子存储初始值；不是实时读取器，水合不会刷新它。'
-          )
-        },
-        disposed: {
-          summary: t(
-            'Initial false value copied by object spread from the original handle; it does not update after this keyed wrapper is disposed.',
-            '对象展开从原句柄复制的初始假值；键控包装释放后此属性不会更新。'
           )
         }
       }
@@ -961,11 +962,6 @@ export const storePersistReference: ILibraryReference = {
           '持久化状态词表的全部值联合。'
         ],
         [
-          'IPersistCodecOutput',
-          'All text, structured and binary codec output values.',
-          '文本、结构化与二进制编解码输出值联合。'
-        ],
-        [
           'IStorePersistErrorCode',
           'All stable StorePersistErrorCode values for typed error handling.',
           '用于类型化错误处理的本包稳定错误码值联合。'
@@ -983,10 +979,6 @@ export const storePersistReference: ILibraryReference = {
         idle: t(
           'Write lane has no currently executing mutation.',
           '写入路径当前没有正在执行的变更。'
-        ),
-        active: t(
-          'Internal lifecycle accepts work before terminal disposal.',
-          '内部生命周期在终态释放前继续接受工作。'
         ),
         loading: t(
           'A hydration attempt is reading or restoring the archive.',

@@ -1,7 +1,7 @@
 /**
- * Local diagnostics reference, verified against packages/store-devtools/src on 2026-10-17. README
- * says actions use maxHistory; source bounds actions and trace with maxTrace instead.
- * StoreDevtoolsCommand is only a public bridge vocabulary: this package never consumes commands.
+ * Local diagnostics reference, checked against current source, README and USEGUIDE on 2026-10-18.
+ * History uses maxHistory; actions and trace each use maxTrace. Extension command ownership lives
+ * in @migaia/store-middleware as ReduxDevToolsCommand, not in this local diagnostic package.
  * Disposal propagates a single cleanup failure unchanged, and aggregates only multiple failures.
  */
 import type { ILibraryReference, IMemberDoc, ISymbolDoc, IText, ITypeDoc } from './contract.js'
@@ -54,8 +54,8 @@ const members: Record<string, IMemberDoc> = {
   ),
   record: {
     summary: t(
-      'Clones the current store snapshot and atomically appends one history entry; a failing clock or clone leaves existing queues unchanged.',
-      '克隆当前存储快照并原子追加一条历史，时钟或克隆失败时保留原有队列。'
+      'Prepares the clock and cloned store snapshot, checks that the session is still active, then publishes one history entry. Callback failure or disposal during preparation leaves queues and the next history ID unchanged.',
+      '先准备时钟与存储克隆快照，再复核会话仍存活后发布历史；准备失败或期间释放时不改变队列，也不消耗历史标识。'
     ),
     params: {
       label: t(
@@ -64,15 +64,15 @@ const members: Record<string, IMemberDoc> = {
       )
     },
     returns: t(
-      'Frozen IStoreHistoryEntry with a newly assigned monotonic ID; explicit calls propagate clock and clone failures.',
-      '返回带新分配单调标识的冻结 `IStoreHistoryEntry`，显式调用会传播时钟或克隆失败。'
+      'Frozen IStoreHistoryEntry with a new monotonic ID. Unclassified clock or clone failures become CALLBACK_FAILED; writable native errors retain identity, foreign identities remain unchanged, and immutable errors or primitive values remain on cause.',
+      '返回带新单调标识的冻结 `IStoreHistoryEntry`。未分类时钟或克隆失败附 `CALLBACK_FAILED`；可写原生错误保持身份，外包身份不改写，不可修改错误或原始值保留在原因链。'
     ),
     example: `${setup}\nconst anchor = tools.record('before-submit')\nconsole.log(anchor.id, anchor.state)\ntools.dispose()\nstore.$dispose()`
   },
   recordAction: {
     summary: t(
-      'Appends an application action record with a timestamp from the session clock; payload and errors are retained without implicit redaction.',
-      '追加应用动作记录，时间戳取自会话时钟；载荷与错误保留原值，不进行隐式脱敏。'
+      'Prepares an application action record and session timestamp, then checks session activity before publishing. Disposal from a getter or clock prevents publication; payload and errors retain their supplied identity.',
+      '先准备应用动作记录与会话时间戳，复核会话存活后才发布；属性读取或时钟中释放会话将阻止追加，载荷与错误保持传入身份。'
     ),
     params: {
       trace: t(
@@ -102,8 +102,8 @@ const members: Record<string, IMemberDoc> = {
   },
   clear: {
     summary: t(
-      'Prepares one current initial snapshot, then clears all three queues and retains only that new history entry without resetting ID sequence.',
-      '先准备当前初始快照，再清空三个队列并仅保留新历史条目，不重置标识序列。'
+      'Prepares one current initial snapshot and rechecks session activity before clearing all three queues. A preparation failure or disposal leaves queues and history ID unchanged; success retains only the new entry without resetting IDs.',
+      '先准备当前初始快照并复核会话存活，再清空三个队列；准备失败或期间释放时队列和历史标识不变，成功后仅保留新条目且不重置标识序列。'
     ),
     returns: noValue,
     example: `${setup}\ntools.recordAction({ name: 'manual' })\ntools.clear()\nconsole.log(tools.history, tools.actions, tools.trace)\ntools.dispose()\nstore.$dispose()`
@@ -120,40 +120,8 @@ const members: Record<string, IMemberDoc> = {
     example: `${setup}\ntools.dispose()\ntools.dispose()\nconsole.log(tools.history)\nstore.$dispose()`
   }
 }
-/** Stable bridge commands and native failure codes, with each value's actual consumer explained. */
+/** Package-owned native failure codes, with each classification boundary explained. */
 const enums: ILibraryReference['enums'] = {
-  StoreDevtoolsCommand: {
-    summary: t(
-      'Vocabulary for an application-owned extension bridge; the local session consumes none of these commands.',
-      '供应用自行实现扩展桥接的命令词汇，本地诊断会话不消费这些命令。'
-    ),
-    values: {
-      dispatch: t(
-        'External bridge envelope identifying a dispatched extension command; this package performs no dispatch.',
-        '外部桥接用于标识扩展派发命令的信封，本包不会据此派发操作。'
-      ),
-      commit: t(
-        'External bridge intent to retain the current baseline; local session clear is a separate explicit call.',
-        '外部桥接表达保留当前基线的意图，本地清空需要另行显式调用。'
-      ),
-      jumpToState: t(
-        'External bridge selects a state snapshot; the application must translate it into its local history ID.',
-        '外部桥接选择状态快照，应用须将其转换为本地历史标识。'
-      ),
-      jumpToAction: t(
-        'External bridge selects an action entry; the application decides how it maps to a state.',
-        '外部桥接选择动作条目，应用自行决定如何映射到本地状态。'
-      ),
-      rollback: t(
-        'External bridge asks to restore its baseline; it does not automatically call local session hydration.',
-        '外部桥接请求恢复其基线，不会自动调用本地会话注水。'
-      ),
-      reset: t(
-        'External bridge asks to restore initial state; an application bridge must implement that behavior.',
-        '外部桥接请求恢复初始状态，具体行为须由应用桥接实现。'
-      )
-    }
-  },
   StoreDevtoolsErrorCode: {
     summary: t(
       'Stable failure codes under source @migaia/store-devtools; native error types are retained.',
@@ -169,8 +137,12 @@ const enums: ILibraryReference['enums'] = {
         '选择的标识不存在或已裁剪，应读取当前历史再选择回放。'
       ),
       invalidOption: t(
-        'Options, callback types or queue/depth bounds are invalid; fix the input before retrying.',
-        '选项、回调类型或队列及深度边界非法，应修正输入后重试。'
+        'Options are not an object, an option getter fails, a callback is not callable, a queue limit is not a positive safe integer, or tree depth is not a nonnegative safe integer. Fix the input before retrying.',
+        '选项非对象、选项读取失败、回调不可调用、队列上限不是正安全整数，或树深度不是非负安全整数；修正输入后再重试。'
+      ),
+      callbackFailed: t(
+        'Unclassified diagnostic preparation failed in a clock, snapshot clone or action property read. Manual capture throws; automatic capture reports through the runtime. Original errors remain identical or reachable on cause.',
+        '时钟、快照克隆或动作属性读取在诊断准备期发生未分类失败；手动捕获抛出，自动捕获经运行时报告，原始错误保持身份或可从原因链追溯。'
       ),
       cleanupFailed: t(
         'Several cleanup failures were aggregated, or setup rollback also failed; inspect errors for originals.',
@@ -233,8 +205,8 @@ const types: Record<string, ITypeDoc> = {
       },
       now: {
         ...p(
-          'Synchronous no-argument clock returning the application timestamp in milliseconds. Manual capture propagates clock failures; automatic capture reports them through the runtime.',
-          '同步无参数时钟，返回应用使用的毫秒时间戳；手动捕获传播时钟失败，自动捕获通过运行时报告失败。'
+          'Synchronous no-argument clock returning application milliseconds. Preparation classifies unowned failures as CALLBACK_FAILED; manual capture throws and automatic capture reports through the runtime.',
+          '同步无参数时钟，返回应用使用的毫秒时间戳；准备期未归属失败附 `CALLBACK_FAILED`，手动捕获抛出，自动捕获经运行时报告。'
         ),
         default: t(
           'Date.now supplies ordinary wall-clock timestamps.',
@@ -243,12 +215,12 @@ const types: Record<string, ITypeDoc> = {
       },
       clone: {
         ...p(
-          'Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns the diagnostic state copy. Manual failures propagate; automatic capture reports them without failing business writes. Apply custom redaction here.',
-          '同步 `(state)` 接收 `store.$plain()` 或保留的回放快照，返回诊断状态副本；手动失败原样传播，自动捕获失败会报告而不使业务写入失败，可在此实现脱敏。'
+          'Synchronous (state) callback receives store.$plain() or a retained replay snapshot and returns a diagnostic copy. Snapshot preparation classifies unowned failures as CALLBACK_FAILED; automatic capture reports them without failing business writes. Replay propagates clone failures. Apply redaction here.',
+          '同步 `(state)` 接收 `store.$plain()` 或保留的回放快照并返回诊断副本；快照准备期未归属失败附 `CALLBACK_FAILED`，自动捕获报告而不影响业务写入，回放传播克隆失败，可在此脱敏。'
         ),
         default: t(
-          'ClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone performs best-effort diagnostic cloning.',
-          '默认使用 `@migaia/store-middleware/tolerant-clone` 的 `ClonePolicy.diagnostic` 尽力克隆策略。'
+          'ClonePolicy.diagnostic from @migaia/store-middleware/tolerant-clone clones best-effort. structuredClone may convert class instances to ordinary objects; reference sharing and prototype preservation are not guaranteed.',
+          '默认使用 `@migaia/store-middleware/tolerant-clone` 的 `ClonePolicy.diagnostic` 尽力克隆；原生结构化克隆可能把类实例转成普通对象，不保证引用共享或原型保留。'
         )
       }
     }
@@ -368,13 +340,6 @@ const types: Record<string, ITypeDoc> = {
       )
     }
   },
-  IStoreDevtoolsCommand: {
-    summary: t(
-      'Value union of StoreDevtoolsCommand for an application-owned command bridge; not a local session dispatcher.',
-      '`StoreDevtoolsCommand` 的取值联合，供应用命令桥接使用，不是本地会话派发器。'
-    ),
-    members: {}
-  },
   IStoreDevtoolsErrorCode: {
     summary: t(
       'Value union of StoreDevtoolsErrorCode; classify with STORE_DEVTOOLS_SOURCE and preserve original causes.',
@@ -399,8 +364,8 @@ const symbols: Record<string, ISymbolDoc> = {
     },
     options: 'IStoreDevToolsOptions',
     returns: t(
-      'Caller-owned IStoreDevTools. Construction snapshots options and records initial state; invalid options throw INVALID_OPTION, while initial clock or clone failure propagates.',
-      '返回调用方拥有的 `IStoreDevTools`；构造时保存选项快照并记录初始状态，非法选项抛出 `INVALID_OPTION`，初始时钟或克隆失败原样传播。'
+      'Caller-owned IStoreDevTools. Construction snapshots options and initial state; invalid options throw Error/INVALID_OPTION, while unclassified initial clock or clone failures carry CALLBACK_FAILED. Existing foreign identities remain unchanged.',
+      '返回调用方拥有的 `IStoreDevTools`；构造时保存选项与初始快照，非法选项抛普通 `Error/INVALID_OPTION`，未分类初始时钟或克隆失败附 `CALLBACK_FAILED`，已有外包身份保持不变。'
     ),
     example: session
   },
@@ -484,15 +449,15 @@ const symbols: Record<string, ISymbolDoc> = {
   createStoreDevtoolsRangeError: {
     role: 'error',
     purpose: t(
-      'Builds a source-and-code tagged native RangeError so callers can retain instanceof RangeError classification for an invalid limit, depth or history selection.',
-      '构造带来源与错误码的原生 `RangeError`，使调用方能用原生类型判断非法上限、深度或历史选择等范围问题。'
+      'Builds a source-and-code tagged native RangeError. Built-in paths use it for invalid tree depth or a missing history selection; queue limit validation uses ordinary Error/INVALID_OPTION.',
+      '构造带来源与错误码的原生 `RangeError`；内置路径用于非法树深度或不存在的历史选择，队列上限校验使用普通 `Error/INVALID_OPTION`。'
     ),
     params: errorParams,
     returns: t(
       'New RangeError with unchanged native stack and tagged source/code.',
       '返回保留原生堆栈并附有来源及错误码的新 `RangeError`。'
     ),
-    example: `import { createStoreDevtoolsRangeError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\nconsole.log(createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'invalid limit'))`
+    example: `import { createStoreDevtoolsRangeError, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\nconsole.log(createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'invalid depth'))`
   },
   createStoreDevtoolsAggregateError: {
     role: 'error',
