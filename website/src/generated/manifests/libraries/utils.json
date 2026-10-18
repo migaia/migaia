@@ -7410,7 +7410,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Options of `combineConfig()`.",
           "core": "strategies: How each value kind merges when both sides have it (record, array, map, set, undefined).\n`record: merge`, `array: replace`, `map: replace`, `set: replace`, `undefined: ignore`.\nstrategies.record: How two objects at the same path merge.\n`merge`.\nMerge keys recursively.\nThe later object replaces the earlier.\nstrategies.array: How two arrays at the same path merge.\n`replace`.\nThe later array replaces the earlier.\nConcatenate earlier then later.\nMerge element by element at the same index.\nstrategies.map: How two `Map` values merge.\nLater replaces earlier.\nMerge entries by key.\nstrategies.set: How two `Set` values merge.\nUnion of both sets.\nstrategies.undefined: What a later `undefined` does.\n`ignore`.\nKeep the earlier value.\nWrite `undefined`.\npathRules: Strategy overrides for path prefixes; the longest matching prefix wins.\nNot set: global strategies apply everywhere.\nonConflict: Decides values that cannot be merged: return `{ kind: \"left\" | \"right\" | \"delete\" }` or `{ kind: \"value\", value }`, synchronously.\nNot set: the later (right) value wins.\nprofile: Validation profile of the result; must match the sources.\nThe first source profile, or `data` when sources are empty.\nlimits: Tighter size limits for the result.\nThe per-field minimum across source limits and package defaults.",
-          "advanced": "",
+          "advanced": "Keep both default and user-supplied menu entries by declaring array concatenation options for combineConfig().",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -7453,7 +7453,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Keep both default and user-supplied menu entries by declaring array concatenation options for combineConfig().",
           "notUse": "",
           "sections": [
             {
@@ -7484,7 +7484,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Keep both default and user-supplied menu entries by declaring array concatenation options for combineConfig()."
             }
           ],
           "declaredConfiguration": [],
@@ -7502,7 +7502,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Argument of `onConflict`.",
           "core": "path: Path of the conflicting values.\nleft: Earlier (left, lower priority) value.\nright: Later (right, higher priority) value.",
-          "advanced": "",
+          "advanced": "Read the conflicting path in a merge callback to protect the default port while accepting other overrides.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -7548,7 +7548,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Read the conflicting path in a merge callback to protect the default port while accepting other overrides.",
           "notUse": "",
           "sections": [
             {
@@ -7579,7 +7579,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Read the conflicting path in a merge callback to protect the default port while accepting other overrides."
             }
           ],
           "declaredConfiguration": [],
@@ -7729,7 +7729,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Caller-authored return of the configuration conflict hook, selecting an existing side, deletion or an explicit replacement.",
           "core": "kind: Conflict decision discriminant: keep left, keep right, delete the key or use an explicit value.\nKeep the earlier lower-priority input at this conflict.\nKeep the later higher-priority input at this conflict.\nRemove the conflicting key from the combined configuration.\nUse the replacement carried by this decision’s value field.\nvalue: Caller-selected replacement present only when kind is value; it is admitted under the chosen configuration profile.",
-          "advanced": "",
+          "advanced": "Give a conflict resolver an explicit return type when replacing two different timeout values with one application-selected value.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -7793,7 +7793,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Give a conflict resolver an explicit return type when replacing two different timeout values with one application-selected value.",
           "notUse": "",
           "sections": [
             {
@@ -7824,7 +7824,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Give a conflict resolver an explicit return type when replacing two different timeout values with one application-selected value."
             }
           ],
           "declaredConfiguration": [],
@@ -7974,7 +7974,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Safety limits of owned configuration; options can only tighten them.",
           "core": "maxDepth: Maximum nesting depth; default 256.\nmaxNodes: Maximum objects in the graph; default 100000.\nmaxKeys: Maximum keys in total; default 1000000.\nmaxPathLength: Maximum path text length; default 4096.\nmaxSegmentLength: Maximum length of one path segment; default 512.",
-          "advanced": "",
+          "advanced": "Keep a complete size policy in a typed variable before passing it to ownConfig() for a small settings document.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -8041,7 +8041,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Keep a complete size policy in a typed variable before passing it to ownConfig() for a small settings document.",
           "notUse": "",
           "sections": [
             {
@@ -8072,7 +8072,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Keep a complete size policy in a typed variable before passing it to ownConfig() for a small settings document."
             }
           ],
           "declaredConfiguration": [],
@@ -8352,7 +8352,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Merge strategy per value kind.",
           "core": "record: Objects: `merge` or `replace`.\nMerge keys.\nLater replaces.\narray: Arrays: `replace`, `concat` or `mergeByIndex`.\nConcatenate.\nMerge by index.\nmap: Maps: `replace` or `merge`.\nMerge entries.\nset: Sets: `replace` or `union`.\nUnion.\nundefined: A later `undefined`: `ignore` or `assign`.\nKeep earlier.\nWrite undefined.",
-          "advanced": "",
+          "advanced": "Store one complete merge policy for application settings so records merge while arrays are replaced.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -8416,7 +8416,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Store one complete merge policy for application settings so records merge while arrays are replaced.",
           "notUse": "",
           "sections": [
             {
@@ -8447,7 +8447,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Store one complete merge policy for application settings so records merge while arrays are replaced."
             }
           ],
           "declaredConfiguration": [],
@@ -8727,7 +8727,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Patch accepted by `patchConfig()`: partial values plus `CONFIG_DELETE`.",
           "core": "Patch accepted by `patchConfig()`: partial values plus `CONFIG_DELETE`.",
-          "advanced": "",
+          "advanced": "Type a saved settings edit as a partial patch, using CONFIG_DELETE to remove an obsolete field.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -8744,7 +8744,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Type a saved settings edit as a partial patch, using CONFIG_DELETE to remove an obsolete field.",
           "notUse": "",
           "sections": [
             {
@@ -8775,7 +8775,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Type a saved settings edit as a partial patch, using CONFIG_DELETE to remove an obsolete field."
             }
           ],
           "declaredConfiguration": [],
@@ -8925,7 +8925,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Options of `patchConfig()`.",
           "core": "reuseUnchangedRoot: Return `base` itself when the patch is empty.\n`true`.\nprofile: Must equal the profile of `base`, otherwise `CONFIG_CONFLICT`.\nThe profile of `base`.\nlimits: May not be wider than the limits of `base`.\nThe limits of `base`.",
-          "advanced": "",
+          "advanced": "Choose a fresh root for an empty patch when a caller needs a separate configuration object.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -8950,7 +8950,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Choose a fresh root for an empty patch when a caller needs a separate configuration object.",
           "notUse": "",
           "sections": [
             {
@@ -8981,7 +8981,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Choose a fresh root for an empty patch when a caller needs a separate configuration object."
             }
           ],
           "declaredConfiguration": [],
@@ -8999,7 +8999,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "One path-prefix rule of `combineConfig()`.",
           "core": "prefix: Path prefix the rule applies to.\nstrategies: Strategies used under that prefix.",
-          "advanced": "",
+          "advanced": "Concatenate menu entries under one configuration branch while other arrays keep the global replacement policy.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -9036,7 +9036,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Concatenate menu entries under one configuration branch while other arrays keep the global replacement policy.",
           "notUse": "",
           "sections": [
             {
@@ -9067,7 +9067,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Concatenate menu entries under one configuration branch while other arrays keep the global replacement policy."
             }
           ],
           "declaredConfiguration": [],
@@ -9217,7 +9217,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Union of `ConfigProfile` values.",
           "core": "Union of `ConfigProfile` values.",
-          "advanced": "",
+          "advanced": "Accept a named validation profile in your own configuration loader and pass it through to ownConfig().",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -9237,7 +9237,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept a named validation profile in your own configuration loader and pass it through to ownConfig().",
           "notUse": "",
           "sections": [
             {
@@ -9268,7 +9268,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept a named validation profile in your own configuration loader and pass it through to ownConfig()."
             }
           ],
           "declaredConfiguration": [],
@@ -9644,7 +9644,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "A configuration object (plain record).",
           "core": "A configuration object (plain record).",
-          "advanced": "",
+          "advanced": "Accept a configuration record with application-defined keys before ownConfig() validates and copies it.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -9663,7 +9663,7 @@
           "overloadSignatures": ["export type IConfigRecord = Record<PropertyKey, unknown>;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept a configuration record with application-defined keys before ownConfig() validates and copies it.",
           "notUse": "",
           "sections": [
             {
@@ -9694,7 +9694,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept a configuration record with application-defined keys before ownConfig() validates and copies it."
             }
           ],
           "declaredConfiguration": [],
@@ -9844,7 +9844,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Options of `ownConfig()`.",
           "core": "profile: `data` rejects functions; `richRuntime` allows functions and constructors (in-process only).\n`data`.\nlimits: Tighter limits (`maxDepth`, `maxNodes`, `maxKeys`, `maxPathLength`, `maxSegmentLength`).\nPackage defaults: 256, 100000, 1000000, 4096, 512.",
-          "advanced": "",
+          "advanced": "Reuse a pure-data validation policy with a tighter nesting limit when importing user settings.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -9878,7 +9878,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Reuse a pure-data validation policy with a tighter nesting limit when importing user settings.",
           "notUse": "",
           "sections": [
             {
@@ -9909,7 +9909,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Reuse a pure-data validation policy with a tighter nesting limit when importing user settings."
             }
           ],
           "declaredConfiguration": [],
@@ -9927,7 +9927,7 @@
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "A configuration registered by `ownConfig()`; accepted by the other config functions.",
           "core": "A configuration registered by `ownConfig()`; accepted by the other config functions.",
-          "advanced": "",
+          "advanced": "Require callers to pass a configuration produced by ownConfig() before applying a settings patch.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -9948,7 +9948,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Require callers to pass a configuration produced by ownConfig() before applying a settings patch.",
           "notUse": "",
           "sections": [
             {
@@ -9979,7 +9979,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Require callers to pass a configuration produced by ownConfig() before applying a settings patch."
             }
           ],
           "declaredConfiguration": [],
@@ -13056,7 +13056,7 @@
           "source": "packages/utils/dist/error-chain-types.d.ts",
           "purpose": "Plain JSON data allowed in a serialized error `data` field.",
           "core": "Plain JSON data allowed in a serialized error `data` field.",
-          "advanced": "",
+          "advanced": "Type additional error details as portable JSON data before including them in a serialized error.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -13072,7 +13072,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Type additional error details as portable JSON data before including them in a serialized error.",
           "notUse": "",
           "sections": [
             {
@@ -13103,7 +13103,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Type additional error details as portable JSON data before including them in a serialized error."
             }
           ],
           "declaredConfiguration": [],
@@ -13121,7 +13121,7 @@
           "source": "packages/utils/dist/error-chain-types.d.ts",
           "purpose": "Boundary policy of error serialization: fields, limits, privacy, data and restoration.",
           "core": "fields: Ordered whitelist of fields to send and accept, starting with source/code/name/message/stack.\n`source`, `code`, `name`, `message`, `stack`, `cause`, `errors`, `data`, `truncated`.\nlimits: Nesting, node, byte and string budgets.\n32 levels, 128 nodes, 65536 bytes, 4096 bytes per string.\nfallback: Source, code and name used for values without valid identity.\n`unknown` / `UNKNOWN` / `Error`.\npresentation: Replaces public code and message of selected errors (privacy).\nnormalizeData: Validates and converts `data` values.\ndataTextLeaf: Selects one text leaf of `data` for redaction.\nextensions: Extra fields with their own read, normalize and restore.\ncreateViolation: Builds the error thrown for invalid input.\nsanitizeText: Cleans every text unit (defaults to `sanitizeErrorText`).\ncreateError: Builds a native error from a serialized node when deserializing.\nattachIdentity: Attaches source/code to a rebuilt error.",
-          "advanced": "",
+          "advanced": "Set a smaller node and text budget when serializing errors for a diagnostic message.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -13237,7 +13237,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Set a smaller node and text budget when serializing errors for a diagnostic message.",
           "notUse": "",
           "sections": [
             {
@@ -13268,7 +13268,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Set a smaller node and text budget when serializing errors for a diagnostic message."
             }
           ],
           "declaredConfiguration": [],
@@ -13286,7 +13286,7 @@
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Identity attached by `attachErrorIdentity()`.",
           "core": "source: Package or boundary that owns the error.\ncode: Stable error code to branch on.\nphase: Optional phase in which the error happened.\ndetail: Optional structured details.",
-          "advanced": "",
+          "advanced": "Keep an application error identity in a typed object and attach it to an existing native error.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -13338,7 +13338,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Keep an application error identity in a typed object and attach it to an existing native error.",
           "notUse": "",
           "sections": [
             {
@@ -13369,7 +13369,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Keep an application error identity in a typed object and attach it to an existing native error."
             }
           ],
           "declaredConfiguration": [],
@@ -13387,7 +13387,7 @@
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Hooks of `attachErrorIdentity()`.",
           "core": "onConflict: Chooses an object to return when a field already has another value.\nonFailure: Chooses an object to return when a field cannot be defined (frozen error).",
-          "advanced": "",
+          "advanced": "Preserve an existing identity when another caller tries to attach a different code, recording the conflict through your hook.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -13421,7 +13421,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Preserve an existing identity when another caller tries to attach a different code, recording the conflict through your hook.",
           "notUse": "",
           "sections": [
             {
@@ -13452,7 +13452,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Preserve an existing identity when another caller tries to attach a different code, recording the conflict through your hook."
             }
           ],
           "declaredConfiguration": [],
@@ -14878,7 +14878,7 @@
           "source": "packages/utils/dist/error-code.d.ts",
           "purpose": "Union of `UtilsErrorCode` values.",
           "core": "Union of `UtilsErrorCode` values.",
-          "advanced": "",
+          "advanced": "Store a Utils error code after isUtilsError() has checked an unknown caught value.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -14896,7 +14896,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Store a Utils error code after isUtilsError() has checked an unknown caught value.",
           "notUse": "",
           "sections": [
             {
@@ -14927,7 +14927,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Store a Utils error code after isUtilsError() has checked an unknown caught value."
             }
           ],
           "declaredConfiguration": [],
@@ -20101,7 +20101,7 @@
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Options shared by the number formatting functions.",
           "core": "locales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
-          "advanced": "",
+          "advanced": "Reuse a locale and decimal precision policy when displaying prices in a table.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -20135,7 +20135,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Reuse a locale and decimal precision policy when displaying prices in a table.",
           "notUse": "",
           "sections": [
             {
@@ -20166,7 +20166,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Reuse a locale and decimal precision policy when displaying prices in a table."
             }
           ],
           "declaredConfiguration": [],
@@ -20184,7 +20184,7 @@
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Reusable formatter `(value) => string` from `createNumberFormatter()`.",
           "core": "Reusable formatter `(value) => string` from `createNumberFormatter()`.",
-          "advanced": "",
+          "advanced": "Pass a reusable number formatter to a table column instead of rebuilding display options for every row.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -20199,7 +20199,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Pass a reusable number formatter to a table column instead of rebuilding display options for every row.",
           "notUse": "",
           "sections": [
             {
@@ -20230,7 +20230,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Pass a reusable number formatter to a table column instead of rebuilding display options for every row."
             }
           ],
           "declaredConfiguration": [],
@@ -20248,7 +20248,7 @@
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Numbers accepted by the formatters: `number` or `bigint` (no strings).",
           "core": "Numbers accepted by the formatters: `number` or `bigint` (no strings).",
-          "advanced": "",
+          "advanced": "Allow both ordinary counts and bigint totals in your own numeric display function without accepting numeric strings.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -20261,7 +20261,7 @@
           "overloadSignatures": ["export type INumericValue = number | bigint;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Allow both ordinary counts and bigint totals in your own numeric display function without accepting numeric strings.",
           "notUse": "",
           "sections": [
             {
@@ -20292,7 +20292,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Allow both ordinary counts and bigint totals in your own numeric display function without accepting numeric strings."
             }
           ],
           "declaredConfiguration": [],
@@ -20945,7 +20945,7 @@
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "One path that `diagnosticSnapshot()` could not copy.",
           "core": "path: Path of the value that was not copied.\nreason: Why the value was not copied; one of the values below.\nA getter was read and its value used.\nReading the property threw.\nThe value cannot be cloned and is kept by reference.\ncause: The value or the thrown error.",
-          "advanced": "",
+          "advanced": "Inspect field paths and reasons when a best-effort snapshot reports a property read or an unsupported value.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -20990,7 +20990,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Inspect field paths and reasons when a best-effort snapshot reports a property read or an unsupported value.",
           "notUse": "",
           "sections": [
             {
@@ -21021,7 +21021,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Inspect field paths and reasons when a best-effort snapshot reports a property read or an unsupported value."
             }
           ],
           "declaredConfiguration": [],
@@ -22268,7 +22268,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "All dot-path strings of a type.",
           "core": "All dot-path strings of a type.",
-          "advanced": "",
+          "advanced": "Restrict a settings selector to string paths that exist in the settings type.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22286,7 +22286,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Restrict a settings selector to string paths that exist in the settings type.",
           "notUse": "",
           "sections": [
             {
@@ -22317,7 +22317,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Restrict a settings selector to string paths that exist in the settings type."
             }
           ],
           "declaredConfiguration": [],
@@ -22335,7 +22335,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "A path given as dot string or segment tuple.",
           "core": "A path given as dot string or segment tuple.",
-          "advanced": "",
+          "advanced": "Let a form field selector accept either a checked string path or a checked tuple path.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22359,7 +22359,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Let a form field selector accept either a checked string path or a checked tuple path.",
           "notUse": "",
           "sections": [
             {
@@ -22390,7 +22390,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Let a form field selector accept either a checked string path or a checked tuple path."
             }
           ],
           "declaredConfiguration": [],
@@ -22408,7 +22408,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "One path segment: property name or array index.",
           "core": "One path segment: property name or array index.",
-          "advanced": "",
+          "advanced": "Build one array-index segment separately before assembling a tuple path for a selected table row.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22424,7 +22424,7 @@
           "overloadSignatures": ["export type IObjectPathSegment = string | number | symbol;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Build one array-index segment separately before assembling a tuple path for a selected table row.",
           "notUse": "",
           "sections": [
             {
@@ -22455,7 +22455,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Build one array-index segment separately before assembling a tuple path for a selected table row."
             }
           ],
           "declaredConfiguration": [],
@@ -22473,7 +22473,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "A parsed path: array of segments.",
           "core": "A parsed path: array of segments.",
-          "advanced": "",
+          "advanced": "Store the parsed segments of a path for logging or later inspection without claiming they belong to a particular object type.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22491,7 +22491,7 @@
           "overloadSignatures": ["export type IObjectPathTuple = readonly IObjectPathSegment[];"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Store the parsed segments of a path for logging or later inspection without claiming they belong to a particular object type.",
           "notUse": "",
           "sections": [
             {
@@ -22522,7 +22522,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Store the parsed segments of a path for logging or later inspection without claiming they belong to a particular object type."
             }
           ],
           "declaredConfiguration": [],
@@ -22540,7 +22540,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Tuple paths valid for a given type.",
           "core": "Tuple paths valid for a given type.",
-          "advanced": "",
+          "advanced": "Select an array element with a numeric segment while checking the rest of the tuple against the document type.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22557,7 +22557,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Select an array element with a numeric segment while checking the rest of the tuple against the document type.",
           "notUse": "",
           "sections": [
             {
@@ -22588,7 +22588,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Select an array element with a numeric segment while checking the rest of the tuple against the document type."
             }
           ],
           "declaredConfiguration": [],
@@ -22606,7 +22606,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Type of the value at a path.",
           "core": "Type of the value at a path.",
-          "advanced": "",
+          "advanced": "Derive a callback parameter from a nested field so its value type stays aligned with the document.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22628,7 +22628,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Derive a callback parameter from a nested field so its value type stays aligned with the document.",
           "notUse": "",
           "sections": [
             {
@@ -22659,7 +22659,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Derive a callback parameter from a nested field so its value type stays aligned with the document."
             }
           ],
           "declaredConfiguration": [],
@@ -22677,7 +22677,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Type accepted when writing at a path (literals widened).",
           "core": "Type accepted when writing at a path (literals widened).",
-          "advanced": "",
+          "advanced": "Accept a new theme string even when the document type records the current theme as a single literal.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22696,7 +22696,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept a new theme string even when the document type records the current theme as a single literal.",
           "notUse": "",
           "sections": [
             {
@@ -22727,7 +22727,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept a new theme string even when the document type records the current theme as a single literal."
             }
           ],
           "declaredConfiguration": [],
@@ -22889,7 +22889,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Hooks of `createPathAccessor()`.",
           "core": "ifMissing: Called when a read finds a missing segment.\nNot set: missing reads just return `undefined`.\nifBlocked: Called when a read meets a non-object on the way.\nNot set.\nifFailed: Called when a getter throws during a read.\nNot set: the error is not reported.\nonGet: Called after each successful `get`; `event.replace(value)` changes the returned value.\nonSet: Called before each `set` is applied; `event.replace(value)` changes the written value.",
-          "advanced": "",
+          "advanced": "Keep a typed read policy that trims a display name whenever a path accessor reads it.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -22952,7 +22952,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Keep a typed read policy that trims a display name whenever a path accessor reads it.",
           "notUse": "",
           "sections": [
             {
@@ -22983,7 +22983,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Keep a typed read policy that trims a display name whenever a path accessor reads it."
             }
           ],
           "declaredConfiguration": [],
@@ -23001,7 +23001,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Probe result: a non-object was met on the way.",
           "core": "kind: Always `blocked`; branch on it to tell probe results apart.\noriginKey: The path exactly as the caller passed it.\nsegments: The parsed path as a segment tuple.\nfailedAt: Index of the segment where reading stopped.\nfailedKey: The segment where reading stopped.\nresolvedPath: Segments that were read successfully before stopping.\nparent: The value that was being read into when reading stopped.",
-          "advanced": "",
+          "advanced": "Handle a path that stops at a null parent separately from an absent property.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -23083,7 +23083,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Handle a path that stops at a null parent separately from an absent property.",
           "notUse": "",
           "sections": [
             {
@@ -23114,7 +23114,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Handle a path that stops at a null parent separately from an absent property."
             }
           ],
           "declaredConfiguration": [],
@@ -23132,7 +23132,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Probe result: a getter or proxy threw.",
           "core": "kind: Always `failed`; branch on it to tell probe results apart.\noriginKey: The path exactly as the caller passed it.\nsegments: The parsed path as a segment tuple.\nfailedAt: Index of the segment where reading stopped.\nfailedKey: The segment where reading stopped.\nresolvedPath: Segments that were read successfully before stopping.\nparent: The value that was being read into when reading stopped.\nerror: The exact value thrown by the getter or proxy.",
-          "advanced": "",
+          "advanced": "Report the original thrown value when reading a path invokes a getter that fails.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -23223,7 +23223,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Report the original thrown value when reading a path invokes a getter that fails.",
           "notUse": "",
           "sections": [
             {
@@ -23254,7 +23254,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Report the original thrown value when reading a path invokes a getter that fails."
             }
           ],
           "declaredConfiguration": [],
@@ -23272,7 +23272,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Event passed to `onGet`.",
           "core": "originKey: The path exactly as the caller passed it.\nsegments: The parsed path as a segment tuple.\nprobe: The probe result of this successful read.\nvalue: The value that was read at the path.\nreplace: Replaces the value returned to the caller.\nreplace.value: Replacement value.\nNothing.",
-          "advanced": "",
+          "advanced": "Declare a reusable read hook that replaces an empty display name before returning it to a caller.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -23341,7 +23341,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Declare a reusable read hook that replaces an empty display name before returning it to a caller.",
           "notUse": "",
           "sections": [
             {
@@ -23372,7 +23372,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Declare a reusable read hook that replaces an empty display name before returning it to a caller."
             }
           ],
           "declaredConfiguration": [],
@@ -23390,7 +23390,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Probe result: a segment does not exist.",
           "core": "kind: Always `missing`; branch on it to tell probe results apart.\noriginKey: The path exactly as the caller passed it.\nsegments: The parsed path as a segment tuple.\nfailedAt: Index of the segment where reading stopped.\nfailedKey: The segment where reading stopped.\nresolvedPath: Segments that were read successfully before stopping.\nparent: The value that was being read into when reading stopped.",
-          "advanced": "",
+          "advanced": "Report which segment is absent when an optional settings branch has not been created.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -23472,7 +23472,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Report which segment is absent when an optional settings branch has not been created.",
           "notUse": "",
           "sections": [
             {
@@ -23503,7 +23503,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Report which segment is absent when an optional settings branch has not been created."
             }
           ],
           "declaredConfiguration": [],
@@ -23593,7 +23593,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Event passed to `onSet`.",
           "core": "originKey: The path exactly as the caller passed it.\nsegments: The parsed path as a segment tuple.\nprobe: Synthetic successful probe containing the proposed new value; it does not read the old value.\nvalue: The value about to be written at the path.\nreplace: Replaces the actual written value without rewriting event.value or the synthetic probe value.\nreplace.value: Replacement value.\nNothing.",
-          "advanced": "",
+          "advanced": "Declare a reusable write hook that keeps an edited page size within the application limit.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -23662,7 +23662,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Declare a reusable write hook that keeps an edited page size within the application limit.",
           "notUse": "",
           "sections": [
             {
@@ -23693,7 +23693,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Declare a reusable write hook that keeps an edited page size within the application limit."
             }
           ],
           "declaredConfiguration": [],
@@ -23711,7 +23711,7 @@
           "source": "packages/utils/dist/object-path.d.ts",
           "purpose": "Probe result: the value was read.",
           "core": "kind: Always `value`: the read succeeded.\noriginKey: The path exactly as the caller passed it.\nsegments: The parsed path as a segment tuple.\nvalue: The value that was read at the path.",
-          "advanced": "",
+          "advanced": "Pass a successful path result to a function that only accepts a confirmed numeric field value.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -23766,7 +23766,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Pass a successful path result to a function that only accepts a confirmed numeric field value.",
           "notUse": "",
           "sections": [
             {
@@ -23797,7 +23797,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Pass a successful path result to a function that only accepts a confirmed numeric field value."
             }
           ],
           "declaredConfiguration": [],
@@ -25205,7 +25205,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Operation of `raceWithAbort()`: `({ signal }) => value | Promise`.",
           "core": "Operation of `raceWithAbort()`: `({ signal }) => value | Promise`.",
-          "advanced": "",
+          "advanced": "Name a cancellable request operation before passing it to raceWithAbort() with a caller-owned signal.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -25220,7 +25220,7 @@
           "overloadSignatures": ["export type IAbortOperation<T> = ITimeoutOperation<T>;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Name a cancellable request operation before passing it to raceWithAbort() with a caller-owned signal.",
           "notUse": "",
           "sections": [
             {
@@ -25251,7 +25251,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Name a cancellable request operation before passing it to raceWithAbort() with a caller-owned signal."
             }
           ],
           "declaredConfiguration": [],
@@ -25269,7 +25269,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Structural shape of an `AbortSignal` accepted by this package.",
           "core": "aborted: `true` once the signal has aborted.\nreason: Reason passed to `abort()`.\naddEventListener: Registers a listener for the `abort` event.\naddEventListener.type: Always the event name `abort`.\naddEventListener.listener: Callback.\naddEventListener.options: Listener options such as `once`.\nNothing.\nremoveEventListener: Stops listening for `abort`.\nremoveEventListener.type: Always the event name `abort`.\nremoveEventListener.listener: The registered callback.",
-          "advanced": "",
+          "advanced": "Accept a caller cancellation signal in a shared delay function without requiring a particular signal class.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -25355,7 +25355,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept a caller cancellation signal in a shared delay function without requiring a particular signal class.",
           "notUse": "",
           "sections": [
             {
@@ -25386,7 +25386,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept a caller cancellation signal in a shared delay function without requiring a particular signal class."
             }
           ],
           "declaredConfiguration": [],
@@ -25523,7 +25523,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Reasons why `admitAbortSignal()` rejects a value.",
           "core": "Reasons why `admitAbortSignal()` rejects a value.",
-          "advanced": "",
+          "advanced": "Store the rejection reason from admitAbortSignal() when checking an unknown signal supplied by another component.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -25538,7 +25538,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Store the rejection reason from admitAbortSignal() when checking an unknown signal supplied by another component.",
           "notUse": "",
           "sections": [
             {
@@ -25569,7 +25569,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Store the rejection reason from admitAbortSignal() when checking an unknown signal supplied by another component."
             }
           ],
           "declaredConfiguration": [],
@@ -25672,7 +25672,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Options of `createAbortTimeoutSignal()`.",
           "core": "signal: Outside signal to follow.\nNot set: only the deadline aborts.\ntimeoutMs: Deadline in milliseconds.\nNot set: no deadline; the outside signal is returned as is.\nscheduler: Clock and timers used to measure the deadline.\n`systemScheduler`.\ntimeoutReason: Builds the abort reason used when the deadline passes.\nNo custom reason: host `abort(undefined)` normalizes to its native AbortError.\nreport: `report(error, { operation, phase, attempt? })` receives failures that arrive after the result settled (late rejections, cleanup errors); default `hostRethrowReporter` rethrows them on a microtask so they are not lost.\n`hostRethrowReporter`.",
-          "advanced": "",
+          "advanced": "Prepare a combined caller signal and timeout for an adapter that consumes a cancellation signal.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -25735,7 +25735,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Prepare a combined caller signal and timeout for an adapter that consumes a cancellation signal.",
           "notUse": "",
           "sections": [
             {
@@ -25766,7 +25766,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Prepare a combined caller signal and timeout for an adapter that consumes a cancellation signal."
             }
           ],
           "declaredConfiguration": [],
@@ -25784,7 +25784,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Cancellation and timing options shared by the promise helpers.",
           "core": "signal: Cancels the operation when it aborts; the Promise rejects with `UtilsAbortError` whose `cause` is the abort reason. Cannot be combined with `signals`.\nNot set: the operation cannot be cancelled from outside.\nsignals: Several signals; the operation is cancelled when any of them aborts. Cannot be combined with `signal` (`TypeError`).\nNot set: only `signal`, if any, cancels.\nscheduler: Clock and timers used for delays and deadlines; inject a manual scheduler in tests.\n`systemScheduler` (native timers).\nunref: In Node, marks timers so they do not keep the process alive.\n`false`: timers keep the process alive.",
-          "advanced": "",
+          "advanced": "Share one caller signal across several waits without repeating the cancellation options at every call.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -25841,7 +25841,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Share one caller signal across several waits without repeating the cancellation options at every call.",
           "notUse": "",
           "sections": [
             {
@@ -25872,7 +25872,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Share one caller signal across several waits without repeating the cancellation options at every call."
             }
           ],
           "declaredConfiguration": [],
@@ -26034,7 +26034,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Operation of `withTimeout({ cooperativeCancellation: false })`; receives a never-aborting signal.",
           "core": "Operation of `withTimeout({ cooperativeCancellation: false })`; receives a never-aborting signal.",
-          "advanced": "",
+          "advanced": "Limit how long a caller waits for work that has no cancellation support, without treating the supplied signal as a native host signal.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -26051,7 +26051,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Limit how long a caller waits for work that has no cancellation support, without treating the supplied signal as a native host signal.",
           "notUse": "",
           "sections": [
             {
@@ -26082,7 +26082,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Limit how long a caller waits for work that has no cancellation support, without treating the supplied signal as a native host signal."
             }
           ],
           "declaredConfiguration": [],
@@ -26195,7 +26195,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "The host `AbortSignal` type passed to operations.",
           "core": "The host `AbortSignal` type passed to operations.",
-          "advanced": "",
+          "advanced": "Type the signal parameter of a request function that receives the host signal produced by withTimeout().",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -26214,7 +26214,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Type the signal parameter of a request function that receives the host signal produced by withTimeout().",
           "notUse": "",
           "sections": [
             {
@@ -26245,7 +26245,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Type the signal parameter of a request function that receives the host signal produced by withTimeout()."
             }
           ],
           "declaredConfiguration": [],
@@ -26263,7 +26263,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Context passed to each retry attempt.",
           "core": "attempt: Attempt number, starting at 1.\nsignal: Signal of this attempt (aborts on timeout or cancellation).\nremainingMs: Time left before the total deadline, if set.",
-          "advanced": "",
+          "advanced": "Read the attempt number and pass the attempt signal to a request inside a reusable retry operation.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -26308,7 +26308,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Read the attempt number and pass the attempt signal to a request inside a reusable retry operation.",
           "notUse": "",
           "sections": [
             {
@@ -26339,7 +26339,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Read the attempt number and pass the attempt signal to a request inside a reusable retry operation."
             }
           ],
           "declaredConfiguration": [],
@@ -26357,7 +26357,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Context passed to `shouldRetry` and `delay`.",
           "core": "maxAttempts: Configured maximum attempts.\nattempt: Number of the attempt that failed.\nsignal: Signal of the attempt that just failed, not a total-retry signal; this context has no remainingMs field.",
-          "advanced": "",
+          "advanced": "Use the current attempt and attempt limit in a retry policy that also reports each failed request.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -26384,7 +26384,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Use the current attempt and attempt limit in a retry policy that also reports each failed request.",
           "notUse": "",
           "sections": [
             {
@@ -26415,7 +26415,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Use the current attempt and attempt limit in a retry policy that also reports each failed request."
             }
           ],
           "declaredConfiguration": [],
@@ -26433,7 +26433,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Operation of `withTimeout()`: `({ signal }) => value | Promise`.",
           "core": "Operation of `withTimeout()`: `({ signal }) => value | Promise`.",
-          "advanced": "",
+          "advanced": "Declare a request operation separately from its timeout so different callers can choose their own waiting limit.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -26451,7 +26451,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Declare a request operation separately from its timeout so different callers can choose their own waiting limit.",
           "notUse": "",
           "sections": [
             {
@@ -26482,7 +26482,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Declare a request operation separately from its timeout so different callers can choose their own waiting limit."
             }
           ],
           "declaredConfiguration": [],
@@ -26500,7 +26500,7 @@
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Reporter `(error, { operation, phase, attempt? }) => void` for late failures.",
           "core": "Reporter `(error, { operation, phase, attempt? }) => void` for late failures.",
-          "advanced": "",
+          "advanced": "Supply a typed reporter for cleanup failures or work that rejects after the public timeout result has already settled.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -26522,7 +26522,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Supply a typed reporter for cleanup failures or work that rejects after the public timeout result has already settled.",
           "notUse": "",
           "sections": [
             {
@@ -26553,7 +26553,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Supply a typed reporter for cleanup failures or work that rejects after the public timeout result has already settled."
             }
           ],
           "declaredConfiguration": [],
@@ -27895,7 +27895,7 @@
           "source": "packages/utils/dist/internal/scheduler.d.ts",
           "purpose": "The scheduler contract: monotonic `now()`, `schedule()` and optional `defer()`.",
           "core": "now: Monotonic milliseconds for durations and deadlines (not epoch time).\nMilliseconds.\nschedule: Runs `callback` once after `delayMs`; never synchronously inside the call.\nschedule.callback: Work to run.\nschedule.delayMs: Finite, non-negative delay.\nA task with `cancel()`.\ndefer: Optional: queues a non-cancellable job (microtask for the system scheduler).\ndefer.callback: Work to run.\nNothing.",
-          "advanced": "",
+          "advanced": "Accept the scheduler contract in a delayed notification function, using the system scheduler for ordinary calls.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -27962,7 +27962,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept the scheduler contract in a delayed notification function, using the system scheduler for ordinary calls.",
           "notUse": "",
           "sections": [
             {
@@ -27993,7 +27993,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept the scheduler contract in a delayed notification function, using the system scheduler for ordinary calls."
             }
           ],
           "declaredConfiguration": [],
@@ -28030,7 +28030,7 @@
           "source": "packages/utils/dist/internal/scheduler.d.ts",
           "purpose": "Epoch clock for diagnostic timestamps.",
           "core": "timestamp: Current epoch milliseconds (`Date.now()`).\nA safe integer timestamp.",
-          "advanced": "",
+          "advanced": "Accept a clock for diagnostic timestamps while keeping elapsed-time scheduling separate.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -28057,7 +28057,7 @@
           "overloadSignatures": ["export type IWallClock = { timestamp(): number; };"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept a clock for diagnostic timestamps while keeping elapsed-time scheduling separate.",
           "notUse": "",
           "sections": [
             {
@@ -28088,7 +28088,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept a clock for diagnostic timestamps while keeping elapsed-time scheduling separate."
             }
           ],
           "declaredConfiguration": [],
@@ -28619,7 +28619,7 @@
           "source": "packages/utils/dist/string.d.ts",
           "purpose": "Options of `format()`: delimiters, missing and nullish handling.",
           "core": "placeholder: Placeholder delimiters `{ open, close }`.\n`{ open: \"{\", close: \"}\" }`.\nmissing: What happens to a placeholder without a value.\n`preserve`: keep the placeholder text.\nKeep `{name}` in the output.\nOutput nothing.\nThrow `FORMAT_VALUE_MISSING`.\nnullish: How `null` / `undefined` values are written.\n`empty`: write nothing.\nWrite nothing.\nWrite `null` / `undefined` as text.",
-          "advanced": "",
+          "advanced": "Choose how a display template handles absent fields and null values in one typed options object.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -28662,7 +28662,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Choose how a display template handles absent fields and null values in one typed options object.",
           "notUse": "",
           "sections": [
             {
@@ -28693,7 +28693,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Choose how a display template handles absent fields and null values in one typed options object."
             }
           ],
           "declaredConfiguration": [],
@@ -28711,7 +28711,7 @@
           "source": "packages/utils/dist/string.d.ts",
           "purpose": "Placeholder delimiters of `format()`.",
           "core": "open: Opening delimiter, e.g. `{`.\nclose: Closing delimiter, e.g. `}`.",
-          "advanced": "",
+          "advanced": "Choose different placeholder delimiters when curly braces already have another meaning in a display template.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -28745,7 +28745,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Choose different placeholder delimiters when curly braces already have another meaning in a display template.",
           "notUse": "",
           "sections": [
             {
@@ -28776,7 +28776,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Choose different placeholder delimiters when curly braces already have another meaning in a display template."
             }
           ],
           "declaredConfiguration": [],
@@ -29256,7 +29256,7 @@
           "source": "packages/utils/dist/typing.d.ts",
           "purpose": "Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.",
           "core": "Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.",
-          "advanced": "",
+          "advanced": "Build a complete handler table for messages whose kind is stored directly on each message.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -29277,7 +29277,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Build a complete handler table for messages whose kind is stored directly on each message.",
           "notUse": "",
           "sections": [
             {
@@ -29308,7 +29308,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Build a complete handler table for messages whose kind is stored directly on each message."
             }
           ],
           "declaredConfiguration": [],
@@ -29326,7 +29326,7 @@
           "source": "packages/utils/dist/typing.d.ts",
           "purpose": "Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.",
           "core": "Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.",
-          "advanced": "",
+          "advanced": "Group notifications by a kind stored inside metadata before defining a handler for each nested kind.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -29347,7 +29347,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Group notifications by a kind stored inside metadata before defining a handler for each nested kind.",
           "notUse": "",
           "sections": [
             {
@@ -29378,7 +29378,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Group notifications by a kind stored inside metadata before defining a handler for each nested kind."
             }
           ],
           "declaredConfiguration": [],
@@ -29599,7 +29599,7 @@
           "source": "packages/utils/dist/value.d.ts",
           "purpose": "The seven JavaScript primitive types.",
           "core": "The seven JavaScript primitive types.",
-          "advanced": "",
+          "advanced": "Accept only primitive values in a display helper that should not traverse arrays or objects.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -29614,7 +29614,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Accept only primitive values in a display helper that should not traverse arrays or objects.",
           "notUse": "",
           "sections": [
             {
@@ -29645,7 +29645,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Accept only primitive values in a display helper that should not traverse arrays or objects."
             }
           ],
           "declaredConfiguration": [],
