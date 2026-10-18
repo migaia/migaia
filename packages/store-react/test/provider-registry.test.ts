@@ -494,7 +494,7 @@ describe('StoreRegistry.disposeAsync()', () => {
   })
 })
 
-describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (StrictMode-safe candidate reclamation)', () => {
+describe('StoreRegistry lifecycle: whenTerminal()/retain() (StrictMode-safe release)', () => {
   it('whenTerminal() resolves once dispose() completes synchronously', async () => {
     const registry = createStoreRegistry()
     let resolved = false
@@ -507,14 +507,14 @@ describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (S
     expect(resolved).toBe(true)
   })
 
-  it('retain() releases and disposes the registry once retainCount reaches zero (microtask-deferred)', async () => {
+  it('retain() releases and disposes the registry once retainCount reaches zero (task-deferred)', async () => {
     vi.useFakeTimers()
     try {
       const registry = createStoreRegistry()
       const release = registry.retain(true)
       release()
 
-      expect(registry.disposed).toBe(false) // dispose is deferred to a microtask
+      expect(registry.disposed).toBe(false) // dispose is deferred to a task
       await vi.advanceTimersByTimeAsync(0)
       expect(registry.disposed).toBe(true)
     } finally {
@@ -542,7 +542,7 @@ describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (S
       const registry = createStoreRegistry()
       const releaseFirst = registry.retain(true) // simulated initial mount
       releaseFirst() // simulated StrictMode unmount probe
-      registry.retain(true) // simulated StrictMode remount, before the microtask runs
+      registry.retain(true) // simulated StrictMode remount, before the task runs
 
       await vi.advanceTimersByTimeAsync(0)
       expect(registry.disposed).toBe(false)
@@ -560,106 +560,6 @@ describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (S
       release() // must not double-decrement retainCount or double-schedule disposal
       await vi.advanceTimersByTimeAsync(0)
       expect(registry.disposed).toBe(true)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('prepareForRender() does not guess that an unretained render was abandoned', async () => {
-    vi.useFakeTimers()
-    try {
-      const registry = createStoreRegistry()
-      registry.prepareForRender()
-      expect(registry.disposed).toBe(false)
-      await vi.advanceTimersByTimeAsync(0)
-      expect(registry.disposed).toBe(false)
-      registry.dispose()
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('does not invoke disposal reporters from render preparation', async () => {
-    vi.useFakeTimers()
-    const hostReportError = vi.fn()
-    vi.stubGlobal('reportError', hostReportError)
-    try {
-      const reporterFailure = new Error('runtime reporter failed')
-      const runtime = createRuntime()
-      vi.spyOn(runtime, 'reportError').mockImplementation(() => {
-        throw reporterFailure
-      })
-      const registry = new StoreRegistry(runtime)
-      registry.register(
-        createStoreToken('candidate'),
-        {
-          dispose: () => undefined
-        },
-        { owned: true }
-      )
-      registry.prepareForRender()
-
-      await vi.advanceTimersByTimeAsync(0)
-      expect(registry.disposed).toBe(false)
-      expect(hostReportError).not.toHaveBeenCalled()
-      registry.dispose()
-    } finally {
-      vi.unstubAllGlobals()
-      vi.useRealTimers()
-    }
-  })
-
-  it('prepareForRender() never disposes a candidate that was retained (i.e. actually committed)', async () => {
-    vi.useFakeTimers()
-    try {
-      const registry = createStoreRegistry()
-      registry.prepareForRender()
-      registry.retain(true) // simulates React committing the render before the check fires
-      await vi.advanceTimersByTimeAsync(0)
-      expect(registry.disposed).toBe(false)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('prepareForRender() is a no-op once the registry is already disposed', () => {
-    const registry = createStoreRegistry()
-    registry.dispose()
-    expect(() => registry.prepareForRender()).not.toThrow()
-  })
-
-  it('prepareForRender(after) does not dispose a candidate while the barrier is pending', async () => {
-    vi.useFakeTimers()
-    try {
-      const registry = createStoreRegistry()
-      const neverSettles = new Promise<void>(() => {})
-      registry.prepareForRender(neverSettles)
-
-      await vi.advanceTimersByTimeAsync(4001)
-      expect(registry.disposed).toBe(false)
-      registry.dispose()
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('prepareForRender(after) does not dispose before a delayed React commit', async () => {
-    vi.useFakeTimers()
-    try {
-      const registry = createStoreRegistry()
-      let resolveAfter: (() => void) | undefined
-      const after = new Promise<void>((resolve) => {
-        resolveAfter = resolve
-      })
-      registry.prepareForRender(after)
-
-      resolveAfter!()
-      await vi.advanceTimersByTimeAsync(0) // let the .then() microtask arm the fast-path timer
-      expect(registry.disposed).toBe(false)
-      await vi.advanceTimersByTimeAsync(16)
-      expect(registry.disposed).toBe(false)
-      registry.retain(false)
-      registry.dispose()
     } finally {
       vi.useRealTimers()
     }

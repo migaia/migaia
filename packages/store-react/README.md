@@ -14,7 +14,7 @@
 pnpm add @migaia/store-react react react-dom
 ```
 
-`react`/`react-dom` 是 peer dependency（`>=18`）。本包依赖 `@migaia/store-light`（`createStore` 产出的 Store 靠 `$runtime`/`$async`/`$snapshot()`/`$batch()` 这几个元字段与 `storeReady()` 对接，见源码 `reactive-store.ts`）、`@migaia/store-keyed`（Atom 定义/AtomStore 协议）、`@migaia/resource`（`Resource`）、`@migaia/reactive`（响应式图）、`@migaia/lifecycle`、`@migaia/utils`；这些包按需装即可，不是全部都要在业务代码里直接 import。产物是纯 ESM，`package.json` 当前只公开根入口，所有 API 都从 `@migaia/store-react` 导入（没有子路径）。
+`react`/`react-dom` 是 peer dependency（`>=19`，异步 Store 使用 React 19 的 `use`）。本包依赖 `@migaia/store-light`（`createStore` 产出的 Store 靠 `$runtime`/`$async`/`$snapshot()`/`$batch()` 这几个元字段与 `storeReady()` 对接，见源码 `reactive-store.ts`）、`@migaia/store-keyed`（Atom 定义/AtomStore 协议）、`@migaia/resource`（`Resource`）、`@migaia/reactive`（响应式图）、`@migaia/lifecycle`、`@migaia/utils`；这些包按需装即可，不是全部都要在业务代码里直接 import。产物是纯 ESM，`package.json` 当前只公开根入口，所有 API 都从 `@migaia/store-react` 导入（没有子路径）。
 
 ## 目录
 
@@ -22,7 +22,7 @@ pnpm add @migaia/store-react react react-dom
 - [核心订阅 hook](#核心订阅-hook)：`useStore` / `useSignal` / `useTracked` / `useNodeValue`
 - [异步值 hook](#异步值-hook)：`useResource` / `useResourceValue` / `useStoreResource` / `useAsyncAtomValue`
 - [Atom hook](#atom-hook)：`useAtomValue` / `useSetAtom` / `useAtom` / `useAtomDefinition` / `useSetAtomDefinition`
-- [依赖注入：StoreToken / StoreRegistry](#依赖注入storetoken--storeregistry)
+- [依赖注入：IStoreToken / StoreRegistry](#依赖注入istoretoken--storeregistry)
 - [Config / Feature flag](#config--feature-flag)
 - [高阶组合示例](#高阶组合示例)
 - [构建门禁](#构建门禁)
@@ -72,7 +72,7 @@ function App() {
 - `disposeOnUnmount?: boolean` —— 都不传 `registry`/`runtime` 时默认 `true`（自建自释放）；只传 `registry` 时默认 `false`（外部对象默认外部拥有）
 - `config?: IStoreProviderConfig` —— `{ features？, ready？, fallback？, defaults？ }`，见下方 [Config / Feature flag](#config--feature-flag)
 
-同时传 `registry` 与 `runtime` 且 `registry.runtime !== runtime` 会立刻抛错；完整所有权规则、`config.ready` 的身份锁定语义、StrictMode 下的候选 Registry 回收机制，见 USEGUIDE §2、§6。
+同时传 `registry` 与 `runtime` 且 `registry.runtime !== runtime` 会立刻抛错；完整所有权规则、`config.ready` 的数组身份换代语义、StrictMode 下的候选 Registry 回收机制，见 USEGUIDE §2、§6。
 
 ---
 
@@ -195,7 +195,7 @@ const increment = useSetAtomDefinition(incrementDef);
 
 <a id="依赖注入storetoken--storeregistry"></a>
 
-## 依赖注入：StoreToken / StoreRegistry
+## 依赖注入：IStoreToken / StoreRegistry
 
 ```tsx
 import {
@@ -224,7 +224,7 @@ const sessionStore = useStoreFromProvider(sessionToken);
 const userId = useProvidedStore(sessionToken, (s) => s.userId);
 ```
 
-`useStoreFromProvider` 单参数 `token: StoreToken<T>`（必填），未注册抛 `[store] missing provider store: X`。`useProvidedStore` 额外参数 `selector: (state: IStoreShape<S>) => Result`（必填）、`isEqual?`（默认 `Object.is`）。均**必须有 Provider**。
+`useStoreFromProvider` 单参数 `token: IStoreToken<T>`（必填），未注册抛 `[store] missing provider store: X`。`useProvidedStore` 额外参数 `selector: (state: IStoreShape<S>) => Result`（必填）、`isEqual?`（默认 `Object.is`）。均**必须有 Provider**。
 
 **`useStoreRegistry()` / `useStoreRuntime()`｜3 秒上手** —— 取当前 Provider 的 Registry / 其所属 Runtime，均**必须有 Provider**（否则抛 `[store] hook requires a StoreProvider`），无参数：
 
@@ -241,7 +241,7 @@ const unregister = registry.register(sessionToken, sessionStore, { owned: true }
 registry.dispose(); // 同步、幂等；owned 实体按注册顺序的逆序释放
 ```
 
-`createStoreRegistry` 单参数 `runtime?: IRuntime`（默认新建）。`StoreRegistry` 实例方法：`register(token, value, { owned? })`（同 token 重复注册抛错，`owned: true` 时 Registry 释放会调用其 `$dispose()`/`dispose()`）、`replace(token, value, options?)`（无重复检查，直接覆盖）、`get`/`require`/`has`（查询）、`remove(token, disposeOwned = true)`、`dispose()`（同步）、`disposeAsync()`（异步、单飞）、只读 `runtime`/`atomStore`/`lifecycle`/`disposed`、`whenTerminal()`。跨 Runtime 注册会抛 `[store] provider store "X" belongs to a different Runtime`。完整生命周期语义见 USEGUIDE §4、§6。
+`createStoreRegistry` 单参数 `runtime?: IRuntime`（默认新建）。`StoreRegistry` 实例方法：`register(token, value, { owned? })`（同 token 重复注册抛错，`owned: true` 时 Registry 释放会调用其 `$dispose()`/`dispose()`）、`replace(token, value, options?)`（无重复检查，直接覆盖）、`get`/`require`/`has`（查询）、`remove(token, disposeOwned = true)`、`dispose()`（同步）、`disposeAsync()`（异步、单飞）、`retain(disposeOnRelease)`（返回幂等 release；最后一次释放延至 setTimeout(0)）、只读 `runtime`/`atomStore`/`lifecycle`/`disposed`、`whenTerminal()`。跨 Runtime 注册会抛 `[store] provider store "X" belongs to a different Runtime`。完整生命周期语义见 USEGUIDE §4、§6。
 
 ---
 
@@ -291,56 +291,49 @@ StoreProviderState.pending; // 'pending' | 'ready' | 'error' 之一
 
 ## 高阶组合示例
 
-### 1. StoreProvider + 就绪屏障 + StoreToken 注入 + Suspense 异步读取
+### 1. StoreProvider + 就绪屏障 + IStoreToken 注入 + Suspense 异步读取
 
 ```tsx
-import { Suspense, useEffect, useMemo } from 'react';
+import { Suspense } from 'react';
 import {
-  StoreProvider,
-  createStoreToken,
-  useProvidedStore,
-  useResourceValue,
-  useStoreFeature,
-  useStoreRegistry,
-  useStoreRuntime
+  StoreProvider, createStoreRegistry, createStoreToken,
+  useProvidedStore, useStoreFromProvider, useResourceValue, useStoreFeature
 } from '@migaia/store-react';
 import { createStore, type IReactiveStore } from '@migaia/store-light';
 import { Resource } from '@migaia/resource';
 
-const sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');
+type ISession = { userId: string; setUserId(id: string): void };
+const sessionToken = createStoreToken<IReactiveStore<ISession>>('session');
+const profileToken = createStoreToken<Resource<{ name: string }>>('profile');
 
-function App() {
-  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定
-  const sessionStore = useMemo(() => createStore({ userId: '' }), []);
+// 在 React 首次渲染前组装；每个应用或 SSR 请求各调用一次。
+function createApplication() {
+  const registry = createStoreRegistry();
+  const sessionStore = createStore<ISession>({
+    userId: '',
+    setUserId(id) { this.userId = id; }
+  }, { runtime: registry.runtime });
+  registry.register(sessionToken, sessionStore, { owned: true });
+  // Resource 来自可观察的应用 owner，身份不随组件 render 改变。
+  const profile = new Resource(async () => ({ name: sessionStore.userId || '访客' }), registry.runtime);
+  registry.register(profileToken, profile, { owned: true });
+  const ready = [() => Promise.resolve()];
 
-  return (
-    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>
-      <SessionInjector store={sessionStore}>
-        <Suspense fallback={<div>加载中…</div>}>
-          <Dashboard />
-        </Suspense>
-      </SessionInjector>
-    </StoreProvider>
-  );
-}
-
-function SessionInjector({ store, children }) {
-  const registry = useStoreRegistry();
-  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);
-  return children;
+  function App() {
+    return (
+      <StoreProvider registry={registry} config={{ ready, fallback: <div>加载中…</div> }}>
+        <Suspense fallback={<div>加载中…</div>}><Dashboard /></Suspense>
+      </StoreProvider>
+    );
+  }
+  return { App, dispose: () => registry.disposeAsync() };
 }
 
 function Dashboard() {
-  const userId = useProvidedStore(sessionToken, (s) => s.userId);
-  const runtime = useStoreRuntime();
+  const userId = useProvidedStore(sessionToken, (state) => state.userId);
+  const profile = useResourceValue(useStoreFromProvider(profileToken));
   const showCharts = useStoreFeature('experimental.charts');
-  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));
-  return (
-    <p>
-      {profile.name}
-      {showCharts ? ' · 图表已开启' : ''}
-    </p>
-  );
+  return <p>{userId}: {profile.name}{showCharts ? ' · 图表已开启' : ''}</p>;
 }
 ```
 
@@ -416,3 +409,5 @@ pnpm --filter @migaia/store-react typecheck:e2e
 pnpm --filter @migaia/store-react test:e2e
 pnpm --filter @migaia/store-react build
 ```
+
+迁移说明：React/react-dom 最低版本改为 19。Registry 首次 dispose 在 owned 回调前关闭接纳；reentrant disposeAsync 复用既有完成 Promise。移除无操作 prepareForRender 和 retain 的无效第二参数；保留 retain/release、原清理顺序与 lifecycle 账本。

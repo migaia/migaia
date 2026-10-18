@@ -17,7 +17,11 @@ import {
   type ILifecycleState
 } from '@migaia/lifecycle'
 import { createAtomStore, type IAtomStore } from '@migaia/store-keyed/atom/store'
-import { createStoreReactAggregateError, createStoreReactError } from './errors.js'
+import {
+  createStoreReactAggregateError,
+  createStoreReactError,
+  identifyRegistryDisposalFailure
+} from './errors.js'
 import { StoreReactErrorCode } from './error-code.js'
 import { StoreReactErrorText } from './error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
@@ -29,18 +33,12 @@ const STORE_TOKEN_VALUE = Symbol('store-token-value')
  * failures.
  */
 function reportRegistryFailure(runtime: IRuntime, error: unknown): void {
-  runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook })
+  runtime.reportError(identifyRegistryDisposalFailure(error), {
+    phase: ReactiveErrorPhase.lifecycleHook
+  })
 }
 
-/**
- * React gives no public hook for "this render/component instance was discarded before it committed"
- * — no callback fires for an effect that never ran. `prepareForRender()`'s timer is the only signal
- * available, and it is inherently a heuristic: too short risks disposing a candidate a legitimately
- * slow (not abandoned) render still needs; too long delays reclaiming a genuinely abandoned one. A
- * pending readiness barrier is deliberately not reclaimed by wall-clock time: React may commit a
- * legitimately slow render after an arbitrary delay. The owner must resolve/reject the barrier or
- * explicitly dispose the candidate; correctness is more important than heuristic reclamation.
- */
+/** Typed immutable key shared by registration and synchronous lookup within a registry. */
 export type IStoreToken<T> = Readonly<{
   key: symbol
   debugName: string
@@ -108,11 +106,15 @@ export class StoreRegistry implements IDisposable {
   readonly runtime: IRuntime
   /** Provider-local atom state/override boundary. Same Runtime may host many registries. */
   readonly atomStore: IAtomStore
+  /** Values and ownership flags admitted before disposal starts. */
   #entries = new Map<symbol, IRegistryEntry>()
+  /** Committed Provider retainers participating in delayed release. */
   #retainCount = 0
+  /** Invalidates a scheduled zero-owner release after a later retain/dispose. */
   #lifecycleGeneration = 0
   /** Lifecycle-owned pending/error/completion truth for the whole registry disposal plan. */
   #disposalLedger: ISyncStartedDisposalLedger = createSyncStartedDisposalLedger()
+  /** Published before cleanup callbacks; also closes registry admission during ledger plan assembly. */
   #disposingAsync: Promise<void> | undefined
 
   constructor(runtime: IRuntime = createRuntime()) {
@@ -123,6 +125,8 @@ export class StoreRegistry implements IDisposable {
 
   /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */
   get lifecycle(): ILifecycleState {
+    if (this.#disposingAsync && this.#disposalLedger.lifecycle === LifecycleState.open)
+      return LifecycleState.closing
     return this.#disposalLedger.lifecycle
   }
 
@@ -135,7 +139,7 @@ export class StoreRegistry implements IDisposable {
   }
 
   get disposed(): boolean {
-    return this.#disposalLedger.lifecycle !== LifecycleState.open
+    return this.lifecycle !== LifecycleState.open
   }
 
   register<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): IDisposer {
@@ -210,7 +214,7 @@ export class StoreRegistry implements IDisposable {
    * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an
    * internally-owned registry between those two phases.
    */
-  retain(disposeOnRelease: boolean, _deferTask = false): IDisposer {
+  retain(disposeOnRelease: boolean): IDisposer {
     this.#assertActive()
     this.#retainCount++
     this.#lifecycleGeneration++
@@ -244,16 +248,6 @@ export class StoreRegistry implements IDisposable {
   }
 
   /**
-   * Retained for source compatibility, but deliberately does not reclaim a render candidate. React
-   * exposes no reliable abandoned-render signal; any timer, including one armed after a readiness
-   * promise settles, can dispose a valid render before its effect commits. Candidate reclamation
-   * belongs to an observable owner or a future GC-backed mechanism.
-   */
-  prepareForRender(after?: Promise<void>): void {
-    void after
-  }
-
-  /**
    * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this
    * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an
    * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving
@@ -261,7 +255,18 @@ export class StoreRegistry implements IDisposable {
    * `terminal` once every tracked thenable has actually settled.
    */
   dispose(): void {
-    if (this.#disposalLedger.lifecycle !== LifecycleState.open) return
+    if (this.disposed) return
+    // The ledger accepts plan items until seal; the registry stops public admission before any
+    // user disposer can register another value or reenter disposeAsync().
+    this.#disposingAsync = this.#disposalLedger.whenTerminal().then(async () => {
+      /** Once terminal, seal returns the original immutable plan and its complete continuation. */
+      const { cleanupErrors } = await mergeCleanupResults([this.#disposalLedger.seal()])
+      if (cleanupErrors.length === 0) return
+      throw this.#mapDisposalErrors(cleanupErrors as readonly ICollectedError[])
+    })
+    // Synchronous callers may never request async completion; the existing Runtime observer reports
+    // failures while this handler prevents the stable public completion from becoming unhandled.
+    void this.#disposingAsync.catch(() => undefined)
     this.#lifecycleGeneration++
     const entries = [...this.#entries.values()].reverse()
     this.#entries.clear()
@@ -283,22 +288,12 @@ export class StoreRegistry implements IDisposable {
    */
   disposeAsync(): Promise<void> {
     if (this.#disposingAsync) return this.#disposingAsync
-    if (this.#disposalLedger.lifecycle === LifecycleState.open) {
-      try {
-        this.dispose()
-      } catch {
-        // The stable completion below replays this failure to async callers.
-      }
+    try {
+      this.dispose()
+    } catch {
+      // The already-published completion replays this failure to async callers.
     }
-    const outcome = this.#disposalLedger.seal()
-    const completion = mergeCleanupResults([outcome]).then(({ cleanupErrors }) => {
-      /** This private ledger never rejects and only produces source-labelled ICollectedErrors. */
-      const errors = cleanupErrors as readonly ICollectedError[]
-      if (errors.length === 0) return
-      throw this.#mapDisposalErrors(errors)
-    })
-    this.#disposingAsync = completion
-    return completion
+    return this.#disposingAsync!
   }
 
   /** Reports asynchronous raw errors once, after ledger completion, without altering their identity. */
@@ -310,12 +305,12 @@ export class StoreRegistry implements IDisposable {
     })
   }
 
-  /** Projects raw ledger errors into Store's synchronous AggregateError contract. */
+  /** Projects raw ledger errors into the package cleanup contract without rewriting foreign owners. */
   #mapDisposalErrors(errors: readonly { readonly error: unknown }[]): unknown {
-    if (errors.length === 1) return errors[0]!.error
+    if (errors.length === 1) return identifyRegistryDisposalFailure(errors[0]!.error)
     return createStoreReactAggregateError(
       StoreReactErrorCode.registryDisposalFailed,
-      errors.map((entry) => entry.error),
+      errors.map((entry) => identifyRegistryDisposalFailure(entry.error)),
       StoreReactErrorText.registryDisposalFailed
     )
   }
@@ -332,8 +327,13 @@ export class StoreRegistry implements IDisposable {
    * independent, ad-hoc operations — but a rejection still must not become unhandled.
    */
   #disposeValueObserved(value: unknown): void {
-    const result = disposeValue(value)
-    containAsyncRejection(result, (error) => reportRegistryFailure(this.runtime, error))
+    try {
+      /** Per-entry operations share the same cleanup error classification as whole-owner disposal. */
+      const result = disposeValue(value)
+      containAsyncRejection(result, (error) => reportRegistryFailure(this.runtime, error))
+    } catch (error) {
+      throw identifyRegistryDisposalFailure(error)
+    }
   }
 
   #assertRuntime<T>(token: IStoreToken<T>, value: T): void {
@@ -347,7 +347,7 @@ export class StoreRegistry implements IDisposable {
   }
 
   #assertActive(): void {
-    if (this.#disposalLedger.lifecycle !== LifecycleState.open) {
+    if (this.disposed) {
       throw createStoreReactError(
         StoreReactErrorCode.registryDisposed,
         StoreReactErrorText.registryDisposed

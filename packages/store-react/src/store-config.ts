@@ -95,13 +95,14 @@ export function normalizeStoreConfig(
   let wasm = false
   let experimentalInput: IStoreFeatureExperimental | undefined
   let barriers: readonly IStoreReadyBarrier[] | undefined
-  let defaults: IStoreProviderDefaults | undefined
+  /** Capture the supported nested default before readiness factories can start application work. */
+  let warnAsyncActions = false
   try {
     const features = config?.features
     wasm = features?.wasm === true
     experimentalInput = features?.experimental
     barriers = config?.ready
-    defaults = config?.defaults
+    warnAsyncActions = config?.defaults?.warnAsyncActions === true
   } catch (error) {
     throw createStoreReactError(StoreReactErrorCode.invalidConfig, StoreReactErrorText.configRead, {
       cause: error
@@ -146,7 +147,7 @@ export function normalizeStoreConfig(
   return {
     features: { wasm, experimental },
     defaults: {
-      warnAsyncActions: defaults?.warnAsyncActions === true
+      warnAsyncActions
     },
     ready
   }
@@ -245,8 +246,8 @@ export function decodeStoreExperimental(encoded: string): Readonly<Record<string
 }
 
 type IBarrierFactory = Extract<IStoreReadyBarrier, () => unknown>
-// Cache by the normalized barrier-list identity, never by factory globally.
-// This keeps separate Provider/SSR scopes isolated. Factory execution is not
+// Cache by scope and factory identity; list promises have their own cache above.
+// Separate Provider/SSR scopes stay isolated. Factory execution is not
 // guaranteed exactly once across abandoned React renders; callers should pass
 // a memoized Promise/resource for non-idempotent work.
 const BARRIER_CACHE = new WeakMap<object, WeakMap<IBarrierFactory, Promise<unknown>>>()

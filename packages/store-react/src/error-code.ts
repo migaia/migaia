@@ -17,9 +17,11 @@ export const StoreReactErrorCode = {
   registryDisposed: 'REGISTRY_DISPOSED',
 
   /**
-   * Provider registry disposal fails and exposes an `AggregateError`.
+   * An owned registry value fails to dispose. Unclassified native errors receive this code;
+   * multiple failures expose an `AggregateError`, and existing foreign package identities remain.
    *
-   * Inspect each entry in `error.errors`. This failure is unrecoverable within the disposal path.
+   * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other
+   * owned values; retrying disposal does not rerun their callbacks.
    */
   registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED',
 

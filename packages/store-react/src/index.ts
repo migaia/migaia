@@ -9,4 +9,10 @@ export { useAtomDefinition, useSetAtomDefinition } from './useAtomDefinition.js'
  */
 export { useNodeValue, type IStableNode } from './useNode.js'
 
-export * from './errors.js'
+export {
+  createStoreReactError,
+  createStoreReactAggregateError,
+  StoreReactErrorCode,
+  STORE_REACT_SOURCE,
+  type IStoreReactErrorCode
+} from './errors.js'

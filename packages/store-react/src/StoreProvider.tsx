@@ -122,11 +122,7 @@ export function StoreProvider({
       {children}
     </RegistryBoundary>
   ) : (
-    <OwnedRegistryBoundary
-      runtime={runtime}
-      disposeOnUnmount={disposeOnUnmount ?? true}
-      armInitial={normalized.ready?.promise}
-    >
+    <OwnedRegistryBoundary runtime={runtime} disposeOnUnmount={disposeOnUnmount ?? true}>
       {children}
     </OwnedRegistryBoundary>
   )
@@ -205,7 +201,6 @@ type IRegistryBoundaryProps = {
   readonly children: ReactNode
   readonly registry: StoreRegistry
   readonly disposeOnUnmount: boolean
-  readonly deferRelease?: boolean
   readonly onCommit?: () => void
 }
 
@@ -213,14 +208,13 @@ function RegistryBoundary({
   children,
   registry,
   disposeOnUnmount,
-  deferRelease,
   onCommit
 }: IRegistryBoundaryProps) {
   useEffect(() => {
-    const release = registry.retain(disposeOnUnmount, deferRelease)
+    const release = registry.retain(disposeOnUnmount)
     onCommit?.()
     return release
-  }, [disposeOnUnmount, deferRelease, onCommit, registry])
+  }, [disposeOnUnmount, onCommit, registry])
   return <StoreRegistryContext.Provider value={registry}>{children}</StoreRegistryContext.Provider>
 }
 
@@ -233,20 +227,17 @@ type IOwnedRegistryBoundaryProps = {
   readonly children: ReactNode
   readonly runtime: IRuntime | undefined
   readonly disposeOnUnmount: boolean
-  readonly armInitial: Promise<void> | undefined
 }
 
 function OwnedRegistryBoundary({
   children,
   runtime,
-  disposeOnUnmount,
-  armInitial
+  disposeOnUnmount
 }: IOwnedRegistryBoundaryProps) {
   const initial = useRef<IOwnedRegistryState>(undefined)
   if (!initial.current) {
     const ownedRuntime = runtime ?? createRuntime()
     const ownedRegistry = createStoreRegistry(ownedRuntime)
-    void armInitial
     initial.current = {
       runtime,
       registry: ownedRegistry
@@ -261,11 +252,6 @@ function OwnedRegistryBoundary({
     } else {
       const nextRuntime = runtime ?? createRuntime()
       const nextRegistry = createStoreRegistry(nextRuntime)
-      // A runtime switch can happen while the readiness barrier is still
-      // pending. Keep the candidate armed by that same barrier; otherwise
-      // prepareForRender() would dispose it on the next timer before the
-      // ReadyBoundary has a chance to commit the subtree.
-      void armInitial
       active = {
         runtime,
         registry: nextRegistry
@@ -283,7 +269,6 @@ function OwnedRegistryBoundary({
     <RegistryBoundary
       registry={active.registry}
       disposeOnUnmount={disposeOnUnmount}
-      deferRelease={armInitial !== undefined}
       onCommit={commitActive}
     >
       {children}
