@@ -10,7 +10,7 @@
 - [`IResourceFetcher` 与依赖追踪](#fetcher-与依赖追踪)
 - [快照类型 `IResourceCacheSnapshot`](#快照类型)
 - [底层依赖：lifecycle 原语的使用方式](#底层依赖)
-- [错误码](#错误码)：`ResourceErrorCode`（8 个码）逐条语义
+- [错误码](#错误码)：`ResourceErrorCode`（9 个码）逐条语义
 - [高阶组合示例](#高阶组合示例)
 - [排查与构建门禁](#排查与构建门禁)
 
@@ -106,8 +106,8 @@ export function disposeUserPanel(): void {
 ### 状态读取（getter）
 
 - `state: IResourceState<T>` —— 响应式状态机快照（读取会建立依赖，并顺带触发 `#ensureFresh()`：过期的 `success` 值或 `idle` 状态会自动发起新请求）。已释放时抛 `RESOURCE_DISPOSED`。
-- `promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise（内部状态机异常）时抛 `NO_ACTIVE_PROMISE`。
-- `disposed: boolean` —— 是否已 `dispose()`；这是唯一在已释放后仍可安全读取、不抛错的成员。
+- `promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise 时抛 `NO_ACTIVE_PROMISE`。
+- `disposed: boolean` —— 是否已 `dispose()`；释放后仍可安全读取；`refreshing`、`observed` 也可读。
 - `refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。
 - `fetchStatus: ResourceFetchStatus` —— 传输层状态，独立于可见的 data/error：`'fetching'` 或 `'idle'`。
 - `isStale: boolean` —— 当前缓存的成功值是否已超过 TTL；非 `success` 状态恒为 `false`。
@@ -120,7 +120,7 @@ read(): T; // Suspense 兼容：success 返回值，pending 抛 Promise，error/
 peek(): T; // 与 read() 形状相同，但不建立依赖边，也不触发 ensureFresh()
 ```
 
-`read()` 按 React Suspense 期望的形状工作：成功返回缓存数据；`pending`/`idle` 抛出当前 `promise`；`error`/`cancelled` 抛出对应的错误对象。`peek()` 是它的非追踪版本，用于 `getSnapshot` 一类"读当前快照但不想加入别人追踪窗口"的场景，且不会顺手启动请求。
+`read()` 按 React Suspense 期望的形状工作：成功返回缓存数据；`pending`/`idle` 抛出当前 `promise`；`error`/`cancelled` 抛出对应的错误对象。`peek()` 是它的非追踪版本，用于 `getSnapshot` 一类"读当前快照但不想加入别人追踪窗口"的场景，且不会顺手启动请求。合法的 `autoStart: false` 初始 idle 状态尚无 Promise，直接 `peek()` 会抛 `NO_ACTIVE_PROMISE`；用 `peekState()` 检查状态或显式启动请求。
 
 ### `refetch()` / `invalidate()`
 
@@ -137,7 +137,7 @@ invalidate(): Promise<T>; // 立即使缓存过期（expiresAt = 0）并发起�
 cancel(): void;
 ```
 
-只中止**当前活跃的一代**请求，资源本身仍可复用；取消后被动读取保持 cancelled，显式 `refetch()` 可重启。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留"正在刷新但没有实际请求"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。
+只中止**当前活跃的一代**请求，资源本身仍可复用；没有活跃请求时为空操作；取消活跃请求后暂停被动重启，pending 的可见状态保持 cancelled，显式 `refetch()` 可重启。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留"正在刷新但没有实际请求"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。
 
 ### `dehydrate()` / `hydrate()`
 
@@ -146,9 +146,9 @@ dehydrate(): IResourceCacheSnapshot<T> | undefined;
 hydrate(snapshot: IResourceCacheSnapshot<T>): void;
 ```
 
-`dehydrate()`：当前状态非 `success` 时返回 `undefined`；否则返回 JSON 安全的快照（`expiresAt` 为 `Infinity` 时序列化为 `null`）。
+`dehydrate()`：非 `success` 时返回 `undefined`；否则原样保留业务 `data`，同时捕获非负时长 `ageMs` 与 `remainingTtlMs`。后者为 `null` 表示无时间过期（`ttl: 0` 或无限 TTL）。任意 `T` 不保证 JSON 可序列化，BigInt/循环对象仍由调用方处理。
 
-`hydrate(snapshot)`：把快照原样恢复为一个 `success` 状态，不发起请求；会先作废当前活跃的请求代（`supersede()`）并清空依赖登记。快照结构非法（`version !== 1`，或 `updatedAt`/`expiresAt` 不是有限数字）抛 `INVALID_SNAPSHOT`——读取快照字段本身失败（hostile getter）时错误的 `cause` 挂原始异常。
+`hydrate(snapshot)`：先验证 v2，再按接收端 scheduler.now() 重建内部时间戳，作废当前请求并清空依赖，恢复 `success`。剩余寿命从 hydration 继续计时；调用方若需计入传输/存储耗时，应把已知耗时加到 `ageMs`，并从有限的 `remainingTtlMs` 扣除（最低为 0）。两端无需共享单调时钟原点。格式不是 v2、时长为负/非有限（仅 remaining 允许 null），或重建时间戳溢出时抛 `INVALID_SNAPSHOT`；getter 失败保留 cause。旧 v1 绝对时间格式明确拒绝，应在知道旧时钟基准的地方转换，接收端不能猜测。
 
 ### `dispose()`
 
@@ -156,7 +156,7 @@ hydrate(snapshot: IResourceCacheSnapshot<T>): void;
 dispose(): void;
 ```
 
-彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放之后调用任何其它方法（除 `disposed` 本身）一律抛 `RESOURCE_DISPOSED`。
+彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放后数据读取/请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 不抛错。
 
 ---
 
@@ -182,12 +182,12 @@ type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => 
 
 逐项语义与校验：
 
-- `ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。
+- `ttl?: number` —— 成功值的新鲜时长（毫秒）。`0` 与 `Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。
 - `autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。
 - `staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。
 - `retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；**Suspense 抛出的 thenable 值不计入失败次数**（`fetcher` 内部同步抛出一个 thenable 是被当作"需要等待后重跑"处理的，不是一次真实失败）。
-- `retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。
-- `keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。
+- `retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回非数字时以原生 `TypeError`/`INVALID_OPTION` 拒绝；返回负数/非有限数字则为 `RangeError`/`INVALID_OPTION`。策略抛错或返回非法值时保留触发重试的 fetch 主因，原生策略 Error 尽量原样附码，已有外部身份不改写。
+- `keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开上游边、保留依赖版本与缓存），下次读取核对版本；依赖未变且缓存新鲜时继续复用，变更时重拉。设为 `true` 时禁用自动休眠。
 - `initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见[快照类型](#快照类型)）。
 - `scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。
 
@@ -203,7 +203,7 @@ type IResourceState<T> =
   | { status: 'pending' }
   | { status: 'success'; data: T; refreshing?: boolean }
   | { status: 'error'; error: unknown }
-  | { status: 'cancelled'; error: DOMException }
+  | { status: 'cancelled'; error: Error } // runtime 为原生 DOMException，类型不要求 DOM lib
 
 const ResourceStatus: {
   idle: 'idle'
@@ -211,7 +211,6 @@ const ResourceStatus: {
   success: 'success'
   error: 'error'
   cancelled: 'cancelled'
-  fetching: 'fetching'
 }
 
 type ResourceFetchStatus = 'idle' | 'fetching'
@@ -243,14 +242,14 @@ type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 
 ```ts
 type IResourceCacheSnapshot<T> = {
-  readonly version: 1
+  readonly version: 2
   readonly data: T
-  readonly updatedAt: number
-  readonly expiresAt: number | null // null 表示无限生命周期的 JSON 安全形式
+  readonly ageMs: number
+  readonly remainingTtlMs: number | null
 }
 ```
 
-`dehydrate()`/`hydrate()`/`initialSnapshot` 共用的 JSON 安全快照结构。`version` 恒为 `1`（预留未来格式演进）；`expiresAt` 为 `null` 对应内部的 `Infinity`（`ttl: Infinity` 场景）。`hydrate()`/构造期 `initialSnapshot` 校验：`version !== 1`，或 `updatedAt`/非 `null` 的 `expiresAt` 不是有限数字，一律抛 `INVALID_SNAPSHOT`。
+快照只携带时长，不携带发送端绝对时间。`remainingTtlMs: null` 表示无时间过期；仅时间元数据可直接 JSON 编码，业务 `data` 由调用方保证可序列化。详见 hydrate() 的传输耗时责任和 v1 迁移说明。
 
 ---
 
@@ -276,19 +275,20 @@ type IResourceCacheSnapshot<T> = {
 import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'
 ```
 
-稳定错误码表，**8 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。
+稳定错误码表，**9 个码**，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。
 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。
 
 | `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                                                        |
 | --------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `resourceDisposed`          | `RESOURCE_DISPOSED`           | 在已 `dispose()` 的 `Resource` 上调用任意读取/操作方法                                                                                          |
-| `requestAborted`            | `REQUEST_ABORTED`             | 请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段） |
+| `requestAborted` | `REQUEST_ABORTED` | 请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause |
 | `requestCancelled`          | `REQUEST_CANCELLED`           | 调用方显式 `cancel()` 导致当前 pending 请求被取消，`state` 落入 `cancelled` 所携带的 `DOMException`                                             |
 | `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | 请求取消已完成状态收敛，但取消期间的 timer/listener cleanup 失败                                                                                |
 | `noActivePromise`           | `NO_ACTIVE_PROMISE`           | 读取 `promise`，或 `pending`/`idle` 状态下内部 `#materialize()` 时，没有一个正在进行或已缓存的 Promise 可返回                                   |
-| `invalidSnapshot`           | `INVALID_SNAPSHOT`            | `hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字                                            |
+| `invalidSnapshot` | `INVALID_SNAPSHOT` | 非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败 |
 | `invalidOption`             | `INVALID_OPTION`              | 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求                                                             |
 | `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | `fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable                                                  |
+| `fetchFailed` | `FETCH_FAILED` | 重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写 |
 
 `requestAborted`/`requestCancelled` 抛出/落入状态的值始终是原生 `DOMException`（`name === 'AbortError'`），调用方通常按 `error.name === 'AbortError'` 判定并静默处理，而不是当作真实失败；`code` 只作为附加字段挂上，不改变类型。调用方应始终以 `error.code === ResourceErrorCode.xxx` 判别，不要硬编码码值字符串。
 
@@ -311,8 +311,9 @@ function UserProfile({ resource }: { resource: Resource<User> }) {
 
 ```ts
 // 服务端：
-const snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }
-// 序列化 snapshot 注入 HTML
+const snapshot = serverUserResource.dehydrate() // undefined 或 { version: 2, data, ageMs, remainingTtlMs }
+// 通过安全的 JSON 传输通道发送；若内嵌 HTML，必须采用适合 HTML 上下文的编码。
+// 根据已知传输/存储耗时调整 ageMs/remainingTtlMs。
 
 // 客户端：
 const userResource = new Resource(fetchUser, runtime, {
@@ -346,7 +347,7 @@ const resource = new Resource(fetchWithFlakyBackend, runtime, {
 
 ```ts
 await resource.invalidate() // 立即视为过期并重新请求
-resource.cancel() // 只中止当前请求，资源仍可复用；下次读取会重新发起
+resource.cancel() // 只中止当前请求，资源仍可复用；被动读取保持暂停，显式 refetch() 重启
 ```
 
 ---
@@ -359,9 +360,9 @@ resource.cancel() // 只中止当前请求，资源仍可复用；下次读取�
 - **`cancel()`/依赖变化后底层请求似乎仍在跑**：`fetcher` 没有把 `ctx.signal` 转交给真正可取消的 I/O；`cancel()` 只是让 `Resource` 忽略这次结果，不会代为中止未接收 `signal` 的请求。
 - **重复读 `state`/`promise` 却拿不到最新数据**：被动读取只在过期或 `idle` 时才发起请求，重复读不会强制刷新；需要强制刷新用 `refetch()` 或 `invalidate()`。
 - **读取抛 `RESOURCE_DISPOSED`**：`Resource` 已被 `dispose()`；停止持有该引用，创建新的 `Resource` 实例。
-- **读取抛 `NO_ACTIVE_PROMISE`**：状态机进入了不一致的中间态，通常意味着绕过了 `refetch()`/`invalidate()`/正常构造流程直接摆弄内部状态；检查调用路径。
-- **`hydrate()`/`initialSnapshot` 抛 `INVALID_SNAPSHOT`**：快照通常来自 SSR 序列化或持久化存储，格式漂移应在装载时就失败；检查快照的产出/序列化路径，确认 `version === 1` 且 `updatedAt`/`expiresAt` 是有限数字。
-- **长时间不用后再次读取，依赖似乎"断了"重新算了一遍**：`keepAlive` 默认 `false`，无人观察时会自动休眠（清依赖、令缓存过期）；需要"没人看也保持热数据"时显式传 `keepAlive: true`。
+- **读取抛 `NO_ACTIVE_PROMISE`**：合法的 `autoStart: false` idle 上直接 `peek()` 也会触发；用 `peekState()` 检查状态，或用 `promise`/`refetch()` 启动工作。
+- **`hydrate()`/`initialSnapshot` 抛 `INVALID_SNAPSHOT`**：快照通常来自 SSR 序列化或持久化存储，格式漂移应在装载时就失败；检查快照的产出/序列化路径，确认 `version === 2`、`ageMs` 为有限非负数、`remainingTtlMs` 为有限非负数或 null。
+- **长时间不用后再次读取，依赖似乎"断了"重新算了一遍**：`keepAlive` 默认 `false`，无人观察时会断开上游边但保留版本与缓存，下一次读取先核对依赖，未变且新鲜时不重拉；需要"没人看也保持热数据"时显式传 `keepAlive: true`。
 - **`fetcher` 里的 Suspense 抛出没有被正确识别**：若抛出值的 `.then` getter 本身抛错，会得到 `SUSPENSE_PROBE_FAILED` 而不是被当作普通 fetch 失败静默重试；检查该值为什么带有会抛错的 hostile getter。
 
 ```bash

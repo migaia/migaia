@@ -66,7 +66,7 @@ describe('AF-T6 resource scheduler injection', () => {
 })
 
 describe('Round21 resource TTL finite-domain admission', () => {
-  it('rejects updatedAt plus finite ttl overflow before success or dehydration', async () => {
+  it('rejects ageMs plus finite ttl overflow before success or dehydration', async () => {
     const runtime = createRuntime()
     const resource = new Resource(async () => 'value', runtime, {
       ttl: Number.MAX_VALUE,
@@ -92,10 +92,10 @@ describe('Round21 resource TTL finite-domain admission', () => {
 
     await expect(resource.promise).resolves.toBe('value')
     expect(resource.dehydrate()).toEqual({
-      version: 1,
+      version: 2,
       data: 'value',
-      updatedAt: halfMax,
-      expiresAt: Number.MAX_VALUE
+      ageMs: 0,
+      remainingTtlMs: halfMax
     })
 
     const hydrated = new Resource(async () => 'unused', runtime, {
@@ -104,7 +104,7 @@ describe('Round21 resource TTL finite-domain admission', () => {
       scheduler: { now: () => 0, schedule: () => ({ cancel: () => undefined }) }
     })
     expect(hydrated.state).toEqual({ status: 'success', data: 'value' })
-    expect(hydrated.dehydrate()?.expiresAt).toBe(Number.MAX_VALUE)
+    expect(hydrated.dehydrate()?.remainingTtlMs).toBe(halfMax)
     resource.dispose()
     hydrated.dispose()
   })
@@ -192,18 +192,20 @@ describe('AF-T21 resource scheduler entry validation', () => {
     const runtime = createRuntime()
     let reads = 0
     const snapshot = {
-      version: 1,
+      version: 2,
       data: 'ok',
-      get updatedAt() {
+      get ageMs() {
         reads++
         return reads === 1 ? 1 : Number.NaN
       },
-      expiresAt: 10
+      remainingTtlMs: 10
     }
-    const resource = new Resource(async () => 'fresh', runtime)
+    const resource = new Resource(async () => 'fresh', runtime, {
+      scheduler: { now: () => 0, schedule: () => ({ cancel: () => undefined }) }
+    })
     resource.hydrate(snapshot as any)
     expect(reads).toBe(1)
-    expect(resource.dehydrate()).toMatchObject({ updatedAt: 1, expiresAt: 10 })
+    expect(resource.dehydrate()).toMatchObject({ ageMs: 1, remainingTtlMs: 10 })
     resource.dispose()
   })
 
@@ -213,12 +215,12 @@ describe('AF-T21 resource scheduler entry validation', () => {
     const resource = new Resource(async () => 'fresh', runtime)
     expect(() =>
       resource.hydrate({
-        version: 1,
+        version: 2,
         data: 'ok',
-        get updatedAt(): number {
+        get ageMs(): number {
           throw cause
         },
-        expiresAt: 10
+        remainingTtlMs: 10
       } as any)
     ).toThrowError(
       expect.objectContaining({
@@ -279,8 +281,8 @@ describe('AF-T21 resource scheduler entry validation', () => {
 describe('AF-T65 resource initialSnapshot construction admission', () => {
   it('reads initialSnapshot once and uses the first value for hydration and autostart', async () => {
     const runtime = createRuntime()
-    const first = { version: 1 as const, data: 'first', updatedAt: 1, expiresAt: null }
-    const second = { version: 1 as const, data: 'second', updatedAt: 1, expiresAt: null }
+    const first = { version: 2 as const, data: 'first', ageMs: 1, remainingTtlMs: null }
+    const second = { version: 2 as const, data: 'second', ageMs: 1, remainingTtlMs: null }
     let reads = 0
     let fetches = 0
     const resource = new Resource(
@@ -377,7 +379,7 @@ describe('AF-T65 resource initialSnapshot construction admission', () => {
         return 'fetched'
       },
       runtime,
-      { initialSnapshot: { version: 1, data: 'cached', updatedAt: 1, expiresAt: null } }
+      { initialSnapshot: { version: 2, data: 'cached', ageMs: 1, remainingTtlMs: null } }
     )
 
     await expect(resource.promise).resolves.toBe('cached')
@@ -925,16 +927,19 @@ describe('Round29 Resource scheduler.now boundary', () => {
   it('R-T29-03 makes repeated passive freshness reads fail closed with one wrapper, stable promise, atomic cache metadata, and reporter identity', async () => {
     const reported: unknown[] = []
     const runtime = createRuntime({ onError: (error) => reported.push(error) })
+    /** Enable the passive clock failure only after v2 admission/dehydration clock samples. */
+    let failClock = false
     let nowCalls = 0
     const clockError = new Error('passive clock failed')
     const scheduler = {
       now: () => {
         nowCalls++
-        throw clockError
+        if (failClock) throw clockError
+        return 0
       },
       schedule: () => ({ cancel: () => undefined })
     }
-    const snapshot = { version: 1 as const, data: 'cached', updatedAt: 1, expiresAt: 10 }
+    const snapshot = { version: 2 as const, data: 'cached', ageMs: 1, remainingTtlMs: 10 }
     const resource = new Resource(async () => 'unused', runtime, {
       autoStart: false,
       initialSnapshot: snapshot,
@@ -942,6 +947,8 @@ describe('Round29 Resource scheduler.now boundary', () => {
     })
 
     expect(resource.dehydrate()).toEqual(snapshot)
+    nowCalls = 0
+    failClock = true
     const state = resource.state
     expect(state.status).toBe('error')
     const failure = (state as { status: 'error'; error: unknown }).error
@@ -1059,7 +1066,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
       runtime,
       {
         autoStart: false,
-        initialSnapshot: { version: 1, data: 'cached', updatedAt: 0, expiresAt: 10 },
+        initialSnapshot: { version: 2, data: 'cached', ageMs: 0, remainingTtlMs: 10 },
         ttl: 10,
         scheduler
       }
@@ -1068,7 +1075,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
     expect(resource.state).toEqual({ status: 'success', data: 'cached' })
     expect(resource.isStale).toBe(false)
     expect(fetches).toBe(0)
-    now = 10
+    now = 15
     expect(resource.state.status).toBe('pending')
     await expect(resource.promise).resolves.toBe('fresh')
     expect(fetches).toBe(1)

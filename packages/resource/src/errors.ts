@@ -1,4 +1,7 @@
-/** `source` value stamped onto every error this package throws. */
+/**
+ * Source stamped onto Resource-owned failures; classified foreign errors retain their original
+ * owner.
+ */
 export const RESOURCE_SOURCE = '@migaia/resource'
 
 /**
@@ -44,4 +47,38 @@ export function tagResourceError<E extends object>(error: E, code: string): E {
   }
   return attachErrorIdentity(error as Error, { source: RESOURCE_SOURCE, code }) as E
 }
-import { attachErrorIdentity } from '@migaia/utils/error'
+import {
+  attachErrorIdentity,
+  attachSecondaryErrors,
+  isNativeErrorValue,
+  tryReadProperty
+} from '@migaia/utils/error'
+
+/**
+ * Gives unclassified callback failures a boundary identity while retaining existing owners and
+ * native types.
+ */
+export function identifyResourceFailure(error: unknown, code: string, message: string): unknown {
+  if (isNativeErrorValue(error)) {
+    /** A complete foreign semantic identity stays owned by its originating package. */
+    const source = tryReadProperty(error as Error & { source?: unknown }, 'source')
+    const existingCode = tryReadProperty(error as Error & { code?: unknown }, 'code')
+    if (
+      !source.threw &&
+      !existingCode.threw &&
+      typeof source.value === 'string' &&
+      source.value.length > 0 &&
+      typeof existingCode.value === 'string' &&
+      existingCode.value.length > 0
+    )
+      return error
+    try {
+      return tagResourceError(error, code)
+    } catch (attachmentError) {
+      return attachSecondaryErrors(createResourceError(code, message, { cause: error }), [
+        attachmentError
+      ])
+    }
+  }
+  return createResourceError(code, message, { cause: error })
+}

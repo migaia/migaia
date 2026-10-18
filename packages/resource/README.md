@@ -16,7 +16,7 @@
 | 需要 Suspense 兼容的读取方式           | `read()` 成功返回数据、pending 抛 Promise、失败抛错误，直接对接 React Suspense/Error Boundary          |
 | 需要缓存过期与后台刷新                 | `ttl` 控制数据新鲜时长，`staleWhileRevalidate` 让刷新时继续展示旧数据                                  |
 | 需要失败重试                           | `retry`/`retryDelay` 支持固定次数或自定义判断/退避策略                                                 |
-| 需要 SSR/持久化快照恢复                | `dehydrate()`/`hydrate()`/`initialSnapshot` 把成功值序列化后原样恢复，不用重新请求一次                 |
+| 需要 SSR/持久化快照恢复                | `dehydrate()`/`hydrate()`/`initialSnapshot` 传递成功数据及剩余 TTL，在接收端恢复本地有效期                 |
 | 需要在 Worker/RPC 场景复用同一套状态机 | `@migaia/store-worker` 的 `workerComputed()` 就是在 `Resource` 上包了一层 Worker RPC 调用              |
 
 不适合的场景：如果异步数据完全不依赖任何响应式输入、只是一次性拉取且不需要取消/重试/缓存过期（比如页面初始化时拉一次静态配置），直接 `await` 一个 Promise 可能更简单，不需要引入状态机。
@@ -29,7 +29,7 @@
 - **取消语义分层**：`cancel()` 只中止当前请求且资源仍可复用，`dispose()` 彻底终结资源、清理依赖和订阅。
 - **缓存与后台刷新**：`ttl` 控制过期时间，`staleWhileRevalidate: true` 时刷新期间继续展示旧成功值，通过 `refreshing` 区分是否在后台刷新。
 - **重试与退避策略可配置**：`retry` 接受固定次数或 `(failureCount, error) => boolean` 判断函数，`retryDelay` 同理支持固定值或按失败次数计算的函数。
-- **SSR/持久化快照**：`dehydrate()` 导出 JSON 安全的成功快照，`hydrate()`/`initialSnapshot` 在另一端原样恢复，不需要重新发起请求。
+- **SSR/持久化快照**：`dehydrate()` 导出 v2 成功快照（`data`、`ageMs`、`remainingTtlMs`）；在另一端按本地单调时钟恢复剩余 TTL。`data` 不复制、不编码，调用方保证其可序列化，并扣除已知传输/存储耗时；新鲜快照不立即请求。
 
 ## 4. 五分钟上手
 
@@ -77,11 +77,11 @@ try {
 }
 ```
 
-构造函数默认 `autoStart: true`，因此 `new Resource(...)` 会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。
+构造函数默认 `autoStart: true`，没有新鲜 `initialSnapshot` 时会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`；新鲜初始快照保留 `success`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。
 
 传给 fetcher 的 `signal` 只属于当前这一代请求。调用 `refetch()` 会强制创建新一代、取消仍在途的上一代，并返回新一代的 Promise；上一代即使忽略 abort 后仍然成功返回，也没有资格覆盖当前状态。把 `signal` 传给 `fetch` 的意义是同时停止底层网络工作、节省资源；Resource 的 generation 检查才是防止旧结果覆盖新状态的最终保证。
 
-`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，但释放后再读 `state`、调用 `refetch()` 或其他公开操作都会抛出 `RESOURCE_DISPOSED`；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。
+`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`，诊断 getter 与幂等清理入口仍可调用；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。
 
 依赖某个响应式输入、自动刷新的写法：
 
@@ -136,7 +136,7 @@ export function disposeUserPanel(): void {
 | **Fetcher**            | 构造时传入的 `({ signal }) => T \| PromiseLike<T>`；同步读取的响应式值成为依赖，`signal` 应转交给可取消的 I/O                                                         |
 | **依赖（deps）**       | fetcher 在**首次 `await` 之前**同步读到的 Signal/Computed；依赖变化会合并触发一次新请求                                                                               |
 | **世代（generation）** | 每次请求的身份标记；只有当前世代的结果会写回状态，被取代的请求结果一律丢弃                                                                                            |
-| **TTL / 过期**         | 成功值的新鲜时长；过期后下一次读取会触发新请求（除非正在 pending）                                                                                                    |
+| **TTL / 过期**         | 正有限值控制新鲜时长；`0` 和 `Infinity` 不因时间流逝过期，仍响应依赖变化与显式刷新                                                                                                    |
 | **Suspense 读取**      | `read()`：成功返回值、pending 抛 Promise、失败抛错误；`peek()` 是它的非追踪版本                                                                                       |
 
 ## 6. 安装与公开入口
@@ -152,8 +152,8 @@ pnpm add @migaia/resource
 1. **依赖追踪只认"首次 `await` 之前的同步读取"**。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。
 2. **`fetcher` 必须把 `signal` 交给真正可取消的 I/O**（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。
 3. **`refetch()` 总是发起新请求，被动读取（`state`/`promise`/`read()`）只在过期或 idle 时才发起**——想强制刷新用 `refetch()` 或 `invalidate()`，不要指望重复读 `state` 能触发。
-4. **不再使用必须 `dispose()`**，否则订阅、在途请求和依赖登记会一直存在；`dispose()` 之后所有方法调用都会抛错。
-5. **默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠**（清理依赖登记、让缓存过期），下次被观察时会重新发起请求；需要"没人看也保持热数据"就显式传 `keepAlive: true`。
+4. **不再使用必须 `dispose()`**，否则订阅、在途请求和依赖登记会一直存在；释放后数据读取和请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 与再次 `dispose()` 是安全空操作。
+5. **默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠**（断开上游边、保留依赖版本与缓存），下次读取先核对依赖；依赖未变且缓存新鲜时复用原值和 Promise，依赖已变则重拉；需要"没人看也保持热数据"就显式传 `keepAlive: true`。
 
 更完整的配置项、每个 API 的精确语义、错误与异常的完整表格、生产级示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
 
@@ -164,3 +164,5 @@ pnpm add @migaia/resource
 ### Canonical request owner for adapters
 
 `peekState()` inspects the state union without starting work or tracking. `reset()` cancels the current request and clears the cache to reusable idle state; the old shared Promise immediately rejects with Resource `REQUEST_ABORTED`/native `AbortError`. `IResourceFetchContext` carries readonly signal/generation/token from lifecycle; retries share identity, resets/replacements advance generation. Loaded-value disposal and rendered-version leases remain adapter responsibilities. See USEGUIDE for the complete reset example.
+
+公开类型还包括 `IResourceOptions<T>`、`IResourceState<T>`、`IResourceFetcher<T>`、`IResourceFetchContext`、`IResourceCacheSnapshot<T>`、`IResourceRetryPolicy`、`IResourceError`、`IResourceErrorCode`；`RESOURCE_SOURCE` 标识 Resource 自己产生的错误。已有完整 source/code 的外部错误保持原身份；未分类 fetch 失败最终贴 `FETCH_FAILED`，不可修改的错误保留在 cause 链。重试策略失败贴 `INVALID_OPTION`，触发它的 fetch 错误仍可达。

@@ -96,10 +96,10 @@ describe('M-T37 (§3.7.2): every declared code has a real trigger', () => {
     const resource = new Resource(() => 1, runtime, { autoStart: false })
     expect(() =>
       resource.hydrate({
-        version: 2 as 1,
+        version: 1 as 2,
         data: 1,
-        updatedAt: Date.now(),
-        expiresAt: null
+        ageMs: Date.now(),
+        remainingTtlMs: null
       })
     ).toThrowError(expect.objectContaining({ code: ResourceErrorCode.invalidSnapshot }))
     resource.dispose()
@@ -181,7 +181,7 @@ describe('M-T41 (§3.7.5): the table is exhaustive and tagging is non-destructiv
   it('code values are unique within this source, so (source, code) is unique by construction', () => {
     const declared = Object.values(ResourceErrorCode)
     expect(new Set(declared).size).toBe(declared.length)
-    expect(declared).toHaveLength(8) // §3.7.2 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED
+    expect(declared).toHaveLength(9) // FETCH_FAILED + §3.7.2 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED
   })
 
   it('a tagged error carries source === "@migaia/resource" and a non-empty stack', () => {

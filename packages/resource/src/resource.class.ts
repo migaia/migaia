@@ -25,6 +25,7 @@ import {
   createResourceError,
   RESOURCE_SOURCE,
   tagResourceError,
+  identifyResourceFailure,
   type IResourceError
 } from './errors.js'
 import { ResourceErrorCode } from './error-code.js'
@@ -50,12 +51,14 @@ export type IResourceFetchContext = IGenerationRequest
 
 export type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 
+/** Portable durations captured at dehydration; callers account for transport/storage elapsed time. */
 export type IResourceCacheSnapshot<T> = {
-  readonly version: 1
+  readonly version: 2
   readonly data: T
-  readonly updatedAt: number
-  /** `null` represents an infinite lifetime in JSON-safe form. */
-  readonly expiresAt: number | null
+  /** Elapsed cache age at capture; independent of the sending scheduler's origin. */
+  readonly ageMs: number
+  /** Remaining lifetime resumes at hydration; `null` means no time-based expiration. */
+  readonly remainingTtlMs: number | null
 }
 
 export type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)
@@ -82,8 +85,8 @@ export type IResourceOptions<T = unknown> = {
   /** Human-readable owner label used in reactive diagnostics and request error context. */
   debugName?: string
   /**
-   * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a
-   * dependency changes or `refetch()` is called.
+   * Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh
+   * until a dependency changes or `refetch()` is called.
    */
   ttl?: number
   /** Start the first request in the constructor. Defaults to true. */
@@ -99,17 +102,39 @@ export type IResourceOptions<T = unknown> = {
   initialSnapshot?: IResourceCacheSnapshot<T>
   /**
    * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays
-   * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing
-   * host capabilities fail immediately instead of silently falling back to microtasks.
+   * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`.
+   * Missing host capabilities fail immediately instead of silently falling back to microtasks.
    */
   scheduler?: IScheduler
 }
 
-function abortError(): DOMException {
-  return tagResourceError(
+/** Reuses a Resource reason, otherwise retains the lower lifecycle reason on the native AbortError. */
+function abortError(...causes: [] | [unknown]): DOMException {
+  /** Existing Resource-initiated cancellation is already the canonical native rejection. */
+  const reason = causes[0]
+  if (reason instanceof DOMException) {
+    /** Read semantic identity safely; native DOMException.code alone is numeric. */
+    const source = tryReadProperty(reason as { source?: unknown }, 'source')
+    const code = tryReadProperty(reason as { code?: unknown }, 'code')
+    if (
+      !source.threw &&
+      !code.threw &&
+      source.value === RESOURCE_SOURCE &&
+      code.value === ResourceErrorCode.requestAborted
+    )
+      return reason
+  }
+  /**
+   * DOMException has no ErrorOptions constructor, so preserve its native type with an attached
+   * cause.
+   */
+  const error = tagResourceError(
     new DOMException(ResourceErrorText.requestAborted, ResourceErrorText.abortName),
     ResourceErrorCode.requestAborted
   )
+  if (causes.length > 0)
+    Object.defineProperty(error, 'cause', { value: reason, configurable: true })
+  return error
 }
 
 class ResourceCancelledError extends DOMException {
@@ -192,13 +217,13 @@ function snapshotInitialSnapshot<T>(value: unknown): IResourceCacheSnapshot<T> |
   }
   let version: unknown
   let data: T
-  let updatedAt: unknown
-  let expiresAt: unknown
+  let ageMs: unknown
+  let remainingTtlMs: unknown
   try {
     version = (value as { version?: unknown }).version
     data = (value as { data: T }).data
-    updatedAt = (value as { updatedAt?: unknown }).updatedAt
-    expiresAt = (value as { expiresAt?: unknown }).expiresAt
+    ageMs = (value as { ageMs?: unknown }).ageMs
+    remainingTtlMs = (value as { remainingTtlMs?: unknown }).remainingTtlMs
   } catch (error) {
     throw createResourceError(
       ResourceErrorCode.invalidSnapshot,
@@ -207,14 +232,18 @@ function snapshotInitialSnapshot<T>(value: unknown): IResourceCacheSnapshot<T> |
     )
   }
   if (
-    version !== 1 ||
-    typeof updatedAt !== 'number' ||
-    !Number.isFinite(updatedAt) ||
-    (expiresAt !== null && (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)))
+    version !== 2 ||
+    typeof ageMs !== 'number' ||
+    !Number.isFinite(ageMs) ||
+    ageMs < 0 ||
+    (remainingTtlMs !== null &&
+      (typeof remainingTtlMs !== 'number' ||
+        !Number.isFinite(remainingTtlMs) ||
+        remainingTtlMs < 0))
   ) {
     throw createResourceError(ResourceErrorCode.invalidSnapshot, ResourceErrorText.invalidSnapshot)
   }
-  return { version: 1, data, updatedAt, expiresAt }
+  return { version: 2, data, ageMs, remainingTtlMs }
 }
 
 /** Admits every public constructor option exactly once before Resource ownership or fetch setup. */
@@ -554,7 +583,7 @@ export class Resource<T> implements IObserver, IDisposable {
   /** Cancels this generation and drops its cache; the same Resource can start again from idle. */
   reset(): void {
     this.#assertUsable()
-    this.#requests.supersede()
+    this.#requests.supersede(abortError())
     this.#requestPending = false
     this.#paused = false
     this.#refreshScheduled = false
@@ -589,18 +618,23 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#abortActiveRequest(true)
   }
 
+  /** Captures duration metadata without serializing or copying the caller-owned data. */
   dehydrate(): IResourceCacheSnapshot<T> | undefined {
     this.#assertUsable()
     const state = this.#stateSignal.peek()
     if (state.status !== ResourceStatus.success) return undefined
-    return {
-      version: 1,
+    /** One clock sample makes cache age and remaining lifetime describe the same instant. */
+    const now = this.#readSchedulerNow()
+    return snapshotInitialSnapshot<T>({
+      version: 2,
       data: state.data,
-      updatedAt: this.#updatedAt,
-      expiresAt: this.#expiresAt === Infinity ? null : this.#expiresAt
-    }
+      ageMs: now - this.#updatedAt,
+      remainingTtlMs:
+        this.#ttl === 0 || this.#expiresAt === Infinity ? null : Math.max(0, this.#expiresAt - now)
+    })
   }
 
+  /** Rebases captured durations into this scheduler; transport/storage elapsed time is caller-owned. */
   hydrate(snapshot: IResourceCacheSnapshot<T>): void {
     this.#assertUsable()
     /** Hydration shares constructor admission; unlike an omitted option, its value is required. */
@@ -611,8 +645,20 @@ export class Resource<T> implements IObserver, IDisposable {
         ResourceErrorText.invalidSnapshot
       )
     }
-    const { data, updatedAt, expiresAt } = admitted
-    this.#requests.supersede()
+    /** Reject unrepresentable rebasing before superseding any live request. */
+    const { data, ageMs, remainingTtlMs } = admitted
+    /** Receiving clock origin has no relationship to the sending scheduler. */
+    const now = this.#readSchedulerNow()
+    /** Internal timestamps remain local, while public snapshots contain durations only. */
+    const updatedAt = now - ageMs
+    const expiresAt = remainingTtlMs === null ? Infinity : now + remainingTtlMs
+    if (!Number.isFinite(updatedAt) || (remainingTtlMs !== null && !Number.isFinite(expiresAt))) {
+      throw createResourceError(
+        ResourceErrorCode.invalidSnapshot,
+        ResourceErrorText.invalidSnapshot
+      )
+    }
+    this.#requests.supersede(abortError())
     this.#requestPending = false
     this.#paused = false
     this.#tracking.clear()
@@ -659,7 +705,7 @@ export class Resource<T> implements IObserver, IDisposable {
       }
     }
 
-    runCleanup(() => this.#requests.dispose())
+    runCleanup(() => this.#requests.dispose(abortError()))
     this.#refreshScheduled = false
     this.#forceRefresh = false
     this.#requestPending = false
@@ -713,6 +759,8 @@ export class Resource<T> implements IObserver, IDisposable {
   #ensureFresh(): void {
     if (this.#requestPending || this.#paused) return
     const state = this.#stateSignal.peek()
+    /** Dependency invalidation is independent of the configured time-expiration policy. */
+    let dependencyChanged = false
     if (state.status === ResourceStatus.success) {
       /** Dependency tracker that owns this resource's suspended snapshot. */
       const tracker = this.#tracking
@@ -720,7 +768,10 @@ export class Resource<T> implements IObserver, IDisposable {
       // (TTL still applies below) and reattach the edges; a changed dependency expires it.
       if (tracker.isSuspended()) {
         if (tracker.revalidate()) this.#scheduleSuspension()
-        else this.#expiresAt = 0
+        else {
+          this.#expiresAt = 0
+          dependencyChanged = true
+        }
       }
     }
     // error/cancelled are stable, inspectable states. Only explicit
@@ -728,13 +779,12 @@ export class Resource<T> implements IObserver, IDisposable {
     let fresh = true
     if (state.status === ResourceStatus.success) {
       try {
-        fresh = this.#isFresh()
+        fresh = this.#isFresh() && !dependencyChanged
       } catch (error) {
         this.#recordPassiveSchedulerFailure(error)
         return
       }
     }
-    if (state.status === ResourceStatus.success && this.#ttl === 0) return
     if (
       state.status === ResourceStatus.idle ||
       (state.status === ResourceStatus.success && !fresh)
@@ -776,6 +826,8 @@ export class Resource<T> implements IObserver, IDisposable {
     const requestToken = this.#requests.begin()
     const token = requestToken.token
     const signal = requestToken.signal
+    /** Cancellation can revoke a token without publishing a replacement request Promise. */
+    const previousPromise = this.#currentPromise
     this.#requestPending = true
     this.#settlementExpiry = undefined
     const current = this.#stateSignal.peek()
@@ -798,7 +850,13 @@ export class Resource<T> implements IObserver, IDisposable {
       }
       return data
     })
-    this.#currentPromise = request
+    // A newer reentrant publisher owns the public slot; same-request cancellation still exposes
+    // this request's rejected Promise so Suspense callers can observe its cancellation.
+    if (
+      this.#terminal.lifecycle === LifecycleState.open &&
+      this.#currentPromise === previousPromise
+    )
+      this.#currentPromise = request
     this.#observeSettlement(request, token)
     return request
   }
@@ -813,7 +871,7 @@ export class Resource<T> implements IObserver, IDisposable {
       /** Each wakeup runs synchronously, then relinquishes the event loop before a Suspense retry. */
       const attempt = (): void => {
         if (controller.signal.aborted) {
-          reject(abortError())
+          reject(abortError(controller.signal.reason))
           return
         }
         /** The fetcher's synchronous reads participate in the same dependency frame. */
@@ -854,7 +912,7 @@ export class Resource<T> implements IObserver, IDisposable {
     controller: IResourceFetchContext,
     failureCount: number
   ): Promise<T> {
-    if (controller.signal.aborted) return Promise.reject(abortError())
+    if (controller.signal.aborted) return Promise.reject(abortError(controller.signal.reason))
     const nextFailureCount = failureCount + 1
     let shouldRetry: boolean
     try {
@@ -876,9 +934,18 @@ export class Resource<T> implements IObserver, IDisposable {
               return result
             })()
     } catch (policyError) {
-      return Promise.reject(policyError)
+      return Promise.reject(
+        identifyResourceFailure(
+          attachSecondaryErrors(policyError, [error]),
+          ResourceErrorCode.invalidOption,
+          ResourceErrorText.retryPolicyFailed
+        )
+      )
     }
-    if (!shouldRetry) return Promise.reject(error)
+    if (!shouldRetry)
+      return Promise.reject(
+        identifyResourceFailure(error, ResourceErrorCode.fetchFailed, ResourceErrorText.fetchFailed)
+      )
     let delay: number
     try {
       delay =
@@ -899,12 +966,18 @@ export class Resource<T> implements IObserver, IDisposable {
               return result
             })()
     } catch (policyError) {
-      return Promise.reject(policyError)
+      return Promise.reject(
+        identifyResourceFailure(
+          attachSecondaryErrors(policyError, [error]),
+          ResourceErrorCode.invalidOption,
+          ResourceErrorText.retryPolicyFailed
+        )
+      )
     }
     if (!Number.isFinite(delay) || delay < 0) {
       return Promise.reject(
         tagResourceError(
-          new RangeError(ResourceErrorText.retryDelayInvalid),
+          new RangeError(ResourceErrorText.retryDelayInvalid, { cause: error }),
           ResourceErrorCode.invalidOption
         )
       )
@@ -924,12 +997,12 @@ export class Resource<T> implements IObserver, IDisposable {
     }
     return abortableDelay(this.#scheduler, delay, controller.signal, reportCleanupFailure).then(
       (elapsed) => {
-        if (!elapsed || controller.signal.aborted) throw abortError()
+        if (!elapsed || controller.signal.aborted) throw abortError(controller.signal.reason)
       },
       (error: unknown) => {
         if (controller.signal.aborted) {
           reportCleanupFailure(error)
-          throw abortError()
+          throw abortError(controller.signal.reason)
         }
         throw createSchedulerFailure(error)
       }
@@ -953,10 +1026,10 @@ export class Resource<T> implements IObserver, IDisposable {
       }
 
       /** Settles cancellation and defers listener removal until hostile registration returns. */
-      const onAbort = (_reason: unknown): void => {
+      const onAbort = (reason: unknown): void => {
         if (settled) return
         settled = true
-        reject(abortError())
+        reject(abortError(reason))
       }
 
       /** Settles source success while preserving its value and cleanup semantics. */
@@ -982,7 +1055,7 @@ export class Resource<T> implements IObserver, IDisposable {
       try {
         if (signal.aborted) {
           settled = true
-          reject(abortError())
+          reject(abortError(signal.reason))
           return
         }
       } catch (error) {
@@ -1081,7 +1154,7 @@ export class Resource<T> implements IObserver, IDisposable {
     if (!this.#requestPending) return
     let cancellationError: IResourceError | undefined
     try {
-      this.#requests.supersede()
+      this.#requests.supersede(abortError())
     } catch (error) {
       cancellationError = createCancellationFailure(error)
     }

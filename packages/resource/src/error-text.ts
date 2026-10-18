@@ -2,6 +2,8 @@
 export const ResourceErrorText = {
   /** Native cancellation name used by DOMException consumers across package boundaries. */
   abortName: 'AbortError',
+  /** Final unclassified fetcher rejection is owned by Resource after retry policy is exhausted. */
+  fetchFailed: 'resource fetch failed',
   /** Request execution stopped after the current generation lost its authority. */
   requestAborted: 'resource request aborted',
   /** Explicit cancel stores this native AbortError in the stable cancelled state. */
@@ -39,6 +41,8 @@ export const ResourceErrorText = {
   ttlExpirationOverflow: 'resource ttl expiration must remain finite',
   /** Explains that a numeric TTL violates the non-negative finite-domain contract. */
   ttlInvalid: 'resource ttl must be non-negative',
+  /** Retry policy callbacks failed; the original request error remains reachable. */
+  retryPolicyFailed: 'resource retry policy failed',
   /** Explains that retry count violates its non-negative integer contract. */
   retryInvalid: 'resource retry count must be a non-negative integer',
   /** Explains that a retry delay violates the scheduler delay contract. */

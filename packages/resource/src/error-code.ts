@@ -17,17 +17,16 @@ export const ResourceErrorCode = {
   resourceDisposed: 'RESOURCE_DISPOSED',
 
   /**
-   * Identifies the `DOMException` used to abort a request and notify the `fetcher` through its
-   * signal. Preserves `DOMException` with the `AbortError` name and attaches the semantic code as a
-   * property. Callers usually recognize `error.name === 'AbortError'` and handle cancellation
-   * quietly.
+   * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses
+   * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause.
+   * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly.
    */
   requestAborted: 'REQUEST_ABORTED',
 
   /**
    * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a
    * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which
-   * identifies the request-abort signal reason, this code identifies explicit cancellation state.
+   * identifies request rejection, this code identifies explicit cancellation state.
    */
   requestCancelled: 'REQUEST_CANCELLED',
 
@@ -47,18 +46,17 @@ export const ResourceErrorCode = {
   noActivePromise: 'NO_ACTIVE_PROMISE',
 
   /**
-   * Rejects a `hydrate()` snapshot whose `version` is not `1`, whose `updatedAt` is nonfinite, or
-   * whose `expiresAt` is neither `null` nor finite. Also reports a snapshot accessor that throws.
-   * `null` represents an unbounded expiration. Snapshots commonly come from SSR serialization or
-   * persistence. Invalid formats fail at load rather than leaving the resource with a corrupt
-   * expiration. Check the snapshot creation and serialization path.
+   * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that
+   * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause.
+   * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots
+   * explicitly; their sender clock origin cannot be inferred on the receiver.
    */
   invalidSnapshot: 'INVALID_SNAPSHOT',
 
   /**
    * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`.
    * Validation rejects invalid configuration before it enters the state machine. Correct the
-   * supplied options.
+   * supplied options. Retry policy failures retain the triggering fetch error in their chain.
    */
   invalidOption: 'INVALID_OPTION',
 
@@ -68,7 +66,15 @@ export const ResourceErrorCode = {
    * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2.
    * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure.
    */
-  suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'
+  suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED',
+
+  /**
+   * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors
+   * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause.
+   * Already classified failures retain their originating package. Inspect the request failure
+   * instead of treating it as cancellation or an invalid option.
+   */
+  fetchFailed: 'FETCH_FAILED'
 } as const
 
 export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode]
