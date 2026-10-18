@@ -51,6 +51,8 @@ import {
 
 type IDocsLoaderData = ILibraryRouteContent & {
   readonly apiLinks?: readonly IGuideApiLink[]
+  /** Every type exported by the library's type-only entry, shown as its own sidebar group. */
+  readonly typeEntryLinks?: readonly IGuideApiLink[]
   readonly guide?: IApiGuide
   /** Search metadata may use a guide purpose even when the article uses authored reference text. */
   readonly metaPurpose?: string
@@ -80,7 +82,7 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
     import('../reference/index.js'),
     import('../reference/localize.js')
   ])
-  const { loadLibraryApiLinks, loadLibraryRouteContent } = contentModule
+  const { loadLibraryApiLinks, loadLibraryRouteContent, loadTypeEntryLinks } = contentModule
   const { referenceFor } = referenceModule
   const { localizeReference, pageReference } = localizationModule
   /** Route params stay basename-relative, so a sub-path deployment cannot shift the locale segment. */
@@ -199,6 +201,8 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   )
   /** Reader routes receive lightweight navigation facts, never other APIs' documentation bodies. */
   const apiLinks = await loadLibraryApiLinks(librarySlug)
+  /** Type-only entry links are listed apart from the runtime inventory in the sidebar. */
+  const typeEntryLinks = await loadTypeEntryLinks(librarySlug)
   let guide: IApiGuide | undefined
   let optionTranslations: Readonly<Record<string, string>> | undefined
   /** Existing English field prose fills missing or duplicated Chinese extractor descriptions. */
@@ -281,6 +285,7 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   return {
     ...content,
     apiLinks,
+    typeEntryLinks,
     guide: hasAuthoredSymbol ? undefined : guide,
     metaPurpose: hasAuthoredSymbol ? guide?.purpose : undefined,
     journey: journeyExists
@@ -371,6 +376,7 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
         locale={locale}
         library={library}
         apiLinks={loaderData?.apiLinks ?? []}
+        typeEntryLinks={loaderData?.typeEntryLinks ?? []}
         journeyTopics={loaderData?.journeyTopics ?? []}
         libraryApis={libraryApis}
         modulePath={modulePath}
@@ -385,6 +391,7 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
       locale={locale}
       library={library}
       apiLinks={loaderData?.apiLinks ?? []}
+      typeEntryLinks={loaderData?.typeEntryLinks ?? []}
       libraryApis={libraryApis}
       modulePath={modulePath}
       journey={loaderData?.journey}
@@ -420,6 +427,7 @@ function docsModulePath(
 /** Renders a library documentation root and its source-backed module map. */
 function DocsLibrary({
   apiLinks,
+  typeEntryLinks,
   guide,
   journeyTopics,
   locale,
@@ -432,6 +440,7 @@ function DocsLibrary({
   reference
 }: {
   apiLinks: readonly IGuideApiLink[]
+  typeEntryLinks: readonly IGuideApiLink[]
   guide?: IApiGuide
   journeyTopics: readonly { readonly title: string; readonly topic: string }[]
   locale: ILocale
@@ -463,14 +472,27 @@ function DocsLibrary({
       <LibraryNavigation
         api={api}
         apiLinks={apiLinks}
+        typeEntryLinks={typeEntryLinks}
         journeyTopics={journeyTopics}
         libraryApis={libraryApis}
         librarySlug={library.slug}
         locale={locale}
-        selectedSymbol={selectedSymbol}
+        selectedSymbol={
+          selectedSymbol ?? api?.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)
+        }
       />
     ),
-    [api, apiLinks, journeyTopics, library.slug, libraryApis, locale, selectedSymbol]
+    [
+      api,
+      apiLinks,
+      typeEntryLinks,
+      journeyTopics,
+      library.slug,
+      libraryApis,
+      locale,
+      selectedSymbol,
+      selectedTypeFragment
+    ]
   )
   usePageNavigation(pageNavigation)
   if (!moduleName || moduleName === 'overview')
@@ -604,6 +626,9 @@ function DocsLibrary({
   )
 }
 
+/** Guide topic that explains a library's type-only entry; linked from the sidebar type group. */
+const TYPE_GUIDE_TOPIC = 'type-utilities'
+
 /**
  * Renders the one library sidebar shared by guide and API pages: guide topics first, then the API
  * tree whose leaves open each API's detail page (signature, parameters, examples).
@@ -612,6 +637,7 @@ function LibraryNavigation({
   activeTopic,
   api,
   apiLinks,
+  typeEntryLinks,
   journeyTopics,
   libraryApis,
   librarySlug,
@@ -621,6 +647,7 @@ function LibraryNavigation({
   readonly activeTopic?: string
   readonly api: IApi | undefined
   readonly apiLinks: readonly IGuideApiLink[]
+  readonly typeEntryLinks: readonly IGuideApiLink[]
   readonly journeyTopics: readonly { readonly title: string; readonly topic: string }[]
   readonly libraryApis: readonly IApi[]
   readonly librarySlug: string
@@ -666,6 +693,12 @@ function LibraryNavigation({
       <LibraryModuleLinks
         api={api}
         apiLinks={apiLinks}
+        typeEntryLinks={typeEntryLinks}
+        typeGuideTopic={
+          journeyTopics.some((entry) => entry.topic === TYPE_GUIDE_TOPIC)
+            ? TYPE_GUIDE_TOPIC
+            : undefined
+        }
         libraryApis={libraryApis}
         librarySlug={librarySlug}
         locale={locale}
@@ -679,6 +712,8 @@ function LibraryNavigation({
 function LibraryModuleLinks({
   api,
   apiLinks,
+  typeEntryLinks,
+  typeGuideTopic,
   libraryApis,
   librarySlug,
   locale,
@@ -686,6 +721,10 @@ function LibraryModuleLinks({
 }: {
   readonly api: IApi | undefined
   readonly apiLinks: readonly IGuideApiLink[]
+  /** Types exported by the type-only entry; rendered as a group apart from the runtime APIs. */
+  readonly typeEntryLinks: readonly IGuideApiLink[]
+  /** Guide topic that explains the type-only entry, when the library maintains one. */
+  readonly typeGuideTopic?: string
   readonly libraryApis: readonly IApi[]
   readonly librarySlug: string
   readonly locale: ILocale
@@ -809,6 +848,30 @@ function LibraryModuleLinks({
               </Link>
             ))}
           </div>
+        </div>
+      ) : null}
+      {typeEntryLinks.length > 0 ? (
+        <div className="left-rail-group left-rail-primary">
+          <span>{locale === 'zh' ? '类型工具' : 'Type utilities'}</span>
+          <div className="left-rail-children">
+            {typeEntryLinks.map((link) => (
+              <Link
+                className={
+                  link.module === api?.module && link.name === selectedSymbol?.name ? 'active' : ''
+                }
+                data-kind={link.kind}
+                key={`${link.module}:${link.symbolPath}`}
+                to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </div>
+          {typeGuideTopic ? (
+            <Link to={guidePath(locale, librarySlug, typeGuideTopic)}>
+              {locale === 'zh' ? '什么时候用这些类型 →' : 'When to use these types →'}
+            </Link>
+          ) : null}
         </div>
       ) : null}
       {primaryEntries.length > 0 ? (
@@ -4029,6 +4092,7 @@ function DomainLibrary({
   locale,
   library,
   apiLinks,
+  typeEntryLinks,
   libraryApis,
   modulePath,
   journey,
@@ -4037,6 +4101,7 @@ function DomainLibrary({
   locale: ILocale
   library: ILibrary
   apiLinks: readonly IGuideApiLink[]
+  typeEntryLinks: readonly IGuideApiLink[]
   libraryApis: readonly IApi[]
   modulePath?: string
   journey?: IGuideJourney
@@ -4054,6 +4119,7 @@ function DomainLibrary({
         activeTopic={topic}
         api={undefined}
         apiLinks={apiLinks}
+        typeEntryLinks={typeEntryLinks}
         journeyTopics={journeyTopics}
         libraryApis={libraryApis}
         librarySlug={library.slug}
@@ -4061,7 +4127,7 @@ function DomainLibrary({
         selectedSymbol={undefined}
       />
     ),
-    [apiLinks, journeyTopics, library.slug, libraryApis, locale, topic]
+    [apiLinks, typeEntryLinks, journeyTopics, library.slug, libraryApis, locale, topic]
   )
   usePageNavigation(pageNavigation)
   return (

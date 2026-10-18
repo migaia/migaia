@@ -73,6 +73,51 @@ function isGuideApiLinkSymbol(slug: string, api: IApi, symbol: IApiSymbol): bool
   return slug === 'rpc-core' && api.module === 'transport-constants' && symbol.kind === 'const'
 }
 
+/**
+ * Module slug of a type-only public entry (`@migaia/<library>/typing`). Its sidebar group lists
+ * every type the entry exports, so readers see the type surface apart from runtime APIs.
+ */
+export const TYPE_ENTRY_MODULE = 'typing'
+
+/**
+ * Lists every type exported by a library's type-only entry: types declared there, plus types it
+ * re-exports, which link to their owning module's page. Empty when the library has no such entry.
+ */
+export async function loadTypeEntryLinks(slug: string): Promise<readonly IGuideApiLink[]> {
+  /** Reuse the library shard so navigation follows the same generated export inventory. */
+  const loader = libraryShardLoaders[`../src/generated/manifests/libraries/${slug}.json`]
+  if (!loader) return []
+  const { apis } = (await loader()).default
+  /** The entry's manifest record carries both its own declarations and its re-export aliases. */
+  const entry = apis.find((api) => api.module === TYPE_ENTRY_MODULE)
+  if (!entry) return []
+  /** Declarations keep the entry's own module and collision-safe route segments. */
+  const declared = entry.symbols.map((symbol) => ({
+    module: entry.module,
+    name: symbol.name,
+    symbolPath: symbolSlug(symbol, entry.symbols),
+    kind: symbol.kind
+  }))
+  /** Re-export aliases preserve canonical declaration ownership instead of duplicating pages. */
+  const reexported = entry.aliases.flatMap((alias) => {
+    /** A re-export is documented once, on the page of the module that declares it. */
+    const owner = apis.find((api) => api.module === alias.ownerModule)
+    /** Resolve the declaration to retain its generated kind and collision-safe route segment. */
+    const symbol = owner?.symbols.find((candidate) => candidate.name === alias.name)
+    return owner && symbol
+      ? [
+          {
+            module: owner.module,
+            name: symbol.name,
+            symbolPath: symbolSlug(symbol, owner.symbols),
+            kind: symbol.kind
+          }
+        ]
+      : []
+  })
+  return [...declared, ...reexported]
+}
+
 /** Projects complete lightweight API navigation without serializing documentation bodies. */
 export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuideApiLink[]> {
   const loader = libraryShardLoaders[`../src/generated/manifests/libraries/${slug}.json`]
