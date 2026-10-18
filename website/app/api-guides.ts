@@ -1,4 +1,6 @@
 import { rpcApiGuides } from './rpc-api-guides.js'
+import { capabilityHostExample } from './reference/capability.js'
+import { storageFeatureExample } from './reference/storage-web.js'
 import { utilsApiGuides } from './utils-api-guides.js'
 import { completionApiGuides } from './completion-api-guides.js'
 import rpcCoreReference from '../src/generated/manifests/libraries/rpc-core.json'
@@ -7195,30 +7197,29 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-web:host:defineFeature': createStorageWebGuide({
     purposeEn:
-      'Defines one capability that a Storage plugin exposes after installation. The factory receives the registration-local Store capability from the Host; defineFeature only describes the capability and does not create a Host, install a plugin, or open storage by itself.',
+      'Defines an optional capability for a storage plugin. A Feature describes how to build that capability; a Plugin is the backend plugin installed and removed by the Host, combining one store with its capabilities. Defining a Feature creates no Host, opens no database, and activates no capability. Pass the Feature in the third argument of definePlugin(), then install that Plugin with createStorageHost({ plugins }) or host.use(). Each installation receives its own backend store and Feature output. The example defines key-counting metrics, installs a memory backend, and exposes the count through the installed plugin handle.',
     purposeZh:
-      '定义 Storage 插件安装后对外暴露的一项能力。factory 会收到 Host 提供的、仅属于本次注册的 Store 能力；也可以读取前置 Feature 的输出。Feature 返回的对象会成为该后端的能力面，随插件安装和释放；defineFeature 本身不会创建 Host、安装插件或打开存储。',
-    quickStart: `import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-web/host'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst metrics = defineFeature((core) => ({\n  backendId: () => core.featureExpose.getBackendId(),\n  count: async () => (await core.featureExpose.getStore().keys()).length\n}))\n\nconst plugin = definePlugin('cache', (core) => {\n  core.registerStore(memoryStorageHost())\n  return {\n    install: async () => {\n      await core.getStore().set('user:1', JSON.stringify({ name: 'Ada' }))\n      // Feature 输出只在插件内部可见；需要对外时由 install 扩展转出。\n      return { count: () => core.features.metrics.count(), backendId: () => core.features.metrics.backendId() }\n    }\n  }\n}, { metrics })\n\nconst host = await createStorageHost()\ntry {\n  const appStorage = await host.use(plugin)
-  console.log(await appStorage.extensions.count(), appStorage.extensions.backendId()) // 1 cache：Feature 从本次注册的 Store 读数据，再由 backend 能力面消费。\n} finally {\n  await host.dispose()\n}`,
+      '给存储插件定义一项可选能力。Feature 是创建能力的定义；Plugin 是 Host 实际安装和卸载的后端插件，组合一个存储及其能力，两者不是一回事。定义 Feature 不会创建 Host、不会打开数据库，也不会启用任何能力。把 Feature 作为第三个参数交给 definePlugin()，再通过 createStorageHost({ plugins }) 或 host.use() 安装插件，能力才会生效。每次安装都使用各自的后端存储和能力输出。下面定义统计键数量的 metrics 能力，安装内存后端，再通过安装后返回的插件句柄读取数量。',
+    quickStart: storageFeatureExample,
     scenariosEn: [
-      'A plugin needs to publish a typed capability derived from its registration-local store.',
-      'The capability must be installed and disposed together with its owning plugin.',
-      'The feature should be attached to a backend plugin instead of used as a standalone service.'
+      'Read data from the store belonging to one installed plugin, instead of accidentally counting another backend.',
+      'Expose selected Feature methods from install so application code can use the installed plugin handle.',
+      'The example prints 1 cache: one stored key and the id supplied to definePlugin. The finally block releases the Host and its memory backend.'
     ],
     scenariosZh: [
-      '插件需要基于本次注册的 Store 发布一项有类型的能力。',
-      '这项能力必须随所属插件一起安装和释放。',
-      'Feature 应附加到 backend plugin，而不是作为独立 service 使用。'
+      '统计一个已安装插件自己的存储内容，避免读到另一个后端的数据。',
+      '由 install 返回选定的 Feature 方法，让应用通过安装后的插件句柄使用能力。',
+      '示例输出 1 cache，分别是已写入的一个键和传给 definePlugin 的后端名称。finally 会释放 Host 及其内存后端。'
     ],
     avoidEn: [
-      'The capability must create its own Host or storage instance.',
-      'The capability needs to outlive the owning plugin.',
-      'A backend plugin definition is required instead of a capability description.'
+      'Use memoryStorageHost() directly when one standalone memory store is sufficient.',
+      'Do not use a Feature to keep resources alive after its plugin is removed.',
+      'Use definePlugin() to define a complete backend plugin; a Feature alone cannot be installed by the Host.'
     ],
     avoidZh: [
-      '能力需要自行创建 Host 或 storage instance。',
-      '能力需要超过所属插件的生命周期继续存在。',
-      '实际需要的是 backend plugin 定义，而不是能力描述。'
+      '只需要一个独立内存存储时，直接创建并使用 memoryStorageHost() 即可。',
+      '需要在插件卸载后继续保留资源时，不应交给这个 Feature 管理。',
+      '定义完整后端插件应使用 definePlugin()；Host 不能直接安装一个 Feature。'
     ]
   }),
   'storage-web:host:createStorageHost': createStorageWebGuide({
@@ -23411,7 +23412,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a tenant-local runtime gate that owns lazy capability activation, structured enablement results, revocation, and physical handle cleanup. Code stays out of the initial bundle only when activate performs a dynamic import.',
-      quickStart: `import { createCapabilityHost, CapabilityEnableStatus, type ICapabilityHandle } from '@migaia/capability'\n\nconst tenantId = 'tenant-42'\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  activate(context) {\n    return {\n      sync: async () => console.log('sync tenant:', context.tenantId),\n      dispose: () => undefined\n    }\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle<ICapabilityHandle & { sync(): Promise<void> }>('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}`,
+      quickStart: capabilityHostExample,
       scenarios: [
         'A feature must be enabled per tenant, rollout, or runtime configuration without sharing state across hosts.',
         'A disabled feature should avoid downloading its implementation until activate executes a dynamic import.',
@@ -23448,7 +23449,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建租户隔离的运行时闸门，统一拥有惰性能力激活、结构化启用结果、撤销与 handle 物理清理。只有 activate 内执行动态 import，关闭的实现才不会进入初始包。',
-      quickStart: `import { createCapabilityHost, CapabilityEnableStatus, type ICapabilityHandle } from '@migaia/capability'\n\nconst tenantId = 'tenant-42'\nconst diagnostics = { report: (name: string, error: unknown) => console.error(name, error) }\nconst host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  activate(context) {\n    return {\n      sync: async () => console.log('sync tenant:', context.tenantId),\n      dispose: () => undefined\n    }\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle<ICapabilityHandle & { sync(): Promise<void> }>('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}`,
+      quickStart: capabilityHostExample,
       scenarios: [
         '按租户、灰度或运行时配置启停能力，并让不同 Host 的状态互不影响。',
         '关闭的能力要等 activate 动态 import 时才下载实现。',

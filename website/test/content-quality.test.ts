@@ -89,42 +89,64 @@ test('storage-web defineEntity imports its concrete IndexedDB backend', () => {
   }
 })
 
+// c8d24f68 replaced the parallel backend Feature/Kind/Plugin factories with native composition.
 test('storage-web feature example defines every custom backend prerequisite', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('storage-web', 'host', 'defineStorageBackendFeature', locale)
+    const guide = findApiGuide('storage-web', 'host', 'defineFeature', locale)
     assert.ok(guide?.quickStart)
     assert.match(guide.quickStart, /import \{ memoryStorageHost \}/)
-    assert.match(guide.quickStart, /defineStorageBackendKind<ICacheStore>\(\)\('cache'\)/)
-    assert.match(guide.quickStart, /const cacheKind =/)
-    assert.match(guide.quickStart, /mode: 'polling'/)
-    assert.match(guide.quickStart, /const cachePlugin = defineStorageBackendPlugin/)
-    assert.match(guide.quickStart, /features: \[reactive\] as const/)
+    assert.match(guide.quickStart, /const metrics = defineFeature\(\(core\) =>/)
+    assert.match(guide.quickStart, /core\.featureExpose\.getStore\(\)\.keys\(\)/)
+    assert.match(guide.quickStart, /const cachePlugin = definePlugin\('cache'/)
+    assert.match(guide.quickStart, /core\.registerStore\(memoryStorageHost\(\)\)/)
+    assert.match(guide.quickStart, /\}, \{ metrics \}\)/)
+    assert.match(guide.quickStart, /const cache = await host\.use\(cachePlugin\)/)
+    assert.match(guide.quickStart, /console\.assert\(await cache\.extensions\.count\(\) === 1\)/)
+    assert.match(guide.quickStart, /finally \{\s+await host\.dispose\(\)/)
     assert.doesNotMatch(guide.quickStart, /\bsubscribe\s*:|\bonChange\s*[,}]/)
   }
 })
 
 test('storage-web feature guide explains the Host effect in plain language', () => {
-  const guide = findApiGuide('storage-web', 'host', 'defineStorageBackendFeature', 'zh')
-  assert.ok(guide)
-  assert.match(guide.purpose, /给 Storage Host 定义一项可选能力/)
-  assert.match(guide.purpose, /不会创建 Host、不会打开数据库，也不会启用任何能力/)
-  assert.match(guide.purpose, /Feature 和 Plugin 不是一回事/)
-  assert.match(guide.purpose, /Plugin 才是 Host 真正安装和卸载的完整后端包/)
-  assert.match(guide.purpose, /零项、一项或多项 Feature/)
-  assert.match(guide.purpose, /裸 Host 只有安装插件、查找已安装后端和统一释放资源等基础管理能力/)
-  assert.match(guide.purpose, /没有任何可用的后端 Feature/)
-  assert.match(
-    guide.purpose,
-    /安装一个携带 reactive Feature 的后端 Plugin 之前，不能使用 liveQuery/
-  )
-  assert.match(guide.purpose, /Feature 绑定的是 backend kind（后端种类），不是某个特定的 Plugin ID/)
-  assert.match(guide.purpose, /任何使用同一个 backendKind 创建的 Plugin 都可以携带它/)
-  assert.match(guide.purpose, /Host 会为这个已安装后端单独接入一份该能力/)
-  assert.match(guide.purpose, /defineStorageBackendPlugin\(\{ features: \[\.\.\.\] \}\)/)
-  assert.match(guide.purpose, /createStorageHost\(\) 或 host\.use\(\).*能力才会对这个后端生效/)
-  assert.match(guide.scenarios.join('\n'), /让安装它的 Storage Host 多获得一项能力/)
-  assert.match(guide.avoidWhen.join('\n'), /直接创建并使用后端即可/)
-  assert.doesNotMatch(guide.purpose, /^创建只绑定到一个 backend kind/)
+  for (const locale of ['zh', 'en'] as const) {
+    const guide = findApiGuide('storage-web', 'host', 'defineFeature', locale)
+    assert.ok(guide)
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /给存储插件定义一项可选能力/ : /optional capability for a storage plugin/
+    )
+    assert.match(
+      guide.purpose,
+      locale === 'zh'
+        ? /Feature.*Plugin.*两者不是一回事/
+        : /Feature describes.*Plugin is the backend plugin/
+    )
+    assert.match(
+      guide.purpose,
+      locale === 'zh'
+        ? /不会创建 Host、不会打开数据库，也不会启用任何能力/
+        : /creates no Host, opens no database, and activates no capability/
+    )
+    assert.match(guide.purpose, /definePlugin\(\)/)
+    assert.match(guide.purpose, /createStorageHost\(\{ plugins \}\).*host\.use\(\)/)
+    assert.match(
+      guide.purpose,
+      locale === 'zh'
+        ? /每次安装都使用各自的后端存储和能力输出/
+        : /Each installation receives its own backend store and Feature output/
+    )
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /插件句柄读取数量/ : /count through the installed plugin handle/
+    )
+    assert.match(guide.scenarios.join('\n'), /1 cache/)
+    assert.match(
+      guide.avoidWhen.join('\n'),
+      locale === 'zh'
+        ? /直接创建并使用 memoryStorageHost\(\) 即可/
+        : /Use memoryStorageHost\(\) directly/
+    )
+  }
 })
 
 test('plugin-host definePlugin explains installation, handle configuration, Feature sharing, and cleanup', () => {

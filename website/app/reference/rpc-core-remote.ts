@@ -179,17 +179,20 @@ const sourceMembers: Readonly<Record<string, IMemberDoc>> = {
   spawn: p(
     'Application source callback receiving the safe local identity and capability offer; choose exactly one source.',
     '应用来源回调接收安全本端身份及能力提议；只能选择一种来源。',
-    t('Omitted: this source kind is not selected.', '省略时不选择启动来源。')
+    t(
+      'No execution unit is launched through spawn when this field is absent.',
+      '省略时不选择启动来源。'
+    )
   ),
   connect: p(
     'Application source callback opening a channel to an existing peer; choose exactly one source.',
     '应用来源回调打开通往已有对端的通道；只能选择一种来源。',
-    t('Omitted: this source kind is not selected.', '省略时不选择连接来源。')
+    t('No outgoing connection is opened through connect when omitted.', '省略时不选择连接来源。')
   ),
   listen: p(
     'Application source callback accepting a negotiated peer channel; choose exactly one source.',
     '应用来源回调接受协商后的对端通道；只能选择一种来源。',
-    t('Omitted: this source kind is not selected.', '省略时不选择监听来源。')
+    t('Without listen, the Peer does not accept incoming connections.', '省略时不选择监听来源。')
   )
 }
 /** Source callbacks receive only safe preparation facts and must return a complete channel. */

@@ -53,6 +53,8 @@ export type ILocalizedSymbolDoc = Readonly<{
   /** Named options type whose member docs (resolved through nested types) document the table. */
   optionsType?: string
   example?: string
+  exampleIntro?: string
+  exampleResult?: string
   scenarios: readonly string[]
   avoid: readonly string[]
 }>
@@ -199,6 +201,8 @@ export function localizeReference(
             ),
             optionsType: doc.options,
             example: code(doc.example, locale),
+            exampleIntro: doc.exampleIntro && text(doc.exampleIntro, locale),
+            exampleResult: doc.exampleResult && text(doc.exampleResult, locale),
             scenarios: (doc.scenarios ?? []).map((value) => text(value, locale)),
             avoid: (doc.avoid ?? []).map((value) => text(value, locale))
           }

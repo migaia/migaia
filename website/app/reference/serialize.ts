@@ -226,7 +226,12 @@ const codecMembers: Readonly<Record<string, IMemberDoc>> = {
       '由工厂固定的格式标识，例如 `json`、`cbor`、`message-pack`、`protobuf` 或 `identity`。'
     )
   },
-  version: versionMember,
+  version: {
+    summary: t(
+      'The wire version captured when this codec was constructed; encoded data and compatibility checks use this retained value.',
+      '编解码器构造时接纳的线格式版本；编码数据与兼容性检查使用这个已保留的值。'
+    )
+  },
   encodedType: {
     summary: t(
       'Declares the runtime representation produced by encoding so a transport can admit the correct payload shape.',

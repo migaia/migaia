@@ -441,7 +441,10 @@ const budgetMembers: Record<string, IMemberDoc> = {
 }
 /** Budget constructor configuration. */
 const budgetOptions: Record<string, IMemberDoc> = {
-  kind: budgetMembers.kind,
+  kind: p(
+    'Select the execution-unit kind admitted by this budget; a parent budget must use the same kind.',
+    '选择此预算允许的执行单元种类；配置父预算时，父预算也必须采用相同种类。'
+  ),
   maxUnits: p(
     'Finite nonnegative integer local concurrency cap; zero admits no unit.',
     '本地并发容量的有限非负整数上限；零表示不准入任何单元。'
@@ -2259,9 +2262,18 @@ export const reference: ILibraryReference = {
           'Application identifier supplied at pool construction.',
           '构造池时应用提供的稳定标识名称。'
         ),
-        spec: launchFields.spec,
-        budget: launchFields.budget,
-        launcher: launchFields.launcher,
+        spec: p(
+          'Launch specification retained from pool construction and used to create warm entries.',
+          '创建池时保留的启动规格，用于创建预热条目。'
+        ),
+        budget: p(
+          'Shared process budget held by this pool; each idle entry keeps its lease until transfer or actual exit.',
+          '池持有的共享进程预算；每个空闲条目的租约保留到转交消费方或进程实际退出。'
+        ),
+        launcher: p(
+          'Runtime adapter retained by the pool for warm launches; exited still waits for execution and resource shutdown.',
+          '池为预热启动保留的运行时适配器；exited 仍须等执行与资源停止后才兑现。'
+        ),
         idle: p(
           'Current number of ready idle entries still owned by the pool.',
           '池当前仍持有的就绪空闲条目数量。'

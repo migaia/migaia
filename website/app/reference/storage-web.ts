@@ -15,6 +15,37 @@ import type {
   ITypeDoc
 } from './contract.js'
 
+/** A custom Feature, its concrete memory backend, and the Host that owns their installation. */
+export const storageFeatureExample = `import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-web/host'
+import { memoryStorageHost } from '@migaia/storage-web/memory'
+
+const metrics = defineFeature((core) => ({
+  backendId: () => core.featureExpose.getBackendId(),
+  count: async () => (await core.featureExpose.getStore().keys()).length
+}))
+const cachePlugin = definePlugin('cache', (core) => {
+  core.registerStore(memoryStorageHost())
+  return {
+    install: async () => {
+      await core.getStore().set('user:1', JSON.stringify({ name: 'Ada' }))
+      return {
+        count: () => core.features.metrics.count(),
+        backendId: () => core.features.metrics.backendId()
+      }
+    }
+  }
+}, { metrics })
+
+const host = await createStorageHost()
+try {
+  const cache = await host.use(cachePlugin)
+  console.assert(await cache.extensions.count() === 1)
+  console.assert(cache.extensions.backendId() === 'cache')
+  console.log(await cache.extensions.count(), cache.extensions.backendId())
+} finally {
+  await host.dispose()
+}`
+
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
@@ -944,21 +975,32 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
     defineFeature: {
       role: 'factory',
       purpose: t(
-        'Defines a Feature for storage plugins, with optional dependencies on other Features.',
-        '为存储插件定义一个 Feature，可以声明对其它 Feature 的依赖，由宿主按依赖顺序安装。'
+        'Defines an optional capability for a storage plugin. A Feature describes how to build that capability; a Plugin is a backend plugin that combines a store with its capabilities and is installed and removed by the Host. Defining the Feature creates no Host and opens no storage. Pass it in the third argument of definePlugin, then install that Plugin with createStorageHost({ plugins }) or host.use(). Each installation gets its own store and Feature output. The Feature output stays inside the plugin unless install returns methods that expose it to callers.',
+        '给存储插件定义一项可选能力。Feature 是创建这项能力的定义；Plugin 是由 Host 安装和卸载的后端插件，把一个存储及其能力组合在一起，两者不是一回事。定义 Feature 不会创建 Host，也不会打开存储。把它作为第三个参数交给 `definePlugin()`，再通过 `createStorageHost({ plugins })` 或 `host.use()` 安装插件，能力才会生效。每次安装都使用各自的存储和能力输出；输出默认只供插件内部使用，调用方需要通过 `install` 返回的方法才能访问。'
       ),
       params: {
         factory: t(
-          '`(core, dependencies) => output`.',
-          'Feature 的工厂函数 `(core, dependencies) => output`。'
+          'Synchronous function receiving core.featureExpose for this installed backend and the outputs of declared dependencies; return the capability object for this plugin.',
+          '同步函数，接收本次后端安装的 `core.featureExpose` 和已声明依赖的输出，返回供这个插件使用的能力对象。'
         ),
-        dependencies: t('Optional dependency references.', '可选的依赖引用记录。')
+        dependencies: t(
+          'Optional named references to other Features; omit this record when the factory uses only its backend store.',
+          '可选的具名 Feature 引用记录；只使用本次后端存储时可以省略。'
+        )
       },
       returns: t(
         'A Feature for `definePlugin(name, factory, features)`.',
         '可交给 `definePlugin(name, factory, features)` 的 Feature。'
       ),
-      example: `const metrics = defineFeature(() => ({ count: () => 0 }))`
+      exampleIntro: t(
+        'The cache plugin below stores one user in memory. Its metrics Feature counts the keys of that same backend, and install exposes the count through the installed plugin handle.',
+        '下面的缓存插件在内存中保存一个用户。`metrics` 能力统计这个后端的键数量，再由 `install` 把查询方法交给插件调用方。'
+      ),
+      example: storageFeatureExample,
+      exampleResult: t(
+        'The assertions pass and the output is 1 cache. Creating a bare Host does not add count(); installing cachePlugin makes it available as cache.extensions.count(). Finally, disposing the Host removes the plugin and releases its memory store.',
+        '两项断言通过，输出为 `1 cache`。只创建空 Host 不会得到 `count()`；安装 `cachePlugin` 后，才能调用 `cache.extensions.count()`。最后释放 Host，会卸载插件并释放其内存存储。'
+      )
     },
     assertStorageBackendId: {
       role: 'operation',

@@ -9,14 +9,17 @@ const context = t(
   '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatformValue`。'
 )
 /** Captures a real sync/async transform and the value it must hand to the next stage. */
-const transform = (en: string, zh: string, input: IText, result: IText): IMemberDoc => ({
+const transform = (
+  en: string,
+  zh: string,
+  input: IText,
+  result: IText,
+  omitted: IText
+): IMemberDoc => ({
   summary: t(en, zh),
   params: { value: input, context },
   returns: result,
-  default: t(
-    'Omitted: this stage is absent; signing/verification must still be configured and encryption/decryption must be supplied together.',
-    '省略时不安装此阶段；签名与验证仍必须配置，加密与解密必须同时提供。'
-  )
+  default: omitted
 })
 /** Configuration stays owned by the canonical authentication middleware. */
 export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -30,6 +33,10 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     t(
       'Encrypted value or its Promise, passed unchanged into sign.',
       '返回加密值或其承诺，原样传入签名阶段。'
+    ),
+    t(
+      'Omit encryption only together with decrypt; sign then receives the unencrypted authentication envelope.',
+      '省略加密时也必须省略 decrypt，sign 将直接接收未加密的认证信封。'
     )
   ),
   decrypt: transform(
@@ -39,6 +46,10 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     t(
       'Recovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.',
       '返回恢复的重放绑定认证信封或其承诺；抛错或拒绝通常成为保留原始原因的认证失败。'
+    ),
+    t(
+      'Without decrypt, encrypt must also be absent; the value recovered by verify is checked directly as an authentication envelope.',
+      '不提供 decrypt 时也不能提供 encrypt；verify 恢复的值将直接作为认证信封校验。'
     )
   ),
   sign: transform(
@@ -51,6 +62,10 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     t(
       'Signed representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.',
       '返回签名表示或其承诺；抛错或拒绝通常成为认证失败，输出须符合声明的编码值域。'
+    ),
+    t(
+      'Required for authentication: omitting sign makes configuration invalid, because encryption also requires signing.',
+      '启用认证必须提供 sign；省略它会使配置非法，因为使用加密同样要求签名。'
     )
   ),
   verify: transform(
@@ -63,6 +78,10 @@ export const authenticationOptionMembers: Readonly<Record<string, IMemberDoc>> =
     t(
       'Authenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.',
       '返回认证内部值或其承诺，配置了解密时传给解密；签名非法时应拒绝或抛错，本地报告保留可能敏感的原校验失败，对端只接收净化摘要，其它返回值仍需通过信封及重放校验。'
+    ),
+    t(
+      'Required counterpart of sign; a signing configuration without verify is rejected before the endpoint is activated.',
+      'verify 是 sign 必须配套的验证阶段；提供签名却缺少验证时，端点会在激活前拒绝配置。'
     )
   ),
   encodedType: {

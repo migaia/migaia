@@ -680,13 +680,22 @@ try {
         )
       },
       health: {
-        summary: t('Unavailable for a local Peer.', '对本地 Peer 不可用，健康状态见各连接。')
+        summary: t(
+          'A local Peer has no aggregate health value; inspect the health of each connection.',
+          '对本地 Peer 不可用，健康状态见各连接。'
+        )
       },
       restartCount: {
-        summary: t('Unavailable for a local Peer.', '对本地 Peer 不可用，重启次数见各连接。')
+        summary: t(
+          'Restart counts belong to individual connections, so this field is unavailable on a local Peer.',
+          '对本地 Peer 不可用，重启次数见各连接。'
+        )
       },
       resources: {
-        summary: t('Unavailable for a local Peer.', '对本地 Peer 不可用，资源用量见各连接。')
+        summary: t(
+          'A local Peer exposes resource usage through its connections rather than this field.',
+          '对本地 Peer 不可用，资源用量见各连接。'
+        )
       }
     }
   },

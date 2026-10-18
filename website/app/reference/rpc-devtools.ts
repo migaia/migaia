@@ -1625,8 +1625,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
     },
     IRpcLogSink: {
       summary: t(
-        'Caller-owned structural logger with four required methods. Methods should enqueue promptly; buffering and I/O are outside the probe, and returned thenable rejections are observed rather than awaited.',
-        '调用者拥有、含四个必填方法的结构化日志接收端，方法应及时入队，缓冲与输入输出归接收端，返回承诺的拒绝会被观察而非等待。'
+        'Caller-owned structural logger with four required methods. Methods should enqueue promptly; buffering and I/O are outside the probe, and returned thenable rejections are observed rather than awaited. Throw or promise rejection is routed to onError.',
+        '调用者拥有、含四个必填方法的结构化日志接收端，方法应及时入队，缓冲与输入输出归接收端，返回承诺的拒绝会被观察而非等待。接收端抛错或承诺拒绝时，错误交给 onError。'
       ),
       example: logExample,
       members: Object.fromEntries(
@@ -1634,8 +1634,8 @@ console.log(RpcDevtoolsErrorCode.recordActive)`
           level,
           {
             summary: t(
-              `Receives one qualifying event assigned to the ${level} level; the original logger receiver is preserved. Throw or promise rejection is routed to onError.`,
-              `接收一个被分配到 \`${level}\` 级别的合格事件，保留原始接收者，抛错或承诺拒绝交给错误观察回调。`
+              `Receives one qualifying event assigned to the ${level} level; the original logger receiver is preserved.`,
+              `接收一个被分配到 \`${level}\` 级别的合格事件，保留原始接收者。`
             ),
             params: {
               message: t(

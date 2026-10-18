@@ -11,24 +11,25 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Construction options used in every example. */
 const execution = 'execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }'
 
+/** Common registration ownership for all pipeline methods of each receiving surface. */
+const stageLifetime = {
+  host: t(
+    'Host stages stay until the host is disposed; registering while a pipeline runs throws PIPELINE_EXECUTING.',
+    '宿主登记的步骤保留到宿主释放；管线运行期间登记新步骤会抛 PIPELINE_EXECUTING。'
+  ),
+  core: t(
+    'Plugin stage registration is allowed only during install; later registration throws RESOURCE_OUTSIDE_INSTALL, and uninstall removes the registered stages.',
+    '插件只能在 install 期间登记步骤，之后登记会抛 RESOURCE_OUTSIDE_INSTALL；卸载插件会移除它登记的步骤。'
+  )
+} as const
+
 /** Shared stage-registration member docs (host and plugin core). */
 const stageMembers = (receiver: 'host' | 'core'): Readonly<Record<string, IMemberDoc>> => {
-  /** Where the stage registration is allowed. */
-  const window =
-    receiver === 'core'
-      ? t(
-          'Only during `install`; outside it throws `RESOURCE_OUTSIDE_INSTALL`. The stage is removed with the plugin.',
-          '只能在 `install` 期间调用，否则抛 `RESOURCE_OUTSIDE_INSTALL`；该步骤随插件卸载而移除。'
-        )
-      : t(
-          'Host stages stay until the host is disposed; registering while a pipeline runs throws `PIPELINE_EXECUTING`.',
-          '宿主步骤一直保留到宿主释放；pipeline 运行期间注册会抛 `PIPELINE_EXECUTING`。'
-        )
   return {
     usePipeline: {
       summary: t(
-        `Adds a synchronous stage \`(value, next) => void\` to the host pipeline. It is lifted to the host mode, so it works in every mode. ${window.en}`,
-        `向宿主 pipeline 添加同步步骤 \`(value, next) => void\`。它会被提升到宿主模式，因此任何模式都可用。${window.zh}`
+        `Adds a synchronous stage \`(value, next) => void\` to the host pipeline. It is lifted to the host mode, so it works in every mode.`,
+        `向宿主 pipeline 添加同步步骤 \`(value, next) => void\`。它会被提升到宿主模式，因此任何模式都可用。`
       ),
       params: {
         stage: t(
@@ -47,8 +48,8 @@ const stageMembers = (receiver: 'host' | 'core'): Readonly<Record<string, IMembe
     },
     useAsyncPipeline: {
       summary: t(
-        `Adds an onion-style async stage; only valid when the host mode is \`async\`, otherwise \`PIPELINE_MODE_MISMATCH\`. ${window.en}`,
-        `添加洋葱模型的异步步骤；只有宿主模式为 \`async\` 时可用，否则抛 \`PIPELINE_MODE_MISMATCH\`。${window.zh}`
+        `Adds an onion-style async stage; only valid when the host mode is \`async\`, otherwise \`PIPELINE_MODE_MISMATCH\`.`,
+        `添加洋葱模型的异步步骤；只有宿主模式为 \`async\` 时可用，否则抛 \`PIPELINE_MODE_MISMATCH\`。`
       ),
       params: {
         stage: t(
@@ -68,8 +69,8 @@ const stageMembers = (receiver: 'host' | 'core'): Readonly<Record<string, IMembe
     },
     useGeneratorPipeline: {
       summary: t(
-        `Adds a generator stage; valid in \`generator\` and \`async-generator\` modes. ${window.en}`,
-        `添加生成器步骤；\`generator\` 与 \`async-generator\` 模式可用。${window.zh}`
+        `Adds a generator stage; valid in \`generator\` and \`async-generator\` modes.`,
+        `添加生成器步骤；\`generator\` 与 \`async-generator\` 模式可用。`
       ),
       params: {
         stage: t(
@@ -88,8 +89,8 @@ const stageMembers = (receiver: 'host' | 'core'): Readonly<Record<string, IMembe
     },
     useAsyncGeneratorPipeline: {
       summary: t(
-        `Adds an async generator stage; only valid in \`async-generator\` mode. ${window.en}`,
-        `添加异步生成器步骤；只有 \`async-generator\` 模式可用。${window.zh}`
+        `Adds an async generator stage; only valid in \`async-generator\` mode.`,
+        `添加异步生成器步骤；只有 \`async-generator\` 模式可用。`
       ),
       params: {
         stage: t(
@@ -1031,8 +1032,8 @@ const admission = port.createPluginAdmission(plugin)`
   types: {
     PluginHost: {
       summary: t(
-        'A plugin-capable host. Its own API manages plugins and stages; domain capabilities come from the plugins installed into it.',
-        '可插件化的宿主。它自身的 API 负责管理插件和步骤；领域能力来自安装进来的插件。'
+        `A plugin-capable host. Its own API manages plugins and stages; domain capabilities come from the plugins installed into it. ${stageLifetime.host.en}`,
+        `可插件化的宿主。它自身的 API 负责管理插件和步骤；领域能力来自安装进来的插件。 ${stageLifetime.host.zh}`
       ),
       scenarios: hostScenarios,
       example: hostExample,
@@ -1040,8 +1041,8 @@ const admission = port.createPluginAdmission(plugin)`
     },
     IHostHandle: {
       summary: t(
-        'Canonical frozen handle returned by defineHost<TDomainCore, TValue, TInstalled, TPublicSurface>. The fourth generic defaults to an empty public surface. Domain members, live accessors and issued identity belong to this same handle; fluent use*Pipeline returns it unchanged.',
-        '函数宿主返回的规范冻结句柄；第四泛型为默认空的领域公开表面，领域成员、实时访问器及已签发身份同属原句柄，管线链式方法返回原对象。'
+        `Canonical frozen handle returned by defineHost<TDomainCore, TValue, TInstalled, TPublicSurface>. The fourth generic defaults to an empty public surface. Domain members, live accessors and issued identity belong to this same handle; fluent use*Pipeline returns it unchanged. ${stageLifetime.host.en}`,
+        `函数宿主返回的规范冻结句柄；第四泛型为默认空的领域公开表面，领域成员、实时访问器及已签发身份同属原句柄，管线链式方法返回原对象。 ${stageLifetime.host.zh}`
       ),
       scenarios: [
         t(
@@ -1076,7 +1077,10 @@ await host.dispose()`,
             'Readable host name used in errors and diagnostics.',
             '宿主的可读名称，出现在错误与诊断信息中。'
           ),
-          default: t('Not set: the host is unnamed.', '不设置：宿主没有名称，只用 id 区分。')
+          default: t(
+            'Not set: diagnostics use the generated id instead of a readable name.',
+            '省略可读名称时，诊断信息使用运行时分配的 id。'
+          )
         },
         'execution.mutationTimeoutMs': {
           summary: t(
@@ -1545,8 +1549,8 @@ console.log(paint('info', 'ready'))`
     },
     IPluginHostCore: {
       summary: t(
-        'The `core` a plugin receives in `install(core)` and `update(next, core)`: the host domain core plus its own configuration, operation context, resource registration and stage registration. It never contains `use`, `unUse` or `dispose`.',
-        '插件在 `install(core)`、`update(next, core)` 中收到的 `core`：宿主领域 core，加上自身配置、操作上下文、资源登记与步骤登记。它不包含 `use`、`unUse`、`dispose`。'
+        `The \`core\` a plugin receives in \`install(core)\` and \`update(next, core)\`: the host domain core plus its own configuration, operation context, resource registration and stage registration. It never contains \`use\`, \`unUse\` or \`dispose\`. ${stageLifetime.core.en}`,
+        `插件在 \`install(core)\`、\`update(next, core)\` 中收到的 \`core\`：宿主领域 core，加上自身配置、操作上下文、资源登记与步骤登记。它不包含 \`use\`、\`unUse\`、\`dispose\`。 ${stageLifetime.core.zh}`
       ),
       members: {
         config: {
@@ -1584,8 +1588,8 @@ console.log(paint('info', 'ready'))`
       }
     },
     IPluginHostCoreFor: alias(
-      '`IPluginHostCore` for a given host, used in plugin typings.',
-      '针对特定宿主的 `IPluginHostCore`，用于插件的类型标注。'
+      `IPluginHostCore for a given host, used in plugin typings. ${stageLifetime.core.en}`,
+      `针对特定宿主的 IPluginHostCore，用于插件的类型标注。${stageLifetime.core.zh}`
     ),
     IPluginLifecycleCore: {
       summary: t(

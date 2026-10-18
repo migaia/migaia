@@ -17,6 +17,30 @@ const alias = (en: string, zh: string): ITypeDoc => ({ summary: t(en, zh), membe
 const setup = `import { createCapabilityHost } from '@migaia/capability'
 const host = createCapabilityHost({ tenant: 'a' }, { flags: { search: true } })
 host.register({ name: 'search', activate: context => ({ tenant: context.tenant, dispose() {} }) })`
+/** Complete tenant persistence example shared by the guide and the audited API page. */
+export const capabilityHostExample = `import { CapabilityEnableStatus, createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'
+
+type IPersistence = ICapabilityHandle & { sync(): Promise<void> }
+const host = createCapabilityHost({ tenantId: 'tenant-42' }, {
+  flags: { persistence: true },
+  onError: (name, error) => console.error(name, error)
+})
+host.register<IPersistence>({
+  name: 'persistence',
+  activate: ({ tenantId }) => ({
+    sync: async () => { console.log('sync:', tenantId) },
+    dispose: () => { console.log('disposed:', tenantId) }
+  })
+})
+
+try {
+  const result = await host.enable('persistence')
+  if (result.status === CapabilityEnableStatus.enabled) {
+    await host.handle<IPersistence>('persistence')?.sync()
+  }
+} finally {
+  await host.dispose()
+}`
 /** Capability identity chosen by the application at registration. */
 const name = t(
   'The application-assigned name supplied to host.register(), here search.',
@@ -359,8 +383,8 @@ const types: Record<string, ITypeDoc> = {
           '通过 `(name, error)` 接收激活或释放失败；名称来自登记，错误保持原值，不使用返回值；报告函数同步失败与异步拒绝进入工具包共享宿主异常队列，不改变业务状态。'
         ),
         default: t(
-          'Omitted: no external reporter; failures remain readable through host.error(name).',
-          '省略时没有外部报告函数，失败仍可通过 `host.error(name)` 查询。'
+          'undefined (no error callback configured); failures remain readable through host.error(name).',
+          'undefined（未配置错误接收回调）；失败仍可通过 `host.error(name)` 查询。'
         )
       }
     }
@@ -493,7 +517,15 @@ export const capabilityReference: ILibraryReference = {
         'Caller-owned ICapabilityHost; dispose it when finished. Invalid options throw tagged native errors before construction completes.',
         '返回调用方拥有的 `ICapabilityHost`，结束后须释放；非法选项在构造完成前抛出附码原生错误。'
       ),
-      example: `${setup}\nawait host.enable('search')\nawait host.dispose()`
+      exampleIntro: t(
+        'Enable persistence separately for each tenant. Register its factory first, then check the enable result before reading the active handle.',
+        '下面按租户启用持久化能力。先登记创建能力的函数，再检查启用结果，确认成功后才读取可用句柄。'
+      ),
+      example: capabilityHostExample,
+      exampleResult: t(
+        'The example prints sync: tenant-42, then disposed: tenant-42. The flag permits activation; enable starts it, and the finally block releases the handle even if sync fails.',
+        '运行后先输出 `sync: tenant-42`，再输出 `disposed: tenant-42`。开关只授予许可，`enable()` 才启动能力；即使 `sync()` 失败，最后的清理仍会释放句柄。'
+      )
     },
     snapshotGraphReadiness: {
       role: 'operation',

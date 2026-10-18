@@ -524,6 +524,12 @@ await target.shutdown('manual')`
   }
 }
 
+/** Argument interpretation shared by every level method, explained once per owning surface. */
+const levelMessageArguments = t(
+  'For every level method, a string first argument supplies the message with %s placeholders; otherwise all arguments are retained in args.',
+  '所有分级方法都把首个字符串参数作为消息，并支持 %s 占位符；首个参数不是字符串时，全部参数都保存在 args 中。'
+)
+
 /** Methods added by `level()`, with their call forms. */
 const levelExt: Readonly<Record<string, IMemberDoc & { call: string }>> = Object.fromEntries(
   (
@@ -539,8 +545,8 @@ const levelExt: Readonly<Record<string, IMemberDoc & { call: string }>> = Object
     {
       call: '(message, ...args)',
       summary: t(
-        `Logs with tag \`${name}\` when \`${name}\` is not below the current level and every filter passes. A string first argument becomes the message (with \`%s\` placeholders); otherwise all arguments go to \`args\`.`,
-        `以 \`${name}\` 标签记录日志（${zh}），前提是 \`${name}\` 不低于当前级别且所有过滤器都放行。第一个参数是字符串时作为消息（支持 \`%s\` 占位符）；否则全部参数放入 \`args\`。`
+        `Logs with tag \`${name}\` when \`${name}\` is not below the current level and every filter passes.`,
+        `以 \`${name}\` 标签记录日志（${zh}），前提是 \`${name}\` 不低于当前级别且所有过滤器都放行。`
       ),
       params: {
         args: t(
@@ -1725,8 +1731,8 @@ ${create}
     },
     ILevelPluginExt: {
       summary: t(
-        'Methods a logger gains from `level()`.',
-        'logger 安装 `level()` 插件后获得的分级记录方法。'
+        `Methods a logger gains from level(). ${levelMessageArguments.en}`,
+        `logger 安装 level() 插件后获得的分级记录方法。${levelMessageArguments.zh}`
       ),
       scenarios: [
         t(
@@ -2306,8 +2312,8 @@ log.endResponse()`,
       kind: 'plugin',
       target: 'Logger',
       summary: t(
-        'After installation the logger has `debug()`, `info()`, `warn()`, `error()`, `fatal()`, `setLevel()`, `addFilter()` and `removeFilter()`, and a pipeline stage that drops entries below the level or rejected by a filter.',
-        '安装后 logger 拥有 `debug()`、`info()`、`warn()`、`error()`、`fatal()`、`setLevel()`、`addFilter()`、`removeFilter()`，并增加一个管线阶段，丢弃低于级别或被过滤器拒绝的条目。'
+        `After installation the logger has debug(), info(), warn(), error(), fatal(), setLevel(), addFilter() and removeFilter(), and a pipeline stage that drops entries below the level or rejected by a filter. ${levelMessageArguments.en}`,
+        `安装后 logger 拥有 debug()、info()、warn()、error()、fatal()、setLevel()、addFilter()、removeFilter()，并增加一个管线阶段，丢弃低于级别或被过滤器拒绝的条目。${levelMessageArguments.zh}`
       ),
       install: `import { Logger } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
@@ -2447,7 +2453,7 @@ await log.shutdown('manual')`
       kind: 'adapter',
       target: 'Logger',
       summary: t(
-        'Signals and crashes drain then shut down; captureCrashes controls fatal logging only, while crashes still exit(1). beforeExit flushes without initiating shutdown. The adapter adds no methods.',
+        'Signals and crashes drain then shut down; captureCrashes controls fatal logging only, while crashes still exit(1). The adapter adds no methods.',
         '信号与崩溃先排空再关闭，崩溃开关仅控制致命日志，崩溃仍以退出码一结束；`beforeExit` 刷新但不主动关闭，适配器不增加方法。'
       ),
       install: `import { Logger } from '@migaia/logger'

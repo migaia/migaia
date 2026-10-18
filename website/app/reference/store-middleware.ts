@@ -175,8 +175,16 @@ const inheritedHostMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEn
       ...(['useAsyncPipeline', 'useGeneratorPipeline', 'useAsyncGeneratorPipeline'].includes(name)
         ? {
             summary: t(
-              'Inherited host API whose required mode is unavailable here because store event hosts always use sync. Calling it rejects with the external PluginHost PIPELINE_MODE_MISMATCH contract.',
-              '继承的宿主接口所需模式在此不可用，因为存储事件宿主始终同步，调用按外包流水线模式不匹配契约拒绝。'
+              name === 'useAsyncPipeline'
+                ? 'Requires async mode, but Store event hosts always run synchronously; registering an async onion stage throws PIPELINE_MODE_MISMATCH.'
+                : name === 'useGeneratorPipeline'
+                  ? 'Requires generator or async-generator mode; a synchronous Store event host rejects generator-stage registration with PIPELINE_MODE_MISMATCH.'
+                  : 'Requires async-generator mode, so a Store event host cannot register an async generator stage and throws PIPELINE_MODE_MISMATCH.',
+              name === 'useAsyncPipeline'
+                ? '异步洋葱步骤要求 async 模式，而存储事件宿主固定同步；登记时抛 PIPELINE_MODE_MISMATCH。'
+                : name === 'useGeneratorPipeline'
+                  ? '生成器步骤要求 generator 或 async-generator 模式，同步的存储事件宿主会以 PIPELINE_MODE_MISMATCH 拒绝登记。'
+                  : '异步生成器步骤只适用于 async-generator 模式，存储事件宿主无法采用该模式，因此登记会抛 PIPELINE_MODE_MISMATCH。'
             )
           }
         : {})

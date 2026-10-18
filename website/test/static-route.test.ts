@@ -1132,9 +1132,10 @@ test('SITE-T-A26/A30 closes emitted chunk and terminology boundaries', () => {
     const html = readFileSync(file, 'utf8')
     const proseHtml = html.replace(/<pre(?:\s[^>]*)?>[\s\S]*?<\/pre>/gi, '')
     // A published package is a valid API concept; only repository paths and stale locales leak internals.
+    // Intl identifiers such as zh-CN are API data; obsolete site paths use /zh-cn.
     assert.doesNotMatch(
       renderedText(proseHtml),
-      /\bzh-cn\b|\.\.[\\/]packages\b|\bpackages[\\/][a-z0-9-]+/i,
+      /\/zh-cn\b|\.\.[\\/]packages\b|\bpackages[\\/][a-z0-9-]+/i,
       `repository path or stale locale in page prose: ${file}`
     )
     assert.doesNotMatch(
@@ -1511,7 +1512,7 @@ test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle'
   assert.doesNotMatch(text, /诊断 sink/)
   assert.match(text, /host\.register\(/)
   assert.match(text, /result\.status === CapabilityEnableStatus\.enabled/)
-  assert.match(text, /await host\.handle\('persistence'\)\?\.sync\(\)/)
+  assert.match(text, /await host\.handle<IPersistence>\('persistence'\)\?\.sync\(\)/)
   assert.match(text, /finally \{\s*await host\.dispose\(\)/)
   assert.doesNotMatch(text, /class="code-walkthrough"|输出用于确认上一操作的结果/)
 })

@@ -201,6 +201,10 @@ export type ISymbolDoc = Readonly<{
   optionDocs?: Readonly<Record<string, IMemberDoc>>
   /** Minimal runnable example shown first on the page. */
   example?: ICode
+  /** Concrete situation explained immediately before the minimal example. */
+  exampleIntro?: IText
+  /** Observable result explained immediately after the minimal example. */
+  exampleResult?: IText
   /** When to use it. */
   scenarios?: readonly IText[]
   /** When not to use it, with the alternative. */

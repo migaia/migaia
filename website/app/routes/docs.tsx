@@ -1569,16 +1569,24 @@ function InstalledCapabilities({
   guide,
   libraryApis,
   locale,
+  memberDocs,
+  purpose,
   symbol
 }: {
   readonly api: IApi
   readonly guide: ILocalizedEnhancerDoc
   readonly libraryApis: readonly IApi[]
   readonly locale: ILocale
+  /** Returned instance methods own shared descriptions that enhancer grants reference. */
+  readonly memberDocs: Readonly<Record<string, ILocalizedMemberDoc>>
+  /** The overview already owns this description when the enhancer reuses it verbatim. */
+  readonly purpose: string
   readonly symbol: IApiSymbol
 }) {
   /** Locale index into the bilingual label tuples. */
   const labelIndex = locale === 'zh' ? 1 : 0
+  /** Behavior copied from the API overview is already explained before installation. */
+  const behaviors = guide.behaviors.filter((behavior) => !sameProseIncluded(purpose, behavior))
   return (
     <section
       className="section-block compact installed-capabilities"
@@ -1590,9 +1598,9 @@ function InstalledCapabilities({
         <TypeExpression api={api} libraryApis={libraryApis} locale={locale} value={guide.target} />
       </p>
       <h2>{locale === 'zh' ? '安装后能力' : 'After installation'}</h2>
-      <p>
-        <InlineText library={api.library} locale={locale} text={guide.summary} />
-      </p>
+      {!sameProseIncluded(purpose, guide.summary) ? (
+        <ReferenceParagraphs library={api.library} locale={locale} text={guide.summary} />
+      ) : null}
       <CodeBlock
         code={guide.install}
         label={locale === 'zh' ? `安装 ${symbol.name}` : `Install ${symbol.name}`}
@@ -1613,9 +1621,13 @@ function InstalledCapabilities({
                     <code>{grant.signature}</code>
                   </h4>
                 </div>
-                <p>
-                  <InlineText library={api.library} locale={locale} text={grant.summary} />
-                </p>
+                {!sameProseIncluded(
+                  memberDocs[grant.signature.match(/\.([\w$]+)(?:\(|$)/u)?.[1] ?? '']?.summary ??
+                    '',
+                  grant.summary
+                ) ? (
+                  <ReferenceParagraphs library={api.library} locale={locale} text={grant.summary} />
+                ) : null}
                 <ReferenceMemberDetails
                   api={api}
                   doc={grant}
@@ -1628,11 +1640,11 @@ function InstalledCapabilities({
           </div>
         </>
       ) : null}
-      {guide.behaviors.length > 0 ? (
+      {behaviors.length > 0 ? (
         <>
           <h3>{locale === 'zh' ? '对已有 API 的影响' : 'Changes to existing APIs'}</h3>
           <ul>
-            {guide.behaviors.map((behavior) => (
+            {behaviors.map((behavior) => (
               <li key={behavior}>
                 <InlineText library={api.library} locale={locale} text={behavior} />
               </li>
@@ -1967,6 +1979,99 @@ function ReferenceMemberDetails({
   )
 }
 
+/**
+ * Splits dense prose at the existing sentence/clause boundaries. Inline code and Markdown links
+ * remain whole, so punctuation in a signature or URL cannot turn into a paragraph break.
+ */
+function readableProseParagraphs(
+  text: string,
+  locale: ILocale,
+  library?: string
+): readonly string[] {
+  /** The reading width used by maintained documentation before code spans needed protection. */
+  const maximumLength = 420
+  /** Inline library explanations contribute to the rendered reading width as well. */
+  const readableLength = (value: string) =>
+    inlineTextParts(value).reduce((length, part) => {
+      /** Maintained links display their label rather than the destination URL. */
+      const linkLabel = part.match(/^\[([^\]]+)\]\([^)]+\)$/u)?.[1]
+      if (linkLabel) return length + linkLabel.length
+      /** Inline code keeps its contents while dropping only the visible Markdown delimiters. */
+      const literal = part.startsWith('`') && part.endsWith('`') ? part.slice(1, -1) : part
+      /** The same library lookup used by InlineText determines the inserted explanation. */
+      const target = crossLibraryReference(literal, library)
+      return (
+        length +
+        literal.length +
+        (target
+          ? target.length +
+            libraryReferenceDescription(locale, target).length +
+            (locale === 'zh' ? '查看该类库 →' : 'Open library →').length
+          : 0)
+      )
+    }, 0)
+  if (readableLength(text) <= maximumLength) return [text]
+  /** Protected Markdown tokens are copied as one unit, including their internal punctuation. */
+  const protectedTokens = [...text.matchAll(/(`+)[\s\S]*?\1|\[[^\]]+\]\([^)]+\)/gu)]
+  /** Safe offsets follow complete prose sentences, clauses, or words. */
+  const boundaries: number[] = []
+  /** Next protected token; advancing it avoids rechecking prior code spans. */
+  let protectedIndex = 0
+  for (let index = 0; index < text.length; index++) {
+    /** Skip the complete next code/link token so none of its punctuation can become a boundary. */
+    const token = protectedTokens[protectedIndex]
+    if (token && index === token.index) {
+      index += token[0].length - 1
+      protectedIndex++
+      continue
+    }
+    if (
+      /[。！？，、；;,\s]/u.test(text[index]!) ||
+      (/[.!?]/u.test(text[index]!) && /\s|^$/u.test(text[index + 1] ?? ''))
+    )
+      boundaries.push(index + 1)
+  }
+  boundaries.push(text.length)
+  /** Output paragraphs retain every authored token in source order. */
+  const paragraphs: string[] = []
+  /** Start of the next unread portion of the maintained paragraph. */
+  let start = 0
+  while (start < text.length) {
+    /** Only boundaries that fit the rendered reading width may end this paragraph. */
+    const fitting = boundaries.filter(
+      (boundary) => boundary > start && readableLength(text.slice(start, boundary)) <= maximumLength
+    )
+    /** Choose the last fitting boundary; an indivisible token stays whole even when long. */
+    const end = fitting.at(-1) ?? boundaries.find((boundary) => boundary > start) ?? text.length
+    /** Preserve source order and content, removing only outer layout whitespace. */
+    const paragraph = text.slice(start, end).trim()
+    if (paragraph) paragraphs.push(paragraph)
+    start = end
+  }
+  return paragraphs
+}
+
+/** Compares two projections of the same authored explanation without Markdown styling. */
+function sameProseIncluded(owner: string, candidate: string): boolean {
+  /** Formatting markers cannot create a second meaning for the same authored explanation. */
+  const visible = (value: string) => value.replace(/[`*]/gu, '').replace(/\s+/gu, ' ').trim()
+  return visible(owner).includes(visible(candidate))
+}
+
+/** Shares prose token boundaries between rendering and paragraph width calculation. */
+function inlineTextParts(text: string): readonly string[] {
+  return (
+    text
+      // Reader terminology says "library"; identifiers such as `package.json`, `read:packages`
+      // and the product name "GitHub Packages" keep their literal spelling.
+      .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
+      .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
+      .split(
+        /(\[[^\]\n]+\]\((?:\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
+      )
+  )
+}
+
 /** Renders reference prose without truncation; blank lines separate paragraphs. */
 function ReferenceParagraphs({
   library,
@@ -1981,6 +2086,7 @@ function ReferenceParagraphs({
     <>
       {text
         .split(/\n\s*\n/)
+        .flatMap((paragraph) => readableProseParagraphs(paragraph, locale, library))
         .filter((paragraph) => paragraph.trim())
         .map((paragraph) => (
           <p key={paragraph}>
@@ -2012,6 +2118,7 @@ function ValueList({
     <ul className="value-list">
       {values.map((entry) => {
         /** Literal of a constant-backed value, read from the constant's declaration. */
+        /** Inline code keeps its contents while dropping only the visible Markdown delimiters. */
         const literal = entry.constant
           ? constantMembers(
               symbols.find((symbol) => symbol.name === entry.constant) ?? ({} as IApiSymbol)
@@ -2283,6 +2390,19 @@ function SingleApiReference({
   const instances = returnedInstances(symbol, symbols)
   /** Reference doc of an audited library; every sentence below comes from it when present. */
   const symbolDoc = symbolDocFor(reference, api.module, symbol.name)
+  /** A factory's instance guide owns scenarios shared with its API definition. */
+  const instanceScenarios = [
+    ...(ownGuide?.scenarios ?? []),
+    ...instances.flatMap(
+      ({ type }) => surfaceGuideFor(reference, api.module, type, symbols)?.scenarios ?? []
+    )
+  ]
+  /** API-only scenarios remain beside the API; shared instance scenarios appear once below. */
+  const scenarios =
+    symbolDoc?.scenarios.filter(
+      (scenario) =>
+        !instanceScenarios.some((instanceScenario) => sameProseIncluded(instanceScenario, scenario))
+    ) ?? []
   /** Only the maintained opening sentence introduces the API outside audited libraries. */
   const purpose = symbolDoc
     ? symbolDoc.purpose
@@ -2443,7 +2563,7 @@ function SingleApiReference({
           {symbolDoc ? (
             <div className="lede">
               <ReferenceParagraphs library={library.slug} locale={locale} text={purpose} />
-              {enumGuide ? (
+              {enumGuide && !sameProseIncluded(purpose, enumGuide.summary) ? (
                 <ReferenceParagraphs
                   library={library.slug}
                   locale={locale}
@@ -2465,7 +2585,21 @@ function SingleApiReference({
           id={`${symbol.fragment}--quick-start`}
         >
           <h2>{locale === 'zh' ? '最小示例' : 'Minimal example'}</h2>
+          {symbolDoc?.exampleIntro ? (
+            <ReferenceParagraphs
+              library={library.slug}
+              locale={locale}
+              text={symbolDoc.exampleIntro}
+            />
+          ) : null}
           <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
+          {symbolDoc?.exampleResult ? (
+            <ReferenceParagraphs
+              library={library.slug}
+              locale={locale}
+              text={symbolDoc.exampleResult}
+            />
+          ) : null}
         </section>
       ) : null}
       {symbolDoc && (Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns) ? (
@@ -2715,10 +2849,32 @@ function SingleApiReference({
           guide={reference.enhancers[symbol.name]!}
           libraryApis={libraryApis}
           locale={locale}
+          memberDocs={Object.fromEntries(
+            instances.flatMap(({ surface }) =>
+              surface.members.flatMap((member) => {
+                /** The returned instance owns this exact member description when grants reuse it. */
+                const doc = memberDocResolver(reference, api.module, surface.owners)?.(member.name)
+                return doc ? [[member.name, doc]] : []
+              })
+            )
+          )}
+          purpose={purpose}
           symbol={symbol}
         />
       ) : null}
-      {ownSurface ? (
+      {ownSurface &&
+      !(isCallableApiSymbol(symbol) && instances.length > 0) &&
+      !instances.some(
+        ({ surface }) =>
+          surface.owners.length === ownSurface.owners.length &&
+          surface.owners.every((owner, index) => owner === ownSurface.owners[index]) &&
+          surface.bases.length === ownSurface.bases.length &&
+          surface.bases.every((base, index) => base === ownSurface.bases[index]) &&
+          surface.members.length === ownSurface.members.length &&
+          surface.members.every(
+            (member, index) => member.signature === ownSurface.members[index]?.signature
+          )
+      ) ? (
         <ClassMemberReference
           api={api}
           bases={ownSurface.bases}
@@ -2747,8 +2903,12 @@ function SingleApiReference({
           key={type.name}
           libraryApis={libraryApis}
           locale={locale}
-          guide={surfaceGuideFor(reference, api.module, type, symbols)}
-          memberDoc={memberDocResolver(reference, api.module, surface.owners)}
+          guide={
+            index === 0 && ownGuide
+              ? ownGuide
+              : surfaceGuideFor(reference, api.module, type, symbols)
+          }
+          memberDoc={memberDocResolver(reference, api.module, [symbol.name, ...surface.owners])}
           members={surface.members}
           strict={Boolean(reference)}
           symbol={symbol}
@@ -2766,12 +2926,12 @@ function SingleApiReference({
           </ul>
         </section>
       ) : null}
-      {symbolDoc && (symbolDoc.scenarios.length > 0 || symbolDoc.avoid.length > 0) ? (
+      {symbolDoc && (scenarios.length > 0 || symbolDoc.avoid.length > 0) ? (
         <section className="section-block compact" id={`${symbol.fragment}--scenarios`}>
           <h2>{locale === 'zh' ? '适用场景' : 'When to use'}</h2>
-          {symbolDoc.scenarios.length > 0 ? (
+          {scenarios.length > 0 ? (
             <ul>
-              {symbolDoc.scenarios.map((scenario) => (
+              {scenarios.map((scenario) => (
                 <li key={scenario}>
                   <InlineText library={library.slug} locale={locale} text={scenario} />
                 </li>
@@ -3384,7 +3544,14 @@ function MaintainedDocument({
   readonly locale: ILocale
 }) {
   /** Repeated parameter facts are presented once without modifying the maintained document. */
-  const sections = uniqueDocumentProse(document.sections)
+  const sections = uniqueDocumentProse(document.sections).map((section) => ({
+    ...section,
+    blocks: section.blocks.flatMap((block): IMaintainedBlock[] =>
+      block.type === 'paragraph'
+        ? readableProseParagraphs(block.text, locale, library).map((text) => ({ ...block, text }))
+        : [block]
+    )
+  }))
   return (
     <div className="maintained-document">
       {sections.map((section) => (
@@ -3686,68 +3853,58 @@ function InlineText({
   readonly text: string
 }) {
   const errorPath = errorReferencePath(locale, library)
-  return (
-    text
-      // Reader terminology says "library"; identifiers such as `package.json`, `read:packages`
-      // and the product name "GitHub Packages" keep their literal spelling.
-      .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
-      .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
-      .split(
-        /(\[[^\]\n]+\]\((?:\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
-      )
-      .map((part, index) => {
-        /** Maintained API tables link to existing local guides without accepting external URLs. */
-        const maintainedLink = part.match(
-          /^\[([^\]\n]+)\]\((\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)$/
+  return inlineTextParts(text).map((part, index) => {
+    /** Maintained API tables link to existing local guides without accepting external URLs. */
+    const maintainedLink = part.match(
+      /^\[([^\]\n]+)\]\((\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)$/
+    )
+    if (maintainedLink) {
+      const [, label, target] = maintainedLink
+      /** In-page anchors stay plain fragment links so the browser scrolls without routing. */
+      if (target!.startsWith('#'))
+        return (
+          <a className="text-link" href={target} key={index}>
+            {label}
+          </a>
         )
-        if (maintainedLink) {
-          const [, label, target] = maintainedLink
-          /** In-page anchors stay plain fragment links so the browser scrolls without routing. */
-          if (target!.startsWith('#'))
-            return (
-              <a className="text-link" href={target} key={index}>
-                {label}
-              </a>
-            )
-          return (
-            <Link className="text-link" key={index} to={target!}>
-              {label}
-            </Link>
-          )
-        }
-        const inlineCode = part.startsWith('`') && part.endsWith('`')
-        const value = inlineCode ? part.slice(1, -1) : part
-        const errorCode = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value)
-        const referencedLibrary = crossLibraryReference(value, library)
-        if (referencedLibrary) {
-          const description = libraryReferenceDescription(locale, referencedLibrary)
-          return (
-            <Link
-              aria-label={`${value}：${description}`}
-              className="library-reference"
-              key={index}
-              title={description}
-              to={domainPath(locale, referencedLibrary)}
-            >
-              {inlineCode ? <code>{value}</code> : value}
-              <span className="library-reference-popover" role="note">
-                <strong>{referencedLibrary}</strong>
-                <span>{description}</span>
-                <b>{locale === 'zh' ? '查看该类库 →' : 'Open library →'}</b>
-              </span>
-            </Link>
-          )
-        }
-        if (errorCode && errorPath)
-          return (
-            <Link className="text-link" key={index} to={errorPath}>
-              <code>{value}</code>
-            </Link>
-          )
-        if (inlineCode) return <code key={index}>{value}</code>
-        return <Fragment key={index}>{part}</Fragment>
-      })
-  )
+      return (
+        <Link className="text-link" key={index} to={target!}>
+          {label}
+        </Link>
+      )
+    }
+    const inlineCode = part.startsWith('`') && part.endsWith('`')
+    const value = inlineCode ? part.slice(1, -1) : part
+    const errorCode = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value)
+    const referencedLibrary = crossLibraryReference(value, library)
+    if (referencedLibrary) {
+      const description = libraryReferenceDescription(locale, referencedLibrary)
+      return (
+        <Link
+          aria-label={`${value}：${description}`}
+          className="library-reference"
+          key={index}
+          title={description}
+          to={domainPath(locale, referencedLibrary)}
+        >
+          {inlineCode ? <code>{value}</code> : value}
+          <span className="library-reference-popover" role="note">
+            <strong>{referencedLibrary}</strong>
+            <span>{description}</span>
+            <b>{locale === 'zh' ? '查看该类库 →' : 'Open library →'}</b>
+          </span>
+        </Link>
+      )
+    }
+    if (errorCode && errorPath)
+      return (
+        <Link className="text-link" key={index} to={errorPath}>
+          <code>{value}</code>
+        </Link>
+      )
+    if (inlineCode) return <code key={index}>{value}</code>
+    return <Fragment key={index}>{part}</Fragment>
+  })
 }
 
 type IGuideApiGroup = {
@@ -4334,13 +4491,11 @@ function CodeBlock({
       className={explain ? 'explained-code annotated' : 'explained-code'}
       data-comment-count={explain ? commentary.notes.length : undefined}
       data-output={isOutput ? 'true' : undefined}
+      data-code-kind={
+        signature || commentaryContext?.kind === 'signature' ? 'signature' : 'example'
+      }
     >
-      <figure
-        className="code-frame"
-        data-code-kind={
-          signature || commentaryContext?.kind === 'signature' ? 'signature' : 'example'
-        }
-      >
+      <figure className="code-frame">
         <figcaption className="code-toolbar">
           <span className="code-language">
             {isOutput

@@ -333,16 +333,16 @@ const clientUser = new Resource(fetchUser, clientRuntime, { initialSnapshot: sna
         },
         markDirty: {
           summary: t(
-            'Called by the reactive runtime when a dependency changed; schedules one refresh for a batch of changes. Application code does not call it.',
-            '依赖变化时由响应式运行时调用；同一批变化只安排一次刷新。应用代码不需要调用。'
+            'Called by the reactive runtime when a dependency changed; schedules one refresh for a batch of changes; application code triggers this by updating the input rather than calling markDirty.',
+            '依赖变化时由响应式运行时调用，同一批变化只安排一次刷新；应用通过修改输入触发更新，无需调用 markDirty。'
           ),
           returns: t('Nothing; a refresh is scheduled.', '无返回值；已安排一次刷新。'),
           example: `// 由运行时调用，例如 userId.value = '2' 之后`
         },
         onDependencyDisconnected: {
           summary: t(
-            'Called by the reactive runtime when a dependency was disposed; forces a re-run so the failure becomes visible. Application code does not call it.',
-            '某个依赖被释放时由响应式运行时调用；强制重新执行，让失败能够被观察到。应用代码不需要调用。'
+            'Called by the reactive runtime when a dependency was disposed; forces a re-run so the failure becomes visible; the runtime invokes this hook when the dependency is disposed.',
+            '依赖被释放时由响应式运行时触发，应用无需直接调用；它安排强制重跑，使依赖失效可以被观察到。'
           ),
           returns: t('Nothing; a forced refresh is scheduled.', '无返回值；已安排一次强制刷新。'),
           example: `// 由运行时调用，例如 userId.dispose() 之后`

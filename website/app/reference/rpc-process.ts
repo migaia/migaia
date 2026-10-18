@@ -2306,13 +2306,21 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
         `staticAgreement.${side}.codec`,
         {
           summary: t(
-            'Fixed identity codec for an already-framed message transport; any other codec rejects configuration.',
-            '已分帧消息传输固定使用原值编解码器，其他编解码器会导致配置拒绝。'
+            side === 'local'
+              ? 'The local framed-message transport uses identity to preserve native message values; configuring a byte codec is rejected.'
+              : 'The expected peer profile must also name identity; a different peer codec cannot match this framed-message transport.',
+            side === 'local'
+              ? '本端的已分帧消息传输使用 identity 保留原生消息值，配置字节编解码器会被拒绝。'
+              : '预期对端配置也必须选择 identity；其他对端编解码器无法与这种已分帧消息传输匹配。'
           ),
           values: {
             identity: t(
-              'Preserve the carrier message value without byte encoding.',
-              '保留载体消息值，不进行字节编码。'
+              side === 'local'
+                ? 'Keep outgoing carrier message values unchanged instead of converting them to bytes.'
+                : 'Require the peer to keep message values unchanged, matching the local representation.',
+              side === 'local'
+                ? '本端发送时保持载体消息值，不把消息转换成字节。'
+                : '要求对端也保持消息值，使双方使用相同表示。'
             )
           }
         }
@@ -2321,8 +2329,12 @@ const processTransportDocs: Readonly<Record<string, IMemberDoc>> = {
         `staticAgreement.${side}.capabilities`,
         {
           summary: t(
-            'Caller-declared ordered capability list. Local and peer arrays must match element for element; no byte negotiation fills missing entries.',
-            '调用方声明的有序能力列表；双方数组必须逐项一致，不通过字节协商补入缺失能力。'
+            side === 'local'
+              ? 'Ordered capabilities declared for this local endpoint; the expected peer list must match every entry in this order.'
+              : 'Expected remote capability list, checked against the local list exactly; message transports do not negotiate missing entries.',
+            side === 'local'
+              ? '声明本端能力及其顺序；预期对端列表必须按相同顺序逐项匹配。'
+              : '预期远端提供的能力列表，必须与本端完全相同；消息传输不会通过协商补入缺失能力。'
           )
         }
       ]
