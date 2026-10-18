@@ -192,6 +192,13 @@ function projectSelectedApi(
   const { expanded, linked } =
     relatedTypes ??
     (selectedSymbol ? collectReferencedTypeNames(selectedSymbol, api.symbols) : noReferencedTypes)
+  /** Authored symbol references replace extractor descriptions in every configuration row. */
+  const symbolReferences = referenceFor(api.library)?.symbols
+  const hasAuthoredSymbol = Boolean(
+    selectedSymbol &&
+    (symbolReferences?.[`${api.module}:${selectedSymbol.name}`] ??
+      symbolReferences?.[selectedSymbol.name])
+  )
   return {
     id: api.id,
     library: api.library,
@@ -220,7 +227,7 @@ function projectSelectedApi(
       .map((symbol) =>
         selectedSymbol
           ? symbol === selectedSymbol
-            ? projectSelectedSymbol(symbol)
+            ? projectSelectedSymbol(symbol, hasAuthoredSymbol)
             : (symbol.kind === 'type' || symbol.kind === 'interface') && expanded.has(symbol.name)
               ? projectTypingSymbol(symbol)
               : symbol.kind === 'class' && expanded.has(symbol.name)
@@ -297,11 +304,8 @@ function projectTypingSymbol(symbol: IApiSymbol): IApiSymbol {
   }
 }
 
-/** Omits generator absence markers instead of shipping them as reader-facing prose. */
-function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
-  const undocumentedAdvanced = symbol.advanced.startsWith(
-    'No additional advanced behavior is declared for '
-  )
+/** Keeps declaration facts used by the detail view; generated narrative sections stay build-only. */
+function projectSelectedSymbol(symbol: IApiSymbol, hasAuthoredReference: boolean): IApiSymbol {
   return {
     name: symbol.name,
     kind: symbol.kind,
@@ -310,8 +314,9 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
     signature: symbol.signature,
     source: publicSourceName(symbol.source),
     purpose: symbol.purpose,
-    core: symbol.core,
-    advanced: undocumentedAdvanced ? '' : symbol.advanced,
+    // Focused reference articles render maintained prose, never these generated narrative copies.
+    core: '',
+    advanced: '',
     parameters: symbol.parameters,
     returns: symbol.returns,
     errors: symbol.errors.filter(
@@ -327,12 +332,18 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
     composes: symbol.composes,
     examples: symbol.examples,
     guidance: symbol.guidance,
-    configuration: symbol.configuration,
+    configuration: hasAuthoredReference
+      ? symbol.configuration.map((field) => ({
+          ...field,
+          // The field's type/flags remain; its maintained reference supplies the visible text.
+          description: '',
+          descriptionEn: undefined,
+          descriptionZh: undefined
+        }))
+      : symbol.configuration,
     whenToUse: symbol.whenToUse,
     notUse: symbol.notUse,
-    sections: symbol.sections.filter(
-      (section) => !(section.id === 'advanced-usage' && undocumentedAdvanced)
-    ),
+    sections: [],
     exportPath: symbol.exportPath,
     usageScore: symbol.usageScore
   }

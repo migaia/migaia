@@ -52,6 +52,8 @@ import {
 type IDocsLoaderData = ILibraryRouteContent & {
   readonly apiLinks?: readonly IGuideApiLink[]
   readonly guide?: IApiGuide
+  /** Search metadata may use a guide purpose even when the article uses authored reference text. */
+  readonly metaPurpose?: string
   readonly journey?: IGuideJourney
   readonly journeyTopics?: readonly { readonly title: string; readonly topic: string }[]
   readonly optionTranslations?: Readonly<Record<string, string>>
@@ -257,35 +259,40 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
       },
       apis: content.apis.filter((api) => !/^(?:internals|node-internals)$/.test(api.module))
     }
-  return content
-    ? {
-        ...content,
-        apiLinks,
-        guide,
-        journey: journeyExists
-          ? journeyModule.findGuideJourney(librarySlug, topic, guideLocale)
-          : undefined,
-        journeyTopics: journeyModule.listGuideJourneys(librarySlug, guideLocale),
-        optionTranslations,
-        optionFallbacks,
-        selectedTypeFragment: selectedType?.fragment,
-        reference: (() => {
-          /** Audited libraries render every API sentence from their reference file. */
-          const libraryReference = domain === 'docs' ? referenceFor(librarySlug) : undefined
-          return libraryReference
-            ? pageReference(
-                localizeReference(libraryReference, guideLocale),
-                selectedModule,
-                selectedApi?.symbols ?? [],
-                [selectedSymbol?.name, selectedType?.name].filter(
-                  (name): name is string => name !== undefined
-                ),
-                content.apis.flatMap((entry) => entry.symbols)
-              )
-            : undefined
-        })()
-      }
-    : null
+  if (!content) return null
+  /** The article's maintained reference owns its visible prose and configuration explanations. */
+  const libraryReference = domain === 'docs' ? referenceFor(librarySlug) : undefined
+  /** Keep the same two-layer reference projection used by the rendered article. */
+  const reference = libraryReference
+    ? pageReference(
+        localizeReference(libraryReference, guideLocale),
+        selectedModule,
+        selectedApi?.symbols ?? [],
+        [selectedSymbol?.name, selectedType?.name].filter(
+          (name): name is string => name !== undefined
+        ),
+        content.apis.flatMap((entry) => entry.symbols)
+      )
+    : undefined
+  /** Audited symbols never render fallback guides or the fallback field translation tables. */
+  const hasAuthoredSymbol = Boolean(
+    selectedSymbol && symbolDocFor(reference, selectedModule, selectedSymbol.name)
+  )
+  return {
+    ...content,
+    apiLinks,
+    guide: hasAuthoredSymbol ? undefined : guide,
+    metaPurpose: hasAuthoredSymbol ? guide?.purpose : undefined,
+    journey: journeyExists
+      ? journeyModule.findGuideJourney(librarySlug, topic, guideLocale)
+      : undefined,
+    journeyTopics: journeyModule.listGuideJourneys(librarySlug, guideLocale),
+    optionTranslations: hasAuthoredSymbol ? undefined : optionTranslations,
+    optionFallbacks: hasAuthoredSymbol ? undefined : optionFallbacks,
+    selectedTypeFragment: selectedType?.fragment,
+    // Runtime articles never render the module overview; module and type routes still need it.
+    reference: selectedSymbol && reference ? { ...reference, modules: {} } : reference
+  }
 }
 
 /** Uses the visible page purpose and canonical API identity for localized search metadata. */
@@ -326,7 +333,8 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, params })
   const purpose =
     domain === 'docs'
       ? symbol
-        ? (data.guide?.purpose ??
+        ? (data.metaPurpose ??
+          data.guide?.purpose ??
           localizedSymbolPurpose(locale, symbol) ??
           libraryReferenceDescription(locale, library.slug))
         : libraryReferenceDescription(locale, library.slug)
