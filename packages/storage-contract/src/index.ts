@@ -77,8 +77,4 @@ export {
   type IOperationContextSnapshot
 } from './operation-context.js'
 
-export { isArrayBuffer, isUint8Array, intrinsicConstructorName } from './bytes.js'
-export {
-  StorageContractConflictPolicy,
-  type IStorageContractConflictPolicy
-} from './policy-constants.js'
+export { intrinsicConstructorName } from './bytes.js'

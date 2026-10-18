@@ -137,7 +137,7 @@ if (isRecordStore(store)) {
 const records = asRecordStore<MyRecord>(store); // 不满足 L1 时抛 StorageContractError(unsupported)
 ```
 
-单参数 `store: IKeyValueStore`（必填），无选项；泛型 `T`（可选，默认 `unknown`）指定记录值类型。失败时抛 `StorageContractError`，`code: 'UNSUPPORTED_CAPABILITY'`，`details.backend` 为探测到的后端（探测失败则为 `undefined`）。
+单参数 `store: IKeyValueStore`（必填），无选项；泛型 `T`（可选，默认 `unknown`）指定记录值类型。失败时抛 `StorageContractError`，访问器失败的原始对象保留在 `cause`，`code: 'UNSUPPORTED_CAPABILITY'`，`error.backend` 为探测到的后端（探测失败则为 `undefined`）。
 
 ---
 
@@ -160,13 +160,15 @@ import {
 if (store.capabilities.binary) await store.setBytes('k', bytes);
 ```
 
-全部字段（均为只读布尔，除 `maxValueBytes`）：
+全部 9 个字段（均为只读布尔，除 `maxValueBytes`）：
 
 - `syncRead: boolean`
 - `binary: boolean`
 - `records: boolean`
 - `transactions: boolean`
 - `iteration: boolean`
+- `secondaryIndexes: boolean` —— 逻辑二级索引能力
+- `changeFeed: boolean` —— 提交后失效通知能力
 - `maxValueBytes: number | undefined` —— 单值近似字节上限；`undefined` 表示受配额而非单值限制（如 IndexedDB）
 - `opaqueEntries: boolean` —— 该后端上是否可能存在不可见的键（如 cookies 的 HttpOnly）
 
@@ -176,7 +178,7 @@ if (store.capabilities.binary) await store.setBytes('k', bytes);
 const capabilities = snapshotStorageCapabilities(raw); // 合法则返回新对象快照，否则 undefined
 ```
 
-单参数 `value: unknown`（必填），无选项。字段访问抛错、类型不符（布尔字段非布尔，或 `maxValueBytes` 不是非负安全整数/`undefined`）都返回 `undefined`，不抛错。
+单参数 `value: unknown`（必填），无选项。旧描述器可省略 `secondaryIndexes`/`changeFeed`，快照将其规范化为 `false`。字段访问或反射抛错、类型不符（其余布尔字段非布尔，或 `maxValueBytes` 不是非负安全整数/`undefined`）都返回 `undefined`，不抛错。
 
 **`isStorageCapabilities`｜3 秒上手** —— 类型守卫，等价于 `snapshotStorageCapabilities(value) !== undefined`：
 
@@ -219,8 +221,8 @@ await store.get('theme', { timeoutMs: 500 });
 
 全部字段：
 
-- `signal?: IAbortSignal` —— 协作式取消，后端可忽略但调用方一定以 `AbortError` 结束等待
-- `timeoutMs?: number` —— 便捷超时，内部合成为 `signal`；与外部 `signal` 同时存在取先触发者
+- `signal?: IAbortSignal` —— 协作式取消，取消感知操作以契约 `ABORTED` 停止等待；不保证原生 `AbortError` 类，进入原子提交后返回真实结局
+- `timeoutMs?: number` —— 由实现层处理的便捷超时；契约包仅校验，不创建计时器或取消引擎
 - `pageSize?: number` —— IndexedDB 等迭代器的分页大小，`1`~`4096` 之间的整数
 
 **`IWriteOptions`｜3 秒上手** —— `IOperationContext` 之上追加 `conflictPolicy?: IConflictPolicy`（默认 `'conflict'`）：
@@ -384,7 +386,7 @@ const restored = await collectionsJsonCodec.decode(raw); // Map 实例
 **`snapshotCodec`｜5 秒上手** —— 读一次并校验未知值是否满足 `ICodec` 形状：
 
 ```ts
-const codec = snapshotCodec(candidate); // 校验后原样返回（浅拷贝出的 4 字段对象）
+const codec = snapshotCodec(candidate); // 校验后返回浅拷贝出的 4 字段新对象，函数引用保持且不绑定旧 receiver
 ```
 
 单参数 `codec: unknown`（必填），无选项。`name` 非空字符串、`output` 属于三值之一、`encode`/`decode` 均为函数，否则抛 `StorageContractError(invalidArgument)`。
@@ -437,7 +439,7 @@ assertTransactionCallback(run, 'memory'); // 非函数抛 invalidArgument
 const policy = readTransactionConflictPolicy(options, 'indexeddb'); // 'conflict' | 'replace'
 ```
 
-参数：`options: unknown`（必填，可为 `undefined`）、`backend: IBackendKind`（必填）。非法值（既不是 `undefined` 也不是 `'conflict'`/`'replace'`）抛 `StorageContractError(invalidArgument)`。
+参数：`options: unknown`（必填，可为 `undefined`）、`backend: IBackendKind`（必填）。非法值（不是 `undefined` 或含可选 `conflictPolicy` 的对象，或该字段不在 `'conflict'`/`'replace'`/`undefined` 中；直接传策略字符串也非法）抛 `StorageContractError(invalidArgument)`。
 
 ---
 
@@ -491,40 +493,22 @@ if (isStorageContractError(error)) console.log(error.code);
 
 <a id="bytes-模块"></a>
 
-## `bytes` / `policy-constants` 模块：底层工具
+## `bytes` 模块：诊断工具
 
 ```ts
-import {
-  isArrayBuffer,
-  isUint8Array,
-  intrinsicConstructorName,
-  StorageContractConflictPolicy,
-  type IStorageContractConflictPolicy
-} from '@migaia/storage-contract';
+import { intrinsicConstructorName, ConflictPolicy, type IConflictPolicy } from '@migaia/storage-contract';
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes';
 ```
 
-**`isUint8Array` / `isArrayBuffer`｜3 秒上手** —— `@migaia/utils/bytes` 所有的内部槽品牌检测；本包只做函数身份不变的兼容 re-export：
+字节品牌检测直接使用 `@migaia/utils/bytes` 的 canonical 入口；本包不再转出同名 guard。策略常量与类型统一使用 `ConflictPolicy` / `IConflictPolicy`，无重复对象或兼容别名。
 
-```ts
-isUint8Array(new Uint8Array()); // true
-isArrayBuffer(new ArrayBuffer(1)); // true
-```
-
-单参数 `value: unknown`（必填），无选项。
-
-**`intrinsicConstructorName`｜3 秒上手** —— 兼容保留的尽力诊断 helper：
+**`intrinsicConstructorName`｜3 秒上手** —— 尽力诊断 helper：
 
 ```ts
 intrinsicConstructorName(new Date()); // 'Date'
 ```
 
 单参数 `value: unknown`（必填），无选项。非对象/`null`/访问失败返回 `undefined`。它会观察可篡改的原型、`constructor` 与 `name`，不得用于安全、类型或协议判定。
-
-**`StorageContractConflictPolicy`｜3 秒上手** —— 与 `ConflictPolicy` 同值的常量对象（供不想引入 `context` 模块类型的场景使用）：
-
-```ts
-StorageContractConflictPolicy.replace; // 'replace'
-```
 
 ---
 

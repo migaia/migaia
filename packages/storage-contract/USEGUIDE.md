@@ -144,7 +144,7 @@ type IStorageCapabilities = {
 function snapshotStorageCapabilities(value: unknown): IStorageCapabilities | undefined;
 ```
 
-读一次候选值的全部 7 个字段并校验类型；`maxValueBytes` 必须是非负安全整数或 `undefined`，其余字段必须是 `boolean`。任一字段访问抛错、类型不符时返回 `undefined`（不抛错）；合法时返回新构造的快照对象（非原值引用）。
+读一次候选值的全部 9 个字段并校验类型；`maxValueBytes` 必须是非负安全整数或 `undefined`，`secondaryIndexes`/`changeFeed` 可在旧描述器中省略并规范化为 `false`，其余字段必须是 `boolean`。任一字段访问抛错、类型不符时返回 `undefined`（不抛错）；合法时返回新构造的快照对象（非原值引用）。
 
 ```ts
 function isStorageCapabilities(value: unknown): value is IStorageCapabilities;
@@ -177,7 +177,7 @@ type IKeyRange = {
 };
 ```
 
-`IOperationContext` 是所有公开异步方法的最后一个可选参数：`signal` 是协作式取消（后端可忽略，但调用方一定以 `AbortError` 结束等待；结构化信号类型，不引全局 `AbortSignal`）；`timeoutMs` 是便捷超时，内部合成为 `signal`，与外部 `signal` 同时存在时取先触发者；`pageSize` 限定迭代器的分页大小（IndexedDB 等），用于保护游标内存。`ISyncWriteOptions` 是同步写唯一支持的选项形状——不接受 `signal`/`timeoutMs`（同步调用无法协作式取消或超时）。
+`IOperationContext` 是所有公开异步方法的最后一个可选参数：`signal` 是协作式取消（取消感知操作以契约 `ABORTED` 停止等待，不保证原生 `AbortError` 类；进入原子提交后返回真实结局；结构化信号类型，不引全局 `AbortSignal`）；`timeoutMs` 是由实现层处理的便捷超时，契约包只校验，不创建计时器或取消引擎；`pageSize` 限定迭代器的分页大小（IndexedDB 等），用于保护游标内存。`ISyncWriteOptions` 是同步写唯一支持的选项形状——不接受 `signal`/`timeoutMs`（同步调用无法协作式取消或超时）。
 
 ```ts
 function snapshotOperationContext(
@@ -198,7 +198,7 @@ function snapshotSyncWriteOptions(options: unknown): { readonly conflictPolicy?:
 function assertSyncWriteOptions(options: unknown): void;
 ```
 
-校验同步写选项：`options` 必须是对象或 `undefined`；一旦出现 `signal` 或 `timeoutMs`（即使值为 `undefined` 以外的任何值也不行，只要属性存在即报错）立即抛 `StorageContractError(invalidArgument)`；`conflictPolicy` 校验同上。
+校验同步写选项：`options` 必须是对象或 `undefined`；`signal` 或 `timeoutMs` 的值非 `undefined` 时立即抛 `StorageContractError(invalidArgument)`；`conflictPolicy` 校验同上。显式 `{ signal: undefined, timeoutMs: undefined }` 被接纳；额外 `pageSize` 不读取、被忽略，并不提供同步分页。
 
 ```ts
 snapshotSyncWriteOptions({ conflictPolicy: 'replace' }); // { conflictPolicy: 'replace' }
@@ -280,7 +280,7 @@ import {
 function snapshotCodec(codec: unknown): ICodec;
 ```
 
-读一次并校验：`codec` 必须是普通对象；`name` 必须是非空字符串（trim 后非空）；`output` 必须属于 `['text','binary','structured']`；`encode`/`decode` 必须是函数。返回浅拷贝出的 4 字段新对象（`{ name, output, encode, decode }`），不透传原对象引用。不合法抛 `StorageContractError(code: 'INVALID_ARGUMENT')`。
+读一次并校验：`codec` 必须是非空、非数组的结构对象（接纳符合形状的 class 实例）；`name` 必须是非空字符串（trim 后非空）；`output` 必须属于 `['text','binary','structured']`；`encode`/`decode` 必须是函数。返回浅拷贝出的 4 字段新对象（`{ name, output, encode, decode }`），不透传原对象引用。不合法抛 `StorageContractError(code: 'INVALID_ARGUMENT')`。
 
 ```ts
 function assertCodec(codec: unknown): asserts codec is ICodec;
@@ -372,27 +372,19 @@ function isStorageContractError(value: unknown): value is StorageContractError;
 
 <a id="bytes-模块"></a>
 
-## `bytes` / `policy-constants` 模块
+## `bytes` 模块
 
-```ts
-function isUint8Array(value: unknown): value is Uint8Array;
-function isArrayBuffer(value: unknown): value is ArrayBuffer;
-```
-
-两个 guard 由 `@migaia/utils/bytes` 所有，本包仅做函数身份不变的兼容 re-export。实现调用 ECMAScript intrinsic 的内部槽 getter，不依赖 `instanceof`，也不信任候选值可篡改的原型、`constructor.name` 或 `Symbol.toStringTag`；合法跨 iframe/Worker realm 实例和子类会被接受，其他 TypedArray、`DataView`、`SharedArrayBuffer`、Proxy 与外形伪造对象会被拒绝。detached 对象仍保留品牌，字节可用性须由调用方另行判断。
+字节 guard 直接从 `@migaia/utils/bytes` 导入，不再从本包转出。它们使用 intrinsic 内部槽检测，不信任可篡改的原型；detached 对象仍保留品牌，字节可用性须另行判断。
 
 ```ts
 function intrinsicConstructorName(value: unknown): string | undefined;
 ```
 
-该 helper 只为兼容诊断保留，会观察可篡改的原型、`constructor` 与 `name`；非对象、`null`、或读取过程抛错返回 `undefined`。它不得用于安全、类型或协议判定。
+该 helper 仅供尽力诊断，会观察可篡改的原型、`constructor` 与 `name`；非对象、`null`、或读取过程抛错返回 `undefined`。不得用于安全、类型或协议判定。
 
-```ts
-const StorageContractConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;
-type IStorageContractConflictPolicy = 'conflict' | 'replace';
-```
+冲突策略统一从本包导入 `ConflictPolicy` / `IConflictPolicy`，不保留重复常量对象或类型别名。
 
-与 `context` 模块的 `ConflictPolicy`/`IConflictPolicy` 是同名同值的独立导出，供不想引入 `IOperationContext` 等类型的调用点单独使用。
+三个能力断言 `asRecordStore` / `asSecondaryIndexRecordStore` / `asChangeFeedStore` 在准入失败时抛 `UNSUPPORTED_CAPABILITY`；若反射或访问器抛错，精确原始对象保留在标准 `cause`。轻量谓词与快照返回失败结果，Detailed 准入同时保留 `cause`。
 
 ---
 

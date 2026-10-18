@@ -106,22 +106,22 @@ export type IKeyValueStoreAdmission =
       readonly cause: unknown
     }
 
-/** Inspect each public store field once and never leak accessor failures from a predicate. */
-const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspection => {
-  if (typeof store !== 'object' || store === null || Array.isArray(store))
-    return {
-      valid: false,
-      backend: undefined,
-      capabilities: undefined,
-      dispose: undefined,
-      cause: undefined
-    }
+/** Internal admission owner shared by record extensions; retain reflection and getter failures. */
+export const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspection => {
   const candidate = store as Record<string, unknown>
   let backend: unknown
   let capabilitiesValue: unknown
   let methods: unknown[]
   let dispose: unknown
   try {
+    if (typeof store !== 'object' || store === null || Array.isArray(store))
+      return {
+        valid: false,
+        backend: undefined,
+        capabilities: undefined,
+        dispose: undefined,
+        cause: undefined
+      }
     backend = candidate.backend
     capabilitiesValue = candidate.capabilities
     methods = ['get', 'set', 'remove', 'has', 'keys', 'clearValues', 'clearAll'].map(
@@ -246,7 +246,8 @@ export const asRecordStore = <T = unknown>(store: IKeyValueStore): IRecordStore<
   const inspection = inspectStoreShape(store, true)
   if (!inspection.valid)
     throw new StorageContractError(StorageContractErrorCode.unsupported, {
-      backend: inspection.backend
+      backend: inspection.backend,
+      cause: inspection.cause
     })
   return store as IRecordStore<T>
 }

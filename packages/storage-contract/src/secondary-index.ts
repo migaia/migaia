@@ -1,5 +1,5 @@
 import type { IKeyRange, IOperationContext, IStorageKey, IWriteOptions } from './context.js'
-import { snapshotRecordStore, type IRecordStore } from './store.js'
+import { inspectStoreShape, type IRecordStore } from './store.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 
 export type IRecordIndexDefinition = {
@@ -79,20 +79,22 @@ const SECONDARY_INDEX_METHODS = [
   'transactionIndexed'
 ] as const
 
-const inspectSecondaryIndexShape = <T>(value: unknown) => {
-  const snapshot = snapshotRecordStore<T>(value)
-  if (snapshot === undefined) return undefined
+/** Compose canonical record admission without discarding its original reflection/getter failure. */
+const inspectSecondaryIndexShape = (value: unknown) => {
+  /** This module adds only extension checks; base record requirements stay owned by store.ts. */
+  const snapshot = inspectStoreShape(value, true)
+  if (!snapshot.valid || snapshot.capabilities === undefined) return snapshot
   try {
     if (
       snapshot.capabilities.secondaryIndexes === true &&
       SECONDARY_INDEX_METHODS.every(
-        (name) => typeof (snapshot.store as Record<string, unknown>)[name] === 'function'
+        (name) => typeof (value as Record<string, unknown>)[name] === 'function'
       )
     )
       return snapshot
-    return undefined
-  } catch {
-    return undefined
+    return { ...snapshot, valid: false }
+  } catch (cause) {
+    return { ...snapshot, valid: false, cause }
   }
 }
 
@@ -100,14 +102,15 @@ const inspectSecondaryIndexShape = <T>(value: unknown) => {
 export const asSecondaryIndexRecordStore = <T = unknown>(
   store: IRecordStore<T>
 ): ISecondaryIndexRecordStore<T> => {
-  const snapshot = inspectSecondaryIndexShape<T>(store)
-  if (snapshot === undefined)
+  const snapshot = inspectSecondaryIndexShape(store)
+  if (!snapshot.valid)
     throw new StorageContractError(StorageContractErrorCode.unsupported, {
-      backend: undefined
+      backend: undefined,
+      cause: snapshot.cause
     })
-  return snapshot.store as ISecondaryIndexRecordStore<T>
+  return store as ISecondaryIndexRecordStore<T>
 }
 
 /** Check secondary-index capability without invoking backend operations. */
 export const isSecondaryIndexRecordStore = (store: unknown): store is ISecondaryIndexRecordStore =>
-  inspectSecondaryIndexShape(store) !== undefined
+  inspectSecondaryIndexShape(store).valid

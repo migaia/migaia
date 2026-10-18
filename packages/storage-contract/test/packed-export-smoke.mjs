@@ -11,7 +11,10 @@ const utilsDirectory = resolve(contractDirectory, '../utils')
 /** Isolated consumer workspace proving packed packages instead of workspace source. */
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-storage-contract-packed-'))
 
-/** Packs both packages, installs them by symlink in an isolated consumer, and checks identity. */
+/**
+ * Packs both packages, installs them by symlink in an isolated consumer, and checks the canonical
+ * byte owner and collection codec.
+ */
 function main() {
   try {
     const packDirectory = join(smokeDirectory, 'pack')
@@ -63,7 +66,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      "import { collectionsJsonCodec, isArrayBuffer as contractBuffer, isUint8Array as contractBytes } from '@migaia/storage-contract'\nimport { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'\nif (contractBuffer !== utilsBuffer || contractBytes !== utilsBytes) throw new Error('brand identity mismatch')\nconst originalClone = globalThis.structuredClone\nlet cloneCalls = 0\nglobalThis.structuredClone = (value) => { cloneCalls += 1; return originalClone(value) }\nlet nested = { leaf: 'ok' }\nfor (let index = 0; index < 128; index += 1) nested = { next: nested }\nconst encoded = await collectionsJsonCodec.encode(nested)\nif (cloneCalls !== 0 || !encoded.includes('\\\"leaf\\\":\\\"ok\\\"')) throw new Error('codec clone budget exceeded')\n",
+      "import { collectionsJsonCodec } from '@migaia/storage-contract'\nimport { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'\nif (!utilsBuffer(new ArrayBuffer(1)) || !utilsBytes(new Uint8Array(1))) throw new Error('canonical byte owner mismatch')\nconst originalClone = globalThis.structuredClone\nlet cloneCalls = 0\nglobalThis.structuredClone = (value) => { cloneCalls += 1; return originalClone(value) }\nlet nested = { leaf: 'ok' }\nfor (let index = 0; index < 128; index += 1) nested = { next: nested }\nconst encoded = await collectionsJsonCodec.encode(nested)\nif (cloneCalls !== 0 || !encoded.includes('\\\"leaf\\\":\\\"ok\\\"')) throw new Error('codec clone budget exceeded')\n",
       'utf8'
     )
     execFileSync(process.execPath, ['identity.mjs'], { cwd: consumerDirectory, stdio: 'inherit' })

@@ -1,5 +1,5 @@
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { isArrayBuffer } from './bytes.js'
+import { isArrayBuffer } from '@migaia/utils/bytes'
 import type { IBackendKind } from './capabilities.js'
 import type { IKeyRange, IStorageKey } from './context.js'
 

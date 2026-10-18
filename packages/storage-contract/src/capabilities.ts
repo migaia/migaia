@@ -26,8 +26,6 @@ export type IStorageCapabilitiesInspection = {
 
 /** Inspect capability accessors once while retaining a hostile getter failure for boundary owners. */
 const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspection => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return { value: undefined, cause: undefined }
   const candidate = value as Record<string, unknown>
   let syncRead: unknown
   let binary: unknown
@@ -39,6 +37,8 @@ const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspect
   let secondaryIndexes: unknown
   let changeFeed: unknown
   try {
+    if (typeof value !== 'object' || value === null || Array.isArray(value))
+      return { value: undefined, cause: undefined }
     syncRead = candidate.syncRead
     binary = candidate.binary
     records = candidate.records

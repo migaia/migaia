@@ -1,6 +1,8 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import type { IConflictPolicy, IOperationContext } from './context.js'
+import { ConflictPolicy } from './context.js'
+import { StorageContractErrorText } from './error-text.js'
 
 type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown
@@ -69,9 +71,13 @@ export const snapshotOperationContext = (
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new RangeError('pageSize must be an integer between 1 and 4096')
     })
-  if (conflictPolicy !== undefined && conflictPolicy !== 'conflict' && conflictPolicy !== 'replace')
+  if (
+    conflictPolicy !== undefined &&
+    conflictPolicy !== ConflictPolicy.conflict &&
+    conflictPolicy !== ConflictPolicy.replace
+  )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause: new TypeError('conflictPolicy must be conflict or replace')
+      cause: new TypeError(StorageContractErrorText.conflictPolicy)
     })
   const snapshot: IOperationContextSnapshot = Object.freeze({
     signal: signal as IAbortSignal | undefined,
@@ -92,13 +98,6 @@ export const assertOperationContext = (ctx: IOperationValidationContext | undefi
 export const snapshotSyncWriteOptions = (
   options: unknown
 ): { readonly conflictPolicy?: IConflictPolicy } => {
-  if (
-    options !== undefined &&
-    (typeof options !== 'object' || options === null || Array.isArray(options))
-  )
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause: new TypeError('sync write options must be an object')
-    })
   const candidate = options as
     | { readonly signal?: unknown; readonly timeoutMs?: unknown; readonly conflictPolicy?: unknown }
     | undefined
@@ -106,6 +105,11 @@ export const snapshotSyncWriteOptions = (
   let timeoutMs: unknown
   let conflictPolicy: unknown
   try {
+    if (
+      options !== undefined &&
+      (typeof options !== 'object' || options === null || Array.isArray(options))
+    )
+      throw new TypeError(StorageContractErrorText.syncWriteObject)
     signal = candidate?.signal
     timeoutMs = candidate?.timeoutMs
     conflictPolicy = candidate?.conflictPolicy
@@ -114,11 +118,15 @@ export const snapshotSyncWriteOptions = (
   }
   if (signal !== undefined || timeoutMs !== undefined)
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause: new TypeError('sync writes do not support signal or timeoutMs')
+      cause: new TypeError(StorageContractErrorText.syncWriteContext)
     })
-  if (conflictPolicy !== undefined && conflictPolicy !== 'conflict' && conflictPolicy !== 'replace')
+  if (
+    conflictPolicy !== undefined &&
+    conflictPolicy !== ConflictPolicy.conflict &&
+    conflictPolicy !== ConflictPolicy.replace
+  )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause: new TypeError('conflictPolicy must be conflict or replace')
+      cause: new TypeError(StorageContractErrorText.conflictPolicy)
     })
   return { conflictPolicy: conflictPolicy as IConflictPolicy | undefined }
 }

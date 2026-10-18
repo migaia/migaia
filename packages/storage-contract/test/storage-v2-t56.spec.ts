@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isArrayBuffer as contractIsArrayBuffer,
-  isUint8Array as contractIsUint8Array
-} from '../src/index.js'
+import * as contract from '../src/index.js'
 import {
   isArrayBuffer as utilsIsArrayBuffer,
   isUint8Array as utilsIsUint8Array
 } from '@migaia/utils/bytes'
 
 describe('SWV2-T56 byte-brand ownership', () => {
-  it('keeps compatibility exports identical to the utils owner', () => {
-    expect(contractIsUint8Array).toBe(utilsIsUint8Array)
-    expect(contractIsArrayBuffer).toBe(utilsIsArrayBuffer)
+  it('uses the utils owner without exporting compatibility aliases', () => {
+    expect(contract).not.toHaveProperty('isUint8Array')
+    expect(contract).not.toHaveProperty('isArrayBuffer')
+    expect(utilsIsUint8Array(new Uint8Array())).toBe(true)
+    expect(utilsIsArrayBuffer(new ArrayBuffer(1))).toBe(true)
   })
 })

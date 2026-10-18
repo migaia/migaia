@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isUint8Array } from '../src/bytes.js'
+import { isUint8Array } from '@migaia/utils/bytes'
 
 describe('SWV2-T55 byte-brand red baseline', () => {
   it('rejects a real non-Uint8 view whose mutable prototype claims Uint8Array', () => {
