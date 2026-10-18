@@ -237,14 +237,17 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g
  * page keeps: its module doc; a purpose-only entry for every symbol of its module (listing and
  * links); and full docs for the selected symbol plus every reference entry its declaration reaches
  * through type names (options types, returned instances, member types, enums, enhancer guides).
- * `declarations` are the manifest symbols of the selected module; `roots` are the selected symbol
- * and type names (empty on a module page).
+ * `declarations` are the manifest symbols listed by the selected module; `roots` are the selected
+ * symbol and type names (empty on a module page). `dependencies` also includes declarations from
+ * sibling entries already projected for this page, so their reached docs stay available without
+ * adding unrelated modules or library-wide reference bodies to the loader payload.
  */
 export function pageReference(
   reference: ILocalizedReference,
   module: string,
   declarations: readonly Readonly<{ name: string }>[],
-  roots: readonly string[]
+  roots: readonly string[],
+  dependencies: readonly Readonly<{ name: string }>[] = declarations
 ): ILocalizedReference {
   /** Strips the `module:` qualifier so qualified and bare keys match one declaration name. */
   const bare = (key: string) => key.slice(key.lastIndexOf(':') + 1)
@@ -263,7 +266,7 @@ export function pageReference(
     if (reached.has(name)) continue
     reached.add(name)
     /** Declaration text plus the doc fields that name other types. */
-    const texts = declarations
+    const texts = dependencies
       .filter((declaration) => declaration.name === name)
       .map((declaration) => JSON.stringify(declaration))
     for (const [key, doc] of Object.entries(reference.symbols))

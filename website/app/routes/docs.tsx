@@ -276,7 +276,8 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
                 selectedApi?.symbols ?? [],
                 [selectedSymbol?.name, selectedType?.name].filter(
                   (name): name is string => name !== undefined
-                )
+                ),
+                content.apis.flatMap((entry) => entry.symbols)
               )
             : undefined
         })()
@@ -514,8 +515,16 @@ function DocsLibrary({
         Boolean(primaryExample(selectedGuide, selectedSymbol, api!.library)),
         [...api!.symbols, ...libraryApis.flatMap((entry) => entry.symbols)],
         Boolean(reference?.enhancers[selectedSymbol.name]),
-        Boolean(aliasedInstanceSurface(selectedSymbol, api!.symbols, reference)),
-        symbolDocFor(reference, api!.module, selectedSymbol.name)
+        Boolean(
+          aliasedInstanceSurface(selectedSymbol, api!.symbols, reference) ||
+          (selectedSymbol.kind === 'const' &&
+            instanceGuideFor(reference, api!.module, selectedSymbol.name))
+        ),
+        symbolDocFor(reference, api!.module, selectedSymbol.name),
+        Boolean(
+          reference?.enums[`${api!.module}:${selectedSymbol.name}`] ??
+          reference?.enums[selectedSymbol.name]
+        )
       )
     : api
       ? moduleReferenceSections(library.documentation, api)
@@ -1133,7 +1142,8 @@ function referenceSections(
   symbols: readonly IApiSymbol[] = [],
   hasInstalledCapabilities = false,
   hasAliasedSurface = false,
-  symbolDoc?: ILocalizedSymbolDoc
+  symbolDoc?: ILocalizedSymbolDoc,
+  hasValueGuide = false
 ): string[] {
   /** Audited pages derive their inventory from the reference doc alone. */
   if (symbolDoc)
@@ -1141,8 +1151,10 @@ function referenceSections(
       'overview',
       ...(symbolDoc.example ? ['quick-start'] : []),
       ...(Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns ? ['contract'] : []),
-      ...(constantMembers(symbol).length > 0 ? ['values'] : []),
-      ...(symbol.configuration.length > 0 ? ['configuration'] : []),
+      ...(constantMembers(symbol).length > 0 || hasValueGuide ? ['values'] : []),
+      ...(symbol.configuration.length > 0 || Object.keys(symbolDoc.options).length > 0
+        ? ['configuration']
+        : []),
       ...(hasInstalledCapabilities ? ['installed'] : []),
       ...((symbol.kind === 'class' && instanceSurface(symbol, symbols).members.length > 0) ||
       hasAliasedSurface
@@ -1203,8 +1215,10 @@ function ModuleOverview({
   const selectedType = selectedTypeFragment
     ? api.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)
     : undefined
+  /** Already-projected sibling declarations supply inherited and composed public members. */
+  const surfaceSymbols = [...api.symbols, ...libraryApis.flatMap((entry) => entry.symbols)]
   /** Resolved members of the selected type, merged across the types it composes. */
-  const selectedSurface = selectedType ? instanceSurface(selectedType, api.symbols) : undefined
+  const selectedSurface = selectedType ? instanceSurface(selectedType, surfaceSymbols) : undefined
   const moduleSymbols = Array.from(
     new Map(api.symbols.map((symbol) => [symbol.fragment, symbol])).values()
   )
@@ -1254,7 +1268,7 @@ function ModuleOverview({
           bases={selectedSurface.bases}
           libraryApis={libraryApis}
           locale={locale}
-          guide={surfaceGuideFor(reference, api.module, selectedType, api.symbols)}
+          guide={surfaceGuideFor(reference, api.module, selectedType, surfaceSymbols)}
           memberDoc={memberDocResolver(reference, api.module, selectedSurface.owners)}
           members={selectedSurface.members}
           strict={Boolean(reference)}
@@ -1516,6 +1530,21 @@ function TypeExpression({
   )
 }
 
+/** Resolves a declaration's actual module before constructing its collision-aware public route. */
+function symbolReferencePath(
+  locale: ILocale,
+  api: IApi,
+  libraryApis: readonly IApi[],
+  symbol: IApiSymbol
+): string {
+  /** Fragment identity distinguishes same-named declarations exported by different modules. */
+  const owner =
+    [api, ...libraryApis].find((candidate) =>
+      candidate.symbols.some((entry) => entry.fragment === symbol.fragment)
+    ) ?? api
+  return docsModulePath(locale, api.library, owner.module, symbolSlug(symbol, owner.symbols))
+}
+
 /** Reader-facing label for each enhancer kind. */
 const enhancerKindLabels: Readonly<
   Record<ILocalizedEnhancerDoc['kind'], readonly [string, string]>
@@ -1587,49 +1616,13 @@ function InstalledCapabilities({
                 <p>
                   <InlineText library={api.library} locale={locale} text={grant.summary} />
                 </p>
-                <dl className="option-meta class-member-meta">
-                  {Object.keys(grant.params).length > 0 ? (
-                    <div>
-                      <dt>{locale === 'zh' ? '参数' : 'Parameters'}</dt>
-                      <dd>
-                        <ul>
-                          {Object.entries(grant.params).map(([name, text]) => (
-                            <li key={name}>
-                              <code>{name}</code>
-                              {' — '}
-                              <InlineText library={api.library} locale={locale} text={text} />
-                            </li>
-                          ))}
-                        </ul>
-                      </dd>
-                    </div>
-                  ) : null}
-                  {grant.returns ? (
-                    <div>
-                      <dt>{locale === 'zh' ? '返回' : 'Returns'}</dt>
-                      <dd>
-                        <InlineText library={api.library} locale={locale} text={grant.returns} />
-                      </dd>
-                    </div>
-                  ) : null}
-                  {grant.whenToUse ? (
-                    <div>
-                      <dt>{locale === 'zh' ? '何时使用' : 'When to use'}</dt>
-                      <dd>
-                        <InlineText library={api.library} locale={locale} text={grant.whenToUse} />
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-                {grant.example ? (
-                  <CodeBlock
-                    code={grant.example}
-                    label={
-                      locale === 'zh' ? `${grant.signature} 示例` : `${grant.signature} example`
-                    }
-                    locale={locale}
-                  />
-                ) : null}
+                <ReferenceMemberDetails
+                  api={api}
+                  doc={grant}
+                  libraryApis={libraryApis}
+                  locale={locale}
+                  name={grant.signature}
+                />
               </section>
             ))}
           </div>
@@ -1705,7 +1698,7 @@ function ClassMemberReference({
   readonly strict?: boolean
   readonly symbol: IApiSymbol
 }) {
-  if (members.length === 0 && bases.length === 0) return null
+  if (members.length === 0 && bases.length === 0 && !guide) return null
   /** Section anchor shared by the outline and member entry ids. */
   const sectionId = id ?? `${symbol.fragment}--members`
   /** Locale labels used by every member entry. */
@@ -1752,7 +1745,7 @@ function ClassMemberReference({
       <div className="option-reference class-member-reference">
         {members.map((member, index) => {
           /** Reference doc for this member; overloads share it. */
-          const doc = memberDoc?.(member.name)
+          const doc = memberDoc?.(member.name) ?? guide?.members[member.name]
           /** Usage notes and the snippet render once, on the first overload. */
           const firstOverload =
             members.findIndex((candidate) => candidate.name === member.name) === index
@@ -1787,106 +1780,190 @@ function ClassMemberReference({
                 label={label(`${member.name} signature`, `${member.name} 签名`)}
                 locale={locale}
               />
-              <dl className="option-meta class-member-meta">
-                {member.kind === 'method' ? (
-                  <div>
-                    <dt>{label('Parameters', '参数')}</dt>
-                    <dd>
-                      {member.parameterDetails.length === 0 ? (
-                        label('None', '无')
-                      ) : (
-                        <ul className="member-parameters">
-                          {member.parameterDetails.map((parameter, parameterIndex) => (
-                            <li key={`${parameter.name}:${parameterIndex}`}>
-                              <code>
-                                {parameter.name}
-                                {parameter.optional ? '?' : ''}
-                              </code>
-                              {': '}
-                              <TypeExpression
-                                api={api}
-                                libraryApis={libraryApis}
-                                locale={locale}
-                                value={parameter.type}
-                              />
-                              {doc?.params[parameter.name] ? (
-                                <>
-                                  {' — '}
-                                  <InlineText
-                                    library={api.library}
-                                    locale={locale}
-                                    text={doc.params[parameter.name]!}
-                                  />
-                                </>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt>
-                    {member.kind === 'method' ? label('Returns', '返回') : label('Type', '类型')}
-                  </dt>
-                  <dd>
-                    <TypeExpression
-                      api={api}
-                      libraryApis={libraryApis}
-                      locale={locale}
-                      value={member.returns}
-                    />
-                    {doc?.returns ? (
-                      <>
-                        {' — '}
-                        <InlineText library={api.library} locale={locale} text={doc.returns} />
-                      </>
-                    ) : null}
-                  </dd>
-                </div>
-                {doc?.default ? (
-                  <div>
-                    <dt>{label('Default', '默认值')}</dt>
-                    <dd>
-                      <InlineText library={api.library} locale={locale} text={doc.default} />
-                    </dd>
-                  </div>
-                ) : null}
-                {doc && doc.values.length > 0 ? (
-                  <div>
-                    <dt>{label('Values', '可选值')}</dt>
-                    <dd>
-                      <ValueList
-                        library={api.library}
-                        locale={locale}
-                        symbols={api.symbols}
-                        values={doc.values}
-                      />
-                    </dd>
-                  </div>
-                ) : null}
-                {firstOverload && doc?.whenToUse ? (
-                  <div>
-                    <dt>{label('When to use', '何时使用')}</dt>
-                    <dd>
-                      <InlineText library={api.library} locale={locale} text={doc.whenToUse} />
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
-              {firstOverload && doc?.example ? (
-                <CodeBlock
-                  code={doc.example}
-                  label={label(`${member.name} example`, `${member.name} 示例`)}
-                  locale={locale}
-                />
-              ) : null}
+              <ReferenceMemberDetails
+                api={api}
+                doc={doc}
+                libraryApis={libraryApis}
+                locale={locale}
+                method={member.kind === 'method'}
+                name={member.name}
+                parameters={member.parameterDetails}
+                resultType={member.returns}
+                showUsage={firstOverload}
+              />
             </section>
           )
         })}
+        {Object.entries(guide?.members ?? {})
+          .filter(([name]) => !members.some((member) => member.name === name))
+          .map(([name, doc]) => (
+            <section
+              className="option-entry class-member-entry"
+              id={`${sectionId}--documented-${optionAnchor(name)}`}
+              key={name}
+            >
+              <div className="option-heading">
+                <h3>
+                  <code>{name}</code>
+                </h3>
+              </div>
+              <ReferenceParagraphs library={api.library} locale={locale} text={doc.summary} />
+              <ReferenceMemberDetails
+                api={api}
+                doc={doc}
+                libraryApis={libraryApis}
+                locale={locale}
+                name={name}
+              />
+            </section>
+          ))}
       </div>
     </section>
+  )
+}
+
+/**
+ * Renders the authored contract of a method, callback, options field or nested member. Declaration
+ * metadata supplies types when available; reference-only paths keep their exact prose without
+ * fabricating a signature or a parameter type for an unresolved composed surface.
+ */
+function ReferenceMemberDetails({
+  api,
+  doc,
+  libraryApis,
+  locale,
+  method = false,
+  name,
+  parameters = [],
+  resultType,
+  showDefault = true,
+  showValues = true,
+  showUsage = true
+}: {
+  readonly api: IApi
+  readonly doc?: ILocalizedMemberDoc
+  readonly libraryApis: readonly IApi[]
+  readonly locale: ILocale
+  readonly method?: boolean
+  readonly name: string
+  readonly parameters?: IApiMember['parameterDetails']
+  readonly resultType?: string
+  readonly showDefault?: boolean
+  readonly showValues?: boolean
+  readonly showUsage?: boolean
+}) {
+  /** Declared names keep their order; authored callback arguments remain visible without types. */
+  const parameterNames = Array.from(
+    new Set([...parameters.map((parameter) => parameter.name), ...Object.keys(doc?.params ?? {})])
+  )
+  /** Localized labels shared by every member-contract panel. */
+  const label = (en: string, zh: string) => (locale === 'zh' ? zh : en)
+  return (
+    <>
+      <dl className="option-meta class-member-meta">
+        {method || parameterNames.length > 0 ? (
+          <div>
+            <dt>{label('Parameters', '参数')}</dt>
+            <dd>
+              {parameterNames.length === 0 ? (
+                label('None', '无')
+              ) : (
+                <ul className="member-parameters">
+                  {parameterNames.map((parameterName) => {
+                    /** Optionality and exact type come only from an extracted declaration. */
+                    const parameter = parameters.find((entry) => entry.name === parameterName)
+                    return (
+                      <li key={parameterName}>
+                        <code>
+                          {parameterName}
+                          {parameter?.optional ? '?' : ''}
+                        </code>
+                        {parameter ? (
+                          <>
+                            {': '}
+                            <TypeExpression
+                              api={api}
+                              libraryApis={libraryApis}
+                              locale={locale}
+                              value={parameter.type}
+                            />
+                          </>
+                        ) : null}
+                        {doc?.params[parameterName] ? (
+                          <>
+                            {' — '}
+                            <InlineText
+                              library={api.library}
+                              locale={locale}
+                              text={doc.params[parameterName]!}
+                            />
+                          </>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </dd>
+          </div>
+        ) : null}
+        {resultType || doc?.returns ? (
+          <div>
+            <dt>{resultType && !method ? label('Type', '类型') : label('Returns', '返回')}</dt>
+            <dd>
+              {resultType ? (
+                <TypeExpression
+                  api={api}
+                  libraryApis={libraryApis}
+                  locale={locale}
+                  value={resultType}
+                />
+              ) : null}
+              {resultType && doc?.returns ? ' — ' : null}
+              {doc?.returns ? (
+                <InlineText library={api.library} locale={locale} text={doc.returns} />
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
+        {showDefault && doc?.default ? (
+          <div>
+            <dt>{label('Default', '默认值')}</dt>
+            <dd>
+              <InlineText library={api.library} locale={locale} text={doc.default} />
+            </dd>
+          </div>
+        ) : null}
+        {showValues && doc && doc.values.length > 0 ? (
+          <div>
+            <dt>{label('Values', '可选值')}</dt>
+            <dd>
+              <ValueList
+                library={api.library}
+                locale={locale}
+                symbols={api.symbols}
+                values={doc.values}
+              />
+            </dd>
+          </div>
+        ) : null}
+        {showUsage && doc?.whenToUse ? (
+          <div>
+            <dt>{label('When to use', '何时使用')}</dt>
+            <dd>
+              <InlineText library={api.library} locale={locale} text={doc.whenToUse} />
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+      {showUsage && doc?.example ? (
+        <CodeBlock
+          code={doc.example}
+          label={label(`${name} example`, `${name} 示例`)}
+          locale={locale}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -2191,11 +2268,14 @@ function SingleApiReference({
   )
   /** The signature disclosure owns all transitive supporting definitions. */
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
+  /** Constants can own a documented object surface without naming a separate instance alias. */
+  const ownGuide = instanceGuideFor(reference, api.module, symbol.name)
   /** A class page documents its own (and inherited) instance members in the main flow. */
   const ownSurface =
     symbol.kind === 'class'
       ? instanceSurface(symbol, symbols)
-      : aliasedInstanceSurface(symbol, symbols, reference)
+      : (aliasedInstanceSurface(symbol, symbols, reference) ??
+        (symbol.kind === 'const' && ownGuide ? instanceSurface(symbol, symbols) : undefined))
   /** A factory page documents the methods of the instance it returns. */
   const instances = returnedInstances(symbol, symbols)
   /** Reference doc of an audited library; every sentence below comes from it when present. */
@@ -2248,7 +2328,7 @@ function SingleApiReference({
             symbolDoc.optionsType,
             fieldIdentity(field.name),
             (name) => instanceGuideFor(reference, api.module, name)?.members,
-            api.symbols
+            symbols
           )
         : undefined)
     if (symbolDoc)
@@ -2258,7 +2338,8 @@ function SingleApiReference({
         defaultValue: undefined,
         defaultText: fieldDoc?.default,
         values: fieldDoc?.values ?? [],
-        example: fieldDoc?.example
+        example: fieldDoc?.example,
+        referenceDoc: fieldDoc
       }
     /** Field guide uses the same option identity as the declaration projection. */
     const optionGuide = guide?.options.find(
@@ -2289,9 +2370,14 @@ function SingleApiReference({
       defaultValue: optionGuide?.defaultValue,
       defaultText: undefined as string | undefined,
       values: [] as readonly ILocalizedValue[],
-      example: optionGuide?.example
+      example: optionGuide?.example,
+      referenceDoc: undefined
     }
   })
+  /** Nested anonymous fields retain their authored contracts when extraction lists only the parent. */
+  const unlistedOptions = Object.entries(symbolDoc?.options ?? {}).filter(
+    ([name]) => !options.some((field) => fieldIdentity(field.name) === fieldIdentity(name))
+  )
   /** Omit the default column when the content supplies no defaults for this API. */
   const hasDefaults = options.some((option) => option.defaultValue?.trim() || option.defaultText)
   /** Only explicit package errors belong in the reference; generator placeholders are omitted. */
@@ -2306,8 +2392,24 @@ function SingleApiReference({
       ]
   /** Shell labels for field flags and defaults. */
   const ui = interfaceCopyFor(locale)
-  /** Literal members of an enum-like constant; empty for every other kind. */
-  const constants = constantMembers(symbol)
+  /** Authored constant meanings also cover numeric fields whose declarations widen to `number`. */
+  const enumGuide =
+    reference?.enums[`${api.module}:${symbol.name}`] ?? reference?.enums[symbol.name]
+  /** Literal rows retain their declaration values when every member is a literal. */
+  const literalConstants = constantMembers(symbol)
+  /**
+   * Prefer literal values; otherwise retain the exact declared field type without inventing a
+   * value.
+   */
+  const constants = literalConstants.length
+    ? literalConstants
+    : enumGuide
+      ? symbol.members.map((member) => ({
+          key: member.name,
+          value: member.returns,
+          description: member.description ?? undefined
+        }))
+      : []
   /** Opening sentences shared by several members classify a family; they never identify a row. */
   const sharedOpeners = constants
     .map((member) => (member.description ? openingSentence(member.description) : ''))
@@ -2318,7 +2420,7 @@ function SingleApiReference({
   const values = constants.map((member) => ({
     ...member,
     description: symbolDoc
-      ? reference?.enums[symbol.name]?.values[member.key]
+      ? enumGuide?.values[member.key]
       : freshSentence(member.description, valueShown)
   }))
   /** The owning module supplies concrete next API choices without repeating every signature. */
@@ -2338,11 +2440,11 @@ function SingleApiReference({
           {symbolDoc ? (
             <div className="lede">
               <ReferenceParagraphs library={library.slug} locale={locale} text={purpose} />
-              {reference?.enums[symbol.name] ? (
+              {enumGuide ? (
                 <ReferenceParagraphs
                   library={library.slug}
                   locale={locale}
-                  text={reference.enums[symbol.name]!.summary}
+                  text={enumGuide.summary}
                 />
               ) : null}
             </div>
@@ -2372,29 +2474,36 @@ function SingleApiReference({
                 <dt>{locale === 'zh' ? '参数' : 'Parameters'}</dt>
                 <dd>
                   <ul className="member-parameters">
-                    {(callableShape(symbol)?.parameters ?? [])
-                      .filter((parameter) => symbolDoc.params[parameter.name])
-                      .map((parameter) => (
-                        <li key={parameter.name}>
+                    {Object.entries(symbolDoc.params).map(([name, text]) => {
+                      /**
+                       * Constructor constants can document parameters without a callable
+                       * projection.
+                       */
+                      const parameter = callableShape(symbol)?.parameters.find(
+                        (entry) => entry.name === name
+                      )
+                      return (
+                        <li key={name}>
                           <code>
-                            {parameter.name}
-                            {parameter.optional ? '?' : ''}
+                            {name}
+                            {parameter?.optional ? '?' : ''}
                           </code>
-                          {': '}
-                          <TypeExpression
-                            api={api}
-                            libraryApis={libraryApis}
-                            locale={locale}
-                            value={parameter.type}
-                          />
+                          {parameter ? (
+                            <>
+                              {': '}
+                              <TypeExpression
+                                api={api}
+                                libraryApis={libraryApis}
+                                locale={locale}
+                                value={parameter.type}
+                              />
+                            </>
+                          ) : null}
                           {' — '}
-                          <InlineText
-                            library={library.slug}
-                            locale={locale}
-                            text={symbolDoc.params[parameter.name]!}
-                          />
+                          <InlineText library={library.slug} locale={locale} text={text} />
                         </li>
-                      ))}
+                      )
+                    })}
                   </ul>
                 </dd>
               </div>
@@ -2463,100 +2572,138 @@ function SingleApiReference({
           </div>
         </section>
       ) : null}
-      {options.length ? (
+      {options.length > 0 || unlistedOptions.length > 0 ? (
         <section
           className="section-block compact api-configuration"
           id={`${symbol.fragment}--configuration`}
         >
           <h2>{locale === 'zh' ? '选项' : 'Options'}</h2>
-          <div className="table-scroll">
-            <table className="option-reference">
-              <thead>
-                <tr>
-                  <th>{locale === 'zh' ? '名称' : 'Name'}</th>
-                  <th>{locale === 'zh' ? '类型' : 'Type'}</th>
-                  {hasDefaults ? <th>{locale === 'zh' ? '默认值' : 'Default'}</th> : null}
-                  <th>{locale === 'zh' ? '行为' : 'Behavior'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {options.map((field) => (
-                  <tr
-                    className="option-entry"
-                    id={`${symbol.fragment}--option-${optionAnchor(field.name)}`}
-                    key={field.name}
-                  >
-                    <th scope="row">
-                      <code>{field.name}</code>
-                      <span
-                        className="field-flag"
-                        data-optional={field.optional ? 'true' : 'false'}
-                      >
-                        {field.optional ? ui.optional : ui.required}
-                      </span>
-                    </th>
-                    <td className="option-type">
-                      <TypeExpression
-                        api={api}
-                        libraryApis={libraryApis}
-                        locale={locale}
-                        value={field.type}
-                      />
-                    </td>
-                    {hasDefaults ? (
-                      <td
-                        className="option-default"
-                        data-empty={field.defaultValue ? undefined : 'true'}
-                        data-label={ui.defaultLabel}
-                      >
-                        {field.defaultText ? (
-                          <InlineText
-                            library={library.slug}
-                            locale={locale}
-                            text={field.defaultText}
-                          />
-                        ) : field.defaultValue ? (
-                          <code>{field.defaultValue}</code>
-                        ) : (
-                          '—'
-                        )}
+          {options.length > 0 ? (
+            <div className="table-scroll">
+              <table className="option-reference">
+                <thead>
+                  <tr>
+                    <th>{locale === 'zh' ? '名称' : 'Name'}</th>
+                    <th>{locale === 'zh' ? '类型' : 'Type'}</th>
+                    {hasDefaults ? <th>{locale === 'zh' ? '默认值' : 'Default'}</th> : null}
+                    <th>{locale === 'zh' ? '行为' : 'Behavior'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {options.map((field) => (
+                    <tr
+                      className="option-entry"
+                      id={`${symbol.fragment}--option-${optionAnchor(field.name)}`}
+                      key={field.name}
+                    >
+                      <th scope="row">
+                        <code>{field.name}</code>
+                        <span
+                          className="field-flag"
+                          data-optional={field.optional ? 'true' : 'false'}
+                        >
+                          {field.optional ? ui.optional : ui.required}
+                        </span>
+                      </th>
+                      <td className="option-type">
+                        <TypeExpression
+                          api={api}
+                          libraryApis={libraryApis}
+                          locale={locale}
+                          value={field.type}
+                        />
                       </td>
-                    ) : null}
-                    <td className="option-behavior">
-                      {field.description ? (
-                        symbolDoc ? (
-                          <ReferenceParagraphs
-                            library={library.slug}
-                            locale={locale}
-                            text={field.description}
-                          />
-                        ) : (
-                          <p>
+                      {hasDefaults ? (
+                        <td
+                          className="option-default"
+                          data-empty={field.defaultValue ? undefined : 'true'}
+                          data-label={ui.defaultLabel}
+                        >
+                          {field.defaultText ? (
                             <InlineText
+                              library={library.slug}
+                              locale={locale}
+                              text={field.defaultText}
+                            />
+                          ) : field.defaultValue ? (
+                            <code>{field.defaultValue}</code>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      ) : null}
+                      <td className="option-behavior">
+                        {field.description ? (
+                          symbolDoc ? (
+                            <ReferenceParagraphs
                               library={library.slug}
                               locale={locale}
                               text={field.description}
                             />
-                          </p>
-                        )
-                      ) : null}
-                      {field.values.length > 0 ? (
-                        <ValueList
-                          library={library.slug}
-                          locale={locale}
-                          symbols={api.symbols}
-                          values={field.values}
-                        />
-                      ) : null}
-                      {field.example ? (
-                        <CodeBlock code={field.example} label={field.name} locale={locale} />
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          ) : (
+                            <p>
+                              <InlineText
+                                library={library.slug}
+                                locale={locale}
+                                text={field.description}
+                              />
+                            </p>
+                          )
+                        ) : null}
+                        {field.values.length > 0 ? (
+                          <ValueList
+                            library={library.slug}
+                            locale={locale}
+                            symbols={api.symbols}
+                            values={field.values}
+                          />
+                        ) : null}
+                        {field.referenceDoc ? (
+                          <ReferenceMemberDetails
+                            api={api}
+                            doc={field.referenceDoc}
+                            libraryApis={libraryApis}
+                            locale={locale}
+                            name={field.name}
+                            showDefault={false}
+                            showValues={false}
+                          />
+                        ) : null}
+                        {!field.referenceDoc && field.example ? (
+                          <CodeBlock code={field.example} label={field.name} locale={locale} />
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          {unlistedOptions.length > 0 ? (
+            <div className="option-reference">
+              {unlistedOptions.map(([name, doc]) => (
+                <section
+                  className="option-entry"
+                  id={`${symbol.fragment}--option-${optionAnchor(name)}`}
+                  key={name}
+                >
+                  <div className="option-heading">
+                    <h3>
+                      <code>{name}</code>
+                    </h3>
+                  </div>
+                  <ReferenceParagraphs library={library.slug} locale={locale} text={doc.summary} />
+                  <ReferenceMemberDetails
+                    api={api}
+                    doc={doc}
+                    libraryApis={libraryApis}
+                    locale={locale}
+                    name={name}
+                  />
+                </section>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
       {reference?.enhancers[symbol.name] ? (
@@ -2574,7 +2721,7 @@ function SingleApiReference({
           bases={ownSurface.bases}
           libraryApis={libraryApis}
           locale={locale}
-          guide={instanceGuideFor(reference, api.module, symbol.name)}
+          guide={ownGuide}
           memberDoc={memberDocResolver(reference, api.module, [symbol.name, ...ownSurface.owners])}
           members={ownSurface.members}
           strict={Boolean(reference)}
@@ -2588,9 +2735,7 @@ function SingleApiReference({
           heading={
             <>
               {locale === 'zh' ? '返回的实例：' : 'Returned instance: '}
-              <Link
-                to={docsModulePath(locale, api.library, api.module, symbolSlug(type, api.symbols))}
-              >
+              <Link to={symbolReferencePath(locale, api, libraryApis, type)}>
                 <code>{type.name}</code>
               </Link>
             </>
@@ -2599,7 +2744,7 @@ function SingleApiReference({
           key={type.name}
           libraryApis={libraryApis}
           locale={locale}
-          guide={surfaceGuideFor(reference, api.module, type, api.symbols)}
+          guide={surfaceGuideFor(reference, api.module, type, symbols)}
           memberDoc={memberDocResolver(reference, api.module, surface.owners)}
           members={surface.members}
           strict={Boolean(reference)}

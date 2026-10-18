@@ -29,15 +29,19 @@ export function instanceSurface(
   const seen = new Set<string>()
   /** Member signatures already listed, so a re-declared member appears once. */
   const signatures = new Set<string>()
+  /** A nearer declaration owns a member name; its inherited optional version must not reappear. */
+  const shadowed = new Set<string>()
+  /** Adds one owner's overloads before marking its names as overrides of inherited members. */
   const visit = (symbol: IApiSymbol) => {
     if (seen.has(symbol.name)) return
     seen.add(symbol.name)
     owners.push(symbol.name)
     for (const member of symbol.members)
-      if (!signatures.has(member.signature)) {
+      if (!shadowed.has(member.name) && !signatures.has(member.signature)) {
         signatures.add(member.signature)
         members.push(member)
       }
+    for (const member of symbol.members) shadowed.add(member.name)
     for (const base of symbol.composes ?? []) {
       /** Same-page declaration that carries its own members; compact projections carry none. */
       const declaration = symbols.find(
