@@ -53,8 +53,8 @@ const terminalReportField: IMemberDoc = {
 /** `style` field shared by channel and hub options. */
 const styleField: IMemberDoc = {
   summary: t(
-    'Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior.',
-    '在构造时为订阅、发布、退订增加别名方法。可传预设名（`on-emit`、`on-trigger`、`listen-fire`），或用 `as const satisfies IEventApiStyleNames` 检查的自定义名称表。原有的 `subscribe`/`publish` 始终保留，别名也引用原来的函数。style 不改变顺序、调度、错误或生命周期语义：换个方法名不会改变监听器调用次序、执行时机、错误处理或退订方式。'
+    'Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior. Older examples may call defineEventApiStyle; that helper has been removed. Write custom names directly as an object and use the type check above to validate its fields while keeping the exact alias names for checking later method calls.',
+    '在构造时为订阅、发布、退订增加别名方法。可传预设名（`on-emit`、`on-trigger`、`listen-fire`），或用 `as const satisfies IEventApiStyleNames` 检查的自定义名称表。原有的 `subscribe`/`publish` 始终保留，别名也引用原来的函数。style 不改变顺序、调度、错误或生命周期语义：换个方法名不会改变监听器调用次序、执行时机、错误处理或退订方式。旧版的 defineEventApiStyle 已移除。自定义名称直接写成对象，并用上面的类型检查方式检查名称表；这样会保留 observe、dispatch 等具体方法名，供编辑器检查后续调用。'
   ),
   default: t('`subscribe-publish`: no aliases are added.', '`subscribe-publish`：不增加别名。'),
   values: {
