@@ -12,6 +12,19 @@ import { referenceFor } from './reference/index.js'
 
 export type ILibrarySummary = Omit<ILibrary, 'documentation'>
 
+/**
+ * Type names one symbol page carries. `expanded` types are referenced directly by the selected
+ * declaration and ship their full declaration; `linked` adds the types those declarations name,
+ * which ship only as compact link entries whose own route loads the full declaration.
+ */
+type IReferencedTypes = {
+  readonly expanded: ReadonlySet<string>
+  readonly linked: ReadonlySet<string>
+}
+
+/** No selected symbol: no type is pulled in beyond the module's own listing. */
+const noReferencedTypes: IReferencedTypes = { expanded: new Set(), linked: new Set() }
+
 export type ILibraryRouteContent = {
   readonly library: ILibrary
   readonly apis: readonly IApi[]
@@ -123,7 +136,7 @@ export async function loadLibraryRouteContent(
         },
         module.default.apis.flatMap((api) => api.symbols)
       )
-    : new Set<string>()
+    : noReferencedTypes
   const library = module.default.library
   return {
     library: {
@@ -171,14 +184,14 @@ function projectReaderDocument(document: ILibrary['documentation']['readme'], li
 function projectSelectedApi(
   api: IApi,
   selectedSymbolPath?: string,
-  relatedTypes?: ReadonlySet<string>
+  relatedTypes?: IReferencedTypes
 ): IApi {
   const selectedSymbol = selectedSymbolPath
     ? api.symbols.find((symbol) => symbolSlug(symbol, api.symbols) === selectedSymbolPath)
     : undefined
-  const relatedTypeNames =
+  const { expanded, linked } =
     relatedTypes ??
-    (selectedSymbol ? collectReferencedTypeNames(selectedSymbol, api.symbols) : new Set<string>())
+    (selectedSymbol ? collectReferencedTypeNames(selectedSymbol, api.symbols) : noReferencedTypes)
   return {
     id: api.id,
     library: api.library,
@@ -202,16 +215,15 @@ function projectSelectedApi(
           !selectedSymbol ||
           symbol === selectedSymbol ||
           (symbol.kind !== 'type' && symbol.kind !== 'interface') ||
-          relatedTypeNames.has(symbol.name)
+          linked.has(symbol.name)
       )
       .map((symbol) =>
         selectedSymbol
           ? symbol === selectedSymbol
             ? projectSelectedSymbol(symbol)
-            : (symbol.kind === 'type' || symbol.kind === 'interface') &&
-                relatedTypeNames.has(symbol.name)
+            : (symbol.kind === 'type' || symbol.kind === 'interface') && expanded.has(symbol.name)
               ? projectTypingSymbol(symbol)
-              : symbol.kind === 'class' && relatedTypeNames.has(symbol.name)
+              : symbol.kind === 'class' && expanded.has(symbol.name)
                 ? // A class returned by the selected factory keeps its instance members.
                   { ...compactSymbol(symbol), members: symbol.members, composes: symbol.composes }
                 : compactSymbol(symbol)
@@ -232,34 +244,42 @@ function projectModuleIndexSymbol(symbol: IApiSymbol): IApiSymbol {
       }
 }
 
-/** Retains only type declarations reachable from the selected API signature. */
+/**
+ * Selects the type declarations one symbol page shows. Types named by the selected declaration (and
+ * the bases they compose) are expanded; types named inside those declarations are linked. Deeper
+ * types are not carried: a linked type's own route loads its declaration on demand, so a page stays
+ * bounded instead of shipping the module's whole reachable type graph.
+ */
 function collectReferencedTypeNames(
   selected: IApiSymbol,
   symbols: readonly IApiSymbol[]
-): ReadonlySet<string> {
+): IReferencedTypes {
   /** Classes count as typing here because a factory may return a class instance. */
   const typing = symbols.filter(
     (symbol) => symbol.kind === 'type' || symbol.kind === 'interface' || symbol.kind === 'class'
   )
-  const names = new Set<string>()
+  /** Whether `text` names the typing symbol as a whole word. */
+  const names = (text: string, symbol: IApiSymbol) => new RegExp(`\\b${symbol.name}\\b`).test(text)
+  const expanded = new Set<string>()
   /** Inherited bases may live outside the visible signature (`class X extends PrivateBase`). */
   const pending = typing.filter(
-    (symbol) =>
-      new RegExp(`\\b${symbol.name}\\b`).test(selected.signature) ||
-      selected.composes?.includes(symbol.name)
+    (symbol) => names(selected.signature, symbol) || selected.composes?.includes(symbol.name)
   )
   while (pending.length > 0) {
     const symbol = pending.shift()
-    if (!symbol || names.has(symbol.name)) continue
-    names.add(symbol.name)
-    for (const dependency of typing)
-      if (
-        !names.has(dependency.name) &&
-        new RegExp(`\\b${dependency.name}\\b`).test(symbol.signature)
-      )
-        pending.push(dependency)
+    if (!symbol || expanded.has(symbol.name)) continue
+    expanded.add(symbol.name)
+    /** A composed base contributes members to this declaration, so it expands too. */
+    for (const base of typing) if (symbol.composes?.includes(base.name)) pending.push(base)
   }
-  return names
+  const linked = new Set(expanded)
+  for (const symbol of typing)
+    if (
+      !linked.has(symbol.name) &&
+      typing.some((owner) => expanded.has(owner.name) && names(owner.signature, symbol))
+    )
+      linked.add(symbol.name)
+  return { expanded, linked }
 }
 
 /**
@@ -322,7 +342,7 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
 function projectApiIndexEntry(
   api: IApi,
   includeSymbols: boolean,
-  relatedTypes: ReadonlySet<string>
+  relatedTypes: IReferencedTypes
 ): IApi {
   return {
     id: api.id,
@@ -334,9 +354,9 @@ function projectApiIndexEntry(
     architecturePath: api.architecturePath,
     aliases: [],
     symbols: api.symbols
-      .filter((symbol) => includeSymbols || relatedTypes.has(symbol.name))
+      .filter((symbol) => includeSymbols || relatedTypes.linked.has(symbol.name))
       .map((symbol) =>
-        relatedTypes.has(symbol.name) ? projectTypingSymbol(symbol) : compactSymbol(symbol)
+        relatedTypes.expanded.has(symbol.name) ? projectTypingSymbol(symbol) : compactSymbol(symbol)
       )
   }
 }

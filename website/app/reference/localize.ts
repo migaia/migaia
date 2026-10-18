@@ -235,12 +235,14 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g
  * Cuts a localized library reference down to what one page renders, so a page's loader data (and
  * the copy inlined into its HTML for hydration) does not carry every other API's documentation. The
  * page keeps: its module doc; a purpose-only entry for every symbol of its module (listing and
- * links); and full docs for the selected symbol plus every reference entry its declaration reaches
- * through type names (options types, returned instances, member types, enums, enhancer guides).
+ * links); full docs and enhancer guides for the selected symbol; and full docs for the types and
+ * enums its own declaration names (options types, returned instances). Other runtime symbols the
+ * declaration mentions keep only their listing entry, and types named in turn are not carried:
+ * their own pages hold them, so one page never ships the library's whole reference graph.
  * `declarations` are the manifest symbols listed by the selected module; `roots` are the selected
  * symbol and type names (empty on a module page). `dependencies` also includes declarations from
- * sibling entries already projected for this page, so their reached docs stay available without
- * adding unrelated modules or library-wide reference bodies to the loader payload.
+ * sibling entries already projected for this page, so a root's directly named types resolve even
+ * when a sibling entry declares them.
  */
 export function pageReference(
   reference: ILocalizedReference,
@@ -253,8 +255,8 @@ export function pageReference(
   const bare = (key: string) => key.slice(key.lastIndexOf(':') + 1)
   /** Reference entries reached from the roots, by bare name. */
   const reached = new Set<string>()
-  /** Names still to expand. */
-  const pending = [...roots]
+  /** Names still to visit with their distance from a root; only roots are expanded. */
+  const pending: Array<readonly [string, number]> = roots.map((name) => [name, 0])
   /** Every bare name the reference documents, so unrelated identifiers are ignored. */
   const documented = new Set(
     [reference.symbols, reference.types, reference.enums, reference.enhancers].flatMap((record) =>
@@ -262,9 +264,10 @@ export function pageReference(
     )
   )
   while (pending.length > 0) {
-    const name = pending.pop() as string
+    const [name, depth] = pending.pop()!
     if (reached.has(name)) continue
     reached.add(name)
+    if (depth > 0) continue
     /** Declaration text plus the doc fields that name other types. */
     const texts = dependencies
       .filter((declaration) => declaration.name === name)
@@ -275,18 +278,20 @@ export function pageReference(
       if (bare(key) === name && doc.surface) texts.push(doc.surface)
     for (const text of texts)
       for (const token of text.match(IDENTIFIER) ?? [])
-        if (documented.has(token) && !reached.has(token)) pending.push(token)
+        if (documented.has(token) && !reached.has(token)) pending.push([token, depth + 1])
   }
   /** Names listed on the module page or in the module's symbol list. */
   const listed = new Set(declarations.map((declaration) => declaration.name))
-  /** Keeps full entries for reached names. */
-  const full = <T>(record: Readonly<Record<string, T>>) =>
-    Object.fromEntries(Object.entries(record).filter(([key]) => reached.has(bare(key))))
+  /** The selected symbol and type names themselves. */
+  const rootNames = new Set(roots)
+  /** Keeps full entries for the given names. */
+  const full = <T>(record: Readonly<Record<string, T>>, names: ReadonlySet<string>) =>
+    Object.fromEntries(Object.entries(record).filter(([key]) => names.has(bare(key))))
   return {
     modules: reference.modules[module] ? { [module]: reference.modules[module] } : {},
     symbols: Object.fromEntries(
       Object.entries(reference.symbols).flatMap(([key, doc]) =>
-        reached.has(bare(key))
+        rootNames.has(bare(key))
           ? [[key, doc]]
           : listed.has(bare(key))
             ? [
@@ -314,7 +319,7 @@ export function pageReference(
             : []
       )
     ),
-    enums: full(reference.enums),
-    enhancers: full(reference.enhancers)
+    enums: full(reference.enums, reached),
+    enhancers: full(reference.enhancers, rootNames)
   }
 }

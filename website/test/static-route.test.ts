@@ -1849,7 +1849,7 @@ test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module 
     docsSource,
     /docsModulePath\([\s\S]*alias\.ownerModule,[\s\S]*symbolSlug\(ownerSymbol, ownerApi\.symbols\)/
   )
-  assert.match(docsSource, /navigate\([\s\S]*symbolSlug\(selectedSymbol, api\.symbols\)/)
+  assert.match(docsSource, /navigate\([\s\S]*symbolSlug\(selectedSymbol, owner\.symbols\)/)
   assert.match(docsSource, /target\.scrollIntoView\(\{ block: 'start' }\)/)
 })
 

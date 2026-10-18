@@ -2266,7 +2266,10 @@ function SingleApiReference({
   const typingSymbols = symbols.filter(
     (candidate) => candidate.kind === 'type' || candidate.kind === 'interface'
   )
-  /** The signature disclosure owns all transitive supporting definitions. */
+  /**
+   * The signature disclosure lists the declarations the loader carried: directly referenced types
+   * in full, and the types they name as compact links (their empty signature ends the walk).
+   */
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
   /** Constants can own a documented object surface without naming a separate instance alias. */
   const ownGuide = instanceGuideFor(reference, api.module, symbol.name)
@@ -2816,7 +2819,12 @@ function SingleApiReference({
         <details>
           <summary>{locale === 'zh' ? '公开类型签名' : 'Public type signature'}</summary>
           <CodeBlock code={symbol.signature} signature label={symbol.name} locale={locale} />
-          <RelatedTypes api={api} locale={locale} symbols={relatedTypes} />
+          <RelatedTypes
+            api={api}
+            libraryApis={libraryApis}
+            locale={locale}
+            symbols={relatedTypes}
+          />
         </details>
       </section>
     </div>
@@ -4028,12 +4036,15 @@ function journeyNextPath(locale: ILocale, library: string, path: string): string
 /** Keeps type declarations subordinate to runtime APIs and displays selected declarations in full. */
 function RelatedTypes({
   api,
+  libraryApis,
   locale,
   selectedFragment,
   standalone = false,
   symbols
 }: {
   readonly api?: IApi
+  /** Every loaded module; a compact entry links to the module that declares it. */
+  readonly libraryApis?: readonly IApi[]
   readonly locale: ILocale
   readonly selectedFragment?: string
   readonly standalone?: boolean
@@ -4062,9 +4073,18 @@ function RelatedTypes({
       if (!target || !typeReferenceRef.current?.contains(target)) return
       /** Compact index entries move to the route whose loader carries the complete declaration. */
       const selectedSymbol = symbols.find((symbol) => symbol.fragment === fragment)
-      if (api && selectedSymbol && !selectedSymbol.signature) {
+      /** Module that declares the compact entry. */
+      const owner = selectedSymbol
+        ? (libraryApis?.find((entry) => entry.symbols.includes(selectedSymbol)) ?? api)
+        : api
+      if (owner && selectedSymbol && !selectedSymbol.signature) {
         navigate(
-          docsModulePath(locale, api.library, api.module, symbolSlug(selectedSymbol, api.symbols)),
+          docsModulePath(
+            locale,
+            owner.library,
+            owner.module,
+            symbolSlug(selectedSymbol, owner.symbols)
+          ),
           { replace: true }
         )
         return
@@ -4077,7 +4097,7 @@ function RelatedTypes({
     locateFragment()
     window.addEventListener('hashchange', locateFragment)
     return () => window.removeEventListener('hashchange', locateFragment)
-  }, [api, locale, navigate, selectedFragment, symbols])
+  }, [api, libraryApis, locale, navigate, selectedFragment, symbols])
   if (symbols.length === 0) return null
   return (
     <section
@@ -4095,16 +4115,18 @@ function RelatedTypes({
       </h2>
       <div className="type-reference-body">
         {symbols.map((symbol) => {
+          /** Module that declares this entry; its route carries the complete declaration. */
+          const owner = libraryApis?.find((entry) => entry.symbols.includes(symbol)) ?? api
           return (
             <section className="type-declaration" id={symbol.fragment} key={symbol.fragment}>
               <h3>
-                {api && !symbol.signature ? (
+                {owner && !symbol.signature ? (
                   <Link
                     to={docsModulePath(
                       locale,
-                      api.library,
-                      api.module,
-                      symbolSlug(symbol, api.symbols)
+                      owner.library,
+                      owner.module,
+                      symbolSlug(symbol, owner.symbols)
                     )}
                   >
                     <code>{symbol.name}</code>
