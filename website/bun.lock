@@ -7,6 +7,7 @@
       "dependencies": {
         "@fontsource-variable/inter": "5.3.0",
         "@fontsource-variable/jetbrains-mono": "5.3.0",
+        "@migaia/storage-web": "0.0.7",
         "isbot": "5.1.36",
         "react": "19.2.7",
         "react-dom": "19.2.7",
@@ -99,6 +100,26 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.6.0", "", {}, "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@migaia/capability": ["@migaia/capability@0.0.6", "https://npm.pkg.github.com/download/@migaia/capability/0.0.6/f6cf83c507d664969e23943e06fd654a79da5c57", { "dependencies": { "@migaia/lifecycle": "^0.0.8", "@migaia/utils": "^0.0.7" } }, "sha512-S86T89naLJOGyNuWZozBGCaDdAtBlOAecogCajntREG0zXkZd+R+hhbmC3STej1ozA+3g4JYS5jrBVYSyxvygg=="],
+
+    "@migaia/event-subscriber": ["@migaia/event-subscriber@0.0.9", "https://npm.pkg.github.com/download/@migaia/event-subscriber/0.0.9/8ddb22d3a1dd129aca7779ae46bd22308268e046", { "dependencies": { "@migaia/utils": "^0.0.7" } }, "sha512-wvu1GHF2S0qtRqV7opA++tNHb3qsc0SIjsCd3XJLP0MUGL+LR84JfZR+mR8iuoGF0Jyl73RHRkeYsFnWdUgiDg=="],
+
+    "@migaia/lifecycle": ["@migaia/lifecycle@0.0.8", "https://npm.pkg.github.com/download/@migaia/lifecycle/0.0.8/cbf1df40d03b2c02fb4fdec654a6d3cd77ebb3d5", { "dependencies": { "@migaia/utils": "^0.0.7" } }, "sha512-EtyvY9FUAIre+P7Uik09/6z9+uADZYMqjOoc9981QrWTzrb5KCcnY4eH2UbyoFcNcjbbCvdw38b5I3L+tPcldg=="],
+
+    "@migaia/middleware-pipeline": ["@migaia/middleware-pipeline@0.0.8", "https://npm.pkg.github.com/download/@migaia/middleware-pipeline/0.0.8/5568372598e1eebbcbe75a8422e903892a39747e", { "dependencies": { "@migaia/utils": "^0.0.7" } }, "sha512-oKlvfX+06AdctHEGfjX3GlyeCk9dkHYMrJWl7j7ARwQcZje9Exb12ZSS02eUG7KSIjlr/yLsJN8Nmd/RY6ZcwA=="],
+
+    "@migaia/plugin-host": ["@migaia/plugin-host@0.0.10", "https://npm.pkg.github.com/download/@migaia/plugin-host/0.0.10/c30e2cdec96707c4c56e30f664d4902307eb3d96", { "dependencies": { "@migaia/capability": "^0.0.6", "@migaia/lifecycle": "^0.0.8", "@migaia/middleware-pipeline": "^0.0.8", "@migaia/utils": "^0.0.7" } }, "sha512-4hdYzLADdwzc1LSWuZtuxTSmlu7zjimMcX0PX5F7CI/+ej5cB9Z8pfQ6MjmAGuqxgoDfDY7s/XIgRPDehAz84g=="],
+
+    "@migaia/reactive": ["@migaia/reactive@0.0.8", "https://npm.pkg.github.com/download/@migaia/reactive/0.0.8/50f90fc26b132c73bbe504520eeb497484a26c63", { "dependencies": { "@migaia/utils": "^0.0.7" } }, "sha512-nNblFe4ErvbH+Cay2WU6qK1/6eaT8s9k4c9R+yrWu0NAo6hLu8sygCTkOgSuMwCM6uqjizhNtQwW+Qk7D22HRQ=="],
+
+    "@migaia/resource": ["@migaia/resource@0.0.8", "https://npm.pkg.github.com/download/@migaia/resource/0.0.8/30829a6262702f3e8d2387a84752f64d5c9ede13", { "dependencies": { "@migaia/lifecycle": "^0.0.8", "@migaia/reactive": "^0.0.8", "@migaia/utils": "^0.0.7" } }, "sha512-ew6U20917Q+OJENbnrz1jEt85oX4HYbEoeUlpiwKkYxPCgjxCC8RveCDB1EuOLee74U05gnWb+Z9k/ZSqWqTGQ=="],
+
+    "@migaia/storage-contract": ["@migaia/storage-contract@0.0.7", "https://npm.pkg.github.com/download/@migaia/storage-contract/0.0.7/7b341f1f8938a082a049942fd3f6f301b8781d45", { "dependencies": { "@migaia/utils": "^0.0.7" } }, "sha512-b2rKTZohZU6jsOJjbEm2hq1ZeSrmfu+hVzS5cK94zAsfg2Tf67kjQJquT+so0Pdxvo6BvCkRkLGJELyh20kXkw=="],
+
+    "@migaia/storage-web": ["@migaia/storage-web@0.0.7", "https://npm.pkg.github.com/download/@migaia/storage-web/0.0.7/b92ccad37d01f599c6e04c04a84086abc2109975", { "dependencies": { "@migaia/capability": "^0.0.6", "@migaia/event-subscriber": "^0.0.9", "@migaia/lifecycle": "^0.0.8", "@migaia/plugin-host": "^0.0.10", "@migaia/reactive": "^0.0.8", "@migaia/resource": "^0.0.8", "@migaia/storage-contract": "^0.0.7", "@migaia/utils": "^0.0.7" } }, "sha512-8yPO+juAoHlQImuLc1PKTyvafTyeAte9vCqT9rLkC6UCLv8cnsjAfhSMvt68qmgGdOOGVRGGE3fHIoGWqcBFbQ=="],
+
+    "@migaia/utils": ["@migaia/utils@0.0.7", "https://npm.pkg.github.com/download/@migaia/utils/0.0.7/fabf74cb773cdbedd428bc3e5837b3545c1d42ed", {}, "sha512-PsGTgU6c8foRxGSTN1Ri2EKjjLCDcIxeFbSZvlXR76UwuFbdygVeRekd8s5DO/TPXe5hibqXCXkNIIt89+1amw=="],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 

@@ -23,6 +23,7 @@ import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { dissolveRouteContent, emergeRouteContent, settleRouteContent } from './motion.js'
 import { OPEN_SEARCH_EVENT } from './search.js'
+import { rememberLocale } from './locale-preference.js'
 import { Button } from './components/ui/button.js'
 import type { IPageNavigationContext } from './components/page-navigation.js'
 
@@ -210,6 +211,13 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
   /** Visible name of the current theme choice for the toggle's accessible label. */
   const themeName =
     theme === 'light' ? ui.themeLight : theme === 'dark' ? ui.themeDark : ui.themeSystem
+
+  /** True on `/en` or `/zh` pages, the only routes whose language counts as the reader's choice. */
+  const onLocaleRoute = /^\/(?:en|zh)(?=\/|$)/.test(canonicalPathname)
+  /** Remembers each language the reader opens, so the site root reopens their last choice. */
+  useEffect(() => {
+    if (onLocaleRoute) rememberLocale(locale)
+  }, [locale, onLocaleRoute])
 
   /** Page navigation links close the existing menu after React Router changes the route. */
   useEffect(() => setMobileNavOpen(false), [location.pathname])

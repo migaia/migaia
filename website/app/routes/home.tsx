@@ -1,4 +1,5 @@
-import type { MetaFunction as IMetaFunction } from 'react-router'
+import { redirect, type MetaFunction as IMetaFunction } from 'react-router'
+import { preferredLocale } from '../locale-preference.js'
 
 /** Shared page purpose for the neutral home introduction and its search description. */
 const HOME_DESCRIPTION =
@@ -9,6 +10,17 @@ export const meta: IMetaFunction = () => [
   { title: 'migaia' },
   { name: 'description', content: HOME_DESCRIPTION }
 ]
+
+/**
+ * Sends the site root to a language home: the reader's last visited language, else the browser
+ * language. Runs in the browser only; the prerendered root keeps the neutral introduction below.
+ */
+export function clientLoader() {
+  throw redirect(`/${preferredLocale()}`)
+}
+
+/** Runs the redirect on the first page load, not only on client-side navigation to the root. */
+clientLoader.hydrate = true as const
 
 /** Describes the three documentation paths available from the global navigation. */
 const DOCUMENTATION_PATHS = [
@@ -29,7 +41,8 @@ const DOCUMENTATION_PATHS = [
 /** Renders the language-neutral entry without duplicating the header language control. */
 function Home() {
   return (
-    <main id="main-content" className="page-shell home-shell" data-pagefind-body>
+    // No data-pagefind-body: the root only redirects, so search must never return it.
+    <main id="main-content" className="page-shell home-shell">
       <p className="eyebrow">Migaia library documentation</p>
       <h1>Build with clear, composable libraries.</h1>
       <p className="lede">{HOME_DESCRIPTION}</p>
@@ -44,5 +57,8 @@ function Home() {
     </main>
   )
 }
+
+/** Prerendered root markup shown until the redirect runs, and to readers without JavaScript. */
+export const HydrateFallback = Home
 
 export default Home
