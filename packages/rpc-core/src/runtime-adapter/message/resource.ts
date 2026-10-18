@@ -1,6 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { retainRuntimeConnectionIdentity } from '../byte/connection-identity.js'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
@@ -37,7 +37,7 @@ import {
 import { RuntimeAdapterErrorText } from '../byte/error-text.js'
 
 /** The original identity/message component pair remains canonical and has no runtime dependency. */
-const messagePipeline = Object.freeze({ codec: identityCodecV1, framer: messageFramerV1 })
+const messagePipeline = Object.freeze({ codec: identityCodec, framer: messageFramerV1 })
 
 /** The canonical parser's admitted initial metadata stays private to its actual held resource. */
 type IAdapterMessageInitial = Extract<
@@ -432,7 +432,7 @@ class AdapterMessageResource implements IAdapterMessageResource {
       scheduler: options.scheduler,
       agreement: Object.freeze({
         source: 'static' as const,
-        codec: identityCodecV1.id,
+        codec: identityCodec.id,
         capabilities
       }),
       pipeline: messagePipeline,

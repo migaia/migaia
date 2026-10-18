@@ -71,7 +71,9 @@ export const SerializeErrorCode = {
 
   /**
    * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder`
-   * capabilities.
+   * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its
+   * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder
+   * for byte merges.
    *
    * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the
    * original capability failure.

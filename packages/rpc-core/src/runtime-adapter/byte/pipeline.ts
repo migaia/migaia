@@ -13,7 +13,7 @@ import {
   type ICodec
 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import {
   messageFramerV1,
   remoteProcessStringFramer as runtimeStringFramer
@@ -117,4 +117,4 @@ export function createRuntimeBytePipeline(
 export const runtimeMessagePipeline: Readonly<{
   codec: ICodec<unknown, unknown>
   framer: IRpcFramer<unknown, unknown, string, number>
-}> = Object.freeze({ codec: identityCodecV1, framer: messageFramerV1 })
+}> = Object.freeze({ codec: identityCodec, framer: messageFramerV1 })

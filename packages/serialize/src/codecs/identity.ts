@@ -8,6 +8,3 @@ export const identityCodec = Object.freeze({
   encode: <T>(value: T): T => value,
   decode: <T>(value: T): T => value
 } satisfies ICodec<unknown, unknown, 'identity', 1>)
-
-/** Legacy entry retains the exact V1 codec object identity. */
-export const identityCodecV1 = identityCodec

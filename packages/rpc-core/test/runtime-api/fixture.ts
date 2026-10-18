@@ -3,7 +3,7 @@ import type {
   IRuntimeDynamicSurface,
   IRuntimePluginTyping
 } from '../../dist/remote/runtime-api/typing.js'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
@@ -73,7 +73,7 @@ export async function legacyEndpoint(
     {
       id,
       transport,
-      codec: identityCodecV1,
+      codec: identityCodec,
       framer: messageFramerV1,
       middlewares: [connect({ transport })]
     },
@@ -124,10 +124,10 @@ export function runtimeSources(
       scheduler: systemScheduler,
       agreement: {
         source: 'static' as const,
-        codec: identityCodecV1.id,
+        codec: identityCodec.id,
         capabilities
       },
-      pipeline: { codec: identityCodecV1, framer: messageFramerV1 },
+      pipeline: { codec: identityCodec, framer: messageFramerV1 },
       features: [],
       close: async () => undefined
     }

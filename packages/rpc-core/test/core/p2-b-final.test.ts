@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
 import { describe, it, vi } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { normalizeRpcEnvelope, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
@@ -30,7 +30,7 @@ function fixture(
   /** Original foundational components do not add user interceptors or codec estimates. */
   const components: IRpcSelectedComponents = {
     protocol: rpcProtocolV1,
-    codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+    codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
     framer: messageFramerV1,
     ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
     shadowed: []

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { normalizeRpcEnvelope, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcTransportError } from '../../../dist/core/errors.js'
@@ -60,7 +60,7 @@ it('[A25/IDLE1] idle completions reuse owner callbacks and preserve failure reco
   /** Canonical components keep the original identity payload and whole-frame path. */
   const components: IRpcSelectedComponents = {
     protocol: rpcProtocolV1,
-    codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+    codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
     framer: messageFramerV1,
     ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
     shadowed: []

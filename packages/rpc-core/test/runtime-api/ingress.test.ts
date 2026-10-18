@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { createEndpointKernel, EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
 import { prepareEndpoint } from '../../dist/core/internal/endpoint-bootstrap.js'
@@ -55,7 +55,7 @@ async function receiver(
     {
       id: 'provider',
       transport,
-      codec: identityCodecV1 as IRpcSelectedComponents['codec'],
+      codec: identityCodec as IRpcSelectedComponents['codec'],
       framer,
       middlewares: []
     },

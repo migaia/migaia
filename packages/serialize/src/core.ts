@@ -14,7 +14,6 @@ export {
   assertSerializeType,
   isChunkShape,
   type ISerializeChunk,
-  type ISerializeChunkType,
   type ISerializeContext,
   type ISerializeOutput,
   type ISerializeParser,
@@ -50,3 +49,5 @@ export {
   type IEncodeStreamOptions,
   type IFrameBudgetOptions
 } from './stream.js'
+
+export type { ISerializeChunkKind } from './format-constants.js'

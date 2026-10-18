@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { identityCodecV1 } from '../src/codecs/identity.js'
+
 import { identityCodec } from '../src/codecs/identity/v1.js'
 import { defineJsonCodec } from '../src/codecs/json.js'
 import { defineMessagePackCodec } from '../src/codecs/message-pack.js'
@@ -26,10 +26,9 @@ const goldenVectors = [
 
 describe('versioned codecs', () => {
   it('preserves identity descriptor and arbitrary whole-frame values', () => {
-    expect(Object.isFrozen(identityCodecV1)).toBe(true)
+    expect(Object.isFrozen(identityCodec)).toBe(true)
     const marker = { value: 1 }
-    expect(identityCodecV1.decode(identityCodecV1.encode(marker))).toBe(marker)
-    expect(identityCodec).toBe(identityCodecV1)
+    expect(identityCodec.decode(identityCodec.encode(marker))).toBe(marker)
   })
 
   it('round-trips the canonical JSON portable profile', () => {

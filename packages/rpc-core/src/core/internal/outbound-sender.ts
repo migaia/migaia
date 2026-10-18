@@ -50,7 +50,7 @@ import {
   readOwnedJsonSnapshot
 } from './outbound-owned-codec.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import {
   measureRpcPhysicalFrame,
   assertRpcPhysicalFrameSize,
@@ -461,7 +461,7 @@ export class RpcOutboundSender {
       const ownedIdentity =
         hasFastComponents(this.components) &&
         this.#objectPort === undefined &&
-        this.components.codec.encode === identityCodecV1.encode
+        this.components.codec.encode === identityCodec.encode
       /** Private codec state is created only by the sender; public options cannot supply it. */
       class SenderBinaryCodec implements IRpcBinaryDataCodec {
         /** Hold the actual sender so every later encode reads its original current selection. */
@@ -883,7 +883,7 @@ export class RpcOutboundSender {
             ? outboundJsonByteUpperBound(value)
             : this.#fast &&
                 !this.#objectPort &&
-                this.components.codec === identityCodecV1 &&
+                this.components.codec === identityCodec &&
                 value === physical
               ? ownedBatchByteUpperBound(entries)
               : undefined

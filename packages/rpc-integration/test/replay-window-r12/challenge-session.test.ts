@@ -14,7 +14,7 @@ import { RpcAuthenticationControl } from '../../../rpc-core/dist/core/internal/a
 import { RpcEnvelopeKind, RpcRouteType } from '@migaia/rpc-contract'
 import { MessageChannel } from 'node:worker_threads'
 import { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { installPlugin } from '../../../rpc-core/test/core/middleware/helpers.js'
 import type { IRpcAuthenticationCapability } from '@migaia/rpc-core'
 
@@ -70,7 +70,7 @@ async function participant(
     id,
     transport,
     middlewares: [connect({ transport }), signed(), ...(options?.ping ? [ping()] : [])],
-    ...(options?.decode ? { codec: { ...identityCodecV1, decode: options.decode } } : {}),
+    ...(options?.decode ? { codec: { ...identityCodec, decode: options.decode } } : {}),
     ...(execute
       ? { provider: { echo: async (context) => context.success(await execute(context.data)) } }
       : {})

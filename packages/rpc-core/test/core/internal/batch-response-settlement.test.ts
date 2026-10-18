@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
 import { createFullOneWayEndpoint } from '../../../dist/core/index.js'
 import { connect } from '../../../dist/core/middleware/connect.js'
@@ -42,7 +42,7 @@ for (const customCodec of [false, true]) {
     }
     /** An ordinary codec wrapper preserves semantics but has no private fast-component identity. */
     const selectedCodec = {
-      ...identityCodecV1,
+      ...identityCodec,
       encode: (value: unknown) => value,
       decode: (value: unknown) => value
     }

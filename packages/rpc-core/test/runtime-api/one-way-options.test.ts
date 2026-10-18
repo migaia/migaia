@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
@@ -38,7 +38,7 @@ function endpoint(
     {
       id,
       transport,
-      codec: identityCodecV1,
+      codec: identityCodec,
       framer: messageFramerV1,
       provider: { ready: (context) => context.success('ready') },
       middlewares: [

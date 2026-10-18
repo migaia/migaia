@@ -1,4 +1,4 @@
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { readCanonicalMiddlewareProof } from './json-object-port.js'
@@ -8,7 +8,7 @@ import type { IEndpointMiddlewareSnapshot } from './endpoint-bootstrap.js'
 
 /** Only foundational factory identities authorize omission of generic encode/framing fanout. */
 const codecs = new WeakMap<object, ((value: unknown) => unknown) | undefined>([
-  [identityCodecV1, identityCodecV1.decode]
+  [identityCodec, identityCodec.decode]
 ])
 /** Arbitrary frozen descriptors with matching metadata remain on the complete frame path. */
 const framers = new WeakSet<object>([messageFramerV1])
@@ -120,7 +120,7 @@ export function hasDecodedRuntimeMetadata(snapshot: object, cloned: boolean): bo
   /** Identity cannot sanitize a custom framer's live result, even after a native clone boundary. */
   const decode = proof?.decode
   return (
-    decode !== undefined && (decode !== identityCodecV1.decode || (cloned && proof?.fast === true))
+    decode !== undefined && (decode !== identityCodec.decode || (cloned && proof?.fast === true))
   )
 }
 

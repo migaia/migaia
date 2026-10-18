@@ -1,5 +1,5 @@
 import { SerializeErrorCode, type ISerializeErrorCode } from './error-code.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 export { SerializeErrorCode, type ISerializeErrorCode }
 
@@ -10,6 +10,22 @@ export const SERIALIZE_SOURCE = '@migaia/serialize' as const
 export const SerializeErrorText = {
   /** Stable boundary text for the public base64 decoder; underlying failures remain on cause. */
   base64Invalid: 'invalid base64 input',
+  /** Native JSON failures keep their own message; this fallback is used for non-Error throws. */
+  jsonEncodeFailed: 'json encoding failed',
+  /** Native JSON parse failures keep their message and type; unknown throws retain their cause. */
+  jsonDecodeFailed: 'json decoding failed',
+  /** JSON.stringify returning undefined cannot produce a serializable text chunk. */
+  jsonUndefined: 'json parser cannot serialize this value',
+  /** Standalone JSON bytes decoding needs an injected or host decoder. */
+  jsonDecoderUnavailable: 'TextDecoder is unavailable',
+  /** Standalone chunk conversion retains the supplied decoder failure behind this fallback. */
+  textDecodeFailed: 'serialize text decoding failed',
+  /** A value chunk deliberately has no wire text representation. */
+  valueTextUnsupported: 'a value chunk has no text form',
+  /** A value chunk deliberately has no wire byte representation. */
+  valueBytesUnsupported: 'a value chunk has no byte form',
+  /** Cooperative stream and registry cancellation share this stable public text. */
+  aborted: 'serialize aborted',
   /** Text output admits only portable own data; diagnostics never reflect rejected input values. */
   outputInvalid: 'serialize output requires a supported format and portable own data',
   /** Generic boundary text for an option accessor that threw during admission. */
@@ -114,15 +130,38 @@ export function tagSerializeError<E extends Error>(
       }
       return tagged
     }
-    throw new TypeError(
-      `serialize error already tagged with a different (source, code): ${tagged.source}, ${tagged.code}`
-    )
+    // The canonical owner supplies the coded conflict and retains the original error as cause.
+    return attachErrorIdentity(error, {
+      source: SERIALIZE_SOURCE,
+      code
+    }) as ISerializeTaggedError<E>
   }
   attachErrorIdentity(error, { source: SERIALIZE_SOURCE, code })
   if (context !== undefined) {
     Object.defineProperty(error, 'context', { value: context, enumerable: true })
   }
   return tagged
+}
+
+/**
+ * Tags a standalone parser or conversion failure without rebuilding an annotatable native error.
+ * Host codes or immutable errors need a coded TypeError wrapper; the exact original remains cause.
+ * The utils attachment hooks own conflict detection instead of duplicating it in each parser.
+ */
+export function tagSerializeFailure(
+  error: unknown,
+  code: ISerializeErrorCode,
+  message: string
+): Error {
+  if (!isNativeErrorValue(error)) return createSerializeError(code, message, { cause: error })
+  return attachErrorIdentity(
+    error,
+    { source: SERIALIZE_SOURCE, code },
+    {
+      onConflict: () => createSerializeTypeError(code, message, { cause: error }),
+      onFailure: () => createSerializeTypeError(code, message, { cause: error })
+    }
+  )
 }
 
 /**

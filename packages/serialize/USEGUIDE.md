@@ -53,7 +53,6 @@ import {
   SerializeCleanupKind,
   SerializePluginType,
   type ISerializeChunk,
-  type ISerializeChunkType,
   type ISerializeContext,
   type ISerializeOutput,
   type ISerializeParser,
@@ -81,7 +80,7 @@ import {
 } from '@migaia/serialize';
 ```
 
-包有四个导出入口：主入口 `.`（上面这份完整列表）、`./core`（静态复用 lifecycle abort leaf 的纯协议子集）、`./plugins`（内置 JSON 插件）、`./registry`（仅 registry 实现面）。四者的精确导出面见 [§11](#11-子路径导出面corepluginsregistry)。
+包的入口由 package.json exports 声明：根、/core、/plugins、/registry、/codec，以及 /codecs/identity/v1、/codecs/json、/codecs/message-pack、/codecs/cbor、/codecs/protobuf。常用模块见 §11，完整逐名入口与用途见文末公开入口索引。
 
 二进制 codec 使用可选 peer，按需安装。仅使用主入口、`/codec` 或 `codecs/json` 无需安装以下库。缺少对应 peer 时，Node 在导入 codec 子路径时抛 `ERR_MODULE_NOT_FOUND`，其他子路径仍可加载。
 
@@ -134,7 +133,7 @@ type ISerializeChunk =
 | `bytes` | `Uint8Array` | transfer 零拷贝、落 IndexedDB、喂 wasm                                                               |
 | `value` | `unknown`    | 已经是成品对象，不需要再编解码——"直通"型 parser（如 memory storage、测试桩）用它跳过无谓的编解码往返 |
 
-`ISerializeChunkType` 是这个联合类型的首元素类型，即 `'text' | 'bytes' | 'value'`。三种标签值本身由 [`SerializeChunkKind`](#25-格式常量root-only) 常量定义（`SerializeChunkKind.text === 'text'` 等），只在主入口可拿到。
+`ISerializeChunkKind` 是这个联合类型的首元素类型，即 `'text' | 'bytes' | 'value'`。三种标签值本身由 [`SerializeChunkKind`](#25-格式常量root-only) 常量定义（`SerializeChunkKind.text === 'text'` 等），只在主入口可拿到。
 
 ### 2.2 Parser 的输出可以是单段、Promise、或流
 
@@ -167,7 +166,7 @@ type ISerializeParser = {
 ### 2.3 单段形状判定
 
 ```ts
-const isChunkShape: (value: unknown) => value is ISerializeChunk;
+const isChunkShape: (value: unknown) => value is readonly [string, unknown];
 ```
 
 判定一个值是「单段」还是「多段容器」——二者都是数组，必须靠首元素消歧：单段的首元素是形态标签字符串，多段容器的首元素是另一个分段（数组）。`isChunkShape` 刻意只查 `typeof value[0] === 'string'`，不校验标签是否是合法的三种之一——非法标签会在内部的形状校验里报出精确原因（"unknown serialize chunk type"、"text chunk data must be a string" 等，均为 `SerializeCodecError`／`INVALID_CHUNK`），而不是在这里被误判成多段容器。
@@ -277,7 +276,7 @@ type ISerializeRegistryOptions = {
 | `decoder?: ITextDecoder`          | 宿主 `TextDecoder`                       | 目前构造期只做能力探测（供后续经该 registry 派生的 API 复用），同上校验规则                                                                                                                                                                                         |
 | `cleanup?`                        | `{ policy: 'throw' }`                    | `{ policy: 'throw' }`：`dispose()` 时任一 parser `dispose()` 失败会并入 `dispose()` 的 reject（见 [§3.3](#33-释放语义详解)）；`{ policy: 'report'; report }`：转发给 `report`，不影响 `dispose()` 的正常结算；`report` 缺失或非函数抛 `TypeError`／`INVALID_OPTION` |
 | `onDrainTimeout?: (d) => void`    | no-op                                    | `dispose({ deadlineAt })` 到期时仍有在途操作，触发一次诊断回调；回调抛错被吞掉（containment），不影响 `dispose()`                                                                                                                                                   |
-| `report?: (error) => void`        | no-op                                    | 两类"迟到"错误的观测出口：① 操作已经因 abort 提前 settle，但底层 parser task 之后才真正 reject（detached 迟到 rejection，`cleanedUp` 之后到达）；② 流式 `encode`/`decode` 内部 async iterator 二次清理失败。两类都不改变已结算的 primary 结果                       |
+| `report?: (error) => void`        | no-op                                    | 两类"迟到"错误的观测出口：① 操作已经因 abort 提前 settle，但底层 parser task 之后才真正 reject（detached 迟到 rejection，不要求 registry 已 cleanup）；② 流式 `encode`/`decode` 内部 async iterator 二次清理失败。两类都不改变已结算的 primary 结果                       |
 
 非对象/非函数的 `options` 本身（例如传了一个 `null`）会抛 `TypeError`／`INVALID_OPTION`。
 
@@ -340,7 +339,7 @@ registry 被 `close()`/`dispose()` 之后再调用 `encode`/`decode`：抛出的
 3. 按 `cleanup` 策略处理 parser 释放失败：`{ policy: 'throw' }`（默认）—— 若第 1 步没有先发生 deadline 相关失败，释放失败会直接成为 `dispose()` 的 reject 值；若已经有 deadline 相关的 primary 错误，释放失败会追加进该错误的 `errors` 数组（对象不可扩展时改用 `AggregateError` 包裹两者）。`{ policy: 'report'; report }`—— 释放失败改为调用 `report({ kind: 'cleanup-error', source: '@migaia/serialize', error })`，`dispose()` 本身仍正常 resolve
 4. `dispose()` **幂等**：第二次及以后的调用直接返回第一次调用产生的同一个 Promise，`deadlineAt` 以首次调用为准冻结，之后的调用即使传了不同的 `deadlineAt` 也不生效
 
-已经结算的操作若其底层 parser task 在 `cleanedUp` 之后才真正 settle（detached 迟到 rejection），该 rejection 会被 `report` 观测但不会改变任何已公开的结果或重新接入生命周期。
+public 结果因 abort 提前结算后，底层 parser 的所有迟到 rejection 均交 report，不要求先 dispose。包括清理期间的 detached ABORTED；不会改变已公开结果或重新接入生命周期。report 自身失败交 utils 的宿主异常通路，原失败仍可观察。未配置 report 时保留既有 no-op 选择。
 
 ---
 
@@ -476,7 +475,7 @@ function createSerializeRangeError(
 | `collectStream()` 需要合并 `bytes` 但未传 `encoder`      | 原生 `Error`              | `ENV_UNSUPPORTED`   | —                                                                                       |
 | `chunkToText`/`chunkToBytes` 传入 `value` 段             | `TypeError`               | `INVALID_CHUNK`     | —                                                                                       |
 | `sliceByFrameBudget`/`encodeStream` 参数越界             | `RangeError`／`TypeError` | `INVALID_OPTION`    | —                                                                                       |
-| `base64ToBytes` 输入非法                                 | `TypeError`               | `INVALID_OPTION`    | 不保留原始 `cause`                                                                      |
+| `base64ToBytes` 输入非法                                 | `TypeError`               | `INVALID_OPTION`    | cause 保留 utils 的原始解码失败                                                                      |
 | `createSerializeRegistry`/JSON 插件探测不到 Encoding API | 原生 `Error`              | `ENV_UNSUPPORTED`   | 原始缺失原因（如有）在 `cause`                                                          |
 
 `encodeStream`/`decodeStream` 内部捕获到单次 `registry.encode`/`decode` 抛出的 `SerializeCodecError` 后，**不会直接透传**——那个内层错误的 `chunkIndex` 说的是"这一次 encode/decode 内部的第几段"，恒为 0，会把"流里的第几片/第几个 chunk"这个真正有用的位置信息盖掉。所以会重新包一层新的 `SerializeCodecError`，用流位置作为 `chunkIndex`，原始错误挂在 `cause` 上——排查时应该顺着 `cause` 链往下看真正的根因。
@@ -520,14 +519,14 @@ function streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void>;
 
 朴素实现——逐字节 `binary += String.fromCharCode(bytes[i])` 拼字符串，再对整个输入调一次 `btoa()`——会让一个 71MB 的 payload 同时在内存里 held 住原始 `Uint8Array`、一个 7100 万字符的中间二进制字符串、以及完整的 base64 输出，峰值内存是输入体积的好几倍，并且全程占着主线程——而这个 codec 存在的意义恰恰是处理大 payload。
 
-内部按 `CHUNK_BYTES = 32763`（`0x7ffd` 向下取到 3 的倍数）分块处理：分块把中间二进制字符串和单次 `btoa()` 的工作量都限制在一块以内；`bytesToBase64` 最终只有拼接完的完整 base64 字符串仍然整份持有（面向的调用方——`persist.ts`/SSR 这类要「一个完整字符串」的场景——本来就需要这个结果）。
+内部按 `CHUNK_BYTES = 32763`（`0x7ffd` 向下取到 3 的倍数）分块处理：每块直接通过 utils 的 runtime-neutral RFC 4648 字节算法生成文本，不创建 binary string，也不调用 btoa/atob；`bytesToBase64` 最终只有拼接完的完整 base64 字符串仍然整份持有（面向的调用方——`persist.ts`/SSR 这类要「一个完整字符串」的场景——本来就需要这个结果）。
 
-块大小必须是 3 的倍数：base64 把 3 字节编码成 4 字符，块边界如果不是 3 对齐，`btoa()` 会在块中间插入 `=` 补齐，导致第一个未对齐块之后的每一块都被破坏。`String.fromCharCode(...chunk)` 的展开参数个数也必须远低于引擎的单次调用参数上限（多数引擎约 65536），这是选定这个具体块大小的另一层原因。
+块大小必须是 3 的倍数：base64 把 3 字节编码成 4 字符，块边界如果不是 3 对齐，每块独立编码会在块中间插入 `=` 补齐，导致第一个未对齐块之后的每一块都被破坏。当前实现不展开 String.fromCharCode 参数；32763 是保持既有分块行为的三字节对齐上限。
 
 | 函数                        | 输入               | 输出                | 同步/异步 | 行为                                                                                                                                                                                      |
 | --------------------------- | ------------------ | ------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bytesToBase64(bytes)`      | `Uint8Array`       | `string`            | 同步      | 内部分块处理后拼接成完整 base64 字符串一次返回                                                                                                                                            |
-| `base64ToBytes(text)`       | `string`（base64） | `Uint8Array`        | 同步      | 解出二进制并转回字节；输入非法（不是合法 base64）时抛 `TypeError`／`INVALID_OPTION`（"invalid base64 input"）——**不保留**原始底层异常为 `cause`                                           |
+| `base64ToBytes(text)`       | `string`（base64） | `Uint8Array`        | 同步      | 解出二进制并转回字节；输入非法（不是合法 base64）时抛 `TypeError`／`INVALID_OPTION`（"invalid base64 input"）——**保留** utils 原始解码异常为 `cause`                                           |
 | `streamBase64Chunks(bytes)` | `Uint8Array`       | `Generator<string>` | 同步      | 与 `bytesToBase64` 相同的分块逻辑，但**逐块 yield 而不拼接**——真正的生成器，惰性消费不会提前算出未被请求的块；空输入不产出任何块（生成器本身不涉及 `Promise`/`await`，`next()` 同步返回） |
 
 `streamBase64Chunks` 面向"写入一个 sink（`WritableStream`、分块上传）从不需要一次性拿到完整字符串"的调用方；如果最终就是想要一整个字符串（比如 JSON/localStorage 字段），直接用 `bytesToBase64`——自己拼接 `streamBase64Chunks` 的输出只是绕了一圈重新构造同一个字符串。三个函数均**无可选项**，分块大小是内部实现细节，不对外暴露为参数。
@@ -629,12 +628,12 @@ function collectStream(
 ): Promise<ISerializeChunk>;
 ```
 
-只在消费者确实需要完整 blob 时才用——它会把整份数据同时驻留在内存里，正是流式设计想要避免的那笔峰值。`encoder` 参数只在合并结果里出现过 `bytes` 段（需要把 `text` 段就地转成字节）时才用得到；如果流里始终只有 `text` 段，`encoder` 可以省略。
+只在消费者确实需要完整 blob 时才用——它会把整份数据同时驻留在内存里，正是流式设计想要避免的那笔峰值。`encoder` 参数只在合并结果里出现过 `bytes` 段时要求提供；单个 bytes chunk 可直接返回，多个 bytes chunk 即使不含 text 仍要求显式 encoder。全 text 流可以省略。
 
 拼装规则与 [§2.2](#22-parser-的输出可以是单段promise或流) 描述的单次 `encode()` 拼装规则一致：
 
 - 全是 `text` → 用 `Array.join('')` 一次性拼接成一个字符串（而不是逐段 `+=`，避免长流退化成二次方级别的字符串复制）
-- 出现过 `bytes` → 需要把 `text` 段就地转成字节整体拼接，此时若未提供 `encoder` 会抛原生 `Error`／`ENV_UNSUPPORTED`（"TextEncoder is unavailable"）——`/core` 不假定宿主一定有 `TextEncoder`
+- 单个 bytes chunk 直接返回；多个 chunk 且含 bytes 时必须注入 encoder（包括全 bytes），缺失时抛原生 Error／ENV_UNSUPPORTED（"serialize encoder must provide encode() as a function"）；core 不读取全局 TextEncoder
 - 出现 `value` → 抛 `SerializeCodecError`／`INVALID_CHUNK`（"cannot collect a value chunk into a stream"，协议流里不允许 value 段）
 - 空流 → 返回 `['text', '']`
 
@@ -761,7 +760,7 @@ import {
   encodeStream,
   sliceByFrameBudget,
   type ISerializeChunk,
-  type ISerializeChunkType,
+  type ISerializeChunkKind,
   type ISerializeContext,
   type ISerializeOutput,
   type ISerializeParser,
@@ -796,7 +795,7 @@ Core 静态复用 `@migaia/lifecycle/abort` 作为唯一取消 owner；packed co
 import { jsonParser, jsonPlugin, type IJsonPluginOptions } from '@migaia/serialize/plugins';
 ```
 
-零包依赖；只导出内置 JSON 插件（`jsonParser`/`jsonPlugin`/`IJsonPluginOptions`），完整参数见 [§8](#8-内置-json-插件)。
+不加载格式可选 peer；经 errors 静态依赖 utils/error，只导出内置 JSON 插件（`jsonParser`/`jsonPlugin`/`IJsonPluginOptions`），完整参数见 [§8](#8-内置-json-插件)。
 
 ### 11.3 `/registry`
 
@@ -827,6 +826,7 @@ import type { IAbortSignal } from '@migaia/utils/promise';
 ## 12. 完整组合示例
 
 ```ts
+import { systemScheduler } from '@migaia/utils/scheduler';
 import {
   createSerializeRegistry,
   encodeStream,
@@ -866,8 +866,8 @@ for await (const rows of decodeStream(registry, wire as never, { context: 'expor
   restored.push(...(rows as unknown[]));
 }
 
-// 4. 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）
-await registry.dispose({ deadlineAt: Date.now() + 500 });
+// 4. 最多等待 500ms 排空在途操作，随后仍逐个 await parser.dispose()；清理本身没有硬超时。
+await registry.dispose({ deadlineAt: systemScheduler.now() + 500 });
 ```
 
 多格式共存（新旧存档平滑迁移）：
@@ -935,7 +935,7 @@ Base64 编码本身会让体积膨胀约 4/3 倍，这不是本包的开销，�
 # Versioned codec boundaries
 
 `@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>`
-shape and retains the `identityCodecV1` compatibility alias. New version-specific callers import
+shape. The old alias and unversioned identity entry are removed. Callers import
 `identityCodec` from `@migaia/serialize/codecs/identity/v1`; it is the same runtime object and
 preserves the input value's concrete type through `encode` and `decode`. Format implementations are intentionally split:
 `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the
@@ -1004,3 +1004,127 @@ RPC 的 null-prototype/freeze、父字段先捕获、canonical tag、深度 64 �
 The factory captures callbacks and its context once. Synchronous node accounting uses primitive slots, saved/restored on invocation and nested array boundaries. Reentrant getter calls restore the outer active path and accounting, and completed calls retain no caller graph. Context is read only during its synchronous strategy hook. No global binary side table or per-request strategy factory is introduced.
 
 For native outcomes `byteUpperBound` includes the strategy-supplied native bytes and the existing scalar/container bound. It is not a manifest's complete unique-backing/offset budget; that physical protocol budget stays with its owner. Existing JSON, MessagePack and CBOR defaults remain inline-only and keep their wire bytes unchanged.
+
+Standalone JSON/转换 helper 原生错误按 encode/decode 附 ENCODE_FAILED/DECODE_FAILED，原生对象可附加身份时保持 identity/type/stack；宿主 code 冲突或 immutable 错误通过 coded TypeError wrapper 的 cause 保留原错。tagSerializeError 冲突复用 utils 的 ERROR_IDENTITY_CONFLICT，原错仍为 cause。Base64 decoder 的 serialize INVALID_OPTION cause 指向 utils INVALID_ENCODING。
+
+
+## Codec 工厂与 portable 参数参考
+
+格式 codec 与 registry 的 parser 是不同契约：codec 的 encode/decode 同步处理一个值；registry parser 可产出 chunk 或流。`ICodec<TValue, TEncoded, TId, TVersion>` 的只读字段为 id、version、encodedType，以及对应输入/输出类型的 encode/decode 函数。
+
+| 工厂与规范入口 | 必填 options 与返回值 | 错误与依赖 |
+| --- | --- | --- |
+| defineJsonCodec，/codecs/json | IJsonCodecOptions 的 version 为正安全整数，无默认值；返回 id=json、encodedType=string 的冻结 codec，输入/解码结果为 ICodecValue | 无格式 peer；非法 version 为 INVALID_OPTION，编码/解码为 ENCODE_FAILED/DECODE_FAILED |
+| defineMessagePackCodec，/codecs/message-pack | IMessagePackCodecOptions 只有必填 version；返回 id=message-pack、encodedType=uint8array 的冻结 codec；ICodecValue 与 Uint8Array 往返 | 需要 @msgpack/msgpack；无自定义扩展，portable 投影按键排序；错误码同 JSON |
+| defineCBORCodec，/codecs/cbor | ICborCodecOptions 只有必填 version；返回 id=cbor、encodedType=uint8array 的冻结 codec；解码安全范围 bigint 归为 number | 需要 cbor-x，禁用 records；错误码同 JSON |
+| defineProtobufCodec，/codecs/protobuf | IProtobufCodecOptions 必填 version、schema、binding；schema 是 IProtobufSchema 的 {id,version}，id 匹配小写字母开头的字母/数字/点/连字符，schema.version 也是独立的正安全整数；binding 为 Buf 生成的 DescMessage | 需要 @bufbuild/protobuf；返回冻结 codec 及冻结 schema 快照，保留 schema 的字面量类型；非法 schema/binding 为 INVALID_OPTION，编解码失败保留 cause |
+| identityCodec，/codecs/identity/v1 | 无构造参数；id=identity、version=1、encodedType=unknown；encode/decode 原样返回输入并保留具体类型 | 无格式 peer，不复制、不验证、不冻结业务值；只冻结 codec 对象 |
+
+```ts
+import { defineJsonCodec } from '@migaia/serialize/codecs/json';
+import { asCodecValue } from '@migaia/serialize/codec';
+
+const codec = defineJsonCodec({ version: 2 });
+const input = asCodecValue({ count: 1 });
+const restored = codec.decode(codec.encode(input));
+```
+
+`ICodecValue` 只表达有限 JSON 数据域：null、boolean、finite number、string、密集数组与字符串键 record。静态 number 类型不能证明有限性，必须保留运行时校验。
+
+| Portable 入口（/codec） | 输入与返回 | 策略与失败责任 |
+| --- | --- | --- |
+| toPortableValue(value, active?) | unknown，active 默认为新的 ancestor Set；返回 legacy 中间投影 unknown | 投影不等于最终断言，不承诺冻结；保持既有转换规则 |
+| assertPortableValue(value, active?) | unknown 与可选 ancestor Set；返回 void，保留原始业务对象 | 拒绝不满足 decoded portable profile 的值，INVALID_OPTION；环检测仅作用于当前祖先路径 |
+| asCodecValue(value) | unknown；验证后返回同一对象的 ICodecValue 视图 | 不复制、不冻结；错误与 assertPortableValue 相同 |
+| normalizeCodecFailure(error, code, message) | unknown、已登记 SerializeErrorCode、边界稳定消息；返回 Error | 已由 serialize 标注的 Error 原样返回；其余以 TypeError 包装并保留 cause；不授予协议控制身份 |
+| createPortableWalker(strategy) | IPortableWalkerStrategy；返回可调用 walker 与其 .value 方法 | 策略解析一次，每次调用独立保存/恢复遍历状态；不可在 hook 中自行递归同一图 |
+
+walker(value, active?, initialDepth?, beforeNativeBinary?) 返回 {value,byteUpperBound,hasBinary}；.value 接受相同参数，仅返回投影值。active 是当前 ancestor 集合，initialDepth 默认为 0；beforeNativeBinary 是当前调用的拒绝守卫，不是全局注册。
+
+IPortableWalkerStrategy 的必需 hook：scalar(value, context) 返回 primitive 或 {value,violation?}；record(value, context) 返回 {entries,output?,tag?,hasBinary?,validate?} 或 undefined；binary(value, context) 返回二进制结果或 undefined；violation(reason,cause?) 必须抛调用方拥有的 coded error，保留原 cause。context 提供 reject、isAncestor、isUint8Array、bytesToBase64url、isCanonicalBase64url，以及可选 beforeNativeBinary。
+
+可选 maxDepth 限制递归深度；key(key,context) 校验键；write(output,key,child) 选择输出属性语义；finish(value,hasNativeBinary) 收尾。array(value,visit,context) 与 arrayValue(value,ownedVisit,childDepth,ancestors,guard,bounds,context) 互斥，后者提供明确词法所有权。没有 nativeByteLength 时 binary 仅返回 inline string；提供该 intrinsic 长度读取 hook 后，binary 可返回 IPortableBinaryResult（string/Uint8Array/ArrayBuffer）。数组/record/scalar 可返回 deferred violation，以保留既有投影失败优先级；立即失败调用 context.reject。所有异常归属与资源预算由既有策略负责，不另建协议或生命周期 owner。
+
+## 公开入口索引
+
+下表逐名覆盖收敛后的公开表面；工厂和 portable hook 的参数责任见上节，其余语义与错误见对应模块。
+
+| 名称 | 规范入口 | 用途 |
+| --- | --- | --- |
+| `asCodecValue` | `@migaia/serialize/codec` | Validate and narrow a decoded format value while preserving its original identity. |
+| `assertPortableValue` | `@migaia/serialize/codec` | Assert the legacy decoded portable profile without replacing or freezing caller data. |
+| `assertSerializeType` | `@migaia/serialize/core` | 校验 1–64 字符 ASCII token，首位字母/数字，其余可含点、下划线、连字符；非法时原生 RangeError/INVALID_OPTION。 |
+| `base64ToBytes` | `@migaia/serialize/core` | Decode canonical padded base64 while preserving the legacy public diagnostic boundary. |
+| `bytesToBase64` | `@migaia/serialize/core` | Encode bytes through the shared runtime-neutral RFC 4648 implementation. |
+| `chunkToBytes` | `@migaia/serialize/registry` | Converts text or byte chunks to bytes using the required `encoder`, for transfer, IndexedDB, or Wasm. |
+| `chunkToText` | `@migaia/serialize/registry` | Converts text or byte chunks to text using the required `decoder`. |
+| `CodecErrorText` | `@migaia/serialize/codec` | Stable codec diagnostics shared by all format-specific implementations. |
+| `collectStream` | `@migaia/serialize/core` | Assembles a chunk stream into one result. |
+| `createPortableWalker` | `@migaia/serialize/codec` | Create one specialized synchronous walker. |
+| `createSerializeError` | `@migaia/serialize/core` | Creates a native construction or lifecycle error, such as `REGISTRY_DISPOSED`, `ENV_UNSUPPORTED`, or rollback failure. |
+| `createSerializeRangeError` | `@migaia/serialize/core` | Creates a native `RangeError` tagged for invalid input, such as an empty plugin list, duplicate type, or illegal type. |
+| `createSerializeRegistry` | `@migaia/serialize/registry` | 快照并接纳插件与 options，返回 encode/decode/close/dispose owner；共享 parser 只释放一次，deadline 仅约束 drain。 |
+| `createSerializeTypeError` | `@migaia/serialize/core` | Creates a native `TypeError` with the supplied code, for example `INVALID_OPTION` for an invalid scheduler. |
+| `decodeStream` | `@migaia/serialize/core` | Decodes a chunk stream one piece at a time without assembling the full result. |
+| `defineCBORCodec` | `@migaia/serialize/codecs/cbor` | Create an RFC-compatible CBOR codec for portable values. |
+| `defineJsonCodec` | `@migaia/serialize/codecs/json` | Create a deterministic JSON codec for the portable profile. |
+| `defineMessagePackCodec` | `@migaia/serialize/codecs/message-pack` | Create an extension-free MessagePack codec for portable values. |
+| `defineProtobufCodec` | `@migaia/serialize/codecs/protobuf` | Create a protobuf codec that keeps codec and schema identities independent. |
+| `emitOutput` | `@migaia/serialize` | Emit one complete portable projection; invalid inputs never produce partial output or evaluate getters. |
+| `encodeStream` | `@migaia/serialize/core` | Encodes a large array as a chunk stream without assembling the full result. |
+| `ICborCodecOptions` | `@migaia/serialize/codecs/cbor` | Options for the deterministic CBOR codec factory. |
+| `ICodec` | `@migaia/serialize/codec` | Generic codec contract; callback properties preserve strict function variance. |
+| `ICodecValue` | `@migaia/serialize/codec` | Runtime-neutral portable input accepted by the built-in format codecs. |
+| `ICollectStreamOptions` | `@migaia/serialize/core` | Captured policy for one collector operation; getters are read before iterator acquisition. |
+| `identityCodec` | `@migaia/serialize/codecs/identity/v1` | Identity codec used by whole-frame transports; it never imports a format runtime. |
+| `IEncodeStreamOptions` | `@migaia/serialize/core` | 按帧预算编码的 scheduler、signal、type/context、yieldTo、maxInFlight 等选项；scheduler 必填。 |
+| `IFrameBudgetOptions` | `@migaia/serialize/core` | Adaptive slicing to fit a frame budget. |
+| `IJsonCodecOptions` | `@migaia/serialize/codecs/json` | Options for the native JSON codec factory. |
+| `IJsonPluginOptions` | `@migaia/serialize/plugins` | 原生 JSON 的 replacer、reviver、space 以及可选字节 decoder；不加载二进制格式 peer。 |
+| `IMessagePackCodecOptions` | `@migaia/serialize/codecs/message-pack` | Options for the MessagePack codec factory. |
+| `IPortableBinaryResult` | `@migaia/serialize/codec` | Binary outcomes are unboxed: inline text or borrowed native storage, with no descriptor allocation. |
+| `IPortableWalkerStrategy` | `@migaia/serialize/codec` | Policy owned by the caller, resolved once at factory creation. |
+| `IProtobufCodecOptions` | `@migaia/serialize/codecs/protobuf` | A generated Buf descriptor is the only executable binding accepted by a Protobuf codec. |
+| `IProtobufSchema` | `@migaia/serialize/codecs/protobuf` | Stable public schema identity remains independent from codec and binding versions. |
+| `isChunkShape` | `@migaia/serialize/core` | Distinguishes one chunk from a container of chunks. |
+| `ISerializeChunk` | `@migaia/serialize/core` | Serialization chunk protocol. |
+| `ISerializeChunkKind` | `@migaia/serialize/core` | SerializeChunkKind 常量的三标签值联合：text、bytes、value；所有入口复用同一声明。 |
+| `ISerializeCleanupError` | `@migaia/serialize/registry` | cleanup-error 诊断事件的 source 与原始 error，不是新增抛错码。 |
+| `ISerializeCleanupKind` | `@migaia/serialize` | cleanup-error 与 drain-timeout 诊断的 kind 联合。 |
+| `ISerializeCleanupPolicy` | `@migaia/serialize` | parser 释放失败的 throw/report 策略联合。 |
+| `ISerializeContext` | `@migaia/serialize/core` | 传给 parser 的组合 signal 与错误定位 context 字符串。 |
+| `ISerializeErrorCode` | `@migaia/serialize/core` | SerializeErrorCode 常量对象的八种已登记码值联合。 |
+| `ISerializeLifecycleError` | `@migaia/serialize/core` | Tagged native error for construction and lifecycle failures. |
+| `ISerializeOutput` | `@migaia/serialize/core` | 单个 chunk、Promise chunk、同步 chunk 迭代器或异步 chunk 迭代器。 |
+| `ISerializeOutputFormat` | `@migaia/serialize` | SerializeOutput 各输出模式的值联合。 |
+| `ISerializeParser` | `@migaia/serialize/core` | Parser implementation. |
+| `ISerializePhase` | `@migaia/serialize/core` | encode/decode 错误位置标签联合，不是 instrumentation 事件。 |
+| `ISerializePlugin` | `@migaia/serialize/core` | Registers a parser under an envelope format tag. |
+| `ISerializePluginType` | `@migaia/serialize` | 内置 SerializePluginType 的值联合。 |
+| `ISerializeRangeError` | `@migaia/serialize/core` | 保持原生 RangeError 类型并附 source/code/context 的标注错误。 |
+| `ISerializeRegistry` | `@migaia/serialize/core` | registry 的 primaryType、encode/decode、close/dispose 公开契约；dispose 幂等共享 Promise。 |
+| `ISerializeRegistryOptions` | `@migaia/serialize/registry` | scheduler/encoder/decoder 能力与 report、onDrainTimeout、cleanup 策略。 |
+| `ISerializeTaggedError` | `@migaia/serialize/core` | Adds `source`, `code`, and optional `context` to a native error while retaining its runtime type and `instanceof` behavior. |
+| `ISerializeTextFormat` | `@migaia/serialize` | emitOutput 的 json/yaml/toml 文本格式联合。 |
+| `ISerializeTimeoutDiagnostic` | `@migaia/serialize/registry` | drain-timeout 事件：source、绝对 deadlineAt 与 pendingCount；不是异常码。 |
+| `ISerializeTypeError` | `@migaia/serialize/core` | 保持原生 TypeError 类型并附 source/code/context 的标注错误。 |
+| `ITextDecoder` | `@migaia/serialize/core` | 可注入的 decode(Uint8Array):string 能力，转换失败按解码边界标注。 |
+| `ITextEncoder` | `@migaia/serialize/core` | Structural Encoding API capability injected into core, plugins, and registry without requiring concrete host classes. |
+| `jsonParser` | `@migaia/serialize/plugins` | Default JSON parser using V8's optimized native JSON implementation. |
+| `jsonPlugin` | `@migaia/serialize/plugins` | 接纳 IJsonPluginOptions 并返回 type=json 与 jsonParser 的插件定义。 |
+| `normalizeCodecFailure` | `@migaia/serialize/codec` | Wraps a format callback while retaining the package error code and original cause. |
+| `SERIALIZE_SOURCE` | `@migaia/serialize/core` | The single literal source for error `source`. |
+| `SERIALIZE_TYPE_PATTERN` | `@migaia/serialize/core` | Allowed plugin `type` characters. |
+| `SerializeChunkKind` | `@migaia/serialize` | Canonical serialized chunk kinds. |
+| `SerializeCleanupKind` | `@migaia/serialize` | cleanup-error 与 drain-timeout 诊断事件的稳定 kind 常量。 |
+| `SerializeCleanupPolicy` | `@migaia/serialize` | Cleanup policies and diagnostic kinds used by the serializer registry. |
+| `SerializeCodecError` | `@migaia/serialize/core` | Encoding or decoding error with `type`, `phase`, `chunkIndex`, and `bytesConsumed` for failure location. |
+| `SerializeErrorCode` | `@migaia/serialize/core` | The single declaration site for `@migaia/serialize` error codes. |
+| `SerializeOutput` | `@migaia/serialize` | Codec output representations used by serializers and persistence adapters. |
+| `SerializePhase` | `@migaia/serialize` | 编码与解码的错误位置标签；这些常量不发射 instrumentation 事件。 |
+| `SerializePluginType` | `@migaia/serialize` | Built-in serializer plugin identifiers used in registry metadata. |
+| `SerializeTextFormat` | `@migaia/serialize` | Portable management projections choose an output-only text format, never a parser plugin. |
+| `sliceByFrameBudget` | `@migaia/serialize/core` | Slices a large array to fit a frame budget and yields the main thread between slices. |
+| `streamBase64Chunks` | `@migaia/serialize/core` | Yields base64 text pieces to consumers that write to a sink, such as `WritableStream` or chunked upload. |
+| `tagSerializeError` | `@migaia/serialize/core` | Attaches read-only `source`, `code`, and optional `context` and returns the original error. |
+| `toPortableValue` | `@migaia/serialize/codec` | Preserve the legacy intermediate projection with a thin default walker instance. |

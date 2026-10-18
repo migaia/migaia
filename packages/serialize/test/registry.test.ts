@@ -1577,7 +1577,7 @@ describe('T-14/T-22 cleanup 判别联合 + detached sink', () => {
 })
 
 describe('T-17 iterator.return 错误专项', () => {
-  it('return() 抛错只 report，不覆盖 primary abort', async () => {
+  it('return() 失败和 detached abort 均 report，不覆盖 public abort', async () => {
     const reported: unknown[] = []
     const controller = createAbortController()
     const registry = createSerializeRegistry(
@@ -1612,8 +1612,9 @@ describe('T-17 iterator.return 错误专项', () => {
     await expect(registry.encode('x', { type: 'a', signal: controller.signal })).rejects.toThrow(
       /aborted/
     )
-    expect(reported).toHaveLength(1)
+    expect(reported).toHaveLength(2)
     expect((reported[0] as Error).message).toBe('return boom')
+    expect(reported[1]).toMatchObject({ code: 'ABORTED', cause: 'stop' })
   })
 })
 
@@ -1686,13 +1687,15 @@ describe('T-19 abort → return() 悬挂 → deadline 竞态', () => {
 })
 
 describe('T-22 detached 迟到错误经 report 通道', () => {
-  it('report 自身抛错被 containment：迟到 rejection 不 unhandled、不改变 terminal', async () => {
+  it('report 自身失败交宿主异常通路，迟到 rejection 被观察且不改变 terminal', async () => {
     const manual = createManualScheduler()
     let rejectGate: ((reason: unknown) => void) | undefined
     const gate = new Promise<unknown>((_, reject) => {
       rejectGate = reject
     })
     let reportCalls = 0
+    /** The same secondary reporter failure must remain observable at the host boundary. */
+    const reporterFailure = new Error('report boom')
     const registry = createSerializeRegistry(
       [
         plugin('a', {
@@ -1708,7 +1711,7 @@ describe('T-22 detached 迟到错误经 report 通道', () => {
         scheduler: manual,
         report: () => {
           reportCalls++
-          throw new Error('report boom')
+          throw reporterFailure
         }
       }
     )
@@ -1717,13 +1720,23 @@ describe('T-22 detached 迟到错误经 report 通道', () => {
     manual.advance(100)
     await disposePromise
 
-    // 迟到 rejection：report 抛错被 containment，不影响 rejection observation。
-    rejectGate?.(new Error('late encode boom'))
-    // R-3 双 Promise：public promise 在 dispose（closing abort）时已以 aborted 结算；迟到的 parser
-    // rejection 走 report 通道（report 自身抛错被 containment，仍计一次调用）。
-    await expect(pending).rejects.toThrow(/aborted/)
-    await Promise.resolve()
-    expect(reportCalls).toBe(1)
+    /** Capture the existing host diagnostic seam without executing an uncaught host throw. */
+    const hostCallbacks: (() => void)[] = []
+    /** Restore host scheduling even when an assertion fails. */
+    const enqueue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      hostCallbacks.push(callback)
+    })
+    try {
+      rejectGate?.(new Error('late encode boom'))
+      await expect(pending).rejects.toThrow(/aborted/)
+      for (let turn = 0; turn < 8; turn++) await Promise.resolve()
+      expect(reportCalls).toBe(1)
+      expect(hostCallbacks).toHaveLength(1)
+      expect(hostCallbacks[0]).toThrow(reporterFailure)
+      expect(registry.dispose()).toBe(disposePromise)
+    } finally {
+      enqueue.mockRestore()
+    }
   })
 
   it('无 report 时走 no-op fallback：迟到 rejection 被 catch 观测、不 unhandled', async () => {
@@ -1757,7 +1770,7 @@ describe('T-22 detached 迟到错误经 report 通道', () => {
 })
 
 describe('A10 single scheduler export surface consumed by serialize', () => {
-  it('exposes one scheduler implementation through utils and none through lifecycle', () => {
+  it('exposes runtime schedulers through utils and reserves manual scheduling for testing', () => {
     expect(utilsRoot.systemScheduler).toBe(utilsScheduler.systemScheduler)
     expect('createManualScheduler' in utilsRoot).toBe(false)
     expect('createManualScheduler' in utilsScheduler).toBe(false)

@@ -2,14 +2,13 @@ import { toCodecPortableValue } from '../portable.js'
 import { Decoder, Encoder } from 'cbor-x'
 import { SerializeErrorCode } from '../error-code.js'
 import {
-  assertCodecVersion,
   asCodecValue,
   CodecErrorText,
-  createCodecError,
   normalizeCodecFailure,
   type ICodec,
   type ICodecValue
 } from '../codec.js'
+import { assertCodecVersion, createCodecError } from '../internal/codec.js'
 
 /** Shared CBOR encoder configured without records, tags, or host-specific extensions. */
 const cborEncoder = new Encoder({

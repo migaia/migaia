@@ -41,8 +41,6 @@ export type ISerializeChunk =
   | readonly [typeof SerializeChunkKind.bytes, Uint8Array]
   | readonly [typeof SerializeChunkKind.value, unknown]
 
-export type ISerializeChunkType = ISerializeChunk[0]
-
 export type ISerializeContext = {
   /**
    * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and
@@ -113,7 +111,7 @@ export function assertSerializeType(type: string): void {
  * This checks the string shape without validating the tag. Invalid tags reach
  * `validateSerializeChunk` for precise diagnostics instead of being mistaken for a container.
  */
-export const isChunkShape = (value: unknown): value is ISerializeChunk =>
+export const isChunkShape = (value: unknown): value is readonly [string, unknown] =>
   Array.isArray(value) && value.length === 2 && typeof value[0] === 'string'
 
 /**

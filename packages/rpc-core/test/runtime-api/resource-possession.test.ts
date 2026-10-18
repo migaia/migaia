@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
@@ -25,7 +25,7 @@ function pair(capabilities: readonly string[] = []) {
         id: `resource-${index}`,
         transport,
         targetIds: [`resource-${1 - index}`],
-        codec: identityCodecV1 as IRpcFactoryConfig['codec'],
+        codec: identityCodec as IRpcFactoryConfig['codec'],
         framer: messageFramerV1,
         middlewares: [connect({ transport }), abort()],
         ...(index === 1 ? { provider: { echo: (context) => context.success(context.data) } } : {})
@@ -90,7 +90,7 @@ describe('C12 resource possession', () => {
       {
         id: 'cold-failure',
         transport: transports[0],
-        codec: identityCodecV1 as IRpcFactoryConfig['codec'],
+        codec: identityCodec as IRpcFactoryConfig['codec'],
         framer: messageFramerV1,
         middlewares: [connect({ transport: transports[0] }), abort()],
         features: [

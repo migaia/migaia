@@ -2,13 +2,13 @@ import { toCodecPortableValue } from '../portable.js'
 import { decode, encode } from '@msgpack/msgpack'
 import { SerializeErrorCode } from '../error-code.js'
 import {
-  assertCodecVersion,
   asCodecValue,
   CodecErrorText,
   normalizeCodecFailure,
   type ICodec,
   type ICodecValue
 } from '../codec.js'
+import { assertCodecVersion } from '../internal/codec.js'
 
 /** Options for the MessagePack codec factory. */
 export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{ version: TVersion }>

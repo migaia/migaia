@@ -1,5 +1,5 @@
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createProcessPeer } from '@migaia/rpc-process'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
@@ -57,10 +57,10 @@ try {
               scheduler: systemScheduler,
               agreement: {
                 source: 'static',
-                codec: identityCodecV1.id,
+                codec: identityCodec.id,
                 capabilities
               },
-              pipeline: { codec: identityCodecV1, framer: messageFramerV1 },
+              pipeline: { codec: identityCodec, framer: messageFramerV1 },
               features: [],
               close: async () => undefined
             }

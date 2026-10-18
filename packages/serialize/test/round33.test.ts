@@ -233,7 +233,7 @@ describe('Round33 packed serialize core boundary', () => {
       const identityLedger = await buildLedger(
         consumerRoot,
         'identity-entry.js',
-        "import { identityCodecV1 } from '@migaia/serialize/codecs/identity'; const marker = identityCodecV1; const value = { marker: true }; if (marker.id !== 'identity' || marker.version !== 1 || marker.encodedType !== 'unknown' || marker.encode(value) !== value || marker.decode(value) !== value) throw new Error('identity codec changed value'); export { identityCodecV1 };\n",
+        "import { identityCodec } from '@migaia/serialize/codecs/identity/v1'; const marker = identityCodec; const value = { marker: true }; if (marker.id !== 'identity' || marker.version !== 1 || marker.encodedType !== 'unknown' || marker.encode(value) !== value || marker.decode(value) !== value) throw new Error('identity codec changed value'); export { identityCodec };\n",
         installedPackages
       )
       const coreLedger = await buildLedger(

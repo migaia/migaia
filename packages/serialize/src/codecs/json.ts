@@ -1,14 +1,13 @@
 import { toCodecPortableValue } from '../portable.js'
 import { SerializeErrorCode } from '../error-code.js'
 import {
-  assertCodecVersion,
   asCodecValue,
-  createCodecError,
   CodecErrorText,
   normalizeCodecFailure,
   type ICodec,
   type ICodecValue
 } from '../codec.js'
+import { assertCodecVersion, createCodecError } from '../internal/codec.js'
 
 /** Options for the native JSON codec factory. */
 export type IJsonCodecOptions<TVersion extends number> = Readonly<{ version: TVersion }>

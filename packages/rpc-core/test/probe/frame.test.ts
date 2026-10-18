@@ -1,6 +1,6 @@
 import { carrierSizeBytes } from '../../dist/adapter/internal-advanced.js'
 import { describe, expect, it, vi } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { RpcRouteProfile, RpcBatchPhysical, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { rpcProtocol } from '@migaia/rpc-contract/v1'
@@ -470,7 +470,7 @@ describe('probe-core A3 outbound frames', () => {
     /** Exact codec identity keeps the ordinary batching size proof intact. */
     const canonical: IRpcSelectedComponents = {
       ...selected,
-      codec: identityCodecV1 as IRpcSelectedComponents['codec']
+      codec: identityCodec as IRpcSelectedComponents['codec']
     }
     /** The retained metadata reveals semantic members independently of physical write count. */
     const events: IRpcProbeEventView[] = []

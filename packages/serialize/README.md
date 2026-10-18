@@ -100,15 +100,11 @@ import {
 
 ```ts
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1';
-import { identityCodecV1 } from '@migaia/serialize/codec';
 
-// The versioned entry is the modern name; the retained alias is the same object.
-const sameCodec = identityCodec === identityCodecV1;
 const literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);
 ```
 
-`identityCodec` preserves the runtime value and its actual TypeScript type in both directions. The
-legacy `identityCodecV1` export remains available for existing callers.
+`identityCodec` preserves the runtime value and its actual TypeScript type in both directions. Import it only from the explicit versioned entry; the compatibility alias and unversioned entry are removed.
 
 **`createSerializeRegistry` + `registry.encode`/`.decode`｜10 秒上手** —— 建一个只认 JSON 的注册表，编解码一个值：
 
@@ -172,7 +168,7 @@ chunkToBytes(chunk, new TextEncoder()); // bytes 返回 .slice() 拷贝；text �
 
 ```ts
 bytesToBase64(bytes); // string，一次性拼接完整结果
-base64ToBytes(text); // Uint8Array；非法输入抛 TypeError／INVALID_OPTION（不保留原始 cause）
+base64ToBytes(text); // Uint8Array；非法输入抛 TypeError／INVALID_OPTION（cause 保留 utils 的原始编码失败）
 for (const part of streamBase64Chunks(bytes)) send(part); // 固定按 32763 字节（3 的倍数）分块 yield，不整段现造
 ```
 
@@ -350,7 +346,7 @@ await registry.dispose();
 ### 2. 多格式共存：新旧存档平滑迁移
 
 ```ts
-import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';
+import { createSerializeRegistry, jsonPlugin, type ISerializeChunk } from '@migaia/serialize';
 
 // 数组第一项 (jsonPlugin) 是 primaryType，写入永远用它；legacyPlugin 只用于读旧存档。
 const registry = createSerializeRegistry([jsonPlugin(), legacyPlugin]);
@@ -368,21 +364,24 @@ async function save(value: unknown) {
 ### 3. 二进制走文本通道：编码 + Base64 + 带截止时间释放
 
 ```ts
+import { systemScheduler } from '@migaia/utils/scheduler';
 import {
   createSerializeRegistry,
   bytesToBase64,
   base64ToBytes,
+  chunkToBytes,
   jsonPlugin
 } from '@migaia/serialize';
 
 const registry = createSerializeRegistry([jsonPlugin()]);
 const chunk = await registry.encode(largeObject);
-const wire = chunk[0] === 'bytes' ? bytesToBase64(chunk[1]) : chunk[1];
+// 先明确转为 UTF-8/原生字节，再统一进行 Base64 编码；value chunk 会被拒绝。
+const wire = bytesToBase64(chunkToBytes(chunk, new TextEncoder()));
 // ... 落 localStorage / 内联进 HTML ...
-const restoredBytes = typeof wire === 'string' ? base64ToBytes(wire) : undefined;
+const restored = await registry.decode(['bytes', base64ToBytes(wire)]);
 
-// 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）
-await registry.dispose({ deadlineAt: Date.now() + 500 });
+// 最多等待 500ms 排空在途操作，随后逐个 await parser.dispose()；清理本身没有硬超时。
+await registry.dispose({ deadlineAt: systemScheduler.now() + 500 });
 ```
 
 ### 4. 自定义 parser 接入 + 安全的 type 校验
@@ -429,3 +428,11 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 策略类型 `IPortableWalkerStrategy` 决定字段读取/排序、复制或仅校验、原型与冻结、二进制准入及表示、深度和违规错误。serialize 不提供消费方 profile。现有 `toPortableValue`/`assertPortableValue` 是包内默认策略的薄实例；JSON、MessagePack、CBOR 编码使用同一融合遍历，保留原来的排序、字节输出和错误边界。详见 [USEGUIDE 的 Portable walker](./USEGUIDE.md#portable-walker)。
 
 Portable strategies may return an inline base64url string or a borrowed `Uint8Array`/`ArrayBuffer` through the typed `IPortableBinaryResult` union. Native strategies supply `nativeByteLength` using their intrinsic length accessor; native values keep their identity and are not frozen. The value-only `walker.value()` uses the same fused traversal without allocating an unused metadata box. Starting depth and a per-call binary guard are optional invocation arguments; create the walker once at module/owner scope.
+
+Standalone jsonParser 与 chunkToText/chunkToBytes 的原生失败也携带语义身份：编码为 ENCODE_FAILED、解码为 DECODE_FAILED；可附加身份的原生错误保持对象、类型与 stack。已有宿主 code 或不可附加身份时使用 coded TypeError wrapper，原始错误保留在 cause。tagSerializeError 的身份冲突委托 utils，抛 (@migaia/utils, ERROR_IDENTITY_CONFLICT)，cause 为原错误。
+
+## 公开名称与入口
+
+完整逐名用途、codec 参数、schema 与 portable hooks 见 [USEGUIDE](./USEGUIDE.md#公开入口索引)。
+
+`CodecErrorText`, `ICborCodecOptions`, `ICodec`, `ICodecValue`, `ICollectStreamOptions`, `IEncodeStreamOptions`, `IFrameBudgetOptions`, `IJsonCodecOptions`, `IJsonPluginOptions`, `IMessagePackCodecOptions`, `IPortableBinaryResult`, `IPortableWalkerStrategy`, `IProtobufCodecOptions`, `IProtobufSchema`, `ISerializeChunk`, `ISerializeChunkKind`, `ISerializeCleanupError`, `ISerializeCleanupKind`, `ISerializeCleanupPolicy`, `ISerializeContext`, `ISerializeErrorCode`, `ISerializeLifecycleError`, `ISerializeOutput`, `ISerializeOutputFormat`, `ISerializeParser`, `ISerializePhase`, `ISerializePlugin`, `ISerializePluginType`, `ISerializeRangeError`, `ISerializeRegistry`, `ISerializeRegistryOptions`, `ISerializeTaggedError`, `ISerializeTextFormat`, `ISerializeTimeoutDiagnostic`, `ISerializeTypeError`, `ITextDecoder`, `ITextEncoder`, `SERIALIZE_SOURCE`, `SERIALIZE_TYPE_PATTERN`, `SerializeChunkKind`, `SerializeCleanupKind`, `SerializeCleanupPolicy`, `SerializeCodecError`, `SerializeErrorCode`, `SerializeOutput`, `SerializePhase`, `SerializePluginType`, `SerializeTextFormat`, `asCodecValue`, `assertPortableValue`, `assertSerializeType`, `base64ToBytes`, `bytesToBase64`, `chunkToBytes`, `chunkToText`, `collectStream`, `createPortableWalker`, `createSerializeError`, `createSerializeRangeError`, `createSerializeRegistry`, `createSerializeTypeError`, `decodeStream`, `defineCBORCodec`, `defineJsonCodec`, `defineMessagePackCodec`, `defineProtobufCodec`, `emitOutput`, `encodeStream`, `identityCodec`, `isChunkShape`, `jsonParser`, `jsonPlugin`, `normalizeCodecFailure`, `sliceByFrameBudget`, `streamBase64Chunks`, `tagSerializeError`, `toPortableValue`.

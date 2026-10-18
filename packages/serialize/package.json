@@ -34,10 +34,6 @@
       "types": "./dist/codec.d.ts",
       "default": "./dist/codec.js"
     },
-    "./codecs/identity": {
-      "types": "./dist/codecs/identity.d.ts",
-      "default": "./dist/codecs/identity.js"
-    },
     "./codecs/identity/v1": {
       "types": "./dist/codecs/identity/v1.d.ts",
       "default": "./dist/codecs/identity/v1.js"

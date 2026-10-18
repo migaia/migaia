@@ -1,4 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
+import { observeThenableRejection } from '@migaia/utils/function'
 import {
   SerializeCodecError,
   assertSerializeType,
@@ -29,7 +30,8 @@ import {
   createSerializeTypeError,
   SERIALIZE_SOURCE,
   SerializeErrorCode,
-  SerializeErrorText
+  SerializeErrorText,
+  tagSerializeFailure
 } from './errors.js'
 import {
   SerializeChunkKind,
@@ -228,7 +230,7 @@ async function collectChunks(
 
   const take = (candidate: unknown): void => {
     if (details.signal.aborted) {
-      throw new SerializeCodecError('serialize aborted', {
+      throw new SerializeCodecError(SerializeErrorText.aborted, {
         type: details.type,
         phase: details.phase,
         context: details.context,
@@ -354,8 +356,21 @@ async function collectChunks(
  */
 export function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): string {
   if (chunk[0] === SerializeChunkKind.text) return chunk[1]
-  if (chunk[0] === SerializeChunkKind.bytes) return decoder.decode(chunk[1])
-  throw createSerializeTypeError(SerializeErrorCode.invalidChunk, 'a value chunk has no text form')
+  if (chunk[0] === SerializeChunkKind.bytes) {
+    try {
+      return decoder.decode(chunk[1])
+    } catch (error) {
+      throw tagSerializeFailure(
+        error,
+        SerializeErrorCode.decodeFailed,
+        SerializeErrorText.textDecodeFailed
+      )
+    }
+  }
+  throw createSerializeTypeError(
+    SerializeErrorCode.invalidChunk,
+    SerializeErrorText.valueTextUnsupported
+  )
 }
 
 /**
@@ -363,9 +378,22 @@ export function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): stri
  * Wasm. Value chunks reject.
  */
 export function chunkToBytes(chunk: ISerializeChunk, encoder: ITextEncoder): Uint8Array {
-  if (chunk[0] === SerializeChunkKind.bytes) return chunk[1].slice()
-  if (chunk[0] === SerializeChunkKind.text) return encoder.encode(chunk[1])
-  throw createSerializeTypeError(SerializeErrorCode.invalidChunk, 'a value chunk has no byte form')
+  if (chunk[0] === SerializeChunkKind.bytes) return new Uint8Array(chunk[1])
+  if (chunk[0] === SerializeChunkKind.text) {
+    try {
+      return encoder.encode(chunk[1])
+    } catch (error) {
+      throw tagSerializeFailure(
+        error,
+        SerializeErrorCode.encodeFailed,
+        SerializeErrorText.textEncodeFailed
+      )
+    }
+  }
+  throw createSerializeTypeError(
+    SerializeErrorCode.invalidChunk,
+    SerializeErrorText.valueBytesUnsupported
+  )
 }
 
 export type {
@@ -392,7 +420,8 @@ export type {
 function raceAbort<T>(
   task: Promise<T>,
   signal: IAbortSignal,
-  details: { readonly type: string; readonly phase: ISerializePhase; readonly context: string }
+  details: { readonly type: string; readonly phase: ISerializePhase; readonly context: string },
+  report: (error: unknown) => void
 ): Promise<T> {
   const abortError = (): unknown => {
     const reason = signal.reason
@@ -402,7 +431,7 @@ function raceAbort<T>(
     ) {
       return reason
     }
-    return new SerializeCodecError('serialize aborted', {
+    return new SerializeCodecError(SerializeErrorText.aborted, {
       type: details.type,
       phase: details.phase,
       context: details.context,
@@ -419,24 +448,28 @@ function raceAbort<T>(
       settled = true
       reject(abortError())
     }
+    // Observe the task even when abort admission settles the caller immediately.
+    task.then(
+      (value) => {
+        if (settled) return
+        settled = true
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      (error) => {
+        if (settled) {
+          observeThenableRejection(undefined, { error }, report)
+          return
+        }
+        settled = true
+        signal.removeEventListener('abort', onAbort)
+        reject(error)
+      }
+    )
     try {
       if (signal.aborted) return onAbort()
       signal.addEventListener('abort', onAbort, { once: true })
       if (signal.aborted) return onAbort()
-      task.then(
-        (value) => {
-          if (settled) return
-          settled = true
-          signal.removeEventListener('abort', onAbort)
-          resolve(value)
-        },
-        (error) => {
-          if (settled) return
-          settled = true
-          signal.removeEventListener('abort', onAbort)
-          reject(error)
-        }
-      )
     } catch (error) {
       if (settled) return
       settled = true
@@ -877,22 +910,10 @@ export function createSerializeRegistry(
   // 5. pending tracker + close/dispose 状态
   let closed = false
   let disposed = false
-  let cleanedUp = false
   const pending: IPendingTracker = createPendingTracker()
   let disposePromise: Promise<void> | undefined
   const track = <T>(task: Promise<T>): Promise<T> => {
     pending.track(task)
-    task.then(undefined, (error) => {
-      // Detached 迟到 rejection（cleanup 之后才 settle）走 report 通道观测；不重新接入 registry
-      // 生命周期、不改变 terminal、不吞 rejection。report 自身抛错 containment（不影响 observation）。
-      if (cleanedUp) {
-        try {
-          report(error)
-        } catch {
-          // report 抛错 containment：不影响 parser task 的 rejection observation
-        }
-      }
-    })
     return task
   }
 
@@ -976,7 +997,7 @@ export function createSerializeRegistry(
               report
             )
             if (signal.aborted) {
-              throw new SerializeCodecError('serialize aborted', {
+              throw new SerializeCodecError(SerializeErrorText.aborted, {
                 type,
                 phase: SerializePhase.encode,
                 context: context.context,
@@ -993,14 +1014,19 @@ export function createSerializeRegistry(
         })()
 
         // 租约唯一释放点 + detached 迟到 rejection 出口（R-3 HIGH-1）：track 完整 collect/encode task，
-        // 其迟到 rejection 在 cleanedUp 后经 report 观测、不改变 terminal。
+        // pending owns drain; raceAbort owns every rejection detached by public cancellation.
         track(parserTask)
         // 双 Promise（R-3）：public promise = race(parserTask, composed abort)，abort 时及时 settle。
-        return await raceAbort(parserTask, signal, {
-          type,
-          phase: SerializePhase.encode,
-          context: context.context
-        })
+        return await raceAbort(
+          parserTask,
+          signal,
+          {
+            type,
+            phase: SerializePhase.encode,
+            context: context.context
+          },
+          report
+        )
       })()
       return task
     },
@@ -1063,11 +1089,16 @@ export function createSerializeRegistry(
         })()
 
         track(parserTask)
-        return await raceAbort(parserTask, signal, {
-          type,
-          phase: SerializePhase.decode,
-          context: context.context
-        })
+        return await raceAbort(
+          parserTask,
+          signal,
+          {
+            type,
+            phase: SerializePhase.decode,
+            context: context.context
+          },
+          report
+        )
       })()
       return task
     },
@@ -1177,7 +1208,6 @@ export function createSerializeRegistry(
           hasCleanupError = true
         } finally {
           byType.clear()
-          cleanedUp = true
         }
 
         if (hasCleanupError) {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createGenerationController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { createEndpoint } from '../../dist/core/index.js'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { connect } from '../../dist/core/middleware/connect.js'
@@ -284,10 +284,10 @@ describe('P2-F private qualification and canonical ownership', () => {
     const calls = { encode: 0, frame: 0, accept: 0 }
     /** Frozen copied identity cannot inherit package-private component proof. */
     const codec = Object.freeze({
-      ...identityCodecV1,
+      ...identityCodec,
       encode: (value: unknown) => {
         calls.encode++
-        return identityCodecV1.encode(value)
+        return identityCodec.encode(value)
       }
     })
     /** Both framing directions remain observable on the original complete pipeline. */

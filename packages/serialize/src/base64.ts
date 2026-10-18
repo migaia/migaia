@@ -34,10 +34,11 @@ export function* streamBase64Chunks(bytes: Uint8Array): Generator<string, void, 
 export function base64ToBytes(text: string): Uint8Array {
   try {
     return decodeCanonicalBase64(text)
-  } catch {
+  } catch (cause) {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
-      SerializeErrorText.base64Invalid
+      SerializeErrorText.base64Invalid,
+      { cause }
     )
   }
 }

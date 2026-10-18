@@ -1,5 +1,5 @@
 import { createRpcError, RpcCoreErrorCode } from '../core/errors.js'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createMemoryTransportPair } from '../core/adapters/memory.js'
@@ -91,8 +91,8 @@ export async function createPeerPair(
         transport: transports[index],
         peerId: identities[1 - index]!.instanceId,
         scheduler,
-        agreement: { source: 'static', codec: identityCodecV1.id, capabilities },
-        pipeline: { codec: identityCodecV1, framer: messageFramerV1 },
+        agreement: { source: 'static', codec: identityCodec.id, capabilities },
+        pipeline: { codec: identityCodec, framer: messageFramerV1 },
         features: [],
         close: async () => {
           transports[index].close()

@@ -2,7 +2,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { createRequire } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { RpcCapability, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcBinaryProfile } from '@migaia/rpc-contract/wire'
@@ -110,7 +110,7 @@ describe('C3 public adapter resource boundaries', () => {
         /** Observe the existing private reader on the actual selected snapshot, without altering it. */
         const proof = vi.spyOn(fast, 'hasFastComponents')
         /** The copied descriptor keeps every public property and method but not its owner identity. */
-        const copiedCodec = { ...identityCodecV1 }
+        const copiedCodec = { ...identityCodec }
         /** The same method objects cannot supply the original framer's private identity. */
         const copiedFramer = { ...messageFramerV1 }
         /** The real qualified carrier ensures construction consults the fast-component reader. */
@@ -120,7 +120,7 @@ describe('C3 public adapter resource boundaries', () => {
           endpoint = await createClientEndpoint({
             id: 'boundary-components',
             transport: channel.transport,
-            codec: writer === 'registerFastCodec' ? copiedCodec : identityCodecV1,
+            codec: writer === 'registerFastCodec' ? copiedCodec : identityCodec,
             framer: writer === 'registerFastFramer' ? copiedFramer : messageFramerV1,
             middlewares: [core.connect()]
           })
@@ -182,7 +182,7 @@ describe('C3 public adapter resource boundaries', () => {
     await withHeldChannel(async (channel) => {
       /** A field with the complete public-looking port shape has no private registration identity. */
       const foreign = Object.assign(foreignTransport(channel.transport), {
-        objectPort: { protocol: rpcProtocolV1, codec: identityCodecV1, framer: messageFramerV1 }
+        objectPort: { protocol: rpcProtocolV1, codec: identityCodec, framer: messageFramerV1 }
       })
       /** Its normal endpoint still selects the public frame path. */
       const endpoint = await createClientEndpoint({
@@ -192,7 +192,7 @@ describe('C3 public adapter resource boundaries', () => {
       })
       try {
         expect(
-          readJsonObjectPort(foreign, rpcProtocolV1, identityCodecV1, messageFramerV1)
+          readJsonObjectPort(foreign, rpcProtocolV1, identityCodec, messageFramerV1)
         ).toBeUndefined()
       } finally {
         await endpoint.dispose()

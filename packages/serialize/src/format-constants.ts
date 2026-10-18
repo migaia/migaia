@@ -16,7 +16,7 @@ export const SerializeOutput = {
 export const SerializeTextFormat = { json: 'json', yaml: 'yaml', toml: 'toml' } as const
 export type ISerializeTextFormat = (typeof SerializeTextFormat)[keyof typeof SerializeTextFormat]
 
-/** Instrumentation phases emitted while encoding or decoding. */
+/** Error-location labels for encoding and decoding; these constants emit no instrumentation events. */
 export const SerializePhase = { encode: 'encode', decode: 'decode' } as const
 
 /** Cleanup policies and diagnostic kinds used by the serializer registry. */

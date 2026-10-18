@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1, remoteProcessStringFramer } from '@migaia/rpc-contract/framing'
 import { createClientEndpoint } from '../../dist/core/client.js'
 import { connect } from '../../dist/core/index.js'
@@ -29,7 +29,7 @@ it.each(['json', 'json-custom-framer', 'live', 'copied-json'] as const)(
         ? remoteProcessJsonCodec
         : source === 'copied-json'
           ? { ...remoteProcessJsonCodec, decodedMetadata: true }
-          : identityCodecV1
+          : identityCodec
     /**
      * Observe actual endpoint component selection, rather than granting proof through a test
      * writer.

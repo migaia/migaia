@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
@@ -49,12 +49,12 @@ for (const size of [64 * 1024, 1024 * 1024]) {
     /** These exact first-party descriptors select the production identity/frame path. */
     const components: IRpcSelectedComponents = {
       protocol: rpcProtocolV1,
-      codec: identityCodecV1 as IRpcSelectedComponents['codec'],
+      codec: identityCodec as IRpcSelectedComponents['codec'],
       framer: messageFramerV1,
       ingressPrepare: bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame),
       shadowed: []
     }
-    proveFastComponents(components, rpcProtocolV1, identityCodecV1, messageFramerV1)
+    proveFastComponents(components, rpcProtocolV1, identityCodec, messageFramerV1)
     /** The existing sender owns physical admission; this sink observes its exact delivered object. */
     const frames: unknown[] = []
     const sender = new RpcOutboundSender(
@@ -123,7 +123,7 @@ async function verifyOwnedSingleton(queued: boolean) {
     'a',
     {
       protocol: rpcProtocolV1,
-      codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+      codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
       framer: messageFramerV1,
       ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
       shadowed: []
@@ -253,7 +253,7 @@ it('[A27-FIX5] queued opaque sizing failures keep the serialization category and
     'a',
     {
       protocol: rpcProtocolV1,
-      codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+      codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
       framer: messageFramerV1,
       ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
       shadowed: []

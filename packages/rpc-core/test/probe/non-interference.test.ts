@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MessageChannel } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import {
   createStringFramer,
@@ -129,7 +129,7 @@ describe('probe non-interference A6', () => {
         'outbound-pipeline'
       )!
       try {
-        expect(sender.components.codec.encode).toBe(identityCodecV1.encode)
+        expect(sender.components.codec.encode).toBe(identityCodec.encode)
         expect(sender.components.framer.frame).toBe(messageFramerV1.frame)
         /** Re-entrancy is isolated from quota saturation before the exact 64-call batch. */
         expect(await client.request('reenter')).toBe(9)
@@ -521,8 +521,8 @@ describe('probe non-interference A6', () => {
               transport: leftWire,
               peerId: 'transfer-right',
               scheduler: systemScheduler,
-              agreement: { source: 'static', codec: identityCodecV1.id, capabilities },
-              pipeline: { codec: identityCodecV1, framer: messageFramerV1 },
+              agreement: { source: 'static', codec: identityCodec.id, capabilities },
+              pipeline: { codec: identityCodec, framer: messageFramerV1 },
               features: [],
               close: async () => ports.port1.close()
             })
@@ -543,8 +543,8 @@ describe('probe non-interference A6', () => {
               transport: rightWire,
               peerId: 'transfer-left',
               scheduler: systemScheduler,
-              agreement: { source: 'static', codec: identityCodecV1.id, capabilities },
-              pipeline: { codec: identityCodecV1, framer: messageFramerV1 },
+              agreement: { source: 'static', codec: identityCodec.id, capabilities },
+              pipeline: { codec: identityCodec, framer: messageFramerV1 },
               features: [],
               close: async () => ports.port2.close()
             })

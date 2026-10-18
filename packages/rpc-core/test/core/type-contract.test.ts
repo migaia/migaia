@@ -21,7 +21,7 @@ import type { ICodec } from '@migaia/serialize/codec'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 import { createDescriptor, rpcProtocolV1, type IRpcStringFrame } from '@migaia/rpc-contract'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import {
   createBinaryFramer,
   createStringFramer,
@@ -212,7 +212,7 @@ void assertInferredPipelineEdges
 
 /** F0 keeps every public factory on one directed, concrete pipeline contract. */
 async function assertPublicFactoryPipelineMatrix(): Promise<void> {
-  const identityLiteral: { readonly x: 1 } = identityCodecV1.encode({ x: 1 } as const)
+  const identityLiteral: { readonly x: 1 } = identityCodec.encode({ x: 1 } as const)
   const preservedLegacy: IRpcFramer<string, string, 'custom', 1> = legacyCustom
   void [identityLiteral, preservedLegacy]
 
@@ -256,7 +256,7 @@ async function assertPublicFactoryPipelineMatrix(): Promise<void> {
     id: 'identity-semantic',
     middlewares: [],
     protocol: rpcProtocolV1,
-    codec: identityCodecV1,
+    codec: identityCodec,
     framer: messageFramerV1,
     transport: semantic
   })

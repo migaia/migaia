@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import {
   normalizeRpcEnvelope,
   rpcProtocolV1,
@@ -24,7 +24,7 @@ import type {
 /** Canonical components preserve real encoding, sizing and gate settlement ownership. */
 const components: IRpcSelectedComponents = {
   protocol: rpcProtocolV1,
-  codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+  codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
   framer: messageFramerV1,
   ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
   shadowed: []

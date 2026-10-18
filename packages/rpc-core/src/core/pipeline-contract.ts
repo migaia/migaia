@@ -1,7 +1,7 @@
 import { rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import type { IRpcWirePortableValue } from '@migaia/rpc-contract/wire'
 import type { IRpcEnvelopeData } from '@migaia/rpc-contract'
-import type { identityCodecV1 } from '@migaia/serialize/codec'
+import type { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import type { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'
 import type { IRpcFeature, IRpcFiniteFeatureTuple } from './feature.js'
@@ -36,7 +36,7 @@ type IComponent<T, TKey extends PropertyKey, TDefault> = T extends {
 }
   ? TValue
   : IMiddlewareContribution<IMiddlewares<T>, TKey, TDefault>
-type ICodec<T> = IComponent<T, 'codec', typeof identityCodecV1>
+type ICodec<T> = IComponent<T, 'codec', typeof identityCodec>
 type IFramer<T> = IComponent<T, 'framer', typeof messageFramerV1>
 type ITransport<T> = IComponent<T, 'transport', IRpcTransport<unknown>>
 type IEnvelope<T> =
@@ -54,7 +54,7 @@ type IRpcOutboundEnvelope = Readonly<Record<string, IRpcWirePortableValue>> &
 /** Checks codecs against values core actually emits, preserving the wider receive contract. */
 type IOutboundEnvelope<T> =
   IEqual<IEnvelope<T>, IRpcEnvelope> extends true ? IRpcOutboundEnvelope : IEnvelope<T>
-type IIdentityCodec<T> = ICodec<T> extends typeof identityCodecV1 ? true : false
+type IIdentityCodec<T> = ICodec<T> extends typeof identityCodec ? true : false
 type IIdentityFramer<T> = IFramer<T> extends typeof messageFramerV1 ? true : false
 type IEncodeInput<T> =
   IIdentityCodec<T> extends true ? IEnvelope<T> : IArg<IMember<ICodec<T>, 'encode'>>

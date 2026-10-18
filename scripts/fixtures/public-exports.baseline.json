@@ -967,17 +967,10 @@
       "./codec": [
         "CodecErrorText",
         "asCodecValue",
-        "assertCodecVersion",
         "assertPortableValue",
-        "createCodecError",
         "createPortableWalker",
-        "identityCodecV1",
         "normalizeCodecFailure",
         "toPortableValue"
-      ],
-      "./codecs/identity": [
-        "identityCodec",
-        "identityCodecV1"
       ],
       "./codecs/identity/v1": [
         "identityCodec"

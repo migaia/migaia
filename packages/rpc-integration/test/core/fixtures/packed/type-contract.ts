@@ -25,7 +25,6 @@ import {
 } from '@migaia/rpc-process'
 import type { IRpcEnvelope, IRpcFramer, IRpcStringFrame } from '@migaia/rpc-contract'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { identityCodecV1 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { IRpcTransport } from '@migaia/rpc-core'
@@ -92,7 +91,7 @@ async function verifyPackedContracts(): Promise<void> {
   const normalized = rpcV1.normalizeRpcEnvelope(
     rpcProtocol.normalize({ kind: 'request', id: 'packed-v1', method: 'ping', data: null })
   )
-  const retainedIdentity: typeof identityCodec = identityCodecV1
+  const retainedIdentity: typeof identityCodec = identityCodec
   void [accepted, normalized, retainedIdentity]
 
   const topologyNodes: ITopologyNode[] = [{ id: 'packed-topology', dependencies: [], ordinal: 0 }]

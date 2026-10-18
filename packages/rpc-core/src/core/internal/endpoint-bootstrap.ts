@@ -18,7 +18,8 @@ import {
 import { RpcPortName } from './plugin-shared-keys.js'
 import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '@migaia/rpc-contract'
 import { rpcProtocol as rpcProtocolV1 } from '@migaia/rpc-contract/v1'
-import { identityCodecV1, type ICodec } from '@migaia/serialize/codec'
+import { type ICodec } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 
@@ -640,7 +641,7 @@ function selectWebRpcComponents(
     })
   }
   const selectedProtocol = select('protocol', input.protocol, rpcProtocolV1)
-  const selectedCodec = select('codec', input.codec, identityCodecV1)
+  const selectedCodec = select('codec', input.codec, identityCodec)
   const selectedFramer = select('framer', input.framer, messageFramerV1)
   /** Pair before snapshots copy descriptors; registry lookup performs no user getter reads. */
   const privateCandidate = readJsonObjectPort(

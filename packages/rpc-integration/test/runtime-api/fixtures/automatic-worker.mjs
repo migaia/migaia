@@ -4,7 +4,7 @@ import { createComposedEndpoint } from '@migaia/rpc-core/composed'
 import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'
 import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
 import { createProviderFeature } from '@migaia/rpc-core/features/provider'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { connect } from '@migaia/rpc-core'
 
@@ -37,7 +37,7 @@ if (typeof threads.createThreadPeer === 'function') {
     {
       id: bootstrap.peerId,
       transport: channel.transport,
-      codec: identityCodecV1,
+      codec: identityCodec,
       framer: messageFramerV1,
       middlewares: [connect({ transport: channel.transport })],
       provider: {

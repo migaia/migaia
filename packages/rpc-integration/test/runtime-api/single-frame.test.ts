@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { identityCodecV1 } from '@migaia/serialize/codec'
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import {
   normalizeRuntimeEnvelope,
@@ -128,7 +128,7 @@ it('[A64] complete carrier at 16 MiB or a tighter channel limit sends once; one 
       'caller',
       {
         protocol: rpcProtocolV1,
-        codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+        codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
         framer: messageFramerV1,
         ingressPrepare: framing.bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame),
         shadowed: []
@@ -203,7 +203,7 @@ it('[A64][A73] one complete group uses the original codec/protect/write once and
   let protects = 0
   const components: IRpcSelectedComponents = {
     protocol: rpcProtocolV1,
-    codec: identityCodecV1 as unknown as IRpcSelectedComponents['codec'],
+    codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
     framer: messageFramerV1,
     ingressPrepare: framing.bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame),
     shadowed: []

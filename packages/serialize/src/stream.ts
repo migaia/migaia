@@ -14,7 +14,8 @@ import {
   createSerializeTypeError,
   SerializeErrorCode,
   SerializeErrorText,
-  SERIALIZE_SOURCE
+  SERIALIZE_SOURCE,
+  type ISerializeErrorCode
 } from './errors.js'
 import { SerializeChunkKind, SerializePhase } from './format-constants.js'
 import { createSerializeOperationSignal } from './signal.js'
@@ -78,13 +79,13 @@ const finalizeEncodeStreamCleanup = (
 const attachSerializeCleanupError = (primaryError: unknown, cleanupError: unknown): unknown =>
   attachSecondaryErrors(primaryError, [cleanupError])
 
-/** Keep an already-owned serialize INVALID_OPTION intact while wrapping a hostile failure. */
-const isSerializeInvalidOption = (error: unknown): boolean => {
+/** Preserve an already-owned semantic code while projecting failures at a stream boundary. */
+const hasSerializeCode = (error: unknown, code: ISerializeErrorCode): boolean => {
   try {
     return (
       error instanceof Error &&
       (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
-      (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption
+      (error as { readonly code?: unknown }).code === code
     )
   } catch {
     return false
@@ -94,19 +95,6 @@ const isSerializeInvalidOption = (error: unknown): boolean => {
 /** Extract hostile protocol-failure text without allowing diagnostics to replace the primary. */
 const streamFailureReason = (error: unknown): string =>
   safeErrorReason(error, SerializeErrorText.reasonUnavailable)
-
-/** Keep pre-existing serialize-owned invalid-chunk errors unchanged during stream cleanup. */
-const isSerializeInvalidChunk = (error: unknown): boolean => {
-  try {
-    return (
-      error instanceof Error &&
-      (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
-      (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidChunk
-    )
-  } catch {
-    return false
-  }
-}
 
 /** Wrap one encode admission failure with the slice index that owns the invocation. */
 const encodeStreamFailure = (
@@ -131,7 +119,7 @@ const encodeStreamFailure = (
 
 /** Convert any stream-option getter, shape, or value failure to serialize INVALID_OPTION. */
 const streamOptionFailure = (error: unknown): never => {
-  if (isSerializeInvalidOption(error)) throw error
+  if (hasSerializeCode(error, SerializeErrorCode.invalidOption)) throw error
   throw createSerializeTypeError(
     SerializeErrorCode.invalidOption,
     SerializeErrorText.operationOptionInvalid,
@@ -141,7 +129,7 @@ const streamOptionFailure = (error: unknown): never => {
 
 /** Translate a task-release failure without replacing its native TypeError semantics. */
 const translateTaskCancelFailure = (error: unknown): unknown =>
-  isSerializeInvalidOption(error)
+  hasSerializeCode(error, SerializeErrorCode.invalidOption)
     ? error
     : createSerializeTypeError(
         SerializeErrorCode.invalidOption,
@@ -155,7 +143,7 @@ const readSerializeSignalAborted = (signal: IAbortSignal): boolean => {
     if (typeof signal.aborted !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid)
     return signal.aborted
   } catch (error) {
-    if (isSerializeInvalidOption(error)) throw error
+    if (hasSerializeCode(error, SerializeErrorCode.invalidOption)) throw error
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.signalAccessorFailed,
@@ -241,7 +229,7 @@ const scheduleOwnedYield = (
       try {
         Reflect.apply(removeAbortListener, signalReceiver, ['abort', onAbort])
       } catch (error) {
-        const cleanupError = isSerializeInvalidOption(error)
+        const cleanupError = hasSerializeCode(error, SerializeErrorCode.invalidOption)
           ? error
           : createSerializeTypeError(
               SerializeErrorCode.invalidOption,
@@ -269,7 +257,7 @@ const scheduleOwnedYield = (
   function onAbort(): void {
     if (settled || hasPrimary) return
     try {
-      primaryError = createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+      primaryError = createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
         cause: signal === undefined ? undefined : readSerializeSignalReason(signal)
       })
     } catch (error) {
@@ -306,7 +294,7 @@ const scheduleOwnedYield = (
       try {
         Reflect.apply(addAbortListener, signal, ['abort', onAbort, { once: true }])
       } catch (error) {
-        const registrationError = isSerializeInvalidOption(error)
+        const registrationError = hasSerializeCode(error, SerializeErrorCode.invalidOption)
           ? error
           : createSerializeTypeError(
               SerializeErrorCode.invalidOption,
@@ -342,7 +330,7 @@ const scheduleOwnedYield = (
     scheduleSettled = true
   } catch (error) {
     if (!hasPrimary) {
-      primaryError = isSerializeInvalidOption(error)
+      primaryError = hasSerializeCode(error, SerializeErrorCode.invalidOption)
         ? error
         : createSerializeTypeError(
             SerializeErrorCode.invalidOption,
@@ -647,7 +635,7 @@ export async function* sliceByFrameBudget<T>(
   let index = 0
   while (index < items.length) {
     if (signal !== undefined && readSerializeSignalAborted(signal))
-      throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+      throw createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
         cause: readSerializeSignalReason(signal)
       })
     const slice = items.slice(index, index + size)
@@ -735,7 +723,7 @@ export async function* encodeStream<T>(
   try {
     for await (const slice of sliceByFrameBudget(items, operationOptions)) {
       if (readSerializeSignalAborted(operationSignal)) {
-        throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+        throw createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
           cause: readSerializeSignalReason(operationSignal)
         })
       }
@@ -797,13 +785,9 @@ export async function* decodeStream(
   let index = 0
   let ownedError: unknown
   try {
+    checkStreamAbort(signal)
     for await (const chunk of chunks as AsyncIterable<ISerializeChunk>) {
-      if (signal !== undefined && readSerializeSignalAborted(signal)) {
-        ownedError = createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
-          cause: readSerializeSignalReason(signal)
-        })
-        throw ownedError
-      }
+      checkStreamAbort(signal)
       try {
         yield await registry.decode(chunk, { type, signal, context })
       } catch (error) {
@@ -823,9 +807,11 @@ export async function* decodeStream(
         throw ownedError
       }
       index++
+      // The consumer may abort while holding a yielded value; check before the next source pull.
+      checkStreamAbort(signal)
     }
   } catch (error) {
-    if (error === ownedError) throw error
+    if (error === ownedError || hasSerializeCode(error, SerializeErrorCode.aborted)) throw error
     throw new SerializeCodecError(
       `decode stream failed at chunk ${index}: ${streamFailureReason(error)}`,
       {
@@ -858,13 +844,15 @@ export async function collectStream(
   let index = 0
   const chunkProgress: number[] = []
   let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
+  /** Undefined is a valid thrown value, so failure presence is separate from its payload. */
+  let hasPrimaryError = false
   let primaryError: unknown
   let completed = false
   try {
-    checkCollectAbort(collectOptions.signal)
+    checkStreamAbort(collectOptions.signal)
     iterator = getCollectIterator(chunks)
     while (true) {
-      checkCollectAbort(collectOptions.signal)
+      checkStreamAbort(collectOptions.signal)
       const step = await iterator.next()
       if (step === null || (typeof step !== 'object' && typeof step !== 'function'))
         throw new SerializeCodecError(SerializeErrorText.collectOptionInvalid, {
@@ -914,7 +902,7 @@ export async function collectStream(
           }
         )
       }
-      checkCollectAbort(collectOptions.signal)
+      checkStreamAbort(collectOptions.signal)
       const validatedChunk = validateSerializeChunk(chunk, {
         type: 'stream',
         phase: SerializePhase.encode,
@@ -941,16 +929,22 @@ export async function collectStream(
       index++
     }
   } catch (error) {
+    hasPrimaryError = true
     primaryError = error
   } finally {
     const cleanupError = await closeCollectIterator(iterator, completed)
     if (cleanupError !== undefined) {
-      if (primaryError === undefined) primaryError = cleanupError
+      if (!hasPrimaryError) primaryError = cleanupError
       else primaryError = attachSerializeCleanupError(primaryError, cleanupError)
+      hasPrimaryError = true
     }
   }
-  if (primaryError !== undefined) {
-    if (isSerializeInvalidChunk(primaryError) || isSerializeInvalidOption(primaryError))
+  if (hasPrimaryError) {
+    if (
+      hasSerializeCode(primaryError, SerializeErrorCode.invalidChunk) ||
+      hasSerializeCode(primaryError, SerializeErrorCode.invalidOption) ||
+      hasSerializeCode(primaryError, SerializeErrorCode.aborted)
+    )
       throw primaryError
     if (primaryError instanceof SerializeCodecError) throw primaryError
     throw new SerializeCodecError(
@@ -1127,7 +1121,7 @@ function getCollectIterator(
     }
     throw new TypeError(SerializeErrorText.collectOptionInvalid)
   } catch (error) {
-    if (isSerializeInvalidOption(error)) throw error
+    if (hasSerializeCode(error, SerializeErrorCode.invalidOption)) throw error
     throw new SerializeCodecError(
       `collect stream failed at chunk 0: ${streamFailureReason(error)}`,
       {
@@ -1144,9 +1138,9 @@ function getCollectIterator(
 }
 
 /** Checks cooperative cancellation at each collector admission boundary. */
-function checkCollectAbort(signal: IAbortSignal | undefined): void {
+function checkStreamAbort(signal: IAbortSignal | undefined): void {
   if (signal !== undefined && readSerializeSignalAborted(signal))
-    throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+    throw createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
       cause: readSerializeSignalReason(signal)
     })
 }
