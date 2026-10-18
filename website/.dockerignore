@@ -4,7 +4,6 @@ build
 .bun-tmp
 test
 scripts
-.npmrc
 .env
 .env.*
 *.log
