@@ -2910,8 +2910,8 @@
           "signature": "export type IRpcWireError = IRpcSerializedError;",
           "declarationLine": 3,
           "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
-          "purpose": "An alias of [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError). RPC Contract defines how source, code, stack, causes, and grouped errors cross a connection; Devtools uses that same representation.",
-          "core": "An alias of [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError). RPC Contract defines how source, code, stack, causes, and grouped errors cross a connection; Devtools uses that same representation.",
+          "purpose": "The error data stored in a Devtools event when an error must cross a connection. It is another name for [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError), defined by RPC Contract. That format carries source and code for classification, stack for the original call trace, and references to causes or grouped errors. Devtools uses this shared format so error details can be read without inventing a second representation.",
+          "core": "The error data stored in a Devtools event when an error must cross a connection. It is another name for [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError), defined by RPC Contract. That format carries source and code for classification, stack for the original call trace, and references to causes or grouped errors. Devtools uses this shared format so error details can be read without inventing a second representation.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2931,7 +2931,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "An alias of [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError). RPC Contract defines how source, code, stack, causes, and grouped errors cross a connection; Devtools uses that same representation."
+              "content": "The error data stored in a Devtools event when an error must cross a connection. It is another name for [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError), defined by RPC Contract. That format carries source and code for classification, stack for the original call trace, and references to causes or grouped errors. Devtools uses this shared format so error details can be read without inventing a second representation."
             },
             {
               "id": "getting-started",
@@ -2951,7 +2951,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "An alias of [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError). RPC Contract defines how source, code, stack, causes, and grouped errors cross a connection; Devtools uses that same representation."
+              "content": "The error data stored in a Devtools event when an error must cross a connection. It is another name for [IRpcSerializedError](/en/docs/rpc-contract/api/errors/IRpcSerializedError), defined by RPC Contract. That format carries source and code for classification, stack for the original call trace, and references to causes or grouped errors. Devtools uses this shared format so error details can be read without inventing a second representation."
             },
             {
               "id": "advanced-usage",
@@ -2972,8 +2972,8 @@
           "signature": "export declare const RPC_DEVTOOLS_SOURCE = \"@migaia/rpc/devtools\";",
           "declarationLine": 2,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
-          "purpose": "Compare RPC_DEVTOOLS_SOURCE with an error’s source, then use RpcDevtoolsErrorCode to choose a response. Configuration failures retain their native TypeError type; session failures use Error.",
-          "core": "Compare RPC_DEVTOOLS_SOURCE with an error’s source, then use RpcDevtoolsErrorCode to choose a response. Configuration failures retain their native TypeError type; session failures use Error.",
+          "purpose": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them.",
+          "core": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -2996,7 +2996,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Compare RPC_DEVTOOLS_SOURCE with an error’s source, then use RpcDevtoolsErrorCode to choose a response. Configuration failures retain their native TypeError type; session failures use Error."
+              "content": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them."
             },
             {
               "id": "getting-started",
@@ -3016,7 +3016,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Compare RPC_DEVTOOLS_SOURCE with an error’s source, then use RpcDevtoolsErrorCode to choose a response. Configuration failures retain their native TypeError type; session failures use Error."
+              "content": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them."
             },
             {
               "id": "advanced-usage",
@@ -4778,8 +4778,8 @@
           "signature": "export type IRpcLogSink = Readonly<{ debug(message: string, fields: object): unknown; info(message: string, fields: object): unknown; warn(message: string, fields: object): unknown; error(message: string, fields: object): unknown; }>;",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/log/types.d.ts",
-          "purpose": "Caller-owned structural logger with four required methods. Methods should enqueue promptly; buffering and I/O are outside the probe, and returned thenable rejections are observed rather than awaited. Throw or promise rejection is routed to onError.",
-          "core": "debug: Receives one qualifying event assigned to the debug level; the original logger receiver is preserved.\ndebug.message: String from the built-in category text or synchronous message formatter.\ndebug.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nAny caller result; thenable rejections are observed, other values are ignored and no sink is awaited.\ninfo: Receives one qualifying event assigned to the info level; the original logger receiver is preserved.\ninfo.message: String from the built-in category text or synchronous message formatter.\ninfo.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nwarn: Receives one qualifying event assigned to the warn level; the original logger receiver is preserved.\nwarn.message: String from the built-in category text or synchronous message formatter.\nwarn.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nerror: Receives one qualifying event assigned to the error level; the original logger receiver is preserved.\nerror.message: String from the built-in category text or synchronous message formatter.\nerror.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.",
+          "purpose": "The application logger supplied to the log probe, with required debug, info, warn and error methods. The probe forwards matching RPC events to these methods. Each method runs with the original logger as its receiver, so it can use that logger's instance state. Each method should accept or queue its record promptly; the logger owns buffering and writing to its destination. The probe does not wait for a returned Promise to finish, but observes its rejection. A thrown error or rejection is passed to onError.",
+          "core": "debug: Receives an RPC event that passes the log filter and is assigned to the debug level.\ndebug.message: String from the built-in category text or synchronous message formatter.\ndebug.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nAny caller result; thenable rejections are observed, other values are ignored and no sink is awaited.\ninfo: Receives an RPC event that passes the log filter and is assigned to the info level.\ninfo.message: String from the built-in category text or synchronous message formatter.\ninfo.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nwarn: Receives an RPC event that passes the log filter and is assigned to the warn level.\nwarn.message: String from the built-in category text or synchronous message formatter.\nwarn.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nerror: Receives an RPC event that passes the log filter and is assigned to the error level.\nerror.message: String from the built-in category text or synchronous message formatter.\nerror.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -4883,7 +4883,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Caller-owned structural logger with four required methods. Methods should enqueue promptly; buffering and I/O are outside the probe, and returned thenable rejections are observed rather than awaited. Throw or promise rejection is routed to onError."
+              "content": "The application logger supplied to the log probe, with required debug, info, warn and error methods. The probe forwards matching RPC events to these methods. Each method runs with the original logger as its receiver, so it can use that logger's instance state. Each method should accept or queue its record promptly; the logger owns buffering and writing to its destination. The probe does not wait for a returned Promise to finish, but observes its rejection. A thrown error or rejection is passed to onError."
             },
             {
               "id": "getting-started",
@@ -4903,7 +4903,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "debug: Receives one qualifying event assigned to the debug level; the original logger receiver is preserved.\ndebug.message: String from the built-in category text or synchronous message formatter.\ndebug.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nAny caller result; thenable rejections are observed, other values are ignored and no sink is awaited.\ninfo: Receives one qualifying event assigned to the info level; the original logger receiver is preserved.\ninfo.message: String from the built-in category text or synchronous message formatter.\ninfo.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nwarn: Receives one qualifying event assigned to the warn level; the original logger receiver is preserved.\nwarn.message: String from the built-in category text or synchronous message formatter.\nwarn.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nerror: Receives one qualifying event assigned to the error level; the original logger receiver is preserved.\nerror.message: String from the built-in category text or synchronous message formatter.\nerror.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference."
+              "content": "debug: Receives an RPC event that passes the log filter and is assigned to the debug level.\ndebug.message: String from the built-in category text or synchronous message formatter.\ndebug.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nAny caller result; thenable rejections are observed, other values are ignored and no sink is awaited.\ninfo: Receives an RPC event that passes the log filter and is assigned to the info level.\ninfo.message: String from the built-in category text or synchronous message formatter.\ninfo.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nwarn: Receives an RPC event that passes the log filter and is assigned to the warn level.\nwarn.message: String from the built-in category text or synchronous message formatter.\nwarn.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference.\nerror: Receives an RPC event that passes the log filter and is assigned to the error level.\nerror.message: String from the built-in category text or synchronous message formatter.\nerror.fields: Probe-created fields containing method/message/sender/target/trace, duration, outcome, kind, rejection, lifecycle, peer and original error; optional captured content retains its reference."
             },
             {
               "id": "advanced-usage",

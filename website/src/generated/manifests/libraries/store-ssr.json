@@ -3733,7 +3733,7 @@
           "signature": "export type ISSRResource = { readonly runtime: IRuntime; readonly disposed: boolean; readonly promise: Promise<unknown>; dehydrate(): IResourceCacheSnapshot<unknown> | undefined; hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; dispose(): void; };",
           "declarationLine": 30,
           "source": "packages/store-ssr/dist/ssr.d.ts",
-          "purpose": "The resource methods required by registerResource. [Resource](/en/docs/resource/api/Resource) supplies the cache and cleanup behavior; create it with scope.runtime so the request scope can own its cleanup.",
+          "purpose": "The methods needed to manage loaded data within one server request: wait for loading, save or restore cached data, and release the resource. [Resource](/en/docs/resource/api/Resource) provides these methods. Construct it with scope.runtime, the request scope’s execution context, and pass it to scope.registerResource. The scope can then wait for it, ask it for cached data, and clean it up by default. Without registration, the scope does not manage it. A resource using a different runtime makes registration throw CROSS_RUNTIME. Resource itself defines whether cached data is available to save.",
           "core": "runtime: Exact Runtime owner, identical to scope.runtime.\ndisposed: Terminal flag checked by dehydration and cleanup.\npromise: Current prefetch Promise, reread each round and deduplicated by identity per key; continuous getter failure is captured once.\ndehydrate: Synchronous optional resource cache snapshot producer.\nIResourceCacheSnapshot or undefined to omit; errors propagate.\nhydrate: Synchronously applies external resource snapshot.\nhydrate.snapshot: Version-2 IResourceCacheSnapshot with relative ageMs/remainingTtlMs from validated SSR state.\nVoid; failures remain reachable through scope hydration.\ndispose: Synchronous resource cleanup; this protocol does not accept async disposal.\nVoid; scope disposal retains failures, unregisterResource propagates them.",
           "advanced": "Prefetch a resource and transfer its cache through the request scope.",
           "parameters": ["This type declaration has no parameters."],
@@ -3821,7 +3821,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The resource methods required by registerResource. [Resource](/en/docs/resource/api/Resource) supplies the cache and cleanup behavior; create it with scope.runtime so the request scope can own its cleanup."
+              "content": "The methods needed to manage loaded data within one server request: wait for loading, save or restore cached data, and release the resource. [Resource](/en/docs/resource/api/Resource) provides these methods. Construct it with scope.runtime, the request scope’s execution context, and pass it to scope.registerResource. The scope can then wait for it, ask it for cached data, and clean it up by default. Without registration, the scope does not manage it. A resource using a different runtime makes registration throw CROSS_RUNTIME. Resource itself defines whether cached data is available to save."
             },
             {
               "id": "getting-started",
@@ -4326,7 +4326,7 @@
           "signature": "export type ISSRStore = { readonly $runtime: IRuntime; readonly $disposed: boolean; $plain(): Record<string, unknown>; $hydrate(state: Record<string, unknown>): void; $dispose(): void | PromiseLike<void>; };",
           "declarationLine": 23,
           "source": "packages/store-ssr/dist/ssr.d.ts",
-          "purpose": "The store methods required by register. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible store; create it with scope.runtime so the request scope can collect and release it.",
+          "purpose": "A request scope groups the stores used by one server request. This type lists the methods it needs to save state, restore it, and release a store. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible object. Create the store with runtime: scope.runtime, sharing the scope’s execution context, then pass it to scope.register. The scope can then collect its state for a request snapshot and owns cleanup by default. Without registration, the scope does not collect or clean up that store. Using a different runtime makes registration throw CROSS_RUNTIME.",
           "core": "$runtime: Exact owner Runtime, identical to scope.runtime.\n$disposed: Terminal flag checked for dehydration/cleanup omission.\n$plain: Synchronous plain data callback, never a Promise.\nRecord<string, unknown>; validated/copied by dehydrate or retained live by trusted path. Throws propagate.\n$hydrate: Synchronous data application callback without transactional rollback.\n$hydrate.state: Store field record from validated state.\nVoid; original failures are retained by hydration or propagate from registration.\n$dispose: Releases owned store resources, possibly asynchronously.\nVoid or PromiseLike<void>; scope observes rejection and disposeAsync awaits completion.",
           "advanced": "Adapt a Store Light instance into request-owned cleanup and snapshots.",
           "parameters": ["This type declaration has no parameters."],
@@ -4405,7 +4405,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The store methods required by register. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible store; create it with scope.runtime so the request scope can collect and release it."
+              "content": "A request scope groups the stores used by one server request. This type lists the methods it needs to save state, restore it, and release a store. [Store Light’s createStore](/en/docs/store-light/api/createStore) returns a compatible object. Create the store with runtime: scope.runtime, sharing the scope’s execution context, then pass it to scope.register. The scope can then collect its state for a request snapshot and owns cleanup by default. Without registration, the scope does not collect or clean up that store. Using a different runtime makes registration throw CROSS_RUNTIME."
             },
             {
               "id": "getting-started",
