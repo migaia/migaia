@@ -18,9 +18,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./serialize/*": {
-      "types": "./dist/serialize/*.d.ts",
-      "default": "./dist/serialize/*.js"
+    "./serialize/worker": {
+      "types": "./dist/serialize/worker.d.ts",
+      "default": "./dist/serialize/worker.js"
     }
   },
   "scripts": {

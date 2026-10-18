@@ -9,7 +9,10 @@
  * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StoreWorkerErrorCode = {
-  /** Worker parser/adapter options were not an object at the JavaScript boundary. */
+  /**
+   * Worker options, parser encode/decode members or the post callback are invalid or inaccessible.
+   * Correct the factory input; native getter failures retain identity or an original cause.
+   */
   invalidOption: 'INVALID_OPTION',
   /**
    * A worker adapter is called after disposal.
@@ -22,8 +25,8 @@ export const StoreWorkerErrorCode = {
    * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream
    * stop.
    *
-   * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and
-   * cannot be retried.
+   * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests
+   * have not sent it; inspect the actual backing buffer before deciding whether retry is safe.
    */
   requestAborted: 'REQUEST_ABORTED',
 
@@ -42,15 +45,8 @@ export const StoreWorkerErrorCode = {
   invalidResponseChunk: 'INVALID_RESPONSE_CHUNK',
 
   /**
-   * Worker wire chunks cannot be merged because the list is empty or a value chunk is mixed into a
-   * byte stream.
-   *
-   * Check the worker parser output chunks. This is a parser implementation error.
-   */
-  chunkMergeFailed: 'CHUNK_MERGE_FAILED',
-
-  /**
-   * Endpoint and/or owned Worker cleanup failed during parser disposal. The caller must inspect
+   * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps
+   * its existing identity rather than receiving this aggregate code. The caller must inspect
    * `cause`/`errors[]` and treat the parser as terminal.
    */
   cleanupFailed: 'CLEANUP_FAILED'

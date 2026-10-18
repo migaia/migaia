@@ -20,11 +20,10 @@ export const StoreWorkerErrorText = {
   requestAbortedBoundary: '[store] worker request aborted',
   requestTimedOut: '[store] worker request timed out',
   invalidChunk: '[store] serialize worker returned an invalid chunk',
-  aborted: (transferred: boolean): string =>
-    `[store] serialize worker request aborted${transferred ? '; transferred input is detached and cannot be retried' : ''}`,
+  /** Ownership is only a requested policy; the caller must inspect whether a send detached input. */
+  aborted: (transferRequested: boolean): string =>
+    `[store] serialize worker request aborted${transferRequested ? '; transfer may detach sent input; inspect the backing buffer before retrying' : ''}`,
   cleanupFailed: '[store] serialize worker cleanup failed',
   invalidRequestChunk: '[store] invalid serialize worker request chunk',
-  invalidPhase: '[store] invalid serialize worker phase',
-  emptyChunks: '[store] cannot merge an empty chunk list',
-  valueChunks: '[store] cannot merge value chunks into bytes'
+  invalidPhase: '[store] invalid serialize worker phase'
 } as const

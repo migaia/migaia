@@ -1327,11 +1327,13 @@
         "WorkerAdapter",
         "WorkerByteOwnership",
         "WorkerDiagnosticType",
-        "createSerializeWorkerHandler",
         "createStoreWorkerAggregateError",
         "createStoreWorkerError",
         "createWorkerHandler",
-        "workerComputed",
+        "workerComputed"
+      ],
+      "./serialize/worker": [
+        "createSerializeWorkerHandler",
         "workerParser",
         "workerPlugin"
       ]

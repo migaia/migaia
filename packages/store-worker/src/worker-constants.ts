@@ -21,7 +21,6 @@ export const WorkerSerializeFrameKind = {
   open: 'open',
   chunk: 'chunk',
   end: 'end',
-  error: 'error',
   cancel: 'cancel',
   ack: 'ack'
 } as const

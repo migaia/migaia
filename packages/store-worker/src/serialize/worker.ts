@@ -1,4 +1,4 @@
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
 import type { IWorkerMessageEvent } from '../worker-message-event.js'
 import {
   SerializeCodecError,
@@ -51,7 +51,6 @@ type IWorkerSerializeFrame = {
   readonly kind: keyof typeof WorkerSerializeFrameKind
   readonly sequence: number
   readonly chunk?: ISerializeChunk
-  readonly error?: unknown
 }
 
 type IWorkerFrameQueue = {
@@ -210,9 +209,6 @@ function createWorkerFrameQueue(
         } else chunks.push({ chunk: frame.chunk, sequence: frame.sequence })
         return
       }
-      if (frame.kind === WorkerSerializeFrameKind.error) {
-        failure = frame.error ?? new Error(StoreWorkerErrorText.invalidChunk)
-      }
       finished = true
       settle()
     },
@@ -242,13 +238,8 @@ function createWorkerFrameQueue(
  * the request is cancelled, callers lose both the result and their input. The default is `copy`;
  * callers must explicitly request transfer.
  */
-/** Encodes one worker input using the canonical byte brand without copying its payload. */
-export function encodeWorkerValue(value: unknown): ISerializeChunk {
-  return isUint8Array(value) ? [SerializeChunkKind.bytes, value] : [SerializeChunkKind.value, value]
-}
-
-/** Encodes one worker decode result, preserving byte payload identity for transfer handling. */
-export function decodeWorkerValue(value: unknown): ISerializeChunk {
+/** Classifies a local codec payload; actual wire encoding remains owned by worker-contract. */
+function workerChunk(value: unknown): ISerializeChunk {
   return isUint8Array(value) ? [SerializeChunkKind.bytes, value] : [SerializeChunkKind.value, value]
 }
 
@@ -262,8 +253,8 @@ export type IWorkerPluginOptions = {
    */
   readonly terminateOnDispose?: boolean
   /**
-   * Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes
-   * are exclusively owned and no longer used after handoff.
+   * Defaults to `copy`, which copies the bytes. Choose transfer only when the bytes are exclusively
+   * owned and no longer used after handoff.
    */
   readonly ownership?: IByteOwnership
   /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */
@@ -297,15 +288,9 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
 /**
  * Moves encoding and decoding into a worker.
  *
- * A documented measurement with one million records and 71.5 MB reports 1.4 ms of main-thread
- * blocking for byte input and output. The result remains bytes instead of being restored into a
- * main-thread object graph. This is about 46 times lower than the 65 ms for direct main-thread
- * JSON, with similar wall time. Sending the object graph through `postMessage` instead blocks the
- * main thread for 126 ms, about twice the direct JSON time. Structured cloning runs synchronously
- * on the caller thread, replacing stringify cost with clone cost.
- *
- * Use this parser for persistence or transport that finishes with bytes, rather than to accelerate
- * hydration.
+ * The portable RPC bridge base64url-encodes bytes before native send; transfer lists are separate.
+ * Detaching input does not establish zero-copy payload delivery. Old raw-postMessage timings do not
+ * describe this bridge; no current timing guarantee is made here.
  */
 export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   assertWorkerParserOptions(options)
@@ -374,11 +359,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
         const stream = streams.get(frame.streamId)
         if (!stream) return
         stream.push(frame)
-        if (
-          frame.kind === WorkerSerializeFrameKind.end ||
-          frame.kind === WorkerSerializeFrameKind.error
-        )
-          streams.delete(frame.streamId)
+        if (frame.kind === WorkerSerializeFrameKind.end) streams.delete(frame.streamId)
       })
     })
     return frameSubscription
@@ -407,7 +388,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
       // Endpoint's abort rejection is generic; re-throw it as the
       // SerializeCodecError shape this parser's callers rely on for diagnostics
       // (chunk index / bytes consumed / which format), and to flag when
-      // ownership: 'transfer' means the input is now unrecoverably detached.
+      // transfer is requested; inspect the actual buffer rather than assuming it detached.
       if (error instanceof Error && error.name === 'AbortError') {
         // web-rpc may synthesize its own AbortError at the transport boundary;
         // the caller's explicit reason is the authoritative original failure
@@ -536,10 +517,10 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   return {
     name: optionType ?? WorkerDiagnosticType.worker,
     encode: (value, context) =>
-      // 已经是字节就按 bytes 段送：只有这一种形态能进 transferList 走零拷贝。
+      // 本地只分类 bytes/value；portable bridge 另编码载荷，transfer list 不代表零拷贝。
       // 包成 value 段的话会退化成结构化克隆，把整份数据在主线程上复制一遍——
       // 实测里这正是「丢给 worker 反而更慢」的成因。
-      streamEncode(encodeWorkerValue(value), context),
+      streamEncode(workerChunk(value), context),
     decode: async (chunk, context) => {
       // 回包可能是 value 段（对象图，结构化克隆回来）也可能是 bytes 段
       // （parser 配了 decodeTo: 'jsonBytes'，走 transfer 回来）。两种情况
@@ -570,16 +551,47 @@ export function createSerializeWorkerHandler(
   parser: ISerializeParser,
   post: (message: unknown, transfer?: readonly unknown[]) => void
 ): IManagedRpcHandler {
-  if (
-    parser === null ||
-    typeof parser !== 'object' ||
-    typeof parser.encode !== 'function' ||
-    typeof parser.decode !== 'function' ||
-    typeof post !== 'function'
-  ) {
+  try {
+    if (
+      parser === null ||
+      typeof parser !== 'object' ||
+      typeof parser.encode !== 'function' ||
+      typeof parser.decode !== 'function' ||
+      typeof post !== 'function'
+    ) {
+      throw createStoreWorkerError(
+        StoreWorkerErrorCode.invalidOption,
+        StoreWorkerErrorText.handlerInvalid
+      )
+    }
+  } catch (error) {
+    if (isNativeErrorValue(error)) {
+      /** Classify this public factory input without invoking error metadata getters. */
+      let identified: Error | undefined
+      try {
+        /** Complete identities remain with the package that already owns the failure. */
+        const source = Object.getOwnPropertyDescriptor(error, 'source')
+        /** Unowned extensible native errors receive this existing invalid-input identity in place. */
+        const code = Object.getOwnPropertyDescriptor(error, 'code')
+        if (typeof source?.value === 'string' && typeof code?.value === 'string') identified = error
+        else if (!source && !code && Object.isExtensible(error))
+          identified = attachErrorIdentity(error, {
+            source: STORE_WORKER_SOURCE,
+            code: StoreWorkerErrorCode.invalidOption
+          })
+      } catch (metadataError) {
+        throw createStoreWorkerAggregateError(
+          StoreWorkerErrorCode.invalidOption,
+          [error, metadataError],
+          StoreWorkerErrorText.handlerInvalid
+        )
+      }
+      if (identified) throw identified
+    }
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
-      StoreWorkerErrorText.handlerInvalid
+      StoreWorkerErrorText.handlerInvalid,
+      { cause: error }
     )
   }
   let inboundListener: ((event: IWorkerMessageEvent) => void) | undefined
@@ -659,12 +671,10 @@ export function createSerializeWorkerHandler(
         }
         signal.addEventListener('abort', abort, { once: true })
         let sequence = 0
-        let completed = false
         let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
         const send = async (
           kind: keyof typeof WorkerSerializeFrameKind,
-          next?: ISerializeChunk,
-          error?: unknown
+          next?: ISerializeChunk
         ) => {
           if (kind === WorkerSerializeFrameKind.chunk) await waitForWorkerCredit(ackState)
           await readyEndpoint.notify(
@@ -672,8 +682,7 @@ export function createSerializeWorkerHandler(
               streamId,
               kind,
               sequence: sequence++,
-              ...(next ? { chunk: next } : {}),
-              ...(error ? { error } : {})
+              ...(next ? { chunk: next } : {})
             },
             WorkerSerializeFrameMethod,
             {
@@ -722,23 +731,16 @@ export function createSerializeWorkerHandler(
             }
           }
           await send(WorkerSerializeFrameKind.end)
-          completed = true
           return { streamId }
-        } catch (error) {
+        } catch (primary) {
           try {
-            await send(WorkerSerializeFrameKind.error, undefined, error)
-          } catch {
-            // Cancellation may close the operation before an error frame can be delivered.
+            await iterator?.return?.()
+          } catch (cleanup) {
+            // Canonical attachment keeps the primary first; RPC already transfers errors[]/cause.
+            throw attachSecondaryErrors(primary, [cleanup])
           }
-          throw error
+          throw primary
         } finally {
-          if (!completed && iterator?.return) {
-            try {
-              await iterator.return()
-            } catch {
-              // Preserve the primary stream failure; endpoint error serialization owns it.
-            }
-          }
           signal.removeEventListener('abort', abort)
           streamStates.delete(streamId)
         }
@@ -750,7 +752,7 @@ export function createSerializeWorkerHandler(
         )
       }
       const value = await parser.decode(chunk, serializeContext)
-      const result: ISerializeChunk = decodeWorkerValue(value)
+      const result: ISerializeChunk = workerChunk(value)
       return result
     })
     return {

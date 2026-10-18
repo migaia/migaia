@@ -2,7 +2,7 @@ import { StoreWorkerErrorCode, type IStoreWorkerErrorCode } from './error-code.j
 
 export { StoreWorkerErrorCode, type IStoreWorkerErrorCode }
 
-/** `source` value stamped onto every error this package throws. */
+/** `source` identity of package-owned errors; foreign RPC/application identities retain their owner. */
 export const STORE_WORKER_SOURCE = '@migaia/store-worker'
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */

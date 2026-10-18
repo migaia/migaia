@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
 import { isRpcRemoteError, type IRpcEndpoint } from '@migaia/rpc-core'
-import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
+import { WorkerAdapter, createWorkerHandler, workerComputed } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
-import { createSerializeWorkerHandler } from '../src/serialize/worker'
+import { createSerializeWorkerHandler, workerParser } from '../src/serialize/worker.js'
 import { createWorkerContractEndpoint } from '../src/worker-contract.js'
 
 function fakePort() {

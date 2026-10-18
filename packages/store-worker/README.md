@@ -4,7 +4,7 @@
 
 ## 适用与不适用场景
 
-**适用**：`Resource` 的取数/计算逻辑很重会卡主线程，用 `workerComputed()` 把 fetcher 换成 Worker 调用；某种序列化格式的编解码需要放进 Worker 跑，用 `workerPlugin()` 接入 `@migaia/serialize` 的插件注册表；落盘/传输前需要对纯字节做编解码(字节进、字节出，走零拷贝 transfer)；需要一个不依赖具体协议细节的 Worker 请求/响应模型。
+**适用**：`Resource` 的取数/计算逻辑很重会卡主线程，用 `workerComputed()` 把 fetcher 换成 Worker 调用；某种序列化格式的编解码需要放进 Worker 跑，用 `workerPlugin()` 接入 `@migaia/serialize` 的插件注册表；落盘/传输前需要对纯字节做编解码(字节进、字节出，走显式 transfer 归属策略)；需要一个不依赖具体协议细节的 Worker 请求/响应模型。
 
 **不适用**：计算量小、同步就能算完的派生逻辑——引入 Worker 通信本身有固定的序列化和消息往返成本，小任务过 Worker 反而更慢；对象图(非纯字节)走 Worker 编解码同样不划算，实测比主线程直接做还慢一倍(见[性能特征](#性能特征))。
 
@@ -61,7 +61,7 @@ adapter.dispose();
 
 实例方法：
 
-- `request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回
+- `request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回
 - `disposed`(只读 getter)—— 是否已 `close()`/`dispose()`
 - `close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint
 - `dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise
@@ -92,9 +92,9 @@ self.onmessage = (event) => {
 
 签名：`<Input, Output>(compute, postMessage, options?) => IManagedRpcHandler`。
 
-- `compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error
+- `compute: (payload: Input, context: { signal: INativeAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error
 - `postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`
-- `options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设
+- `options.timeoutMs?: number` —— 该端点发起 request 的默认超时；不会限制本端 provider compute 的执行期限；通常在主端 Adapter 配置请求超时
 
 返回值 `IManagedRpcHandler` 是一个函数(需要手动接上 `self.onmessage`)，额外带 `dispose()`/`close()`/`pendingCount`/`disposed`，见 [USEGUIDE §4](./USEGUIDE.md#4-imanagedrpchandler-生命周期细节)。
 
@@ -128,7 +128,7 @@ sum.dispose();
 `IWorkerComputedOptions<Input, Output>` 全部字段(是 `IResourceOptions<Output>` 的超集)：
 
 - `runtime?: IRuntime` —— 默认 `defaultRuntime`
-- `transfer?: (input: Input) => readonly unknown[]` —— 给定 `input`，返回这次调用要零拷贝转移的列表；只在确认 `input` 转移后不会再被主线程使用时才该提供
+- `transfer?: (input: Input) => readonly unknown[]` —— 给定 `input`，返回这次调用要转移的列表；只在确认 `input` 转移后不会再被主线程使用时才该提供
 - `debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致
 
 返回标准 `Resource<Output>` 实例，`refetch()`/`.state`/`dispose()` 等用法与直接 `new Resource(...)` 得到的对象没有区别。非法 `adapter`/`selectInput`/`transfer` 会同步抛出带 `INVALID_OPTION` 的错误。
@@ -145,8 +145,7 @@ import {
   workerPlugin,
   createSerializeWorkerHandler
 } from '@migaia/store-worker/serialize/worker';
-// 也可以从包根导入（index.ts 里 `export * from './serialize/worker.js'`）：
-// import { workerPlugin } from '@migaia/store-worker';
+// 序列化工厂仅从此具体子路径导入；根入口只负责通用计算与公共诊断类型。
 ```
 
 **`workerPlugin`｜10 秒上手** —— 把 Worker 编解码接成 `@migaia/serialize` 的标准插件：
@@ -184,7 +183,7 @@ const chunk = await registry.encode(largeBytePayload);
 - `worker: IWorkerLike`（必填）—— 满足 `IWebWorkerLikePort` 加可选 `terminate()` 的对象
 - `type?: string` —— 写进 `ISerializePlugin.type` 的注册表格式标签，默认 `'worker'`
 - `terminateOnDispose?: boolean` —— `dispose()` 时是否顺带 `worker.terminate?.()`，默认 `false`(外部传入的 Worker 默认归调用方所有)
-- `ownership?: 'copy' | 'transfer'` —— 字节数据过边界时复制还是零拷贝转移，默认 `'copy'`
+- `ownership?: 'copy' | 'transfer'` —— 字节数据过边界时复制还是转移，默认 `'copy'`
 - `clientId?: string` —— 本端在 RPC 拓扑里的 id，默认 `'main'`
 
 **`workerParser`｜5 秒上手** —— `workerPlugin` 内部使用的主线程侧 `ISerializeParser` 实现，也可单独使用：
@@ -193,7 +192,7 @@ const chunk = await registry.encode(largeBytePayload);
 const parser = workerParser({ worker });
 ```
 
-签名同 `workerPlugin` 的 `options`。`encode`/`decode` 都通过 RPC 转发给 Worker；`value` 是 `Uint8Array` 时按 bytes 段发送(唯一能走零拷贝的形态)，否则按 value 段发送(退化为结构化克隆)。`dispose()` 异步释放端点，`terminateOnDispose: true` 时额外尝试 `worker.terminate?.()`，两步失败都发生时抛 `CLEANUP_FAILED` 的 `AggregateError`。
+签名同 `workerPlugin` 的 `options`。`encode`/`decode` 都通过 RPC 转发给 Worker；Uint8Array 按 bytes 段分类，其他值按 value 段；当前 portable RPC 桥在发送前把 bytes 编成 base64url，transfer list 独立传递，detach 不代表载荷零拷贝。`dispose()` 异步释放端点，`terminateOnDispose: true` 时额外尝试 `worker.terminate?.()`，两步失败都发生时抛 `CLEANUP_FAILED` 的 `AggregateError`。
 
 **`createSerializeWorkerHandler`｜10 秒上手** —— Worker 侧的对端，把一个普通 `ISerializeParser` 接成消息处理器：
 
@@ -203,7 +202,7 @@ const handler = createSerializeWorkerHandler(parser, (message, transfer) =>
 );
 ```
 
-签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。`parser`/`post` 的解码/编码结果、多段流式输出的本地拼装规则见 [USEGUIDE §6.5](./USEGUIDE.md#65-多段结果的本地拼装)。
+签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。encode 多段按 open/chunk/end 与两 credit/ACK 逐块传送，见 USEGUIDE §6.5；终结错误由 canonical RPC error response 传整链，不发送普通应用 error 帧。
 
 ---
 
@@ -239,11 +238,7 @@ WorkerDiagnosticType.worker; // 'worker'
 ## 错误码与错误工厂
 
 ```ts
-import {
-  StoreWorkerErrorCode,
-  createStoreWorkerError,
-  createStoreWorkerAggregateError
-} from '@migaia/store-worker';
+import { StoreWorkerErrorCode, createStoreWorkerError, createStoreWorkerAggregateError } from '@migaia/store-worker';
 ```
 
 **`StoreWorkerErrorCode`｜3 秒上手** —— 稳定错误码表：
@@ -254,7 +249,7 @@ if (error.code === StoreWorkerErrorCode.adapterDisposed) {
 }
 ```
 
-全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)、`chunkMergeFailed`(`CHUNK_MERGE_FAILED`)。
+全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)。
 
 **`createStoreWorkerError`｜5 秒上手**：
 
@@ -280,14 +275,7 @@ throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, [err1,
 
 ## 性能特征
 
-以下数字来自包内注释记录的实测结论(测试规模:100 万条记录、71.5MB)：
-
-| 方案                                                     | 主线程阻塞时长 | 相对直接在主线程做 JSON                           |
-| -------------------------------------------------------- | -------------- | ------------------------------------------------- |
-| 字节进、字节出(走 transfer，结果不还原成主线程对象图)    | 约 1.4ms       | 快约 46 倍(直接 JSON 约 65ms)，墙钟总耗时基本持平 |
-| 对象图 `postMessage` 进 Worker(需要在主线程还原成对象图) | 约 126ms       | 比主线程直接做还慢一倍                            |
-
-结论：只有当 Worker 的输入输出都停留在字节层面时，把编解码搬进 Worker 才是净收益；结构化克隆本身在调用方线程同步完成，把对象图丢给 Worker 只是把 `JSON.stringify` 的开销换成结构化克隆的开销。
+当前桥接会把 bytes 编成 base64url portable payload，随后独立传 native transfer list；原 buffer detach 与载荷零拷贝不是同一保证。本任务没有当前性能测量，旧的 1.4ms/46 倍等数据不再作为此实现结论。是否适合卸载取决于实际计算、编码与通信成本。
 
 ---
 
@@ -378,13 +366,13 @@ registry.dispose(); // 连带 dispose workerParser 的端点，并 terminate wor
 ### 3. 用错误码分支处理 abort 场景，判断是否可以重试
 
 ```ts
-import { StoreWorkerErrorCode } from '@migaia/store-worker';
+import { isRpcError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core';
 
 try {
   await adapter.request(payload, { signal: controller.signal, transfer: [buffer] });
 } catch (error) {
-  if ((error as { code?: string }).code === StoreWorkerErrorCode.requestAborted) {
-    // ownership: 'transfer' 场景下原始数据已 detach，不能直接重试同一份数据
+  if (isRpcError(error) && error.source === RPC_CORE_ERROR_SOURCE && error.code === RpcCoreErrorCode.cancelled) {
+    // 通用 Adapter 保留 RPC 取消身份；检查原 buffer 实际状态，再决定能否重试。
   }
   throw error;
 }
@@ -414,3 +402,5 @@ pnpm --filter @migaia/store-worker build
 
 
 Stream cancellation keeps its native DOMException/AbortError and original message/stack. Worker credit waits and explicit stream stop attach the existing @migaia/store-worker / REQUEST_ABORTED identity; cancellation remains separate from codec or cleanup failure.
+
+入口迁移：workerParser/workerPlugin/createSerializeWorkerHandler 仅从 @migaia/store-worker/serialize/worker 导入；删除根 aliases。encodeWorkerValue/decodeWorkerValue 合为内部分类函数，transferablesOf 仅内部使用；显式 exports 不再公开 serialize/* 通配入口。移除无抛点的 CHUNK_MERGE_FAILED；其余六码保持。旧导入/成员引用需 breaking 迁移，无 shim。
