@@ -712,8 +712,8 @@ export const storeMiddlewareReference: ILibraryReference = {
     loggerMiddleware: {
       role: 'enhancer',
       purpose: t(
-        'Creates the store-logger plugin, which records next(event) then calls its sink before downstream execution; synchronous continuation does not execute downstream inline. Pair with createStoreMiddlewareHost and install using use; creating a descriptor alone produces no logs.',
-        '创建固定名称日志插件，先记录继续值，再于下游执行前把事件及当前状态交给接收端，搭配 `createStoreMiddlewareHost` 安装，单独创建描述不产生日志。'
+        'Creates a logging plugin named store-logger. Install it on a host from createStoreMiddlewareHost with host.use; creating the plugin alone prints nothing. For each event, the plugin first passes the event on with next(event), then gives the event and the current state to its sink. The sink still runs before the next plugin handles the event. The logger never relies on the shape of your state, so it installs into a host of any state type without a type argument.',
+        '创建名为 store-logger 的日志插件。用 `host.use` 把它装到 `createStoreMiddlewareHost` 创建的宿主上；只创建插件不会输出任何日志。每收到一个事件，插件先用 `next(event)` 把事件交给后面的插件，再把事件和当前状态交给 sink（接收日志的回调）。sink 仍会在后面的插件处理这个事件之前运行。日志插件不依赖状态的具体结构，所以不写类型参数也能装到任意状态类型的宿主上。'
       ),
       params: {
         sink: t(

@@ -20790,14 +20790,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '登记清理函数，或实现 Symbol.dispose / Symbol.asyncDispose 的对象；插件卸载时由 Host 调用。'
                   ],
                   [
-                    'loggerMiddleware<S>(sink?)',
+                    'loggerMiddleware<S = any>(sink?)',
                     'sink(event: IMiddlewareEvent<unknown>, state: unknown) => void；缺省把 [store]、event、state 交给 console.log，固定插件名 store-logger。'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '直接插件在 install(core) 中通过 core.usePipeline 注册同步阶段，使用完整配置与清理上下文；loggerMiddleware 的泛型应与目标 Host 状态类型一致。'
+                text: '直接插件在 install(core) 中通过 core.usePipeline 注册同步阶段，使用完整配置与清理上下文。loggerMiddleware 只把状态当作未知值交给 sink，不依赖状态的具体结构，所以不写类型参数也能装进任意状态类型的 Host。'
               }
             ]
           },
@@ -20955,14 +20955,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Registers a disposer function or an object implementing Symbol.dispose / Symbol.asyncDispose, invoked by the Host on removal.'
                   ],
                   [
-                    'loggerMiddleware<S>(sink?)',
+                    'loggerMiddleware<S = any>(sink?)',
                     'sink(event: IMiddlewareEvent<unknown>, state: unknown) => void; defaults to console.log with [store], event, and state under the fixed store-logger plugin name.'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'Direct plugins register synchronous stages through core.usePipeline in install(core), with full configuration and cleanup context. Match loggerMiddleware generics to the target Host state type.'
+                text: 'Direct plugins register synchronous stages through core.usePipeline in install(core), with full configuration and cleanup context. loggerMiddleware hands state to its sink as an unknown value and never relies on its shape, so it installs into a Host of any state type without a type argument.'
               }
             ]
           },
