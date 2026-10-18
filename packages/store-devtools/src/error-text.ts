@@ -4,6 +4,8 @@ export const StoreDevtoolsErrorText = {
   sessionDisposed: '[store] DevTools session is disposed',
   /** Cleanup reports all subscription failures through this stable heading. */
   cleanupFailed: '[store] DevTools cleanup failed',
+  /** Manual preparation failures and automatic diagnostic reports share this fallback heading. */
+  preparationFailed: '[store] DevTools diagnostic preparation failed',
   /** Formats a rejected history identifier without reading user state. */
   unknownHistoryEntry: (id: number): string => `[store] unknown history entry: ${id}`,
   /** Formats invalid bounded diagnostic configuration. */

@@ -20,16 +20,26 @@ export const StoreDevtoolsErrorCode = {
   unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY',
 
   /**
-   * A history/trace limit is non-finite or below one. Callers must provide a finite positive
-   * integer to retain bounded diagnostics.
+   * Options are not an object, an option getter fails, a configured callback is not a function, a
+   * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer.
+   * Correct the configuration before retrying.
    */
   invalidOption: 'INVALID_OPTION',
 
   /**
-   * One or more DevTools subscriptions failed during cleanup. The caller must inspect `errors[]`;
-   * the session is terminal and cannot be revived.
+   * Multiple subscription cleanups failed, or construction failed together with rollback cleanup.
+   * The caller must inspect `errors[]`, whose first entry retains the construction failure; the
+   * session is terminal and cannot be revived.
    */
-  cleanupFailed: 'CLEANUP_FAILED'
+  cleanupFailed: 'CLEANUP_FAILED',
+
+  /**
+   * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic
+   * identity. Manual calls throw; automatic diagnostics report the failure without interrupting
+   * business writes. Correct the callback or input; the original error remains the same instance or
+   * reachable by cause.
+   */
+  callbackFailed: 'CALLBACK_FAILED'
 } as const
 
 export type IStoreDevtoolsErrorCode =

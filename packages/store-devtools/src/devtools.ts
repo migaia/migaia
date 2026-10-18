@@ -13,7 +13,8 @@ import { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'
 import {
   createStoreDevtoolsAggregateError,
   createStoreDevtoolsError,
-  createStoreDevtoolsRangeError
+  createStoreDevtoolsRangeError,
+  identifyDevtoolsFailure
 } from './errors.js'
 import { StoreDevtoolsErrorCode } from './error-code.js'
 import { StoreDevtoolsLabel, StoreDevtoolsNodeKind } from './devtools-constants.js'
@@ -299,14 +300,19 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
       )
   }
   const createEntry = (label: string): IStoreHistoryEntry => {
-    /** Timestamp is evaluated before reserving an id so a failing clock leaves queues unchanged. */
-    const timestamp = now()
-    /** Snapshot is fully cloned before reserving an id or mutating any diagnostic queue. */
-    const state = Object.freeze(clone(store.$plain()))
-    /** Fully prepared history entry ready for atomic publication. */
-    const entry: IStoreHistoryEntry = Object.freeze({ id: nextId, timestamp, label, state })
-    nextId++
-    return entry
+    try {
+      /** Timestamp is evaluated before reserving an id so a failing clock leaves queues unchanged. */
+      const timestamp = now()
+      /** Snapshot is fully cloned before reserving an id or mutating any diagnostic queue. */
+      const state = Object.freeze(clone(store.$plain()))
+      assertActive()
+      /** Fully prepared history entry ready for atomic publication. */
+      const entry: IStoreHistoryEntry = Object.freeze({ id: nextId, timestamp, label, state })
+      nextId++
+      return entry
+    } catch (error) {
+      throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
+    }
   }
   const record = (label: string = StoreDevtoolsLabel.stateChange): IStoreHistoryEntry => {
     assertActive()
@@ -316,7 +322,14 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
   }
   const recordAction = (action: Omit<IActionTrace, 'timestamp'>): void => {
     assertActive()
-    actions.push({ ...action, timestamp: now() })
+    try {
+      /** Prepare all caller-owned properties and the clock before publishing to the queue. */
+      const entry = { ...action, timestamp: now() }
+      assertActive()
+      actions.push(entry)
+    } catch (error) {
+      throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
+    }
   }
   record(StoreDevtoolsLabel.initial)
   let unsubscribe: (() => void) | undefined

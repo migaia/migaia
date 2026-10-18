@@ -6,7 +6,7 @@
 
 **适用**：排查"这个字段为什么变了"（`history` + `jumpTo`）、"哪次 action 报错了/耗时多久"（`actions`）、"这个 Effect/Signal 到底连着谁"（`getDependencyTree`/`getObserverTree`）。开发期本地诊断，不改动 Store 本身的任何写入行为，只是订阅它已有的通知机制。
 
-**不适用**：不要把它当作浏览器 DevTools 扩展协议的实现——那是 `@migaia/store-middleware` 的 `connectDevTools()`，本包不接入该协议（`StoreDevtoolsCommand` 只是与该协议同名的命令字符串表，供调用方自己搭桥时复用，本包内部不消费它）。也不要把它当作生产环境状态审计或持久化层：`history` 只在内存里，进程重启即丢失；`jumpTo()` 不是事务回滚，无法撤销已经发出的网络请求或其他副作用。
+**不适用**：不要把它当作浏览器 DevTools 扩展协议的实现——那是 `@migaia/store-middleware` 的 `connectDevTools()`，本包不接入该协议；其协议词表由同包 `ReduxDevToolsCommand` / `IReduxDevToolsCommand` 维护。也不要把它当作生产环境状态审计或持久化层：`history` 只在内存里，进程重启即丢失；`jumpTo()` 不是事务回滚，无法撤销已经发出的网络请求或其他副作用。
 
 ## 安装
 
@@ -20,7 +20,7 @@ pnpm add @migaia/store-devtools
 
 - [诊断会话：`createStoreDevTools`](#诊断会话)
 - [依赖树：`getDependencyTree` / `getObserverTree`](#依赖树)
-- [命令常量：`StoreDevtoolsCommand`](#命令常量)
+- [扩展协议迁移](#命令常量)
 - [错误：`StoreDevtoolsErrorCode` 与错误工厂](#错误模块)
 - [高阶组合示例](#高阶组合示例)
 - [构建门禁](#构建门禁)
@@ -59,8 +59,8 @@ tools.dispose(); // 用完必须调用，取消对 Store 的订阅
 
 全部选项（第二参数 `IStoreDevToolsOptions`）：
 
-- `maxHistory?: number` —— 默认 `100`；`history` **和** `actions` 两个队列共用它做上限（`actions` 没有独立的 `maxActions`）；必须是 `>= 1` 的安全整数，否则构造时抛错（不会被静默夹到 `1`）
-- `maxTrace?: number` —— 默认 `1000`；仅约束 `trace` 队列；同样必须是 `>= 1` 的安全整数，否则抛错
+- `maxHistory?: number` —— 默认 `100`；仅约束 `history` 队列；必须是 `>= 1` 的安全整数，否则构造时抛错（不会被静默夹到 `1`）
+- `maxTrace?: number` —— 默认 `1000`；分别约束 `actions` 和 `trace` 的独立队列（没有独立 `maxActions`）；同样必须是 `>= 1` 的安全整数，否则抛错
 - `captureRuntimeTrace?: boolean` —— 默认 `true`；传 `false` 时完全不订阅 runtime trace，`trace` 永远为空数组，`actions` 也不再被自动填充（只能靠手动 `recordAction()`）
 - `now?: () => number` —— 默认 `Date.now`；时间戳来源，传非函数值抛错
 - `clone?: (state: Record<string, unknown>) => Record<string, unknown>` —— 默认 `ClonePolicy.diagnostic`（来自 `@migaia/store-middleware/tolerant-clone`，尽力克隆、遇到不可克隆值不抛错）；传非函数值抛错
@@ -115,19 +115,16 @@ getObserverTree(someSignal);
 
 <a id="命令常量"></a>
 
-## 命令常量：`StoreDevtoolsCommand`
+## 扩展协议迁移
+
+本地诊断入口不再导出 `StoreDevtoolsCommand` / `IStoreDevtoolsCommand`。自建扩展桥接应改用实际协议所有者：
 
 ```ts
-import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';
+import { ReduxDevToolsCommand, type IReduxDevToolsCommand } from '@migaia/store-middleware';
+ReduxDevToolsCommand.jumpToState; // 'JUMP_TO_STATE'
 ```
 
-**`StoreDevtoolsCommand`｜3 秒上手** —— 一张与 Redux DevTools 扩展协议同名的命令字符串表，本包内部任何函数都不消费它；只有自己搭桥接入该扩展协议时才用得上：
-
-```ts
-StoreDevtoolsCommand.jumpToState; // 'JUMP_TO_STATE'
-```
-
-无调用参数，是常量对象；全部取值：`dispatch`(`'DISPATCH'`)、`commit`(`'COMMIT'`)、`jumpToState`(`'JUMP_TO_STATE'`)、`jumpToAction`(`'JUMP_TO_ACTION'`)、`rollback`(`'ROLLBACK'`)、`reset`(`'RESET'`)。
+这是一项破坏性导入迁移；六个协议字符串保持不变。开箱即用的连接继续使用 Store Middleware 的 `createReduxDevToolsAdapter` / `connectDevTools()`。
 
 ---
 
@@ -154,7 +151,7 @@ if (error.code === StoreDevtoolsErrorCode.sessionDisposed) {
 }
 ```
 
-无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)。
+无调用参数；全部取值：`sessionDisposed`(`'SESSION_DISPOSED'`)、`unknownHistoryEntry`(`'UNKNOWN_HISTORY_ENTRY'`)、`invalidOption`(`'INVALID_OPTION'`)、`cleanupFailed`(`'CLEANUP_FAILED'`)、`callbackFailed`(`'CALLBACK_FAILED'`)。
 
 **`STORE_DEVTOOLS_SOURCE`｜3 秒上手** —— 本包每个错误都会被打上的 `source` 常量：
 
@@ -179,7 +176,7 @@ throw createStoreDevtoolsAggregateError(
 参数：
 
 - `createStoreDevtoolsError(code, message, options?)` —— `code: IStoreDevtoolsErrorCode`（必填）、`message: string`（必填）、`options.cause?: unknown`（可选，透传进 `Error` 的 `cause`）；返回原生 `Error`
-- `createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth`/`maxHistory` 校验）
+- `createStoreDevtoolsRangeError(code, message)` —— `code`/`message` 均必填；返回原生 `RangeError`（用于需要 `instanceof RangeError` 分支的场景，例如 `maxDepth` 校验或 unknown history id）
 - `createStoreDevtoolsAggregateError(code, errors, message)` —— `code`（必填）、`errors: readonly unknown[]`（必填，保留全部原始失败）、`message: string`（必填）；返回原生 `AggregateError`
 
 ---
@@ -267,3 +264,5 @@ const tools = createStoreDevTools(authStore, {
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
+诊断准备阶段的 clock、clone 或 action getter 失败按 `CALLBACK_FAILED` 分类：可注记原生错误保留同一对象、类型和 stack，已有完整外包身份保留；不可注记值通过 cause 保留。手动调用抛出，自动监听走 Runtime reporter。准备期间释放会话则以 `SESSION_DISPOSED` 拒绝发布；队列与下一个 history id 不变。

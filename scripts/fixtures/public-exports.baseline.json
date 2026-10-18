@@ -1083,7 +1083,6 @@
     "@migaia/store-devtools": {
       ".": [
         "STORE_DEVTOOLS_SOURCE",
-        "StoreDevtoolsCommand",
         "StoreDevtoolsErrorCode",
         "createStoreDevTools",
         "createStoreDevtoolsAggregateError",

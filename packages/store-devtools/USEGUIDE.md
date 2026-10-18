@@ -31,26 +31,26 @@ import {
 
 ```ts
 type IStoreDevToolsOptions = {
-  readonly maxHistory?: number;
-  readonly maxTrace?: number;
-  readonly captureRuntimeTrace?: boolean;
-  readonly now?: () => number;
-  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;
+  maxHistory?: number;
+  maxTrace?: number;
+  captureRuntimeTrace?: boolean;
+  now?: () => number;
+  clone?: (state: Record<string, unknown>) => Record<string, unknown>;
 };
 
 type IStoreHistoryEntry = {
-  readonly id: number;
-  readonly timestamp: number;
-  readonly label: string;
-  readonly state: Record<string, unknown>;
+  id: number;
+  timestamp: number;
+  label: string;
+  state: Record<string, unknown>;
 };
 
 type IActionTrace = {
-  readonly timestamp: number;
-  readonly name: string;
-  readonly payload?: unknown;
-  readonly durationMs?: number;
-  readonly error?: unknown;
+  timestamp: number;
+  name: string;
+  payload?: unknown;
+  durationMs?: number;
+  error?: unknown;
 };
 
 type IStoreDevTools = {
@@ -180,7 +180,7 @@ type IRuntimeNodeDescriptor = Readonly<{
 }>;
 ```
 
-四种事件都携带只读的节点**描述符**（`id`/`kind`/`debugName?`），不是可变的图节点本身——在事件里长期持有引用不会阻止对应 Signal/Computed/Effect 被回收。`trace.length` 超过 `maxTrace` 时从头部裁掉最旧条目。`captureRuntimeTrace: false` 完全跳过这条订阅，`trace` 永远是空数组。
+前三种事件按具体事件类型携带节点描述符；action 仅携带 name/durationMs/error，没有通用节点描述符。事件联合由 `@migaia/reactive` 维护，本包不转换事件。`trace.length` 超过 `maxTrace` 时从头部裁掉最旧条目。`captureRuntimeTrace: false` 完全跳过这条订阅，`trace` 永远是空数组。
 
 ### 快照/克隆失败与诊断上报
 
@@ -190,7 +190,7 @@ type IRuntimeNodeDescriptor = Readonly<{
 
 ### 克隆策略
 
-`options.clone` 默认是 `ClonePolicy.diagnostic`（`@migaia/store-middleware/tolerant-clone`）：优先用 `structuredClone`；遇到不可克隆的值（函数、DOM 句柄、Class 实例等）不抛错，而是递归遍历普通对象/数组，只在真正不可克隆的那个值上退化为引用共享，其余可克隆部分仍是独立拷贝。如果状态里包含敏感字段（token、密码等），默认克隆策略**不会做任何脱敏**——要么不让这些字段进入 `store.$plain()`（不用 signal 承载），要么传一个自行脱敏的 `clone` 函数替换默认值（见 README 的[高阶组合示例 5](./README.md#高阶组合示例)）。
+`options.clone` 默认是 `ClonePolicy.diagnostic`（`@migaia/store-middleware/tolerant-clone`）：优先用 `structuredClone`；成功时使用其克隆结果，普通自定义 Class 可能被转成普通对象；失败时递归遍历普通对象/数组，在无法继续克隆的值上退化为引用共享。这是尽力诊断策略，不保证保留原型或完全隔离。如果状态里包含敏感字段（token、密码等），默认克隆策略**不会做任何脱敏**——要么不让这些字段进入 `store.$plain()`（不用 signal 承载），要么传一个自行脱敏的 `clone` 函数替换默认值（见 README 的[高阶组合示例 5](./README.md#高阶组合示例)）。
 
 <a id="dispose-与生命周期"></a>
 
@@ -274,25 +274,15 @@ getDependencyTree(someEffect, 5);
 
 <a id="命令常量模块"></a>
 
-## 命令常量模块
+## 扩展协议迁移
+
+`StoreDevtoolsCommand` / `IStoreDevtoolsCommand` 已从本地诊断入口移除。自建桥接改为：
 
 ```ts
-import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';
+import { ReduxDevToolsCommand, type IReduxDevToolsCommand } from '@migaia/store-middleware';
 ```
 
-```ts
-const StoreDevtoolsCommand: {
-  readonly dispatch: 'DISPATCH';
-  readonly commit: 'COMMIT';
-  readonly jumpToState: 'JUMP_TO_STATE';
-  readonly jumpToAction: 'JUMP_TO_ACTION';
-  readonly rollback: 'ROLLBACK';
-  readonly reset: 'RESET';
-};
-type IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];
-```
-
-一张与 Redux DevTools 浏览器扩展协议同名的命令字符串常量表。**本包内部没有任何函数消费这张表**——`createStoreDevTools`/`getDependencyTree`/`getObserverTree` 都不引用它。它的存在是为了给调用方自己搭建"把 `history`/`jumpTo` 桥接到浏览器扩展协议"的适配层时，复用一套与协议同名的稳定字符串，避免各自拼写字面量。如果需要开箱即用地接入该协议，应使用 `@migaia/store-middleware` 的 `connectDevTools()`，本包不实现该协议本身。
+六个值保持 `DISPATCH` / `COMMIT` / `JUMP_TO_STATE` / `JUMP_TO_ACTION` / `ROLLBACK` / `RESET`。实际消费者 `createReduxDevToolsAdapter` 也使用这份词表；本包不新增扩展桥接层。
 
 ---
 
@@ -311,7 +301,7 @@ import {
 } from '@migaia/store-devtools';
 ```
 
-本包边界抛出的一切错误都保留原生 `Error`/`RangeError`/`AggregateError` 类型（不引入自定义错误类），并通过 `attachErrorIdentity`（`@migaia/utils/error`）就地打上 `source: '@migaia/store-devtools'` 与稳定 `code`——`instanceof` 判断和 `code` 判断可以同时使用。
+包自建错误带本包 source/code。clock、clone 和 action getter 的未分类失败以 `CALLBACK_FAILED` 注记：可注记原生错误保留同一对象、类型与 stack；完整外包身份保留其 source/code；冻结错误或非 Error 值保留在 cause。自动监听仍上报而不打断业务写入；手动记录抛出。订阅和单个清理错误沿其原有公共提供者身份传播。
 
 ```ts
 const STORE_DEVTOOLS_SOURCE: '@migaia/store-devtools';
@@ -325,6 +315,7 @@ const StoreDevtoolsErrorCode: {
   readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';
   readonly invalidOption: 'INVALID_OPTION';
   readonly cleanupFailed: 'CLEANUP_FAILED';
+  readonly callbackFailed: 'CALLBACK_FAILED';
 };
 type IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];
 ```
@@ -333,8 +324,9 @@ type IStoreDevtoolsErrorCode = (typeof StoreDevtoolsErrorCode)[keyof typeof Stor
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | `SESSION_DISPOSED`      | 会话 `dispose()` 后继续调用 `record`/`recordAction`/`jumpTo`/`clear`                                                                                                   | `Error`                                                   |
 | `UNKNOWN_HISTORY_ENTRY` | `jumpTo(id)` 传了一个不在 `history` 里的 `id`（含已被 `maxHistory` 裁掉的）                                                                                            | `RangeError`                                              |
-| `INVALID_OPTION`        | `createStoreDevTools` 的 `options` 不是对象、`maxHistory`/`maxTrace` 非正整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负整数 | `Error`（options 校验）或 `RangeError`（`maxDepth` 校验） |
-| `CLEANUP_FAILED`        | `dispose()` 或构造期回滚清理时，多个订阅清理同时失败                                                                                                                   | `AggregateError`，`errors` 保留每个原始失败               |
+| `INVALID_OPTION`        | `createStoreDevTools` 的 `options` 不是对象、option getter 失败、`maxHistory`/`maxTrace` 非正安全整数、`now`/`clone` 非函数；或 `getDependencyTree`/`getObserverTree` 的 `maxDepth` 非非负安全整数 | `Error`（options 校验）或 `RangeError`（`maxDepth` 校验） |
+| `CALLBACK_FAILED` | 未分类的 clock、clone 或 action 属性读取失败 | 原生错误同一实例；不可注记值保留在 cause |
+| `CLEANUP_FAILED`        | 多个订阅清理失败，或构造失败并伴随至少一个回滚清理失败                                                                                                                   | `AggregateError`，`errors` 保留每个原始失败               |
 
 `SESSION_DISPOSED`/`UNKNOWN_HISTORY_ENTRY` 是永久性错误：调用方应新建会话或检查 `id` 是否仍存活于 `history`，不要重试同一次调用。
 
@@ -420,3 +412,5 @@ try {
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
+准备快照或 action 后、发布前再次检查终态；若 clock/clone/getter 在准备中释放会话，抛 `SESSION_DISPOSED`，不追加队列或消耗 history id。history 条目和 state 为浅冻结，actions 仅返回数组冻结，公开字段类型本身没有额外 readonly 修饰。

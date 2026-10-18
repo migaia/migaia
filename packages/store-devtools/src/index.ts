@@ -1,4 +1,9 @@
 export * from './devtools.js'
-export { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from './devtools-constants.js'
-
-export * from './errors.js'
+export {
+  StoreDevtoolsErrorCode,
+  type IStoreDevtoolsErrorCode,
+  STORE_DEVTOOLS_SOURCE,
+  createStoreDevtoolsError,
+  createStoreDevtoolsRangeError,
+  createStoreDevtoolsAggregateError
+} from './errors.js'
