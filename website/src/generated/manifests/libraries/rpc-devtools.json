@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-devtools",
     "description": "RPC probe, service and offline record contracts.",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "exports": [".", "./contract", "./hub", "./log"],
     "documentation": {
       "readme": {

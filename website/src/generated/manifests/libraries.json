@@ -4,7 +4,7 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
       "documentation": {
         "readme": {
@@ -1357,7 +1357,7 @@
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [".", "./subscriber"],
       "documentation": {
         "readme": {
@@ -2616,7 +2616,7 @@
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./abort",
@@ -4663,7 +4663,7 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [".", "./plugins", "./plugins/file"],
       "documentation": {
         "readme": {
@@ -5902,7 +5902,7 @@
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -6353,7 +6353,7 @@
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [".", "./composition"],
       "documentation": {
         "readme": {
@@ -8104,7 +8104,7 @@
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [".", "./extension"],
       "documentation": {
         "readme": {
@@ -8940,7 +8940,7 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -9615,7 +9615,7 @@
     {
       "slug": "rpc-browser",
       "description": "RPC browser owner.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [
         ".",
         "./adapters/broadcast-channel",
@@ -10248,7 +10248,7 @@
     {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [
         ".",
         "./binary",
@@ -10976,7 +10976,7 @@
     {
       "slug": "rpc-core",
       "description": "RPC core owner.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [
         ".",
         "./adapter",
@@ -12431,7 +12431,7 @@
     {
       "slug": "rpc-devtools",
       "description": "RPC probe, service and offline record contracts.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [".", "./contract", "./hub", "./log"],
       "documentation": {
         "readme": {
@@ -12848,7 +12848,7 @@
     {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -13039,7 +13039,7 @@
     {
       "slug": "rpc-process",
       "description": "RPC process owner.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [
         ".",
         "./adapters/bun-socket",
@@ -14568,7 +14568,7 @@
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [".", "./adapters/electron-main", "./adapters/node"],
       "documentation": {
         "readme": {
@@ -15330,7 +15330,7 @@
     {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./codec",
@@ -17610,7 +17610,7 @@
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -18807,7 +18807,7 @@
     {
       "slug": "storage-web",
       "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./cookies",
@@ -21006,7 +21006,7 @@
     {
       "slug": "store-devtools",
       "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -21776,7 +21776,7 @@
     {
       "slug": "store-indexed",
       "description": "Indexed reactive collections with lazy cell materialization.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -22897,7 +22897,7 @@
     {
       "slug": "store-keyed",
       "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./atom/definition", "./atom/store", "./optics", "./reactive/atom"],
       "documentation": {
         "readme": {
@@ -24786,7 +24786,7 @@
     {
       "slug": "store-light",
       "description": "Minimal object-state Store facade.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -26156,7 +26156,7 @@
     {
       "slug": "store-middleware",
       "description": "Store mutation policy and middleware pipeline.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./tolerant-clone"],
       "documentation": {
         "readme": {
@@ -27135,7 +27135,7 @@
     {
       "slug": "store-persist",
       "description": "Store snapshot persistence and storage adapter protocol.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./indexed", "./keyed", "./light"],
       "documentation": {
         "readme": {
@@ -28029,7 +28029,7 @@
     {
       "slug": "store-react",
       "description": "React Provider and hooks for the Store runtime.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -29270,7 +29270,7 @@
     {
       "slug": "store-shared",
       "description": "SharedArrayBuffer and Atomics-backed Store state.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -30249,7 +30249,7 @@
     {
       "slug": "store-ssr",
       "description": "Request-scoped Store SSR dehydration and hydration.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -31643,7 +31643,7 @@
     {
       "slug": "store-wasm",
       "description": "Optional WASM-backed fields for Store light.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -32620,7 +32620,7 @@
     {
       "slug": "store-worker",
       "description": "Worker adapters and worker-backed Resource/serialization integrations.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./serialize/worker"],
       "documentation": {
         "readme": {
@@ -33720,7 +33720,7 @@
     {
       "slug": "supervision",
       "description": "Runtime-neutral supervision for execution units and coroutines.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./coroutine", "./process", "./threads"],
       "documentation": {
         "readme": {
@@ -33911,7 +33911,7 @@
     {
       "slug": "tray",
       "description": null,
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
       "documentation": {
         "readme": {
@@ -34883,7 +34883,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./bytes",
@@ -38022,7 +38022,7 @@
     {
       "slug": "wasm",
       "description": null,
-      "version": "0.1.1",
+      "version": "0.1.2",
       "exports": ["."],
       "documentation": {
         "readme": {

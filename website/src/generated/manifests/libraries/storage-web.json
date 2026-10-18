@@ -3,7 +3,7 @@
   "library": {
     "slug": "storage-web",
     "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "exports": [
       ".",
       "./cookies",

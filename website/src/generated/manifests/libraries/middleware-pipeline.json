@@ -3,7 +3,7 @@
   "library": {
     "slug": "middleware-pipeline",
     "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": ["."],
     "documentation": {
       "readme": {

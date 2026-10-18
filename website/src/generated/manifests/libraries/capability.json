@@ -3,7 +3,7 @@
   "library": {
     "slug": "capability",
     "description": "Store-neutral capability lifecycle and feature gate.",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
     "documentation": {
       "readme": {

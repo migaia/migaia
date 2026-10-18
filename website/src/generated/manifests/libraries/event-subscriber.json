@@ -3,7 +3,7 @@
   "library": {
     "slug": "event-subscriber",
     "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "exports": [".", "./subscriber"],
     "documentation": {
       "readme": {

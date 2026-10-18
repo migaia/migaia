@@ -3,7 +3,7 @@
   "library": {
     "slug": "store-shared",
     "description": "SharedArrayBuffer and Atomics-backed Store state.",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "exports": ["."],
     "documentation": {
       "readme": {

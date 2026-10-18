@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-threads",
     "description": "RPC threads owner.",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "exports": [".", "./adapters/electron-main", "./adapters/node"],
     "documentation": {
       "readme": {

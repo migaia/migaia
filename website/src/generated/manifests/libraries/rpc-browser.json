@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-browser",
     "description": "RPC browser owner.",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "exports": [
       ".",
       "./adapters/broadcast-channel",

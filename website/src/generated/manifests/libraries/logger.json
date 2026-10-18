@@ -3,7 +3,7 @@
   "library": {
     "slug": "logger",
     "description": null,
-    "version": "0.0.9",
+    "version": "0.0.10",
     "exports": [".", "./plugins", "./plugins/file"],
     "documentation": {
       "readme": {
