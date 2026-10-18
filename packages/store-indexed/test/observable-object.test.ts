@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime, defaultRuntime } from '@migaia/reactive'
-import { ObservableObject, observableObject } from '../src'
+import { ObservableObject } from '../src'
 
 describe('ObservableObject', () => {
   it('reads initial values from the constructor', () => {
@@ -295,8 +295,8 @@ describe('ObservableObject', () => {
     obj.dispose()
   })
 
-  it('observableObject() factory takes (initial, options, runtime), distinct from the class constructor order', () => {
-    const obj = observableObject({ a: 1 }, { debugName: 'factoryObj' })
+  it('constructs with the single (initial, runtime, options) public order', () => {
+    const obj = new ObservableObject({ a: 1 }, undefined, { debugName: 'factoryObj' })
     expect(obj.peek('a')).toBe(1)
     obj.dispose()
     expect(() => obj.peek('a')).toThrow('[store] factoryObj is disposed')

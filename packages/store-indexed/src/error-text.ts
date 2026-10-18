@@ -1,5 +1,10 @@
 /** Stable public diagnostics owned by `@migaia/store-indexed`. */
 export const StoreIndexedErrorText = {
+  /**
+   * Fallback for guard/updater failures that cannot carry identity; ordinary native messages stay
+   * intact.
+   */
+  callbackFailed: '[store] collection callback failed',
   optionsObject: '[store] observable collection options must be an object',
   debugName: '[store] observable collection debugName must be a string',
   collectionInput: '[store] observable collection input must be a non-null object or iterable',

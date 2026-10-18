@@ -16,6 +16,7 @@ import {
 } from './errors.js'
 import { StoreIndexedErrorCode } from './error-code.js'
 import { StoreIndexedErrorText } from './error-text.js'
+import { runCollectionCallback } from './collection-callback.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 const ABSENT = Symbol('observable-collection-absent')
@@ -83,6 +84,21 @@ function materializeIterable<T>(initial: Iterable<T>, allowPrimitiveString = fal
   }
 }
 
+/** Native Map admission is shared by construction and replacement before collection state changes. */
+function materializeMap<K, V>(initial: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): Map<K, V> {
+  /** Consume the outer iterator once before native entry-shape validation. */
+  const entries = materializeIterable(initial)
+  try {
+    return new Map(entries)
+  } catch (error) {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.collectionInput,
+      { cause: error }
+    )
+  }
+}
+
 /** Enforces the string-key contract of ObservableObject after JavaScript type erasure. */
 function assertObjectKey(key: unknown): asserts key is string {
   if (typeof key !== 'string') {
@@ -117,8 +133,8 @@ abstract class ObservableCollectionBase implements IDisposable {
   readonly runtime: IRuntime
   #mutationGuard?: IMutationGuard
   protected readonly debugName: string
-  /** Collection-owned nodes stay registered until release or terminal collection disposal. */
-  #nodes = new Set<IReactiveSignal<unknown> & IObservable>()
+  /** Nodes and cell pools share the same collection owner and terminal disposal pass. */
+  #nodes = new Set<Pick<IDisposable, 'dispose'>>()
   #disposed = false
 
   protected constructor(
@@ -168,10 +184,10 @@ abstract class ObservableCollectionBase implements IDisposable {
     return this.#disposed
   }
 
-  /** Registers a created node for disposal while preserving its graph protocol. */
-  protected own<T>(node: IReactiveSignal<T> & IObservable): IReactiveSignal<T> & IObservable {
-    this.#nodes.add(node as IReactiveSignal<unknown> & IObservable)
-    return node
+  /** Registers nodes and their reference pools with the existing terminal collection owner. */
+  protected own<T extends Pick<IDisposable, 'dispose'>>(resource: T): T {
+    this.#nodes.add(resource)
+    return resource
   }
 
   /** Releases ownership only after the last observer disconnects. */
@@ -191,7 +207,9 @@ abstract class ObservableCollectionBase implements IDisposable {
 
   protected assertMutation(operation: string): void {
     this.assertActive()
-    this.#mutationGuard?.assertMutationAllowed(`${this.debugName}.${operation}`)
+    runCollectionCallback(() =>
+      this.#mutationGuard?.assertMutationAllowed(`${this.debugName}.${operation}`)
+    )
   }
 
   dispose(): void {
@@ -206,9 +224,12 @@ abstract class ObservableCollectionBase implements IDisposable {
 /** Fine-grained keyed object with explicit accessors and structural key tracking. */
 export class ObservableObject<T extends Record<string, unknown>> extends ObservableCollectionBase {
   #values = new Map<string, unknown>()
-  #cells = new ReactiveCellPool<string, unknown>(
-    (node) => this.own(node),
-    (node) => this.release(node)
+  /** The collection owner clears this pool alongside its nodes at terminal disposal. */
+  #cells = this.own(
+    new ReactiveCellPool<string, unknown>(
+      (node) => this.own(node),
+      (node) => this.release(node)
+    )
   )
   /** Invalidates object key enumeration when the stored shape changes. */
   #structure: IReactiveSignal<number> & IObservable
@@ -248,7 +269,7 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
   }
 
   // `peek` does not track or create cells. `ReactiveCellPool` reclaims cells through observer hooks.
-  // A never-observed cell never triggers `onUnobserved`, so it remains in `nodes` or `cells`.
+  // Never-observed speculative cells also release at Runtime idle; peek avoids allocating them.
   // Creating cells while peeking at 100,000 keys would materialize 100,000 unsubscribed `Signal` instances.
   peek<K extends keyof T & string>(key: K): T[K] {
     this.assertActive()
@@ -282,7 +303,7 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
         StoreIndexedErrorText.collectionInput
       )
     }
-    const nextValue = updater(this.peek(key))
+    const nextValue = runCollectionCallback(() => updater(this.peek(key)))
     this.runtime.batch(() => this.#setInternal(key, nextValue))
   }
 
@@ -394,9 +415,12 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
 /** Explicit array with index-level dependencies and separate length tracking. */
 export class ObservableArray<T> extends ObservableCollectionBase {
   #values: T[]
-  #cells = new ReactiveCellPool<number, T | typeof ABSENT>(
-    (node) => this.own(node),
-    (node) => this.release(node)
+  /** The collection owner clears this pool alongside its nodes at terminal disposal. */
+  #cells = this.own(
+    new ReactiveCellPool<number, T | typeof ABSENT>(
+      (node) => this.own(node),
+      (node) => this.release(node)
+    )
   )
   /** Invalidates array structure observers when length or index membership changes. */
   #structure: IReactiveSignal<number> & IObservable
@@ -474,10 +498,12 @@ export class ObservableArray<T> extends ObservableCollectionBase {
       )
     }
     if (Object.is(this.#values[index], value)) return
-    this.#values[index] = value
-    const cell = this.#cells.get(index)
-    if (cell) cell.value = value
-    this.#revision.value = this.#revision.peek() + 1
+    this.runtime.batch(() => {
+      this.#values[index] = value
+      const cell = this.#cells.get(index)
+      if (cell) cell.value = value
+      this.#revision.value = this.#revision.peek() + 1
+    })
   }
 
   push(...values: readonly T[]): number {
@@ -580,9 +606,12 @@ export class ObservableArray<T> extends ObservableCollectionBase {
 /** Per-key lookup tracking plus a separate dependency for iteration and size. */
 export class ObservableMap<K, V> extends ObservableCollectionBase {
   #values = new Map<K, V>()
-  #cells = new ReactiveCellPool<K, V | typeof ABSENT>(
-    (node) => this.own(node),
-    (node) => this.release(node)
+  /** The collection owner clears this pool alongside its nodes at terminal disposal. */
+  #cells = this.own(
+    new ReactiveCellPool<K, V | typeof ABSENT>(
+      (node) => this.own(node),
+      (node) => this.release(node)
+    )
   )
   /** Invalidates map size and key observations when membership changes. */
   #structure: IReactiveSignal<number> & IObservable
@@ -594,17 +623,10 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
     runtime: IRuntime = defaultRuntime,
     options: IObservableCollectionOptions = {}
   ) {
-    const initialEntries = materializeIterable(initial)
+    /** Validate the full native Map before the collection acquires Runtime ownership. */
+    const initialEntries = materializeMap(initial)
     super(runtime, options, 'ObservableMap')
-    try {
-      for (const [key, value] of initialEntries) this.#values.set(key, value)
-    } catch (error) {
-      throw createStoreIndexedTypeError(
-        StoreIndexedErrorCode.invalidOption,
-        StoreIndexedErrorText.collectionInput,
-        { cause: error }
-      )
-    }
+    this.#values = initialEntries
     this.#structure = this.own(
       internalRuntimeOf(runtime).signal(0, {
         debugName: `${this.debugName}.structure`
@@ -630,7 +652,7 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
     return value === ABSENT ? undefined : value
   }
 
-  // As in `ObservableObject`, untracked reads do not create cells because never-observed cells cannot be reclaimed.
+  // As in `ObservableObject`, untracked reads avoid allocation; speculative never-observed cells also have idle reclamation.
   peek(key: K): V | undefined {
     this.assertActive()
     return this.#values.get(key)
@@ -698,18 +720,7 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
    */
   replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void {
     this.assertMutation('replace')
-    const entries = materializeIterable(next)
-    let materialized: Map<K, V>
-    try {
-      materialized = new Map(entries)
-    } catch (error) {
-      throw createStoreIndexedTypeError(
-        StoreIndexedErrorCode.invalidOption,
-        StoreIndexedErrorText.collectionInput,
-        { cause: error }
-      )
-    }
-    this.#replaceInternal(materialized)
+    this.#replaceInternal(materializeMap(next))
   }
 
   keys(): readonly K[] {
@@ -768,12 +779,13 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
       let structuralChange = !sameSize
       let contentChange = !sameSize
       if (sameSize) {
+        /**
+         * Native Map keys define both membership and insertion order, including canonical zero
+         * keys.
+         */
+        const nextKeys = next.keys()
         for (const [key, value] of previous) {
-          if (!next.has(key)) {
-            structuralChange = true
-            contentChange = true
-            break
-          }
+          if (!Object.is(key, nextKeys.next().value)) structuralChange = true
           if (!Object.is(value, next.get(key))) contentChange = true
         }
       }
@@ -794,9 +806,12 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
 /** Set counterpart of ObservableMap with per-value membership tracking. */
 export class ObservableSet<T> extends ObservableCollectionBase {
   #values = new Set<T>()
-  #cells = new ReactiveCellPool<T, boolean>(
-    (node) => this.own(node),
-    (node) => this.release(node)
+  /** The collection owner clears this pool alongside its nodes at terminal disposal. */
+  #cells = this.own(
+    new ReactiveCellPool<T, boolean>(
+      (node) => this.own(node),
+      (node) => this.release(node)
+    )
   )
   /** Invalidates set size and iteration observations when membership changes. */
   #structure: IReactiveSignal<number> & IObservable
@@ -917,7 +932,14 @@ export class ObservableSet<T> extends ObservableCollectionBase {
       for (const [value, cell] of this.#cells) {
         cell.value = next.has(value)
       }
-      const changed = previous.size !== next.size || [...previous].some((value) => !next.has(value))
+      /**
+       * Set values are canonical native keys, so ordered identity detects reorders as well as
+       * membership.
+       */
+      const nextValues = next.values()
+      const changed =
+        previous.size !== next.size ||
+        [...previous].some((value) => !Object.is(value, nextValues.next().value))
       if (changed) this.#bumpStructure()
     })
   }
@@ -925,38 +947,6 @@ export class ObservableSet<T> extends ObservableCollectionBase {
   #bumpStructure(): void {
     this.#structure.value = this.#structure.peek() + 1
   }
-}
-
-export function observableObject<T extends Record<string, unknown>>(
-  initial: T,
-  options: IObservableCollectionOptions = {},
-  runtime: IRuntime = defaultRuntime
-): ObservableObject<T> {
-  return new ObservableObject(initial, runtime, options)
-}
-
-export function observableArray<T>(
-  initial: Iterable<T> = [],
-  options: IObservableCollectionOptions = {},
-  runtime: IRuntime = defaultRuntime
-): ObservableArray<T> {
-  return new ObservableArray(initial, runtime, options)
-}
-
-export function observableMap<K, V>(
-  initial: ReadonlyMap<K, V> | Iterable<readonly [K, V]> = [],
-  options: IObservableCollectionOptions = {},
-  runtime: IRuntime = defaultRuntime
-): ObservableMap<K, V> {
-  return new ObservableMap(initial, runtime, options)
-}
-
-export function observableSet<T>(
-  initial: Iterable<T> = [],
-  options: IObservableCollectionOptions = {},
-  runtime: IRuntime = defaultRuntime
-): ObservableSet<T> {
-  return new ObservableSet(initial, runtime, options)
 }
 
 function freezeArray<T>(values: Iterable<T>): readonly T[] {

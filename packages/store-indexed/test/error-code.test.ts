@@ -6,10 +6,10 @@ import {
 } from '../src/errors'
 
 describe('store-indexed error-code contract (E-T9)', () => {
-  it('declares 5 unique codes under the package source', () => {
+  it('declares 6 unique codes under the package source', () => {
     const codes = Object.values(StoreIndexedErrorCode)
-    expect(codes).toHaveLength(5)
-    expect(new Set(codes).size).toBe(5)
+    expect(codes).toHaveLength(6)
+    expect(new Set(codes).size).toBe(6)
     expect(STORE_INDEXED_SOURCE).toBe('@migaia/store-indexed')
   })
 

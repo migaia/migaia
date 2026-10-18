@@ -14,7 +14,7 @@
 pnpm add @migaia/store-indexed
 ```
 
-依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`IReactiveSignal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。
+package metadata 声明普通 dependencies：`@migaia/reactive`、`@migaia/utils`、`@migaia/store-light`（此处仅导入 `IMutationGuard` 类型）；未声明 peerDependencies。
 
 ## 目录
 
@@ -38,10 +38,6 @@ import {
   ObservableArray,
   ObservableMap,
   ObservableSet,
-  observableObject,
-  observableArray,
-  observableMap,
-  observableSet,
   type IObservableCollectionOptions
 } from '@migaia/store-indexed'
 ```
@@ -113,21 +109,11 @@ tags.dispose()
 - `mutationGuard?: IMutationGuard`（来自 `@migaia/store-light`）—— 默认无；每次写操作前调用其 `assertMutationAllowed(operation)`，不通过则抛错
 - `debugName?: string` —— 默认取类名（如 `'ObservableArray'`）；内部各 Signal 的调试名前缀
 
-**`observableObject`/`observableArray`/`observableMap`/`observableSet`｜5 秒上手** —— 类的工厂函数版本，**参数顺序与类构造函数不同**：
+创建入口统一为四个类构造函数：`new ObservableObject/ObservableArray/ObservableMap/ObservableSet(initial, runtime?, options?)`。四个薄工厂已移除；从旧 `(initial, options, runtime)` 调用迁移时，交换后两参数。外部用户需破坏版本迁移，无工厂别名或兼容 wrapper。
 
 ```ts
-import { observableArray } from '@migaia/store-indexed'
-
-const rows = observableArray([{ id: 'a' }], {}, myRuntime)
+const rows = new ObservableArray([{ id: 'a' }], myRuntime, {})
 ```
-
-全部参数（注意顺序是 `(initial, options, runtime)`，类构造函数是 `(initial, runtime, options)`）：
-
-- `initial`（`observableObject` 必填，其余可选，默认 `[]`）—— 同对应类构造函数的 `initial`
-- `options?: IObservableCollectionOptions` —— 默认 `{}`
-- `runtime?: IRuntime` —— 默认 `defaultRuntime`
-
-混用两套参数顺序会把 `options` 当成 `runtime` 传（或反过来）；`options`/`runtime` 结构不同，TypeScript 通常会在传入具体值时拦住，但都省略或用 `undefined` 传递时编译期不一定能拦住，务必按各自签名顺序传参。
 
 ---
 
@@ -179,9 +165,9 @@ try {
 }
 ```
 
-全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。
+全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)、`callbackFailed`(`CALLBACK_FAILED`)。`IStoreIndexedErrorCode` 是其取值的联合类型。
 
-**`STORE_INDEXED_SOURCE`｜3 秒上手** —— 本包所有边界错误的 `source` 字段固定值，无调用参数：
+**`STORE_INDEXED_SOURCE`｜3 秒上手** —— 本包创建错误的 `source` 字段固定值，无调用参数：
 
 ```ts
 STORE_INDEXED_SOURCE // '@migaia/store-indexed'
@@ -319,3 +305,5 @@ pnpm run typecheck:e2e && pnpm run test:e2e
 ```
 
 Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle.
+
+Map/Set replace 的插入顺序属于可观察结果；成员和值相同但重新排序，也会使结构/迭代读失效。Array.set 在一次 Runtime batch 内同时提交 cell 和 revision，同步调度器不会看到新元素配旧 snapshot。dispose 通过集合现有 owner 同时释放 Signal 与 pool 引用；不再保留仅由 pool 捕获的缺失对象键。backing data 和已有 snapshot 未被本次扩大清空，不承诺销毁集合中全部应用数据。

@@ -6,13 +6,24 @@
  * (`error-code-rollout.sdd.md` §1.2).
  */
 export const StoreIndexedErrorCode = {
-  /** Collection constructor options were not an object at the JavaScript boundary. */
+  /**
+   * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape.
+   * Correct the named argument; no partial construction or replacement is committed.
+   */
   invalidOption: 'INVALID_OPTION',
   /**
    * Rejects reads or writes after collection disposal. Create a new collection instead of reusing
    * the disposed instance.
    */
   collectionDisposed: 'COLLECTION_DISPOSED',
+
+  /**
+   * A synchronous mutation guard or ObservableObject updater fails without an existing package
+   * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain
+   * the original. The outer mutation is not committed; callback-owned side effects are not rolled
+   * back.
+   */
+  callbackFailed: 'CALLBACK_FAILED',
 
   /**
    * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0,

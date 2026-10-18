@@ -5,7 +5,7 @@
 ## 目录
 
 - [设计动机与核心机制](#设计动机与核心机制)
-- [集合类型与工厂函数模块](#集合类型与工厂函数模块)
+- [集合类型与构造模块](#集合类型与构造模块)
 - [操作常量模块](#操作常量模块)
 - [错误模块](#错误模块)
 - [生命周期与资源释放](#生命周期与资源释放)
@@ -33,7 +33,7 @@ const users = new ObservableMap<string, { name: string }>()
 users.set('u1', { name: 'Ann' })
 
 // 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它
-users.get('u1') // 现在为 'u1' 创建了 cell
+users.get('u1') // 普通同步读取 backing Map，不创建 cell；effect/computed 内追踪才物化
 ```
 
 cell 的生命周期完全自动：
@@ -66,9 +66,9 @@ cell 的生命周期完全自动：
 
 ---
 
-<a id="集合类型与工厂函数模块"></a>
+<a id="集合类型与构造模块"></a>
 
-## 集合类型与工厂函数模块
+## 集合类型与构造模块
 
 ```ts
 import {
@@ -76,10 +76,6 @@ import {
   ObservableArray,
   ObservableMap,
   ObservableSet,
-  observableObject,
-  observableArray,
-  observableMap,
-  observableSet,
   type IObservableCollectionOptions
 } from '@migaia/store-indexed'
 ```
@@ -152,7 +148,7 @@ class ObservableObject<T extends Record<string, unknown>> implements IDisposable
 | `delete(key)`          | `key: keyof T & string`                  | `boolean`（key 是否存在过）                    | 写                                           | key 不存在直接返回 `false` 且不触发任何信号；存在则清空值、置 cell 为缺失、触发结构信号与修订信号，并尝试 tombstone 对应 cell                               |
 | `keys()`               | 无                                       | 当前全部 key 的数组                            | 追踪读（依赖结构信号）                       | 无                                                                                                                                                          |
 | `snapshot()`           | 无                                       | 冻结的、`Object.create(null)` 起始的浅拷贝对象 | 追踪读（依赖修订信号），非追踪上下文不建依赖 | 无。使用空原型对象是为了让来自外部数据的 `__proto__` 之类 key 被当成普通数据 key，不触发 `Object.prototype` 的 setter                                       |
-| `replace(next)`        | `next: T`                                | `void`                                         | 写                                           | 计算出多余的 key 先逐个 `delete`，再对 `next` 的每个 key 调 `set`；整体在一次 `batch()` 内完成                                                              |
+| `replace(next)`        | `next: T`                                | `void`                                         | 写                                           | 先物化输入，随后一次 batch 内调用内部 delete/set 提交；不调用公开方法，guard 只在 replace 入口调用一次                                                              |
 | `prune()`              | 无                                       | 本次回收的 cell 数                             | —                                            | 对每个已不在当前 key 集合里的 cell，尝试立即 tombstone（仅当它已无订阅者）                                                                                  |
 | `dispose()`            | 无                                       | `void`                                         | —                                            | 释放全部拥有的 Signal；重复调用是安全的空操作                                                                                                               |
 
@@ -192,7 +188,7 @@ class ObservableArray<T> implements IDisposable {
 | `clear()`                               | 无                                                         | `void`                                   | 写                                                    | 等价于 `replace([])`                                                                                                                   |
 | `dispose()`                             | 无                                                         | `void`                                   | —                                                     | 释放全部拥有的 Signal                                                                                                                  |
 
-`#replaceInternal`（`replace`/`splice`/`clear` 共用）的精确行为：只遍历**已经物化的 cell**（而不是全部索引）逐个更新值——未物化的索引没有任何订阅者需要通知，等真的被读到时会直接从新数组里取值；只有当新旧长度不同，或存在任意一处值变化（`Object.is` 逐项比较）时才触发修订信号；只有长度变化才触发结构信号。这个设计避免了"replace 一个十万项数组，只有 5 个索引被订阅"时做十万次无意义的 diff。
+`#replaceInternal`（`replace`/`splice`/`clear` 共用）的精确行为：只遍历**已经物化的 cell**（而不是全部索引）逐个更新值——未物化的索引没有任何订阅者需要通知，等真的被读到时会直接从新数组里取值；只有当新旧长度不同，或存在任意一处值变化（`Object.is` 逐项比较）时才触发修订信号；只有长度变化才触发结构信号。这减少的是已物化 cell 的通知遍历；等长数组仍可能逐项比较全部十万值，并非仅比较 5 项。
 
 ### `ObservableMap` 完整参考
 
@@ -226,7 +222,7 @@ class ObservableMap<K, V> implements IDisposable {
 | `set(key, value)` | `key: K, value: V`                               | `this`                                     | 写                                                                | 已存在且 `Object.is` 判定值未变时直接跳过；否则更新 cell、按需触发结构信号，始终触发迭代信号                                                              |
 | `delete(key)`     | `key: K`                                         | `boolean`（key 是否存在过）                | 写                                                                | 不存在直接返回 `false`；存在则置 cell 缺失、触发结构信号与迭代信号，并尝试 tombstone                                                                      |
 | `clear()`         | 无                                               | `void`                                     | 写                                                                | 空表直接跳过；否则遍历**已物化**的 cell 逐个置缺失并 tombstone，一次性触发结构信号与迭代信号（不是逐 key 调用 `delete()`，避免为每个 key 各触发一轮信号） |
-| `replace(next)`   | `ReadonlyMap<K, V> \| Iterable<readonly [K, V]>` | `void`                                     | 写                                                                | 完整物化并验证后原子替换；失败保持旧 Map；整次替换最多各触发一次结构/迭代通知，内容相同则不通知                                                           |
+| `replace(next)`   | `ReadonlyMap<K, V> \| Iterable<readonly [K, V]>` | `void`                                     | 写                                                                | 完整物化并验证后原子替换；失败保持旧 Map；整次替换最多各触发一次结构/迭代通知，key、value 及插入顺序相同才不通知                                                           |
 | `keys()`          | 无                                               | 当前 key 数组                              | 追踪读（依赖结构信号）                                            | 无                                                                                                                                                        |
 | `valuesArray()`   | 无                                               | 冻结的值数组                               | 追踪读（依赖迭代信号）                                            | 无                                                                                                                                                        |
 | `entries()`       | 无                                               | 冻结的 `[K, V]` 元组数组，元组本身也被冻结 | 追踪读（依赖迭代信号）                                            | 无                                                                                                                                                        |
@@ -261,8 +257,8 @@ class ObservableSet<T> implements IDisposable {
 | `has(value)`    | `value: T`    | `boolean`               | 追踪读，惰性建 cell（membership 按值追踪） | 无                                                                                     |
 | `add(value)`    | `value: T`    | `this`                  | 写                                         | 已存在直接跳过；否则更新 cell 为 `true`，触发结构信号                                  |
 | `delete(value)` | `value: T`    | `boolean`（是否存在过） | 写                                         | 不存在返回 `false`；存在则更新 cell 为 `false`，触发结构信号，并尝试 tombstone         |
-| `clear()`       | 无            | `void`                  | 写                                         | 空集合直接跳过；否则对当前每个成员调用一次 `delete()`（走同一个 `batch()`）            |
-| `replace(next)` | `Iterable<T>` | `void`                  | 写                                         | 完整物化后原子替换；失败保持旧 Set；整次替换最多触发一次结构通知，成员集合相同则不通知 |
+| `clear()`       | 无            | `void`                  | 写                                         | 空集合直接跳过；否则一次 batch 清 backing Set、更新已物化 cell 并提升一次结构信号；不逐项调用公开 delete            |
+| `replace(next)` | `Iterable<T>` | `void`                  | 写                                         | 完整物化后原子替换；失败保持旧 Set；整次替换最多触发一次结构通知，成员及迭代顺序相同则不通知 |
 | `valuesArray()` | 无            | 冻结的成员数组          | 追踪读（依赖结构信号）                     | 无                                                                                     |
 | `snapshot()`    | 无            | 新建的原生 `Set` 副本   | 追踪读（依赖结构信号）                     | 无                                                                                     |
 | `prune()`       | 无            | 本次回收的 cell 数      | —                                          | 对每个已不在当前成员集合里的 cell 尝试 tombstone                                       |
@@ -270,47 +266,16 @@ class ObservableSet<T> implements IDisposable {
 
 `ObservableSet` 没有单独的修订/迭代信号——它只有一个结构信号，因为"成员是谁"和"内容是否变化"对 Set 而言是同一件事。`ObservableSet` 也没有 `peek()`：它没有"按 key 查值"的读取形态。
 
-### 工厂函数参考
+### 单一构造入口与迁移
+
+四个类构造是唯一创建入口，统一参数顺序 `(initial, runtime?, options?)`。旧薄工厂已移除；从原 `(initial, options, runtime)` 调用迁移时交换后两参数，不保留工厂别名。默认初值与 options 不变。
 
 ```ts
-function observableObject<T extends Record<string, unknown>>(
-  initial: T,
-  options?: IObservableCollectionOptions,
-  runtime?: IRuntime
-): ObservableObject<T>
-
-function observableArray<T>(
-  initial?: Iterable<T>,
-  options?: IObservableCollectionOptions,
-  runtime?: IRuntime
-): ObservableArray<T>
-
-function observableMap<K, V>(
-  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,
-  options?: IObservableCollectionOptions,
-  runtime?: IRuntime
-): ObservableMap<K, V>
-
-function observableSet<T>(
-  initial?: Iterable<T>,
-  options?: IObservableCollectionOptions,
-  runtime?: IRuntime
-): ObservableSet<T>
+new ObservableObject({ count: 1 }, myRuntime, { debugName: 'counter' })
+new ObservableArray([1, 2, 3], myRuntime, {})
+new ObservableMap([['key', 1]], myRuntime, {})
+new ObservableSet(['value'], myRuntime, {})
 ```
-
-**参数顺序是 `(initial, options, runtime)`**，而对应的类构造函数是 `(initial, runtime, options)`——两者故意不一致，混着用最容易踩坑：
-
-```ts
-// 错误示范：把 runtime 当成第二个参数传给工厂函数
-observableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！
-
-// 正确写法
-observableArray([1, 2, 3], {}, myRuntime)
-// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)
-new ObservableArray([1, 2, 3], myRuntime)
-```
-
-`options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。
 
 ---
 
@@ -354,6 +319,7 @@ import {
 const StoreIndexedErrorCode = {
   invalidOption: 'INVALID_OPTION',
   collectionDisposed: 'COLLECTION_DISPOSED',
+  callbackFailed: 'CALLBACK_FAILED',
   indexOutOfRange: 'INDEX_OUT_OF_RANGE',
   invalidIndex: 'INVALID_INDEX',
   crossRuntime: 'CROSS_RUNTIME'
@@ -363,7 +329,7 @@ type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreI
 const STORE_INDEXED_SOURCE: '@migaia/store-indexed'
 ```
 
-码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。
+码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 用于本包创建的错误；外包已编码错误保留实际 owner。
 
 ```ts
 function createStoreIndexedError(
@@ -381,11 +347,11 @@ function createStoreIndexedTypeError(
 ): TypeError
 ```
 
-三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别"这是一个 store-indexed 语义错误"。
+三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，原错通过 `.cause` 可达；原生 `.stack` 保持不变，不保证包含 cause 的消息全文。本包用它们构造自己拥有的错误；已有身份的外包错误按原 owner 传播；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别"这是一个 store-indexed 语义错误"。
 
 ### 错误信息全表
 
-每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带 `source: '@migaia/store-indexed'` 与稳定 `code`。调用方应按 `code` 判断语义，不应依赖消息文本。
+本包创建的错误带 `source: '@migaia/store-indexed'` 与稳定 `code`。Reactive 与其它已编码错误保留实际 owner。未编码 guard/updater 失败归 `CALLBACK_FAILED`：可扩展原生错误保留对象/类型/message/stack，frozen 或非 Error 原值通过 cause/errors 可达。调用方应按 `code` 判断语义，不应依赖消息文本。
 
 | 错误信息                                                                                      | 抛出位置                                                                                                           | 触发条件                                                                                                     |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -501,8 +467,8 @@ rows.dispose()
 
 ## 排查与构建门禁
 
-**Q：`new ObservableArray(x, y)` 和 `observableArray(x, y)` 里的 `y` 含义一样吗？**
-不一样。类构造函数第二个参数是 `runtime`，工厂函数第二个参数是 `options`。混用会把值传错位置，参见[工厂函数参考](#集合类型与工厂函数模块)。
+**Q：如何迁移旧集合工厂调用？**
+改用对应的类构造，参数顺序为 `(initial, runtime, options)`；原工厂的第二个 options 参数移到第三位，原第三个 runtime 移到第二位。
 
 **Q：我 `delete()` 了一个 key，但内存分析工具里还能看到对应的 Signal。**
 如果那个 key 当时还有活跃订阅者，这是预期行为——cell 会留到订阅者自己退订才回收，保证订阅者能读到"缺失"这个变化。批量清理后可以调用 `prune()` 主动回收剩余的僵尸 cell。
@@ -511,13 +477,13 @@ rows.dispose()
 检查是不是在追踪范围外（不在 effect/computed 内）调用的 `at(3)`，或者用的是 `peek()`——两者都不建立依赖。另外确认改值前后是否真的不同：`set()` 内部用 `Object.is` 比较，值没变不会触发任何信号。
 
 **Q：`keys()` 为什么在某个 key 的值变化后没有重新触发，而 `snapshot()` 触发了？**
-`keys()`（以及 `ObservableMap.size`）只依赖结构信号，只关心 key 集合本身是否变化；`snapshot()` 依赖修订/迭代信号，任意值变化都会触发。这是刻意的追踪粒度拆分，见[设计动机与核心机制](#设计动机与核心机制)。
+`keys()`（以及 `ObservableMap.size`）只依赖结构信号，关心 key 集合及其迭代顺序是否变化；`snapshot()` 依赖修订/迭代信号，任意值变化都会触发。这是刻意的追踪粒度拆分，见[设计动机与核心机制](#设计动机与核心机制)。
 
 **Q：跨 Runtime 的错误具体是什么时候抛的？**
 只在**追踪型读**发生时检查（当前处于某个 Runtime 的追踪状态，且不是本集合绑定的那个）。非追踪读（`peek()`，或压根不在任何 effect 内的普通调用）不受影响，随时可以跨 Runtime 调用。
 
 **Q：`mutationGuard` 抛出的错误会不会被本包吞掉？**
-不会。`assertMutation()` 直接调用 `mutationGuard.assertMutationAllowed(operation)`，抛出的错误原样从 `set`/`push`/`delete` 等调用里冒出来，调用方按普通异常处理即可。
+不会。guard/updater 失败在写入前传播；已有外包 source/code 保留，未编码原生错误附 CALLBACK_FAILED，不能附码的值经 cause/errors 保留。只保证外层提交未执行，不回滚回调自己的副作用。
 
 **Q：`IndexedOperation` 要在哪里用？**
 它不是本包内部使用的枚举，而是给消费方（诊断面板、中间件）统一分类"这是读/写/删"操作用的公共词表；本包自己的写操作传给 `mutationGuard` 的 `operation` 是形如 `` `${debugName}.set(key)` `` 的字符串，不是 `IndexedOperation` 的取值。
@@ -533,3 +499,5 @@ pnpm run typecheck:e2e && pnpm run test:e2e
 ```
 
 Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle.
+
+Map/Set replace 的插入顺序属于可观察结果；成员和值相同但重新排序，也会使结构/迭代读失效。Array.set 在一次 Runtime batch 内同时提交 cell 和 revision，同步调度器不会看到新元素配旧 snapshot。dispose 通过集合现有 owner 同时释放 Signal 与 pool 引用；不再保留仅由 pool 捕获的缺失对象键。backing data 和已有 snapshot 未被本次扩大清空，不承诺销毁集合中全部应用数据。

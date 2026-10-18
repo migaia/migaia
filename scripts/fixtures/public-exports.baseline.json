@@ -1104,11 +1104,7 @@
         "StoreIndexedErrorCode",
         "createStoreIndexedError",
         "createStoreIndexedRangeError",
-        "createStoreIndexedTypeError",
-        "observableArray",
-        "observableMap",
-        "observableObject",
-        "observableSet"
+        "createStoreIndexedTypeError"
       ]
     },
     "@migaia/store-keyed": {

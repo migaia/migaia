@@ -246,7 +246,7 @@ describe('store-indexed', () => {
     set.dispose()
   })
 
-  it('ObservableSet.replace() no-ops the notification when content is unchanged', () => {
+  it('ObservableSet.replace() notifies for order changes and no-ops identical ordered content', () => {
     const set = new ObservableSet<number>([1, 2])
     let runs = 0
     const dispose = defaultRuntime.effect(() => {
@@ -255,8 +255,14 @@ describe('store-indexed', () => {
     })
     expect(runs).toBe(1)
 
-    set.replace([2, 1])
+    set.replace([1, 2])
     expect(runs).toBe(1)
+
+    set.replace([2, 1])
+    expect(runs).toBe(2)
+    expect([...set.snapshot()]).toEqual([2, 1])
+    set.replace([2, 1])
+    expect(runs).toBe(2)
 
     dispose.dispose()
     set.dispose()

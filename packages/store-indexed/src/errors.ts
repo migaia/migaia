@@ -18,7 +18,7 @@ export function createStoreIndexedError(
 ): Error {
   const error = new Error(
     message,
-    options?.cause !== undefined ? { cause: options.cause } : undefined
+    options !== undefined && Object.hasOwn(options, 'cause') ? { cause: options.cause } : undefined
   )
   return tagStoreIndexedError(error, code)
 }
