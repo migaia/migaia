@@ -128,21 +128,48 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
       )
     ).codes
   )
+  /**
+   * Codes later programs registered after the merge froze its fixture sets: probe reporting,
+   * forwarding, authentication sessions, provider generations, capability negotiation and the API
+   * audit's callback failures. Each already has its own registry row and owner tests.
+   */
+  const laterAdded = {
+    contract: ['CALLBACK_FAILED'],
+    core: [
+      'CALLBACK_FAILED',
+      'CAPABILITY_UNSUPPORTED',
+      'CHALLENGE_INVALID',
+      'FORWARD_HOP_LIMIT',
+      'FORWARD_LOOP',
+      'PROBE_FAILED',
+      'PROVIDER_GENERATION_MISMATCH',
+      'PROVIDER_GENERATION_RETIRED',
+      'SESSION_UNKNOWN'
+    ]
+  }
   const rows = collectErrorRegistry()
   const codes = (source) => rows.filter((row) => row.source === source).map((row) => row.code)
   assert.deepEqual(
     codes('@migaia/rpc/contract'),
-    [...frozen.contract, ...added.contract, ...controlAdded.contract].sort()
+    [...frozen.contract, ...added.contract, ...controlAdded.contract, ...laterAdded.contract].sort()
   )
   assert.deepEqual(
     codes('@migaia/rpc/core'),
     [
       ...frozen.core.filter((code) => !retired.has(code)),
       ...added.core,
-      ...controlAdded.core
+      ...controlAdded.core,
+      ...laterAdded.core
     ].sort()
   )
-  assert.equal(codes('@migaia/capability/graph').length, 15)
+  /** The graph subpath owns exactly the codes its own declaration file lists. */
+  const graphCodes = [
+    ...readFileSync(
+      join(repositoryRoot, 'packages/capability/src/graph/error-code.ts'),
+      'utf8'
+    ).matchAll(/^\s*[A-Za-z][A-Za-z0-9]*\s*:\s*'([A-Z][A-Z0-9_]*)'/gm)
+  ].map((match) => match[1])
+  assert.deepEqual(codes('@migaia/capability/graph').sort(), graphCodes.sort())
   assert.deepEqual(codes('@migaia/rpc-contract'), [])
   assert.deepEqual(codes('@migaia/web-rpc'), [])
   assert.doesNotMatch(
@@ -214,7 +241,8 @@ test('A13 lists every utils code with its own scenario and regenerates a checkab
   ].map((match) => match[1])
   /** Registry rows owned by the utils package. */
   const utilsRows = rows.filter((row) => row.source === '@migaia/utils')
-  assert.equal(utilsRows.length, 20)
+  /** One registry row per declared code: no duplicates and none missing. */
+  assert.equal(utilsRows.length, utilsCodes.length)
   assert.deepEqual(new Set(utilsRows.map((row) => row.code)), new Set(utilsCodes))
   /** Header first sentences of every error-code file in the repository. */
   const headers = new Set(

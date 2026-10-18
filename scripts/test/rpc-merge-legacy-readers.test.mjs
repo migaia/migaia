@@ -7,8 +7,11 @@ import { parseSync } from 'oxc-parser'
 
 /** Repository root and retired names are fixed by rpc-merge A6. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const legacyPattern =
-  /@migaia\/(?:rpc-contract|web-rpc)|(?:rpc-contract|web-rpc)\/|packages\/(?:rpc-contract|web-rpc)/g
+/**
+ * Only `web-rpc` stays retired. The later package split reintroduced `@migaia/rpc-contract` as the
+ * canonical wire-contract owner, so its name is a live package, not a legacy reader.
+ */
+const legacyPattern = /@migaia\/web-rpc|web-rpc\/|packages\/web-rpc/g
 /** A5 cases intentionally name legacy sources while checking their absence. */
 const permittedA5Titles = new Set([
   'A5 uses a layer ERROR_SOURCE and falls back to the package name',
@@ -28,7 +31,7 @@ function filesUnder(directory) {
       return filesUnder(path)
     }
     if (relativePath.startsWith('scripts/test/rpc-merge-')) return []
-    if (/^packages\/rpc\/test\/fixtures\/legacy-.*\.json$/.test(relativePath)) return []
+    if (/^packages\/rpc-integration\/test\/fixtures\/legacy-.*\.json$/.test(relativePath)) return []
     if (relativePath.startsWith('packages/storage-web/test/fixtures/storage-v2-')) return []
     if (
       relativePath === 'packages/event-subscriber/test/fixtures/storage-v2-b00-capability-map.json'
@@ -92,7 +95,6 @@ function readerFiles() {
 }
 
 test('A6 removes every old RPC package reader and both obsolete package directories', () => {
-  assert.equal(existsSync(join(root, 'packages/rpc-contract')), false)
   assert.equal(existsSync(join(root, 'packages/web-rpc')), false)
   const matches = readerFiles().flatMap((file) => {
     const relativePath = relative(root, file)
