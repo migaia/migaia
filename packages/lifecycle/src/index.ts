@@ -2,7 +2,6 @@ export type {
   IDisposer,
   ILifecycleOwner,
   ILifecycleState,
-  IUnitState,
   IReleaseContext,
   IReleaseDescriptor,
   ICollectedError,
@@ -13,11 +12,7 @@ export type { IDisposerContext } from './disposer-context.js'
 
 export {
   LifecycleState,
-  LifecycleUnitState,
   LifecycleErrorPolicy,
-  type ILifecycleStateValue,
-  type ILifecycleUnitStateValue,
-  type ILifecycleErrorPolicy,
   DisposeTransactionKind,
   type IDisposeTransactionKind
 } from './state-constants.js'
@@ -39,7 +34,6 @@ export { snapshotScheduler } from './scheduler-entry.js'
 
 export {
   LIFECYCLE_SOURCE,
-  createLifecycleError,
   containAsyncRejection,
   createErrorCollector,
   type ILifecycleError,

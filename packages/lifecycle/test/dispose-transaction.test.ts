@@ -227,8 +227,16 @@ describe('L-T25 force errors flow to the policy outcome without dangling rejecti
 
 describe('L-T26 IReleaseContext: report and signal', () => {
   it('report is invoked and a reporter throw is contained', async () => {
+    /** Host reporting stays observable without throwing into the test process. */
+    const callbacks: (() => void)[] = []
+    /** Capture the canonical utils terminal-report channel. */
+    const queue = vi
+      .spyOn(globalThis, 'queueMicrotask')
+      .mockImplementation((callback) => callbacks.push(callback))
+    /** Reporter failure must survive independently of transaction settlement. */
+    const failure = new Error('reporter exploded')
     const reportSpy = vi.fn(() => {
-      throw new Error('reporter exploded')
+      throw failure
     })
     const transaction = createDisposeTransaction(
       { kind: 'plan' },
@@ -245,6 +253,9 @@ describe('L-T26 IReleaseContext: report and signal', () => {
       }
     ])
     expect(reportSpy).toHaveBeenCalledWith('diagnostic, non-fatal')
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(failure)
+    queue.mockRestore()
   })
 
   it('the closing signal reflects an already-aborted external signal for every item', async () => {

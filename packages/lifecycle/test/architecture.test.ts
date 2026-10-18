@@ -267,8 +267,11 @@ describe('AF-T34 rule gate: no Function.prototype call/apply/bind; Reflect.apply
     }
     expect(forbidden).toEqual([])
     expect([...reflectFiles].sort()).toEqual([
+      // Read-only Set/Map facades honour forEach `thisArg` exactly like the native collections.
+      'capability/src/graph/dependency.ts',
       // Dynamic node snapshots invoke captured starts with their original definition receiver.
       'capability/src/graph/dynamic.ts',
+      'capability/src/graph/topology-index.ts',
       'capability/src/index.ts',
       // Abort registration invokes captured host methods with their original signal receiver.
       'lifecycle/src/observed-subscription.ts',

@@ -364,6 +364,14 @@ describe('L-T30 GenerationController: old generation cleanup failure does not po
   })
 
   it('a throwing onReleaseError callback does not propagate out of adopt()', () => {
+    /** Inspect terminal host reporting separately from the synchronous adopt result. */
+    const callbacks: (() => void)[] = []
+    /** Capture the canonical terminal channel rather than suppressing its failure. */
+    const queue = vi
+      .spyOn(globalThis, 'queueMicrotask')
+      .mockImplementation((callback) => callbacks.push(callback))
+    /** The exact reporter failure must remain observable. */
+    const failure = new Error('reporter also failed')
     const controller = createGenerationController()
     const stale = controller.begin()
     controller.begin()
@@ -375,10 +383,13 @@ describe('L-T30 GenerationController: old generation cleanup failure does not po
           throw new Error('cleanup failed')
         },
         () => {
-          throw new Error('reporter also failed')
+          throw failure
         }
       )
     ).not.toThrow()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(failure)
+    queue.mockRestore()
   })
 })
 

@@ -1,7 +1,9 @@
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import type { ICollectedError, IErrorPolicy } from './types.js'
-import { attachErrorIdentity, attachSecondaryErrors } from '@migaia/utils/error'
+import { attachErrorIdentity, attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
+import { assertErrorPolicyReporter } from './error-boundary.js'
 
 /** `source` value stamped onto every error this package throws. */
 export const LIFECYCLE_SOURCE = '@migaia/lifecycle'
@@ -121,12 +123,21 @@ export function createLifecycleFailure(
   message: string,
   error: unknown
 ): ILifecycleError {
-  const errorLike =
-    error !== null &&
-    (typeof error === 'object' || typeof error === 'function') &&
-    typeof (error as { readonly message?: unknown }).message === 'string' &&
-    typeof (error as { readonly stack?: unknown }).stack === 'string'
-  if (errorLike) {
+  if (error !== null && (typeof error === 'object' || typeof error === 'function')) {
+    /** Diagnostic getters are fallible input reads, not authority to replace the original throw. */
+    const messageRead = tryReadProperty(error as { message?: unknown }, 'message')
+    /** Preserve getter failures as secondary evidence while keeping the original value as cause. */
+    const stackRead = tryReadProperty(error as { stack?: unknown }, 'stack')
+    if (messageRead.threw || stackRead.threw)
+      return createLifecycleError(code, message, {
+        cause: error,
+        errors: [
+          ...(messageRead.threw ? [messageRead.error] : []),
+          ...(stackRead.threw ? [stackRead.error] : [])
+        ]
+      })
+    if (typeof messageRead.value !== 'string' || typeof stackRead.value !== 'string')
+      return createLifecycleError(code, message, { cause: error })
     try {
       return tagLifecycleError(error as Error, code) as ILifecycleError
     } catch {
@@ -187,6 +198,7 @@ export function createErrorCollector(
   policy: IErrorPolicy,
   report: ((error: unknown) => void) | undefined
 ): IErrorCollector {
+  assertErrorPolicyReporter(policy, report)
   const entries: ICollectedError[] = []
   let firstError: unknown
   let hasFirstError = false
@@ -197,6 +209,33 @@ export function createErrorCollector(
   return {
     policy,
     add(source, error) {
+      // Existing semantic identities belong to their original package. Unclassified callback
+      // failures receive this release boundary's code without replacing native objects.
+      if (error === null || (typeof error !== 'object' && typeof error !== 'function'))
+        error = createLifecycleFailure(
+          LifecycleErrorCode.scopeDisposalFailed,
+          LifecycleErrorText.disposeTransactionFailed,
+          error
+        )
+      else {
+        /** Only guarded reads may decide whether a caller already supplied semantic identity. */
+        const identitySource = tryReadProperty(error as { source?: unknown }, 'source')
+        /** A host code without a package source is still an unclassified lifecycle boundary error. */
+        const identityCode = tryReadProperty(error as { code?: unknown }, 'code')
+        if (
+          identitySource.threw ||
+          identityCode.threw ||
+          typeof identitySource.value !== 'string' ||
+          identitySource.value.length === 0 ||
+          typeof identityCode.value !== 'string' ||
+          identityCode.value.length === 0
+        )
+          error = createLifecycleFailure(
+            LifecycleErrorCode.scopeDisposalFailed,
+            LifecycleErrorText.disposeTransactionFailed,
+            error
+          )
+      }
       if (policy === 'report') {
         invokeReport(error)
         return
@@ -221,9 +260,8 @@ export function createErrorCollector(
         return []
       }
       if (policy === 'collect') return [...entries]
-      // 'throw': a single error is thrown exactly as the caller produced it — untagged, since it is
-      // their error, not ours. The multi-error aggregate is a shape we construct ourselves, so it
-      // carries our own (source, code) (L-T41: `SCOPE_DISPOSAL_FAILED`).
+      // add() already preserves valid identities or annotates unclassified native failures.
+      // A single failure remains the same instance; only multiple failures need an aggregate.
       if (entries.length === 1) throw entries[0]!.error
       if (entries.length > 1) {
         throw tagLifecycleError(
@@ -253,17 +291,19 @@ export function containAsyncRejection(value: unknown, onRejected: (error: unknow
 
 /**
  * Hands `error` to a caller-supplied reporter, the last error boundary of a lifecycle operation.
- * The reporter's own synchronous throw and async rejection are contained here because no lower
- * layer exists to receive them (L-T26, L-T35). An absent reporter makes this a no-op.
+ * Reporter failures go through utils' shared host exception queue, preserving secondary failure
+ * traceability without creating unhandled Promise rejections. An absent reporter is a no-op.
  */
 export function safeReport(report: ((error: unknown) => void) | undefined, error: unknown): void {
   if (!report) return
   try {
     const result: unknown = report(error)
-    containAsyncRejection(result, () => {
-      // The reporter's own async failure has no lower layer to report to; it terminates here.
+    containAsyncRejection(result, (reporterError) => {
+      throw reporterError // utils owns the terminal host exception queue for reporter failures.
     })
-  } catch {
-    // The reporter is the last error boundary for its own failures too (L-T35).
+  } catch (reporterError) {
+    observeThenableRejection(undefined, { error: reporterError }, (failure) => {
+      throw failure
+    })
   }
 }

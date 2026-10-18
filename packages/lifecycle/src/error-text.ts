@@ -37,7 +37,7 @@ export const LifecycleErrorText = {
   /** Explains that a scheduler returned a task without the required cancel function. */
   schedulerTaskInvalid:
     '[lifecycle] scheduler.schedule must return an object with a cancel() function',
-  /** Explains that reading a scheduler's methods failed at an injection boundary. */
+  /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */
   schedulerAccessorFailed: '[lifecycle] scheduler accessor failed',
   /** Optional deferred registration must be callable before a scheduler owns any work. */
   schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided',
@@ -53,8 +53,9 @@ export const LifecycleErrorText = {
   schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite',
   /**
    * Explains that the `report`/`firstError` error policy was chosen without a `report` callback.
-   * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and
-   * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later.
+   * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`,
+   * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the
+   * failures later.
    */
   errorPolicyReporterMissing:
     '[lifecycle] errorPolicy "report" and "firstError" require a report callback',

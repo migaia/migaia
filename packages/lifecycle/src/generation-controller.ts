@@ -208,7 +208,13 @@ export function createGenerationController(
   }
 
   /** Invalidates a parent-driven generation using the reason captured by the subscription. */
-  const abortFromParent = (reason: unknown): void => releaseCurrent(reason)
+  const abortFromParent = (reason: unknown): void => {
+    try {
+      releaseCurrent(reason)
+    } catch (error) {
+      safeReport(report, error)
+    }
+  }
 
   /** Rolls back a partially admitted generation and throws the original admission failure. */
   const rollbackAdmission = (
@@ -251,6 +257,16 @@ export function createGenerationController(
     onReleaseError: ((error: unknown) => void) | undefined,
     error: unknown
   ): void => safeReport(onReleaseError ?? report, error)
+
+  /** Callback failures use the configured reporter, otherwise utils' terminal host observation. */
+  const reportCallbackFailure = (error: unknown): void =>
+    safeReport(
+      report ??
+        ((failure) => {
+          throw failure
+        }),
+      error
+    )
 
   return {
     get generation() {
@@ -303,8 +319,24 @@ export function createGenerationController(
             invalidatedByParent = true
           } else {
             const registrationErrors: unknown[] = []
-            const registration = observeAbortSubscription(parentSignal, abortFromParent, (error) =>
-              registrationErrors.push(error)
+            /** Initial failures reject begin(); later callback failures use the existing reporter. */
+            let admitting = true
+            const registration = observeAbortSubscription(
+              parentSignal,
+              abortFromParent,
+              (error) => {
+                if (admitting) registrationErrors.push(error)
+                // releaseCurrent owns errors from its own unsubscribe and throws them after cleanup.
+                else if (currentParentRegistration === registration)
+                  safeReport(
+                    report,
+                    createLifecycleFailure(
+                      LifecycleErrorCode.generationCancellationFailed,
+                      LifecycleErrorText.generationCancellationFailed,
+                      error
+                    )
+                  )
+              }
             )
             admissionRegistration = registration
             currentParentRegistration = registration
@@ -313,6 +345,7 @@ export function createGenerationController(
               currentParentRegistration = undefined
               throw createAdmissionFailure(registrationErrors[0], registrationErrors.slice(1))
             }
+            admitting = false
             if (currentController === undefined || currentToken === undefined) {
               currentParentRegistration = undefined
               invalidatedByParent = true
@@ -399,14 +432,16 @@ export function createGenerationController(
       if (!disposed && currentToken === token) return true
       if (options.onSuperseded) {
         try {
-          options.onSuperseded(
+          /** Observe the nominal-void callback result through the canonical thenable boundary. */
+          const result: unknown = options.onSuperseded(
             createLifecycleError(
               LifecycleErrorCode.generationSuperseded,
               LifecycleErrorText.generationSupersededBeforeAdopt
             )
           )
-        } catch {
-          // The diagnostic callback is the last boundary for its own synchronous failures.
+          containAsyncRejection(result, reportCallbackFailure)
+        } catch (error) {
+          reportCallbackFailure(error)
         }
       }
       let result: void | PromiseLike<void>

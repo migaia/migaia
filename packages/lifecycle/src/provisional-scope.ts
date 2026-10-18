@@ -1,7 +1,7 @@
 import { attachLifecycleSecondaryErrors } from './error-boundary.js'
 import type { ILifecycleOwner, IReleaseDescriptor } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError } from './errors.js'
+import { createLifecycleError, createLifecycleFailure } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
@@ -34,8 +34,9 @@ export type IProvisionalScope = {
    */
   commitTo(parent: ILifecycleOwner): Promise<void>
   /**
-   * Releases every owned resource in reverse order, collecting every failure into one
-   * `AggregateError` (idempotent).
+   * Releases every owned resource in reverse order. A single failure keeps its annotated native
+   * identity; multiple failures form an AggregateError. Repeated calls reuse the first Promise,
+   * including its rejection.
    */
   rollback(): Promise<void>
 }
@@ -58,7 +59,20 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
   let parentSubscription: IObservedAbortSubscription | undefined
   const registrationErrors: unknown[] = []
   const forwardAbort = (reason: unknown): void => controller.abort(reason)
-  const detachParent = (): void => parentSubscription?.unsubscribe()
+  /** Finalize the live listener failure channel at settlement, after every detach attempt. */
+  const detachParent = (): void => {
+    parentSubscription?.unsubscribe()
+    if (registrationErrors.length > 0)
+      throw attachLifecycleSecondaryErrors(
+        createLifecycleFailure(
+          LifecycleErrorCode.scopeDisposalFailed,
+          LifecycleErrorText.provisionalCleanupFailed,
+          registrationErrors[0]
+        ),
+        registrationErrors.slice(1),
+        LifecycleErrorText.provisionalCleanupFailed
+      )
+  }
   if (parentSignal?.aborted) {
     controller.abort(parentSignal.reason)
   } else if (parentSignal) {

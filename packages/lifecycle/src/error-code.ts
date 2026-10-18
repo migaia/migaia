@@ -51,9 +51,9 @@ export const LifecycleErrorCode = {
   scopeSyncViolation: 'SCOPE_SYNC_VIOLATION',
 
   /**
-   * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each
-   * original failure in `error.errors`. A single failure is thrown unchanged and does not use this
-   * code.
+   * Classifies untagged release failures in every error policy and aggregates multiple failures
+   * under the throw policy. Native single failures retain identity; primitives retain cause.
+   * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals.
    */
   scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED',
 
@@ -164,12 +164,14 @@ export const LifecycleErrorCode = {
   envUnsupported: 'ENV_UNSUPPORTED',
 
   /**
-   * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing
-   * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects
-   * nonfinite time values, nonfinite or negative delays, addition that overflows, or cleanup
-   * observations without the error array required by `mergeCleanupResults`. Enforces scheduler
-   * admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative delays in R-9.
-   * Correct the scheduler or delay instead of retrying the same invalid input.
+   * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including
+   * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable.
+   * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction
+   * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that
+   * overflows, or cleanup observations without the error array required by `mergeCleanupResults`.
+   * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite
+   * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid
+   * input.
    */
   invalidOption: 'INVALID_OPTION'
 } as const

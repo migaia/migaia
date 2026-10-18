@@ -45,16 +45,29 @@ describe('L-T17 containAsyncRejection: non-Promise thenable', () => {
     expect(onRejected).not.toHaveBeenCalled()
   })
 
-  it('never throws even if onRejected itself throws', async () => {
+  it('observes onRejected failure through the shared host exception queue', async () => {
     const rejecting = Promise.reject(new Error('x'))
     void rejecting.catch(() => undefined)
-    expect(() =>
-      containAsyncRejection(rejecting, () => {
-        throw new Error('handler exploded')
-      })
-    ).not.toThrow()
-    await Promise.resolve()
-    await Promise.resolve()
+    /** The host exception queue retains the exact secondary error, without executing it here. */
+    const callbacks: (() => void)[] = []
+    /** Exact instance proves diagnostic traceability after synchronous return. */
+    const failure = new Error('handler exploded')
+    /** Restore host scheduling even when the observation fails. */
+    const enqueue = vi
+      .spyOn(globalThis, 'queueMicrotask')
+      .mockImplementation((callback) => callbacks.push(callback))
+    try {
+      expect(() =>
+        containAsyncRejection(rejecting, () => {
+          throw failure
+        })
+      ).not.toThrow()
+      for (let turn = 0; turn < 8; turn++) await Promise.resolve()
+      expect(callbacks).toHaveLength(1)
+      expect(callbacks[0]).toThrow(failure)
+    } finally {
+      enqueue.mockRestore()
+    }
   })
 })
 
@@ -90,8 +103,22 @@ describe('L-T18 error policies: throw / collect / report / firstError', () => {
     sink.add('b', 'err-b')
     const result = sink.finalize('msg')
     expect(result).toEqual([
-      { source: 'a', error: 'err-a' },
-      { source: 'b', error: 'err-b' }
+      {
+        source: 'a',
+        error: expect.objectContaining({
+          source: LIFECYCLE_SOURCE,
+          code: 'SCOPE_DISPOSAL_FAILED',
+          cause: 'err-a'
+        })
+      },
+      {
+        source: 'b',
+        error: expect.objectContaining({
+          source: LIFECYCLE_SOURCE,
+          code: 'SCOPE_DISPOSAL_FAILED',
+          cause: 'err-b'
+        })
+      }
     ])
   })
 
@@ -101,11 +128,22 @@ describe('L-T18 error policies: throw / collect / report / firstError', () => {
     sink.add('a', 'err-a')
     sink.add('b', 'err-b')
     expect(sink.finalize('msg')).toEqual([])
-    expect(reported).toEqual(['err-a', 'err-b'])
+    expect(reported).toEqual([
+      expect.objectContaining({
+        source: LIFECYCLE_SOURCE,
+        code: 'SCOPE_DISPOSAL_FAILED',
+        cause: 'err-a'
+      }),
+      expect.objectContaining({
+        source: LIFECYCLE_SOURCE,
+        code: 'SCOPE_DISPOSAL_FAILED',
+        cause: 'err-b'
+      })
+    ])
   })
 
   it('firstError: keeps the first, observes but does not surface subsequent ones as the thrown value', () => {
-    const sink = createErrorCollector('firstError', undefined)
+    const sink = createErrorCollector('firstError', vi.fn())
     const first = new Error('first')
     sink.add('a', first)
     sink.add('b', new Error('second'))
@@ -114,35 +152,44 @@ describe('L-T18 error policies: throw / collect / report / firstError', () => {
   })
 
   it('firstError: no error added -> finalize returns empty, does not throw', () => {
-    const sink = createErrorCollector('firstError', undefined)
+    const sink = createErrorCollector('firstError', vi.fn())
     expect(sink.finalize('msg')).toEqual([])
   })
 })
 
-describe('L-T35 report: reporter throwing is contained', () => {
-  it('a synchronously-throwing reporter does not escape add()', () => {
-    const sink = createErrorCollector('report', () => {
-      throw new Error('reporter exploded')
-    })
-    expect(() => sink.add('a', 'err')).not.toThrow()
-    expect(sink.finalize('msg')).toEqual([])
-  })
-
-  it('a reporter returning a rejecting promise is observed without becoming an unhandled rejection', async () => {
-    const sink = createErrorCollector('report', () =>
-      Promise.reject(new Error('async reporter failure'))
-    )
-    sink.add('a', 'err')
-    await Promise.resolve()
-    await Promise.resolve()
-    // If this test file completes without an unhandledRejection, the rejection was contained.
-    expect(true).toBe(true)
-  })
+describe('L-T35 report: secondary failures reach host diagnostics', () => {
+  it.each([false, true])(
+    'reports secondary failure without altering policy outcome, async=%s',
+    async (asynchronous) => {
+      /** Exact reporter failure is captured through the existing host diagnostic seam. */
+      const failure = new Error('reporter failure')
+      /** Host callbacks can be inspected without crashing the test process. */
+      const callbacks: (() => void)[] = []
+      /** Restore the host queue even on assertion failure. */
+      const enqueue = vi
+        .spyOn(globalThis, 'queueMicrotask')
+        .mockImplementation((callback) => callbacks.push(callback))
+      try {
+        /** Reporter may throw now or return a rejecting Promise under the nominal void contract. */
+        const sink = createErrorCollector('report', () => {
+          if (asynchronous) return Promise.reject(failure)
+          throw failure
+        })
+        expect(() => sink.add('item', new Error('primary'))).not.toThrow()
+        expect(sink.finalize('done')).toEqual([])
+        for (let turn = 0; turn < 8; turn++) await Promise.resolve()
+        expect(callbacks).toHaveLength(1)
+        expect(callbacks[0]).toThrow(failure)
+      } finally {
+        enqueue.mockRestore()
+      }
+    }
+  )
 })
 
 describe('L-T38 firstError: subsequent errors are fully observed', () => {
   it('records every subsequent error even though only the first is thrown', () => {
-    const sink = createErrorCollector('firstError', undefined)
+    const sink = createErrorCollector('firstError', vi.fn())
     sink.add('a', new Error('first'))
     sink.add('b', new Error('second'))
     sink.add('c', new Error('third'))
@@ -167,7 +214,7 @@ describe('L-T38 firstError: subsequent errors are fully observed', () => {
   })
 
   it('an async subsequent failure funneled through containAsyncRejection does not produce an unhandled rejection', async () => {
-    const sink = createErrorCollector('firstError', undefined)
+    const sink = createErrorCollector('firstError', vi.fn())
     sink.add('a', new Error('first'))
     const laterRejection = Promise.reject(new Error('second, async'))
     containAsyncRejection(laterRejection, () => {

@@ -242,8 +242,11 @@ describe('L-T41 lifecycle code table: every code has a precise trigger, phase ma
   })
 
   it('diagnostic-only codes (GENERATION_SUPERSEDED, RELEASE_FORCE_FAILED, DEADLINE_EXCEEDED, UNIT_START_FAILED) never throw out of their call site', () => {
+    /** Diagnostic callback failures use the existing report channel. */
+    const report = vi.fn()
     expect(() => {
       const controller = createGenerationController({
+        report,
         onSuperseded: () => {
           throw new Error('reporter blew up')
         }
@@ -252,6 +255,7 @@ describe('L-T41 lifecycle code table: every code has a precise trigger, phase ma
       controller.begin()
       controller.adopt(first.token, 'v', () => {})
     }).not.toThrow()
+    expect(report).toHaveBeenCalledTimes(1)
   })
 })
 

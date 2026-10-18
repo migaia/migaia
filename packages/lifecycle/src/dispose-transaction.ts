@@ -1,7 +1,7 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { defaultLifecycleScheduler } from './scheduler.js'
 import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.js'
-import { safeReport } from './errors.js'
+import { containAsyncRejection, safeReport } from './errors.js'
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
 import type { IDisposerContext } from './disposer-context.js'
 import { createErrorCollector, createLifecycleError, createLifecycleTypeError } from './errors.js'
@@ -159,6 +159,8 @@ async function awaitGraceful(
     }
   }
   if (effectiveDeadline <= start) {
+    // Graceful already started. Observe its rejection before taking the force fallback.
+    containAsyncRejection(promise, (error) => safeReport(context.report, error))
     // The shared budget was already spent by an earlier item before this one even got a chance to
     // try — there is no point racing a wait against a deadline that has already passed. Surface it
     // as a diagnostic (not an item error — timing out is a normal degrade path) and go straight to
@@ -368,7 +370,7 @@ export type IDisposeTransactionOptions = {
   readonly signal?: IAbortSignal
   /** Owner-bound self-join capability, supplied only by a LifecycleScope owner. */
   readonly disposer?: IDisposerContext
-  /** Awaited after every item settles, so in-flight work started by a release can still be drained. */
+  /** Drained once after all items settle, including in-flight work started by their releases. */
   readonly pending?: { drain(): Promise<void> }
 }
 

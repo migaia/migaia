@@ -78,7 +78,7 @@ const formerOwners = new Set([
 ])
 
 /** Relative path of the one canonical scheduler module. */
-const canonicalModule = 'utils/src/scheduler.ts'
+const canonicalModule = 'utils/src/internal/scheduler.ts'
 
 /** A plain-text superset skips AST work only when no checked symbol can occur. */
 const candidateTokens = [

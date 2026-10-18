@@ -79,7 +79,6 @@
         "LifecycleErrorPolicy",
         "LifecycleErrorText",
         "LifecycleState",
-        "LifecycleUnitState",
         "abortableDelay",
         "boundedWait",
         "containAsyncRejection",
@@ -87,7 +86,6 @@
         "createDisposeTransaction",
         "createErrorCollector",
         "createGenerationController",
-        "createLifecycleError",
         "createLifecycleScope",
         "createMutationQueue",
         "createObjectLeaseRegistry",
@@ -107,7 +105,6 @@
         "observeAbortSubscription"
       ],
       "./scheduler": [
-        "addSchedulerTime",
         "resolveScheduler",
         "resolveSchedulerOption",
         "snapshotScheduler"
@@ -133,10 +130,7 @@
       "./errors": [
         "LIFECYCLE_SOURCE",
         "containAsyncRejection",
-        "createErrorCollector",
-        "createLifecycleError",
-        "createLifecycleFailure",
-        "createLifecycleTypeError"
+        "createErrorCollector"
       ]
     },
     "@migaia/logger": {

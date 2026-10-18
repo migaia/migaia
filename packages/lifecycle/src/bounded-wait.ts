@@ -5,6 +5,7 @@ import { tryReadProperty } from '@migaia/utils/error'
 import { createLifecycleTypeError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+import { attachLifecycleSecondaryErrors } from './error-boundary.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   resolveSchedulerOption,
@@ -52,19 +53,44 @@ export const boundedWait = async (
   return new Promise<boolean>((resolve, reject) => {
     let settled = false
     let timer: { cancel(): void } | undefined
-    const settle = (outcome: () => void): void => {
-      if (settled) return
+    /** Scheduling can synchronously request completion before returning its cleanup handle. */
+    let admitted = false
+    /** The first timer/task outcome waits until all owned cleanup handles are visible. */
+    let outcome: (() => void) | undefined
+    /** Task rejection presence is separate from its payload, which may be undefined. */
+    let taskFailed = false
+    /** Preserve the task primary independently from any cancellation failure. */
+    let primaryError: unknown
+    /** Finalize the selected outcome after schedule admission, cancelling the timer exactly once. */
+    const finish = (): void => {
+      if (settled || !admitted || outcome === undefined) return
       settled = true
       try {
         timer?.cancel()
       } catch (error) {
         if (reportCleanup) safeReport(reportCleanup, error)
         else {
-          reject(error)
+          reject(
+            taskFailed
+              ? attachLifecycleSecondaryErrors(
+                  primaryError,
+                  [error],
+                  LifecycleErrorText.delayFailed
+                )
+              : error
+          )
           return
         }
       }
       outcome()
+    }
+    /** Select one winner while retaining task failure identity for secondary cleanup attachment. */
+    const settle = (next: () => void, failed = false, error?: unknown): void => {
+      if (settled || outcome !== undefined) return
+      outcome = next
+      taskFailed = failed
+      primaryError = error
+      finish()
     }
     try {
       timer = scheduler.schedule(() => settle(() => resolve(false)), delayMs)
@@ -72,21 +98,15 @@ export const boundedWait = async (
       reject(error)
       return
     }
-    if (settled) {
-      try {
-        timer.cancel()
-      } catch (error) {
-        if (reportCleanup) safeReport(reportCleanup, error)
-        else reject(error)
-      }
-    }
+    admitted = true
+    finish()
     void observedTask.then(
       () => settle(() => resolve(true)),
       (error: unknown) => {
         // A rejection after the timeout is deliberately consumed by this handler. Before the
         // timeout it remains the caller's primary failure, without relying on an error class from
         // another package or bundle to identify the timer winner.
-        settle(() => reject(error))
+        settle(() => reject(error), true, error)
       }
     )
   })

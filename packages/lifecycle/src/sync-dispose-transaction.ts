@@ -1,5 +1,10 @@
-import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { createErrorCollector, createLifecycleError } from './errors.js'
+import { observeThenableRejection, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
+import {
+  createErrorCollector,
+  createLifecycleError,
+  createLifecycleFailure,
+  safeReport
+} from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import type { IAdmissionBatch } from './dispose-transaction.js'
@@ -10,7 +15,8 @@ type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly e
 /** Runs one synchronous callback and rejects thenable results without adding an await boundary. */
 function runSyncCallback(
   callback: (context: IReleaseContext) => void | PromiseLike<void>,
-  context: IReleaseContext
+  context: IReleaseContext,
+  reportLate: (error: unknown) => void
 ): ICallbackOutcome {
   /** Callback output retained for a single thenable admission read. */
   let result: void | PromiseLike<void>
@@ -24,6 +30,8 @@ function runSyncCallback(
   const probe = probeThenable(result)
   if (probe.kind === ThenableProbeKind.failed) return { ok: false, error: probe.error }
   if (probe.kind === 'thenable') {
+    // oxlint-disable-next-line unicorn/no-thenable -- Reuse the already captured PromiseLike method without reading its getter twice.
+    observeThenableRejection(result, { then: probe.thenFn }, reportLate)
     return {
       ok: false,
       error: createLifecycleError(
@@ -41,23 +49,24 @@ function runSyncCallback(
  */
 function executeSyncDescriptor(
   descriptor: IReleaseDescriptor,
-  context: IReleaseContext
+  context: IReleaseContext,
+  reportLate: (error: unknown) => void
 ): readonly unknown[] {
   if (descriptor.custom) {
     /** Custom release owns the complete chain, so no fallback phase runs afterwards. */
-    const outcome = runSyncCallback(descriptor.custom, context)
+    const outcome = runSyncCallback(descriptor.custom, context, reportLate)
     return outcome.ok ? [] : [outcome.error]
   }
   /** Failed graceful and force phases remain ordered without replacing the original errors. */
   const errors: unknown[] = []
   if (descriptor.graceful) {
     /** Successful graceful release skips force; a failure keeps the forced fallback active. */
-    const gracefulOutcome = runSyncCallback(descriptor.graceful, context)
+    const gracefulOutcome = runSyncCallback(descriptor.graceful, context, reportLate)
     if (gracefulOutcome.ok) return []
     errors.push(gracefulOutcome.error)
   }
   /** Final synchronous fallback contributes its own raw failure when it cannot release. */
-  const forceOutcome = runSyncCallback(descriptor.force, context)
+  const forceOutcome = runSyncCallback(descriptor.force, context, reportLate)
   if (!forceOutcome.ok) errors.push(forceOutcome.error)
   return errors
 }
@@ -75,12 +84,23 @@ export function executeSyncDisposeTransaction(
 ): readonly ICollectedError[] {
   /** Policy collector receives all admission failures before any resource callback runs. */
   const collector = createErrorCollector(errorPolicy, report)
+  /** Late callback failure cannot enter an already-returned sync result; use the existing reporter. */
+  const reportLate = (error: unknown): void => {
+    /** Tag an annotatable original; immutable/primitive failures remain reachable through cause. */
+    const failure = createLifecycleFailure(
+      LifecycleErrorCode.scopeSyncViolation,
+      LifecycleErrorText.syncCallbackReturnedThenable,
+      error
+    )
+    if (report) safeReport(report, failure)
+    else throw failure // utils observes this reporter failure through its shared host exception queue.
+  }
   for (const item of admission.rejected) collector.add(item.source, item.error)
   for (const item of admission.admitted) {
     /** Fresh context keeps the scope's established per-item callback boundary. */
     const context = createContext()
     /** Raw failures retain native type and identity until the policy handles them. */
-    const errors = executeSyncDescriptor(item.descriptor, context)
+    const errors = executeSyncDescriptor(item.descriptor, context, reportLate)
     for (const error of errors) collector.add(item.source, error)
   }
   return collector.finalize(LifecycleErrorText.syncScopeDisposalFailed)

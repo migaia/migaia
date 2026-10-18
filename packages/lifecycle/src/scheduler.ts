@@ -11,11 +11,29 @@ import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/u
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   createLifecycleError,
+  createLifecycleFailure,
   createLifecycleRangeError,
   createLifecycleTypeError
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+
+/** Invokes one captured host method, retaining native failures with lifecycle scheduler identity. */
+function invokeSchedulerMethod<T>(
+  method: (...args: never[]) => T,
+  receiver: object,
+  args: readonly unknown[]
+): T {
+  try {
+    return Reflect.apply(method, receiver, args)
+  } catch (error) {
+    throw createLifecycleFailure(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerAccessorFailed,
+      error
+    )
+  }
+}
 
 /** Canonical runtime check for scheduler-produced and scheduler-consumed numeric values. */
 export function validateSchedulerTime(value: unknown, label: string): number {
@@ -106,7 +124,7 @@ function snapshotScheduledTask(value: unknown): IScheduledTask {
   }
   /** Cancels the injected timer with its original receiver. */
   const cancelTask = (): void => {
-    Reflect.apply(cancel as () => void, receiver, [])
+    invokeSchedulerMethod(cancel as () => void, receiver, [])
   }
   /** Rejects the task after rolling back its started timer; rollback failures stay secondary. */
   const reject = (primary: Error): never => {
@@ -143,7 +161,7 @@ function snapshotScheduledTask(value: unknown): IScheduledTask {
   return {
     cancel: cancelTask,
     unref: () => {
-      Reflect.apply(unref as () => void, receiver, [])
+      invokeSchedulerMethod(unref as () => void, receiver, [])
     }
   }
 }
@@ -176,17 +194,23 @@ export function snapshotScheduler(value: unknown): IScheduler | undefined {
       LifecycleErrorText.schedulerDeferInvalid
     )
   return {
-    now: () => validateSchedulerTime(Reflect.apply(now, receiver, []), 'now()'),
+    now: () =>
+      validateSchedulerTime(invokeSchedulerMethod(now as () => unknown, receiver, []), 'now()'),
     ...(typeof deferred === 'function'
       ? {
           defer: (callback: () => void) => {
-            Reflect.apply(deferred, receiver, [callback])
+            invokeSchedulerMethod(deferred as (...args: never[]) => void, receiver, [callback])
           }
         }
       : {}),
     schedule: (callback, delayMs) => {
       const validDelay = validateSchedulerDelay(delayMs)
-      return snapshotScheduledTask(Reflect.apply(schedule, receiver, [callback, validDelay]))
+      return snapshotScheduledTask(
+        invokeSchedulerMethod(schedule as (...args: never[]) => unknown, receiver, [
+          callback,
+          validDelay
+        ])
+      )
     }
   }
 }

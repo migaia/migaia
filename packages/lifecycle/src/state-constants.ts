@@ -31,9 +31,6 @@ export const ProvisionalScopeState = {
   rolledBack: 'rolledback'
 } as const
 
-export type ILifecycleStateValue = (typeof LifecycleState)[keyof typeof LifecycleState]
-export type ILifecycleUnitStateValue = (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState]
-export type ILifecycleErrorPolicy = (typeof LifecycleErrorPolicy)[keyof typeof LifecycleErrorPolicy]
 export type IDisposeTransactionKind =
   (typeof DisposeTransactionKind)[keyof typeof DisposeTransactionKind]
 export type IProvisionalScopeState =
