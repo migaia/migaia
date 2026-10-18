@@ -13,12 +13,11 @@ import {
   type IThreadHandle,
   type IThreadSpec
 } from '@migaia/supervision/threads'
-import type { IRuntimeThreadSpawn } from '@migaia/rpc-threads'
+import { type IRuntimeThreadSpawn, type INodeThreadHandle } from '@migaia/rpc-threads'
 import type { IRemoteBinding } from '@migaia/rpc-core/remote'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import { createManagedRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/managed-peer.js'
 import { createRuntimeApiEndpoint } from '../../../rpc-core/dist/core/runtime-api-endpoint.js'

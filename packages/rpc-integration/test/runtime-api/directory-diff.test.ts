@@ -3,11 +3,10 @@ import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer, type INodeThreadHandle } from '@migaia/rpc-threads'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
 import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'

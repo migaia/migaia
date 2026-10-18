@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '@migaia/rpc-threads'
 import {
   createThreadPeer,
   createWebThreadLauncher,

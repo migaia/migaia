@@ -14,7 +14,7 @@ import {
   type IRpcPlugin
 } from '@migaia/rpc-core'
 import { buildCapabilityTopology, type ITopologyNode } from '@migaia/capability/graph/topology'
-import rpcV1, { rpcProtocol } from '@migaia/rpc-contract/v1'
+import { normalizeRpcEnvelope as normalizeV1Envelope, rpcProtocol } from '@migaia/rpc-contract/v1'
 import { messageFramer } from '@migaia/rpc-contract/framing/v1'
 import { createBinaryFramer, createStringFramer } from '@migaia/rpc-contract/framing'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
@@ -88,7 +88,7 @@ async function verifyPackedContracts(): Promise<void> {
   const frameContext = { source: 'packed-fixture', messageId: 'identity-literal' }
   const framed = messageFramer.frame(decoded, frameContext)
   const accepted = messageFramer.accept(framed[0], frameContext)
-  const normalized = rpcV1.normalizeRpcEnvelope(
+  const normalized = normalizeV1Envelope(
     rpcProtocol.normalize({ kind: 'request', id: 'packed-v1', method: 'ping', data: null })
   )
   const retainedIdentity: typeof identityCodec = identityCodec

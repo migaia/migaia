@@ -7,11 +7,10 @@ import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 

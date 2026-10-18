@@ -226,6 +226,11 @@ function migratedTitle(title: string): string | undefined {
     .replace('24 unique codes', '25 unique codes')
     .replace('25 unique codes', '26 unique codes')
     .replace('26 unique codes', '31 unique codes')
+    // The title no longer carries a count, so registering a code does not rename the test.
+    .replace(
+      'keeps the (source, code) contract: 31 unique codes and a constant source',
+      'keeps unique registered codes and a constant source'
+    )
     .replace(
       'does not let a hostile code getter escape',
       'reports a hostile code getter as PROPERTY_READ_FAILED with the original cause'
@@ -297,7 +302,13 @@ function expectsAbsence(node: ts.StringLiteralLike): boolean {
       )
         return true
     }
-    if (ts.isStatement(parent)) return false
+    if (ts.isStatement(parent)) {
+      /** A `@ts-expect-error` statement asserts that its specifier no longer resolves. */
+      const text = parent.getSourceFile().getFullText()
+      return (ts.getLeadingCommentRanges(text, parent.getFullStart()) ?? []).some((range) =>
+        text.slice(range.pos, range.end).includes('@ts-expect-error')
+      )
+    }
   }
   return false
 }

@@ -41,11 +41,15 @@ function logicalPath(file: string): string {
     : relative(sourceRoot, file).split(sep).join('/')
 }
 
-/** Contract portable traversal depends inward on serialize alongside byte/error utilities. */
+/**
+ * Contract portable traversal depends inward on serialize alongside byte/error utilities, and on
+ * utils/function so the framer observes thenable rejections instead of swallowing them.
+ */
 const contractBareAllowlist = new Set([
   '@migaia/serialize',
   '@migaia/utils/bytes',
-  '@migaia/utils/error'
+  '@migaia/utils/error',
+  '@migaia/utils/function'
 ])
 /** Published adapter boundary: shared primitives, errors, and local text only. */
 const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/index.ts'])

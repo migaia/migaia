@@ -7,7 +7,11 @@ import {
   createProcessTransport,
   createNativeProcessOffer
 } from '@migaia/rpc-process'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import {
+  createThreadPeer,
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
+} from '@migaia/rpc-threads'
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
 import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'
 import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'

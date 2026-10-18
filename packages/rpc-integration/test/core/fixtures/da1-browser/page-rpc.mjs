@@ -1,7 +1,6 @@
 import { installPage } from './page-common.mjs'
 import { peerOptions } from './rpc.mjs'
 import { BrowserBenchText } from './text.mjs'
-import { createThreadPeer } from '@migaia/rpc-threads'
 import {
   createThreadPeer,
   createWebThreadLauncher,

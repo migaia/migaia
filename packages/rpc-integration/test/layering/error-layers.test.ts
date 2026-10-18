@@ -269,7 +269,7 @@ describe('layered error ownership', () => {
   it('A2 removes every dead core code while retaining a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
-    expect(core.size).toBe(33)
+    expect(core.size).toBe(34)
     /** Contract R5 declares this report code before probe-core installs its observation runtime. */
     expect(core.get('probeFailed')).toBe('PROBE_FAILED')
     expect(core.get('duplicateModuleInstance')).toBe('DUPLICATE_MODULE_INSTANCE')

@@ -18,6 +18,8 @@ const runtimeExports = [
   'createListenerFailureState',
   'drainListenerFailures',
   'drainTerminalListenerFailures',
+  // Adapter-facing identity for native transport failures (rpc-browser D01).
+  'identifyRpcBoundaryFailure',
   'observeListener',
   'registerListeners',
   'releaseListenerRegistration',

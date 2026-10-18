@@ -271,10 +271,15 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
 /** C3 retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
 const retiredSymbols: Record<string, readonly string[]> = {
   '@migaia/rpc/contract': ['invalidRpcStream'],
-  '@migaia/rpc/contract/v1': ['invalidRpcStream'],
-  '@migaia/rpc/contract/framing': ['rejectRpcPhysicalFrameSize'],
+  '@migaia/rpc/contract/v1': ['invalidRpcStream', 'default'],
+  '@migaia/rpc/contract/framing': [
+    'rejectRpcPhysicalFrameSize',
+    'createReassembler',
+    'processStringFramer'
+  ],
   /** Core constructors are internal except the real caller-owned lifecycle error use. */
   '@migaia/rpc/core': [
+    'createAuthenticationNonce',
     'RpcError',
     'RpcSchemaValidationError',
     'RpcConfigurationError',
@@ -362,13 +367,11 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/process/adapters/windows-job',
       '@migaia/rpc/contract/framing/stream',
       '@migaia/rpc/threads',
-      ...['node', 'deno', 'bun', 'electron-main', 'electron-renderer', 'browser'].map(
-        (name) => `@migaia/rpc/threads/adapters/${name}`
-      )
+      ...['node', 'electron-main'].map((name) => `@migaia/rpc/threads/adapters/${name}`)
     ]
       .map((name) => (coreRefactorDelta.relocations as Record<string, string>)[name] ?? name)
       .sort()
-    expect(expected).toHaveLength(48)
+    expect(expected).toHaveLength(44)
     const currentEntries = expected.map((name) => {
       const entry = splitEntry(name)
       return `${entry.owner}:${entry.key}`
@@ -376,7 +379,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(66)
+    expect(currentEntries).toHaveLength(62)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))

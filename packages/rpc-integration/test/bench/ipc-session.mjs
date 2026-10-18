@@ -100,10 +100,6 @@ async function rpcApi() {
   const processApi = await import('@migaia/rpc-process')
   const threads = await import('@migaia/rpc-threads')
   const threadAdapters = await import('@migaia/rpc-threads/adapters/node')
-  const bunAdapters = process.versions.bun
-    ? await import('@migaia/rpc-threads/adapters/bun')
-    : undefined
-  const denoAdapters = deno ? await import('@migaia/rpc-threads/adapters/deno') : undefined
   /** Capability declarations come from the actual factory source context, never a fixture guess. */
   offer = (id, capabilities) => ({
     ...processApi.createNativeProcessOffer({
@@ -111,7 +107,7 @@ async function rpcApi() {
     }),
     capabilities
   })
-  return { ...processApi, ...threads, ...threadAdapters, ...bunAdapters, ...denoAdapters }
+  return { ...processApi, ...threads, ...threadAdapters }
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
 const echoMethod = RuntimeBench.echo

@@ -48,7 +48,11 @@ describe('rpc-devtools layer-1 dependency direction', () => {
     for (const path of sourceFiles(devtoolsRoot))
       for (const specifier of imports(path)) {
         if (specifier.startsWith('.')) expect(specifier, path).toMatch(/\.js$/u)
-        else expect(specifier, path).toMatch(/^@migaia\/rpc-(?:core|contract)(?:\/|$)/u)
+        // The runtime-neutral scheduler is the only foundation import: one clock for snapshots.
+        else
+          expect(specifier, path).toMatch(
+            /^(?:@migaia\/rpc-(?:core|contract)(?:\/|$)|@migaia\/utils\/scheduler$)/u
+          )
       }
   })
 })

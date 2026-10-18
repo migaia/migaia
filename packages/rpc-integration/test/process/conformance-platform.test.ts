@@ -189,6 +189,10 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       'packages/store-persist/package.json': {
         dependencies: { '@migaia/lifecycle': 'workspace:^' }
       },
+      // store-react uses React 19 `use`; the old >=18 range never loaded on React 18 (D06).
+      'packages/store-react/package.json': {
+        peerDependencies: { react: '>=19', 'react-dom': '>=19' }
+      },
       'packages/store-shared/package.json': {
         dependencies: { '@migaia/lifecycle': 'workspace:^' }
       },

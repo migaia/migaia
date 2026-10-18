@@ -5,11 +5,10 @@ import { it, vi } from 'vitest'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import * as runtimeEndpoint from '@migaia/rpc-core'
 

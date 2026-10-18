@@ -9,13 +9,12 @@ import {
   runtimeTestHost
 } from '../../../rpc-core/test/runtime-api/fixture.js'
 import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+import { createThreadPlugin, type INodeThreadHandle, createThreadPeer } from '@migaia/rpc-threads'
 import { createRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '@migaia/rpc-threads'
+
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
 import { RpcCapability } from '@migaia/rpc-contract'

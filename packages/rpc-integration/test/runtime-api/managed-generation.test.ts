@@ -10,11 +10,10 @@ import { it, vi } from 'vitest'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer, createThreadPlugin } from '@migaia/rpc-threads'
+import { createThreadPeer, createThreadPlugin, type INodeThreadHandle } from '@migaia/rpc-threads'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'

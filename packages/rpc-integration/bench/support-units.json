@@ -908,7 +908,7 @@
     },
     {
       "carrier": "Bun Web Worker",
-      "reason": "termination/exit-observation unsupported, required isolation rejects; src/threads/adapters/bun.ts; producer rpc-threads K31"
+      "reason": "termination/exit-observation unsupported, required isolation rejects; src/threads/web-launcher.ts; producer rpc-threads K31"
     },
     {
       "carrier": "Node IPC/Bun IPC process",

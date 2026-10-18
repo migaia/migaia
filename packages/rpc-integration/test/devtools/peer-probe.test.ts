@@ -4,11 +4,10 @@ import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createProcessPeer } from '@migaia/rpc-process'
-import { createThreadPeer } from '@migaia/rpc-threads'
+import { createThreadPeer, type INodeThreadHandle } from '@migaia/rpc-threads'
 import {
   createNodeThreadLauncher,
-  createNodeThreadChannelFactory,
-  type INodeThreadHandle
+  createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
 import { createBrowserPeer } from '@migaia/rpc-browser'
 import { defineProbe, RpcProbeStage, RpcProbeKind } from '@migaia/rpc-core/probe'

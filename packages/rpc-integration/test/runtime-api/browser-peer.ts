@@ -1,7 +1,6 @@
 import type { IRuntimeDynamicSurface } from '../../../rpc-core/dist/remote/runtime-api/typing.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '@migaia/rpc-threads'
 import {
   createThreadPeer,
   createWebThreadLauncher,
