@@ -2457,11 +2457,27 @@ test('SITE-T-STORAGE-WEB-HOST documents authority, topology, installation, and l
     }
 })
 
-test('SITE-T-STORAGE-WEB-BOUNDARIES documents internal names, metadata, namespace, and errors', () => {
+test('SITE-T-STORAGE-WEB-BOUNDARIES documents public namespace and errors while keeping Host helpers private', () => {
+  /** Commit 8e6e59ed removed these Host implementation helpers from public exports. */
+  const privateHostEntries = [
+    'pluginNameFromBackendId',
+    'reactiveAdapterNameFromBackendId',
+    'STORAGE_LIVE_QUERY_SERVICE_NAME'
+  ] as const
+
+  for (const symbolName of privateHostEntries)
+    assert.equal(
+      generatedApis.some(
+        (api) =>
+          api.library === 'storage-web' &&
+          [...api.symbols, ...api.aliases].some((symbol) => symbol.name === symbolName)
+      ),
+      false,
+      `storage-web exposes internal Host entry ${symbolName}`
+    )
+
+  /** Public root entries retain their complete bilingual guide requirements. */
   const targets = [
-    ['host', 'pluginNameFromBackendId', ['id']],
-    ['host', 'reactiveAdapterNameFromBackendId', ['id']],
-    ['host', 'STORAGE_LIVE_QUERY_SERVICE_NAME', []],
     ['index', 'lengthPrefixedNamespaceCodec', []],
     ['index', 'STORAGE_WEB_SOURCE', []],
     ['index', 'StorageErrorText', []],

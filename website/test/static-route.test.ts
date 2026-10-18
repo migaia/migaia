@@ -3197,15 +3197,11 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Validate, query, and upgrade application records',
       'Version upgrades and migration counts'
     ],
-    [
-      '/zh/docs/storage-web/host-and-plugins',
-      '按名称组合存储并统一关闭',
-      '插件编写者使用的辅助入口'
-    ],
+    ['/zh/docs/storage-web/host-and-plugins', '按名称组合存储并统一关闭', '检查自定义后端 ID'],
     [
       '/en/docs/storage-web/host-and-plugins',
       'Compose named stores and close them together',
-      'Helpers for plugin authors'
+      'Validate custom backend IDs'
     ],
     [
       '/zh/docs/storage-web/indexeddb-and-transactions',
