@@ -211,7 +211,7 @@ async function shutdownApplication() {
 第二参数 `ICapabilityHostOptions` 全部字段：
 
 - `flags?: Readonly<Record<string, boolean>>` —— 开关表快照，只在**创建时**复制一份；只有自有、可枚举、值严格等于 `true` 的数据属性才算允许，之后必须调用 `setFlag()`/`setFlags()` 才能改变
-- `onError?: (name: string, error: unknown) => void` —— 激活/释放失败的上报口；reporter 自己抛错也不会破坏闸门状态机
+- `onError?: (name: string, error: unknown) => void` —— 激活/释放失败的上报口；reporter 自己的 throw/rejection 交 utils 共享宿主异常队列，不改变闸门状态机
 
 `options` 本身必须是对象或函数（`null`/原始值会抛 `INVALID_OPTION` 的 `TypeError`）；`onError` 若提供必须是函数。
 
@@ -348,7 +348,7 @@ if (capabilities.state('greeting') === CapabilityState.on) {
 - `gated` —— 开关明确拒绝（与"从未尝试启用"的 `off` 区分开）
 - `activating` —— `activate()` 正在执行，尚未 settle
 - `on` —— 已启用，持有一个有效 handle
-- `failed` —— 上一次激活失败，或代数匹配下的释放清理失败
+- `failed` —— 上一次激活失败；release 失败只记录 error，不把 off/gated 改为 failed
 
 `ICapabilityState` 是这五个字符串字面量的联合类型。
 
@@ -361,8 +361,8 @@ if (result.status === CapabilityEnableStatus.failed) console.error(result.error)
 全部取值：`enabled`、`gated`、`cancelled`、`failed`。对应的完整返回值类型 `ICapabilityEnableResult` 全部分支：
 
 - `{ status: 'enabled' }`
-- `{ status: 'gated' }` —— 开关拒绝，未尝试激活
-- `{ status: 'cancelled' }` —— 激活在完成前被开关关闭或 host 释放作废
+- `{ status: 'gated' }` —— 初始 flag 拒绝时不尝试激活；已开始激活后撤回 flag 且当前仍拒绝时释放 late handle 并返回 gated
+- `{ status: 'cancelled' }` —— 激活在完成前被 disable、host dispose 或代际替换作废；flag 撤回且当前仍拒绝时返回 gated
 - `{ status: 'failed'; error: unknown }` —— `activate()` 抛错或返回值不是合法 handle
 
 ---
@@ -574,8 +574,7 @@ Pure topology and incremental indexes share one private structural/edge admissio
 
 readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节点阻塞原因使用
 `@migaia/capability/graph` 的 `GraphBlockedReason`；binding 释放原因使用
-`@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。现有 `IGraphReadinessState`、
-`IGraphBindingReleaseReason` 与 diagnostic `reason` 的取值不变。动态 remove/suspend 的
+`@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。同名的 runtime/type domain 保持唯一入口；diagnostic `reason` 的取值不变。动态 remove/suspend 的
 `IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy.reject/cascade`，
 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建，
 既有错误文案、native TypeError 和 code 保持原契约。
@@ -586,3 +585,7 @@ readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节
 `graph.readValue<T>(id)` reads the same payload as `graph.nodeState(id).value` without constructing a diagnostic snapshot. It returns the original object, and only exposes data while the whole graph is ready. An existing node may legitimately hold `undefined`; inspect `graph.state` to distinguish availability. An unknown identifier still throws `GRAPH_UNKNOWN_NODE`.
 
 Inside a node's `start`, keep using `context.get(provider)` and declared dependencies. The unscoped read is for an external composition root after startup. Custom implementations or mocks of the public `ICapabilityGraph` type must add `readValue`; factory callers receive the method automatically.
+
+拓扑准入 getter 失败通过 `onInvalid(reason, nodeId?, failure?: { cause: unknown })` 传递原值；纯拓扑 owner 同时把捕获的原错保留在 adapter 抛出错误的 cause/errors 链，沿用 caller 的外壳/语义 code，原生可附加时不替换其 identity。ReadonlyMap/ReadonlySet 的 `forEach(callback, thisArg?)` 按标准 receiver 语义调用，集合仍不可变。
+
+动态 Graph 的最终 dispose 与普通 mutation 共用 FIFO，但该任务关闭排队 admission timeout；它等待已准入前序任务后执行现有 release/fence/terminal 清理，不强制中断前序任务。三个诊断 sink 的自身 throw/rejection 统一交 utils 的共享宿主异常队列。

@@ -723,6 +723,12 @@ describe('能力闸门', () => {
   })
 
   it('contains disposal and reporter errors when an in-flight activation is revoked', async () => {
+    /** Reporter containment must preserve its own error on the host channel. */
+    const callbacks: (() => void)[] = []
+    /** Capture terminal delivery separately from capability settlement. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
     const disposeError = new Error('late handle failed to dispose')
     const reporterError = new Error('reporter failed')
     const onError = vi.fn(() => {
@@ -748,9 +754,18 @@ describe('能力闸门', () => {
     expect(host.error('worker')).toBe(disposeError)
     expect(onError).toHaveBeenCalledWith('worker', disposeError)
     await host.dispose()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(reporterError)
+    queue.mockRestore()
   })
 
   it('contains async disposal and reporter rejections during rollback', async () => {
+    /** Async reporter failure uses the same host boundary as a synchronous throw. */
+    const callbacks: (() => void)[] = []
+    /** Inspect terminal work independently from cleanup. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
     const disposeError = new Error('async dispose failed')
     const reporterError = new Error('async reporter failed')
     const onError = vi.fn(async () => {
@@ -779,6 +794,10 @@ describe('能力闸门', () => {
     expect(host.error('worker')).toBe(disposeError)
     expect(onError).toHaveBeenCalledWith('worker', disposeError)
     await host.dispose()
+    for (let turn = 0; turn < 8; turn++) await Promise.resolve()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(reporterError)
+    queue.mockRestore()
   })
 
   it('reports a stale async cleanup failure without poisoning a replacement generation', async () => {
@@ -884,8 +903,16 @@ describe('能力闸门', () => {
   })
 
   it('contains activation reporter errors and rejects malformed handles as failures', async () => {
+    /** Failed activation and failed reporting are separately observable. */
+    const callbacks: (() => void)[] = []
+    /** Capture terminal reporting without throwing into the test host. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
+    /** Exact reporter error must survive the final boundary. */
+    const reporterError = new Error('reporter failed')
     const onError = vi.fn(() => {
-      throw new Error('reporter failed')
+      throw reporterError
     })
     const host = createCapabilityHost(undefined, {
       flags: { malformed: true },
@@ -904,6 +931,9 @@ describe('能力闸门', () => {
     expect(String(host.error('malformed'))).toContain('invalid handle')
     expect(onError).toHaveBeenCalledTimes(1)
     await host.dispose()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(reporterError)
+    queue.mockRestore()
   })
 
   it('discards an in-flight activation that was disabled meanwhile', async () => {

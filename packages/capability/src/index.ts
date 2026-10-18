@@ -22,6 +22,7 @@ import {
   type IGenerationController
 } from '@migaia/lifecycle'
 import { CapabilityErrorCode } from './error-code.js'
+import { invokeCapabilityReporter } from './reporter.js'
 import { CapabilityErrorText } from './error-text.js'
 import { createCapabilityError, tagCapabilityError } from './errors.js'
 import { CapabilityEnableStatus, CapabilityState } from './state-constants.js'
@@ -30,8 +31,7 @@ export {
   GraphReadinessState,
   snapshotGraphReadiness,
   type ICapabilityReadinessSource,
-  type IGraphReadinessSnapshot,
-  type IGraphReadinessState
+  type IGraphReadinessSnapshot
 } from './graph-readiness.js'
 
 // Error codes are public API (`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1).
@@ -253,7 +253,7 @@ export function createCapabilityHost<Context>(
    * 记录真正进入 on 的顺序，回退按这个顺序 LIFO。
    *
    * 老实说这是**完成顺序**，不是依赖顺序，也不是调用顺序——三者在并发激活下 会分叉。`enable(A)` 之后马上 `enable(B)`，如果 B 的 `activate()` 先
-   * resolve（网络快、无 I/O 等等），它先进 activationOrder，回退时 B 反而 先释放。这本身没问题：真正互相依赖的两个能力，调用方必须自己 `await
+   * resolve（网络快、无 I/O 等等），它先进 activationOrder，A 后进入；回退先释放 A，再释放 B。这本身没问题：真正互相依赖的两个能力，调用方必须自己 `await
    * enable('A')` 完再 `enable('B')`——这样 A 保证先进 activationOrder，"后进先出"就等价于"先释放依赖 A 的 B，再释放 A"。
    *
    * 本模块**不提供** dependsOn 声明或强制串行 activate；早先试过在这里把 全部 activate() 调用串行化，直接和现有的"作废的在途激活不得卡住后来者"
@@ -322,16 +322,9 @@ export function createCapabilityHost<Context>(
 
   /** 错误上报属于诊断路径，绝不能反向改变能力生命周期。 */
   const reportError = (name: string, error: unknown): void => {
-    try {
-      const result: unknown = onError
-        ? Reflect.apply(onError, optionsReceiver, [name, error])
-        : undefined
-      containAsyncRejection(result, () => {
-        // Reporter 的异步失败没有更低一层可上报，只能在边界终止。
-      })
-    } catch {
-      // Reporter 已经是最后一道错误边界；这里不能再把它抛回业务 Promise。
-    }
+    invokeCapabilityReporter(() =>
+      onError ? Reflect.apply(onError, optionsReceiver, [name, error]) : undefined
+    )
   }
 
   /**

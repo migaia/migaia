@@ -2,7 +2,9 @@ import { createTopologyIndexFromSnapshots } from './topology-index.js'
 import {
   admitTopologyId,
   isTopologyRecord,
-  snapshotTopologyDependencies
+  snapshotTopologyDependencies,
+  retainTopologyFailure,
+  type ITopologySnapshotFailure
 } from './topology-admission.js'
 
 /** Stable structural reasons passed to the caller-owned topology error adapter. */
@@ -58,7 +60,7 @@ export type ICapabilityTopology = {
 function snapshotTopologyNode(
   candidate: unknown,
   nodeCount: number,
-  onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never
+  onInvalid: ITopologySnapshotFailure
 ): ITopologyNode {
   if (!isTopologyRecord(candidate)) onInvalid(TopologyInvalidReason.invalidNode)
   /** Static projection captures all three caller fields before validating their values. */
@@ -77,8 +79,8 @@ function snapshotTopologyNode(
     idValue = record.id
     ordinalValue = record.ordinal
     dependenciesValue = record.dependencies
-  } catch {
-    onInvalid(TopologyInvalidReason.invalidNode)
+  } catch (cause) {
+    onInvalid(TopologyInvalidReason.invalidNode, undefined, { cause })
   }
   /** ID validation is shared while this leaf retains its existing invalid-ID diagnostic shape. */
   const nodeId = admitTopologyId(idValue, (reason) => onInvalid(reason))
@@ -89,9 +91,7 @@ function snapshotTopologyNode(
   )
     onInvalid(TopologyInvalidReason.invalidNode, nodeId)
   /** Canonical edge admission supplies the frozen dependency snapshot once. */
-  const dependencies = snapshotTopologyDependencies(dependenciesValue, nodeId, (reason, id) =>
-    onInvalid(reason, id)
-  )
+  const dependencies = snapshotTopologyDependencies(dependenciesValue, nodeId, onInvalid)
   return Object.freeze({
     id: nodeId,
     dependencies,
@@ -102,7 +102,7 @@ function snapshotTopologyNode(
 /** Copies and validates all public node and required-edge facts before graph traversal. */
 function snapshotTopologyNodes(
   nodes: readonly ITopologyNode[],
-  onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never
+  onInvalid: ITopologySnapshotFailure
 ): readonly ITopologyNode[] {
   if (!Array.isArray(nodes)) onInvalid(TopologyInvalidReason.invalidNode)
   const candidates: unknown[] = nodes.slice() as unknown[]
@@ -127,9 +127,11 @@ export function buildCapabilityTopology(
   nodes: readonly ITopologyNode[],
   onUnknownProvider: (nodeId: string, provider: string) => never,
   onCycle: (path: readonly string[]) => never,
-  onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never
+  onInvalid: ITopologySnapshotFailure
 ): ICapabilityTopology {
-  const snapshots = snapshotTopologyNodes(nodes, onInvalid)
+  /** Caller policy selects the shell; the shared admission boundary keeps captured causes reachable. */
+  const invalid = retainTopologyFailure(onInvalid)
+  const snapshots = snapshotTopologyNodes(nodes, invalid)
   /** IDs admitted by the hostile-input snapshot. */
   const nodeIds = new Set(snapshots.map((node) => node.id))
   for (const node of snapshots) {
@@ -153,7 +155,7 @@ export function buildCapabilityTopology(
         const normalized = [...cycle.slice(start), ...cycle.slice(0, start)]
         return onCycle(Object.freeze([...normalized, normalized[0]!]))
       },
-      onInvalid
+      onInvalid: invalid
     },
     [...snapshots].sort((left, right) => left.ordinal - right.ordinal)
   )

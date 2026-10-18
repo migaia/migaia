@@ -1,4 +1,8 @@
-import { snapshotTopologyDependencies, snapshotTopologyIndexNode } from './topology-admission.js'
+import {
+  retainTopologyFailure,
+  snapshotTopologyDependencies,
+  snapshotTopologyIndexNode
+} from './topology-admission.js'
 import {
   TopologyInvalidReason,
   type ICapabilityTopology,
@@ -9,7 +13,12 @@ import {
 
 export type ITopologyIndexAdapter = Readonly<{
   readonly onCycle: (path: readonly string[]) => never
-  readonly onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never
+  /** Getter failures include their exact cause; the pure owner preserves it on the thrown error. */
+  readonly onInvalid: (
+    reason: ITopologyInvalidReason,
+    nodeId?: string,
+    failure?: { readonly cause: unknown }
+  ) => never
 }>
 
 export type ITopologyIndexNode = Readonly<{
@@ -25,6 +34,11 @@ export type IGraphDependents = Readonly<{
 export type ITopologyIndexReader = Readonly<{
   readonly size: number
   has(id: string): boolean
+  /**
+   * Stable registration ordinal owned by the index; unlike snapshot ordinals, removals do not
+   * renumber it.
+   */
+  registrationOrdinal(id: string): number
   dependencies(id: string): readonly ITopologyDependency[]
   dependents(id: string): IGraphDependents
   missing(id: string): readonly ITopologyDependency[]
@@ -158,8 +172,11 @@ function createReadonlyMap<K, V>(entries: readonly (readonly [K, V])[]): Readonl
     entries: (): MapIterator<[K, V]> => lookup.entries(),
     keys: (): MapIterator<K> => lookup.keys(),
     values: (): MapIterator<V> => lookup.values(),
-    forEach: (callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void): void => {
-      for (const [key, value] of lookup) callback(value, key, facade)
+    forEach: (
+      callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
+      thisArg?: unknown
+    ): void => {
+      for (const [key, value] of lookup) Reflect.apply(callback, thisArg, [value, key, facade])
     },
     [Symbol.iterator]: (): MapIterator<[K, V]> => lookup[Symbol.iterator]()
   } as ReadonlyMap<K, V>
@@ -188,7 +205,15 @@ class TopologyIndex implements ITopologyIndex {
    * the parent's without copying them.
    */
   constructor(adapter: ITopologyIndexAdapter, parent?: TopologyIndex) {
-    this.#adapter = parent ? parent.#adapter : Object.freeze({ ...adapter })
+    if (parent) this.#adapter = parent.#adapter
+    else {
+      /** Preserve the original frozen receiver snapshot while adding the captured-cause boundary. */
+      const snapshot = Object.freeze({ ...adapter })
+      this.#adapter = Object.freeze({
+        onCycle: (path) => snapshot.onCycle(path),
+        onInvalid: retainTopologyFailure((...args) => snapshot.onInvalid(...args))
+      })
+    }
     this.#nodes = parent ? new OverlayStore(parent.#nodes) : new Map()
     this.#consumers = parent ? new OverlayStore(parent.#consumers) : new Map()
     this.#nextOrdinal = parent ? parent.#nextOrdinal : 0
@@ -202,6 +227,11 @@ class TopologyIndex implements ITopologyIndex {
   /** Reports membership with one direct node lookup. */
   has(id: string): boolean {
     return this.#nodes.has(id)
+  }
+
+  /** Reads the existing monotonic registration fact without constructing a dense static snapshot. */
+  registrationOrdinal(id: string): number {
+    return this.#requireNode(id).ordinal
   }
 
   /** Returns the frozen dependency facts for one present node. */
@@ -340,8 +370,10 @@ class TopologyIndex implements ITopologyIndex {
   /** Adds one node atomically and activates reverse-indexed dangling edges. */
   add(candidate: ITopologyIndexNode): void {
     this.#assertWritable()
-    const node = snapshotTopologyIndexNode(candidate, (reason, id) =>
-      this.#adapter.onInvalid(reason, id)
+    const node = snapshotTopologyIndexNode(candidate, (reason, id, failure) =>
+      failure === undefined
+        ? this.#adapter.onInvalid(reason, id)
+        : this.#adapter.onInvalid(reason, id, failure)
     )
     this.#addSnapshot(node)
   }
@@ -389,8 +421,10 @@ class TopologyIndex implements ITopologyIndex {
   setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void {
     this.#assertWritable()
     const node = this.#requireNode(id)
-    const snapshots = snapshotTopologyDependencies(dependencies, id, (reason, nodeId) =>
-      this.#adapter.onInvalid(reason, nodeId)
+    const snapshots = snapshotTopologyDependencies(dependencies, id, (reason, nodeId, failure) =>
+      failure === undefined
+        ? this.#adapter.onInvalid(reason, nodeId)
+        : this.#adapter.onInvalid(reason, nodeId, failure)
     )
     /** Newly introduced present providers that could close a back edge. */
     const oldProviders = new Set(node.dependencies.map((dependency) => dependency.provider))
@@ -618,6 +652,12 @@ class TopologyTransaction implements ITopologyTransaction {
   has(id: string): boolean {
     this.#assertOpen()
     return this.#working.has(id)
+  }
+
+  /** Reads the transaction's canonical ordinal while enforcing its existing closed guard. */
+  registrationOrdinal(id: string): number {
+    this.#assertOpen()
+    return this.#working.registrationOrdinal(id)
   }
 
   /** Delegates dependency reads to the transaction view. */

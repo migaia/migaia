@@ -11,6 +11,7 @@ import {
   type IReleaseDescriptor
 } from '@migaia/lifecycle'
 import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.js'
+import { invokeCapabilityReporter } from '../reporter.js'
 import { CapabilityGraphErrorText } from './error-text.js'
 import {
   createCapabilityGraphError,
@@ -181,14 +182,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
 
   const reportError = (error: unknown): void => {
     if (!onError) return
-    try {
-      const result = onError(error)
-      const probe = probeThenable(result)
-      if (probe.kind === ThenableProbeKind.thenable)
-        void assimilateCapturedThen(probe.thenFn, result).catch(() => undefined)
-    } catch {
-      // The diagnostic sink is the final boundary and cannot invalidate Graph state.
-    }
+    invokeCapabilityReporter(() => onError(error))
   }
 
   const root = createLifecycleScope({ errorPolicy: 'throw', report: reportError })
@@ -452,8 +446,12 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
       if (auxiliaryResources.has(value))
         throw fail(CapabilityGraphErrorCode.invalidNode, { nodeId: node.id })
       if (!generations.isCurrent(requestToken) || graphState !== CapabilityGraphState.starting) {
-        await provisional.rollback()
-        releaseLateResult(node, result, releaseMethod, requestSignal)
+        try {
+          await provisional.rollback()
+        } finally {
+          // Auxiliary failure cannot revoke ownership of an admitted late primary instance.
+          releaseLateResult(node, result, releaseMethod, requestSignal)
+        }
         node.state = CapabilityGraphNodeState.rolledBack
         return
       }

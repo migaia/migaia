@@ -44,7 +44,7 @@ import {
 } from '@migaia/capability'
 ```
 
-`exports` 提供包根（`.`）、静态 Graph（`./graph`）、拓扑索引（`./graph/topology`）、依赖规划器（`./graph/dependency`）与动态 Graph（`./graph/dynamic`）子路径。Host 符号从包根导入，Graph 符号按职责从对应子路径导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
+`exports` 提供包根（`.`）、静态 Graph（`./graph`）、拓扑索引（`./graph/topology`）、依赖规划器（`./graph/dependency`）与动态 Graph（`./graph/dynamic`）子路径。Host 符号从包根导入，Graph 符号按职责从对应子路径导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不向 Store、React、DOM 或 Node feature 层反向依赖；默认静态 Graph 使用 lifecycle 的 native AbortController/AbortSignal 契约，宿主仍需提供取消能力，仅支持 ESM 本身并不足够。
 
 <a id="静态-capability-graph"></a>
 
@@ -80,13 +80,15 @@ type IGraphNodeDefinition<T> = {
 
 `IGraphNodeInstance` 必须提供 `{ value, release }`。Graph 只拥有一次 primary release；auxiliary release 由 lifecycle scope 管理，节点内 primary 先于 auxiliary，节点之间按逆拓扑释放。`ready()` 与 `dispose()` 在重复调用时保留 Promise identity；启动失败后 Graph 不隐式 retry，但仍可调用 `dispose()` 收尾。
 
-`snapshotGraphReadiness(source)` 是 Host 与 Graph 之间的低层准入快照：严格按 `state`、`error` 顺序各读取一次，只接受 `ready | blocked | failed`，并返回冻结的 `{ state, error }`。原生 `Error` getter failure 保持实例身份；非 `Error` 抛出值会以 `INVALID_OPTION` 包装且保留在 `cause`。普通业务代码应读取 Graph 自身状态；只有桥接外部 readiness source 时才直接调用它。
+`snapshotGraphReadiness(source)` 是 Host 与 Graph 之间的低层准入快照：严格按 `state`、`error` 顺序各读取一次，只接受 `ready | blocked | failed`，并返回冻结的 `{ state, error }`。可附码的原生 getter Error 保持实例/类型/stack 并附 INVALID_OPTION；primitive、不可变或冲突错误通过 coded fallback 的 cause 保留（含 undefined）。普通业务代码应读取 Graph 自身状态；只有桥接外部 readiness source 时才直接调用它。
 
-Graph 状态为 `open → starting → ready | failed → quiescing → terminal`。`nodeState()` 与 `nodes` 在 terminal 后仍可读取；unknown node 抛 `GRAPH_UNKNOWN_NODE`。14 个 Graph error code 从 `CapabilityGraphErrorCode` 导出，错误保留 native Error/cause/stack，并由 `onError` 作为 diagnostics sink 接收 cleanup/late-result failure。
+Graph 状态为 `open → starting → ready | failed → quiescing → terminal`。`nodeState()` 与 `nodes` 在 terminal 后仍可读取；unknown node 抛 `GRAPH_UNKNOWN_NODE`。17 个 Graph error code 从 `CapabilityGraphErrorCode` 导出，错误保留 native Error/cause/stack，并由 `onError` 作为 diagnostics sink 接收 cleanup/late-result failure。
 
 ## 增量拓扑索引
 
-`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。
+`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `registrationOrdinal`、`add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。
+
+`registrationOrdinal(id)` 读取索引既有的单调登记序号，删除不会重编号，unknown id 仍走 onInvalid；事务 reader 同样支持且遵守 closed guard。`snapshot().ordinal` 仍是面向静态投影的连续压缩序号，两者职责不同。动态 nodeState ordinal 来自 registrationOrdinal，不另设计数器。
 
 `order()` 使用 `(level, ordinal)`：先输出较低依赖层级，同层按首次加入索引的顺序。`begin()` 返回隔离事务；事务 `commit()` 前基础索引保持不变，`rollback()` 恢复完整可观察快照。事务打开期间基础索引禁止写入，已提交或回滚的事务禁止继续读取或写入。
 
@@ -110,7 +112,7 @@ Graph 状态为 `open → starting → ready | failed → quiescing → terminal
 | `gated`      | 开关明确拒绝                               | 注册时开关不为 `true`；或 `setFlag`/`setFlags` 把某能力移出允许表                           |
 | `activating` | `activate()` 正在执行，尚未 settle         | 调用 `enable()` 且当前不是 `on`                                                             |
 | `on`         | 已启用，持有一个有效 handle                | `activate()` 成功返回合法 handle，且期间没有被回退作废                                      |
-| `failed`     | 上一次激活失败，或激活期间自身资源清理失败 | `activate()` 抛错、返回值不是带 `dispose()` 的对象；或代数匹配下的 release 出错             |
+| `failed` | 上一次激活失败 | activate 抛错或返回非法 handle；release 失败记录 error 并上报，保持 off/gated |
 
 把 `off` 和 `gated` 分开是有意为之：控制台与调用方不会把"从未尝试启用"误报成"被灰度策略拦截"——两者的排查方向完全不同；同时与 tray 的 graph availability `blocked` 状态在名字上区分开，两者是完全不同的恢复语义，不共用一个状态名。
 
@@ -124,10 +126,10 @@ const CapabilityState = {
   on: 'on',
   failed: 'failed'
 } as const
-type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]
+type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState]
 ```
 
-`state-constants.ts` 经主入口 `export *` 一并导出 `ICapabilityStateValue`（与 `ICapabilityState` 同一个联合类型，命名历史遗留、两者等价）。
+只保留 canonical `ICapabilityState`；不提供重复 Value alias。
 
 ```ts
 const CapabilityEnableStatus = {
@@ -153,8 +155,8 @@ type ICapabilityEnableResult =
 ```
 
 - `enabled` —— 激活成功并被采纳，`state` 变为 `on`。
-- `gated` —— 开关拒绝，`enable()` 直接短路，从未调用 `activate()`。
-- `cancelled` —— 激活在完成前被开关关闭或 host 释放作废（见 [Generation](#generation-races)），刚创建出的 handle 已被就地释放。
+- `gated` —— 初始 flag 拒绝时 enable 短路；已开始激活后撤回 flag 且当前仍拒绝时，late handle 被释放，结果同样是 gated。
+- `cancelled` —— 激活在完成前被 disable、host dispose 或代际替换作废；flag 撤回且当前仍拒绝时返回 gated（见 [Generation](#generation-races)），刚创建出的 handle 已被就地释放。
 - `failed` —— `activate()` 抛错，或返回值不是"带可调用 `dispose` 的对象"；`error` 字段携带原始失败原因，与 `error(name)` 查到的一致。
 
 ---
@@ -267,7 +269,7 @@ type ICapabilityHost<Context> = {
 
 #### `disable(name)`
 
-关闭并等待 handle 的 `dispose()`（含异步）真正完成后再 resolve；返回是否确实关掉了一个此前处于启用/在途状态的能力。`disposed` 优先级高于 `NOT_REGISTERED`——host 已释放时优先抛 `HOST_DISPOSED`，其次才做 name 查找。内部用"循环直到稳定"等待与该能力相关的在途激活和在途释放都清零，见[释放顺序与依赖](#释放顺序与依赖)。
+关闭并等待 handle 的 `dispose()`（含异步）真正完成后再 resolve；仅返回此前是否处于 on；activating 时仍会取消并等待清理，但返回 false。`disposed` 优先级高于 `NOT_REGISTERED`——host 已释放时优先抛 `HOST_DISPOSED`，其次才做 name 查找。内部用"循环直到稳定"等待与该能力相关的在途激活和在途释放都清零，见[释放顺序与依赖](#释放顺序与依赖)。
 
 #### `dispose()`
 
@@ -288,11 +290,11 @@ host 是否已经整体关闭；`true` 之后所有变更类方法（`register`/
 异步 `activate()` 完成时，`generationController.adopt(token, handle, releaseFn)` 会比较"发起时的 generation"和"当前 generation"：
 
 - 一致 → 正常提交，`state` 变为 `on`，handle 生效，进入 `activationOrder`。
-- 不一致（说明激活过程中开关被关掉了，或 host 已被 `dispose()`）→ **不采纳这个结果**，`adopt()` 立即调用释放回调把刚创建出的 handle 就地释放；对外表现为 `enable()` 返回 `{ status: 'cancelled' }`。
+- 不一致（说明激活过程中开关被关掉了，或 host 已被 `dispose()`）→ **不采纳这个结果**，`adopt()` 立即调用释放回调把刚创建出的 handle 就地释放；当前 flag 仍拒绝时 enable 返回 gated；disable/dispose 或其他代际作废返回 cancelled。
 
 这就是"关闭一个能力"和裸的动态 `import()` 之间的本质区别：没有这层保护，一个正在加载的 chunk 完成后会直接把开关"偷偷"打开，用户看到的是"明明关了，过几百毫秒又自己回来了"。
 
-**LIFO 释放顺序按的是真实激活完成顺序（`activationOrder` 数组的推入顺序），不是注册顺序，也不是调用 `enable()` 的顺序**——三者在并发激活下会分叉。比如先后调用 `enable('A')`、`enable('B')`，如果 B 的 `activate()` 先 resolve（比如没有 I/O），它会先进入 `activationOrder`，回退时反而先于 A 释放。这本身没问题：真正互相依赖的两个能力，调用方必须自己 `await enable('A')` 完成后再 `enable('B')`——这样 A 保证先进入顺序表，"后进先出"就自然等价于"先释放依赖 A 的 B，再释放 A"。
+**LIFO 释放顺序按的是真实激活完成顺序（`activationOrder` 数组的推入顺序），不是注册顺序，也不是调用 `enable()` 的顺序**——三者在并发激活下会分叉。比如先后调用 `enable('A')`、`enable('B')`，如果 B 的 `activate()` 先 resolve（比如没有 I/O），它先进入 `activationOrder`，A 后进入；回退时先释放 A，再释放 B。这本身没问题：真正互相依赖的两个能力，调用方必须自己 `await enable('A')` 完成后再 `enable('B')`——这样 A 保证先进入顺序表，"后进先出"就自然等价于"先释放依赖 A 的 B，再释放 A"。
 
 本包**不提供** `dependsOn` 声明，也不会把所有 `activate()` 调用强制串行化——一个被 `setFlag(false)` 废弃、永不 settle 的 `activate()` 会连带卡死排在它后面的每一个 `enable()`。需要严格顺序保证的调用方必须显式 `await`，host 不会替你保证。
 
@@ -486,8 +488,7 @@ Pure topology and incremental indexes share one private structural/edge admissio
 
 readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节点阻塞原因使用
 `@migaia/capability/graph` 的 `GraphBlockedReason`；binding 释放原因使用
-`@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。现有 `IGraphReadinessState`、
-`IGraphBindingReleaseReason` 与 diagnostic `reason` 的取值不变。动态 remove/suspend 的
+`@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。同名的 runtime/type domain 保持唯一入口；diagnostic `reason` 的取值不变。动态 remove/suspend 的
 `IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy.reject/cascade`，
 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建，
 既有错误文案、native TypeError 和 code 保持原契约。
@@ -515,3 +516,7 @@ try {
 ```
 
 这不改变 `get(consumer, provider)` 和启动 context 的依赖约束。手写 `ICapabilityGraph` 替代实现需要实现新方法；缺失 id 的错误仍为 `GRAPH_UNKNOWN_NODE`，不能把 undefined 当作不存在的标记。
+
+拓扑准入 getter 失败通过 `onInvalid(reason, nodeId?, failure?: { cause: unknown })` 传递原值；纯拓扑 owner 同时把捕获的原错保留在 adapter 抛出错误的 cause/errors 链，沿用 caller 的外壳/语义 code，原生可附加时不替换其 identity。ReadonlyMap/ReadonlySet 的 `forEach(callback, thisArg?)` 按标准 receiver 语义调用，集合仍不可变。
+
+动态 Graph 的最终 dispose 与普通 mutation 共用 FIFO，但该任务关闭排队 admission timeout；它等待已准入前序任务后执行现有 release/fence/terminal 清理，不强制中断前序任务。三个诊断 sink 的自身 throw/rejection 统一交 utils 的共享宿主异常队列。

@@ -3,13 +3,30 @@ import {
   type ITopologyDependency,
   type ITopologyInvalidReason
 } from './topology.js'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 
-/** Internal adapters may retain a getter cause; public topology adapters keep their own policy. */
+/** Getter metadata reaches caller-owned policy while the pure boundary retains the original cause. */
 export type ITopologySnapshotFailure = (
   reason: ITopologyInvalidReason,
   nodeId?: string,
   failure?: { readonly cause: unknown }
 ) => never
+
+/** Preserves captured getter failures without replacing a caller adapter's native error identity. */
+export function retainTopologyFailure(
+  onInvalid: ITopologySnapshotFailure
+): ITopologySnapshotFailure {
+  return (...args) => {
+    /** Failure presence is distinct from its payload, which may intentionally be undefined. */
+    const failure = args[2]
+    try {
+      return onInvalid(...args)
+    } catch (primary) {
+      if (failure === undefined || primary === failure.cause) throw primary
+      throw attachSecondaryErrors(primary, [failure.cause])
+    }
+  }
+}
 
 /** Structural records include callable objects, as accepted by both existing topology entries. */
 export const isTopologyRecord = (value: unknown): value is Record<string, unknown> =>

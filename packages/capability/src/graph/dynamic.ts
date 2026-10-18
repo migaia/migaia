@@ -13,6 +13,7 @@ import {
 
 export { GraphBindingReleaseReason } from './state-constants.js'
 import { CapabilityGraphErrorCode } from './error-code.js'
+import { invokeCapabilityReporter } from '../reporter.js'
 import { graphFailure, graphMessageFor } from './errors.js'
 import {
   DependencyMutationKind,
@@ -34,9 +35,9 @@ import type {
   IGraphNodeInstance
 } from './index.js'
 import {
-  containAsyncRejection,
   createMutationQueue,
-  createQuiescenceTracker
+  createQuiescenceTracker,
+  type IEnqueueOptions
 } from '@migaia/lifecycle'
 
 /** Result returned after one dynamic graph mutation commits. */
@@ -88,7 +89,10 @@ export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
    * result.
    */
   readonly report?: (error: unknown) => void
-  /** Maximum time an accepted mutation may wait behind an older serialized mutation. */
+  /**
+   * Ordinary mutation queue budget; final dispose waits in the same FIFO without this admission
+   * timeout.
+   */
   readonly mutationAdmissionMs?: number
   /** Composition-owned startup for one topologically ordered affected frontier. Required. */
   readonly startBatch: (
@@ -103,14 +107,11 @@ export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
   readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>
 }>
 
-/** Identifies why one exact graph binding generation left the graph. */
-export type IGraphBindingReleaseReason = GraphBindingReleaseReason
-
 /** Exact binding custody released after graph-owned instance cleanup. */
 export type IGraphBindingReleaseEntry<TBinding> = Readonly<{
   readonly id: IGraphNodeId
   readonly binding: TBinding
-  readonly reason: IGraphBindingReleaseReason
+  readonly reason: GraphBindingReleaseReason
 }>
 
 /** Exact binding-generation lease retained by a consumer until it no longer observes the value. */
@@ -186,11 +187,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   const bindingLeases = createQuiescenceTracker<object>()
   /** Reports secondary cleanup failures without changing the mutation primary. */
   const report = (error: unknown): void => {
-    try {
-      containAsyncRejection(options.report?.(error), () => undefined)
-    } catch {
-      // This final diagnostic sink contains its own throws and rejections without recursion.
-    }
+    invokeCapabilityReporter(() => options.report?.(error))
   }
 
   /** Constructs a canonical graph error while retaining the package-owned message. */
@@ -237,7 +234,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
    * mutation that never ran because its admission budget expired rejects with
    * `GRAPH_MUTATION_ADMISSION_TIMEOUT`, keeping the lifecycle timeout on `cause`.
    */
-  const schedule = <T>(task: () => Promise<T>): Promise<T> => {
+  const schedule = <T>(task: () => Promise<T>, enqueueOptions?: IEnqueueOptions): Promise<T> => {
     /** True once the queue admitted this mutation; separates task failures from admission timeouts. */
     let admitted = false
     return mutationQueue
@@ -246,7 +243,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         // Keep the mutation body asynchronous relative to the caller, as the former Promise chain did.
         await undefined
         return task()
-      })
+      }, enqueueOptions)
       .catch((error: unknown) => {
         if (admitted) throw error
         throw graphFailure(CapabilityGraphErrorCode.mutationAdmissionTimeout, error)
@@ -371,7 +368,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   const release = async (
     entries: readonly IStoredNode<TBinding>[],
     bindingIds: ReadonlySet<string>,
-    reason: IGraphBindingReleaseReason
+    reason: GraphBindingReleaseReason
   ): Promise<void> => {
     const leasedEntries = entries.filter((entry) => entry.instance !== undefined)
     for (const entry of leasedEntries) bindingLeases.seal(entry.leaseKey)
@@ -402,7 +399,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   const releaseBindings = async (
     entries: readonly IStoredNode<TBinding>[],
     bindingIds: ReadonlySet<string>,
-    reason: IGraphBindingReleaseReason
+    reason: GraphBindingReleaseReason
   ): Promise<void> => {
     if (!options.releaseBinding) return
     for (const entry of entries) {
@@ -522,15 +519,15 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         /** Snapshot at queue admission, preserving the existing mutation scheduling boundary. */
         const node = snapshotNode(input)
         if (definitions.has(node.id)) throw fail(CapabilityGraphErrorCode.duplicateNode)
+        topologyIndex.add({ id: node.id, dependencies: node.dependencies })
         const entry: IStoredNode<TBinding> = {
           definition: node,
-          ordinal: definitions.size,
+          ordinal: topologyIndex.registrationOrdinal(node.id),
           binding,
           state: CapabilityGraphNodeState.registered,
           generation: graphGeneration,
           leaseKey: {}
         }
-        topologyIndex.add({ id: node.id, dependencies: node.dependencies })
         invalidateDiagnostics()
         definitions.set(node.id, entry)
         graphGeneration += 1
@@ -740,22 +737,25 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     dispose() {
       if (disposePromise) return disposePromise
       graphState = CapabilityGraphState.quiescing
-      disposePromise = schedule(async () => {
-        try {
-          const entries = readOrderedEntries()
-          await release(
-            entries,
-            new Set(entries.map((entry) => entry.definition.id)),
-            GraphBindingReleaseReason.dispose
-          )
-        } finally {
-          definitions.clear()
-          for (const id of topologyIndex.order()) topologyIndex.remove(id)
-          invalidateDiagnostics()
-          graphState = CapabilityGraphState.terminal
-          graphGeneration += 1
-        }
-      })
+      disposePromise = schedule(
+        async () => {
+          try {
+            const entries = readOrderedEntries()
+            await release(
+              entries,
+              new Set(entries.map((entry) => entry.definition.id)),
+              GraphBindingReleaseReason.dispose
+            )
+          } finally {
+            definitions.clear()
+            for (const id of topologyIndex.order()) topologyIndex.remove(id)
+            invalidateDiagnostics()
+            graphState = CapabilityGraphState.terminal
+            graphGeneration += 1
+          }
+        },
+        { queueAdmissionTimeoutMs: false }
+      )
       return disposePromise
     }
   }

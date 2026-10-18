@@ -102,8 +102,11 @@ function createReadonlySet<T>(values: Iterable<T>): ReadonlySet<T> {
     entries: (): SetIterator<[T, T]> => lookup.entries(),
     keys: (): SetIterator<T> => lookup.keys(),
     values: (): SetIterator<T> => lookup.values(),
-    forEach: (callback: (value: T, value2: T, set: ReadonlySet<T>) => void): void => {
-      for (const value of lookup) callback(value, value, facade)
+    forEach: (
+      callback: (value: T, value2: T, set: ReadonlySet<T>) => void,
+      thisArg?: unknown
+    ): void => {
+      for (const value of lookup) Reflect.apply(callback, thisArg, [value, value, facade])
     },
     [Symbol.iterator]: (): SetIterator<T> => lookup[Symbol.iterator]()
   } as ReadonlySet<T>

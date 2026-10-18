@@ -1,6 +1,7 @@
 import { CapabilityErrorCode } from './error-code.js'
 import { CapabilityErrorText } from './error-text.js'
-import { createCapabilityError } from './errors.js'
+import { createCapabilityError, tagCapabilityError } from './errors.js'
+import { isNativeErrorValue } from '@migaia/utils/error'
 
 /** Read-only Host boundary consumed once during Graph admission. */
 export type ICapabilityReadinessSource = {
@@ -20,18 +21,16 @@ export const GraphReadinessState = {
 
 export type GraphReadinessState = keyof typeof GraphReadinessState
 
-/** Existing named readiness type retains the canonical availability domain. */
-export type IGraphReadinessState = GraphReadinessState
-
 /** Immutable, one-time readiness fact passed to Graph and direct consumers. */
 export type IGraphReadinessSnapshot = {
-  readonly state: IGraphReadinessState
+  readonly state: GraphReadinessState
   readonly error: unknown | undefined
 }
 
 /**
  * Reads Host readiness in fixed state-then-error order and freezes the result. Error instances
- * propagate unchanged; foreign thrown values are tagged with their original value as cause.
+ * retain native identity when annotatable and receive INVALID_OPTION; other thrown values remain
+ * reachable through cause on the coded fallback.
  */
 export function snapshotGraphReadiness(
   source: ICapabilityReadinessSource
@@ -66,7 +65,13 @@ export function snapshotGraphReadiness(
  * capability error contract.
  */
 function normalizeReadinessGetterFailure(thrown: unknown): Error {
-  if (thrown instanceof Error) return thrown
+  if (isNativeErrorValue(thrown)) {
+    try {
+      return tagCapabilityError(thrown, CapabilityErrorCode.invalidOption)
+    } catch {
+      // Immutable or foreign-coded failures retain their original identity through the fallback cause.
+    }
+  }
   return createCapabilityError(
     CapabilityErrorCode.invalidOption,
     CapabilityErrorText.optionsSnapshotFailed,

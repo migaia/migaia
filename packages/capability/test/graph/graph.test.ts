@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { walkErrorCauses } from '@migaia/utils/error'
 import {
   CapabilityGraphErrorCode,
   CapabilityGraphNodeState,
@@ -279,6 +280,12 @@ describe('capability graph core', () => {
   })
 
   it('CAP-B7 contains asynchronous diagnostic rejection without changing removal', async () => {
+    /** Terminal reporter rejection stays observable outside removal's business Promise. */
+    const callbacks: (() => void)[] = []
+    /** Inspect the existing utils host channel without crashing the test process. */
+    const queue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) => {
+      callbacks.push(callback)
+    })
     /** Binding cleanup is the original diagnostic; reporter failure must remain observer-only. */
     const cleanupFailure = new Error('binding cleanup')
     /** A real rejected Promise must be handled by the diagnostic boundary, not by the fixture. */
@@ -306,6 +313,9 @@ describe('capability graph core', () => {
     expect(reports).toEqual([cleanupFailure])
     expect(graph.nodes).toEqual([])
     await graph.dispose()
+    expect(callbacks).toHaveLength(1)
+    expect(callbacks[0]).toThrow(reporterFailure)
+    queue.mockRestore()
   })
 
   it('CG-T01 exposes the graph subpath contract and stable public nodes', () => {
@@ -1556,7 +1566,7 @@ describe('capability graph core', () => {
 
     const cleanupError = new Error('release cleanup')
     const abortGraph = createCapabilityGraph({
-      onError: (error) => expect(error).toBe(cleanupError)
+      onError: (error) => expect(walkErrorCauses(error).includes(cleanupError)).toBe(true)
     })
     abortGraph.register({
       id: id('abort'),

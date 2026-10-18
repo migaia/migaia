@@ -87,7 +87,8 @@ export const CapabilityErrorCode = {
 
   /**
    * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while
-   * snapshotting `flags` or `definition`, for example on a hostile proxy.
+   * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile
+   * proxy. Annotatable readiness getter Errors retain their native identity and receive this code.
    *
    * The gate fails closed before throwing. `cause` retains the original proxy exception by
    * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object

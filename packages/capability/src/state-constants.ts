@@ -14,6 +14,5 @@ export const CapabilityEnableStatus = {
   failed: 'failed'
 } as const
 
-export type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]
 export type ICapabilityEnableStatusValue =
   (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]

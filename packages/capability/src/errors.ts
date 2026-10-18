@@ -21,7 +21,7 @@ export function createCapabilityError(
 ): ICapabilityError {
   const error = new Error(
     message,
-    options?.cause !== undefined ? { cause: options.cause } : undefined
+    options !== undefined && 'cause' in options ? { cause: options.cause } : undefined
   )
   return attachErrorIdentity(error, { source: CAPABILITY_SOURCE, code }) as ICapabilityError
 }
