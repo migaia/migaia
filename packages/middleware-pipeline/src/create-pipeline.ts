@@ -1,7 +1,10 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.js'
-import { createMiddlewarePipelineInvalidOptionError } from './errors.js'
+import {
+  createMiddlewarePipelineInvalidOptionError,
+  identifyMiddlewarePipelineFailure
+} from './errors.js'
 import {
   adaptGeneratorStageToAsyncGenerator,
   adaptSyncStageToAsync,
@@ -24,15 +27,20 @@ import {
   MiddlewarePipelineMode,
   type IGeneratorMiddlewareSignals,
   type IMiddlewarePipelineMode,
-  type IMiddlewarePipelineViolationHandler
+  type IMiddlewarePipelineViolationHandler,
+  type IMiddlewarePipelineViolation
 } from './state-constants.js'
 
 /** Stage selected by one concrete middleware mode. */
-export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue> = {
+export type IMiddlewarePipelineStage<
+  TMode extends IMiddlewarePipelineMode,
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+> = {
   readonly sync: ISyncMiddlewareStage<TValue>
   readonly async: IAsyncMiddlewareStage<TValue>
-  readonly generator: IGeneratorMiddlewareStage<TValue>
-  readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue>
+  readonly generator: IGeneratorMiddlewareStage<TValue, TSignals>
+  readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue, TSignals>
 }[TMode]
 
 /** Modes whose execution completes before `run` returns. */
@@ -83,14 +91,18 @@ export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Read
 }>
 
 /** Stateless runner returned by `createPipeline`. */
-export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> = Readonly<{
+export type IMiddlewarePipeline<
+  TMode extends IMiddlewarePipelineMode,
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+> = Readonly<{
   readonly mode: TMode
   lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(
-    stage: IMiddlewarePipelineStage<TFrom, TValue>,
+    stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>,
     from: TFrom
-  ): IMiddlewarePipelineStage<TMode, TValue>
+  ): IMiddlewarePipelineStage<TMode, TValue, TSignals>
   run(
-    stages: readonly IMiddlewarePipelineStage<TMode, TValue>[],
+    stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[],
     value: TValue,
     done: IMiddlewarePipelineDone<TMode, TValue>,
     control?: IMiddlewarePipelineControlOptions
@@ -158,23 +170,48 @@ const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
   return Object.freeze({ undefined: undefinedSignal, halt, continue: continueSignal })
 }
 
+/** Reads one supported public option once and preserves a hostile getter as INVALID_OPTION cause. */
+const readOption = (candidate: object, key: string): unknown => {
+  /** Structural option reads belong to admission, never to a later runner transition. */
+  const read = tryReadProperty(candidate as Record<string, unknown>, key)
+  if (read.threw)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
+      cause: read.error
+    })
+  return read.value
+}
+
 /** Validates and freezes construction options before any mode-specific work begins. */
 const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
   if (!isOptionRecord(options))
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOptions)
   /** Unknown input narrowed only after object admission. */
   const candidate = options as Record<string, unknown>
-  if (!isPipelineMode(candidate.mode))
+  /** Mode is both validated and published from this one captured value. */
+  const mode = readOption(candidate, 'mode')
+  if (!isPipelineMode(mode))
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidMode)
+  /** Captured next callbacks can report after run returns, so this callback owns its boundary. */
+  const onViolation = readCallback<IMiddlewarePipelineViolationHandler>(
+    readOption(candidate, 'onViolation')
+  )
   return Object.freeze({
-    mode: candidate.mode,
+    mode,
     onViolation:
-      readCallback<IMiddlewarePipelineViolationHandler>(candidate.onViolation) ?? ignoreViolation,
-    assertActive: readCallback<() => void>(candidate.assertActive),
-    signal: candidate.signal as IAbortSignal | undefined,
-    signals: readSignals(candidate.signals),
+      onViolation === undefined
+        ? ignoreViolation
+        : (kind: IMiddlewarePipelineViolation): void => {
+            try {
+              onViolation(kind)
+            } catch (error) {
+              throw identifyMiddlewarePipelineFailure(error)
+            }
+          },
+    assertActive: readCallback<() => void>(readOption(candidate, 'assertActive')),
+    signal: readOption(candidate, 'signal') as IAbortSignal | undefined,
+    signals: readSignals(readOption(candidate, 'signals')),
     combineStageAndDownstreamError: readCallback<(stage: unknown, downstream: unknown) => unknown>(
-      candidate.combineStageAndDownstreamError
+      readOption(candidate, 'combineStageAndDownstreamError')
     )
   })
 }
@@ -188,7 +225,7 @@ const selectSignal = (
   if (!isOptionRecord(control))
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
   /** Call-time signal wins when supplied; creation signal remains the fallback. */
-  return (control as IMiddlewarePipelineControlOptions).signal ?? options.signal
+  return (readOption(control, 'signal') as IAbortSignal | undefined) ?? options.signal
 }
 
 /** Promotes one stage through the canonical existing adapter matrix. */
@@ -196,16 +233,21 @@ const liftStage = (
   target: IMiddlewarePipelineMode,
   from: IMiddlewarePipelineMode,
   stage: unknown,
-  onViolation: IMiddlewarePipelineViolationHandler
+  onViolation: IMiddlewarePipelineViolationHandler,
+  signals: IGeneratorMiddlewareSignals
 ): unknown => {
   if (target === from) return stage
   if (target === MiddlewarePipelineMode.async && from === MiddlewarePipelineMode.sync)
     return adaptSyncStageToAsync(stage as ISyncMiddlewareStage<unknown>, onViolation)
   if (target === MiddlewarePipelineMode.generator && from === MiddlewarePipelineMode.sync)
-    return adaptSyncStageToGenerator(stage as ISyncMiddlewareStage<unknown>, onViolation)
+    return adaptSyncStageToGenerator(stage as ISyncMiddlewareStage<unknown>, onViolation, signals)
   if (target === MiddlewarePipelineMode.asyncGenerator) {
     if (from === MiddlewarePipelineMode.sync)
-      return adaptSyncStageToAsyncGenerator(stage as ISyncMiddlewareStage<unknown>, onViolation)
+      return adaptSyncStageToAsyncGenerator(
+        stage as ISyncMiddlewareStage<unknown>,
+        onViolation,
+        signals
+      )
     if (from === MiddlewarePipelineMode.generator)
       return adaptGeneratorStageToAsyncGenerator(stage as IGeneratorMiddlewareStage<unknown>)
   }
@@ -289,22 +331,62 @@ export function createPipeline<TValue>(
 export function createPipeline<TValue>(
   options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>
 ): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>
+/** Creates a generator runner whose control symbols belong to the explicitly supplied set. */
+export function createPipeline<TValue>(
+  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & {
+    readonly signals: IGeneratorMiddlewareSignals
+  }
+): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>
+/** Creates an async-generator runner whose control symbols belong to the explicitly supplied set. */
+export function createPipeline<TValue>(
+  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & {
+    readonly signals: IGeneratorMiddlewareSignals
+  }
+): IMiddlewarePipeline<
+  typeof MiddlewarePipelineMode.asyncGenerator,
+  TValue,
+  IGeneratorMiddlewareSignals
+>
 /** Creates a stateless generator pipeline with a value type chosen by its caller. */
 export function createPipeline<TValue>(
-  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>
+  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & {
+    readonly signals?: undefined
+  }
 ): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>
 /** Creates a stateless async-generator pipeline with a value type chosen by its caller. */
 export function createPipeline<TValue>(
-  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>
+  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & {
+    readonly signals?: undefined
+  }
 ): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>
+/** Keeps a generic mode's explicitly supplied sentinel set separate from its payload type. */
+export function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(
+  options: ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals }
+): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>
 /** Creates a stateless runner whose mode controls stage, terminal, lift, and result types. */
 export function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(
-  options: ICreatePipelineOptions<TMode>
+  options: ICreatePipelineOptions<TMode> & { readonly signals?: undefined }
 ): IMiddlewarePipeline<TMode, TValue>
+/** Admits annotated generator options whose optional sentinel presence is known only at runtime. */
+export function createPipeline<TValue>(
+  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>
+): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>
+/** Admits annotated async-generator options without widening their payload type. */
+export function createPipeline<TValue>(
+  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>
+): IMiddlewarePipeline<
+  typeof MiddlewarePipelineMode.asyncGenerator,
+  TValue,
+  IGeneratorMiddlewareSignals
+>
+/** Admits a generic annotated mode whose optional sentinel set cannot be statically narrowed. */
+export function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(
+  options: ICreatePipelineOptions<TMode>
+): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>
 /** Normalizes options once and exposes immutable mode dispatch. */
 export function createPipeline(
   options: ICreatePipelineOptions<IMiddlewarePipelineMode>
-): IMiddlewarePipeline<IMiddlewarePipelineMode, unknown> {
+): IMiddlewarePipeline<IMiddlewarePipelineMode, unknown, IGeneratorMiddlewareSignals> {
   /** Frozen construction state shared by each independent run. */
   const normalized = readPipelineOptions(options)
   return Object.freeze({
@@ -314,13 +396,27 @@ export function createPipeline(
         throw createMiddlewarePipelineInvalidOptionError(
           MiddlewarePipelineErrorText.unsupportedLift
         )
-      return liftStage(normalized.mode, from, stage, normalized.onViolation)
+      return liftStage(normalized.mode, from, stage, normalized.onViolation, normalized.signals)
     },
     run: (
       stages: readonly unknown[],
       value: unknown,
       done: unknown,
       control?: IMiddlewarePipelineControlOptions
-    ): void | Promise<void> => runForMode(normalized.mode, normalized, stages, value, done, control)
-  }) as IMiddlewarePipeline<IMiddlewarePipelineMode, unknown>
+    ): void | Promise<void> => {
+      try {
+        /**
+         * Existing mode runners own timing and execution; only their final failure crosses this
+         * boundary.
+         */
+        const pending = runForMode(normalized.mode, normalized, stages, value, done, control)
+        if (pending)
+          return pending.catch((error: unknown) => {
+            throw identifyMiddlewarePipelineFailure(error)
+          })
+      } catch (error) {
+        throw identifyMiddlewarePipelineFailure(error)
+      }
+    }
+  }) as IMiddlewarePipeline<IMiddlewarePipelineMode, unknown, IGeneratorMiddlewareSignals>
 }

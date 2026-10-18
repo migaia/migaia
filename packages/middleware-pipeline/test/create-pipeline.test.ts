@@ -559,7 +559,7 @@ describe('createPipeline', () => {
     ).rejects.toBe(asyncGeneratorFailure)
   })
 
-  it('A8 combines an unchanged same-error pair while the signal is active', async () => {
+  it('A8 propagates one same-error identity while the signal is active', async () => {
     /** Same object occupies both channels without cancellation. */
     const downstream = new Error('downstream')
     /** Captures the exact pair and the number of combination calls. */
@@ -587,8 +587,8 @@ describe('createPipeline', () => {
         1,
         () => undefined
       )
-    ).rejects.toBe(combined)
-    expect(pairs).toEqual([[downstream, downstream]])
+    ).rejects.toBe(downstream)
+    expect(pairs).toEqual([])
   })
 
   it('A8 keeps a fire-and-forget downstream failure after abort', async () => {

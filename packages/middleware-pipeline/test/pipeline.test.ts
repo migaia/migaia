@@ -64,13 +64,8 @@ const assertNestedControlDoesNotEraseStageError = async (
       }
     })
 
-    if (outerStyle === 'void') {
-      await expect(run).rejects.toBe(stageError)
-      expect(combinations).toEqual([])
-    } else {
-      await expect(run).rejects.toThrow(`combined nested ${guard} ${outerStyle}`)
-      expect(combinations).toEqual([[stageError, stageError]])
-    }
+    await expect(run).rejects.toBe(stageError)
+    expect(combinations).toEqual([])
   }
 }
 
@@ -356,7 +351,7 @@ describe('runAsyncMiddleware', () => {
   })
 
   it.each(['await', 'return'] as const)(
-    'combines stage and downstream channels for %s next() with the same Error',
+    'propagates one failure for %s next() without combining the same Error',
     async (style) => {
       const sharedError = new Error(`same ${style} failure`)
       const combinations: unknown[][] = []
@@ -376,8 +371,8 @@ describe('runAsyncMiddleware', () => {
             return new Error('combined same failure')
           }
         })
-      ).rejects.toThrow('combined same failure')
-      expect(combinations).toEqual([[sharedError, sharedError]])
+      ).rejects.toBe(sharedError)
+      expect(combinations).toEqual([])
     }
   )
 
@@ -409,7 +404,7 @@ describe('runAsyncMiddleware', () => {
   })
 
   it.each(['then', 'catch', 'finally'] as const)(
-    'combines failures after using borrowed native Promise.prototype.%s',
+    'propagates one failure after borrowed native Promise.prototype.%s',
     async (method) => {
       const sharedError = new Error(`borrowed ${method} failure`)
       const combinations: unknown[][] = []
@@ -439,8 +434,8 @@ describe('runAsyncMiddleware', () => {
             return new Error('combined borrowed failure')
           }
         })
-      ).rejects.toThrow('combined borrowed failure')
-      expect(combinations).toEqual([[sharedError, sharedError]])
+      ).rejects.toBe(sharedError)
+      expect(combinations).toEqual([])
     }
   )
 
@@ -463,8 +458,8 @@ describe('runAsyncMiddleware', () => {
           return new Error('combined mutated constructor failure')
         }
       })
-    ).rejects.toThrow('combined mutated constructor failure')
-    expect(combinations).toEqual([[sharedError, sharedError]])
+    ).rejects.toBe(sharedError)
+    expect(combinations).toEqual([])
   })
 
   it.each([undefined, null])('throws explicit nullish combiner result: %s', async (result) => {
@@ -488,7 +483,7 @@ describe('runAsyncMiddleware', () => {
           combineStageAndDownstreamError: () => result
         }
       )
-    ).rejects.toEqual(result)
+    ).rejects.toMatchObject({ code: 'EXECUTION_FAILED', cause: result })
   })
 
   it('combines independent post-next stage and downstream failures in stage-first order', async () => {
@@ -604,7 +599,7 @@ describe('runAsyncMiddleware', () => {
           onViolation: () => undefined
         }
       )
-    ).rejects.toBeUndefined()
+    ).rejects.toMatchObject({ code: 'EXECUTION_FAILED', cause: undefined })
     await expect(
       runAsyncForTest(
         [
@@ -617,7 +612,7 @@ describe('runAsyncMiddleware', () => {
         () => undefined,
         { onViolation: () => undefined }
       )
-    ).rejects.toBeUndefined()
+    ).rejects.toMatchObject({ code: 'EXECUTION_FAILED', cause: undefined })
   })
 
   it('throws exact stage failure before a closing active check', async () => {
@@ -876,7 +871,7 @@ describe('runAsyncMiddleware', () => {
     expect(combinations).toEqual([])
   })
 
-  it('does not check active after done completes the dispatch', async () => {
+  it('checks active on the outer stage return after done', async () => {
     const activeError = new Error('host is closing')
     let active = true
     let doneCalled = false
@@ -895,7 +890,7 @@ describe('runAsyncMiddleware', () => {
           }
         }
       )
-    ).resolves.toBeUndefined()
+    ).rejects.toBe(activeError)
     expect(doneCalled).toBe(true)
   })
 

@@ -46,8 +46,8 @@ export type IGeneratorMiddlewareSignals = {
 }
 
 /** Default sentinel set paired with this package's public generator constants. */
-export const MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals = Object.freeze({
+export const MiddlewarePipelineGeneratorSignals = Object.freeze({
   undefined: GENERATOR_UNDEFINED,
   halt: GENERATOR_HALT,
   continue: GENERATOR_CONTINUE
-})
+} as const) satisfies IGeneratorMiddlewareSignals

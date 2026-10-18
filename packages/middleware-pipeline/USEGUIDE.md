@@ -30,7 +30,7 @@ const pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string>
 - `signals`：可选，generator 三个互不相同的 symbol sentinel；创建时读取并快照，不再访问调用方对象。
 - `combineStageAndDownstreamError`：可选，仅异步洋葱帧同时失败时组合两个错误。
 
-选项会被读取并冻结。无效模式、无效回调、无效 sentinel 集或不支持的提升方向都会产生原生 `TypeError`；错误附带：
+选项字段只读取一次并冻结，mode 以同一个已验证值发布；字段 getter 失败抛 TypeError/INVALID_OPTION，cause 保留原错。无效模式、无效回调、无效 sentinel 集或不支持的提升方向都会产生原生 `TypeError`；错误附带：
 
 ```ts
 error.source === '@migaia/middleware-pipeline'
@@ -200,7 +200,7 @@ await pipeline.run(stages, payload, consume, { signal: request.signal })
 
 自定义 `signal.reason` 的 getter 抛出时，抛出值按 reason 处理。
 
-`assertActive` 抛出的错误原样传播。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。
+`assertActive`、stage、done 的 Error 在可附码时保留原对象/原生类型/stack；没有 semantic source/code 时附 EXECUTION_FAILED，已有外部身份不改写。不可修改错误或非 Error 值保留在包错误的 cause；abort reason 使用 ABORTED。它用于复用 host 已有的 generation、lease 或 scope 规则，而不是在本包中重新实现生命周期。
 
 ## 5. 违约处理
 
@@ -223,8 +223,14 @@ const pipeline = createPipeline<number>({
 
 - `createPipeline` 与 `ICreatePipelineOptions`。
 - `IMiddlewarePipeline`、`IMiddlewarePipelineStage`、`IMiddlewarePipelineDone`、`IMiddlewarePipelineRunResult`、`IMiddlewarePipelineLiftSource`。
-- 四种 stage 类型，以及 context、control、abort-signal 类型。
+- 四种 stage 类型，以及 context、control 类型；IAbortSignal 从 canonical @migaia/utils/promise 导入，本包不再声称导出它。
 - `MiddlewarePipelineMode`、`MiddlewarePipelineViolation`、`MiddlewarePipelineGeneratorSignals` 和三个 generator sentinel。
 - `MiddlewarePipelineErrorCode`、`IMiddlewarePipelineErrorCode`、`MIDDLEWARE_PIPELINE_SOURCE`。
 
 具体执行器与适配器仅供包内调度，根入口不导出。消费者应通过 `createPipeline()` 切换模式和提升 stage。
+
+自定义 generator 控制集也用于 sync lift 的 halt/continue，控制 symbol 不作为 payload 送到 done。公开 IGeneratorMiddlewareStage/IAsyncGeneratorMiddlewareStage 与 IMiddlewarePipeline/IMiddlewarePipelineStage 的 TSignals 参数将控制域与 TValue 分开；提供自定义 signals 的工厂重载接受该控制集，number payload 仍为 number。默认控制集保留精确 unique symbol 类型，GENERATOR_UNDEFINED 仍要求 TValue 包含 undefined。
+
+async 洋葱返回时每个外层 stage 都复核取消/host active，包括 done 已执行的情况；这不会撤销已发生的 done。await next 传播的同一个对象失败只保留一次（相等的 primitive 值仍可能代表独立失败，保持组合），不制造两个相同 entries 的 AggregateError。独立 stage/downstream 失败才组合；combiner 自身抛错时，其原错误尽量作为 primary，两已发生错误在 errors/cause 链可达。成功返回的自定义组合结果仍需由调用方履行 cause 可达合同。
+
+IMiddlewarePipelineSyncMode 仅是 Done/RunResult 的包内条件类型中间项，已从根入口撤回。消费者使用公开 IMiddlewarePipelineDone/IMiddlewarePipelineRunResult，无兼容 alias。

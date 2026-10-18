@@ -5,8 +5,7 @@ export {
   type IMiddlewarePipelineDone,
   type IMiddlewarePipelineLiftSource,
   type IMiddlewarePipelineRunResult,
-  type IMiddlewarePipelineStage,
-  type IMiddlewarePipelineSyncMode
+  type IMiddlewarePipelineStage
 } from './create-pipeline.js'
 export {
   GENERATOR_CONTINUE,

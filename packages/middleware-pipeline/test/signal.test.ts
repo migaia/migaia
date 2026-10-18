@@ -463,7 +463,12 @@ describe('signal round 2 contract', () => {
   it('MP-T58 separately proves ordinary dual failure combiner receives both exact failures once', async () => {
     const stageFailure = new Error('stage')
     const downstreamFailure = new Error('downstream')
-    const combine = vi.fn((stage: unknown, downstream: unknown) => ({ stage, downstream }))
+    const combine = vi.fn((stage: unknown, downstream: unknown) =>
+      Object.assign(new AggregateError([stage, downstream], 'combined fixture failures'), {
+        stage,
+        downstream
+      })
+    )
     await expect(
       runAsyncForTest(
         [

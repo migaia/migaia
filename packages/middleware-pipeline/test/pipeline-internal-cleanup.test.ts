@@ -354,7 +354,7 @@ describe('pipeline internal cleanup', () => {
       .join('\n')
     const runtime = readFileSync(`${sourceDirectory}/runtime.ts`, 'utf8')
     const codes = readFileSync(`${sourceDirectory}/error-code.ts`, 'utf8')
-    expect(runtime).toMatch(/import \{ tryReadProperty \} from '@migaia\/utils\/error'/)
+    expect(runtime).toMatch(/import \{[^}]*\btryReadProperty\b[^}]*\} from '@migaia\/utils\/error'/)
     expect((runtime.match(/tryReadProperty\([^\n]*, 'reason'\)/g) ?? []).length).toBe(1)
     expect(source).not.toMatch(/\.reason\b/)
     const comment = codes.slice(

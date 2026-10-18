@@ -3,7 +3,7 @@ import { MiddlewarePipelineErrorText } from './error-text.js'
 import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
 import { admitAbortSignal } from '@migaia/utils/promise'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { tryReadProperty } from '@migaia/utils/error'
+import { tryReadProperty, attachSecondaryErrors } from '@migaia/utils/error'
 import {
   createMiddlewarePipelineAbortCleanupError,
   createMiddlewarePipelineAbortError,
@@ -11,9 +11,6 @@ import {
 } from './errors.js'
 
 import {
-  GENERATOR_CONTINUE,
-  GENERATOR_HALT,
-  GENERATOR_UNDEFINED,
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineViolation,
   type IGeneratorMiddlewareSignals,
@@ -21,9 +18,10 @@ import {
 } from './state-constants.js'
 
 /** Explicit generator result used when the payload itself may be undefined. */
-type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
-  ? typeof GENERATOR_UNDEFINED
-  : never
+type IGeneratorUndefinedSignal<
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals
+> = undefined extends TValue ? TSignals['undefined'] : never
 
 export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }
 export type IMiddlewarePipelineControlOptions = {
@@ -39,27 +37,33 @@ export type IAsyncMiddlewareStage<TValue> = (
   next: (value: TValue) => Promise<void>,
   context?: IMiddlewarePipelineContext
 ) => void | Promise<void>
-export type IGeneratorMiddlewareStage<TValue> = (
+export type IGeneratorMiddlewareStage<
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+> = (
   value: TValue,
   context?: IMiddlewarePipelineContext
 ) => Generator<
   TValue,
   | TValue
-  | IGeneratorUndefinedSignal<TValue>
-  | typeof GENERATOR_HALT
-  | typeof GENERATOR_CONTINUE
+  | IGeneratorUndefinedSignal<TValue, TSignals>
+  | TSignals['halt']
+  | TSignals['continue']
   | undefined,
   void
 >
-export type IAsyncGeneratorMiddlewareStage<TValue> = (
+export type IAsyncGeneratorMiddlewareStage<
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+> = (
   value: TValue,
   context?: IMiddlewarePipelineContext
 ) => AsyncGenerator<
   TValue,
   | TValue
-  | IGeneratorUndefinedSignal<TValue>
-  | typeof GENERATOR_HALT
-  | typeof GENERATOR_CONTINUE
+  | IGeneratorUndefinedSignal<TValue, TSignals>
+  | TSignals['halt']
+  | TSignals['continue']
   | undefined,
   void
 >
@@ -239,11 +243,15 @@ export const adaptSyncStageToAsync =
     if (guard.called()) await next(nextValue)
   }
 
-/** Adapts a sync stage to generator middleware while preserving next() violations. */
-export const adaptSyncStageToGenerator = <TValue>(
+/** Adapts a sync stage with this runner's control identities while preserving next() violations. */
+export const adaptSyncStageToGenerator = <
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+>(
   stage: ISyncMiddlewareStage<TValue>,
-  onViolation: IMiddlewarePipelineViolationHandler
-): IGeneratorMiddlewareStage<TValue> =>
+  onViolation: IMiddlewarePipelineViolationHandler,
+  signals: TSignals = MiddlewarePipelineGeneratorSignals as TSignals
+): IGeneratorMiddlewareStage<TValue, TSignals> =>
   function* (value, context) {
     let nextValue = value
     const guard = createNextGuard<TValue, void>(
@@ -255,25 +263,32 @@ export const adaptSyncStageToGenerator = <TValue>(
     )
     invokeWithContext(stage, [value, guard.next], context)
     guard.returned()
-    if (!guard.called()) return GENERATOR_HALT
+    if (!guard.called()) return signals.halt
     yield nextValue
-    return GENERATOR_CONTINUE
+    return signals.continue
   }
 
 /** Promotes a synchronous generator by delegating its yields and terminal signal. */
-export const adaptGeneratorStageToAsyncGenerator = <TValue>(
-  stage: IGeneratorMiddlewareStage<TValue>
-): IAsyncGeneratorMiddlewareStage<TValue> =>
+export const adaptGeneratorStageToAsyncGenerator = <
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+>(
+  stage: IGeneratorMiddlewareStage<TValue, TSignals>
+): IAsyncGeneratorMiddlewareStage<TValue, TSignals> =>
   async function* (value, context) {
     return yield* invokeWithContext(stage, [value], context)
   }
 
 /** Promotes a sync next-style stage through the canonical sync-to-generator violation guard. */
-export const adaptSyncStageToAsyncGenerator = <TValue>(
+export const adaptSyncStageToAsyncGenerator = <
+  TValue,
+  TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals
+>(
   stage: ISyncMiddlewareStage<TValue>,
-  onViolation: IMiddlewarePipelineViolationHandler
-): IAsyncGeneratorMiddlewareStage<TValue> =>
-  adaptGeneratorStageToAsyncGenerator(adaptSyncStageToGenerator(stage, onViolation))
+  onViolation: IMiddlewarePipelineViolationHandler,
+  signals: TSignals = MiddlewarePipelineGeneratorSignals as TSignals
+): IAsyncGeneratorMiddlewareStage<TValue, TSignals> =>
+  adaptGeneratorStageToAsyncGenerator(adaptSyncStageToGenerator(stage, onViolation, signals))
 
 /** Runs a synchronous stage sequence with one admitted signal and synchronous failure timing. */
 export const runSyncMiddleware = <TValue>(
@@ -333,7 +348,6 @@ export const runAsyncMiddleware = async <TValue>(
   /** Caller-stage identity snapshot; async dispatch never re-reads the mutable input list. */
   const stageSnapshot = stages.slice()
   let index = -1
-  let completed = false
   /** Synchronous spill records used only after the native depth guard trips. */
   const spill: Array<{
     readonly value: TValue
@@ -362,7 +376,6 @@ export const runAsyncMiddleware = async <TValue>(
     index += 1
     const stage = stageSnapshot[index]
     if (index >= stageSnapshot.length) {
-      completed = true
       check(context)
       return invokeWithContext(done, [current], context)
     }
@@ -419,23 +432,34 @@ export const runAsyncMiddleware = async <TValue>(
       throw activeError
     }
     if (hasStageError && hasDownstreamError) {
-      if (context && stageError === downstreamError && readAborted(context.signal))
+      // Equal primitive values can represent independent failures; only object identity proves aliasing.
+      if (
+        stageError !== null &&
+        (typeof stageError === 'object' || typeof stageError === 'function') &&
+        stageError === downstreamError
+      )
         throw downstreamError
       if (options.combineStageAndDownstreamError) {
-        throw options.combineStageAndDownstreamError(stageError, downstreamError)
+        /** The combiner owns a successful return; a throw must retain both preexisting failures. */
+        let combined: unknown
+        try {
+          combined = options.combineStageAndDownstreamError(stageError, downstreamError)
+        } catch (combinerFailure) {
+          throw attachSecondaryErrors(combinerFailure, [stageError, downstreamError])
+        }
+        throw combined
       }
       throw createMiddlewarePipelineExecutionError(stageError, downstreamError)
     }
     if (hasStageError) throw stageError
     if (hasDownstreamError) throw downstreamError
-    if (!completed) {
-      try {
-        check(context)
-        options.assertActive?.()
-      } catch (error) {
-        markParentActiveError(error)
-        throw error
-      }
+    // Reaching done does not exempt the returning outer onion frame from its post-stage check.
+    try {
+      check(context)
+      options.assertActive?.()
+    } catch (error) {
+      markParentActiveError(error)
+      throw error
     }
   }
   /** Drains deep requests without adding a microtask boundary to their stage entry. */

@@ -119,7 +119,7 @@ await pipeline.run(stages, input, consume, { signal: request.signal })
 ```
 
 - `run()` 的 `control.signal` 优先于构造时的 `signal`。
-- 已取消的 signal 会保留原始 reason 与原生 AbortError 语义。
+- Error reason 尽量保留原生类型/对象；未分类 Error 附 ABORTED，已有外部 source/code 不改写；primitive/undefined reason 用普通 Error/ABORTED 的 cause 保留，未必是原生 AbortError。
 - 四种 mode 都在进入 `run()`、每个 stage 开始前、每个 stage 返回后以及 `done` 前检查 signal；generator 类还会在每次迭代后检查。
 - 已开始的 stage 不会被强制打断；它可以从 `context.signal` 读取本次运行实际采用的 signal 并协作退出。
 - 用户代码已经抛出普通失败时，该失败保持为主错误，之后观察到的取消不会替换它；async stage 与下游分别失败时仍按组合器或 `EXECUTION_FAILED` 处理。
@@ -132,3 +132,9 @@ await pipeline.run(stages, input, consume, { signal: request.signal })
 根入口公开 `createPipeline`、`MiddlewarePipelineMode`、generator 信号、stage/control/context 类型，以及 `MiddlewarePipelineErrorCode` 与 `MIDDLEWARE_PIPELINE_SOURCE`。模式的具体执行器和适配器属于包内实现，不是根入口 API。
 
 完整契约和更多示例见 [USEGUIDE.md](./USEGUIDE.md)。
+
+自定义 generator 控制集也用于 sync lift 的 halt/continue，控制 symbol 不作为 payload 送到 done。公开 IGeneratorMiddlewareStage/IAsyncGeneratorMiddlewareStage 与 IMiddlewarePipeline/IMiddlewarePipelineStage 的 TSignals 参数将控制域与 TValue 分开；提供自定义 signals 的工厂重载接受该控制集，number payload 仍为 number。默认控制集保留精确 unique symbol 类型，GENERATOR_UNDEFINED 仍要求 TValue 包含 undefined。
+
+async 洋葱返回时每个外层 stage 都复核取消/host active，包括 done 已执行的情况；这不会撤销已发生的 done。await next 传播的同一个对象失败只保留一次（相等的 primitive 值仍可能代表独立失败，保持组合），不制造两个相同 entries 的 AggregateError。独立 stage/downstream 失败才组合；combiner 自身抛错时，其原错误尽量作为 primary，两已发生错误在 errors/cause 链可达。成功返回的自定义组合结果仍需由调用方履行 cause 可达合同。
+
+IMiddlewarePipelineSyncMode 仅是 Done/RunResult 的包内条件类型中间项，已从根入口撤回。消费者使用公开 IMiddlewarePipelineDone/IMiddlewarePipelineRunResult，无兼容 alias。
