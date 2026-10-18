@@ -509,26 +509,7 @@ function DocsLibrary({
   const visibleModuleName = readerFacingModuleName(locale, moduleName)
   /** Exact section inventory shared by the desktop and mobile tables of contents. */
   const onPageSections = selectedSymbol
-    ? referenceSections(
-        locale,
-        selectedSymbol,
-        Boolean(selectedGuide),
-        Boolean(selectedGuide?.options.length),
-        Boolean(selectedGuide?.examples?.length),
-        Boolean(primaryExample(selectedGuide, selectedSymbol, api!.library)),
-        [...api!.symbols, ...libraryApis.flatMap((entry) => entry.symbols)],
-        Boolean(reference?.enhancers[selectedSymbol.name]),
-        Boolean(
-          aliasedInstanceSurface(selectedSymbol, api!.symbols, reference) ||
-          (selectedSymbol.kind === 'const' &&
-            instanceGuideFor(reference, api!.module, selectedSymbol.name))
-        ),
-        symbolDocFor(reference, api!.module, selectedSymbol.name),
-        Boolean(
-          reference?.enums[`${api!.module}:${selectedSymbol.name}`] ??
-          reference?.enums[selectedSymbol.name]
-        )
-      )
+    ? referenceSections(selectedSymbol, api!, libraryApis, reference, selectedGuide)
     : api
       ? moduleReferenceSections(library.documentation, api, reference)
       : []
@@ -1142,18 +1123,26 @@ function moduleReferenceSectionLabel(locale: ILocale, section: string): string {
 
 /** Returns the actual rendered reading order for desktop and mobile API outlines. */
 function referenceSections(
-  _locale: ILocale,
   symbol: IApiSymbol,
-  _curated: boolean,
-  hasGuideOptions = false,
-  _hasGuideExamples = false,
-  hasQuickExample = false,
-  symbols: readonly IApiSymbol[] = [],
-  hasInstalledCapabilities = false,
-  hasAliasedSurface = false,
-  symbolDoc?: ILocalizedSymbolDoc,
-  hasValueGuide = false
+  api: IApi,
+  libraryApis: readonly IApi[],
+  reference?: ILocalizedReference,
+  guide?: IApiGuide
 ): string[] {
+  /** The outline uses the same projected declarations and visible instance content as the article. */
+  const symbols = [...api.symbols, ...libraryApis.flatMap((entry) => entry.symbols)]
+  const { ownSurface, instances, scenarios, symbolDoc } = referenceInstanceContent(
+    symbol,
+    api.module,
+    symbols,
+    reference
+  )
+  /** Authored enum details and installed capabilities each own one visible section. */
+  const hasValueGuide = Boolean(
+    reference?.enums[`${api.module}:${symbol.name}`] ?? reference?.enums[symbol.name]
+  )
+  /** An authored enhancer renders its own installation section. */
+  const hasInstalledCapabilities = Boolean(reference?.enhancers[symbol.name])
   /** Audited pages derive their inventory from the reference doc alone. */
   if (symbolDoc)
     return [
@@ -1165,26 +1154,20 @@ function referenceSections(
         ? ['configuration']
         : []),
       ...(hasInstalledCapabilities ? ['installed'] : []),
-      ...((symbol.kind === 'class' && instanceSurface(symbol, symbols).members.length > 0) ||
-      hasAliasedSurface
-        ? ['members']
-        : []),
-      ...(returnedInstances(symbol, symbols).length > 0 ? ['instance'] : []),
-      ...(symbolDoc.scenarios.length > 0 || symbolDoc.avoid.length > 0 ? ['scenarios'] : []),
+      ...(ownSurface ? ['members'] : []),
+      ...(instances.length > 0 ? ['instance'] : []),
+      ...(scenarios.length > 0 || symbolDoc.avoid.length > 0 ? ['scenarios'] : []),
       'related-apis',
       'signature'
     ]
   return [
     'overview',
-    ...(hasQuickExample ? ['quick-start'] : []),
+    ...(primaryExample(guide, symbol, api.library) ? ['quick-start'] : []),
     ...(hasInstalledCapabilities ? ['installed'] : []),
     ...(constantMembers(symbol).length > 0 ? ['values'] : []),
-    ...(symbol.configuration.length > 0 || hasGuideOptions ? ['configuration'] : []),
-    ...((symbol.kind === 'class' && instanceSurface(symbol, symbols).members.length > 0) ||
-    hasAliasedSurface
-      ? ['members']
-      : []),
-    ...(returnedInstances(symbol, symbols).length > 0 ? ['instance'] : []),
+    ...(symbol.configuration.length > 0 || guide?.options.length ? ['configuration'] : []),
+    ...(ownSurface ? ['members'] : []),
+    ...(instances.length > 0 ? ['instance'] : []),
     ...(symbol.errors.some(
       (error) => error.trim() && !error.startsWith('No documented errors are declared for ')
     )
@@ -2137,7 +2120,6 @@ function ValueList({
     <ul className="value-list">
       {values.map((entry) => {
         /** Literal of a constant-backed value, read from the constant's declaration. */
-        /** Inline code keeps its contents while dropping only the visible Markdown delimiters. */
         const literal = entry.constant
           ? constantMembers(
               symbols.find((symbol) => symbol.name === entry.constant) ?? ({} as IApiSymbol)
@@ -2363,6 +2345,65 @@ function withoutFieldPreamble(name: string, text: string): string {
   )
 }
 
+/** Shares visible instance ownership and scenarios between the article and its outline. */
+function referenceInstanceContent(
+  symbol: IApiSymbol,
+  module: string,
+  symbols: readonly IApiSymbol[],
+  reference?: ILocalizedReference
+) {
+  /** Factories may own lifecycle guidance that belongs with their first returned instance. */
+  const ownGuide = instanceGuideFor(reference, module, symbol.name)
+  /** Resolve the same class or aliased object surface without expanding the loader projection. */
+  const declaredSurface =
+    symbol.kind === 'class'
+      ? instanceSurface(symbol, symbols)
+      : (aliasedInstanceSurface(symbol, symbols, reference) ??
+        (symbol.kind === 'const' && ownGuide ? instanceSurface(symbol, symbols) : undefined))
+  /** Each returned surface carries the guide the article actually displays. */
+  const instances = returnedInstances(symbol, symbols)
+    .map((instance, index) => ({
+      ...instance,
+      guide:
+        index === 0 && ownGuide
+          ? ownGuide
+          : surfaceGuideFor(reference, module, instance.type, symbols)
+    }))
+    .filter(({ surface, guide }) => surface.members.length > 0 || surface.bases.length > 0 || guide)
+  /** Callable factories show their instance once; identical object surfaces share that owner. */
+  const ownSurface =
+    declaredSurface &&
+    (declaredSurface.members.length > 0 || declaredSurface.bases.length > 0 || ownGuide) &&
+    !(isCallableApiSymbol(symbol) && instances.length > 0) &&
+    !instances.some(
+      ({ surface }) =>
+        surface.owners.length === declaredSurface.owners.length &&
+        surface.owners.every((owner, index) => owner === declaredSurface.owners[index]) &&
+        surface.bases.length === declaredSurface.bases.length &&
+        surface.bases.every((base, index) => base === declaredSurface.bases[index]) &&
+        surface.members.length === declaredSurface.members.length &&
+        surface.members.every(
+          (member, index) => member.signature === declaredSurface.members[index]?.signature
+        )
+    )
+      ? declaredSurface
+      : undefined
+  /** Only scenarios in a visible guide can replace the corresponding API explanation. */
+  const instanceScenarios = [
+    ...(ownSurface ? (ownGuide?.scenarios ?? []) : []),
+    ...instances.flatMap(({ guide }) => guide?.scenarios ?? [])
+  ]
+  /** Maintained API scenarios remain available when no displayed instance owns them. */
+  const symbolDoc = symbolDocFor(reference, module, symbol.name)
+  /** Different API scenarios retain their own section instead of disappearing with a hidden guide. */
+  const scenarios =
+    symbolDoc?.scenarios.filter(
+      (scenario) =>
+        !instanceScenarios.some((instanceScenario) => sameProseIncluded(instanceScenario, scenario))
+    ) ?? []
+  return { ownGuide, ownSurface, instances, scenarios, symbolDoc }
+}
+
 /** Renders one runtime API as a focused reference article with subordinate typing. */
 function SingleApiReference({
   guide,
@@ -2397,31 +2438,13 @@ function SingleApiReference({
    * in full, and the types they name as compact links (their empty signature ends the walk).
    */
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
-  /** Constants can own a documented object surface without naming a separate instance alias. */
-  const ownGuide = instanceGuideFor(reference, api.module, symbol.name)
-  /** A class page documents its own (and inherited) instance members in the main flow. */
-  const ownSurface =
-    symbol.kind === 'class'
-      ? instanceSurface(symbol, symbols)
-      : (aliasedInstanceSurface(symbol, symbols, reference) ??
-        (symbol.kind === 'const' && ownGuide ? instanceSurface(symbol, symbols) : undefined))
-  /** A factory page documents the methods of the instance it returns. */
-  const instances = returnedInstances(symbol, symbols)
-  /** Reference doc of an audited library; every sentence below comes from it when present. */
-  const symbolDoc = symbolDocFor(reference, api.module, symbol.name)
-  /** A factory's instance guide owns scenarios shared with its API definition. */
-  const instanceScenarios = [
-    ...(ownGuide?.scenarios ?? []),
-    ...instances.flatMap(
-      ({ type }) => surfaceGuideFor(reference, api.module, type, symbols)?.scenarios ?? []
-    )
-  ]
-  /** API-only scenarios remain beside the API; shared instance scenarios appear once below. */
-  const scenarios =
-    symbolDoc?.scenarios.filter(
-      (scenario) =>
-        !instanceScenarios.some((instanceScenario) => sameProseIncluded(instanceScenario, scenario))
-    ) ?? []
+  /** Article and outline share the final visible instance and scenario inventory. */
+  const { ownGuide, ownSurface, instances, scenarios, symbolDoc } = referenceInstanceContent(
+    symbol,
+    api.module,
+    symbols,
+    reference
+  )
   /** Only the maintained opening sentence introduces the API outside audited libraries. */
   const purpose = symbolDoc
     ? symbolDoc.purpose
@@ -2887,19 +2910,7 @@ function SingleApiReference({
           symbol={symbol}
         />
       ) : null}
-      {ownSurface &&
-      !(isCallableApiSymbol(symbol) && instances.length > 0) &&
-      !instances.some(
-        ({ surface }) =>
-          surface.owners.length === ownSurface.owners.length &&
-          surface.owners.every((owner, index) => owner === ownSurface.owners[index]) &&
-          surface.bases.length === ownSurface.bases.length &&
-          surface.bases.every((base, index) => base === ownSurface.bases[index]) &&
-          surface.members.length === ownSurface.members.length &&
-          surface.members.every(
-            (member, index) => member.signature === ownSurface.members[index]?.signature
-          )
-      ) ? (
+      {ownSurface ? (
         <ClassMemberReference
           api={api}
           bases={ownSurface.bases}
@@ -2912,7 +2923,7 @@ function SingleApiReference({
           symbol={symbol}
         />
       ) : null}
-      {instances.map(({ type, surface }, index) => (
+      {instances.map(({ type, surface, guide }, index) => (
         <ClassMemberReference
           api={api}
           bases={surface.bases}
@@ -2928,11 +2939,7 @@ function SingleApiReference({
           key={type.name}
           libraryApis={libraryApis}
           locale={locale}
-          guide={
-            index === 0 && ownGuide
-              ? ownGuide
-              : surfaceGuideFor(reference, api.module, type, symbols)
-          }
+          guide={guide}
           memberDoc={memberDocResolver(reference, api.module, [symbol.name, ...surface.owners])}
           members={surface.members}
           strict={Boolean(reference)}
