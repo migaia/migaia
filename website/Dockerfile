@@ -13,7 +13,9 @@ COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 COPY . .
 ENV WEBSITE_BASE=/migaia/
-RUN bun --bun react-router build && bun --bun pagefind --site build/client
+# Index the basename directory so Pagefind URLs are /zh/... ; indexing build/client would record
+# /migaia/zh/... and the runtime's derived /migaia/ base URL would double the prefix into a 404.
+RUN bun --bun react-router build && bun --bun pagefind --site build/client/migaia
 
 # Caddy: official static release binary, checked against the release checksum list.
 FROM debian:trixie-slim AS caddy
@@ -29,10 +31,9 @@ RUN grep " caddy_${CADDY_VERSION}_linux_${TARGETARCH}.tar.gz\$" caddy_${CADDY_VE
 FROM gcr.io/distroless/static-debian13:nonroot
 COPY --from=caddy /tmp/caddy/caddy /usr/bin/caddy
 COPY docker/Caddyfile /etc/caddy/Caddyfile
-# React Router writes basename pages to build/client/migaia/, but assets and the Pagefind
-# bundle stay at build/client/; their URLs are /migaia/assets and /migaia/pagefind.
+# React Router writes basename pages to build/client/migaia/ (Pagefind writes its bundle there
+# too), but assets stay at build/client/; their URLs are /migaia/assets and /migaia/pagefind.
 COPY --from=build /website/build/client/migaia /srv/migaia
 COPY --from=build /website/build/client/assets /srv/migaia/assets
-COPY --from=build /website/build/client/pagefind /srv/migaia/pagefind
 EXPOSE 8080
 ENTRYPOINT ["/usr/bin/caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

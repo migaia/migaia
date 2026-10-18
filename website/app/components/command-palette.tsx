@@ -32,6 +32,10 @@ type IPagefindHit = {
 
 /** Subset of the Pagefind runtime this palette calls. */
 type IPagefind = {
+  /** Sets init options; `language` picks the per-locale index before the next search loads it. */
+  readonly options: (options: { readonly language: ILocale }) => Promise<void>
+  /** Drops the loaded index so the next `options` + `search` loads another language. */
+  readonly destroy: () => Promise<void>
   readonly search: (query: string) => Promise<{
     readonly results: readonly { readonly data: () => Promise<IPagefindHit> }[]
   } | null>
@@ -85,12 +89,19 @@ export default function CommandPalette({
   const [active, setActive] = useState(0)
   /** Lazily loaded Pagefind module; null when the index is unavailable (local dev). */
   const pagefindRef = useRef<Promise<IPagefind | null> | undefined>(undefined)
+  /**
+   * Locale whose index the Pagefind singleton holds. Pagefind binds one language at first search,
+   * so a client-side language switch must reload it or results stay in the previous language.
+   */
+  const indexLocaleRef = useRef<ILocale | undefined>(undefined)
   /** Scroll container used to keep the active row visible. */
   const listRef = useRef<HTMLDivElement>(null)
 
   /** Library rows match slug or description; an empty query lists every library. */
   const libraries = useMemo<readonly IPaletteItem[]>(() => {
     const needle = query.trim().toLowerCase()
+    /** Slug form of the query, so `store light` still matches `store-light`. */
+    const slugNeedle = needle.replace(/\s+/g, '-')
     const rows = LIBRARY_INDEX.map((library) => ({
       key: `library:${library.slug}`,
       group: 'libraries' as const,
@@ -98,7 +109,8 @@ export default function CommandPalette({
       detail: libraryReferenceDescription(locale, library.slug),
       to: domainPath(locale, library.slug)
     })).filter(
-      (row) => !needle || row.title.includes(needle) || row.detail.toLowerCase().includes(needle)
+      (row) =>
+        !needle || row.title.includes(slugNeedle) || row.detail.toLowerCase().includes(needle)
     )
     return needle ? rows.slice(0, MAX_LIBRARY_RESULTS) : rows
   }, [locale, query])
@@ -127,6 +139,11 @@ export default function CommandPalette({
       /** Resolved hit data; a failed query reports and shows the empty state. */
       let hits: readonly IPagefindHit[] = []
       try {
+        if (pagefind && indexLocaleRef.current !== locale) {
+          await pagefind.destroy()
+          await pagefind.options({ language: locale })
+          indexLocaleRef.current = locale
+        }
         const response = pagefind ? await pagefind.search(needle) : null
         hits = await Promise.all(
           (response?.results ?? []).slice(0, MAX_PAGE_RESULTS).map((result) => result.data())
@@ -150,7 +167,7 @@ export default function CommandPalette({
       stale = true
       window.clearTimeout(timer)
     }
-  }, [open, query])
+  }, [locale, open, query])
 
   /** Flat keyboard order: libraries first, then pages. */
   const items = useMemo(() => [...libraries, ...pages], [libraries, pages])
