@@ -8,7 +8,7 @@ Rust 编译的 WASM 字节暂存区和 JSON ⇄ MessagePack 转码器。它提�
 pnpm add @migaia/wasm
 ```
 
-包内包含 wasm-pack 生成的 ES module 和 `.wasm` 资源。修改 Rust 实现后，用 `pnpm run build` 重新生成 `src/`；不要手工编辑生成文件。
+包内包含 wasm-pack 生成的 ES module 和 `.wasm` 资源。修改 Rust 实现后，用 `pnpm run build` 重新生成 `src/`；build 随后通过 scripts/finalize-glue.ts 给既有 finalizer 加入一次发布规则，不手工编辑生成文件。
 
 ## API
 
@@ -28,27 +28,37 @@ import init, {
 转码函数都返回同一次操作绑定的 `ConversionResult`：
 
 ```ts
-type ConversionResult = {
-  readonly id: number // 成功时的新输出分配，失败时为 0
-  readonly len: number // 精确输出长度，失败时为 0
-  readonly error: string // 成功为空串，失败为原因
-}
+import type { ConversionResult } from '@migaia/wasm'
+declare const result: ConversionResult
+result.id // 成功时的新输出分配，失败时为 0
+result.len // 精确输出长度，失败时为 0
+result.error // 成功为空串，失败为原因
+result.free() // 独立释放 wasm-bindgen 结果元数据，不释放输出 arena
 ```
 
 ```ts
 const wasm = await init()
+const json = new TextEncoder().encode(JSON.stringify({ count: 2 }))
 const input = alloc_bytes(json.length)
-new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)
-
-const result = json_to_msgpack(input, json.length)
-if (result.id === 0) throw new Error(result.error)
-const packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()
-
-dealloc_bytes(input)
-dealloc_bytes(result.id)
+let outputId = 0
+try {
+  new Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)
+  const result = json_to_msgpack(input, json.length)
+  try {
+    outputId = result.id
+    if (outputId === 0) throw new Error(result.error)
+    const packed = new Uint8Array(wasm.memory.buffer, ptr_of(outputId), result.len).slice()
+    console.log(packed.byteLength)
+  } finally {
+    result.free()
+  }
+} finally {
+  dealloc_bytes(input)
+  if (outputId !== 0) dealloc_bytes(outputId)
+}
 ```
 
-`msgpack_to_json` 具有对称签名。输入必须是单个完整文档；尾随非空白字节会失败。成功和失败都只通过当前返回值报告，不存在全局“上一次结果”或兼容别名，因此两个调用的结果可以安全地交错保存。输入分配不会由转码自动释放。
+`msgpack_to_json` 具有对称签名。输入必须是单个完整文档；尾随非空白字节会失败。成功和失败都只通过当前返回值报告，不存在全局“上一次结果”或兼容别名，因此两个调用的结果可以安全地交错保存。输入分配不会由转码自动释放。每次成功和失败的结果元数据均须 free()；元数据与 arena 分配是两个独立的所有权。
 
 `json_to_msgpack` 保持 map key 为字符串并直接从 reader 转到 writer，不先构造 `serde_json::Value`；`msgpack_to_json` 同样保持单文档边界。
 
@@ -63,11 +73,19 @@ arena 使用 `Vec<u64>`，保证指针适合 `Float64Array`/`BigInt64Array`。WA
 每次转码返回独立的 `ConversionResult`，因此可以先保留多个结果，再按业务顺序读取。输入 id 和成功结果 id 都归调用者所有；用 `try/finally` 把释放收拢到同一个边界，避免异常路径泄漏 arena 分配：
 
 ```ts
-import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'
+import init, {
+  alloc_bytes,
+  dealloc_bytes,
+  json_to_msgpack,
+  ptr_of,
+  type ConversionResult
+} from '@migaia/wasm'
 
 const wasm = await init()
 
-function writeJson(value: unknown): { id: number; length: number } {
+type IJsonAllocation = { id: number; length: number }
+
+function writeJson(value: unknown): IJsonAllocation {
   const bytes = new TextEncoder().encode(JSON.stringify(value))
   const id = alloc_bytes(bytes.length)
   if (id === 0) throw new Error('WASM arena allocation failed')
@@ -75,23 +93,23 @@ function writeJson(value: unknown): { id: number; length: number } {
   return { id, length: bytes.length }
 }
 
-const firstInput = writeJson({ id: 1, status: 'ready' })
-const secondInput = writeJson({ id: 2, status: 'queued' })
-const outputIds: number[] = []
-
+const inputs: IJsonAllocation[] = []
+const results: ConversionResult[] = []
 try {
-  const first = json_to_msgpack(firstInput.id, firstInput.length)
-  const second = json_to_msgpack(secondInput.id, secondInput.length)
-  for (const result of [first, second]) {
+  inputs.push(writeJson({ id: 1, status: 'ready' }))
+  inputs.push(writeJson({ id: 2, status: 'queued' }))
+  for (const input of inputs) results.push(json_to_msgpack(input.id, input.length))
+  for (const result of results) {
     if (result.id === 0) throw new Error(result.error)
-    outputIds.push(result.id)
     const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()
     console.log(ownedCopy.byteLength)
   }
 } finally {
-  dealloc_bytes(firstInput.id)
-  dealloc_bytes(secondInput.id)
-  for (const id of outputIds) dealloc_bytes(id)
+  for (const input of inputs) dealloc_bytes(input.id)
+  for (const result of results) {
+    if (result.id !== 0) dealloc_bytes(result.id)
+    result.free()
+  }
 }
 ```
 
@@ -101,10 +119,11 @@ try {
 
 ```bash
 pnpm run build       # wasm-pack build --target web --release --out-dir ../src
-pnpm run test        # cargo test（Rust 单元/host 测试）
+pnpm run test        # wasm-pack test --node rust，再运行 JS glue 回归
+pnpm run test:rust   # cargo test（Rust 原生单元测试）
 pnpm run typecheck   # 生成声明和包配置检查
 ```
 
-生成的 `src/` 由 wasm-pack 完整覆盖。发布或验证前应执行一次确定性重复构建，并通过真实 WASM host 和 packed consumer 导入/实例化测试。
+生成的 glue/声明/WASM 先由 wasm-pack 覆盖，再由 TypeScript build 后处理固定首个 exports 的发布，避免晚完成的 init 替换已交付 memory。发布或验证前应执行一次确定性重复构建，并通过真实 WASM host 和 packed consumer 导入/实例化测试。
 
 转码的往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数不保证可逆，可能被改写或拒绝。JSON 对象直接走 map 序列化，不依赖 struct-map 配置。
