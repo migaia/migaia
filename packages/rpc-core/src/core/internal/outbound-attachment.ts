@@ -1894,26 +1894,35 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       () => this.kernel.time.scheduler.now(),
       this.#fast
     )
-    const remaining = operation.remaining(timeoutMs)
-    operation.assertActive(this.kernel.generation)
-    if (remaining === 0) throw createRpcTimeoutError()
-    /** The original options copy retains only Core's exact captured input and forward association. */
-    const callOptions = retainForwardOptions(options, { ...options, timeoutMs: remaining })
-    /** Private fields are deliberately not copied by spread; Core carries its own input explicitly. */
-    const input = readRuntimeRequestInput(options, method, data, 2)
-    if (input) retainRuntimeRequestInput(callOptions, input)
-    return this.#requestOnce<T>(
-      targetId,
-      method,
-      data,
-      callOptions,
-      this.#fast
-        ? options.signal
-          ? [options.signal]
-          : []
-        : [operation.signal, ...(options.signal ? [options.signal] : [])],
-      operation
-    ).finally(() => operation.finish())
+    try {
+      const remaining = operation.remaining(timeoutMs)
+      operation.assertActive(this.kernel.generation)
+      if (remaining === 0) throw createRpcTimeoutError()
+      /** The original options copy retains only Core's exact captured input and forward association. */
+      const callOptions = retainForwardOptions(options, { ...options, timeoutMs: remaining })
+      /**
+       * Private fields are deliberately not copied by spread; Core carries its own input
+       * explicitly.
+       */
+      const input = readRuntimeRequestInput(options, method, data, 2)
+      if (input) retainRuntimeRequestInput(callOptions, input)
+      return this.#requestOnce<T>(
+        targetId,
+        method,
+        data,
+        callOptions,
+        this.#fast
+          ? options.signal
+            ? [options.signal]
+            : []
+          : [operation.signal, ...(options.signal ? [options.signal] : [])],
+        operation
+      ).finally(() => operation.finish())
+    } catch (error) {
+      // Preserve the normal request's original finally reaction and release synchronous admission failures.
+      operation.finish()
+      throw error
+    }
   }
 
   /** Owns one request's task id, pending settlement, timeout, and abort listeners. */

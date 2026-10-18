@@ -1,6 +1,6 @@
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../../dist/core/internal/time-port.js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { raceWithAsyncControl } from '../../../dist/core/internal/async-control.js'
 
 describe('async control', () => {
@@ -167,6 +167,14 @@ describe('async control', () => {
   })
   it('observes race listener cleanup failures without replacing the result', async () => {
     const diagnostics: unknown[] = []
+    /** Reporter failure remains observable through the canonical host queue after the result wins. */
+    const reporterFailure = new Error('diagnostic failed')
+    /** Capture only this test's deliberate host exception rather than leaking it to the runner. */
+    const queued: VoidFunction[] = []
+    /** The production helper still uses the real public host queue operation. */
+    const enqueue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((task) => {
+      queued.push(task)
+    })
     const signal = {
       aborted: false,
       addEventListener() {},
@@ -174,19 +182,25 @@ describe('async control', () => {
         throw new Error('remove failed')
       }
     } as unknown as AbortSignal
-    await expect(
-      raceWithAsyncControl({
-        time: createEndpointTimePort(systemScheduler),
-        operation: () => Promise.resolve('ok'),
-        signals: [signal],
-        createTimeoutError: () => new Error('timeout'),
-        createAbortError: () => new Error('aborted'),
-        onDiagnostic: (error) => {
-          diagnostics.push(error)
-          throw new Error('diagnostic failed')
-        }
-      })
-    ).resolves.toBe('ok')
-    expect(diagnostics).toHaveLength(1)
+    try {
+      await expect(
+        raceWithAsyncControl({
+          time: createEndpointTimePort(systemScheduler),
+          operation: () => Promise.resolve('ok'),
+          signals: [signal],
+          createTimeoutError: () => new Error('timeout'),
+          createAbortError: () => new Error('aborted'),
+          onDiagnostic: (error) => {
+            diagnostics.push(error)
+            throw reporterFailure
+          }
+        })
+      ).resolves.toBe('ok')
+      expect(diagnostics).toHaveLength(1)
+      expect(queued).toHaveLength(1)
+      expect(() => queued[0]!()).toThrow(reporterFailure)
+    } finally {
+      enqueue.mockRestore()
+    }
   })
 })

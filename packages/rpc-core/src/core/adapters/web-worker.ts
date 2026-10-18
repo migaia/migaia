@@ -1,7 +1,7 @@
 import type { IRpcCarrierProbe } from '../probe/types.js'
 import { RpcCarrierDetailKey } from './probe-detail.js'
 import { carrierSizeBytes, captureTransferredContent } from './probe-content.js'
-import { createRpcTransportError, tagRpcError } from '../errors.js'
+import { createRpcTransportError, identifyRpcBoundaryFailure, tagRpcError } from '../errors.js'
 import { registerBatchAgreement } from '../internal/batch-frame.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { RpcAdapterErrorText as BrowserRpcErrorText } from './error-text.js'
@@ -44,6 +44,8 @@ export type IWebWorkerLikePort = {
 
 /** The fields this adapter reads from a native message, error or messageerror event. */
 export type IWebWorkerPortEvent = {
+  /** Native ErrorEvent retains the actual failure independently from its presentation message. */
+  readonly error?: unknown
   readonly data?: unknown
   readonly origin?: unknown
   readonly source?: unknown
@@ -154,7 +156,10 @@ export function createWebWorkerTransport(
     (reason: string) =>
     (event: IWebWorkerPortEvent): void => {
       let detail: string
+      /** Native event causes remain local diagnostic references instead of being rebuilt as text. */
+      let cause: unknown
       try {
+        cause = event?.error
         detail = safeString(
           (event as unknown as { message?: string } | undefined)?.message || reason,
           reason,
@@ -166,6 +171,7 @@ export function createWebWorkerTransport(
           }
         )
       } catch (error) {
+        cause = error
         emitTransportError(
           createRpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
         )
@@ -173,7 +179,10 @@ export function createWebWorkerTransport(
       }
       emitTransportError(
         tagRpcError(
-          new Error(BrowserRpcErrorText.workerFailure(reason, detail)),
+          new Error(
+            BrowserRpcErrorText.workerFailure(reason, detail),
+            cause === undefined ? undefined : { cause }
+          ),
           RpcCoreErrorCode.transport
         )
       )
@@ -224,7 +233,15 @@ export function createWebWorkerTransport(
           )
         }
       }
-      port.postMessage(message, transfer)
+      try {
+        port.postMessage(message, transfer)
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          BrowserRpcErrorText.nativeSendFailed
+        )
+      }
     },
     // Attached lazily on first subscriber, detached once the last one
     // leaves — a client that closes must not leave the underlying port

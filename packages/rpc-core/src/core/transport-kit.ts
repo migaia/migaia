@@ -2,6 +2,8 @@
 export type { IRpcTransport, IRpcSendOptions } from './transport.js'
 /** Stable platform and resource ownership values for adapters. */
 export { RpcPlatform, RpcTransportOwnership } from './transport-constants.js'
+/** Classify native adapter I/O failures without duplicating Core's semantic error policy. */
+export { identifyRpcBoundaryFailure } from './errors.js'
 /** Listener lifecycle and failure primitives shared by platform adapters. */
 export {
   collectListenerCleanupFailures,

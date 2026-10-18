@@ -1,3 +1,6 @@
+import { identifyRpcBoundaryFailure } from '../core/errors.js'
+import { RpcCoreErrorText } from '../core/error-text.js'
+import { resolveAbortReason } from '../core/internal/async-control.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
@@ -207,6 +210,8 @@ async function constructDefinitionPeer<TInput>(
   const key = recipe.kind === 'message' ? RuntimePluginKey.thread : RuntimePluginKey.process
   const task = captureAdapterTask(definition, original, key)
   const provenance = readRuntimePreparationContext(original)
+  /** The existing preparation signal has the same precedence for every physical source kind. */
+  const signal = task.preparation.initialSignal ?? options.signal
   const report = options.report ?? defaultRpcReporter
   /** Mutually exclusive raw source values map to the existing single-source Core grammar. */
   const sources = [original.spawn, original.connect, original.listen].filter(
@@ -229,7 +234,7 @@ async function constructDefinitionPeer<TInput>(
     get providerAdmission() {
       return provenance?.providerAdmission ?? scope?.admission
     },
-    signal: task.preparation.initialSignal ?? options.signal,
+    signal,
     ...(options.governor ? { wrapEndpoint: (endpoint) => governor!.endpoint(endpoint) } : {})
   }
   /** Caller-owned source values and presentation do not enter the accepted private agreement. */
@@ -324,6 +329,12 @@ async function constructDefinitionPeer<TInput>(
             ? (recipe.options.dial ?? recipe.options.open)
             : recipe.options.open
       if (!opening) throw createAdapterSourceConfigurationError()
+      if (signal?.aborted)
+        throw identifyRpcBoundaryFailure(
+          resolveAbortReason(signal),
+          RpcCoreErrorCode.cancelled,
+          RpcCoreErrorText.webRPCRequestCancelled
+        )
       const byte = await opening(input)
       const ipc = options.ipc ?? {
         connectionId: createAdapterId(),
@@ -345,7 +356,7 @@ async function constructDefinitionPeer<TInput>(
         scheduler,
         report,
         ipc,
-        signal: provenance?.initialSignal
+        signal
       }
       const connection = await createRuntimeByteConnection(
         byte,

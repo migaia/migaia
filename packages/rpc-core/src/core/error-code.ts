@@ -14,6 +14,11 @@ export const ERROR_SOURCE = '@migaia/rpc/core'
  */
 export const RpcCoreErrorCode = {
   /**
+   * A cold Probe listener, middleware installation callback, or diagnostic reporter throws. The
+   * original remains reachable; callers repair the callback rather than retrying side effects.
+   */
+  callbackFailed: 'CALLBACK_FAILED',
+  /**
    * BCPS1 rejects a second resolved owner instance before it constructs resources in this realm.
    * Fix dependency resolution and reload; the first instance and other realms continue normally.
    */
@@ -185,8 +190,8 @@ export const RpcCoreErrorCode = {
   /**
    * A transport send fails, a terminal event occurs, or the transport closes (`RpcTransportError`).
    *
-   * The caller checks the underlying channel state. This is a transient transport failure that can
-   * be retried, unlike a remote business failure.
+   * The code alone does not establish whether a send already executed. Retry only with independent
+   * evidence that it did not execute, or use the existing idempotency/outcome reconciliation.
    */
   transport: 'TRANSPORT',
 

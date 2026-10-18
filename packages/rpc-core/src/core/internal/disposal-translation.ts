@@ -1,5 +1,6 @@
 import { createRpcLifecycleError, type IRpcCleanupError, RpcLifecycleError } from '../errors.js'
 import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '@migaia/plugin-host'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 
 import { RpcCoreErrorText } from '../error-text.js'
 
@@ -31,29 +32,6 @@ const isPluginHostAggregateContainer = (
 ): value is Error & { readonly cause: unknown } =>
   value instanceof Error &&
   readPluginHostDisposalProvenance(value)?.kind === PluginHostDisposalNodeKind.aggregate
-
-/**
- * Reuses the native lifecycle diagnostic after cleanup has failed. This only presents the original
- * error; the host's independent finally block owns terminal state and grants no control identity.
- */
-const findLifecycleError = (
-  value: unknown,
-  seen: Set<object> = new Set()
-): RpcLifecycleError | undefined => {
-  if (value instanceof RpcLifecycleError) return value
-  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined
-  if (seen.has(value)) return undefined
-  seen.add(value)
-  if (isCleanupRecord(value)) return findLifecycleError(value.error, seen)
-  if (value instanceof AggregateError)
-    for (const child of value.errors) {
-      const lifecycleError = findLifecycleError(child, seen)
-      if (lifecycleError) return lifecycleError
-    }
-  if (isPluginHostAggregateContainer(value)) return findLifecycleError(value.cause, seen)
-  if (isPluginHostResourceWrapper(value)) return findLifecycleError(value.cause, seen)
-  return undefined
-}
 
 /**
  * Flattens PluginHost's structural cleanup containers while retaining every raw leaf in release
@@ -88,8 +66,6 @@ export const translateEndpointDisposalError = (
   error: unknown,
   cleanupErrors: readonly IRpcCleanupError[] = []
 ): RpcLifecycleError => {
-  const nestedLifecycleError = findLifecycleError(error)
-  if (nestedLifecycleError) return nestedLifecycleError
   const hostCleanupErrors = flattenHostCleanupErrors(error)
   const labeledByIdentity = new Map(
     cleanupErrors.map((cleanupError) => [cleanupError.error, cleanupError] as const)
@@ -106,11 +82,22 @@ export const translateEndpointDisposalError = (
     seenLeaves.add(cleanupError.error)
     translatedCleanupErrors.push(cleanupError)
   }
-  if (translatedCleanupErrors.length > 0)
-    return createRpcLifecycleError(
+  /** Reuse a sole diagnostic only after proving that no independent cleanup leaf would be lost. */
+  const soleFailure = translatedCleanupErrors[0]?.error
+  if (translatedCleanupErrors.length === 1 && soleFailure instanceof RpcLifecycleError)
+    return soleFailure
+  if (translatedCleanupErrors.length > 0) {
+    /** Labels remain public data while the standard cause/errors graph reaches every raw failure. */
+    const failure = createRpcLifecycleError(
       RpcCoreErrorText.endpointDisposalCleanupFailed,
       translatedCleanupErrors[0]?.error,
       translatedCleanupErrors
     )
+    attachSecondaryErrors(
+      failure,
+      translatedCleanupErrors.slice(1).map(({ error }) => error)
+    )
+    return failure
+  }
   return createRpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, error)
 }

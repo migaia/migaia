@@ -1,5 +1,8 @@
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
+import { createDisposeTransaction, DisposeTransactionKind } from '@migaia/lifecycle'
+import { drainListenerFailures } from '../../core/internal/listener-safety.js'
+import { RpcCoreErrorCode } from '../../core/error-code.js'
 import type { IRpcFeature } from '../../core/index.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { createIpcLogFeature } from '../../core/plugins/log.js'
@@ -19,7 +22,7 @@ export function attachIpcConnection(
   transport: IRpcTransport,
   ipc: IRuntimeConnectionOptions['ipc'],
   report: (error: unknown) => void,
-  _scheduler: IScheduler = systemScheduler
+  scheduler: IScheduler = systemScheduler
 ): Readonly<{
   transport: IRpcTransport
   features: readonly IRpcFeature[]
@@ -83,13 +86,24 @@ export function attachIpcConnection(
         void (async () => {
           try {
             resourcesClosed = true
-            for (const resource of resources) {
-              /** Synchronous removers preserve the original physical-close invocation order. */
-              const result = resource.close()
-              if (result !== undefined) await result
-            }
+            /** Lifecycle runs every resource followed by the physical close in the existing order. */
+            const items = [...resources, { close: () => installedTransport.close?.() }].map(
+              (resource, index) => ({
+                source: String(index),
+                descriptor: { force: () => resource.close() }
+              })
+            )
             resources.clear()
-            await installedTransport.close?.()
+            /** Collecting preserves the first original error while preventing skipped releases. */
+            const failures = await createDisposeTransaction(
+              { kind: DisposeTransactionKind.plan },
+              { errorPolicy: 'collect', scheduler }
+            ).run(items)
+            if (failures.length === 1) throw failures[0]!.error
+            drainListenerFailures(
+              failures.map(({ error }) => error),
+              { code: RpcCoreErrorCode.transport }
+            )
             done.resolve()
           } catch (error) {
             done.reject(error)

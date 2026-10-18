@@ -1,3 +1,5 @@
+import type { IRpcPlatformValue } from '../transport-constants.js'
+import { RpcErrorFamily } from '../error-family.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
@@ -5,7 +7,8 @@ import {
   createRpcError,
   createRpcLifecycleError,
   createRpcTimeoutError,
-  RpcCoreErrorCode
+  RpcCoreErrorCode,
+  tagRpcError
 } from '../errors.js'
 import { createOutboundEnvelope } from './outbound-envelope.js'
 import { RpcPlatform } from '../transport-constants.js'
@@ -17,7 +20,6 @@ import type {
   IRpcDiscoveryCandidate,
   IRpcInboundDiscoveryQuery,
   IRpcServerMetadata,
-  IRpcPlatform,
   IRpcConnectCapability,
   IRpcHookEvent,
   IRpcUuidConfig,
@@ -44,7 +46,7 @@ import type {
 import { DiscoveryRegistry } from './discovery-registry.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
 import { safeRead, tupleKey, type IRpcPropertyReadReporter } from './safe-value.js'
-import { raceWithAsyncControl } from './async-control.js'
+import { raceWithAsyncControl, resolveAbortReason } from './async-control.js'
 import type { IRpcDiscoveryCleanupFaults } from './test-observer.js'
 import { allocateRpcId } from './id.js'
 import {
@@ -100,7 +102,7 @@ type IManualInboundQuery = {
   readonly targetId: string
   readonly verifiedPeerKey: string
   readonly data: unknown
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
   readonly origin?: string
 }
 
@@ -872,8 +874,23 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.discoveryTimeoutMustBeFiniteAndNonNegative
       )
-    if (options?.signal?.aborted)
-      throw createRpcError(RpcCoreErrorCode.cancelled, RpcCoreErrorText.discoveryAborted)
+    /** One captured signal owns both pre-admission and in-flight cancellation reasons. */
+    const signal = options?.signal
+    /** Manual cancellation preserves the host-native AbortError family and exact caller reason. */
+    const createAbortError = (): DOMException => {
+      /** The original native instance retains its engine stack and standard AbortError name. */
+      const error = tagRpcError(
+        new DOMException(RpcCoreErrorText.discoveryAborted, RpcErrorFamily.abort),
+        RpcCoreErrorCode.cancelled
+      )
+      Object.defineProperty(error, 'cause', {
+        value: resolveAbortReason(signal!),
+        configurable: true,
+        writable: true
+      })
+      return error
+    }
+    if (signal?.aborted) throw createAbortError()
     const taskId = this.#makeId(targetId)
     return new Promise((resolve, reject) => {
       const settleResolve = (value: readonly IRpcDiscoveryCandidate<TTargetId>[]): void => {
@@ -893,15 +910,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         candidateKeys: new Set(),
         candidatePeerCounts: new Map(),
         timer,
-        signal: options?.signal
+        signal
       }
       this.#registry.setManualWaiter(taskId, waiter)
-      if (options?.signal) {
+      if (signal) {
         const onAbort = (): void => {
-          const abortError = createRpcError(
-            RpcCoreErrorCode.cancelled,
-            RpcCoreErrorText.discoveryAborted
-          )
+          const abortError = createAbortError()
           try {
             this.#registry.rejectManualWaiter(taskId, abortError)
           } catch (error) {
@@ -917,8 +931,8 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         }
         ;(waiter as { onAbort?: () => void }).onAbort = onAbort
         try {
-          options.signal.addEventListener('abort', onAbort, { once: true })
-          if (options.signal.aborted) onAbort()
+          signal.addEventListener('abort', onAbort, { once: true })
+          if (signal.aborted) onAbort()
         } catch (error) {
           this.#registry.deleteManualWaiter(taskId)
           timer?.clear()

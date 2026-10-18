@@ -1,13 +1,13 @@
+import type { IFactoryDiscoveryMode, IFactoryPingCapability } from './internal/factory-types.js'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRpcProviderRejection } from './provider-admission.js'
 import type {
   RpcProviderRejectionReason,
   RpcReplayCapacityNamespace
 } from './semantic-constants.js'
-import type { IRpcError } from './errors.js'
 import type { IRpcTransport } from './transport.js'
 import type { IRpcFeature } from './feature.js'
-import type { IRpcMiddlewareComponentContribution, IRpcNativeMiddleware } from './middleware.js'
+import type { IRpcNativeMiddleware } from './middleware.js'
 import type {
   IRpcEnvelope,
   IRpcFramer,
@@ -17,7 +17,7 @@ import type {
 import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/v1'
 import type { IRpcIdempotencyStore } from './idempotency-store.js'
 import type { ICodec } from '@migaia/serialize/codec'
-import type { IRpcPlatformValue as IProtocolWebRpcPlatform } from './transport-constants.js'
+import type { IRpcPlatformValue } from './transport-constants.js'
 import type { IRpcCandidateStatus, IRpcOperation } from './transport-constants.js'
 
 export type IRpcProviderResult =
@@ -169,7 +169,7 @@ export type IRpcProtocolCapability = {
 export type IRpcAuthenticationContext = {
   readonly direction: 'outbound' | 'inbound'
   readonly endpointId: string
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
 }
 export type IRpcAuthenticationTransform = (
   value: unknown,
@@ -209,12 +209,12 @@ export type IRpcConnectContext = {
   readonly origin?: string
   readonly source?: unknown
   readonly data?: unknown
-  readonly platform?: IRpcPlatform
+  readonly platform?: IRpcPlatformValue
   readonly topology?: 'exclusive' | 'multiplexed' | 'broadcast'
 }
 export type IRpcUniqueTargetIdContext = {
   readonly endpointId: string
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
 }
 export type IRpcConnectConfig = {
   /** Optional when factory.transport supplies the canonical transport. */
@@ -259,12 +259,11 @@ export type IRpcConnectCapability = Omit<IRpcConnectConfig, 'uniqueTargetId'> & 
     reportRead?: (failure: Readonly<{ key: PropertyKey; error: unknown }>) => undefined
   ) => boolean | Promise<boolean>
 }
-export type IRpcPlatform = IProtocolWebRpcPlatform
 export type IRpcServerMetadata<TTargetId extends string = string> = {
   readonly targetId: TTargetId
   readonly receiverId: string
   readonly uniqueTargetId?: string
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
   readonly origin?: string
   /**
    * Endpoint monotonic time (the endpoint scheduler's `now()`) when the receiver was registered.
@@ -297,7 +296,7 @@ export type IRpcConnectControl<TTargetId extends string = string> = {
 export type IRpcInboundDiscoveryQuery<TTargetId extends string = string> = {
   readonly targetId: TTargetId
   readonly data: unknown
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
   readonly origin?: string
   readonly accept: (data?: unknown) => Promise<boolean>
   readonly reject: (reason?: string) => Promise<boolean>
@@ -307,7 +306,7 @@ export type IRpcDiscoveryCandidate<TTargetId extends string = string> = {
   readonly targetId: TTargetId
   readonly receiverId?: string
   readonly data: unknown
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
   readonly origin?: string
 }
 export type IRpcDiscoveryControl<TTargetId extends string = string> = {
@@ -432,40 +431,6 @@ export type IRpcFactoryConfig<
     readonly timeoutMs?: number | false
   }
 }
-/**
- * Reads component slots only from native middleware definitions. The optional unique-symbol marker
- * is otherwise structurally compatible with legacy middleware and would incorrectly infer a ping
- * capability from an ordinary `connect()` descriptor.
- */
-type INativeMiddlewareComponentContribution<TMiddleware> =
-  TMiddleware extends IRpcNativeMiddleware & IRpcMiddlewareComponentContribution<infer TComponents>
-    ? TComponents
-    : never
-export type IFactoryDiscoveryMode<TMiddlewares extends readonly IRpcMiddleware[]> = [
-  Extract<
-    TMiddlewares[number] | INativeMiddlewareComponentContribution<TMiddlewares[number]>,
-    { readonly discoveryMode: 'manual' }
-  >
-] extends [never]
-  ? 'automatic'
-  : 'manual'
-/** Distinguishes an explicitly selected ping capability from the optional legacy slot. */
-type IRequiredPingCapability<TMiddleware> = TMiddleware extends object
-  ? 'pingCapability' extends keyof TMiddleware
-    ? {} extends Pick<TMiddleware, 'pingCapability'>
-      ? false
-      : TMiddleware extends { readonly pingCapability: true }
-        ? true
-        : false
-    : false
-  : false
-/** Selects the public ping surface only when a middleware actually requires that capability. */
-export type IFactoryPingCapability<TMiddlewares extends readonly IRpcMiddleware[]> =
-  true extends IRequiredPingCapability<
-    TMiddlewares[number] | INativeMiddlewareComponentContribution<TMiddlewares[number]>
-  >
-    ? true
-    : false
 export type IRpcPingEndpointSurface<TPing extends boolean> = boolean extends TPing
   ? {
       ping(targetId: string, receiverId?: string, options?: IRpcPingOptions): Promise<boolean>
@@ -518,4 +483,3 @@ export type IRpcEndpointFactory = <
 ) => Promise<
   IRpcEndpoint<TTargetId, IFactoryDiscoveryMode<TMiddlewares>, IFactoryPingCapability<TMiddlewares>>
 >
-export type IRpcPublicError = IRpcError

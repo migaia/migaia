@@ -86,7 +86,15 @@ export type IAdapterDefinition<
 > = Readonly<{
   peer<TRemote = never>(
     options: IAdapterDefinitionPeerOptions<TInput>
-  ): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>
+  ): Promise<
+    [TRemote] extends [never]
+      ? IRuntimePeer
+      : IRuntimeTypedPeer<
+          TRemote,
+          import('../remote/runtime-api/typing.js').IRuntimeFlatten<TRemote>,
+          TKey
+        >
+  >
   plugin<
     TRemote = Record<never, never>,
     const TProvide extends IRuntimePeerProvide = Record<never, never>,

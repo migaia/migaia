@@ -334,7 +334,7 @@ const server = await createEndpoint({
 })
 server.provide('add', (context) => {
   const [a, b] = context.data as [number, number]
-  return context.success(a + b) // 或 context.failed(error)
+  return context.success(a + b) // 或 context.failed('Invalid input', 'INVALID_INPUT')
 })
 const client = await createEndpoint({
   id: 'client',
@@ -367,7 +367,7 @@ try {
 
 ### 4.3 createRuntimeApiEndpoint：自定义 runtime Endpoint
 
-`createRuntimeApiEndpoint(config)` 构造支持 runtime 调用（`group`、`outcome` 等）的 Endpoint，平台包内部以及 `endpointFactory` 自定义组装时使用。它同步返回 Endpoint，使用前先 `await endpoint.ready`。
+`createRuntimeApiEndpoint(config, channel)` 使用真实 channel 构造支持 runtime 调用（`group`、`outcome` 等）的 Endpoint，平台包内部以及 `endpointFactory` 自定义组装时使用。它同步返回 Endpoint，使用前先 `await endpoint.ready`。单参数形式只适用于 `createRuntimeApiEndpoint({ binding })`，由调用方提供完整的 owned binding operations。 该 facade 的重复与同步重入 `dispose()` 共享 facade 自己的首次结算 Promise，底层 `dispose` 只调用一次。
 
 | 配置                     | 说明                                                   |
 | ------------------------ | ------------------------------------------------------ |
@@ -413,7 +413,7 @@ try {
 | ----------------------------------- | --------------------------------------------------- |
 | `contract` 的 `version`             | 本端业务契约版本                                    |
 | `contract` 的 `acceptVersions`      | 额外接受的对端契约版本列表                          |
-| `contract` 的 `maxIdentifierLength` | 方法名等标识符的最大长度                            |
+| `contract` 的 `maxIdentifierLength` | discovery 的 targetId、receiverId、uniqueTargetId 与 variation id 长度上限；不限制方法名 |
 | `contract` 的 `schemas`             | 按方法名声明参数与结果的 schema，调用时校验         |
 | `authentication` 的 `encodedType`   | 受保护帧的编码类型：`any`、`string` 或 `uint8array` |
 | `hooks` 的 `onHookError`            | 钩子监听器抛错时的回调，不影响调用本身              |
@@ -463,7 +463,7 @@ try {
 | 入口         | 函数                     | 能力                                 |
 | ------------ | ------------------------ | ------------------------------------ |
 | `./client`   | `createClientEndpoint`   | 只发起调用                           |
-| `./provider` | `createProviderEndpoint` | 只提供方法                           |
+| `./provider` | `createProviderEndpoint` | 提供方法并保留出站调用                           |
 | `./full`     | `createFullEndpoint`     | 双向                                 |
 | `./composed` | `createComposedEndpoint` | 从 `./features/*` 中显式挑选功能模块 |
 
@@ -653,6 +653,8 @@ try {
 
 `./adapter/internal-advanced` 保留原生 Process、Threads 与 JSON-RPC Bridge 仍需要的低级操作。第三方的起点是上面的两个定义函数；它们不接受成品 Peer、channel、已协商能力、可信身份或 ownership 声明。
 
+字节握手的 `auth.verify` 原始失败通过本地 `cause` 和可信 `report` 保留；发给对端的拒绝只含净化摘要，不序列化 verifier 的原始错误链。
+
 适配器自己的错误继续用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加自己的 source/code，并保留原错误在 `cause` 上；协议错误继续由原 Core/Contract owner 产生。
 
 ## 10. 错误码与处理
@@ -697,6 +699,8 @@ try {
 - `isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。
 - 错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。
 
+公开错误形状使用 `IRpcError`；平台与拓扑值域使用 `IRpcPlatformValue`、`IRpcTransportTopologyValue`。工厂组合类型从实际调用结果推导，认证 nonce 由认证 owner 内部生成。
+
 ### 10.2 Core 错误码
 
 source 均为 `@migaia/rpc/core`。
@@ -719,7 +723,6 @@ source 均为 `@migaia/rpc/core`。
 | `TARGET_NOT_IDENTIFIABLE`                          | 同名多实例无法唯一确定                              | 用 `{ name, instanceId }` 精确指定                               |
 | `ENDPOINT_DISPOSED`                                | Endpoint 已释放                                     | 新建；已发出的调用仍按原结果对账                                 |
 | `AUTHENTICATION_FAILED`                            | 认证失败                                            | 修正凭据或重建会话；不会自动重放旧消息                           |
-| `SESSION_UNKNOWN`、`CHALLENGE_INVALID`             | 认证被拒绝的具体原因：会话未知 / 质询格式不合法     | 前者丢弃缓存后重新发现；后者修正帧格式，不要盲目重试             |
 | `STREAM_RESULT_UNKNOWN`                            | 流中断，已交付的项之外结果未知                      | 业务对账后再开新流，不重放已交付的项                             |
 | `IDEMPOTENCY_RESULT_UNAVAILABLE`                   | 业务已执行，但结果未被保留                          | 对账；不要换键重执行                                             |
 | `PROVIDER_GENERATION_MISMATCH`                     | 目标代次不匹配                                      | 重新选择目标                                                     |
@@ -727,12 +730,17 @@ source 均为 `@migaia/rpc/core`。
 | `FORWARD_LOOP`、`FORWARD_HOP_LIMIT`                | 转发成环 / 超过三跳                                 | 修正转发路径，或改为直接连接                                     |
 | `PROVIDER_DUPLICATED`                              | 重复注册同名方法                                    | 修正注册                                                         |
 | `PROVIDER_NOT_SETTLED`                             | 提供方函数没有完成（未调用 success / failed）       | 修正提供方实现                                                   |
-| `PROVIDER_CONTEXT_EXPIRED`                         | 提供方在上下文过期后才完成                          | 修正提供方生命周期                                               |
+| `PROVIDER_CONTEXT_EXPIRED` | 过期 context 的 `success` / `failed` 返回 `ok:false` 与此码 | 检查返回值；修正提供方生命周期 |
 | `MIDDLEWARE_DUPLICATED`、`MIDDLEWARE_MISSING`      | 中间件重复或缺失                                    | 修正 Endpoint 组装                                               |
 | `CHUNK_INVALID`                                    | 分片重组失败                                        | 修正分帧或载体                                                   |
 | `PROPERTY_READ_FAILED`、`STRING_CONVERSION_FAILED` | 读取属性的 getter 抛错 / 无法转为字符串             | 修正输入对象                                                     |
 | `DUPLICATE_MODULE_INSTANCE`                        | 同一环境加载了两份 rpc-core                         | 修正依赖解析，然后重新加载                                       |
+| `CALLBACK_FAILED` | 冷 Probe stage listener、中间件安装或诊断 reporter 失败 | 检查原错或 cause；reporter 失败进入既有宿主异常队列 |
 | `INTERNAL`                                         | 内部错误                                            | 按 `cause` 处理，默认不自动重试                                  |
+
+认证拒绝使用 `code: AUTHENTICATION_FAILED`；`error.reason` 为 `RpcAuthenticationRejectionReason.sessionUnknown`（丢弃会话缓存后重新发现）或 `challengeInvalid`（修正帧格式）。
+
+手动 `connect.query` 的取消拒绝是带 `CANCELLED` 的原生 `DOMException` / `AbortError`，`cause` 指向调用方的 `signal.reason`。
 
 ### 10.3 Remote 错误码
 
@@ -783,6 +791,7 @@ source 均为 `@migaia/rpc/remote`。
 
 **两个包各装了一份 rpc-core？**
 会得到 `DUPLICATE_MODULE_INSTANCE`。让所有 `@migaia/rpc-*` 包解析到同一份 `@migaia/rpc-core`。
+这个检测覆盖 `exports` 指向的构建产物；直接复制或导入 `src/` 不包含检测。
 
 **能自己定义新的协议级能力吗？**
 不能。自定义中间件可以做日志、诊断、策略；新的根能力需要在 Core 内实现。
@@ -925,7 +934,9 @@ probe.setStages(['frame', 'protected']) // 恢复选定阶段。
 
 ### 13.3 Endpoint 安装与生命周期
 
-Endpoint 用户在激活前安装 `probePlugin`。Peer 用户只需传入 `probe`。Core 在激活后交付一次 descriptor；只有载体实际提供 `observe` 才调用它，释放函数由现有 resource scope 在关闭时执行。Peer 阶段覆盖 handshake、ready、exit、restart、directory 与 closing。`setStages([])` 暂停后不再构造所选事件；关闭后不再发送事件。
+Endpoint 用户在激活前安装 `probePlugin`。Peer 用户只需传入 `probe`。Core 在激活后交付一次 descriptor；只有载体实际提供 `observe` 才调用它，释放函数由现有 resource scope 在关闭时执行。Peer 阶段覆盖 handshake、ready、exit、restart、directory 与 closing。冷 `subscribeProbeStages` listener 抛错时，`setStages` 仍先通知其余 listener，使已安装 emitter 采用新 mask，再传播 `CALLBACK_FAILED`；单个可附码原生错误保留身份。
+
+`setStages([])` 暂停后不再构造所选事件；关闭后不再发送事件。
 
 ```ts doc-test=run group=useguide-probe-endpoint file=main.ts
 import assert from 'node:assert/strict'

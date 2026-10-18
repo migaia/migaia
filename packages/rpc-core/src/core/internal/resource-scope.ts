@@ -4,12 +4,24 @@ import {
   type ILifecycleScope,
   type ISyncLifecycleScope
 } from '@migaia/lifecycle'
+import { createRpcLifecycleError, type RpcLifecycleError } from '../errors.js'
+import { RpcCoreErrorText } from '../error-text.js'
 
 export type IResourceReleaseError = { readonly resource: string; readonly error: unknown }
 export type IResourceReleasePhase = 'critical' | 'application'
 
 /** Higher `order` runs first (§3.1: critical transport resources release before application ones). */
 const ORDER_BY_PHASE: Record<IResourceReleasePhase, number> = { critical: 1, application: 0 }
+
+/** Keep resource labels on a coded native error so Lifecycle need not wrap an unclassified record. */
+const releaseFailure = (
+  resource: string,
+  error: unknown
+): RpcLifecycleError & IResourceReleaseError =>
+  Object.assign(createRpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, error), {
+    resource,
+    error
+  })
 
 /**
  * Owns heterogeneous resources and releases them in reverse registration order.
@@ -46,7 +58,7 @@ export class ResourceScope {
         try {
           release()
         } catch (error) {
-          throw { resource: name, error } satisfies IResourceReleaseError
+          throw releaseFailure(name, error)
         }
       }
     })
@@ -80,7 +92,7 @@ export class ResourceScope {
         try {
           await release()
         } catch (error) {
-          throw { resource: name, error } satisfies IResourceReleaseError
+          throw releaseFailure(name, error)
         }
       }
     })
@@ -98,7 +110,10 @@ export class ResourceScope {
     const count = this.#syncCount
     this.#syncCount = 0
     this.#count -= count
-    return this.#sync.dispose().map((entry) => entry.error as IResourceReleaseError)
+    return this.#sync.dispose().map((entry) => {
+      const { resource, error } = entry.error as IResourceReleaseError
+      return { resource, error }
+    })
   }
 
   /** Releases every resource, continuing after failures and preserving order. */
@@ -119,7 +134,10 @@ export class ResourceScope {
       this.#count = 0
       resolveRelease([
         ...syncErrors,
-        ...asyncErrors.map((entry) => entry.error as IResourceReleaseError)
+        ...asyncErrors.map((entry) => {
+          const { resource, error } = entry.error as IResourceReleaseError
+          return { resource, error }
+        })
       ])
     })().catch(rejectRelease)
     return this.#releasePromise

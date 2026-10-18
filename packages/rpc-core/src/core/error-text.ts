@@ -1,5 +1,7 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** Stable fallback and wire presentation for callback failures classified by the Core owner. */
+  callbackFailed: 'RPC callback failed',
   /** Contract-only installation refuses activation until the probe-core runtime is available. */
   probeRuntimeNotInstalled: 'probe runtime not installed',
   /** The probe compiler requires one definition object before reading its configuration. */

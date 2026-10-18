@@ -2,10 +2,8 @@
 export type { IRpcCoreConfig as ILayeringNew001 } from '@migaia/rpc-core/composed'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcCoreConfig as ILayeringOld001 } from '@migaia/rpc-core/composed'
-export type { IRpcKernelSurface as ILayeringNew002 } from '@migaia/rpc-core/composed'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcKernelSurface as ILayeringOld002 } from '@migaia/rpc-core/composed'
-export type { IRpcRootProjection as ILayeringNew003 } from '@migaia/rpc-core/composed'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcRootProjection as ILayeringOld003 } from '@migaia/rpc-core/composed'
 export type { IRpcCoreErrorCode as ILayeringNew004 } from '@migaia/rpc-core'
@@ -68,7 +66,7 @@ export type { IWebRpcSendOptions as ILayeringOld022 } from '@migaia/rpc-core'
 export type { IRpcTransport as ILayeringNew023 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcTransport as ILayeringOld023 } from '@migaia/rpc-core'
-export type { IRpcTransportTopology as ILayeringNew024 } from '@migaia/rpc-core'
+export type { IRpcTransportTopologyValue as ILayeringNew024 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcTransportTopology as ILayeringOld024 } from '@migaia/rpc-core'
 export type { IRpcConstructionControl as ILayeringNew025 } from '../../dist/core/internal/construction-install.js'
@@ -329,7 +327,7 @@ export type { IWebRpcTransportEncoding as ILayeringOld110 } from '../../dist/cor
 export type { IRpcTransportOwnership as ILayeringNew111 } from '../../dist/core/transport.js'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcTransportOwnership as ILayeringOld111 } from '../../dist/core/transport.js'
-export type { IRpcTransportTopology as ILayeringNew112 } from '@migaia/rpc-core'
+export type { IRpcTransportTopologyValue as ILayeringNew112 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcTransportTopology as ILayeringOld112 } from '../../dist/core/transport.js'
 export type { IRpcAbortCapability as ILayeringNew113 } from '@migaia/rpc-core'
@@ -435,7 +433,7 @@ export type { IWebRpcPingEndpointSurface as ILayeringOld145 } from '../../dist/c
 export type { IRpcPingOptions as ILayeringNew146 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcPingOptions as ILayeringOld146 } from '../../dist/core/typing.js'
-export type { IRpcPlatform as ILayeringNew147 } from '@migaia/rpc-core'
+export type { IRpcPlatformValue as ILayeringNew147 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcPlatform as ILayeringOld147 } from '../../dist/core/typing.js'
 export type { IRpcPlugin as ILayeringNew148 } from '@migaia/rpc-core'
@@ -468,7 +466,7 @@ export type { IWebRpcProviderLimits as ILayeringOld156 } from '../../dist/core/t
 export type { IRpcProviderResult as ILayeringNew157 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcProviderResult as ILayeringOld157 } from '../../dist/core/typing.js'
-export type { IRpcPublicError as ILayeringNew158 } from '@migaia/rpc-core'
+export type { IRpcError as ILayeringNew158 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcPublicError as ILayeringOld158 } from '../../dist/core/typing.js'
 export type { IRpcSchema as ILayeringNew159 } from '@migaia/rpc-core'

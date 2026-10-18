@@ -1,3 +1,4 @@
+import type { IRpcPlatformValue } from '../transport-constants.js'
 import {
   createRpcConfigurationError,
   createRpcError,
@@ -39,7 +40,6 @@ import type {
   IRpcFactoryConfig,
   IRpcPingCapability,
   IRpcHookEvent,
-  IRpcPlatform,
   IRpcConnectCapability,
   IRpcAuthenticationCapability,
   IRpcContractCapability,
@@ -150,7 +150,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   factoryReplay: IRpcFactoryConfig['replay'],
   factoryIdempotency: IRpcIdempotencyConfig | undefined,
   transport: IRpcTransport,
-  platform: IRpcPlatform,
+  platform: IRpcPlatformValue,
   encodedType: string | undefined,
   _construction: IRpcFactoryConfig['construction'],
   components: IRpcSelectedComponents,
@@ -535,7 +535,7 @@ export async function prepareEndpoint<
   if (
     typeof send !== 'function' ||
     typeof subscribe !== 'function' ||
-    !Object.values(RpcPlatform).includes(platform as IRpcPlatform) ||
+    !Object.values(RpcPlatform).includes(platform as IRpcPlatformValue) ||
     (encodedType !== undefined &&
       encodedType !== 'any' &&
       encodedType !== 'string' &&
@@ -584,7 +584,7 @@ export async function prepareEndpoint<
         factoryReplay,
         factoryIdempotency,
         transport,
-        platform as IRpcPlatform,
+        platform as IRpcPlatformValue,
         encodedType as string | undefined,
         construction,
         components,

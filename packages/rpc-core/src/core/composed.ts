@@ -1,7 +1,14 @@
+import type {
+  IFactoryPingCapability,
+  IRecursiveProvideSurface,
+  IRpcRootProjection,
+  IRpcKernelSurface
+} from './internal/factory-types.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcConstructionError,
   createRpcError,
+  identifyRpcBoundaryFailure,
   type IRpcCleanupError,
   isLocalRpcError,
   RpcCoreErrorCode,
@@ -25,10 +32,7 @@ import {
   readFeaturePolicy
 } from './internal/feature-policy.js'
 import { createWebRpcPluginHost, type IRpcPluginHost } from './internal/web-rpc-plugin-host.js'
-import {
-  readFirstPartyPublicRoots,
-  type IRpcPublicFirstPartyRootNames
-} from './internal/first-party-roots.js'
+import { readFirstPartyPublicRoots } from './internal/first-party-roots.js'
 import {
   type IDeferredPreparedEndpoint,
   type IPreparedEndpoint,
@@ -48,11 +52,9 @@ import {
 } from './internal/test-observer.js'
 import { createEndpointProjection } from './internal/endpoint-projection.js'
 import type {
-  IFactoryPingCapability,
   IRpcEndpoint,
   IRpcFactoryConfig,
   IRpcMiddleware,
-  IRpcProvider,
   IRpcPingEndpointSurface,
   IRpcHookEvent
 } from './typing.js'
@@ -359,7 +361,7 @@ async function createComposedEndpointRuntime<
         readonly detail?: { readonly rollbackErrors?: readonly unknown[] }
       }
       if (hostFailure.code === 'PLUGIN_INSTALL_FAILED') {
-        const cause = hostFailure.cause ?? primary
+        const cause = Object.hasOwn(hostFailure, 'cause') ? hostFailure.cause : primary
         const rollbackErrors = (hostFailure.detail?.rollbackErrors ?? []).flatMap((error) =>
           error instanceof AggregateError ? [...error.errors] : [error]
         )
@@ -372,7 +374,11 @@ async function createComposedEndpointRuntime<
               error
             }))
           )
-        throw cause
+        throw identifyRpcBoundaryFailure(
+          cause,
+          RpcCoreErrorCode.callbackFailed,
+          RpcCoreErrorText.callbackFailed
+        )
       }
     } else if (kernel) {
       construction?.close()
@@ -575,39 +581,3 @@ function assertNativeRootRecord(
   )
     throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
-
-/** Mirrors the runtime branch: only private first-party roots prepare then project `public`. */
-type IRpcFeatureRootSurface<TName extends string, TFeature> =
-  TFeature extends IRpcFeature<infer TOutput>
-    ? TName extends `first-party-${string}`
-      ? TOutput extends { readonly prepare: (...args: readonly never[]) => infer TPrepared }
-        ? TPrepared extends { readonly public: infer TPublic extends object }
-          ? TPublic
-          : Record<never, never>
-        : Record<never, never>
-      : TOutput
-    : Record<never, never>
-
-/** Intersects only explicitly selected roots; private closure dependencies never widen this type. */
-export type IRpcRootProjection<TRoots extends Readonly<Record<string, IRpcFeature>>> =
-  IUnionToIntersection<
-    {
-      [TName in IRpcPublicFirstPartyRootNames<TRoots>]: IRpcFeatureRootSurface<TName, TRoots[TName]>
-    }[IRpcPublicFirstPartyRootNames<TRoots>]
-  >
-
-/** Reprojects the completed endpoint so detached `provide()` remains fluent over every surface. */
-export type IRecursiveProvideSurface<TSurface extends object> = Omit<TSurface, 'provide'> &
-  ('provide' extends keyof TSurface
-    ? {
-        provide(method: string, provider: IRpcProvider): IRecursiveProvideSurface<TSurface>
-      }
-    : {})
-
-type IUnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) extends (
-  value: infer I
-) => void
-  ? I
-  : never
-
-export type IRpcKernelSurface = Pick<IRpcEndpoint, 'dispose'>

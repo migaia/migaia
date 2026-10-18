@@ -6,7 +6,6 @@ import type {
   IRpcTransportOwnershipValue,
   IRpcTransportTopologyValue
 } from './transport-constants.js'
-export type IRpcTransportTopology = IRpcTransportTopologyValue
 export type IRpcTransportEncoding = IRpcTransportEncodingValue
 export type IRpcTransportOwnership = IRpcTransportOwnershipValue
 export type IRpcInboundMessage<T = unknown> = {
@@ -27,7 +26,7 @@ export type IRpcTransport<Message = unknown, Transfer = unknown> = {
   readonly origin?: string
   readonly platform: IRpcPlatformValue
   /** Describes whether adapter messages share one peer, many peers, or a broadcast group. */
-  readonly topology?: IRpcTransportTopology
+  readonly topology?: IRpcTransportTopologyValue
   readonly encodedType?: IRpcTransportEncoding
   readonly ownership?: IRpcTransportOwnership
   /** Adapter-owned source proof for multiplexed transports. */

@@ -1,5 +1,7 @@
 /** Stable adapters error text stays with its owner outside the root endpoint graph. */
 export const RpcAdapterErrorText = {
+  /** Native postMessage failures retain their original instance under the TRANSPORT identity. */
+  nativeSendFailed: '[rpc] native message send failed',
   /** The memory-pair factory accepts only its optional delivery scheduler configuration. */
   memoryOptions: '[rpc] memory transport options must be an object',
   /**

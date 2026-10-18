@@ -2,7 +2,10 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { bindNativeReplayTransport } from '../../core/internal/native-replay.js'
 import { registerBatchAgreement } from '../../core/internal/batch-frame.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { serializeRpcError } from '@migaia/rpc-contract'
+import {
+  registerLocalErrorWireSummary,
+  serializeRpcError
+} from '../../core/internal/error-wire-metadata.js'
 import {
   acceptRpcHandshake,
   completeRpcHandshake,
@@ -128,11 +131,20 @@ async function exchangeByteHandshake(
       )
       if (typeof principal === 'string') retainPrincipal(principal)
     } catch {
-      /** Verifier exceptions may contain the offered token and never enter any report or cause. */
+      /**
+       * Verifier exceptions may contain the offered token and never enter any report or cause
+       * (handshake redaction contract); this outranks the general rule that keeps the original
+       * error reachable.
+       */
       const rejected = createRuntimeDiagnosticError(
         diagnostics.authenticationRejected,
         undefined,
         true
+      )
+      registerLocalErrorWireSummary(
+        rejected,
+        diagnostics.authenticationRejected.code,
+        diagnostics.authenticationRejected.message
       )
       reportSafely(options.report, rejected)
       const wireError = serializeRpcError(rejected, { report: () => undefined })

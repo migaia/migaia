@@ -1,3 +1,4 @@
+import type { IRpcPlatformValue } from '../transport-constants.js'
 import { carrierSizeBytes } from '../adapters/probe-content.js'
 import {
   createRpcAuthenticationError,
@@ -26,7 +27,6 @@ import {
 import type {
   IRpcAuthenticationCapability,
   IRpcAuthenticationContext,
-  IRpcPlatform,
   ISendOptions
 } from '../typing.js'
 import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
@@ -175,7 +175,7 @@ type IRuntimeWriteRecord = Readonly<{
 
 /** Minimal canonical send port consumed by the outbound owner. */
 export type IRpcOutboundTransport = {
-  readonly platform: IRpcPlatform
+  readonly platform: IRpcPlatformValue
   readonly encodedType?: IRpcTransport['encodedType']
   send(message: unknown, options?: IRpcSendOptions): void | Promise<void>
 } & Partial<Omit<IRpcTransport, 'send' | 'platform' | 'encodedType'>>
@@ -240,7 +240,7 @@ export class RpcOutboundSender {
     id: string,
     components: IRpcSelectedComponents,
     authentication?: IRpcAuthenticationCapability,
-    platform: IRpcPlatform = transport.platform,
+    platform: IRpcPlatformValue = transport.platform,
     gate?: IRpcOutboundGate,
     reportConfiguration?: (error: unknown) => void,
     fast = false,

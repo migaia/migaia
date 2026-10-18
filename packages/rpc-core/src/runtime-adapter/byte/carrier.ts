@@ -1,4 +1,6 @@
-import { hostRethrowReporter } from '@migaia/utils/promise'
+import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
+import { createDisposeTransaction, DisposeTransactionKind } from '@migaia/lifecycle'
+import { drainListenerFailures } from '../../core/internal/listener-safety.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import {
@@ -550,15 +552,46 @@ export function bindRuntimeMessageTransport(
   /** Close releases both listener registrations before the underlying port. */
   const close = (reason?: unknown): Promise<void> => {
     if (closing) return closing
+    /** Publish before a terminal listener can synchronously join this physical teardown. */
+    const done = deferred<void>()
+    closing = done.promise
     closed = true
     probe = undefined
     terminalError = reason ?? createRuntimeDiagnosticError(diagnostics.closed)
-    for (const listener of errorListeners) listener(terminalError)
-    closing = (async () => {
-      removeMessage()
-      removeClose()
-      options.signal?.removeEventListener('abort', onAbort)
-      await channel.close()
+    for (const listener of errorListeners) {
+      try {
+        listener(terminalError)
+      } catch (error) {
+        try {
+          options.report(error)
+        } catch (failure) {
+          hostRethrowReporter(failure, IpcReporterContext)
+        }
+      }
+    }
+    void (async () => {
+      try {
+        /** The existing lifecycle executor keeps every remover ahead of the physical release. */
+        const failures = await createDisposeTransaction(
+          { kind: DisposeTransactionKind.plan },
+          { errorPolicy: 'collect' }
+        ).run(
+          [
+            removeMessage,
+            removeClose,
+            () => options.signal?.removeEventListener('abort', onAbort),
+            () => channel.close()
+          ].map((force, index) => ({ source: String(index), descriptor: { force } }))
+        )
+        if (failures.length === 1) throw failures[0]!.error
+        drainListenerFailures(
+          failures.map(({ error }) => error),
+          { code: RpcCoreErrorCode.transport }
+        )
+        done.resolve()
+      } catch (error) {
+        done.reject(error)
+      }
     })()
     return closing
   }

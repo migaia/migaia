@@ -1,6 +1,6 @@
 import { RpcCoreErrorCode } from '../error-code.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import { tagRpcError } from '../errors.js'
+import { identifyRpcBoundaryFailure, tagRpcError } from '../errors.js'
 import { RpcProbeStageName, type IRpcProbeStageName } from './constants.js'
 import { readProbeState, registerProbeState, type IRpcProbeState } from './internal.js'
 import type { IRpcProbe, IRpcProbeDefinition } from './types.js'
@@ -113,7 +113,27 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
     if (nextMask === state.stageMask) return
     state.stageMask = nextMask
     /** Each installed emitter rebuilds its existing dispatch table only on a changed mask. */
-    for (const listener of state.listeners) listener()
+    /** Listener failures cannot prevent installed emitters from adopting the committed mask. */
+    const failures: Error[] = []
+    for (const listener of state.listeners) {
+      try {
+        listener()
+      } catch (error) {
+        failures.push(
+          identifyRpcBoundaryFailure(
+            error,
+            RpcCoreErrorCode.callbackFailed,
+            RpcCoreErrorText.callbackFailed
+          )
+        )
+      }
+    }
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1)
+      throw tagRpcError(
+        new AggregateError(failures, RpcCoreErrorText.callbackFailed),
+        RpcCoreErrorCode.callbackFailed
+      )
   }
   if (hasHost) {
     /** All validation completes before the first property is attached to the original host. */

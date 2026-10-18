@@ -1,7 +1,12 @@
 import { RpcErrorFamily } from './error-family.js'
 import { RpcCoreErrorText } from './error-text.js'
 import { ERROR_SOURCE, RpcCoreErrorCode, type IRpcCoreErrorCode } from './error-code.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import {
+  attachErrorIdentity,
+  attachSecondaryErrors,
+  isNativeErrorValue,
+  tryReadProperty
+} from '@migaia/utils/error'
 import { safeRead } from './internal/safe-value.js'
 export { RpcCoreErrorCode, type IRpcCoreErrorCode }
 
@@ -81,6 +86,35 @@ export function tagRpcError<E extends Error>(
   return attachErrorIdentity(error, { source: RPC_CORE_ERROR_SOURCE, code }) as E &
     Pick<IRpcError, 'source' | 'code'>
 }
+
+/** Classify one boundary failure without replacing a mutable native error or a foreign identity. */
+export function identifyRpcBoundaryFailure(
+  error: unknown,
+  code: IRpcCoreErrorCode,
+  message: string
+): Error {
+  if (isNativeErrorValue(error)) {
+    /** A complete semantic identity remains owned by the package that supplied it. */
+    const source = tryReadProperty(error as { source?: unknown }, 'source')
+    /** Numeric native DOM codes alone do not constitute a semantic package identity. */
+    const existingCode = tryReadProperty(error as { code?: unknown }, 'code')
+    if (
+      !source.threw &&
+      !existingCode.threw &&
+      typeof source.value === 'string' &&
+      source.value.length > 0 &&
+      typeof existingCode.value === 'string' &&
+      existingCode.value.length > 0
+    )
+      return error
+    try {
+      return tagRpcError(error, code)
+    } catch (attachmentError) {
+      return attachSecondaryErrors(new RpcError(code, message, error), [attachmentError]) as Error
+    }
+  }
+  return new RpcError(code, message, error)
+}
 export class RpcSchemaValidationError extends RpcError {
   readonly data: unknown
   constructor(message: string, data: unknown, cause?: unknown) {
@@ -111,6 +145,8 @@ export class RpcConstructionError extends RpcConfigurationError {
   }
 }
 export class RpcLifecycleError extends RpcError {
+  /** Core cleanup translation exposes secondary failures through the standard error graph. */
+  declare readonly errors?: readonly unknown[]
   readonly cleanupErrors?: readonly IRpcCleanupError[]
   constructor(message: string, cause?: unknown, cleanupErrors?: readonly IRpcCleanupError[]) {
     super(RpcCoreErrorCode.endpointDisposed, message, cause)

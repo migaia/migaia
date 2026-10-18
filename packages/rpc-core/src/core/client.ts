@@ -1,6 +1,6 @@
+import type { IRpcKernelSurface } from './internal/factory-types.js'
 import { createComposedEndpoint } from './composed.js'
 import { createClientFirstPartyRoots } from './internal/client-first-party-roots.js'
-import type { IRpcKernelSurface } from './composed.js'
 import type { IOutboundSurface } from './features/outbound.js'
 import type { IRpcFeature, IRpcFeatureSurface } from './feature.js'
 import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'

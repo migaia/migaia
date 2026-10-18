@@ -94,13 +94,20 @@ describe('composed endpoint root disposal boundary', () => {
       structuralRaw
     ])
 
+    /** Lifecycle wraps non-native structural throws, retaining their original value as cause. */
+    const structuralFailure = (hostResult.cleanupErrors[3] as Error).cause as Error
+    expect(structuralFailure).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: 'SCOPE_DISPOSAL_FAILED',
+      cause: structuralRaw
+    })
     const translated = translateEndpointDisposalError(
       new AggregateError(hostResult.cleanupErrors),
       [
         { resource: 'first root', error: firstRaw },
         { resource: 'second root', error: secondRaw },
         { resource: 'custom root', error: customRaw },
-        { resource: 'structural root', error: structuralRaw }
+        { resource: 'structural root', error: structuralFailure }
       ]
     )
 
@@ -109,7 +116,9 @@ describe('composed endpoint root disposal boundary', () => {
       { resource: 'first root', error: firstRaw },
       { resource: 'second root', error: secondRaw },
       { resource: 'custom root', error: customRaw },
-      { resource: 'structural root', error: structuralRaw }
+      { resource: 'structural root', error: structuralFailure },
+      // Host also retains the original structural throw as its separately reported cleanup leaf.
+      { resource: 'resource disposer', error: structuralRaw }
     ])
     expect((firstRaw as { readonly cause?: unknown }).cause).toBeInstanceOf(AggregateError)
     expect((firstRaw as { readonly cause: AggregateError }).cause.errors[0]).toBe(firstInner)

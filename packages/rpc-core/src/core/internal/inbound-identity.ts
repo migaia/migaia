@@ -1,10 +1,10 @@
+import type { IRpcPlatformValue, IRpcTransportTopologyValue } from '../transport-constants.js'
 import { VerifiedPeerRegistry } from './identity.js'
 import { SourceIdentityRegistry } from './source-identity.js'
 import { tupleKey, type IRpcPropertyReadReporter } from './safe-value.js'
 import { recordInboundIdentityRelease } from './test-observer.js'
 import type { IRpcConnectCapability } from '../typing.js'
-import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
-import type { IRpcPlatform } from '../typing.js'
+import type { IRpcInboundMessage } from '../transport.js'
 import type { INativeReplayReceipt } from './native-replay.js'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 
@@ -57,8 +57,8 @@ export class InboundIdentityCoordinator {
   /** Adapter source proof is the first fail-closed admission check. */
   readonly #sourceProof: ((source: unknown, origin?: string) => boolean) | undefined
   /** Platform and topology context passed to connect verification. */
-  readonly #platform: IRpcPlatform
-  readonly #topology: IRpcTransportTopology | undefined
+  readonly #platform: IRpcPlatformValue
+  readonly #topology: IRpcTransportTopologyValue | undefined
   /** Discovery-established peer leases reused by later frames on source-less transports. */
   readonly #established = new Map<string, string>()
   /** Exact prepared receipts prevent copied, foreign, or replayed source admission. */
@@ -76,8 +76,8 @@ export class InboundIdentityCoordinator {
     readonly connect?: IRpcConnectCapability
     readonly reportRead?: IRpcPropertyReadReporter
     readonly sourceProof?: (source: unknown, origin?: string) => boolean
-    readonly platform: IRpcPlatform
-    readonly topology?: IRpcTransportTopology
+    readonly platform: IRpcPlatformValue
+    readonly topology?: IRpcTransportTopologyValue
     readonly peers?: VerifiedPeerRegistry
   }) {
     this.#connect = options.connect

@@ -6,6 +6,7 @@ import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import { isForwardedOperation } from '../core/internal/outbound-envelope.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
+import { reportDiagnostic } from '../core/internal/diagnostic-reporter.js'
 import { RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
 import type { IRemoteGenerationEvents, IRemoteRetryDispatch, IRemoteRetryPort } from './types.js'
@@ -133,12 +134,12 @@ export function dispatchRemoteRetry(
               if (!departed) finish(value, true)
             },
             (error: unknown) => {
-              if (departed) options.report(error)
+              if (departed) reportDiagnostic(options.report, error)
               else finish(error, false)
             }
           )
       } catch (error) {
-        if (departed) options.report(error)
+        if (departed) reportDiagnostic(options.report, error)
         else finish(error, false)
       }
     }

@@ -27,9 +27,11 @@
 pnpm add @migaia/rpc-core @migaia/rpc-contract
 ```
 
-`@migaia/rpc-contract` 是 peer 依赖，两者版本必须一致（当前 `0.0.7`）。运行时依赖 `@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/event-subscriber`、`@migaia/serialize`、`@migaia/supervision`、`@migaia/utils`，随包安装。
+`@migaia/rpc-contract` 是 peer 依赖，两者版本必须一致（当前 `0.0.9`）。运行时依赖 `@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/event-subscriber`、`@migaia/serialize`、`@migaia/supervision`、`@migaia/utils`，随包安装。
 
 同一个页面或进程里只能加载一份 `@migaia/rpc-core`。依赖解析出两份副本时，第二份在取得任何资源前抛出 `@migaia/rpc/core` / `DUPLICATE_MODULE_INSTANCE`；请修正依赖，让所有 RPC 包解析到同一份。不同 Worker 各自独立，不受影响。
+
+此保证针对 `package.json` 的 `exports` 指向的构建产物；直接复制或导入 `src/` 不包含副本检测。
 
 ## 入口一览
 
@@ -47,6 +49,8 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | `./transport-kit`、`./transport-constants`                        | 编写自定义 transport 的工具与常量                                                                                                                                                              |
 | `./adapter`                                                       | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）                                                                                           |
 | `./probe`                                                         | Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 与 Endpoint 安装入口 `probePlugin`                                                                      |
+
+公开错误形状使用 `IRpcError`，平台与拓扑值域使用 `IRpcPlatformValue`、`IRpcTransportTopologyValue`。工厂组合类型从实际调用结果推导；认证 nonce 由认证 owner 内部生成。
 
 ## 快速开始
 
@@ -104,7 +108,7 @@ Task resolve 表示正常退出，reject 表示崩溃。Stop 通过 task 的 `si
 
 ## Probe
 
-`@migaia/rpc-core/probe` 在 Core Peer 或 Endpoint 上安装同步观察。默认只读元数据；请求、返回值与错误保持原有语义。下面的 `connect` 示例使用实际 MessagePort。当前 managed Thread spawn 与 Process `spawn: true` 的选项重建没有转发 `probe`，这些路径的跨包观察仍待补齐。
+`@migaia/rpc-core/probe` 在 Core Peer 或 Endpoint 上安装同步观察。默认只读元数据；请求、返回值与错误保持原有语义。下面的 `connect` 示例使用实际 MessagePort。managed Thread spawn 与 Process `spawn: true` 同样把原 `probe` 引用传入对应的 Peer。
 
 ```ts doc-test=run group=readme-probe-peer file=main.ts
 import assert from 'node:assert/strict'
@@ -207,7 +211,7 @@ try {
 
 `capture` 默认关闭，必须显式列出需要捕获内容的阶段，且定义时为 `stages` 的子集。`protected` 内容也须显式启用，并只在认证保护路径存在时产生。`setStages([])` 暂停；恢复时设置所需阶段，原 `captureMask` 保持不变。host 的公开 `stageMask` 为初始定义值，后续选择保存在私有状态；独立 handle 的 getter 则反映当前值。详细契约见 [USEGUIDE 的 Probe 节](./USEGUIDE.md#13-probe)。
 
-`sizeBytes` 只表示当前层已知的字节表示。UTF-8 string transport 与字节 buffer/view 提供精确长度；clone transport 中的字符串没有物理 UTF-8 字节表示，因此使用 `-1`，不为观察额外编码或扫描业务内容。
+`sizeBytes` 只表示当前层已知的字节表示。字节 buffer/view 提供已有的精确字节长度；所有 string 的观察长度为 `-1`，不为观察额外编码或扫描内容。
 
 ## 高阶用法：编写适配器
 

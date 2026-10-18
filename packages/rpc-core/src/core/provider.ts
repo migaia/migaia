@@ -1,6 +1,6 @@
-import { createComposedEndpoint, type IRecursiveProvideSurface } from './composed.js'
+import type { IRecursiveProvideSurface, IRpcKernelSurface } from './internal/factory-types.js'
+import { createComposedEndpoint } from './composed.js'
 import { createProviderFirstPartyRoots } from './internal/provider-first-party-roots.js'
-import type { IRpcKernelSurface } from './composed.js'
 import type { IProviderSurface } from './features/provider.js'
 import type { IRpcFeature, IRpcFeatureSurface } from './feature.js'
 import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'

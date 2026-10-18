@@ -1,3 +1,4 @@
+import type { IRpcPlatformValue, IRpcTransportTopologyValue } from './transport-constants.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcConstructionError,
@@ -15,10 +16,8 @@ import type {
   IRpcSendOptions,
   IRpcTransport,
   IRpcTransportEncoding,
-  IRpcTransportOwnership,
-  IRpcTransportTopology
+  IRpcTransportOwnership
 } from './transport.js'
-import type { IRpcPlatform } from './typing.js'
 import { RpcPlatform } from './transport-constants.js'
 import { systemScheduler, type IScheduler, type IWallClock } from '@migaia/utils/scheduler'
 import {
@@ -95,8 +94,8 @@ export type IEndpointKernelActivation = {
 /** Feature-neutral transport, routing, lifecycle, and resource ports. */
 export type IEndpointKernelHost = {
   readonly transport: IRpcTransport
-  readonly platform: IRpcPlatform
-  readonly topology: IRpcTransportTopology | undefined
+  readonly platform: IRpcPlatformValue
+  readonly topology: IRpcTransportTopologyValue | undefined
   readonly origin: string | undefined
   readonly encodedType: IRpcTransportEncoding | undefined
   readonly ownership: IRpcTransportOwnership | undefined
@@ -132,9 +131,9 @@ class EndpointKernel implements IEndpointKernelHost {
   /** Physical transport retained for context-safe method invocation and adapter metadata. */
   readonly #transport: IRpcTransport
   /** Validated platform snapshot used by protocol and authentication context. */
-  readonly #platform: IRpcPlatform
+  readonly #platform: IRpcPlatformValue
   /** Validated adapter topology snapshot used by routing policy. */
-  readonly #topology: IRpcTransportTopology | undefined
+  readonly #topology: IRpcTransportTopologyValue | undefined
   /** Validated adapter origin snapshot used by identity policy. */
   readonly #origin: string | undefined
   /** Validated wire encoding snapshot used by protocol compatibility checks. */
@@ -242,12 +241,12 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Returns the immutable validated platform snapshot. */
-  get platform(): IRpcPlatform {
+  get platform(): IRpcPlatformValue {
     return this.#platform
   }
 
   /** Returns the immutable validated topology snapshot. */
-  get topology(): IRpcTransportTopology | undefined {
+  get topology(): IRpcTransportTopologyValue | undefined {
     return this.#topology
   }
 
@@ -495,6 +494,6 @@ export function readTransportSnapshot(transport: IRpcTransport): IEndpointKernel
 }
 
 /** Narrows a hostile transport platform descriptor to the public platform domain. */
-function isRpcPlatform(value: unknown): value is IRpcPlatform {
-  return Object.values(RpcPlatform).includes(value as IRpcPlatform)
+function isRpcPlatform(value: unknown): value is IRpcPlatformValue {
+  return Object.values(RpcPlatform).includes(value as IRpcPlatformValue)
 }

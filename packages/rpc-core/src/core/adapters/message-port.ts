@@ -1,7 +1,12 @@
 import type { IRpcCarrierProbe } from '../probe/types.js'
 import { RpcCarrierDetailKey } from './probe-detail.js'
 import { carrierSizeBytes, captureTransferredContent } from './probe-content.js'
-import { createRpcTransportError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
+import {
+  createRpcTransportError,
+  identifyRpcBoundaryFailure,
+  RpcCoreErrorCode,
+  tagRpcError
+} from '../errors.js'
 import { RpcAdapterErrorText } from './error-text.js'
 import { registerCloneTransferCarrier } from '../internal/batch-frame.js'
 import {
@@ -241,7 +246,15 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
           )
         }
       }
-      port.postMessage(message, transfer)
+      try {
+        port.postMessage(message, transfer)
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          RpcAdapterErrorText.nativeSendFailed
+        )
+      }
     },
     subscribe(listener) {
       if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
@@ -480,7 +493,15 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
           )
         }
       }
-      port.postMessage(message, transfer)
+      try {
+        port.postMessage(message, transfer)
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          RpcAdapterErrorText.nativeSendFailed
+        )
+      }
     },
     // Lazily attached/detached the same way as the web-worker adapter —
     // a client that closes must not leave the underlying port still

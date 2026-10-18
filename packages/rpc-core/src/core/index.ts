@@ -48,7 +48,7 @@ export type {
 } from './errors.js'
 export { serializeRpcError, deserializeRpcError } from './internal/error-wire-metadata.js'
 export { defaultRpcReporter } from './default-reporter.js'
-export type { IRpcTransport, IRpcSendOptions, IRpcTransportTopology } from './transport.js'
+export type { IRpcTransport, IRpcSendOptions } from './transport.js'
 export {
   createRpcIdempotencyStore,
   type IRpcIdempotencyClaim,
@@ -60,5 +60,4 @@ export * from './middleware/index.js'
 export { RpcProviderRejectionReason } from './semantic-constants.js'
 export type { IRpcProviderRejection } from './provider-admission.js'
 
-export { createAuthenticationNonce } from './middleware/authentication-envelope.js'
 export { createRuntimeApiEndpoint } from './runtime-api-endpoint.js'

@@ -25,7 +25,11 @@ import {
   RuntimeSourceKind,
   RuntimeConnectionDirection
 } from './runtime-api/constants.js'
-import { createGenerationController } from '@migaia/lifecycle'
+import {
+  createGenerationController,
+  createDisposeTransaction,
+  DisposeTransactionKind
+} from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
@@ -695,8 +699,22 @@ class RemoteRegistration<TUnit, TSpec> {
       served,
       ...(runtime ? { runtime } : {}),
       close: async () => {
-        await closeEndpoint()
-        await closeChannel()
+        /** Lifecycle continues the original endpoint-before-channel plan after either failure. */
+        const failures = await createDisposeTransaction(
+          { kind: DisposeTransactionKind.plan },
+          { errorPolicy: 'collect', scheduler: channel.scheduler }
+        ).run(
+          [closeEndpoint, closeChannel].map((force, index) => ({
+            source: String(index),
+            descriptor: { force }
+          }))
+        )
+        if (failures.length === 1) throw failures[0]!.error
+        if (failures.length > 1)
+          throw codedAggregate(
+            failures.map(({ error }) => error),
+            RpcRemoteLayerErrorCode.closed
+          )
       }
     })
     try {
@@ -1298,14 +1316,12 @@ class RemoteRegistration<TUnit, TSpec> {
         try {
           if (closing) await closing
         } catch (failure) {
-          if (!this.#options.beforeRelease) throw failure
           failures.push(failure)
         }
         if (this.#options.binding.ownership === 'owned') {
           try {
             await this.#options.binding.supervisor.dispose()
           } catch (failure) {
-            if (!this.#options.beforeRelease) throw failure
             failures.push(failure)
           }
         }

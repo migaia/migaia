@@ -28,6 +28,7 @@ import type { IRpcFactoryConfig, IRpcEndpoint, ISendOptions } from './typing.js'
 import { RpcCoreErrorText } from './error-text.js'
 import type { IProviderAdmissionScope, IProviderRegistrationSurface } from './features/provider.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
+import { deferred } from '@migaia/utils/promise'
 
 /** Constructor controls derive their portable fields from the existing public call envelope. */
 type IRpcRuntimeOptions = Extract<IRpcRuntimeEnvelope, { kind: 'runtime-call' }>['options']
@@ -155,7 +156,7 @@ export function createRuntimeApiEndpoint(
   if ('binding' in config) {
     /** These are complete owned operations, never caller claims or public preparation plumbing. */
     const binding = config.binding
-    /** Repeated disposal joins the held binding's original first settlement Promise. */
+    /** Repeated and reentrant disposal share one facade-owned binding settlement. */
     let closing: Promise<void> | undefined
     return Object.freeze({
       get ready() {
@@ -166,7 +167,18 @@ export function createRuntimeApiEndpoint(
       notify: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
         binding.notify(method, payload, options),
       stream: binding.stream,
-      dispose: () => (closing ??= binding.dispose())
+      dispose: () => {
+        if (closing) return closing
+        /** Publish before the held operation invokes user callbacks or synchronously reenters. */
+        const done = deferred<void>()
+        closing = done.promise
+        try {
+          void Promise.resolve(binding.dispose()).then(done.resolve, done.reject)
+        } catch (error) {
+          done.reject(error)
+        }
+        return closing
+      }
     })
   }
   if (!channel) rejectRuntimeApiCapability()
