@@ -3449,7 +3449,7 @@
         {
           "name": "ReactiveErrorCode",
           "kind": "const",
-          "signature": "export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * module identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: \"COPY_CONFLICT\"; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: \"FLUSH_LOOP\"; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: \"GRAPH_NODE_REGISTERED\"; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * module identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: 'NODE_DISPOSED'; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: 'CIRCULAR_DEPENDENCY'; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: 'NOT_RUNTIME_OWNED'; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: 'OWNERSHIP_CONFLICT'; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: 'COPY_CONFLICT'; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: 'BRAND_CORRUPTED'; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: 'VERSION_EXHAUSTED'; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: 'FLUSH_LOOP'; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: 'OBSERVER_FAILED'; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: 'ACTION_FLUSH_FAILED'; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: 'SCHEDULER_FAILED'; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: 'BINDING_DUPLICATE'; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: 'GRAPH_NODE_REGISTERED'; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: 'INTERNALS_REGISTERED'; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 15,
           "source": "packages/reactive/dist/error-code.d.ts",
           "purpose": "Every error code this package throws or reports. Branch on `error.code === ReactiveErrorCode.x` instead of the message text.",
@@ -3469,170 +3469,170 @@
               "name": "callbackFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly callbackFailed: \"CALLBACK_FAILED\";",
+              "signature": "readonly callbackFailed: 'CALLBACK_FAILED';",
               "description": "An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * package identities are preserved. Handle the callback failure before retrying the operation.",
               "parameterDetails": [],
-              "returns": "\"CALLBACK_FAILED\""
+              "returns": "'CALLBACK_FAILED'"
             },
             {
               "name": "nodeDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly nodeDisposed: \"NODE_DISPOSED\";",
+              "signature": "readonly nodeDisposed: 'NODE_DISPOSED';",
               "description": "Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance.",
               "parameterDetails": [],
-              "returns": "\"NODE_DISPOSED\""
+              "returns": "'NODE_DISPOSED'"
             },
             {
               "name": "circularDependency",
               "kind": "property",
               "optional": false,
-              "signature": "readonly circularDependency: \"CIRCULAR_DEPENDENCY\";",
+              "signature": "readonly circularDependency: 'CIRCULAR_DEPENDENCY';",
               "description": "Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle.",
               "parameterDetails": [],
-              "returns": "\"CIRCULAR_DEPENDENCY\""
+              "returns": "'CIRCULAR_DEPENDENCY'"
             },
             {
               "name": "crossRuntime",
               "kind": "property",
               "optional": false,
-              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "signature": "readonly crossRuntime: 'CROSS_RUNTIME';",
               "description": "Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes.",
               "parameterDetails": [],
-              "returns": "\"CROSS_RUNTIME\""
+              "returns": "'CROSS_RUNTIME'"
             },
             {
               "name": "notRuntimeOwned",
               "kind": "property",
               "optional": false,
-              "signature": "readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\";",
+              "signature": "readonly notRuntimeOwned: 'NOT_RUNTIME_OWNED';",
               "description": "Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories.",
               "parameterDetails": [],
-              "returns": "\"NOT_RUNTIME_OWNED\""
+              "returns": "'NOT_RUNTIME_OWNED'"
             },
             {
               "name": "ownershipConflict",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ownershipConflict: \"OWNERSHIP_CONFLICT\";",
+              "signature": "readonly ownershipConflict: 'OWNERSHIP_CONFLICT';",
               "description": "Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes.",
               "parameterDetails": [],
-              "returns": "\"OWNERSHIP_CONFLICT\""
+              "returns": "'OWNERSHIP_CONFLICT'"
             },
             {
               "name": "copyConflict",
               "kind": "property",
               "optional": false,
-              "signature": "readonly copyConflict: \"COPY_CONFLICT\";",
+              "signature": "readonly copyConflict: 'COPY_CONFLICT';",
               "description": "Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies.",
               "parameterDetails": [],
-              "returns": "\"COPY_CONFLICT\""
+              "returns": "'COPY_CONFLICT'"
             },
             {
               "name": "brandCorrupted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly brandCorrupted: \"BRAND_CORRUPTED\";",
+              "signature": "readonly brandCorrupted: 'BRAND_CORRUPTED';",
               "description": "Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects.",
               "parameterDetails": [],
-              "returns": "\"BRAND_CORRUPTED\""
+              "returns": "'BRAND_CORRUPTED'"
             },
             {
               "name": "versionExhausted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly versionExhausted: \"VERSION_EXHAUSTED\";",
+              "signature": "readonly versionExhausted: 'VERSION_EXHAUSTED';",
               "description": "Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph.",
               "parameterDetails": [],
-              "returns": "\"VERSION_EXHAUSTED\""
+              "returns": "'VERSION_EXHAUSTED'"
             },
             {
               "name": "flushLoop",
               "kind": "property",
               "optional": false,
-              "signature": "readonly flushLoop: \"FLUSH_LOOP\";",
+              "signature": "readonly flushLoop: 'FLUSH_LOOP';",
               "description": "Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle.",
               "parameterDetails": [],
-              "returns": "\"FLUSH_LOOP\""
+              "returns": "'FLUSH_LOOP'"
             },
             {
               "name": "observerFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly observerFailed: \"OBSERVER_FAILED\";",
+              "signature": "readonly observerFailed: 'OBSERVER_FAILED';",
               "description": "Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code.",
               "parameterDetails": [],
-              "returns": "\"OBSERVER_FAILED\""
+              "returns": "'OBSERVER_FAILED'"
             },
             {
               "name": "actionFlushFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\";",
+              "signature": "readonly actionFlushFailed: 'ACTION_FLUSH_FAILED';",
               "description": "Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`.",
               "parameterDetails": [],
-              "returns": "\"ACTION_FLUSH_FAILED\""
+              "returns": "'ACTION_FLUSH_FAILED'"
             },
             {
               "name": "schedulerFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerFailed: \"SCHEDULER_FAILED\";",
+              "signature": "readonly schedulerFailed: 'SCHEDULER_FAILED';",
               "description": "Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics.",
               "parameterDetails": [],
-              "returns": "\"SCHEDULER_FAILED\""
+              "returns": "'SCHEDULER_FAILED'"
             },
             {
               "name": "captureInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly captureInvalid: \"CAPTURE_INVALID\";",
+              "signature": "readonly captureInvalid: 'CAPTURE_INVALID';",
               "description": "Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render.",
               "parameterDetails": [],
-              "returns": "\"CAPTURE_INVALID\""
+              "returns": "'CAPTURE_INVALID'"
             },
             {
               "name": "bindingDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly bindingDuplicate: \"BINDING_DUPLICATE\";",
+              "signature": "readonly bindingDuplicate: 'BINDING_DUPLICATE';",
               "description": "Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again.",
               "parameterDetails": [],
-              "returns": "\"BINDING_DUPLICATE\""
+              "returns": "'BINDING_DUPLICATE'"
             },
             {
               "name": "graphNodeRegistered",
               "kind": "property",
               "optional": false,
-              "signature": "readonly graphNodeRegistered: \"GRAPH_NODE_REGISTERED\";",
+              "signature": "readonly graphNodeRegistered: 'GRAPH_NODE_REGISTERED';",
               "description": "Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_NODE_REGISTERED\""
+              "returns": "'GRAPH_NODE_REGISTERED'"
             },
             {
               "name": "internalsRegistered",
               "kind": "property",
               "optional": false,
-              "signature": "readonly internalsRegistered: \"INTERNALS_REGISTERED\";",
+              "signature": "readonly internalsRegistered: 'INTERNALS_REGISTERED';",
               "description": "Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path.",
               "parameterDetails": [],
-              "returns": "\"INTERNALS_REGISTERED\""
+              "returns": "'INTERNALS_REGISTERED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             }
           ],
           "composes": [],
           "aliasOf": "ReactiveErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * module identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: \"COPY_CONFLICT\"; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: \"FLUSH_LOOP\"; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: \"GRAPH_NODE_REGISTERED\"; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * module identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: 'NODE_DISPOSED'; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: 'CIRCULAR_DEPENDENCY'; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: 'NOT_RUNTIME_OWNED'; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: 'OWNERSHIP_CONFLICT'; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: 'COPY_CONFLICT'; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: 'BRAND_CORRUPTED'; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: 'VERSION_EXHAUSTED'; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: 'FLUSH_LOOP'; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: 'OBSERVER_FAILED'; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: 'ACTION_FLUSH_FAILED'; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: 'SCHEDULER_FAILED'; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: 'BINDING_DUPLICATE'; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: 'GRAPH_NODE_REGISTERED'; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: 'INTERNALS_REGISTERED'; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3671,7 +3671,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/error-code.d.ts:ReactiveErrorCode:export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * package identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: \"COPY_CONFLICT\"; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: \"FLUSH_LOOP\"; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: \"GRAPH_NODE_REGISTERED\"; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/reactive/dist/error-code.d.ts:ReactiveErrorCode:export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * package identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: 'NODE_DISPOSED'; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: 'CIRCULAR_DEPENDENCY'; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: 'NOT_RUNTIME_OWNED'; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: 'OWNERSHIP_CONFLICT'; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: 'COPY_CONFLICT'; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: 'BRAND_CORRUPTED'; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: 'VERSION_EXHAUSTED'; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: 'FLUSH_LOOP'; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: 'OBSERVER_FAILED'; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: 'ACTION_FLUSH_FAILED'; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: 'SCHEDULER_FAILED'; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: 'BINDING_DUPLICATE'; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: 'GRAPH_NODE_REGISTERED'; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: 'INTERNALS_REGISTERED'; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "错误码",
@@ -3792,7 +3792,7 @@
         {
           "name": "ReactiveTracePhase",
           "kind": "const",
-          "signature": "export declare const ReactiveTracePhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; readonly connect: \"connect\"; readonly disconnect: \"disconnect\"; };",
+          "signature": "export declare const ReactiveTracePhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; readonly connect: 'connect'; readonly disconnect: 'disconnect'; };",
           "declarationLine": 9,
           "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
           "purpose": "Phase field of trace events (`start`, `end`, `error`, `connect`, `disconnect`).",
@@ -3812,53 +3812,53 @@
               "name": "start",
               "kind": "property",
               "optional": false,
-              "signature": "readonly start: \"start\";",
+              "signature": "readonly start: 'start';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"start\""
+              "returns": "'start'"
             },
             {
               "name": "end",
               "kind": "property",
               "optional": false,
-              "signature": "readonly end: \"end\";",
+              "signature": "readonly end: 'end';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"end\""
+              "returns": "'end'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             },
             {
               "name": "connect",
               "kind": "property",
               "optional": false,
-              "signature": "readonly connect: \"connect\";",
+              "signature": "readonly connect: 'connect';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"connect\""
+              "returns": "'connect'"
             },
             {
               "name": "disconnect",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disconnect: \"disconnect\";",
+              "signature": "readonly disconnect: 'disconnect';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"disconnect\""
+              "returns": "'disconnect'"
             }
           ],
           "composes": [],
           "aliasOf": "ReactiveTracePhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReactiveTracePhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; readonly connect: \"connect\"; readonly disconnect: \"disconnect\"; };"
+            "export declare const ReactiveTracePhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; readonly connect: 'connect'; readonly disconnect: 'disconnect'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3897,7 +3897,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveTracePhase:export declare const ReactiveTracePhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; readonly connect: \"connect\"; readonly disconnect: \"disconnect\"; };",
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveTracePhase:export declare const ReactiveTracePhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; readonly connect: 'connect'; readonly disconnect: 'disconnect'; };",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -3906,7 +3906,7 @@
         {
           "name": "ReactiveTraceReason",
           "kind": "const",
-          "signature": "export declare const ReactiveTraceReason: { readonly set: \"set\"; readonly notify: \"notify\"; readonly retrack: \"retrack\"; readonly invalidate: \"invalidate\"; readonly dispose: \"dispose\"; };",
+          "signature": "export declare const ReactiveTraceReason: { readonly set: 'set'; readonly notify: 'notify'; readonly retrack: 'retrack'; readonly invalidate: 'invalidate'; readonly dispose: 'dispose'; };",
           "declarationLine": 33,
           "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
           "purpose": "Reason field of node-change and dependency trace events.",
@@ -3925,53 +3925,53 @@
               "name": "set",
               "kind": "property",
               "optional": false,
-              "signature": "readonly set: \"set\";",
+              "signature": "readonly set: 'set';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"set\""
+              "returns": "'set'"
             },
             {
               "name": "notify",
               "kind": "property",
               "optional": false,
-              "signature": "readonly notify: \"notify\";",
+              "signature": "readonly notify: 'notify';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"notify\""
+              "returns": "'notify'"
             },
             {
               "name": "retrack",
               "kind": "property",
               "optional": false,
-              "signature": "readonly retrack: \"retrack\";",
+              "signature": "readonly retrack: 'retrack';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"retrack\""
+              "returns": "'retrack'"
             },
             {
               "name": "invalidate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidate: \"invalidate\";",
+              "signature": "readonly invalidate: 'invalidate';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"invalidate\""
+              "returns": "'invalidate'"
             },
             {
               "name": "dispose",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dispose: \"dispose\";",
+              "signature": "readonly dispose: 'dispose';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"dispose\""
+              "returns": "'dispose'"
             }
           ],
           "composes": [],
           "aliasOf": "ReactiveTraceReason",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReactiveTraceReason: { readonly set: \"set\"; readonly notify: \"notify\"; readonly retrack: \"retrack\"; readonly invalidate: \"invalidate\"; readonly dispose: \"dispose\"; };"
+            "export declare const ReactiveTraceReason: { readonly set: 'set'; readonly notify: 'notify'; readonly retrack: 'retrack'; readonly invalidate: 'invalidate'; readonly dispose: 'dispose'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4010,7 +4010,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveTraceReason:export declare const ReactiveTraceReason: { readonly set: \"set\"; readonly notify: \"notify\"; readonly retrack: \"retrack\"; readonly invalidate: \"invalidate\"; readonly dispose: \"dispose\"; };",
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveTraceReason:export declare const ReactiveTraceReason: { readonly set: 'set'; readonly notify: 'notify'; readonly retrack: 'retrack'; readonly invalidate: 'invalidate'; readonly dispose: 'dispose'; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -4019,7 +4019,7 @@
         {
           "name": "ReactiveTraceType",
           "kind": "const",
-          "signature": "export declare const ReactiveTraceType: { readonly observableChange: \"observable-change\"; readonly dependency: \"dependency\"; readonly observerRun: \"observer-run\"; readonly action: \"action\"; };",
+          "signature": "export declare const ReactiveTraceType: { readonly observableChange: 'observable-change'; readonly dependency: 'dependency'; readonly observerRun: 'observer-run'; readonly action: 'action'; };",
           "declarationLine": 2,
           "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
           "purpose": "Type field that tells trace event kinds apart.",
@@ -4039,44 +4039,44 @@
               "name": "observableChange",
               "kind": "property",
               "optional": false,
-              "signature": "readonly observableChange: \"observable-change\";",
+              "signature": "readonly observableChange: 'observable-change';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"observable-change\""
+              "returns": "'observable-change'"
             },
             {
               "name": "dependency",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dependency: \"dependency\";",
+              "signature": "readonly dependency: 'dependency';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"dependency\""
+              "returns": "'dependency'"
             },
             {
               "name": "observerRun",
               "kind": "property",
               "optional": false,
-              "signature": "readonly observerRun: \"observer-run\";",
+              "signature": "readonly observerRun: 'observer-run';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"observer-run\""
+              "returns": "'observer-run'"
             },
             {
               "name": "action",
               "kind": "property",
               "optional": false,
-              "signature": "readonly action: \"action\";",
+              "signature": "readonly action: 'action';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"action\""
+              "returns": "'action'"
             }
           ],
           "composes": [],
           "aliasOf": "ReactiveTraceType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReactiveTraceType: { readonly observableChange: \"observable-change\"; readonly dependency: \"dependency\"; readonly observerRun: \"observer-run\"; readonly action: \"action\"; };"
+            "export declare const ReactiveTraceType: { readonly observableChange: 'observable-change'; readonly dependency: 'dependency'; readonly observerRun: 'observer-run'; readonly action: 'action'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4115,7 +4115,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveTraceType:export declare const ReactiveTraceType: { readonly observableChange: \"observable-change\"; readonly dependency: \"dependency\"; readonly observerRun: \"observer-run\"; readonly action: \"action\"; };",
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveTraceType:export declare const ReactiveTraceType: { readonly observableChange: 'observable-change'; readonly dependency: 'dependency'; readonly observerRun: 'observer-run'; readonly action: 'action'; };",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -4124,9 +4124,9 @@
       ],
       "aliases": [
         {
-          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: 'async-flush'; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: 'cause-read'; readonly dependencyDisconnect: 'dependency-disconnect'; readonly lifecycleHook: 'lifecycle-hook'; readonly ssrResource: 'ssr-resource'; readonly subscriptionListener: 'subscription-listener'; readonly traceListener: 'trace-listener'; };",
           "name": "ReactiveErrorPhase",
-          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: 'async-flush'; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: 'cause-read'; readonly dependencyDisconnect: 'dependency-disconnect'; readonly lifecycleHook: 'lifecycle-hook'; readonly ssrResource: 'ssr-resource'; readonly subscriptionListener: 'subscription-listener'; readonly traceListener: 'trace-listener'; };",
           "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./extension",
@@ -6983,7 +6983,7 @@
         {
           "name": "ReactiveErrorPhase",
           "kind": "const",
-          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: 'async-flush'; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: 'cause-read'; readonly dependencyDisconnect: 'dependency-disconnect'; readonly lifecycleHook: 'lifecycle-hook'; readonly ssrResource: 'ssr-resource'; readonly subscriptionListener: 'subscription-listener'; readonly traceListener: 'trace-listener'; };",
           "declarationLine": 17,
           "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
           "purpose": "Values of `context.phase` passed to `onError` / `reportError`, telling where a reported error happened.",
@@ -7003,71 +7003,71 @@
               "name": "asyncFlush",
               "kind": "property",
               "optional": false,
-              "signature": "readonly asyncFlush: \"async-flush\";",
+              "signature": "readonly asyncFlush: 'async-flush';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"async-flush\""
+              "returns": "'async-flush'"
             },
             {
               "name": "causeRead",
               "kind": "property",
               "optional": false,
-              "signature": "readonly causeRead: \"cause-read\";",
+              "signature": "readonly causeRead: 'cause-read';",
               "description": "Reports a hostile action-error cause getter during batch flush failure reconciliation.",
               "parameterDetails": [],
-              "returns": "\"cause-read\""
+              "returns": "'cause-read'"
             },
             {
               "name": "dependencyDisconnect",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dependencyDisconnect: \"dependency-disconnect\";",
+              "signature": "readonly dependencyDisconnect: 'dependency-disconnect';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"dependency-disconnect\""
+              "returns": "'dependency-disconnect'"
             },
             {
               "name": "lifecycleHook",
               "kind": "property",
               "optional": false,
-              "signature": "readonly lifecycleHook: \"lifecycle-hook\";",
+              "signature": "readonly lifecycleHook: 'lifecycle-hook';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"lifecycle-hook\""
+              "returns": "'lifecycle-hook'"
             },
             {
               "name": "ssrResource",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ssrResource: \"ssr-resource\";",
+              "signature": "readonly ssrResource: 'ssr-resource';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ssr-resource\""
+              "returns": "'ssr-resource'"
             },
             {
               "name": "subscriptionListener",
               "kind": "property",
               "optional": false,
-              "signature": "readonly subscriptionListener: \"subscription-listener\";",
+              "signature": "readonly subscriptionListener: 'subscription-listener';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"subscription-listener\""
+              "returns": "'subscription-listener'"
             },
             {
               "name": "traceListener",
               "kind": "property",
               "optional": false,
-              "signature": "readonly traceListener: \"trace-listener\";",
+              "signature": "readonly traceListener: 'trace-listener';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"trace-listener\""
+              "returns": "'trace-listener'"
             }
           ],
           "composes": [],
           "aliasOf": "ReactiveErrorPhase",
           "exportPath": "./extension",
           "overloadSignatures": [
-            "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };"
+            "export declare const ReactiveErrorPhase: { readonly asyncFlush: 'async-flush'; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: 'cause-read'; readonly dependencyDisconnect: 'dependency-disconnect'; readonly lifecycleHook: 'lifecycle-hook'; readonly ssrResource: 'ssr-resource'; readonly subscriptionListener: 'subscription-listener'; readonly traceListener: 'trace-listener'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7106,7 +7106,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: 'async-flush'; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: 'cause-read'; readonly dependencyDisconnect: 'dependency-disconnect'; readonly lifecycleHook: 'lifecycle-hook'; readonly ssrResource: 'ssr-resource'; readonly subscriptionListener: 'subscription-listener'; readonly traceListener: 'trace-listener'; };",
           "guidance": [
             {
               "id": "8-生命周期-错误与边界",

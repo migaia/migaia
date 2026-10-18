@@ -2425,7 +2425,7 @@
         {
           "name": "ConflictPolicy",
           "kind": "const",
-          "signature": "export declare const ConflictPolicy: Readonly<{ readonly conflict: \"conflict\"; readonly replace: \"replace\"; }>;",
+          "signature": "export declare const ConflictPolicy: Readonly<{ readonly conflict: 'conflict'; readonly replace: 'replace'; }>;",
           "declarationLine": 21,
           "source": "packages/storage-contract/dist/context.d.ts",
           "purpose": "Frozen public existing-key policy values consumed by write and transaction contexts. Conflict rejects an existing key; replace deliberately allows overwriting under the backend’s commit semantics.",
@@ -2449,26 +2449,26 @@
               "name": "conflict",
               "kind": "property",
               "optional": false,
-              "signature": "readonly conflict: \"conflict\";",
+              "signature": "readonly conflict: 'conflict';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"conflict\""
+              "returns": "'conflict'"
             },
             {
               "name": "replace",
               "kind": "property",
               "optional": false,
-              "signature": "readonly replace: \"replace\";",
+              "signature": "readonly replace: 'replace';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"replace\""
+              "returns": "'replace'"
             }
           ],
           "composes": [],
           "aliasOf": "ConflictPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ConflictPolicy: Readonly<{ readonly conflict: \"conflict\"; readonly replace: \"replace\"; }>;"
+            "export declare const ConflictPolicy: Readonly<{ readonly conflict: 'conflict'; readonly replace: 'replace'; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2507,7 +2507,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/context.d.ts:ConflictPolicy:export declare const ConflictPolicy: Readonly<{ readonly conflict: \"conflict\"; readonly replace: \"replace\"; }>;",
+          "identity": "packages/storage-contract/dist/context.d.ts:ConflictPolicy:export declare const ConflictPolicy: Readonly<{ readonly conflict: 'conflict'; readonly replace: 'replace'; }>;",
           "guidance": [
             {
               "id": "context-operation-context-模块-操作上下文与写选项",
@@ -5908,7 +5908,7 @@
           "name": "isStorageCapabilities",
           "kind": "const",
           "signature": "export declare const isStorageCapabilities: (value: unknown) => value is IStorageCapabilities;",
-          "declarationLine": 29,
+          "declarationLine": 31,
           "source": "packages/storage-contract/dist/capabilities.d.ts",
           "purpose": "Checks the runtime capability descriptor through the same single-read snapshot admission. It accepts omitted legacy change-feed and secondary-index flags without mutating the supplied object.",
           "core": "value: Unknown descriptor obtained from a backend or extension boundary.\nTrue when a normalized capability snapshot can be created, otherwise false.",
@@ -8554,7 +8554,7 @@
           "name": "snapshotStorageCapabilities",
           "kind": "const",
           "signature": "export declare const snapshotStorageCapabilities: (value: unknown) => IStorageCapabilities | undefined;",
-          "declarationLine": 27,
+          "declarationLine": 29,
           "source": "packages/storage-contract/dist/capabilities.d.ts",
           "purpose": "Reads each capability field once and normalizes legacy missing changeFeed and secondaryIndexes flags to false. Invalid types or thrown accessors return undefined; no storage method is invoked.",
           "core": "value: Unknown capability object issued by a concrete backend implementation.\nA fresh `IStorageCapabilities` plain snapshot, or undefined; maxValueBytes must be a nonnegative safe integer or undefined.",
@@ -9450,7 +9450,7 @@
         {
           "name": "StorageContractErrorCode",
           "kind": "const",
-          "signature": "export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: \"INVALID_ARGUMENT\"; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: \"INVALID_KEY\"; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: \"UNSUPPORTED_CAPABILITY\"; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: \"STORE_DISPOSED\"; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: \"ABORTED\"; }>;",
+          "signature": "export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: 'INVALID_KEY'; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: 'UNSUPPORTED_CAPABILITY'; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: 'STORE_DISPOSED'; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: 'ABORTED'; }>;",
           "declarationLine": 10,
           "source": "packages/storage-contract/dist/error-code.d.ts",
           "purpose": "Frozen table of stable contract error codes. The source/code pair identifies input, key, capability, lifecycle and cancellation failures independently of a concrete backend implementation.",
@@ -9472,53 +9472,53 @@
               "name": "invalidArgument",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidArgument: \"INVALID_ARGUMENT\";",
+              "signature": "readonly invalidArgument: 'INVALID_ARGUMENT';",
               "description": "A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes.",
               "parameterDetails": [],
-              "returns": "\"INVALID_ARGUMENT\""
+              "returns": "'INVALID_ARGUMENT'"
             },
             {
               "name": "invalidKey",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidKey: \"INVALID_KEY\";",
+              "signature": "readonly invalidKey: 'INVALID_KEY';",
               "description": "An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key.",
               "parameterDetails": [],
-              "returns": "\"INVALID_KEY\""
+              "returns": "'INVALID_KEY'"
             },
             {
               "name": "unsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unsupported: \"UNSUPPORTED_CAPABILITY\";",
+              "signature": "readonly unsupported: 'UNSUPPORTED_CAPABILITY';",
               "description": "An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back.",
               "parameterDetails": [],
-              "returns": "\"UNSUPPORTED_CAPABILITY\""
+              "returns": "'UNSUPPORTED_CAPABILITY'"
             },
             {
               "name": "disposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposed: \"STORE_DISPOSED\";",
+              "signature": "readonly disposed: 'STORE_DISPOSED';",
               "description": "A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance.",
               "parameterDetails": [],
-              "returns": "\"STORE_DISPOSED\""
+              "returns": "'STORE_DISPOSED'"
             },
             {
               "name": "aborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly aborted: \"ABORTED\";",
+              "signature": "readonly aborted: 'ABORTED';",
               "description": "`IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback.",
               "parameterDetails": [],
-              "returns": "\"ABORTED\""
+              "returns": "'ABORTED'"
             }
           ],
           "composes": [],
           "aliasOf": "StorageContractErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: \"INVALID_ARGUMENT\"; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: \"INVALID_KEY\"; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: \"UNSUPPORTED_CAPABILITY\"; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: \"STORE_DISPOSED\"; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: \"ABORTED\"; }>;"
+            "export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: 'INVALID_KEY'; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: 'UNSUPPORTED_CAPABILITY'; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: 'STORE_DISPOSED'; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: 'ABORTED'; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -9557,7 +9557,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/error-code.d.ts:StorageContractErrorCode:export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: \"INVALID_ARGUMENT\"; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: \"INVALID_KEY\"; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: \"UNSUPPORTED_CAPABILITY\"; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: \"STORE_DISPOSED\"; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: \"ABORTED\"; }>;",
+          "identity": "packages/storage-contract/dist/error-code.d.ts:StorageContractErrorCode:export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: 'INVALID_KEY'; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: 'UNSUPPORTED_CAPABILITY'; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: 'STORE_DISPOSED'; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: 'ABORTED'; }>;",
           "guidance": [
             {
               "id": "errors-模块",

@@ -4039,7 +4039,7 @@
         {
           "name": "MiddlewareCommandType",
           "kind": "const",
-          "signature": "export declare const MiddlewareCommandType: { readonly commit: \"commit\"; readonly jump: \"jump\"; readonly reset: \"reset\"; };",
+          "signature": "export declare const MiddlewareCommandType: { readonly commit: 'commit'; readonly jump: 'jump'; readonly reset: 'reset'; };",
           "declarationLine": 8,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Normalized DevTools commands commit, jump and reset; the adapter maps extension messages to these values before host state application.",
@@ -4059,35 +4059,35 @@
               "name": "commit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly commit: \"commit\";",
+              "signature": "readonly commit: 'commit';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"commit\""
+              "returns": "'commit'"
             },
             {
               "name": "jump",
               "kind": "property",
               "optional": false,
-              "signature": "readonly jump: \"jump\";",
+              "signature": "readonly jump: 'jump';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"jump\""
+              "returns": "'jump'"
             },
             {
               "name": "reset",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reset: \"reset\";",
+              "signature": "readonly reset: 'reset';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"reset\""
+              "returns": "'reset'"
             }
           ],
           "composes": [],
           "aliasOf": "MiddlewareCommandType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewareCommandType: { readonly commit: \"commit\"; readonly jump: \"jump\"; readonly reset: \"reset\"; };"
+            "export declare const MiddlewareCommandType: { readonly commit: 'commit'; readonly jump: 'jump'; readonly reset: 'reset'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4126,7 +4126,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareCommandType:export declare const MiddlewareCommandType: { readonly commit: \"commit\"; readonly jump: \"jump\"; readonly reset: \"reset\"; };",
+          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareCommandType:export declare const MiddlewareCommandType: { readonly commit: 'commit'; readonly jump: 'jump'; readonly reset: 'reset'; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -4135,7 +4135,7 @@
         {
           "name": "MiddlewareEventPhase",
           "kind": "const",
-          "signature": "export declare const MiddlewareEventPhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; };",
+          "signature": "export declare const MiddlewareEventPhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; };",
           "declarationLine": 14,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Canonical synchronous action phases start, end and error; diagnostic error events use separate caller phase strings.",
@@ -4155,35 +4155,35 @@
               "name": "start",
               "kind": "property",
               "optional": false,
-              "signature": "readonly start: \"start\";",
+              "signature": "readonly start: 'start';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"start\""
+              "returns": "'start'"
             },
             {
               "name": "end",
               "kind": "property",
               "optional": false,
-              "signature": "readonly end: \"end\";",
+              "signature": "readonly end: 'end';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"end\""
+              "returns": "'end'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             }
           ],
           "composes": [],
           "aliasOf": "MiddlewareEventPhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewareEventPhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; };"
+            "export declare const MiddlewareEventPhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4222,7 +4222,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventPhase:export declare const MiddlewareEventPhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; };",
+          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventPhase:export declare const MiddlewareEventPhase: { readonly start: 'start'; readonly end: 'end'; readonly error: 'error'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -4231,7 +4231,7 @@
         {
           "name": "MiddlewareEventType",
           "kind": "const",
-          "signature": "export declare const MiddlewareEventType: { readonly action: \"action\"; readonly state: \"state\"; readonly error: \"error\"; };",
+          "signature": "export declare const MiddlewareEventType: { readonly action: 'action'; readonly state: 'state'; readonly error: 'error'; };",
           "declarationLine": 2,
           "source": "packages/store-middleware/dist/event-constants.d.ts",
           "purpose": "Canonical action, state and error domain event discriminants emitted by Store hosts and bindings; use them for plugin event selection.",
@@ -4251,35 +4251,35 @@
               "name": "action",
               "kind": "property",
               "optional": false,
-              "signature": "readonly action: \"action\";",
+              "signature": "readonly action: 'action';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"action\""
+              "returns": "'action'"
             },
             {
               "name": "state",
               "kind": "property",
               "optional": false,
-              "signature": "readonly state: \"state\";",
+              "signature": "readonly state: 'state';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"state\""
+              "returns": "'state'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             }
           ],
           "composes": [],
           "aliasOf": "MiddlewareEventType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewareEventType: { readonly action: \"action\"; readonly state: \"state\"; readonly error: \"error\"; };"
+            "export declare const MiddlewareEventType: { readonly action: 'action'; readonly state: 'state'; readonly error: 'error'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4318,7 +4318,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventType:export declare const MiddlewareEventType: { readonly action: \"action\"; readonly state: \"state\"; readonly error: \"error\"; };",
+          "identity": "packages/store-middleware/dist/event-constants.d.ts:MiddlewareEventType:export declare const MiddlewareEventType: { readonly action: 'action'; readonly state: 'state'; readonly error: 'error'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -4486,7 +4486,7 @@
         {
           "name": "ReduxDevToolsCommand",
           "kind": "const",
-          "signature": "export declare const ReduxDevToolsCommand: { readonly dispatch: \"DISPATCH\"; readonly commit: \"COMMIT\"; readonly jumpToState: \"JUMP_TO_STATE\"; readonly jumpToAction: \"JUMP_TO_ACTION\"; readonly rollback: \"ROLLBACK\"; readonly reset: \"RESET\"; };",
+          "signature": "export declare const ReduxDevToolsCommand: { readonly dispatch: 'DISPATCH'; readonly commit: 'COMMIT'; readonly jumpToState: 'JUMP_TO_STATE'; readonly jumpToAction: 'JUMP_TO_ACTION'; readonly rollback: 'ROLLBACK'; readonly reset: 'RESET'; };",
           "declarationLine": 2,
           "source": "packages/store-middleware/dist/devtools-constants.d.ts",
           "purpose": "Canonical Redux extension wire vocabulary consumed by createReduxDevToolsAdapter and custom bridges. This owner replaces StoreDevtoolsCommand imports from store-devtools; normalized domain commands still use MiddlewareCommandType.",
@@ -4503,62 +4503,62 @@
               "name": "dispatch",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dispatch: \"DISPATCH\";",
+              "signature": "readonly dispatch: 'DISPATCH';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"DISPATCH\""
+              "returns": "'DISPATCH'"
             },
             {
               "name": "commit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly commit: \"COMMIT\";",
+              "signature": "readonly commit: 'COMMIT';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"COMMIT\""
+              "returns": "'COMMIT'"
             },
             {
               "name": "jumpToState",
               "kind": "property",
               "optional": false,
-              "signature": "readonly jumpToState: \"JUMP_TO_STATE\";",
+              "signature": "readonly jumpToState: 'JUMP_TO_STATE';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"JUMP_TO_STATE\""
+              "returns": "'JUMP_TO_STATE'"
             },
             {
               "name": "jumpToAction",
               "kind": "property",
               "optional": false,
-              "signature": "readonly jumpToAction: \"JUMP_TO_ACTION\";",
+              "signature": "readonly jumpToAction: 'JUMP_TO_ACTION';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"JUMP_TO_ACTION\""
+              "returns": "'JUMP_TO_ACTION'"
             },
             {
               "name": "rollback",
               "kind": "property",
               "optional": false,
-              "signature": "readonly rollback: \"ROLLBACK\";",
+              "signature": "readonly rollback: 'ROLLBACK';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ROLLBACK\""
+              "returns": "'ROLLBACK'"
             },
             {
               "name": "reset",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reset: \"RESET\";",
+              "signature": "readonly reset: 'RESET';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"RESET\""
+              "returns": "'RESET'"
             }
           ],
           "composes": [],
           "aliasOf": "ReduxDevToolsCommand",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReduxDevToolsCommand: { readonly dispatch: \"DISPATCH\"; readonly commit: \"COMMIT\"; readonly jumpToState: \"JUMP_TO_STATE\"; readonly jumpToAction: \"JUMP_TO_ACTION\"; readonly rollback: \"ROLLBACK\"; readonly reset: \"RESET\"; };"
+            "export declare const ReduxDevToolsCommand: { readonly dispatch: 'DISPATCH'; readonly commit: 'COMMIT'; readonly jumpToState: 'JUMP_TO_STATE'; readonly jumpToAction: 'JUMP_TO_ACTION'; readonly rollback: 'ROLLBACK'; readonly reset: 'RESET'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4597,7 +4597,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/devtools-constants.d.ts:ReduxDevToolsCommand:export declare const ReduxDevToolsCommand: { readonly dispatch: \"DISPATCH\"; readonly commit: \"COMMIT\"; readonly jumpToState: \"JUMP_TO_STATE\"; readonly jumpToAction: \"JUMP_TO_ACTION\"; readonly rollback: \"ROLLBACK\"; readonly reset: \"RESET\"; };",
+          "identity": "packages/store-middleware/dist/devtools-constants.d.ts:ReduxDevToolsCommand:export declare const ReduxDevToolsCommand: { readonly dispatch: 'DISPATCH'; readonly commit: 'COMMIT'; readonly jumpToState: 'JUMP_TO_STATE'; readonly jumpToAction: 'JUMP_TO_ACTION'; readonly rollback: 'ROLLBACK'; readonly reset: 'RESET'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4701,7 +4701,7 @@
         {
           "name": "StoreMiddlewareErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: \"MIDDLEWARE_NOT_CHAINED\"; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: \"ACTION_SCOPE_REQUIRED\"; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: \"CLONE_UNSUPPORTED\"; /** * A synchronous action or binding disposer callback fails without another module identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: \"DEVTOOLS_MESSAGE_INVALID\"; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: \"DEVTOOLS_CAPABILITY\"; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "signature": "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action or binding disposer callback fails without another module identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "declarationLine": 11,
           "source": "packages/store-middleware/dist/error-code.d.ts",
           "purpose": "Stable package codes for invalid host input, action guards, missing pipeline continuation, cloning capabilities, DevTools application and binding cleanup.",
@@ -4724,89 +4724,89 @@
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "middlewareNotChained",
               "kind": "property",
               "optional": false,
-              "signature": "readonly middlewareNotChained: \"MIDDLEWARE_NOT_CHAINED\";",
+              "signature": "readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED';",
               "description": "A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional.",
               "parameterDetails": [],
-              "returns": "\"MIDDLEWARE_NOT_CHAINED\""
+              "returns": "'MIDDLEWARE_NOT_CHAINED'"
             },
             {
               "name": "actionScopeRequired",
               "kind": "property",
               "optional": false,
-              "signature": "readonly actionScopeRequired: \"ACTION_SCOPE_REQUIRED\";",
+              "signature": "readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED';",
               "description": "A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode.",
               "parameterDetails": [],
-              "returns": "\"ACTION_SCOPE_REQUIRED\""
+              "returns": "'ACTION_SCOPE_REQUIRED'"
             },
             {
               "name": "cloneUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cloneUnsupported: \"CLONE_UNSUPPORTED\";",
+              "signature": "readonly cloneUnsupported: 'CLONE_UNSUPPORTED';",
               "description": "`ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable.",
               "parameterDetails": [],
-              "returns": "\"CLONE_UNSUPPORTED\""
+              "returns": "'CLONE_UNSUPPORTED'"
             },
             {
               "name": "callbackFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly callbackFailed: \"CALLBACK_FAILED\";",
+              "signature": "readonly callbackFailed: 'CALLBACK_FAILED';",
               "description": "A synchronous action or binding disposer callback fails without another package identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once.",
               "parameterDetails": [],
-              "returns": "\"CALLBACK_FAILED\""
+              "returns": "'CALLBACK_FAILED'"
             },
             {
               "name": "devtoolsMessageInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly devtoolsMessageInvalid: \"DEVTOOLS_MESSAGE_INVALID\";",
+              "signature": "readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID';",
               "description": "A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work.",
               "parameterDetails": [],
-              "returns": "\"DEVTOOLS_MESSAGE_INVALID\""
+              "returns": "'DEVTOOLS_MESSAGE_INVALID'"
             },
             {
               "name": "devtoolsCapability",
               "kind": "property",
               "optional": false,
-              "signature": "readonly devtoolsCapability: \"DEVTOOLS_CAPABILITY\";",
+              "signature": "readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY';",
               "description": "A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands.",
               "parameterDetails": [],
-              "returns": "\"DEVTOOLS_CAPABILITY\""
+              "returns": "'DEVTOOLS_CAPABILITY'"
             },
             {
               "name": "envUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "signature": "readonly envUnsupported: 'ENV_UNSUPPORTED';",
               "description": "`ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability.",
               "parameterDetails": [],
-              "returns": "\"ENV_UNSUPPORTED\""
+              "returns": "'ENV_UNSUPPORTED'"
             },
             {
               "name": "cleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cleanupFailed: \"CLEANUP_FAILED\";",
+              "signature": "readonly cleanupFailed: 'CLEANUP_FAILED';",
               "description": "Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal.",
               "parameterDetails": [],
-              "returns": "\"CLEANUP_FAILED\""
+              "returns": "'CLEANUP_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreMiddlewareErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: \"MIDDLEWARE_NOT_CHAINED\"; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: \"ACTION_SCOPE_REQUIRED\"; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: \"CLONE_UNSUPPORTED\"; /** * A synchronous action or binding disposer callback fails without another module identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: \"DEVTOOLS_MESSAGE_INVALID\"; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: \"DEVTOOLS_CAPABILITY\"; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };"
+            "export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action or binding disposer callback fails without another module identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4845,7 +4845,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/error-code.d.ts:StoreMiddlewareErrorCode:export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: \"MIDDLEWARE_NOT_CHAINED\"; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: \"ACTION_SCOPE_REQUIRED\"; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: \"CLONE_UNSUPPORTED\"; /** * A synchronous action or binding disposer callback fails without another package identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: \"DEVTOOLS_MESSAGE_INVALID\"; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: \"DEVTOOLS_CAPABILITY\"; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "identity": "packages/store-middleware/dist/error-code.d.ts:StoreMiddlewareErrorCode:export declare const StoreMiddlewareErrorCode: { /** * Host options are not objects, or a DevTools adapter lacks init/send or has a non-callable * subscribe. */ readonly invalidOption: 'INVALID_OPTION'; /** * A middleware stage omits `next()`, filtering the event chain at that stage. * * This is reported through `reportError`, not thrown. Check whether `next(event)` is missing or * filtering is intentional. */ readonly middlewareNotChained: 'MIDDLEWARE_NOT_CHAINED'; /** * A store field is written directly outside a store method in `actions-only` mode. * * Write through store methods, `$set`, `$hydrate`, or `$batch`, or use `off` mode. */ readonly actionScopeRequired: 'ACTION_SCOPE_REQUIRED'; /** * `ClonePolicy.immutable` receives a custom class, accessor, unsupported native data value, or a * value the canonical structured clone cannot copy. Admission supports data-only records/arrays, * current-realm native Map/Set/Date/RegExp and non-shared ArrayBuffer/view storage. * * Use `ClonePolicy.diagnostic` or `ClonePolicy.opaque`, or make the subtree cloneable. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * A synchronous action or binding disposer callback fails without another package identity. * Native mutable errors retain their object/type/stack; fallback cause/errors retain the * original. The action scope still exits and each binding cleanup is attempted once. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * A supported Redux state command contains invalid JSON. The adapter ignores that command and * reports its original SyntaxError through the requested Runtime; later valid commands still * work. */ readonly devtoolsMessageInvalid: 'DEVTOOLS_MESSAGE_INVALID'; /** * A DevTools state command, such as jump or reset, is called without `applyState`. * * Provide `applyState` in the `bindStoreMiddleware` core or avoid state commands. */ readonly devtoolsCapability: 'DEVTOOLS_CAPABILITY'; /** * `ClonePolicy.immutable` requires `structuredClone`, but the environment does not provide it. * * Provide a polyfill or use `diagnostic` or `opaque`. This is a missing deployment capability. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Binding or host cleanup failed after all cleanup actions were attempted. The caller must * inspect `errors[]` and treat the host as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "guidance": [
             {
               "id": "错误构造入口",

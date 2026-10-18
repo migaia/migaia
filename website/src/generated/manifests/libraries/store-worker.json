@@ -2642,11 +2642,11 @@
         {
           "name": "StoreWorkerErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: \"ADAPTER_DISPOSED\"; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\"; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\"; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "signature": "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "declarationLine": 11,
           "source": "packages/store-worker/dist/error-code.d.ts",
           "purpose": "Stable Worker bridge and serializer failure codes; canonical RPC/Resource failures may retain their own package identity.",
-          "core": "invalidOption: Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered AggregateError retains both.",
+          "core": "invalidOption: Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered CLEANUP_FAILED AggregateError retains both. A single cleanup failure keeps its existing identity and does not receive this aggregate code.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -2667,62 +2667,62 @@
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "adapterDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly adapterDisposed: \"ADAPTER_DISPOSED\";",
+              "signature": "readonly adapterDisposed: 'ADAPTER_DISPOSED';",
               "description": "A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance.",
               "parameterDetails": [],
-              "returns": "\"ADAPTER_DISPOSED\""
+              "returns": "'ADAPTER_DISPOSED'"
             },
             {
               "name": "requestAborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly requestAborted: \"REQUEST_ABORTED\";",
+              "signature": "readonly requestAborted: 'REQUEST_ABORTED';",
               "description": "Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe.",
               "parameterDetails": [],
-              "returns": "\"REQUEST_ABORTED\""
+              "returns": "'REQUEST_ABORTED'"
             },
             {
               "name": "invalidRequestChunk",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\";",
+              "signature": "readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK';",
               "description": "A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error.",
               "parameterDetails": [],
-              "returns": "\"INVALID_REQUEST_CHUNK\""
+              "returns": "'INVALID_REQUEST_CHUNK'"
             },
             {
               "name": "invalidResponseChunk",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\";",
+              "signature": "readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK';",
               "description": "A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error.",
               "parameterDetails": [],
-              "returns": "\"INVALID_RESPONSE_CHUNK\""
+              "returns": "'INVALID_RESPONSE_CHUNK'"
             },
             {
               "name": "cleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cleanupFailed: \"CLEANUP_FAILED\";",
+              "signature": "readonly cleanupFailed: 'CLEANUP_FAILED';",
               "description": "Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal.",
               "parameterDetails": [],
-              "returns": "\"CLEANUP_FAILED\""
+              "returns": "'CLEANUP_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreWorkerErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: \"ADAPTER_DISPOSED\"; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\"; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\"; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };"
+            "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2752,7 +2752,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "invalidOption: Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered AggregateError retains both."
+              "content": "invalidOption: Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered CLEANUP_FAILED AggregateError retains both. A single cleanup failure keeps its existing identity and does not receive this aggregate code."
             },
             {
               "id": "advanced-usage",
@@ -2761,7 +2761,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/error-code.d.ts:StoreWorkerErrorCode:export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: \"ADAPTER_DISPOSED\"; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\"; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\"; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "identity": "packages/store-worker/dist/error-code.d.ts:StoreWorkerErrorCode:export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "guidance": [
             {
               "id": "7-2-storeworkererrorcode-与错误工厂",
@@ -2919,7 +2919,7 @@
           "declarationLine": 8,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "Creates a main-side client that asynchronously initializes a canonical worker endpoint; requests await readiness automatically. Pair it with createWorkerHandler on the worker. It borrows the supplied Worker and never terminates it.",
-          "core": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nOmitted: no default request deadline is supplied.",
+          "core": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nOmitted: no default request deadline is supplied.",
           "advanced": "Offload computation then connect its result to a Resource.",
           "parameters": [
             "port: IWorkerPort",
@@ -3040,7 +3040,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nOmitted: no default request deadline is supplied."
+              "content": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nOmitted: no default request deadline is supplied."
             },
             {
               "id": "advanced-usage",
@@ -3088,7 +3088,7 @@
         {
           "name": "WorkerByteOwnership",
           "kind": "const",
-          "signature": "export declare const WorkerByteOwnership: { readonly copy: \"copy\"; readonly transfer: \"transfer\"; };",
+          "signature": "export declare const WorkerByteOwnership: { readonly copy: 'copy'; readonly transfer: 'transfer'; };",
           "declarationLine": 6,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "Input byte transfer-list policy constants. Native transfer ownership risks remain even though current portable conversion does not promise zero-copy.",
@@ -3109,26 +3109,26 @@
               "name": "copy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly copy: \"copy\";",
+              "signature": "readonly copy: 'copy';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"copy\""
+              "returns": "'copy'"
             },
             {
               "name": "transfer",
               "kind": "property",
               "optional": false,
-              "signature": "readonly transfer: \"transfer\";",
+              "signature": "readonly transfer: 'transfer';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"transfer\""
+              "returns": "'transfer'"
             }
           ],
           "composes": [],
           "aliasOf": "WorkerByteOwnership",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const WorkerByteOwnership: { readonly copy: \"copy\"; readonly transfer: \"transfer\"; };"
+            "export declare const WorkerByteOwnership: { readonly copy: 'copy'; readonly transfer: 'transfer'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3167,7 +3167,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerByteOwnership:export declare const WorkerByteOwnership: { readonly copy: \"copy\"; readonly transfer: \"transfer\"; };",
+          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerByteOwnership:export declare const WorkerByteOwnership: { readonly copy: 'copy'; readonly transfer: 'transfer'; };",
           "guidance": [],
           "usageScore": 44,
           "configuration": [],
@@ -3438,7 +3438,7 @@
         {
           "name": "WorkerDiagnosticType",
           "kind": "const",
-          "signature": "export declare const WorkerDiagnosticType: { readonly worker: \"worker\"; };",
+          "signature": "export declare const WorkerDiagnosticType: { readonly worker: 'worker'; };",
           "declarationLine": 2,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "Default worker parser name, registry format and codec diagnostic type when no explicit type is provided.",
@@ -3460,17 +3460,17 @@
               "name": "worker",
               "kind": "property",
               "optional": false,
-              "signature": "readonly worker: \"worker\";",
+              "signature": "readonly worker: 'worker';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"worker\""
+              "returns": "'worker'"
             }
           ],
           "composes": [],
           "aliasOf": "WorkerDiagnosticType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const WorkerDiagnosticType: { readonly worker: \"worker\"; };"
+            "export declare const WorkerDiagnosticType: { readonly worker: 'worker'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3509,7 +3509,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerDiagnosticType:export declare const WorkerDiagnosticType: { readonly worker: \"worker\"; };",
+          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerDiagnosticType:export declare const WorkerDiagnosticType: { readonly worker: 'worker'; };",
           "guidance": [],
           "usageScore": 56,
           "configuration": [],

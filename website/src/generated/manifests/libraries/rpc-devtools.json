@@ -1075,9 +1075,9 @@
           "ownerFragment": "rpc-devtools-contract--RPC_DEVTOOLS_SOURCE"
         },
         {
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: \"TARGET_RELEASE_FAILED\"; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "name": "RpcDevtoolsErrorCode",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: \"TARGET_RELEASE_FAILED\"; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./contract",
@@ -2215,10 +2215,10 @@
               "name": "format",
               "kind": "property",
               "optional": false,
-              "signature": "readonly format: \"migaia-rpc-devtools\";",
+              "signature": "readonly format: 'migaia-rpc-devtools';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"migaia-rpc-devtools\""
+              "returns": "'migaia-rpc-devtools'"
             },
             {
               "name": "version",
@@ -3045,7 +3045,7 @@
         {
           "name": "RpcDevtoolsErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: \"TARGET_RELEASE_FAILED\"; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Stable semantic error vocabulary for options, collector lifecycle, recording, portable service conversion and hub target ownership. Original causes remain reachable through native error chains.",
@@ -3062,98 +3062,98 @@
               "name": "serviceResultInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\";",
+              "signature": "readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID';",
               "description": "Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure.",
               "parameterDetails": [],
-              "returns": "\"SERVICE_RESULT_INVALID\""
+              "returns": "'SERVICE_RESULT_INVALID'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Collector/hub options violate their supported domain; fix the option before construction (R5).",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "closed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closed: \"CLOSED\";",
+              "signature": "readonly closed: 'CLOSED';",
               "description": "Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5).",
               "parameterDetails": [],
-              "returns": "\"CLOSED\""
+              "returns": "'CLOSED'"
             },
             {
               "name": "recordActive",
               "kind": "property",
               "optional": false,
-              "signature": "readonly recordActive: \"RECORD_ACTIVE\";",
+              "signature": "readonly recordActive: 'RECORD_ACTIVE';",
               "description": "A recording already owns the collector; stop it before starting another (collector R3).",
               "parameterDetails": [],
-              "returns": "\"RECORD_ACTIVE\""
+              "returns": "'RECORD_ACTIVE'"
             },
             {
               "name": "recordNotActive",
               "kind": "property",
               "optional": false,
-              "signature": "readonly recordNotActive: \"RECORD_NOT_ACTIVE\";",
+              "signature": "readonly recordNotActive: 'RECORD_NOT_ACTIVE';",
               "description": "No recording remains active; start one before stopping it (collector R3).",
               "parameterDetails": [],
-              "returns": "\"RECORD_NOT_ACTIVE\""
+              "returns": "'RECORD_NOT_ACTIVE'"
             },
             {
               "name": "recordFormatInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\";",
+              "signature": "readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID';",
               "description": "Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4).",
               "parameterDetails": [],
-              "returns": "\"RECORD_FORMAT_INVALID\""
+              "returns": "'RECORD_FORMAT_INVALID'"
             },
             {
               "name": "redactFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly redactFailed: \"REDACT_FAILED\";",
+              "signature": "readonly redactFailed: 'REDACT_FAILED';",
               "description": "Redaction failed; report the original cause and discard content (collector §5).",
               "parameterDetails": [],
-              "returns": "\"REDACT_FAILED\""
+              "returns": "'REDACT_FAILED'"
             },
             {
               "name": "targetDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly targetDuplicate: \"TARGET_DUPLICATE\";",
+              "signature": "readonly targetDuplicate: 'TARGET_DUPLICATE';",
               "description": "A hub target name is registered; remove it before replacement (hub R1).",
               "parameterDetails": [],
-              "returns": "\"TARGET_DUPLICATE\""
+              "returns": "'TARGET_DUPLICATE'"
             },
             {
               "name": "targetUnknown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly targetUnknown: \"TARGET_UNKNOWN\";",
+              "signature": "readonly targetUnknown: 'TARGET_UNKNOWN';",
               "description": "A hub operation names an unknown target; register it before use (hub R1).",
               "parameterDetails": [],
-              "returns": "\"TARGET_UNKNOWN\""
+              "returns": "'TARGET_UNKNOWN'"
             },
             {
               "name": "targetReleaseFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly targetReleaseFailed: \"TARGET_RELEASE_FAILED\";",
+              "signature": "readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED';",
               "description": "Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup.",
               "parameterDetails": [],
-              "returns": "\"TARGET_RELEASE_FAILED\""
+              "returns": "'TARGET_RELEASE_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "RpcDevtoolsErrorCode",
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: \"TARGET_RELEASE_FAILED\"; };"
+            "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3192,7 +3192,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: \"TARGET_RELEASE_FAILED\"; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "guidance": [
             {
               "id": "4-错误身份",
@@ -3212,7 +3212,7 @@
         {
           "name": "RpcDevtoolsRecordFormat",
           "kind": "const",
-          "signature": "export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;",
+          "signature": "export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: 'migaia-rpc-devtools'; readonly version: 1; }>;",
           "declarationLine": 3,
           "source": "packages/rpc-devtools/dist/contract/record.d.ts",
           "purpose": "Frozen version-one record header identity containing format migaia-rpc-devtools and version one. Use the same object when constructing records for the codec; it carries no clock or descriptor metadata.",
@@ -3233,10 +3233,10 @@
               "name": "format",
               "kind": "property",
               "optional": false,
-              "signature": "readonly format: \"migaia-rpc-devtools\";",
+              "signature": "readonly format: 'migaia-rpc-devtools';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"migaia-rpc-devtools\""
+              "returns": "'migaia-rpc-devtools'"
             },
             {
               "name": "version",
@@ -3252,7 +3252,7 @@
           "aliasOf": "RpcDevtoolsRecordFormat",
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;"
+            "export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: 'migaia-rpc-devtools'; readonly version: 1; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3291,7 +3291,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/record.d.ts:RpcDevtoolsRecordFormat:export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/record.d.ts:RpcDevtoolsRecordFormat:export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: 'migaia-rpc-devtools'; readonly version: 1; }>;",
           "guidance": [],
           "usageScore": 40,
           "configuration": [],
@@ -4244,7 +4244,7 @@
         {
           "name": "RpcDevtoolsTargetStatus",
           "kind": "const",
-          "signature": "export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
+          "signature": "export declare const RpcDevtoolsTargetStatus: { readonly connecting: 'connecting'; readonly connected: 'connected'; readonly disconnected: 'disconnected'; readonly offline: 'offline'; readonly removed: 'removed'; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/hub/types.d.ts",
           "purpose": "Target lifecycle values emitted by hub status observations and returned by status queries. These values describe connectivity or offline ownership and are never thrown error codes.",
@@ -4261,52 +4261,52 @@
               "name": "connecting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly connecting: \"connecting\";",
+              "signature": "readonly connecting: 'connecting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"connecting\""
+              "returns": "'connecting'"
             },
             {
               "name": "connected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly connected: \"connected\";",
+              "signature": "readonly connected: 'connected';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"connected\""
+              "returns": "'connected'"
             },
             {
               "name": "disconnected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disconnected: \"disconnected\";",
+              "signature": "readonly disconnected: 'disconnected';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"disconnected\""
+              "returns": "'disconnected'"
             },
             {
               "name": "offline",
               "kind": "property",
               "optional": false,
-              "signature": "readonly offline: \"offline\";",
+              "signature": "readonly offline: 'offline';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"offline\""
+              "returns": "'offline'"
             },
             {
               "name": "removed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly removed: \"removed\";",
+              "signature": "readonly removed: 'removed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"removed\""
+              "returns": "'removed'"
             }
           ],
           "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
-            "export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };",
+            "export declare const RpcDevtoolsTargetStatus: { readonly connecting: 'connecting'; readonly connected: 'connected'; readonly disconnected: 'disconnected'; readonly offline: 'offline'; readonly removed: 'removed'; };",
             "export type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;"
           ],
           "overloadParameterDetails": [[], []],
@@ -4346,7 +4346,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:RpcDevtoolsTargetStatus:export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:RpcDevtoolsTargetStatus:export declare const RpcDevtoolsTargetStatus: { readonly connecting: 'connecting'; readonly connected: 'connected'; readonly disconnected: 'disconnected'; readonly offline: 'offline'; readonly removed: 'removed'; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

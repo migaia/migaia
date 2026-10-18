@@ -3278,37 +3278,37 @@
               "name": "value",
               "kind": "property",
               "optional": false,
-              "signature": "readonly value: \"value\";",
+              "signature": "readonly value: 'value';",
               "description": "Plain data label used by static admission and entry diagnostics.",
               "parameterDetails": [],
-              "returns": "\"value\""
+              "returns": "'value'"
             },
             {
               "name": "computed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly computed: \"computed\";",
+              "signature": "readonly computed: 'computed';",
               "description": "Derived-data label; dependency execution still belongs to Capability Graph.",
               "parameterDetails": [],
-              "returns": "\"computed\""
+              "returns": "'computed'"
             },
             {
               "name": "resource",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resource: \"resource\";",
+              "signature": "readonly resource: 'resource';",
               "description": "Resource label; the returned release descriptor still owns its lifetime.",
               "parameterDetails": [],
-              "returns": "\"resource\""
+              "returns": "'resource'"
             },
             {
               "name": "service",
               "kind": "property",
               "optional": false,
-              "signature": "readonly service: \"service\";",
+              "signature": "readonly service: 'service';",
               "description": "Service label for externally consumed capabilities without a second lifecycle.",
               "parameterDetails": [],
-              "returns": "\"service\""
+              "returns": "'service'"
             }
           ],
           "composes": [],
@@ -6954,7 +6954,7 @@
         {
           "name": "TrayErrorCode",
           "kind": "const",
-          "signature": "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\"; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\"; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: \"TRAY_TOPIC_INVALID\"; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };",
+          "signature": "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
           "declarationLine": 2,
           "source": "packages/tray/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
@@ -6974,287 +6974,287 @@
               "name": "hostUnavailable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\";",
+              "signature": "readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE';",
               "description": "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
               "parameterDetails": [],
-              "returns": "\"TRAY_HOST_UNAVAILABLE\""
+              "returns": "'TRAY_HOST_UNAVAILABLE'"
             },
             {
               "name": "routingUnknown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\";",
+              "signature": "readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN';",
               "description": "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
               "parameterDetails": [],
-              "returns": "\"TRAY_ROUTING_UNKNOWN\""
+              "returns": "'TRAY_ROUTING_UNKNOWN'"
             },
             {
               "name": "topicInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly topicInvalid: \"TRAY_TOPIC_INVALID\";",
+              "signature": "readonly topicInvalid: 'TRAY_TOPIC_INVALID';",
               "description": "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
               "parameterDetails": [],
-              "returns": "\"TRAY_TOPIC_INVALID\""
+              "returns": "'TRAY_TOPIC_INVALID'"
             },
             {
               "name": "routingInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly routingInvalid: \"TRAY_ROUTING_INVALID\";",
+              "signature": "readonly routingInvalid: 'TRAY_ROUTING_INVALID';",
               "description": "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
               "parameterDetails": [],
-              "returns": "\"TRAY_ROUTING_INVALID\""
+              "returns": "'TRAY_ROUTING_INVALID'"
             },
             {
               "name": "hostInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostInvalid: \"TRAY_HOST_INVALID\";",
+              "signature": "readonly hostInvalid: 'TRAY_HOST_INVALID';",
               "description": "Host definition violates instances R1; provide an admitted host DSL.",
               "parameterDetails": [],
-              "returns": "\"TRAY_HOST_INVALID\""
+              "returns": "'TRAY_HOST_INVALID'"
             },
             {
               "name": "hostUnknown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostUnknown: \"TRAY_HOST_UNKNOWN\";",
+              "signature": "readonly hostUnknown: 'TRAY_HOST_UNKNOWN';",
               "description": "Spawn names an unregistered host in R3; register the host before spawning.",
               "parameterDetails": [],
-              "returns": "\"TRAY_HOST_UNKNOWN\""
+              "returns": "'TRAY_HOST_UNKNOWN'"
             },
             {
               "name": "hostMismatch",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostMismatch: \"TRAY_HOST_MISMATCH\";",
+              "signature": "readonly hostMismatch: 'TRAY_HOST_MISMATCH';",
               "description": "Remote host differs from the admission in R6; select the record's host.",
               "parameterDetails": [],
-              "returns": "\"TRAY_HOST_MISMATCH\""
+              "returns": "'TRAY_HOST_MISMATCH'"
             },
             {
               "name": "reservedName",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reservedName: \"TRAY_RESERVED_NAME\";",
+              "signature": "readonly reservedName: 'TRAY_RESERVED_NAME';",
               "description": "Expose uses a reserved internal plugin in R1; rename the business plugin.",
               "parameterDetails": [],
-              "returns": "\"TRAY_RESERVED_NAME\""
+              "returns": "'TRAY_RESERVED_NAME'"
             },
             {
               "name": "valueNotPortable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\";",
+              "signature": "readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE';",
               "description": "Config or payload violates R3/R6 portable data; remove unsupported values.",
               "parameterDetails": [],
-              "returns": "\"TRAY_VALUE_NOT_PORTABLE\""
+              "returns": "'TRAY_VALUE_NOT_PORTABLE'"
             },
             {
               "name": "instanceDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\";",
+              "signature": "readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE';",
               "description": "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
               "parameterDetails": [],
-              "returns": "\"TRAY_INSTANCE_DUPLICATE\""
+              "returns": "'TRAY_INSTANCE_DUPLICATE'"
             },
             {
               "name": "instanceUnknown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\";",
+              "signature": "readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN';",
               "description": "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
               "parameterDetails": [],
-              "returns": "\"TRAY_INSTANCE_UNKNOWN\""
+              "returns": "'TRAY_INSTANCE_UNKNOWN'"
             },
             {
               "name": "instanceNotReady",
               "kind": "property",
               "optional": false,
-              "signature": "readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\";",
+              "signature": "readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY';",
               "description": "Call targets a non-ready instance in R6; await its ready transition.",
               "parameterDetails": [],
-              "returns": "\"TRAY_INSTANCE_NOT_READY\""
+              "returns": "'TRAY_INSTANCE_NOT_READY'"
             },
             {
               "name": "instanceStartFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\";",
+              "signature": "readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED';",
               "description": "Install or generation init fails in R3/R5; inspect the preserved cause.",
               "parameterDetails": [],
-              "returns": "\"TRAY_INSTANCE_START_FAILED\""
+              "returns": "'TRAY_INSTANCE_START_FAILED'"
             },
             {
               "name": "pathNotExposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\";",
+              "signature": "readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED';",
               "description": "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
               "parameterDetails": [],
-              "returns": "\"TRAY_PATH_NOT_EXPOSED\""
+              "returns": "'TRAY_PATH_NOT_EXPOSED'"
             },
             {
               "name": "childStateInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\";",
+              "signature": "readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID';",
               "description": "Child init repeats or names another host in R2; init once per generation.",
               "parameterDetails": [],
-              "returns": "\"TRAY_CHILD_STATE_INVALID\""
+              "returns": "'TRAY_CHILD_STATE_INVALID'"
             },
             {
               "name": "disposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposed: \"TRAY_DISPOSED\";",
+              "signature": "readonly disposed: 'TRAY_DISPOSED';",
               "description": "Operation enters a closing registry in R3; create a new Tray.",
               "parameterDetails": [],
-              "returns": "\"TRAY_DISPOSED\""
+              "returns": "'TRAY_DISPOSED'"
             },
             {
               "name": "loaderContractInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\";",
+              "signature": "readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID';",
               "description": "Loader shape or artifact descriptor is invalid; repair the loader contract before retrying.",
               "parameterDetails": [],
-              "returns": "\"LOADER_CONTRACT_INVALID\""
+              "returns": "'LOADER_CONTRACT_INVALID'"
             },
             {
               "name": "loaderExecutionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\";",
+              "signature": "readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED';",
               "description": "Loader execution failed; inspect the preserved source error before deciding whether to retry.",
               "parameterDetails": [],
-              "returns": "\"LOADER_EXECUTION_FAILED\""
+              "returns": "'LOADER_EXECUTION_FAILED'"
             },
             {
               "name": "adapterContractInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\";",
+              "signature": "readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID';",
               "description": "Adapter shape or produced plugin is invalid; repair adapter compatibility.",
               "parameterDetails": [],
-              "returns": "\"ADAPTER_CONTRACT_INVALID\""
+              "returns": "'ADAPTER_CONTRACT_INVALID'"
             },
             {
               "name": "adapterExecutionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\";",
+              "signature": "readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED';",
               "description": "Adapter execution failed; inspect the preserved artifact compatibility cause.",
               "parameterDetails": [],
-              "returns": "\"ADAPTER_EXECUTION_FAILED\""
+              "returns": "'ADAPTER_EXECUTION_FAILED'"
             },
             {
               "name": "runtimeContractInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\";",
+              "signature": "readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID';",
               "description": "Runtime host, name, options, or callback violates the Runtime boundary contract.",
               "parameterDetails": [],
-              "returns": "\"RUNTIME_CONTRACT_INVALID\""
+              "returns": "'RUNTIME_CONTRACT_INVALID'"
             },
             {
               "name": "runtimeDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly runtimeDisposed: \"RUNTIME_DISPOSED\";",
+              "signature": "readonly runtimeDisposed: 'RUNTIME_DISPOSED';",
               "description": "Runtime admission was attempted after closing; create a fresh Runtime.",
               "parameterDetails": [],
-              "returns": "\"RUNTIME_DISPOSED\""
+              "returns": "'RUNTIME_DISPOSED'"
             },
             {
               "name": "runtimeExecutionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\";",
+              "signature": "readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED';",
               "description": "Runtime callback failed after exact lease admission; inspect the preserved callback cause.",
               "parameterDetails": [],
-              "returns": "\"RUNTIME_EXECUTION_FAILED\""
+              "returns": "'RUNTIME_EXECUTION_FAILED'"
             },
             {
               "name": "runtimeAborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly runtimeAborted: \"RUNTIME_ABORTED\";",
+              "signature": "readonly runtimeAborted: 'RUNTIME_ABORTED';",
               "description": "Runtime cancellation or deadline was observed; callback settlement still owns the lease.",
               "parameterDetails": [],
-              "returns": "\"RUNTIME_ABORTED\""
+              "returns": "'RUNTIME_ABORTED'"
             },
             {
               "name": "artifactCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\";",
+              "signature": "readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED';",
               "description": "An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors.",
               "parameterDetails": [],
-              "returns": "\"ARTIFACT_CLEANUP_FAILED\""
+              "returns": "'ARTIFACT_CLEANUP_FAILED'"
             },
             {
               "name": "invalidEntry",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidEntry: \"TRAY_INVALID_ENTRY\";",
+              "signature": "readonly invalidEntry: 'TRAY_INVALID_ENTRY';",
               "description": "An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host.",
               "parameterDetails": [],
-              "returns": "\"TRAY_INVALID_ENTRY\""
+              "returns": "'TRAY_INVALID_ENTRY'"
             },
             {
               "name": "duplicateEntry",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\";",
+              "signature": "readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY';",
               "description": "Duplicate key during factory admission; caller must provide unique keys.",
               "parameterDetails": [],
-              "returns": "\"TRAY_DUPLICATE_ENTRY\""
+              "returns": "'TRAY_DUPLICATE_ENTRY'"
             },
             {
               "name": "unknownEntry",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\";",
+              "signature": "readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY';",
               "description": "Unknown lookup or dependency key; caller must use an admitted key.",
               "parameterDetails": [],
-              "returns": "\"TRAY_UNKNOWN_ENTRY\""
+              "returns": "'TRAY_UNKNOWN_ENTRY'"
             },
             {
               "name": "unavailable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unavailable: \"TRAY_UNAVAILABLE\";",
+              "signature": "readonly unavailable: 'TRAY_UNAVAILABLE';",
               "description": "Entry is not ready or gate failed; caller must await readiness or repair the gate.",
               "parameterDetails": [],
-              "returns": "\"TRAY_UNAVAILABLE\""
+              "returns": "'TRAY_UNAVAILABLE'"
             },
             {
               "name": "gateReadFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\";",
+              "signature": "readonly gateReadFailed: 'TRAY_GATE_READ_FAILED';",
               "description": "Readiness getter failed; caller must inspect the preserved cause and fix the source.",
               "parameterDetails": [],
-              "returns": "\"TRAY_GATE_READ_FAILED\""
+              "returns": "'TRAY_GATE_READ_FAILED'"
             },
             {
               "name": "hostMutationBypass",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\";",
+              "signature": "readonly hostMutationBypass: 'HOST_MUTATION_BYPASS';",
               "description": "Managed reads detect a mutation made through the escaped concrete Host.",
               "parameterDetails": [],
-              "returns": "\"HOST_MUTATION_BYPASS\""
+              "returns": "'HOST_MUTATION_BYPASS'"
             }
           ],
           "composes": [],
           "aliasOf": "TrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\"; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\"; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: \"TRAY_TOPIC_INVALID\"; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };"
+            "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7293,7 +7293,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\"; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\"; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: \"TRAY_TOPIC_INVALID\"; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };",
+          "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
           "guidance": [
             {
               "id": "7-错误码",
@@ -7542,7 +7542,7 @@
         {
           "name": "TrayInstanceEvent",
           "kind": "const",
-          "signature": "export declare const TrayInstanceEvent: { readonly spawned: \"spawned\"; readonly ready: \"ready\"; readonly restarting: \"restarting\"; readonly failed: \"failed\"; readonly stopped: \"stopped\"; readonly removed: \"removed\"; };\nexport type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];",
+          "signature": "export declare const TrayInstanceEvent: { readonly spawned: 'spawned'; readonly ready: 'ready'; readonly restarting: 'restarting'; readonly failed: 'failed'; readonly stopped: 'stopped'; readonly removed: 'removed'; };\nexport type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];",
           "declarationLine": 34,
           "source": "packages/tray/dist/hosts/constants.d.ts",
           "purpose": "Lifecycle events observed with `tray.on()` and `tray.watch()`.",
@@ -7559,62 +7559,62 @@
               "name": "spawned",
               "kind": "property",
               "optional": false,
-              "signature": "readonly spawned: \"spawned\";",
+              "signature": "readonly spawned: 'spawned';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"spawned\""
+              "returns": "'spawned'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "restarting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly restarting: \"restarting\";",
+              "signature": "readonly restarting: 'restarting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"restarting\""
+              "returns": "'restarting'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             },
             {
               "name": "stopped",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stopped: \"stopped\";",
+              "signature": "readonly stopped: 'stopped';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stopped\""
+              "returns": "'stopped'"
             },
             {
               "name": "removed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly removed: \"removed\";",
+              "signature": "readonly removed: 'removed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"removed\""
+              "returns": "'removed'"
             }
           ],
           "composes": [],
           "aliasOf": "TrayInstanceEvent",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TrayInstanceEvent: { readonly spawned: \"spawned\"; readonly ready: \"ready\"; readonly restarting: \"restarting\"; readonly failed: \"failed\"; readonly stopped: \"stopped\"; readonly removed: \"removed\"; };",
+            "export declare const TrayInstanceEvent: { readonly spawned: 'spawned'; readonly ready: 'ready'; readonly restarting: 'restarting'; readonly failed: 'failed'; readonly stopped: 'stopped'; readonly removed: 'removed'; };",
             "export type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];"
           ],
           "overloadParameterDetails": [[], [], []],
@@ -7654,7 +7654,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/constants.d.ts:TrayInstanceEvent:export declare const TrayInstanceEvent: { readonly spawned: \"spawned\"; readonly ready: \"ready\"; readonly restarting: \"restarting\"; readonly failed: \"failed\"; readonly stopped: \"stopped\"; readonly removed: \"removed\"; };\nexport type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];",
+          "identity": "packages/tray/dist/hosts/constants.d.ts:TrayInstanceEvent:export declare const TrayInstanceEvent: { readonly spawned: 'spawned'; readonly ready: 'ready'; readonly restarting: 'restarting'; readonly failed: 'failed'; readonly stopped: 'stopped'; readonly removed: 'removed'; };\nexport type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7663,7 +7663,7 @@
         {
           "name": "TrayInstanceState",
           "kind": "const",
-          "signature": "export declare const TrayInstanceState: { readonly starting: \"starting\"; readonly ready: \"ready\"; readonly restarting: \"restarting\"; readonly failed: \"failed\"; readonly stopped: \"stopped\"; };\nexport type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];",
+          "signature": "export declare const TrayInstanceState: { readonly starting: 'starting'; readonly ready: 'ready'; readonly restarting: 'restarting'; readonly failed: 'failed'; readonly stopped: 'stopped'; };\nexport type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];",
           "declarationLine": 24,
           "source": "packages/tray/dist/hosts/constants.d.ts",
           "purpose": "Registry states of an instance, shown in `list()` and `get()`.",
@@ -7680,53 +7680,53 @@
               "name": "starting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly starting: \"starting\";",
+              "signature": "readonly starting: 'starting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"starting\""
+              "returns": "'starting'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "restarting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly restarting: \"restarting\";",
+              "signature": "readonly restarting: 'restarting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"restarting\""
+              "returns": "'restarting'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             },
             {
               "name": "stopped",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stopped: \"stopped\";",
+              "signature": "readonly stopped: 'stopped';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stopped\""
+              "returns": "'stopped'"
             }
           ],
           "composes": [],
           "aliasOf": "TrayInstanceState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TrayInstanceState: { readonly starting: \"starting\"; readonly ready: \"ready\"; readonly restarting: \"restarting\"; readonly failed: \"failed\"; readonly stopped: \"stopped\"; };",
+            "export declare const TrayInstanceState: { readonly starting: 'starting'; readonly ready: 'ready'; readonly restarting: 'restarting'; readonly failed: 'failed'; readonly stopped: 'stopped'; };",
             "export type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];"
           ],
           "overloadParameterDetails": [[], [], []],
@@ -7766,7 +7766,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/constants.d.ts:TrayInstanceState:export declare const TrayInstanceState: { readonly starting: \"starting\"; readonly ready: \"ready\"; readonly restarting: \"restarting\"; readonly failed: \"failed\"; readonly stopped: \"stopped\"; };\nexport type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];",
+          "identity": "packages/tray/dist/hosts/constants.d.ts:TrayInstanceState:export declare const TrayInstanceState: { readonly starting: 'starting'; readonly ready: 'ready'; readonly restarting: 'restarting'; readonly failed: 'failed'; readonly stopped: 'stopped'; };\nexport type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -7775,7 +7775,7 @@
         {
           "name": "TrayRuntime",
           "kind": "const",
-          "signature": "export declare const TrayRuntime: { readonly coroutine: \"coroutine\"; readonly thread: \"thread\"; readonly process: \"process\"; };\nexport type TrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime];",
+          "signature": "export declare const TrayRuntime: { readonly coroutine: 'coroutine'; readonly thread: 'thread'; readonly process: 'process'; };\nexport type TrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime];",
           "declarationLine": 16,
           "source": "packages/tray/dist/hosts/constants.d.ts",
           "purpose": "How a host runs its instances: `coroutine`, `thread` or `process`.",
@@ -7792,35 +7792,35 @@
               "name": "coroutine",
               "kind": "property",
               "optional": false,
-              "signature": "readonly coroutine: \"coroutine\";",
+              "signature": "readonly coroutine: 'coroutine';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"coroutine\""
+              "returns": "'coroutine'"
             },
             {
               "name": "thread",
               "kind": "property",
               "optional": false,
-              "signature": "readonly thread: \"thread\";",
+              "signature": "readonly thread: 'thread';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"thread\""
+              "returns": "'thread'"
             },
             {
               "name": "process",
               "kind": "property",
               "optional": false,
-              "signature": "readonly process: \"process\";",
+              "signature": "readonly process: 'process';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"process\""
+              "returns": "'process'"
             }
           ],
           "composes": [],
           "aliasOf": "TrayRuntime",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TrayRuntime: { readonly coroutine: \"coroutine\"; readonly thread: \"thread\"; readonly process: \"process\"; };",
+            "export declare const TrayRuntime: { readonly coroutine: 'coroutine'; readonly thread: 'thread'; readonly process: 'process'; };",
             "export type TrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime];"
           ],
           "overloadParameterDetails": [[], []],
@@ -7860,7 +7860,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/constants.d.ts:TrayRuntime:export declare const TrayRuntime: { readonly coroutine: \"coroutine\"; readonly thread: \"thread\"; readonly process: \"process\"; };\nexport type TrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime];",
+          "identity": "packages/tray/dist/hosts/constants.d.ts:TrayRuntime:export declare const TrayRuntime: { readonly coroutine: 'coroutine'; readonly thread: 'thread'; readonly process: 'process'; };\nexport type TrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -10375,7 +10375,7 @@
         {
           "name": "TrayHostState",
           "kind": "const",
-          "signature": "export declare const TrayHostState: { readonly active: \"active\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; readonly failed: \"failed\"; };",
+          "signature": "export declare const TrayHostState: { readonly active: 'active'; readonly closing: 'closing'; readonly terminal: 'terminal'; readonly failed: 'failed'; };",
           "declarationLine": 97,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Lifecycle states of a managed host: `active`, `closing`, `terminal`, `failed`.",
@@ -10392,44 +10392,44 @@
               "name": "active",
               "kind": "property",
               "optional": false,
-              "signature": "readonly active: \"active\";",
+              "signature": "readonly active: 'active';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"active\""
+              "returns": "'active'"
             },
             {
               "name": "closing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closing: \"closing\";",
+              "signature": "readonly closing: 'closing';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"closing\""
+              "returns": "'closing'"
             },
             {
               "name": "terminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly terminal: \"terminal\";",
+              "signature": "readonly terminal: 'terminal';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"terminal\""
+              "returns": "'terminal'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             }
           ],
           "composes": [],
           "aliasOf": "TrayHostState",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export declare const TrayHostState: { readonly active: \"active\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; readonly failed: \"failed\"; };"
+            "export declare const TrayHostState: { readonly active: 'active'; readonly closing: 'closing'; readonly terminal: 'terminal'; readonly failed: 'failed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10468,7 +10468,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:TrayHostState:export declare const TrayHostState: { readonly active: \"active\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; readonly failed: \"failed\"; };",
+          "identity": "packages/tray/dist/host/typing.d.ts:TrayHostState:export declare const TrayHostState: { readonly active: 'active'; readonly closing: 'closing'; readonly terminal: 'terminal'; readonly failed: 'failed'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

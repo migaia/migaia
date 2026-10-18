@@ -1909,7 +1909,7 @@
         {
           "name": "AtomKind",
           "kind": "const",
-          "signature": "export declare const AtomKind: { readonly primitive: \"primitive\"; readonly primitiveFactory: \"primitive-factory\"; readonly derived: \"derived\"; readonly writableDerived: \"writable-derived\"; };",
+          "signature": "export declare const AtomKind: { readonly primitive: 'primitive'; readonly primitiveFactory: 'primitive-factory'; readonly derived: 'derived'; readonly writableDerived: 'writable-derived'; };",
           "declarationLine": 2,
           "source": "packages/store-keyed/dist/atom/kind-constants.d.ts",
           "purpose": "Discriminates pure definition token kinds so AtomStore can select source cloning, per-store initialization, derived computation or custom writing. Kind values allocate no state by themselves. The object is statically readonly through as const, not frozen at runtime.",
@@ -1931,44 +1931,44 @@
               "name": "primitive",
               "kind": "property",
               "optional": false,
-              "signature": "readonly primitive: \"primitive\";",
+              "signature": "readonly primitive: 'primitive';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"primitive\""
+              "returns": "'primitive'"
             },
             {
               "name": "primitiveFactory",
               "kind": "property",
               "optional": false,
-              "signature": "readonly primitiveFactory: \"primitive-factory\";",
+              "signature": "readonly primitiveFactory: 'primitive-factory';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"primitive-factory\""
+              "returns": "'primitive-factory'"
             },
             {
               "name": "derived",
               "kind": "property",
               "optional": false,
-              "signature": "readonly derived: \"derived\";",
+              "signature": "readonly derived: 'derived';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"derived\""
+              "returns": "'derived'"
             },
             {
               "name": "writableDerived",
               "kind": "property",
               "optional": false,
-              "signature": "readonly writableDerived: \"writable-derived\";",
+              "signature": "readonly writableDerived: 'writable-derived';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"writable-derived\""
+              "returns": "'writable-derived'"
             }
           ],
           "composes": [],
           "aliasOf": "AtomKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const AtomKind: { readonly primitive: \"primitive\"; readonly primitiveFactory: \"primitive-factory\"; readonly derived: \"derived\"; readonly writableDerived: \"writable-derived\"; };"
+            "export declare const AtomKind: { readonly primitive: 'primitive'; readonly primitiveFactory: 'primitive-factory'; readonly derived: 'derived'; readonly writableDerived: 'writable-derived'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2007,7 +2007,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/atom/kind-constants.d.ts:AtomKind:export declare const AtomKind: { readonly primitive: \"primitive\"; readonly primitiveFactory: \"primitive-factory\"; readonly derived: \"derived\"; readonly writableDerived: \"writable-derived\"; };",
+          "identity": "packages/store-keyed/dist/atom/kind-constants.d.ts:AtomKind:export declare const AtomKind: { readonly primitive: 'primitive'; readonly primitiveFactory: 'primitive-factory'; readonly derived: 'derived'; readonly writableDerived: 'writable-derived'; };",
           "guidance": [],
           "usageScore": 50,
           "configuration": [],
@@ -5409,7 +5409,7 @@
         {
           "name": "StoreKeyedErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\"; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: \"DISPOSAL_FAILED\"; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: \"CIRCULAR_PREVIEW\"; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: \"CYCLIC_OVERRIDE\"; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: \"OVERRIDE_CONTRACT\"; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: \"PREVIEW_UNSAFE\"; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: \"OPTIC_ACCESS_FAILED\"; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: 'ATOM_STORE_DISPOSED'; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: 'DISPOSAL_FAILED'; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: 'CIRCULAR_PREVIEW'; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: 'CYCLIC_OVERRIDE'; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: 'OVERRIDE_CONTRACT'; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: 'PREVIEW_UNSAFE'; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: 'OPTIC_ACCESS_FAILED'; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 11,
           "source": "packages/store-keyed/dist/error-code.d.ts",
           "purpose": "Stable package semantic codes for scoped stores, previews, overrides, runtime access, optic access, environment capability and input validation. Native errors preserve original runtime classes and causes.",
@@ -5434,98 +5434,98 @@
               "name": "atomStoreDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\";",
+              "signature": "readonly atomStoreDisposed: 'ATOM_STORE_DISPOSED';",
               "description": "An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance.",
               "parameterDetails": [],
-              "returns": "\"ATOM_STORE_DISPOSED\""
+              "returns": "'ATOM_STORE_DISPOSED'"
             },
             {
               "name": "disposalFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposalFailed: \"DISPOSAL_FAILED\";",
+              "signature": "readonly disposalFailed: 'DISPOSAL_FAILED';",
               "description": "Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause.",
               "parameterDetails": [],
-              "returns": "\"DISPOSAL_FAILED\""
+              "returns": "'DISPOSAL_FAILED'"
             },
             {
               "name": "circularPreview",
               "kind": "property",
               "optional": false,
-              "signature": "readonly circularPreview: \"CIRCULAR_PREVIEW\";",
+              "signature": "readonly circularPreview: 'CIRCULAR_PREVIEW';",
               "description": "An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles.",
               "parameterDetails": [],
-              "returns": "\"CIRCULAR_PREVIEW\""
+              "returns": "'CIRCULAR_PREVIEW'"
             },
             {
               "name": "cyclicOverride",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cyclicOverride: \"CYCLIC_OVERRIDE\";",
+              "signature": "readonly cyclicOverride: 'CYCLIC_OVERRIDE';",
               "description": "An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other.",
               "parameterDetails": [],
-              "returns": "\"CYCLIC_OVERRIDE\""
+              "returns": "'CYCLIC_OVERRIDE'"
             },
             {
               "name": "overrideContract",
               "kind": "property",
               "optional": false,
-              "signature": "readonly overrideContract: \"OVERRIDE_CONTRACT\";",
+              "signature": "readonly overrideContract: 'OVERRIDE_CONTRACT';",
               "description": "An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides.",
               "parameterDetails": [],
-              "returns": "\"OVERRIDE_CONTRACT\""
+              "returns": "'OVERRIDE_CONTRACT'"
             },
             {
               "name": "previewUnsafe",
               "kind": "property",
               "optional": false,
-              "signature": "readonly previewUnsafe: \"PREVIEW_UNSAFE\";",
+              "signature": "readonly previewUnsafe: 'PREVIEW_UNSAFE';",
               "description": "A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview.",
               "parameterDetails": [],
-              "returns": "\"PREVIEW_UNSAFE\""
+              "returns": "'PREVIEW_UNSAFE'"
             },
             {
               "name": "crossRuntime",
               "kind": "property",
               "optional": false,
-              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "signature": "readonly crossRuntime: 'CROSS_RUNTIME';",
               "description": "An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes.",
               "parameterDetails": [],
-              "returns": "\"CROSS_RUNTIME\""
+              "returns": "'CROSS_RUNTIME'"
             },
             {
               "name": "envUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "signature": "readonly envUnsupported: 'ENV_UNSUPPORTED';",
               "description": "The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue.",
               "parameterDetails": [],
-              "returns": "\"ENV_UNSUPPORTED\""
+              "returns": "'ENV_UNSUPPORTED'"
             },
             {
               "name": "opticAccessFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly opticAccessFailed: \"OPTIC_ACCESS_FAILED\";",
+              "signature": "readonly opticAccessFailed: 'OPTIC_ACCESS_FAILED';",
               "description": "An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key.",
               "parameterDetails": [],
-              "returns": "\"OPTIC_ACCESS_FAILED\""
+              "returns": "'OPTIC_ACCESS_FAILED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreKeyedErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\"; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: \"DISPOSAL_FAILED\"; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: \"CIRCULAR_PREVIEW\"; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: \"CYCLIC_OVERRIDE\"; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: \"OVERRIDE_CONTRACT\"; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: \"PREVIEW_UNSAFE\"; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: \"OPTIC_ACCESS_FAILED\"; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: 'ATOM_STORE_DISPOSED'; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: 'DISPOSAL_FAILED'; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: 'CIRCULAR_PREVIEW'; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: 'CYCLIC_OVERRIDE'; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: 'OVERRIDE_CONTRACT'; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: 'PREVIEW_UNSAFE'; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: 'OPTIC_ACCESS_FAILED'; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5564,7 +5564,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/error-code.d.ts:StoreKeyedErrorCode:export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: \"ATOM_STORE_DISPOSED\"; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: \"DISPOSAL_FAILED\"; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: \"CIRCULAR_PREVIEW\"; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: \"CYCLIC_OVERRIDE\"; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: \"OVERRIDE_CONTRACT\"; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: \"PREVIEW_UNSAFE\"; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: \"OPTIC_ACCESS_FAILED\"; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/store-keyed/dist/error-code.d.ts:StoreKeyedErrorCode:export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: 'ATOM_STORE_DISPOSED'; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: 'DISPOSAL_FAILED'; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: 'CIRCULAR_PREVIEW'; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: 'CYCLIC_OVERRIDE'; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: 'OVERRIDE_CONTRACT'; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: 'PREVIEW_UNSAFE'; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: 'OPTIC_ACCESS_FAILED'; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "7-2-storekeyederrorcode-与触发条件",

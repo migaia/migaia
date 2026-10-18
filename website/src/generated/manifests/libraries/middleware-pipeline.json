@@ -2444,7 +2444,7 @@
         {
           "name": "MiddlewarePipelineErrorCode",
           "kind": "const",
-          "signature": "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
+          "signature": "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: 'EXECUTION_FAILED'; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: 'ABORTED'; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: 'ABORT_CLEANUP_FAILED'; };",
           "declarationLine": 7,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
           "purpose": "Every error code of this package. Errors keep their native type (`TypeError`, `AggregateError`, `AbortError`) and carry `source` and `code`.",
@@ -2463,44 +2463,44 @@
               "name": "executionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly executionFailed: \"EXECUTION_FAILED\";",
+              "signature": "readonly executionFailed: 'EXECUTION_FAILED';",
               "description": "Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors.",
               "parameterDetails": [],
-              "returns": "\"EXECUTION_FAILED\""
+              "returns": "'EXECUTION_FAILED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "aborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly aborted: \"ABORTED\";",
+              "signature": "readonly aborted: 'ABORTED';",
               "description": "Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause.",
               "parameterDetails": [],
-              "returns": "\"ABORTED\""
+              "returns": "'ABORTED'"
             },
             {
               "name": "abortCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\";",
+              "signature": "readonly abortCleanupFailed: 'ABORT_CLEANUP_FAILED';",
               "description": "Abort cleanup and abort primary both failed; caller should inspect errors in order.",
               "parameterDetails": [],
-              "returns": "\"ABORT_CLEANUP_FAILED\""
+              "returns": "'ABORT_CLEANUP_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "MiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };"
+            "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: 'EXECUTION_FAILED'; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: 'ABORTED'; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: 'ABORT_CLEANUP_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2539,7 +2539,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MiddlewarePipelineErrorCode:export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
+          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MiddlewarePipelineErrorCode:export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity and every original error. Enforces * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`, * or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: 'EXECUTION_FAILED'; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Cooperative abort: unclassified native Error reasons gain identity in place; other values stay * on cause. */ readonly aborted: 'ABORTED'; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: 'ABORT_CLEANUP_FAILED'; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -2641,7 +2641,7 @@
         {
           "name": "MiddlewarePipelineMode",
           "kind": "const",
-          "signature": "export declare const MiddlewarePipelineMode: { readonly sync: \"sync\"; readonly async: \"async\"; readonly generator: \"generator\"; readonly asyncGenerator: \"async-generator\"; };",
+          "signature": "export declare const MiddlewarePipelineMode: { readonly sync: 'sync'; readonly async: 'async'; readonly generator: 'generator'; readonly asyncGenerator: 'async-generator'; };",
           "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "The four execution modes accepted by `createPipeline({ mode })`. The mode fixes the stage shape, whether `run()` returns a Promise, and when downstream starts.",
@@ -2672,44 +2672,44 @@
               "name": "sync",
               "kind": "property",
               "optional": false,
-              "signature": "readonly sync: \"sync\";",
+              "signature": "readonly sync: 'sync';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"sync\""
+              "returns": "'sync'"
             },
             {
               "name": "async",
               "kind": "property",
               "optional": false,
-              "signature": "readonly async: \"async\";",
+              "signature": "readonly async: 'async';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"async\""
+              "returns": "'async'"
             },
             {
               "name": "generator",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generator: \"generator\";",
+              "signature": "readonly generator: 'generator';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"generator\""
+              "returns": "'generator'"
             },
             {
               "name": "asyncGenerator",
               "kind": "property",
               "optional": false,
-              "signature": "readonly asyncGenerator: \"async-generator\";",
+              "signature": "readonly asyncGenerator: 'async-generator';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"async-generator\""
+              "returns": "'async-generator'"
             }
           ],
           "composes": [],
           "aliasOf": "MiddlewarePipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewarePipelineMode: { readonly sync: \"sync\"; readonly async: \"async\"; readonly generator: \"generator\"; readonly asyncGenerator: \"async-generator\"; };"
+            "export declare const MiddlewarePipelineMode: { readonly sync: 'sync'; readonly async: 'async'; readonly generator: 'generator'; readonly asyncGenerator: 'async-generator'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2748,7 +2748,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineMode:export declare const MiddlewarePipelineMode: { readonly sync: \"sync\"; readonly async: \"async\"; readonly generator: \"generator\"; readonly asyncGenerator: \"async-generator\"; };",
+          "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineMode:export declare const MiddlewarePipelineMode: { readonly sync: 'sync'; readonly async: 'async'; readonly generator: 'generator'; readonly asyncGenerator: 'async-generator'; };",
           "guidance": [
             {
               "id": "4-取消与-host-生命周期",
@@ -2809,7 +2809,7 @@
         {
           "name": "MiddlewarePipelineViolation",
           "kind": "const",
-          "signature": "export declare const MiddlewarePipelineViolation: { readonly late: \"late\"; readonly duplicate: \"duplicate\"; };",
+          "signature": "export declare const MiddlewarePipelineViolation: { readonly late: 'late'; readonly duplicate: 'duplicate'; };",
           "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "Kinds of `next()` misuse passed to `onViolation`: calling it twice in one stage, or after the stage already finished.",
@@ -2826,26 +2826,26 @@
               "name": "late",
               "kind": "property",
               "optional": false,
-              "signature": "readonly late: \"late\";",
+              "signature": "readonly late: 'late';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"late\""
+              "returns": "'late'"
             },
             {
               "name": "duplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicate: \"duplicate\";",
+              "signature": "readonly duplicate: 'duplicate';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"duplicate\""
+              "returns": "'duplicate'"
             }
           ],
           "composes": [],
           "aliasOf": "MiddlewarePipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewarePipelineViolation: { readonly late: \"late\"; readonly duplicate: \"duplicate\"; };"
+            "export declare const MiddlewarePipelineViolation: { readonly late: 'late'; readonly duplicate: 'duplicate'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2884,7 +2884,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineViolation:export declare const MiddlewarePipelineViolation: { readonly late: \"late\"; readonly duplicate: \"duplicate\"; };",
+          "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineViolation:export declare const MiddlewarePipelineViolation: { readonly late: 'late'; readonly duplicate: 'duplicate'; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],

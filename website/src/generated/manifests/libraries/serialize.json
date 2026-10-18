@@ -2793,7 +2793,7 @@
         {
           "name": "SerializeChunkKind",
           "kind": "const",
-          "signature": "export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
+          "signature": "export declare const SerializeChunkKind: { readonly value: 'value'; readonly text: 'text'; readonly bytes: 'bytes'; };",
           "declarationLine": 2,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Discriminates the payload representation at chunk tuple index zero.",
@@ -2815,35 +2815,35 @@
               "name": "value",
               "kind": "property",
               "optional": false,
-              "signature": "readonly value: \"value\";",
+              "signature": "readonly value: 'value';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"value\""
+              "returns": "'value'"
             },
             {
               "name": "text",
               "kind": "property",
               "optional": false,
-              "signature": "readonly text: \"text\";",
+              "signature": "readonly text: 'text';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"text\""
+              "returns": "'text'"
             },
             {
               "name": "bytes",
               "kind": "property",
               "optional": false,
-              "signature": "readonly bytes: \"bytes\";",
+              "signature": "readonly bytes: 'bytes';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"bytes\""
+              "returns": "'bytes'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeChunkKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };"
+            "export declare const SerializeChunkKind: { readonly value: 'value'; readonly text: 'text'; readonly bytes: 'bytes'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2882,7 +2882,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeChunkKind:export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeChunkKind:export declare const SerializeChunkKind: { readonly value: 'value'; readonly text: 'text'; readonly bytes: 'bytes'; };",
           "guidance": [],
           "usageScore": 84,
           "configuration": [],
@@ -2891,7 +2891,7 @@
         {
           "name": "SerializeCleanupKind",
           "kind": "const",
-          "signature": "export declare const SerializeCleanupKind: { readonly cleanupError: \"cleanup-error\"; readonly drainTimeout: \"drain-timeout\"; };",
+          "signature": "export declare const SerializeCleanupKind: { readonly cleanupError: 'cleanup-error'; readonly drainTimeout: 'drain-timeout'; };",
           "declarationLine": 30,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Distinguishes cleanup failures from drain-deadline diagnostics.",
@@ -2911,26 +2911,26 @@
               "name": "cleanupError",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cleanupError: \"cleanup-error\";",
+              "signature": "readonly cleanupError: 'cleanup-error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cleanup-error\""
+              "returns": "'cleanup-error'"
             },
             {
               "name": "drainTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly drainTimeout: \"drain-timeout\";",
+              "signature": "readonly drainTimeout: 'drain-timeout';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"drain-timeout\""
+              "returns": "'drain-timeout'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeCleanupKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeCleanupKind: { readonly cleanupError: \"cleanup-error\"; readonly drainTimeout: \"drain-timeout\"; };"
+            "export declare const SerializeCleanupKind: { readonly cleanupError: 'cleanup-error'; readonly drainTimeout: 'drain-timeout'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2969,7 +2969,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupKind:export declare const SerializeCleanupKind: { readonly cleanupError: \"cleanup-error\"; readonly drainTimeout: \"drain-timeout\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupKind:export declare const SerializeCleanupKind: { readonly cleanupError: 'cleanup-error'; readonly drainTimeout: 'drain-timeout'; };",
           "guidance": [],
           "usageScore": 30,
           "configuration": [],
@@ -2978,7 +2978,7 @@
         {
           "name": "SerializeCleanupPolicy",
           "kind": "const",
-          "signature": "export declare const SerializeCleanupPolicy: { readonly throw: \"throw\"; readonly report: \"report\"; };",
+          "signature": "export declare const SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report'; };",
           "declarationLine": 26,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Selects how disposal exposes parser cleanup errors.",
@@ -2998,26 +2998,26 @@
               "name": "throw",
               "kind": "property",
               "optional": false,
-              "signature": "readonly throw: \"throw\";",
+              "signature": "readonly throw: 'throw';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"throw\""
+              "returns": "'throw'"
             },
             {
               "name": "report",
               "kind": "property",
               "optional": false,
-              "signature": "readonly report: \"report\";",
+              "signature": "readonly report: 'report';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"report\""
+              "returns": "'report'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeCleanupPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeCleanupPolicy: { readonly throw: \"throw\"; readonly report: \"report\"; };"
+            "export declare const SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3056,7 +3056,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupPolicy:export declare const SerializeCleanupPolicy: { readonly throw: \"throw\"; readonly report: \"report\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupPolicy:export declare const SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report'; };",
           "guidance": [],
           "usageScore": 30,
           "configuration": [],
@@ -3065,7 +3065,7 @@
         {
           "name": "SerializeOutput",
           "kind": "const",
-          "signature": "export declare const SerializeOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };",
+          "signature": "export declare const SerializeOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };",
           "declarationLine": 8,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Describes output representations for consumers and persistence adapters.",
@@ -3085,35 +3085,35 @@
               "name": "text",
               "kind": "property",
               "optional": false,
-              "signature": "readonly text: \"text\";",
+              "signature": "readonly text: 'text';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"text\""
+              "returns": "'text'"
             },
             {
               "name": "structured",
               "kind": "property",
               "optional": false,
-              "signature": "readonly structured: \"structured\";",
+              "signature": "readonly structured: 'structured';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"structured\""
+              "returns": "'structured'"
             },
             {
               "name": "binary",
               "kind": "property",
               "optional": false,
-              "signature": "readonly binary: \"binary\";",
+              "signature": "readonly binary: 'binary';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"binary\""
+              "returns": "'binary'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeOutput",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };"
+            "export declare const SerializeOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3152,7 +3152,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeOutput:export declare const SerializeOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeOutput:export declare const SerializeOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -3161,7 +3161,7 @@
         {
           "name": "SerializePhase",
           "kind": "const",
-          "signature": "export declare const SerializePhase: { readonly encode: \"encode\"; readonly decode: \"decode\"; };",
+          "signature": "export declare const SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode'; };",
           "declarationLine": 21,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Error-location labels identifying which serialization operation owns a failure position. These constants emit no instrumentation events.",
@@ -3181,26 +3181,26 @@
               "name": "encode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly encode: \"encode\";",
+              "signature": "readonly encode: 'encode';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"encode\""
+              "returns": "'encode'"
             },
             {
               "name": "decode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly decode: \"decode\";",
+              "signature": "readonly decode: 'decode';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"decode\""
+              "returns": "'decode'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializePhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializePhase: { readonly encode: \"encode\"; readonly decode: \"decode\"; };"
+            "export declare const SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3239,7 +3239,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePhase:export declare const SerializePhase: { readonly encode: \"encode\"; readonly decode: \"decode\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePhase:export declare const SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode'; };",
           "guidance": [],
           "usageScore": 30,
           "configuration": [],
@@ -3248,7 +3248,7 @@
         {
           "name": "SerializePluginType",
           "kind": "const",
-          "signature": "export declare const SerializePluginType: { readonly json: \"json\"; };",
+          "signature": "export declare const SerializePluginType: { readonly json: 'json'; };",
           "declarationLine": 35,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Built-in registration tag used by jsonPlugin and jsonParser metadata.",
@@ -3268,17 +3268,17 @@
               "name": "json",
               "kind": "property",
               "optional": false,
-              "signature": "readonly json: \"json\";",
+              "signature": "readonly json: 'json';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"json\""
+              "returns": "'json'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializePluginType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializePluginType: { readonly json: \"json\"; };"
+            "export declare const SerializePluginType: { readonly json: 'json'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3317,7 +3317,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePluginType:export declare const SerializePluginType: { readonly json: \"json\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePluginType:export declare const SerializePluginType: { readonly json: 'json'; };",
           "guidance": [],
           "usageScore": 38,
           "configuration": [],
@@ -3326,7 +3326,7 @@
         {
           "name": "SerializeTextFormat",
           "kind": "const",
-          "signature": "export declare const SerializeTextFormat: { readonly json: \"json\"; readonly yaml: \"yaml\"; readonly toml: \"toml\"; };",
+          "signature": "export declare const SerializeTextFormat: { readonly json: 'json'; readonly yaml: 'yaml'; readonly toml: 'toml'; };",
           "declarationLine": 14,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Output-only formats accepted by emitOutput; these do not register input parsers.",
@@ -3343,35 +3343,35 @@
               "name": "json",
               "kind": "property",
               "optional": false,
-              "signature": "readonly json: \"json\";",
+              "signature": "readonly json: 'json';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"json\""
+              "returns": "'json'"
             },
             {
               "name": "yaml",
               "kind": "property",
               "optional": false,
-              "signature": "readonly yaml: \"yaml\";",
+              "signature": "readonly yaml: 'yaml';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"yaml\""
+              "returns": "'yaml'"
             },
             {
               "name": "toml",
               "kind": "property",
               "optional": false,
-              "signature": "readonly toml: \"toml\";",
+              "signature": "readonly toml: 'toml';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"toml\""
+              "returns": "'toml'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeTextFormat",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeTextFormat: { readonly json: \"json\"; readonly yaml: \"yaml\"; readonly toml: \"toml\"; };"
+            "export declare const SerializeTextFormat: { readonly json: 'json'; readonly yaml: 'yaml'; readonly toml: 'toml'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3410,7 +3410,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeTextFormat:export declare const SerializeTextFormat: { readonly json: \"json\"; readonly yaml: \"yaml\"; readonly toml: \"toml\"; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeTextFormat:export declare const SerializeTextFormat: { readonly json: 'json'; readonly yaml: 'yaml'; readonly toml: 'toml'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -3839,9 +3839,9 @@
           "ownerFragment": "serialize-plugins--jsonPlugin"
         },
         {
-          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
+          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
           "name": "SERIALIZE_SOURCE",
-          "signature": "export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
+          "signature": "export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
           "source": "packages/serialize/dist/errors.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -3869,9 +3869,9 @@
           "ownerFragment": "serialize-core--SerializeCodecError"
         },
         {
-          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: \"CODEC_NOT_FOUND\"; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: \"DECODE_FAILED\"; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: \"INVALID_CHUNK\"; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: \"ABORTED\"; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; };",
+          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
           "name": "SerializeErrorCode",
-          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: \"CODEC_NOT_FOUND\"; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: \"DECODE_FAILED\"; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: \"INVALID_CHUNK\"; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: \"ABORTED\"; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; };",
+          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
           "source": "packages/serialize/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -4099,7 +4099,7 @@
         {
           "name": "CodecErrorText",
           "kind": "const",
-          "signature": "export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
+          "signature": "export declare const CodecErrorText: { readonly invalidVersion: 'serialize codec version must be a positive safe integer'; readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; readonly encodeFailed: 'serialize codec encode failed'; readonly decodeFailed: 'serialize codec decode failed'; readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; };",
           "declarationLine": 2,
           "source": "packages/serialize/dist/codec-text.d.ts",
           "purpose": "Stable diagnostic messages for standalone format codec boundaries.",
@@ -4116,53 +4116,53 @@
               "name": "invalidVersion",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidVersion: \"serialize codec version must be a positive safe integer\";",
+              "signature": "readonly invalidVersion: 'serialize codec version must be a positive safe integer';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"serialize codec version must be a positive safe integer\""
+              "returns": "'serialize codec version must be a positive safe integer'"
             },
             {
               "name": "invalidSchema",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\";",
+              "signature": "readonly invalidSchema: 'serialize protobuf schema descriptor is invalid';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"serialize protobuf schema descriptor is invalid\""
+              "returns": "'serialize protobuf schema descriptor is invalid'"
             },
             {
               "name": "encodeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly encodeFailed: \"serialize codec encode failed\";",
+              "signature": "readonly encodeFailed: 'serialize codec encode failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"serialize codec encode failed\""
+              "returns": "'serialize codec encode failed'"
             },
             {
               "name": "decodeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly decodeFailed: \"serialize codec decode failed\";",
+              "signature": "readonly decodeFailed: 'serialize codec decode failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"serialize codec decode failed\""
+              "returns": "'serialize codec decode failed'"
             },
             {
               "name": "portableValueInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly portableValueInvalid: \"serialize codec value is outside the portable profile\";",
+              "signature": "readonly portableValueInvalid: 'serialize codec value is outside the portable profile';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"serialize codec value is outside the portable profile\""
+              "returns": "'serialize codec value is outside the portable profile'"
             }
           ],
           "composes": [],
           "aliasOf": "CodecErrorText",
           "exportPath": "./codec",
           "overloadSignatures": [
-            "export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };"
+            "export declare const CodecErrorText: { readonly invalidVersion: 'serialize codec version must be a positive safe integer'; readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; readonly encodeFailed: 'serialize codec encode failed'; readonly decodeFailed: 'serialize codec decode failed'; readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4201,7 +4201,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec-text.d.ts:CodecErrorText:export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
+          "identity": "packages/serialize/dist/codec-text.d.ts:CodecErrorText:export declare const CodecErrorText: { readonly invalidVersion: 'serialize codec version must be a positive safe integer'; readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; readonly encodeFailed: 'serialize codec encode failed'; readonly decodeFailed: 'serialize codec decode failed'; readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -10439,7 +10439,7 @@
         {
           "name": "SERIALIZE_SOURCE",
           "kind": "const",
-          "signature": "export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
+          "signature": "export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
           "declarationLine": 4,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "Canonical @migaia/serialize error source marker. Compare it together with SerializeErrorCode when native error classes come from several packages.",
@@ -10460,7 +10460,7 @@
           "composes": [],
           "aliasOf": "SERIALIZE_SOURCE",
           "exportPath": "./core",
-          "overloadSignatures": ["export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";"],
+          "overloadSignatures": ["export declare const SERIALIZE_SOURCE: '@migaia/serialize';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -10498,7 +10498,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
+          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
           "guidance": [
             {
               "id": "4-3-tagserializeerror-createserializeerror-createserializetypeerror-createserializerangeerror-构造期失败",
@@ -11133,7 +11133,7 @@
         {
           "name": "SerializeErrorCode",
           "kind": "const",
-          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: \"CODEC_NOT_FOUND\"; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: \"DECODE_FAILED\"; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: \"INVALID_CHUNK\"; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: \"ABORTED\"; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; };",
+          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
           "declarationLine": 11,
           "source": "packages/serialize/dist/error-code.d.ts",
           "purpose": "Package semantic error codes; classify with source rather than matching messages.",
@@ -11156,80 +11156,80 @@
               "name": "registryDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly registryDisposed: \"REGISTRY_DISPOSED\";",
+              "signature": "readonly registryDisposed: 'REGISTRY_DISPOSED';",
               "description": "Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources.",
               "parameterDetails": [],
-              "returns": "\"REGISTRY_DISPOSED\""
+              "returns": "'REGISTRY_DISPOSED'"
             },
             {
               "name": "codecNotFound",
               "kind": "property",
               "optional": false,
-              "signature": "readonly codecNotFound: \"CODEC_NOT_FOUND\";",
+              "signature": "readonly codecNotFound: 'CODEC_NOT_FOUND';",
               "description": "Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it.",
               "parameterDetails": [],
-              "returns": "\"CODEC_NOT_FOUND\""
+              "returns": "'CODEC_NOT_FOUND'"
             },
             {
               "name": "encodeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly encodeFailed: \"ENCODE_FAILED\";",
+              "signature": "readonly encodeFailed: 'ENCODE_FAILED';",
               "description": "Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure.",
               "parameterDetails": [],
-              "returns": "\"ENCODE_FAILED\""
+              "returns": "'ENCODE_FAILED'"
             },
             {
               "name": "decodeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly decodeFailed: \"DECODE_FAILED\";",
+              "signature": "readonly decodeFailed: 'DECODE_FAILED';",
               "description": "Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure.",
               "parameterDetails": [],
-              "returns": "\"DECODE_FAILED\""
+              "returns": "'DECODE_FAILED'"
             },
             {
               "name": "invalidChunk",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidChunk: \"INVALID_CHUNK\";",
+              "signature": "readonly invalidChunk: 'INVALID_CHUNK';",
               "description": "Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure.",
               "parameterDetails": [],
-              "returns": "\"INVALID_CHUNK\""
+              "returns": "'INVALID_CHUNK'"
             },
             {
               "name": "aborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly aborted: \"ABORTED\";",
+              "signature": "readonly aborted: 'ABORTED';",
               "description": "Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors.",
               "parameterDetails": [],
-              "returns": "\"ABORTED\""
+              "returns": "'ABORTED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Text emitters also reject nonportable own data and values the selected format cannot express.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "envUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "signature": "readonly envUnsupported: 'ENV_UNSUPPORTED';",
               "description": "Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure.",
               "parameterDetails": [],
-              "returns": "\"ENV_UNSUPPORTED\""
+              "returns": "'ENV_UNSUPPORTED'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeErrorCode",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: \"CODEC_NOT_FOUND\"; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: \"DECODE_FAILED\"; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: \"INVALID_CHUNK\"; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: \"ABORTED\"; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; };"
+            "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11268,7 +11268,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: \"CODEC_NOT_FOUND\"; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: \"DECODE_FAILED\"; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: \"INVALID_CHUNK\"; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: \"ABORTED\"; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; };",
+          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
           "guidance": [
             {
               "id": "4-1-serializecodecerror-编解码期失败",

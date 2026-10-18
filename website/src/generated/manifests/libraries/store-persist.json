@@ -3401,7 +3401,7 @@
         {
           "name": "PersistCodecOutput",
           "kind": "const",
-          "signature": "export declare const PersistCodecOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };",
+          "signature": "export declare const PersistCodecOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };",
           "declarationLine": 12,
           "source": "packages/store-persist/dist/state-constants.d.ts",
           "purpose": "Codec output representation vocabulary used for backend routing; the current persistence projection supports text and binary writes.",
@@ -3421,35 +3421,35 @@
               "name": "text",
               "kind": "property",
               "optional": false,
-              "signature": "readonly text: \"text\";",
+              "signature": "readonly text: 'text';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"text\""
+              "returns": "'text'"
             },
             {
               "name": "structured",
               "kind": "property",
               "optional": false,
-              "signature": "readonly structured: \"structured\";",
+              "signature": "readonly structured: 'structured';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"structured\""
+              "returns": "'structured'"
             },
             {
               "name": "binary",
               "kind": "property",
               "optional": false,
-              "signature": "readonly binary: \"binary\";",
+              "signature": "readonly binary: 'binary';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"binary\""
+              "returns": "'binary'"
             }
           ],
           "composes": [],
           "aliasOf": "PersistCodecOutput",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const PersistCodecOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };"
+            "export declare const PersistCodecOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3488,7 +3488,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/state-constants.d.ts:PersistCodecOutput:export declare const PersistCodecOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };",
+          "identity": "packages/store-persist/dist/state-constants.d.ts:PersistCodecOutput:export declare const PersistCodecOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -3823,7 +3823,7 @@
         {
           "name": "PersistState",
           "kind": "const",
-          "signature": "export declare const PersistState: { readonly idle: \"idle\"; readonly loading: \"loading\"; readonly writing: \"writing\"; readonly ready: \"ready\"; readonly success: \"success\"; readonly error: \"error\"; readonly disposed: \"disposed\"; };",
+          "signature": "export declare const PersistState: { readonly idle: 'idle'; readonly loading: 'loading'; readonly writing: 'writing'; readonly ready: 'ready'; readonly success: 'success'; readonly error: 'error'; readonly disposed: 'disposed'; };",
           "declarationLine": 2,
           "source": "packages/store-persist/dist/state-constants.d.ts",
           "purpose": "Shared lifecycle vocabulary used by overall, hydration and write status projections; each projection permits only its documented subset.",
@@ -3843,71 +3843,71 @@
               "name": "idle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly idle: \"idle\";",
+              "signature": "readonly idle: 'idle';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"idle\""
+              "returns": "'idle'"
             },
             {
               "name": "loading",
               "kind": "property",
               "optional": false,
-              "signature": "readonly loading: \"loading\";",
+              "signature": "readonly loading: 'loading';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"loading\""
+              "returns": "'loading'"
             },
             {
               "name": "writing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly writing: \"writing\";",
+              "signature": "readonly writing: 'writing';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"writing\""
+              "returns": "'writing'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "success",
               "kind": "property",
               "optional": false,
-              "signature": "readonly success: \"success\";",
+              "signature": "readonly success: 'success';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"success\""
+              "returns": "'success'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             },
             {
               "name": "disposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposed: \"disposed\";",
+              "signature": "readonly disposed: 'disposed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"disposed\""
+              "returns": "'disposed'"
             }
           ],
           "composes": [],
           "aliasOf": "PersistState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const PersistState: { readonly idle: \"idle\"; readonly loading: \"loading\"; readonly writing: \"writing\"; readonly ready: \"ready\"; readonly success: \"success\"; readonly error: \"error\"; readonly disposed: \"disposed\"; };"
+            "export declare const PersistState: { readonly idle: 'idle'; readonly loading: 'loading'; readonly writing: 'writing'; readonly ready: 'ready'; readonly success: 'success'; readonly error: 'error'; readonly disposed: 'disposed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3946,7 +3946,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/state-constants.d.ts:PersistState:export declare const PersistState: { readonly idle: \"idle\"; readonly loading: \"loading\"; readonly writing: \"writing\"; readonly ready: \"ready\"; readonly success: \"success\"; readonly error: \"error\"; readonly disposed: \"disposed\"; };",
+          "identity": "packages/store-persist/dist/state-constants.d.ts:PersistState:export declare const PersistState: { readonly idle: 'idle'; readonly loading: 'loading'; readonly writing: 'writing'; readonly ready: 'ready'; readonly success: 'success'; readonly error: 'error'; readonly disposed: 'disposed'; };",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -4809,7 +4809,7 @@
         {
           "name": "StorePersistErrorCode",
           "kind": "const",
-          "signature": "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: \"CODEC_NOT_RESOLVED\"; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\"; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: \"BACKEND_CAPABILITY\"; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: \"ENVELOPE_INVALID\"; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\"; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: \"ABORTED_BY_DISPOSE\"; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 11,
           "source": "packages/store-persist/dist/error-code.d.ts",
           "purpose": "Stable persistence failure codes covering configuration, envelope, codec, backend and disposal cancellation failures.",
@@ -4826,80 +4826,80 @@
               "name": "codecNotResolved",
               "kind": "property",
               "optional": false,
-              "signature": "readonly codecNotResolved: \"CODEC_NOT_RESOLVED\";",
+              "signature": "readonly codecNotResolved: 'CODEC_NOT_RESOLVED';",
               "description": "No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available.",
               "parameterDetails": [],
-              "returns": "\"CODEC_NOT_RESOLVED\""
+              "returns": "'CODEC_NOT_RESOLVED'"
             },
             {
               "name": "codecOutputMismatch",
               "kind": "property",
               "optional": false,
-              "signature": "readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\";",
+              "signature": "readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH';",
               "description": "Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure.",
               "parameterDetails": [],
-              "returns": "\"CODEC_OUTPUT_MISMATCH\""
+              "returns": "'CODEC_OUTPUT_MISMATCH'"
             },
             {
               "name": "backendCapability",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendCapability: \"BACKEND_CAPABILITY\";",
+              "signature": "readonly backendCapability: 'BACKEND_CAPABILITY';",
               "description": "A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_CAPABILITY\""
+              "returns": "'BACKEND_CAPABILITY'"
             },
             {
               "name": "envelopeInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envelopeInvalid: \"ENVELOPE_INVALID\";",
+              "signature": "readonly envelopeInvalid: 'ENVELOPE_INVALID';",
               "description": "The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch.",
               "parameterDetails": [],
-              "returns": "\"ENVELOPE_INVALID\""
+              "returns": "'ENVELOPE_INVALID'"
             },
             {
               "name": "encodeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly encodeFailed: \"ENCODE_FAILED\";",
+              "signature": "readonly encodeFailed: 'ENCODE_FAILED';",
               "description": "The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`.",
               "parameterDetails": [],
-              "returns": "\"ENCODE_FAILED\""
+              "returns": "'ENCODE_FAILED'"
             },
             {
               "name": "hydrateAndWriteFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\";",
+              "signature": "readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED';",
               "description": "Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error.",
               "parameterDetails": [],
-              "returns": "\"HYDRATE_AND_WRITE_FAILED\""
+              "returns": "'HYDRATE_AND_WRITE_FAILED'"
             },
             {
               "name": "abortedByDispose",
               "kind": "property",
               "optional": false,
-              "signature": "readonly abortedByDispose: \"ABORTED_BY_DISPOSE\";",
+              "signature": "readonly abortedByDispose: 'ABORTED_BY_DISPOSE';",
               "description": "A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete.",
               "parameterDetails": [],
-              "returns": "\"ABORTED_BY_DISPOSE\""
+              "returns": "'ABORTED_BY_DISPOSE'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             }
           ],
           "composes": [],
           "aliasOf": "StorePersistErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: \"CODEC_NOT_RESOLVED\"; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\"; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: \"BACKEND_CAPABILITY\"; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: \"ENVELOPE_INVALID\"; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\"; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: \"ABORTED_BY_DISPOSE\"; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4938,7 +4938,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: \"CODEC_NOT_RESOLVED\"; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\"; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: \"BACKEND_CAPABILITY\"; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: \"ENVELOPE_INVALID\"; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\"; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: \"ABORTED_BY_DISPOSE\"; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "8-错误参考",

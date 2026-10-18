@@ -3728,7 +3728,7 @@
         {
           "name": "StorageErrorCode",
           "kind": "const",
-          "signature": "export declare const StorageErrorCode: Readonly<{ /** * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1. */ readonly unavailable: \"BACKEND_UNAVAILABLE\"; /** * A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change. */ readonly quotaExceeded: \"QUOTA_EXCEEDED\"; /** * A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment. */ readonly valueTooLarge: \"VALUE_TOO_LARGE\"; /** * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure. */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage. */ readonly deserializeFailed: \"DESERIALIZE_FAILED\"; /** * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage. */ readonly validationFailed: \"VALIDATION_FAILED\"; /** * A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic. */ readonly migrationFailed: \"MIGRATION_FAILED\"; /** * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried. */ readonly transactionFailed: \"TRANSACTION_FAILED\"; /** * A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels. */ readonly duplicateKey: \"DUPLICATE_KEY\"; /** * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version. */ readonly versionUnsupported: \"VERSION_UNSUPPORTED\"; /** * An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception. */ readonly extensionFailed: \"EXTENSION_FAILED\"; /** * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption. */ readonly transactionConflict: \"TRANSACTION_CONFLICT\"; /** * A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously. */ readonly writeFailed: \"WRITE_FAILED\"; /** * Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity. */ readonly cookieScopeAmbiguous: \"COOKIE_SCOPE_AMBIGUOUS\"; /** * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result. */ readonly indexOrphan: \"INDEX_ORPHAN\"; /** * An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying. */ readonly indexUniqueConflict: \"INDEX_UNIQUE_CONFLICT\"; /** * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot. */ readonly indexQueryInvalidated: \"INDEX_QUERY_INVALIDATED\"; /** * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle. */ readonly liveQueryDisposed: \"LIVE_QUERY_DISPOSED\"; /** * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired. */ readonly indexBackfillStale: \"INDEX_BACKFILL_STALE\"; /** * Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded. */ readonly indexBackfillFailed: \"INDEX_BACKFILL_FAILED\"; /** * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation. */ readonly backendIdInvalid: \"BACKEND_ID_INVALID\"; /** * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying. */ readonly backendDuplicate: \"BACKEND_DUPLICATE\"; /** * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID. */ readonly backendNotInstalled: \"BACKEND_NOT_INSTALLED\"; /** * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store. */ readonly backendPluginInvalid: \"BACKEND_PLUGIN_INVALID\"; /** * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished. */ readonly backendInstallFailed: \"BACKEND_INSTALL_FAILED\"; /** * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry. */ readonly storageHostBusy: \"STORAGE_HOST_BUSY\"; /** * A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one. */ readonly storageHostDisposed: \"STORAGE_HOST_DISPOSED\"; /** * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics. */ readonly storageHostDisposeFailed: \"STORAGE_HOST_DISPOSE_FAILED\"; /** * Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors. */ readonly liveQueryDisposeFailed: \"LIVE_QUERY_DISPOSE_FAILED\"; /** * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying. */ readonly reactiveFeatureInvalid: \"REACTIVE_FEATURE_INVALID\"; /** * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs. */ readonly reactiveTopologyInvalid: \"REACTIVE_TOPOLOGY_INVALID\"; /** * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query. */ readonly reactiveServiceNotInstalled: \"REACTIVE_SERVICE_NOT_INSTALLED\"; /** * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback. */ readonly reactiveAdapterNotInstalled: \"REACTIVE_ADAPTER_NOT_INSTALLED\"; /** * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover. */ readonly reactiveAdapterFailed: \"REACTIVE_ADAPTER_FAILED\"; /** * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors. */ readonly reactiveAdapterDisposeFailed: \"REACTIVE_ADAPTER_DISPOSE_FAILED\"; /** * Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors. */ readonly backendDisposeFailed: \"BACKEND_DISPOSE_FAILED\"; }>;",
+          "signature": "export declare const StorageErrorCode: Readonly<{ /** * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1. */ readonly unavailable: 'BACKEND_UNAVAILABLE'; /** * A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change. */ readonly quotaExceeded: 'QUOTA_EXCEEDED'; /** * A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment. */ readonly valueTooLarge: 'VALUE_TOO_LARGE'; /** * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage. */ readonly deserializeFailed: 'DESERIALIZE_FAILED'; /** * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage. */ readonly validationFailed: 'VALIDATION_FAILED'; /** * A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic. */ readonly migrationFailed: 'MIGRATION_FAILED'; /** * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** * A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels. */ readonly duplicateKey: 'DUPLICATE_KEY'; /** * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version. */ readonly versionUnsupported: 'VERSION_UNSUPPORTED'; /** * An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception. */ readonly extensionFailed: 'EXTENSION_FAILED'; /** * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption. */ readonly transactionConflict: 'TRANSACTION_CONFLICT'; /** * A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously. */ readonly writeFailed: 'WRITE_FAILED'; /** * Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity. */ readonly cookieScopeAmbiguous: 'COOKIE_SCOPE_AMBIGUOUS'; /** * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result. */ readonly indexOrphan: 'INDEX_ORPHAN'; /** * An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying. */ readonly indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT'; /** * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot. */ readonly indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED'; /** * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle. */ readonly liveQueryDisposed: 'LIVE_QUERY_DISPOSED'; /** * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired. */ readonly indexBackfillStale: 'INDEX_BACKFILL_STALE'; /** * Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded. */ readonly indexBackfillFailed: 'INDEX_BACKFILL_FAILED'; /** * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation. */ readonly backendIdInvalid: 'BACKEND_ID_INVALID'; /** * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying. */ readonly backendDuplicate: 'BACKEND_DUPLICATE'; /** * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID. */ readonly backendNotInstalled: 'BACKEND_NOT_INSTALLED'; /** * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store. */ readonly backendPluginInvalid: 'BACKEND_PLUGIN_INVALID'; /** * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished. */ readonly backendInstallFailed: 'BACKEND_INSTALL_FAILED'; /** * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry. */ readonly storageHostBusy: 'STORAGE_HOST_BUSY'; /** * A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one. */ readonly storageHostDisposed: 'STORAGE_HOST_DISPOSED'; /** * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics. */ readonly storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED'; /** * Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors. */ readonly liveQueryDisposeFailed: 'LIVE_QUERY_DISPOSE_FAILED'; /** * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying. */ readonly reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID'; /** * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs. */ readonly reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID'; /** * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query. */ readonly reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED'; /** * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback. */ readonly reactiveAdapterNotInstalled: 'REACTIVE_ADAPTER_NOT_INSTALLED'; /** * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover. */ readonly reactiveAdapterFailed: 'REACTIVE_ADAPTER_FAILED'; /** * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors. */ readonly reactiveAdapterDisposeFailed: 'REACTIVE_ADAPTER_DISPOSE_FAILED'; /** * Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors. */ readonly backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'; }>;",
           "declarationLine": 13,
           "source": "packages/storage-web/dist/error-code.d.ts",
           "purpose": "Table of this package’s 37 stable error codes; values are the strings on error.code. `INDEX_BACKFILL_FAILED` identifies backfill and failed-readiness persistence failing together on a native AggregateError.",
@@ -3752,341 +3752,341 @@
               "name": "unavailable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unavailable: \"BACKEND_UNAVAILABLE\";",
+              "signature": "readonly unavailable: 'BACKEND_UNAVAILABLE';",
               "description": "A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_UNAVAILABLE\""
+              "returns": "'BACKEND_UNAVAILABLE'"
             },
             {
               "name": "quotaExceeded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly quotaExceeded: \"QUOTA_EXCEEDED\";",
+              "signature": "readonly quotaExceeded: 'QUOTA_EXCEEDED';",
               "description": "A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change.",
               "parameterDetails": [],
-              "returns": "\"QUOTA_EXCEEDED\""
+              "returns": "'QUOTA_EXCEEDED'"
             },
             {
               "name": "valueTooLarge",
               "kind": "property",
               "optional": false,
-              "signature": "readonly valueTooLarge: \"VALUE_TOO_LARGE\";",
+              "signature": "readonly valueTooLarge: 'VALUE_TOO_LARGE';",
               "description": "A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment.",
               "parameterDetails": [],
-              "returns": "\"VALUE_TOO_LARGE\""
+              "returns": "'VALUE_TOO_LARGE'"
             },
             {
               "name": "serializeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly serializeFailed: \"SERIALIZE_FAILED\";",
+              "signature": "readonly serializeFailed: 'SERIALIZE_FAILED';",
               "description": "Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure.",
               "parameterDetails": [],
-              "returns": "\"SERIALIZE_FAILED\""
+              "returns": "'SERIALIZE_FAILED'"
             },
             {
               "name": "deserializeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly deserializeFailed: \"DESERIALIZE_FAILED\";",
+              "signature": "readonly deserializeFailed: 'DESERIALIZE_FAILED';",
               "description": "Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage.",
               "parameterDetails": [],
-              "returns": "\"DESERIALIZE_FAILED\""
+              "returns": "'DESERIALIZE_FAILED'"
             },
             {
               "name": "validationFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly validationFailed: \"VALIDATION_FAILED\";",
+              "signature": "readonly validationFailed: 'VALIDATION_FAILED';",
               "description": "Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage.",
               "parameterDetails": [],
-              "returns": "\"VALIDATION_FAILED\""
+              "returns": "'VALIDATION_FAILED'"
             },
             {
               "name": "migrationFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly migrationFailed: \"MIGRATION_FAILED\";",
+              "signature": "readonly migrationFailed: 'MIGRATION_FAILED';",
               "description": "A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic.",
               "parameterDetails": [],
-              "returns": "\"MIGRATION_FAILED\""
+              "returns": "'MIGRATION_FAILED'"
             },
             {
               "name": "transactionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly transactionFailed: \"TRANSACTION_FAILED\";",
+              "signature": "readonly transactionFailed: 'TRANSACTION_FAILED';",
               "description": "A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried.",
               "parameterDetails": [],
-              "returns": "\"TRANSACTION_FAILED\""
+              "returns": "'TRANSACTION_FAILED'"
             },
             {
               "name": "duplicateKey",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateKey: \"DUPLICATE_KEY\";",
+              "signature": "readonly duplicateKey: 'DUPLICATE_KEY';",
               "description": "A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels.",
               "parameterDetails": [],
-              "returns": "\"DUPLICATE_KEY\""
+              "returns": "'DUPLICATE_KEY'"
             },
             {
               "name": "versionUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly versionUnsupported: \"VERSION_UNSUPPORTED\";",
+              "signature": "readonly versionUnsupported: 'VERSION_UNSUPPORTED';",
               "description": "Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version.",
               "parameterDetails": [],
-              "returns": "\"VERSION_UNSUPPORTED\""
+              "returns": "'VERSION_UNSUPPORTED'"
             },
             {
               "name": "extensionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly extensionFailed: \"EXTENSION_FAILED\";",
+              "signature": "readonly extensionFailed: 'EXTENSION_FAILED';",
               "description": "An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception.",
               "parameterDetails": [],
-              "returns": "\"EXTENSION_FAILED\""
+              "returns": "'EXTENSION_FAILED'"
             },
             {
               "name": "transactionConflict",
               "kind": "property",
               "optional": false,
-              "signature": "readonly transactionConflict: \"TRANSACTION_CONFLICT\";",
+              "signature": "readonly transactionConflict: 'TRANSACTION_CONFLICT';",
               "description": "A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption.",
               "parameterDetails": [],
-              "returns": "\"TRANSACTION_CONFLICT\""
+              "returns": "'TRANSACTION_CONFLICT'"
             },
             {
               "name": "writeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly writeFailed: \"WRITE_FAILED\";",
+              "signature": "readonly writeFailed: 'WRITE_FAILED';",
               "description": "A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously.",
               "parameterDetails": [],
-              "returns": "\"WRITE_FAILED\""
+              "returns": "'WRITE_FAILED'"
             },
             {
               "name": "cookieScopeAmbiguous",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cookieScopeAmbiguous: \"COOKIE_SCOPE_AMBIGUOUS\";",
+              "signature": "readonly cookieScopeAmbiguous: 'COOKIE_SCOPE_AMBIGUOUS';",
               "description": "Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity.",
               "parameterDetails": [],
-              "returns": "\"COOKIE_SCOPE_AMBIGUOUS\""
+              "returns": "'COOKIE_SCOPE_AMBIGUOUS'"
             },
             {
               "name": "invalidConfig",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidConfig: \"INVALID_CONFIG\";",
+              "signature": "readonly invalidConfig: 'INVALID_CONFIG';",
               "description": "Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes.",
               "parameterDetails": [],
-              "returns": "\"INVALID_CONFIG\""
+              "returns": "'INVALID_CONFIG'"
             },
             {
               "name": "indexOrphan",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexOrphan: \"INDEX_ORPHAN\";",
+              "signature": "readonly indexOrphan: 'INDEX_ORPHAN';",
               "description": "IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result.",
               "parameterDetails": [],
-              "returns": "\"INDEX_ORPHAN\""
+              "returns": "'INDEX_ORPHAN'"
             },
             {
               "name": "indexUniqueConflict",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexUniqueConflict: \"INDEX_UNIQUE_CONFLICT\";",
+              "signature": "readonly indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT';",
               "description": "An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying.",
               "parameterDetails": [],
-              "returns": "\"INDEX_UNIQUE_CONFLICT\""
+              "returns": "'INDEX_UNIQUE_CONFLICT'"
             },
             {
               "name": "indexQueryInvalidated",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexQueryInvalidated: \"INDEX_QUERY_INVALIDATED\";",
+              "signature": "readonly indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED';",
               "description": "A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot.",
               "parameterDetails": [],
-              "returns": "\"INDEX_QUERY_INVALIDATED\""
+              "returns": "'INDEX_QUERY_INVALIDATED'"
             },
             {
               "name": "liveQueryDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly liveQueryDisposed: \"LIVE_QUERY_DISPOSED\";",
+              "signature": "readonly liveQueryDisposed: 'LIVE_QUERY_DISPOSED';",
               "description": "A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle.",
               "parameterDetails": [],
-              "returns": "\"LIVE_QUERY_DISPOSED\""
+              "returns": "'LIVE_QUERY_DISPOSED'"
             },
             {
               "name": "indexBackfillStale",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexBackfillStale: \"INDEX_BACKFILL_STALE\";",
+              "signature": "readonly indexBackfillStale: 'INDEX_BACKFILL_STALE';",
               "description": "A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired.",
               "parameterDetails": [],
-              "returns": "\"INDEX_BACKFILL_STALE\""
+              "returns": "'INDEX_BACKFILL_STALE'"
             },
             {
               "name": "indexBackfillFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexBackfillFailed: \"INDEX_BACKFILL_FAILED\";",
+              "signature": "readonly indexBackfillFailed: 'INDEX_BACKFILL_FAILED';",
               "description": "Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded.",
               "parameterDetails": [],
-              "returns": "\"INDEX_BACKFILL_FAILED\""
+              "returns": "'INDEX_BACKFILL_FAILED'"
             },
             {
               "name": "backendIdInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendIdInvalid: \"BACKEND_ID_INVALID\";",
+              "signature": "readonly backendIdInvalid: 'BACKEND_ID_INVALID';",
               "description": "A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_ID_INVALID\""
+              "returns": "'BACKEND_ID_INVALID'"
             },
             {
               "name": "backendDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendDuplicate: \"BACKEND_DUPLICATE\";",
+              "signature": "readonly backendDuplicate: 'BACKEND_DUPLICATE';",
               "description": "A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_DUPLICATE\""
+              "returns": "'BACKEND_DUPLICATE'"
             },
             {
               "name": "backendNotInstalled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendNotInstalled: \"BACKEND_NOT_INSTALLED\";",
+              "signature": "readonly backendNotInstalled: 'BACKEND_NOT_INSTALLED';",
               "description": "A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_NOT_INSTALLED\""
+              "returns": "'BACKEND_NOT_INSTALLED'"
             },
             {
               "name": "backendPluginInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendPluginInvalid: \"BACKEND_PLUGIN_INVALID\";",
+              "signature": "readonly backendPluginInvalid: 'BACKEND_PLUGIN_INVALID';",
               "description": "A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_PLUGIN_INVALID\""
+              "returns": "'BACKEND_PLUGIN_INVALID'"
             },
             {
               "name": "backendInstallFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendInstallFailed: \"BACKEND_INSTALL_FAILED\";",
+              "signature": "readonly backendInstallFailed: 'BACKEND_INSTALL_FAILED';",
               "description": "Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_INSTALL_FAILED\""
+              "returns": "'BACKEND_INSTALL_FAILED'"
             },
             {
               "name": "storageHostBusy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageHostBusy: \"STORAGE_HOST_BUSY\";",
+              "signature": "readonly storageHostBusy: 'STORAGE_HOST_BUSY';",
               "description": "A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry.",
               "parameterDetails": [],
-              "returns": "\"STORAGE_HOST_BUSY\""
+              "returns": "'STORAGE_HOST_BUSY'"
             },
             {
               "name": "storageHostDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageHostDisposed: \"STORAGE_HOST_DISPOSED\";",
+              "signature": "readonly storageHostDisposed: 'STORAGE_HOST_DISPOSED';",
               "description": "A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one.",
               "parameterDetails": [],
-              "returns": "\"STORAGE_HOST_DISPOSED\""
+              "returns": "'STORAGE_HOST_DISPOSED'"
             },
             {
               "name": "storageHostDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageHostDisposeFailed: \"STORAGE_HOST_DISPOSE_FAILED\";",
+              "signature": "readonly storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED';",
               "description": "Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics.",
               "parameterDetails": [],
-              "returns": "\"STORAGE_HOST_DISPOSE_FAILED\""
+              "returns": "'STORAGE_HOST_DISPOSE_FAILED'"
             },
             {
               "name": "liveQueryDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly liveQueryDisposeFailed: \"LIVE_QUERY_DISPOSE_FAILED\";",
+              "signature": "readonly liveQueryDisposeFailed: 'LIVE_QUERY_DISPOSE_FAILED';",
               "description": "Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors.",
               "parameterDetails": [],
-              "returns": "\"LIVE_QUERY_DISPOSE_FAILED\""
+              "returns": "'LIVE_QUERY_DISPOSE_FAILED'"
             },
             {
               "name": "reactiveFeatureInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveFeatureInvalid: \"REACTIVE_FEATURE_INVALID\";",
+              "signature": "readonly reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID';",
               "description": "A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying.",
               "parameterDetails": [],
-              "returns": "\"REACTIVE_FEATURE_INVALID\""
+              "returns": "'REACTIVE_FEATURE_INVALID'"
             },
             {
               "name": "reactiveTopologyInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveTopologyInvalid: \"REACTIVE_TOPOLOGY_INVALID\";",
+              "signature": "readonly reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID';",
               "description": "Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs.",
               "parameterDetails": [],
-              "returns": "\"REACTIVE_TOPOLOGY_INVALID\""
+              "returns": "'REACTIVE_TOPOLOGY_INVALID'"
             },
             {
               "name": "reactiveServiceNotInstalled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveServiceNotInstalled: \"REACTIVE_SERVICE_NOT_INSTALLED\";",
+              "signature": "readonly reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED';",
               "description": "Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query.",
               "parameterDetails": [],
-              "returns": "\"REACTIVE_SERVICE_NOT_INSTALLED\""
+              "returns": "'REACTIVE_SERVICE_NOT_INSTALLED'"
             },
             {
               "name": "reactiveAdapterNotInstalled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveAdapterNotInstalled: \"REACTIVE_ADAPTER_NOT_INSTALLED\";",
+              "signature": "readonly reactiveAdapterNotInstalled: 'REACTIVE_ADAPTER_NOT_INSTALLED';",
               "description": "The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback.",
               "parameterDetails": [],
-              "returns": "\"REACTIVE_ADAPTER_NOT_INSTALLED\""
+              "returns": "'REACTIVE_ADAPTER_NOT_INSTALLED'"
             },
             {
               "name": "reactiveAdapterFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveAdapterFailed: \"REACTIVE_ADAPTER_FAILED\";",
+              "signature": "readonly reactiveAdapterFailed: 'REACTIVE_ADAPTER_FAILED';",
               "description": "A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover.",
               "parameterDetails": [],
-              "returns": "\"REACTIVE_ADAPTER_FAILED\""
+              "returns": "'REACTIVE_ADAPTER_FAILED'"
             },
             {
               "name": "reactiveAdapterDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveAdapterDisposeFailed: \"REACTIVE_ADAPTER_DISPOSE_FAILED\";",
+              "signature": "readonly reactiveAdapterDisposeFailed: 'REACTIVE_ADAPTER_DISPOSE_FAILED';",
               "description": "Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors.",
               "parameterDetails": [],
-              "returns": "\"REACTIVE_ADAPTER_DISPOSE_FAILED\""
+              "returns": "'REACTIVE_ADAPTER_DISPOSE_FAILED'"
             },
             {
               "name": "backendDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendDisposeFailed: \"BACKEND_DISPOSE_FAILED\";",
+              "signature": "readonly backendDisposeFailed: 'BACKEND_DISPOSE_FAILED';",
               "description": "Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors.",
               "parameterDetails": [],
-              "returns": "\"BACKEND_DISPOSE_FAILED\""
+              "returns": "'BACKEND_DISPOSE_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "StorageErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorageErrorCode: Readonly<{ /** * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1. */ readonly unavailable: \"BACKEND_UNAVAILABLE\"; /** * A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change. */ readonly quotaExceeded: \"QUOTA_EXCEEDED\"; /** * A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment. */ readonly valueTooLarge: \"VALUE_TOO_LARGE\"; /** * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure. */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage. */ readonly deserializeFailed: \"DESERIALIZE_FAILED\"; /** * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage. */ readonly validationFailed: \"VALIDATION_FAILED\"; /** * A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic. */ readonly migrationFailed: \"MIGRATION_FAILED\"; /** * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried. */ readonly transactionFailed: \"TRANSACTION_FAILED\"; /** * A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels. */ readonly duplicateKey: \"DUPLICATE_KEY\"; /** * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version. */ readonly versionUnsupported: \"VERSION_UNSUPPORTED\"; /** * An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception. */ readonly extensionFailed: \"EXTENSION_FAILED\"; /** * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption. */ readonly transactionConflict: \"TRANSACTION_CONFLICT\"; /** * A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously. */ readonly writeFailed: \"WRITE_FAILED\"; /** * Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity. */ readonly cookieScopeAmbiguous: \"COOKIE_SCOPE_AMBIGUOUS\"; /** * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result. */ readonly indexOrphan: \"INDEX_ORPHAN\"; /** * An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying. */ readonly indexUniqueConflict: \"INDEX_UNIQUE_CONFLICT\"; /** * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot. */ readonly indexQueryInvalidated: \"INDEX_QUERY_INVALIDATED\"; /** * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle. */ readonly liveQueryDisposed: \"LIVE_QUERY_DISPOSED\"; /** * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired. */ readonly indexBackfillStale: \"INDEX_BACKFILL_STALE\"; /** * Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded. */ readonly indexBackfillFailed: \"INDEX_BACKFILL_FAILED\"; /** * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation. */ readonly backendIdInvalid: \"BACKEND_ID_INVALID\"; /** * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying. */ readonly backendDuplicate: \"BACKEND_DUPLICATE\"; /** * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID. */ readonly backendNotInstalled: \"BACKEND_NOT_INSTALLED\"; /** * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store. */ readonly backendPluginInvalid: \"BACKEND_PLUGIN_INVALID\"; /** * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished. */ readonly backendInstallFailed: \"BACKEND_INSTALL_FAILED\"; /** * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry. */ readonly storageHostBusy: \"STORAGE_HOST_BUSY\"; /** * A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one. */ readonly storageHostDisposed: \"STORAGE_HOST_DISPOSED\"; /** * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics. */ readonly storageHostDisposeFailed: \"STORAGE_HOST_DISPOSE_FAILED\"; /** * Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors. */ readonly liveQueryDisposeFailed: \"LIVE_QUERY_DISPOSE_FAILED\"; /** * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying. */ readonly reactiveFeatureInvalid: \"REACTIVE_FEATURE_INVALID\"; /** * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs. */ readonly reactiveTopologyInvalid: \"REACTIVE_TOPOLOGY_INVALID\"; /** * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query. */ readonly reactiveServiceNotInstalled: \"REACTIVE_SERVICE_NOT_INSTALLED\"; /** * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback. */ readonly reactiveAdapterNotInstalled: \"REACTIVE_ADAPTER_NOT_INSTALLED\"; /** * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover. */ readonly reactiveAdapterFailed: \"REACTIVE_ADAPTER_FAILED\"; /** * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors. */ readonly reactiveAdapterDisposeFailed: \"REACTIVE_ADAPTER_DISPOSE_FAILED\"; /** * Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors. */ readonly backendDisposeFailed: \"BACKEND_DISPOSE_FAILED\"; }>;"
+            "export declare const StorageErrorCode: Readonly<{ /** * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1. */ readonly unavailable: 'BACKEND_UNAVAILABLE'; /** * A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change. */ readonly quotaExceeded: 'QUOTA_EXCEEDED'; /** * A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment. */ readonly valueTooLarge: 'VALUE_TOO_LARGE'; /** * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage. */ readonly deserializeFailed: 'DESERIALIZE_FAILED'; /** * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage. */ readonly validationFailed: 'VALIDATION_FAILED'; /** * A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic. */ readonly migrationFailed: 'MIGRATION_FAILED'; /** * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** * A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels. */ readonly duplicateKey: 'DUPLICATE_KEY'; /** * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version. */ readonly versionUnsupported: 'VERSION_UNSUPPORTED'; /** * An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception. */ readonly extensionFailed: 'EXTENSION_FAILED'; /** * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption. */ readonly transactionConflict: 'TRANSACTION_CONFLICT'; /** * A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously. */ readonly writeFailed: 'WRITE_FAILED'; /** * Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity. */ readonly cookieScopeAmbiguous: 'COOKIE_SCOPE_AMBIGUOUS'; /** * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result. */ readonly indexOrphan: 'INDEX_ORPHAN'; /** * An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying. */ readonly indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT'; /** * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot. */ readonly indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED'; /** * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle. */ readonly liveQueryDisposed: 'LIVE_QUERY_DISPOSED'; /** * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired. */ readonly indexBackfillStale: 'INDEX_BACKFILL_STALE'; /** * Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded. */ readonly indexBackfillFailed: 'INDEX_BACKFILL_FAILED'; /** * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation. */ readonly backendIdInvalid: 'BACKEND_ID_INVALID'; /** * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying. */ readonly backendDuplicate: 'BACKEND_DUPLICATE'; /** * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID. */ readonly backendNotInstalled: 'BACKEND_NOT_INSTALLED'; /** * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store. */ readonly backendPluginInvalid: 'BACKEND_PLUGIN_INVALID'; /** * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished. */ readonly backendInstallFailed: 'BACKEND_INSTALL_FAILED'; /** * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry. */ readonly storageHostBusy: 'STORAGE_HOST_BUSY'; /** * A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one. */ readonly storageHostDisposed: 'STORAGE_HOST_DISPOSED'; /** * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics. */ readonly storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED'; /** * Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors. */ readonly liveQueryDisposeFailed: 'LIVE_QUERY_DISPOSE_FAILED'; /** * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying. */ readonly reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID'; /** * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs. */ readonly reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID'; /** * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query. */ readonly reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED'; /** * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback. */ readonly reactiveAdapterNotInstalled: 'REACTIVE_ADAPTER_NOT_INSTALLED'; /** * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover. */ readonly reactiveAdapterFailed: 'REACTIVE_ADAPTER_FAILED'; /** * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors. */ readonly reactiveAdapterDisposeFailed: 'REACTIVE_ADAPTER_DISPOSE_FAILED'; /** * Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors. */ readonly backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4125,7 +4125,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/error-code.d.ts:StorageErrorCode:export declare const StorageErrorCode: Readonly<{ /** * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1. */ readonly unavailable: \"BACKEND_UNAVAILABLE\"; /** * A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change. */ readonly quotaExceeded: \"QUOTA_EXCEEDED\"; /** * A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment. */ readonly valueTooLarge: \"VALUE_TOO_LARGE\"; /** * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure. */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage. */ readonly deserializeFailed: \"DESERIALIZE_FAILED\"; /** * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage. */ readonly validationFailed: \"VALIDATION_FAILED\"; /** * A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic. */ readonly migrationFailed: \"MIGRATION_FAILED\"; /** * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried. */ readonly transactionFailed: \"TRANSACTION_FAILED\"; /** * A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels. */ readonly duplicateKey: \"DUPLICATE_KEY\"; /** * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version. */ readonly versionUnsupported: \"VERSION_UNSUPPORTED\"; /** * An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception. */ readonly extensionFailed: \"EXTENSION_FAILED\"; /** * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption. */ readonly transactionConflict: \"TRANSACTION_CONFLICT\"; /** * A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously. */ readonly writeFailed: \"WRITE_FAILED\"; /** * Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity. */ readonly cookieScopeAmbiguous: \"COOKIE_SCOPE_AMBIGUOUS\"; /** * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result. */ readonly indexOrphan: \"INDEX_ORPHAN\"; /** * An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying. */ readonly indexUniqueConflict: \"INDEX_UNIQUE_CONFLICT\"; /** * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot. */ readonly indexQueryInvalidated: \"INDEX_QUERY_INVALIDATED\"; /** * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle. */ readonly liveQueryDisposed: \"LIVE_QUERY_DISPOSED\"; /** * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired. */ readonly indexBackfillStale: \"INDEX_BACKFILL_STALE\"; /** * Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded. */ readonly indexBackfillFailed: \"INDEX_BACKFILL_FAILED\"; /** * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation. */ readonly backendIdInvalid: \"BACKEND_ID_INVALID\"; /** * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying. */ readonly backendDuplicate: \"BACKEND_DUPLICATE\"; /** * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID. */ readonly backendNotInstalled: \"BACKEND_NOT_INSTALLED\"; /** * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store. */ readonly backendPluginInvalid: \"BACKEND_PLUGIN_INVALID\"; /** * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished. */ readonly backendInstallFailed: \"BACKEND_INSTALL_FAILED\"; /** * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry. */ readonly storageHostBusy: \"STORAGE_HOST_BUSY\"; /** * A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one. */ readonly storageHostDisposed: \"STORAGE_HOST_DISPOSED\"; /** * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics. */ readonly storageHostDisposeFailed: \"STORAGE_HOST_DISPOSE_FAILED\"; /** * Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors. */ readonly liveQueryDisposeFailed: \"LIVE_QUERY_DISPOSE_FAILED\"; /** * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying. */ readonly reactiveFeatureInvalid: \"REACTIVE_FEATURE_INVALID\"; /** * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs. */ readonly reactiveTopologyInvalid: \"REACTIVE_TOPOLOGY_INVALID\"; /** * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query. */ readonly reactiveServiceNotInstalled: \"REACTIVE_SERVICE_NOT_INSTALLED\"; /** * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback. */ readonly reactiveAdapterNotInstalled: \"REACTIVE_ADAPTER_NOT_INSTALLED\"; /** * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover. */ readonly reactiveAdapterFailed: \"REACTIVE_ADAPTER_FAILED\"; /** * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors. */ readonly reactiveAdapterDisposeFailed: \"REACTIVE_ADAPTER_DISPOSE_FAILED\"; /** * Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors. */ readonly backendDisposeFailed: \"BACKEND_DISPOSE_FAILED\"; }>;",
+          "identity": "packages/storage-web/dist/error-code.d.ts:StorageErrorCode:export declare const StorageErrorCode: Readonly<{ /** * A storage backend is unavailable because a private-mode probe fails or localStorage, IndexedDB, * or `document` is disabled or missing. * * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access, * rather than retrying the same unavailable backend. Enforces the availability probe contract in * §10.1. */ readonly unavailable: 'BACKEND_UNAVAILABLE'; /** * A write reaches the browser quota, such as `QuotaExceededError` or Firefox's * `NS_ERROR_DOM_QUOTA_REACHED`. * * The caller removes unneeded data or selects IndexedDB. The failure persists until storage * conditions change. */ readonly quotaExceeded: 'QUOTA_EXCEEDED'; /** * A serialized cookie assignment exceeds the 4 KB limit. * * The caller shortens the value, name, or attributes, or stores the data in IndexedDB. The * library does not silently truncate the assignment. */ readonly valueTooLarge: 'VALUE_TOO_LARGE'; /** * Serialization fails because `JSON.stringify` throws, codec `encode` returns unexpected output, * or a memory write fails during `structuredClone`. * * The caller checks whether the value can be serialized. This is a data shape failure rather than * a backend failure. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** * Deserialization fails because `JSON.parse` throws, an envelope is malformed, or codec `decode` * returns unexpected output. * * The caller checks whether an external writer or newer version changes the stored data. * `onInvalid` handles the `decode` stage. */ readonly deserializeFailed: 'DESERIALIZE_FAILED'; /** * Schema validation fails because `ISchemaAdapter.validate` throws. The Standard Schema adapter * converts returned issues into a validation failure. * * The caller corrects the data to match the schema. `onInvalid` handles the `validate` stage. */ readonly validationFailed: 'VALIDATION_FAILED'; /** * A migration function fails. * * Failure to migrate one record does not affect other records. The caller isolates the failure at * the `migrate` stage or repairs the migration logic. */ readonly migrationFailed: 'MIGRATION_FAILED'; /** * A transaction or exclusive entity commit fails, including IndexedDB creation/commit, host * coordination, or a callback error outside the storage error family. * * The caller checks whether the transaction crosses the automatic commit boundary or its scope * escapes. Transient concurrency failures can be retried. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** * A logical key conflicts across the value, bytes, and record channels without `conflictPolicy: * 'replace'`. * * The caller changes the key or explicitly selects `replace` to atomically remove the same key * from other channels. */ readonly duplicateKey: 'DUPLICATE_KEY'; /** * Entity envelope `__v` or the IndexedDB schema version exceeds the version known to the current * code. * * The caller upgrades the code or downgrades the data. Older code must not misread or overwrite * data from a newer version. */ readonly versionUnsupported: 'VERSION_UNSUPPORTED'; /** * An extension such as schema, codec, `namespaceCodec`, comparator, or diagnostic throws an * unclassified exception. * * The caller checks the extension implementation. `extensionStage` identifies the failed * extension, and `cause` retains the original exception. */ readonly extensionFailed: 'EXTENSION_FAILED'; /** * A read revision, global epoch, or KV entity snapshot changes before its atomic/exclusive * commit, causing a concurrent write conflict. * * The caller reads again and retries the entire transaction. This is a retryable concurrency * conflict rather than data corruption. */ readonly transactionConflict: 'TRANSACTION_CONFLICT'; /** * A cookie is not visible after a write because the browser silently rejects it. * * The caller checks cookie attributes (`path`, `domain`, `SameSite`, and `secure`) and capacity. * Privacy policies may still remove the cookie asynchronously. */ readonly writeFailed: 'WRITE_FAILED'; /** * Multiple visible cookie scopes share a name, so the target value's scope is ambiguous. * * The caller gives each scope a unique cookie name or fixes the scope at construction to avoid * ambiguity. */ readonly cookieScopeAmbiguous: 'COOKIE_SCOPE_AMBIGUOUS'; /** * Web adapter input or configuration validation fails. Covers cookie `SameSite`, `Secure`, * `Partitioned`, and scope settings; IndexedDB factory, store names, and `IDBKeyRange`; * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s * `onDiagnostic`. * * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3. * * The caller corrects the configuration before retrying. The argument or configuration failure * persists until it changes. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2 * orphan-reporting rule; callers should repair or rebuild the index rather than treating the * skipped row as a successful query result. */ readonly indexOrphan: 'INDEX_ORPHAN'; /** * An indexed mutation would assign one logical unique key to two authoritative records. Enforces * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different * indexed value or remove the competing record before retrying. */ readonly indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT'; /** * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then * closes it before yielding; callers must restart the query rather than trust a mixed snapshot. */ readonly indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED'; /** * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2 * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a * new live query instead of reusing the disposed handle. */ readonly liveQueryDisposed: 'LIVE_QUERY_DISPOSED'; /** * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint. * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should * retry through a fresh repository operation after the current handle is reacquired. */ readonly indexBackfillStale: 'INDEX_BACKFILL_STALE'; /** * Secondary-index backfill failed and persisting its failed readiness also failed. The caller * inspects the native aggregate's original cause/errors before retrying; neither the primary * failure nor the persistence failure may be discarded. */ readonly indexBackfillFailed: 'INDEX_BACKFILL_FAILED'; /** * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must * correct the bounded backend ID before retrying installation. */ readonly backendIdInvalid: 'BACKEND_ID_INVALID'; /** * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23; * callers must use a distinct ID or wait for the existing batch before retrying. */ readonly backendDuplicate: 'BACKEND_DUPLICATE'; /** * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17; * callers must install that exact backend or select an installed ID. */ readonly backendNotInstalled: 'BACKEND_NOT_INSTALLED'; /** * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers * must repair the plugin definition rather than relying on an unvalidated store. */ readonly backendPluginInvalid: 'BACKEND_PLUGIN_INVALID'; /** * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30; * callers may retry after fixing the cause, while the failed batch remains unpublished. */ readonly backendInstallFailed: 'BACKEND_INSTALL_FAILED'; /** * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82; * callers must wait for that batch to settle and explicitly retry. */ readonly storageHostBusy: 'STORAGE_HOST_BUSY'; /** * A host or its public operation was used after sealing or terminal disposal. Enforces * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one. */ readonly storageHostDisposed: 'STORAGE_HOST_DISPOSED'; /** * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host * as terminal while inspecting the aggregate errors for cleanup diagnostics. */ readonly storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED'; /** * Live-query request or owned reactive cleanup collected one or more failures. Enforces * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors. */ readonly liveQueryDisposeFailed: 'LIVE_QUERY_DISPOSE_FAILED'; /** * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying. */ readonly reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID'; /** * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs. */ readonly reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID'; /** * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the * admitted reactive service before requesting a query. */ readonly reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED'; /** * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87; * callers must use an installed adapter-bound backend ID, with no default fallback. */ readonly reactiveAdapterNotInstalled: 'REACTIVE_ADAPTER_NOT_INSTALLED'; /** * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers * should observe the query error state and allow a later invalidation or poll to recover. */ readonly reactiveAdapterFailed: 'REACTIVE_ADAPTER_FAILED'; /** * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81; * callers must treat the adapter as terminal and inspect AggregateError.errors. */ readonly reactiveAdapterDisposeFailed: 'REACTIVE_ADAPTER_DISPOSE_FAILED'; /** * Direct backend quiescence, transport, connection, or channel cleanup collected failures. * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors. */ readonly backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'; }>;",
           "guidance": [
             {
               "id": "错误模块",
@@ -4387,7 +4387,7 @@
         {
           "name": "StorageErrorText",
           "kind": "const",
-          "signature": "export declare const StorageErrorText: Readonly<{ /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */ readonly entityUniqueSnapshotChanged: \"entity unique-write snapshot changed before commit\"; /** Entity construction requires every upgrade step, including when the graph is omitted. */ readonly entityMigrationGraphIncomplete: \"entity migration graph must contain every version step\"; /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\"; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\"; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\"; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\"; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\"; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\"; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\"; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\"; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\"; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\"; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\"; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\"; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: \"invalid storage key wire\"; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: \"key too large\"; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\"; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;",
+          "signature": "export declare const StorageErrorText: Readonly<{ /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */ readonly entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit'; /** Entity construction requires every upgrade step, including when the graph is omitted. */ readonly entityMigrationGraphIncomplete: 'entity migration graph must contain every version step'; /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues'; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: 'namespace codec encode must return a string'; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined'; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: 'web storage injection must implement the Storage surface'; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: 'web storage length must remain a non-negative safe integer'; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: 'web storage key enumeration must return one unique string per index'; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: 'web storage key enumeration returned a duplicate physical key'; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: 'invalid IndexedDB change hint key'; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction'; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property'; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: 'entity orderBy comparator must return a number'; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits'; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: 'invalid storage key wire'; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: 'key too large'; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: 'invalid storage key wire tag'; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: 'storage backend id is invalid'; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: 'storage backend is already installed'; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: 'storage backend is not installed'; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: 'storage backend plugin is invalid'; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: 'storage backend installation failed'; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: 'storage host is busy installing plugins'; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: 'storage host is disposed'; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: 'storage host failed to dispose'; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: 'live query failed to dispose'; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: 'reactive feature is invalid'; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: 'reactive feature topology is invalid'; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: 'reactive live-query service is not installed'; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: 'reactive backend adapter is not installed'; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: 'reactive backend adapter failed'; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: 'reactive backend adapter failed to dispose'; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: 'live query extension failed'; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: 'storage backend failed to dispose'; readonly indexOrphan: 'indexed record index contains orphan sidecar row'; readonly indexQueryInvalidated: 'native record index query invalidated by a concurrent mutation'; readonly liveQueryDisposed: 'live query is disposed; create a new live query'; readonly indexBackfillStale: 'indexed record backfill handle is stale; retry the query'; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: 'indexed record backfill projection exceeds its fixed limit'; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: 'indexed record backfill decoded payload exceeds its fixed limit'; }>;",
           "declarationLine": 2,
           "source": "packages/storage-web/dist/error-text.d.ts",
           "purpose": "Stable message texts used by this package, for custom backends and codecs that want the same wording; branch on `code`, not on text.",
@@ -4406,368 +4406,368 @@
               "name": "entityUniqueSnapshotChanged",
               "kind": "property",
               "optional": false,
-              "signature": "readonly entityUniqueSnapshotChanged: \"entity unique-write snapshot changed before commit\";",
+              "signature": "readonly entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit';",
               "description": "A KV snapshot changed while schema/projection work ran; the caller retries the whole write.",
               "parameterDetails": [],
-              "returns": "\"entity unique-write snapshot changed before commit\""
+              "returns": "'entity unique-write snapshot changed before commit'"
             },
             {
               "name": "entityMigrationGraphIncomplete",
               "kind": "property",
               "optional": false,
-              "signature": "readonly entityMigrationGraphIncomplete: \"entity migration graph must contain every version step\";",
+              "signature": "readonly entityMigrationGraphIncomplete: 'entity migration graph must contain every version step';",
               "description": "Entity construction requires every upgrade step, including when the graph is omitted.",
               "parameterDetails": [],
-              "returns": "\"entity migration graph must contain every version step\""
+              "returns": "'entity migration graph must contain every version step'"
             },
             {
               "name": "standardSchemaIssuesInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\";",
+              "signature": "readonly standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues';",
               "description": "Standard Schema issue arrays must contain object entries with string messages.",
               "parameterDetails": [],
-              "returns": "\"Standard Schema returned invalid issues\""
+              "returns": "'Standard Schema returned invalid issues'"
             },
             {
               "name": "namespaceCodecEncodeInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\";",
+              "signature": "readonly namespaceCodecEncodeInvalid: 'namespace codec encode must return a string';",
               "description": "Namespace codecs must encode a physical key as a string.",
               "parameterDetails": [],
-              "returns": "\"namespace codec encode must return a string\""
+              "returns": "'namespace codec encode must return a string'"
             },
             {
               "name": "namespaceCodecDecodeInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\";",
+              "signature": "readonly namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined';",
               "description": "Namespace codecs may decode only a string key or an absent foreign namespace.",
               "parameterDetails": [],
-              "returns": "\"namespace codec decode must return string or undefined\""
+              "returns": "'namespace codec decode must return string or undefined'"
             },
             {
               "name": "webStorageInjectionInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\";",
+              "signature": "readonly webStorageInjectionInvalid: 'web storage injection must implement the Storage surface';",
               "description": "Injected Web Storage values must implement the complete Storage surface.",
               "parameterDetails": [],
-              "returns": "\"web storage injection must implement the Storage surface\""
+              "returns": "'web storage injection must implement the Storage surface'"
             },
             {
               "name": "webStorageLengthInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\";",
+              "signature": "readonly webStorageLengthInvalid: 'web storage length must remain a non-negative safe integer';",
               "description": "Live Web Storage length must remain a usable enumeration bound.",
               "parameterDetails": [],
-              "returns": "\"web storage length must remain a non-negative safe integer\""
+              "returns": "'web storage length must remain a non-negative safe integer'"
             },
             {
               "name": "webStorageKeyInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\";",
+              "signature": "readonly webStorageKeyInvalid: 'web storage key enumeration must return one unique string per index';",
               "description": "Live Web Storage enumeration must return a string key for every visible index.",
               "parameterDetails": [],
-              "returns": "\"web storage key enumeration must return one unique string per index\""
+              "returns": "'web storage key enumeration must return one unique string per index'"
             },
             {
               "name": "webStorageKeyDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\";",
+              "signature": "readonly webStorageKeyDuplicate: 'web storage key enumeration returned a duplicate physical key';",
               "description": "Live Web Storage enumeration must not repeat the same physical key.",
               "parameterDetails": [],
-              "returns": "\"web storage key enumeration returned a duplicate physical key\""
+              "returns": "'web storage key enumeration returned a duplicate physical key'"
             },
             {
               "name": "indexedDbChangeHintKeyInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\";",
+              "signature": "readonly indexedDbChangeHintKeyInvalid: 'invalid IndexedDB change hint key';",
               "description": "IndexedDB coordination hints must contain decodable storage keys.",
               "parameterDetails": [],
-              "returns": "\"invalid IndexedDB change hint key\""
+              "returns": "'invalid IndexedDB change hint key'"
             },
             {
               "name": "indexedDbUpgradeTransactionMissing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\";",
+              "signature": "readonly indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction';",
               "description": "IndexedDB upgrade events require the transaction supplied by the platform.",
               "parameterDetails": [],
-              "returns": "\"IndexedDB upgrade event is missing its transaction\""
+              "returns": "'IndexedDB upgrade event is missing its transaction'"
             },
             {
               "name": "cookieDocumentBecameInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\";",
+              "signature": "readonly cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property';",
               "description": "A cookie document must keep exposing its string cookie property after admission.",
               "parameterDetails": [],
-              "returns": "\"cookie document must continue exposing a string cookie property\""
+              "returns": "'cookie document must continue exposing a string cookie property'"
             },
             {
               "name": "entityComparatorInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\";",
+              "signature": "readonly entityComparatorInvalid: 'entity orderBy comparator must return a number';",
               "description": "Entity ordering extensions must return a finite comparable number.",
               "parameterDetails": [],
-              "returns": "\"entity orderBy comparator must return a number\""
+              "returns": "'entity orderBy comparator must return a number'"
             },
             {
               "name": "storageKeyDecodeLimitExceeded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\";",
+              "signature": "readonly storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits';",
               "description": "Encoded storage keys are bounded to the contract depth and node limits.",
               "parameterDetails": [],
-              "returns": "\"storage key exceeds decode limits\""
+              "returns": "'storage key exceeds decode limits'"
             },
             {
               "name": "storageKeyWireInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageKeyWireInvalid: \"invalid storage key wire\";",
+              "signature": "readonly storageKeyWireInvalid: 'invalid storage key wire';",
               "description": "Encoded storage keys must use the canonical two-slot wire tuple.",
               "parameterDetails": [],
-              "returns": "\"invalid storage key wire\""
+              "returns": "'invalid storage key wire'"
             },
             {
               "name": "storageKeyBinaryTooLarge",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageKeyBinaryTooLarge: \"key too large\";",
+              "signature": "readonly storageKeyBinaryTooLarge: 'key too large';",
               "description": "Encoded binary storage keys must remain within the public key-size limit.",
               "parameterDetails": [],
-              "returns": "\"key too large\""
+              "returns": "'key too large'"
             },
             {
               "name": "storageKeyWireTagInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\";",
+              "signature": "readonly storageKeyWireTagInvalid: 'invalid storage key wire tag';",
               "description": "Encoded storage keys must use one of the registered wire tags.",
               "parameterDetails": [],
-              "returns": "\"invalid storage key wire tag\""
+              "returns": "'invalid storage key wire tag'"
             },
             {
               "name": "backendIdInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendIdInvalid: \"storage backend id is invalid\";",
+              "signature": "readonly backendIdInvalid: 'storage backend id is invalid';",
               "description": "Stable text for rejecting malformed backend identifiers before host mutation.",
               "parameterDetails": [],
-              "returns": "\"storage backend id is invalid\""
+              "returns": "'storage backend id is invalid'"
             },
             {
               "name": "backendDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendDuplicate: \"storage backend is already installed\";",
+              "signature": "readonly backendDuplicate: 'storage backend is already installed';",
               "description": "Stable text for duplicate backend registration or install-batch identifiers.",
               "parameterDetails": [],
-              "returns": "\"storage backend is already installed\""
+              "returns": "'storage backend is already installed'"
             },
             {
               "name": "backendNotInstalled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendNotInstalled: \"storage backend is not installed\";",
+              "signature": "readonly backendNotInstalled: 'storage backend is not installed';",
               "description": "Stable text for a valid backend identifier absent from the host registry.",
               "parameterDetails": [],
-              "returns": "\"storage backend is not installed\""
+              "returns": "'storage backend is not installed'"
             },
             {
               "name": "backendPluginInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendPluginInvalid: \"storage backend plugin is invalid\";",
+              "signature": "readonly backendPluginInvalid: 'storage backend plugin is invalid';",
               "description": "Stable text for backend plugin/store contract rejection.",
               "parameterDetails": [],
-              "returns": "\"storage backend plugin is invalid\""
+              "returns": "'storage backend plugin is invalid'"
             },
             {
               "name": "backendInstallFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendInstallFailed: \"storage backend installation failed\";",
+              "signature": "readonly backendInstallFailed: 'storage backend installation failed';",
               "description": "Stable text for backend factory, preparation, or PluginHost install failure.",
               "parameterDetails": [],
-              "returns": "\"storage backend installation failed\""
+              "returns": "'storage backend installation failed'"
             },
             {
               "name": "storageHostBusy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageHostBusy: \"storage host is busy installing plugins\";",
+              "signature": "readonly storageHostBusy: 'storage host is busy installing plugins';",
               "description": "Stable text for rejecting host mutation while another batch is installing.",
               "parameterDetails": [],
-              "returns": "\"storage host is busy installing plugins\""
+              "returns": "'storage host is busy installing plugins'"
             },
             {
               "name": "storageHostDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageHostDisposed: \"storage host is disposed\";",
+              "signature": "readonly storageHostDisposed: 'storage host is disposed';",
               "description": "Stable text for host operations after seal or terminal disposal.",
               "parameterDetails": [],
-              "returns": "\"storage host is disposed\""
+              "returns": "'storage host is disposed'"
             },
             {
               "name": "storageHostDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storageHostDisposeFailed: \"storage host failed to dispose\";",
+              "signature": "readonly storageHostDisposeFailed: 'storage host failed to dispose';",
               "description": "Stable text for aggregate host cleanup failure.",
               "parameterDetails": [],
-              "returns": "\"storage host failed to dispose\""
+              "returns": "'storage host failed to dispose'"
             },
             {
               "name": "liveQueryDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly liveQueryDisposeFailed: \"live query failed to dispose\";",
+              "signature": "readonly liveQueryDisposeFailed: 'live query failed to dispose';",
               "description": "Stable text for aggregate live-query cleanup failure.",
               "parameterDetails": [],
-              "returns": "\"live query failed to dispose\""
+              "returns": "'live query failed to dispose'"
             },
             {
               "name": "reactiveFeatureInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveFeatureInvalid: \"reactive feature is invalid\";",
+              "signature": "readonly reactiveFeatureInvalid: 'reactive feature is invalid';",
               "description": "Stable text for malformed reactive feature/provider/adapter descriptors.",
               "parameterDetails": [],
-              "returns": "\"reactive feature is invalid\""
+              "returns": "'reactive feature is invalid'"
             },
             {
               "name": "reactiveTopologyInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\";",
+              "signature": "readonly reactiveTopologyInvalid: 'reactive feature topology is invalid';",
               "description": "Stable text for rejected reactive feature topology.",
               "parameterDetails": [],
-              "returns": "\"reactive feature topology is invalid\""
+              "returns": "'reactive feature topology is invalid'"
             },
             {
               "name": "reactiveServiceNotInstalled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\";",
+              "signature": "readonly reactiveServiceNotInstalled: 'reactive live-query service is not installed';",
               "description": "Stable text for live-query service lookup before service installation.",
               "parameterDetails": [],
-              "returns": "\"reactive live-query service is not installed\""
+              "returns": "'reactive live-query service is not installed'"
             },
             {
               "name": "reactiveAdapterNotInstalled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\";",
+              "signature": "readonly reactiveAdapterNotInstalled: 'reactive backend adapter is not installed';",
               "description": "Stable text for backend reactive adapter lookup failure.",
               "parameterDetails": [],
-              "returns": "\"reactive backend adapter is not installed\""
+              "returns": "'reactive backend adapter is not installed'"
             },
             {
               "name": "reactiveAdapterFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveAdapterFailed: \"reactive backend adapter failed\";",
+              "signature": "readonly reactiveAdapterFailed: 'reactive backend adapter failed';",
               "description": "Stable text for recoverable adapter event, poll, or authoritative-read failure.",
               "parameterDetails": [],
-              "returns": "\"reactive backend adapter failed\""
+              "returns": "'reactive backend adapter failed'"
             },
             {
               "name": "reactiveAdapterDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\";",
+              "signature": "readonly reactiveAdapterDisposeFailed: 'reactive backend adapter failed to dispose';",
               "description": "Stable text for aggregate reactive adapter/service cleanup failure.",
               "parameterDetails": [],
-              "returns": "\"reactive backend adapter failed to dispose\""
+              "returns": "'reactive backend adapter failed to dispose'"
             },
             {
               "name": "liveQueryFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly liveQueryFailed: \"live query extension failed\";",
+              "signature": "readonly liveQueryFailed: 'live query extension failed';",
               "description": "Stable text for a live-query callback failure retained under EXTENSION_FAILED.",
               "parameterDetails": [],
-              "returns": "\"live query extension failed\""
+              "returns": "'live query extension failed'"
             },
             {
               "name": "backendDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backendDisposeFailed: \"storage backend failed to dispose\";",
+              "signature": "readonly backendDisposeFailed: 'storage backend failed to dispose';",
               "description": "Stable text for aggregate direct backend cleanup failure.",
               "parameterDetails": [],
-              "returns": "\"storage backend failed to dispose\""
+              "returns": "'storage backend failed to dispose'"
             },
             {
               "name": "indexOrphan",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexOrphan: \"indexed record index contains orphan sidecar row\";",
+              "signature": "readonly indexOrphan: 'indexed record index contains orphan sidecar row';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"indexed record index contains orphan sidecar row\""
+              "returns": "'indexed record index contains orphan sidecar row'"
             },
             {
               "name": "indexQueryInvalidated",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\";",
+              "signature": "readonly indexQueryInvalidated: 'native record index query invalidated by a concurrent mutation';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"native record index query invalidated by a concurrent mutation\""
+              "returns": "'native record index query invalidated by a concurrent mutation'"
             },
             {
               "name": "liveQueryDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly liveQueryDisposed: \"live query is disposed; create a new live query\";",
+              "signature": "readonly liveQueryDisposed: 'live query is disposed; create a new live query';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"live query is disposed; create a new live query\""
+              "returns": "'live query is disposed; create a new live query'"
             },
             {
               "name": "indexBackfillStale",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\";",
+              "signature": "readonly indexBackfillStale: 'indexed record backfill handle is stale; retry the query';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"indexed record backfill handle is stale; retry the query\""
+              "returns": "'indexed record backfill handle is stale; retry the query'"
             },
             {
               "name": "indexBackfillProjectionTooLarge",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\";",
+              "signature": "readonly indexBackfillProjectionTooLarge: 'indexed record backfill projection exceeds its fixed limit';",
               "description": "Stable cause text for rejecting bounded backfill projection work before sidecar writes.",
               "parameterDetails": [],
-              "returns": "\"indexed record backfill projection exceeds its fixed limit\""
+              "returns": "'indexed record backfill projection exceeds its fixed limit'"
             },
             {
               "name": "indexBackfillDecodedTooLarge",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\";",
+              "signature": "readonly indexBackfillDecodedTooLarge: 'indexed record backfill decoded payload exceeds its fixed limit';",
               "description": "Stable cause text for rejecting decoded backfill work before issuing a partial batch.",
               "parameterDetails": [],
-              "returns": "\"indexed record backfill decoded payload exceeds its fixed limit\""
+              "returns": "'indexed record backfill decoded payload exceeds its fixed limit'"
             }
           ],
           "composes": [],
           "aliasOf": "StorageErrorText",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorageErrorText: Readonly<{ /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */ readonly entityUniqueSnapshotChanged: \"entity unique-write snapshot changed before commit\"; /** Entity construction requires every upgrade step, including when the graph is omitted. */ readonly entityMigrationGraphIncomplete: \"entity migration graph must contain every version step\"; /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\"; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\"; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\"; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\"; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\"; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\"; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\"; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\"; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\"; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\"; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\"; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\"; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: \"invalid storage key wire\"; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: \"key too large\"; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\"; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;"
+            "export declare const StorageErrorText: Readonly<{ /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */ readonly entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit'; /** Entity construction requires every upgrade step, including when the graph is omitted. */ readonly entityMigrationGraphIncomplete: 'entity migration graph must contain every version step'; /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues'; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: 'namespace codec encode must return a string'; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined'; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: 'web storage injection must implement the Storage surface'; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: 'web storage length must remain a non-negative safe integer'; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: 'web storage key enumeration must return one unique string per index'; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: 'web storage key enumeration returned a duplicate physical key'; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: 'invalid IndexedDB change hint key'; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction'; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property'; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: 'entity orderBy comparator must return a number'; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits'; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: 'invalid storage key wire'; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: 'key too large'; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: 'invalid storage key wire tag'; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: 'storage backend id is invalid'; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: 'storage backend is already installed'; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: 'storage backend is not installed'; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: 'storage backend plugin is invalid'; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: 'storage backend installation failed'; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: 'storage host is busy installing plugins'; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: 'storage host is disposed'; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: 'storage host failed to dispose'; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: 'live query failed to dispose'; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: 'reactive feature is invalid'; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: 'reactive feature topology is invalid'; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: 'reactive live-query service is not installed'; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: 'reactive backend adapter is not installed'; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: 'reactive backend adapter failed'; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: 'reactive backend adapter failed to dispose'; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: 'live query extension failed'; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: 'storage backend failed to dispose'; readonly indexOrphan: 'indexed record index contains orphan sidecar row'; readonly indexQueryInvalidated: 'native record index query invalidated by a concurrent mutation'; readonly liveQueryDisposed: 'live query is disposed; create a new live query'; readonly indexBackfillStale: 'indexed record backfill handle is stale; retry the query'; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: 'indexed record backfill projection exceeds its fixed limit'; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: 'indexed record backfill decoded payload exceeds its fixed limit'; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4806,7 +4806,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/error-text.d.ts:StorageErrorText:export declare const StorageErrorText: Readonly<{ /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */ readonly entityUniqueSnapshotChanged: \"entity unique-write snapshot changed before commit\"; /** Entity construction requires every upgrade step, including when the graph is omitted. */ readonly entityMigrationGraphIncomplete: \"entity migration graph must contain every version step\"; /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\"; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\"; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\"; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\"; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\"; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\"; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\"; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\"; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\"; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\"; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\"; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\"; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: \"invalid storage key wire\"; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: \"key too large\"; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\"; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;",
+          "identity": "packages/storage-web/dist/error-text.d.ts:StorageErrorText:export declare const StorageErrorText: Readonly<{ /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */ readonly entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit'; /** Entity construction requires every upgrade step, including when the graph is omitted. */ readonly entityMigrationGraphIncomplete: 'entity migration graph must contain every version step'; /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues'; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: 'namespace codec encode must return a string'; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined'; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: 'web storage injection must implement the Storage surface'; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: 'web storage length must remain a non-negative safe integer'; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: 'web storage key enumeration must return one unique string per index'; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: 'web storage key enumeration returned a duplicate physical key'; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: 'invalid IndexedDB change hint key'; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction'; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property'; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: 'entity orderBy comparator must return a number'; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits'; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: 'invalid storage key wire'; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: 'key too large'; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: 'invalid storage key wire tag'; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: 'storage backend id is invalid'; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: 'storage backend is already installed'; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: 'storage backend is not installed'; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: 'storage backend plugin is invalid'; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: 'storage backend installation failed'; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: 'storage host is busy installing plugins'; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: 'storage host is disposed'; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: 'storage host failed to dispose'; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: 'live query failed to dispose'; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: 'reactive feature is invalid'; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: 'reactive feature topology is invalid'; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: 'reactive live-query service is not installed'; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: 'reactive backend adapter is not installed'; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: 'reactive backend adapter failed'; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: 'reactive backend adapter failed to dispose'; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: 'live query extension failed'; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: 'storage backend failed to dispose'; readonly indexOrphan: 'indexed record index contains orphan sidecar row'; readonly indexQueryInvalidated: 'native record index query invalidated by a concurrent mutation'; readonly liveQueryDisposed: 'live query is disposed; create a new live query'; readonly indexBackfillStale: 'indexed record backfill handle is stale; retry the query'; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: 'indexed record backfill projection exceeds its fixed limit'; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: 'indexed record backfill decoded payload exceeds its fixed limit'; }>;",
           "guidance": [
             {
               "id": "错误模块",
@@ -11483,7 +11483,7 @@
         {
           "name": "cookieBackendPlugin",
           "kind": "const",
-          "signature": "export declare const cookieBackendPlugin: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;",
+          "signature": "export declare const cookieBackendPlugin: <const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/cookies.d.ts",
           "purpose": "Plugin that installs a `document.cookie` store into a storage host under an id (default `cookies`); no reactive capability.",
@@ -11499,7 +11499,7 @@
           "composes": [],
           "exportPath": "./plugins/cookies",
           "overloadSignatures": [
-            "export declare const cookieBackendPlugin: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;"
+            "export declare const cookieBackendPlugin: <const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11569,7 +11569,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/cookies.d.ts:cookieBackendPlugin:export declare const cookieBackendPlugin: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;",
+          "identity": "packages/storage-web/dist/plugins/cookies.d.ts:cookieBackendPlugin:export declare const cookieBackendPlugin: <const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [
@@ -11638,7 +11638,7 @@
         {
           "name": "indexedDbBackendPlugin",
           "kind": "const",
-          "signature": "export declare const indexedDbBackendPlugin: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;",
+          "signature": "export declare const indexedDbBackendPlugin: <const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;",
           "declarationLine": 8,
           "source": "packages/storage-web/dist/plugins/indexed-db.d.ts",
           "purpose": "Plugin that installs an IndexedDB record store with indexes and transactions into a storage host under an id (default `indexed-db`); no reactive capability.",
@@ -11656,7 +11656,7 @@
           "composes": [],
           "exportPath": "./plugins/indexed-db",
           "overloadSignatures": [
-            "export declare const indexedDbBackendPlugin: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;"
+            "export declare const indexedDbBackendPlugin: <const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11744,7 +11744,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/indexed-db.d.ts:indexedDbBackendPlugin:export declare const indexedDbBackendPlugin: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;",
+          "identity": "packages/storage-web/dist/plugins/indexed-db.d.ts:indexedDbBackendPlugin:export declare const indexedDbBackendPlugin: <const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [
@@ -11901,7 +11901,7 @@
         {
           "name": "localStorageBackendPlugin",
           "kind": "const",
-          "signature": "export declare const localStorageBackendPlugin: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;",
+          "signature": "export declare const localStorageBackendPlugin: <const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/local-storage.d.ts",
           "purpose": "Plugin that installs a namespaced `localStorage` store into a storage host under an id (default `local`); no reactive capability.",
@@ -11917,7 +11917,7 @@
           "composes": [],
           "exportPath": "./plugins/local-storage",
           "overloadSignatures": [
-            "export declare const localStorageBackendPlugin: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;"
+            "export declare const localStorageBackendPlugin: <const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11981,7 +11981,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/local-storage.d.ts:localStorageBackendPlugin:export declare const localStorageBackendPlugin: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;",
+          "identity": "packages/storage-web/dist/plugins/local-storage.d.ts:localStorageBackendPlugin:export declare const localStorageBackendPlugin: <const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [
@@ -12042,7 +12042,7 @@
         {
           "name": "memoryBackendPlugin",
           "kind": "const",
-          "signature": "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
+          "signature": "export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/plugins/memory.d.ts",
           "purpose": "Plugin that installs an in-memory record store into a storage host under an id (default `memory`); no reactive capability.",
@@ -12062,7 +12062,7 @@
           "composes": [],
           "exportPath": "./plugins/memory",
           "overloadSignatures": [
-            "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;"
+            "export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -12108,7 +12108,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/memory.d.ts:memoryBackendPlugin:export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
+          "identity": "packages/storage-web/dist/plugins/memory.d.ts:memoryBackendPlugin:export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
           "guidance": [],
           "usageScore": 52,
           "configuration": [
@@ -12950,7 +12950,7 @@
         {
           "name": "sessionStorageBackendPlugin",
           "kind": "const",
-          "signature": "export declare const sessionStorageBackendPlugin: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;",
+          "signature": "export declare const sessionStorageBackendPlugin: <const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;",
           "declarationLine": 5,
           "source": "packages/storage-web/dist/plugins/session-storage.d.ts",
           "purpose": "Plugin that installs a namespaced `sessionStorage` store into a storage host under an id (default `session`); no reactive capability.",
@@ -12966,7 +12966,7 @@
           "composes": [],
           "exportPath": "./plugins/session-storage",
           "overloadSignatures": [
-            "export declare const sessionStorageBackendPlugin: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;"
+            "export declare const sessionStorageBackendPlugin: <const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -13030,7 +13030,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/session-storage.d.ts:sessionStorageBackendPlugin:export declare const sessionStorageBackendPlugin: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;",
+          "identity": "packages/storage-web/dist/plugins/session-storage.d.ts:sessionStorageBackendPlugin:export declare const sessionStorageBackendPlugin: <const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [

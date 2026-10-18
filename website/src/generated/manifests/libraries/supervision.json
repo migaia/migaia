@@ -211,7 +211,7 @@
         {
           "name": "BudgetOverflow",
           "kind": "const",
-          "signature": "export declare const BudgetOverflow: { readonly queue: \"queue\"; readonly reject: \"reject\"; };\nexport type BudgetOverflow = (typeof BudgetOverflow)[keyof typeof BudgetOverflow];",
+          "signature": "export declare const BudgetOverflow: { readonly queue: 'queue'; readonly reject: 'reject'; };\nexport type BudgetOverflow = (typeof BudgetOverflow)[keyof typeof BudgetOverflow];",
           "declarationLine": 75,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Capacity overflow policy of a shared admission budget. Values are stable public contract identifiers; use the matching table entries below.",
@@ -228,26 +228,26 @@
               "name": "queue",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queue: \"queue\";",
+              "signature": "readonly queue: 'queue';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"queue\""
+              "returns": "'queue'"
             },
             {
               "name": "reject",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reject: \"reject\";",
+              "signature": "readonly reject: 'reject';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"reject\""
+              "returns": "'reject'"
             }
           ],
           "composes": [],
           "aliasOf": "BudgetOverflow",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const BudgetOverflow: { readonly queue: \"queue\"; readonly reject: \"reject\"; };",
+            "export declare const BudgetOverflow: { readonly queue: 'queue'; readonly reject: 'reject'; };",
             "export type BudgetOverflow = (typeof BudgetOverflow)[keyof typeof BudgetOverflow];"
           ],
           "overloadParameterDetails": [[], []],
@@ -287,7 +287,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:BudgetOverflow:export declare const BudgetOverflow: { readonly queue: \"queue\"; readonly reject: \"reject\"; };\nexport type BudgetOverflow = (typeof BudgetOverflow)[keyof typeof BudgetOverflow];",
+          "identity": "packages/supervision/dist/constants.d.ts:BudgetOverflow:export declare const BudgetOverflow: { readonly queue: 'queue'; readonly reject: 'reject'; };\nexport type BudgetOverflow = (typeof BudgetOverflow)[keyof typeof BudgetOverflow];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -296,7 +296,7 @@
         {
           "name": "BudgetRejection",
           "kind": "const",
-          "signature": "export declare const BudgetRejection: { readonly full: \"full\"; readonly rateLimited: \"rate-limited\"; readonly queueTimeout: \"queue-timeout\"; readonly aborted: \"aborted\"; readonly closed: \"closed\"; };\nexport type BudgetRejection = (typeof BudgetRejection)[keyof typeof BudgetRejection];",
+          "signature": "export declare const BudgetRejection: { readonly full: 'full'; readonly rateLimited: 'rate-limited'; readonly queueTimeout: 'queue-timeout'; readonly aborted: 'aborted'; readonly closed: 'closed'; };\nexport type BudgetRejection = (typeof BudgetRejection)[keyof typeof BudgetRejection];",
           "declarationLine": 81,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Stable refusal reasons returned instead of throwing during budget admission. Values are stable public contract identifiers; use the matching table entries below.",
@@ -313,53 +313,53 @@
               "name": "full",
               "kind": "property",
               "optional": false,
-              "signature": "readonly full: \"full\";",
+              "signature": "readonly full: 'full';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"full\""
+              "returns": "'full'"
             },
             {
               "name": "rateLimited",
               "kind": "property",
               "optional": false,
-              "signature": "readonly rateLimited: \"rate-limited\";",
+              "signature": "readonly rateLimited: 'rate-limited';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"rate-limited\""
+              "returns": "'rate-limited'"
             },
             {
               "name": "queueTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queueTimeout: \"queue-timeout\";",
+              "signature": "readonly queueTimeout: 'queue-timeout';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"queue-timeout\""
+              "returns": "'queue-timeout'"
             },
             {
               "name": "aborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly aborted: \"aborted\";",
+              "signature": "readonly aborted: 'aborted';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"aborted\""
+              "returns": "'aborted'"
             },
             {
               "name": "closed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closed: \"closed\";",
+              "signature": "readonly closed: 'closed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"closed\""
+              "returns": "'closed'"
             }
           ],
           "composes": [],
           "aliasOf": "BudgetRejection",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const BudgetRejection: { readonly full: \"full\"; readonly rateLimited: \"rate-limited\"; readonly queueTimeout: \"queue-timeout\"; readonly aborted: \"aborted\"; readonly closed: \"closed\"; };",
+            "export declare const BudgetRejection: { readonly full: 'full'; readonly rateLimited: 'rate-limited'; readonly queueTimeout: 'queue-timeout'; readonly aborted: 'aborted'; readonly closed: 'closed'; };",
             "export type BudgetRejection = (typeof BudgetRejection)[keyof typeof BudgetRejection];"
           ],
           "overloadParameterDetails": [[], []],
@@ -399,7 +399,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:BudgetRejection:export declare const BudgetRejection: { readonly full: \"full\"; readonly rateLimited: \"rate-limited\"; readonly queueTimeout: \"queue-timeout\"; readonly aborted: \"aborted\"; readonly closed: \"closed\"; };\nexport type BudgetRejection = (typeof BudgetRejection)[keyof typeof BudgetRejection];",
+          "identity": "packages/supervision/dist/constants.d.ts:BudgetRejection:export declare const BudgetRejection: { readonly full: 'full'; readonly rateLimited: 'rate-limited'; readonly queueTimeout: 'queue-timeout'; readonly aborted: 'aborted'; readonly closed: 'closed'; };\nexport type BudgetRejection = (typeof BudgetRejection)[keyof typeof BudgetRejection];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -408,7 +408,7 @@
         {
           "name": "CapabilityLevel",
           "kind": "const",
-          "signature": "export declare const CapabilityLevel: { readonly enforced: \"enforced\"; readonly monitored: \"monitored\"; readonly cooperative: \"cooperative\"; readonly unsupported: \"unsupported\"; };\nexport type CapabilityLevel = (typeof CapabilityLevel)[keyof typeof CapabilityLevel];",
+          "signature": "export declare const CapabilityLevel: { readonly enforced: 'enforced'; readonly monitored: 'monitored'; readonly cooperative: 'cooperative'; readonly unsupported: 'unsupported'; };\nexport type CapabilityLevel = (typeof CapabilityLevel)[keyof typeof CapabilityLevel];",
           "declarationLine": 55,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Launcher declarations describe the actual strength of each capability. Values are stable public contract identifiers; use the matching table entries below.",
@@ -425,44 +425,44 @@
               "name": "enforced",
               "kind": "property",
               "optional": false,
-              "signature": "readonly enforced: \"enforced\";",
+              "signature": "readonly enforced: 'enforced';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"enforced\""
+              "returns": "'enforced'"
             },
             {
               "name": "monitored",
               "kind": "property",
               "optional": false,
-              "signature": "readonly monitored: \"monitored\";",
+              "signature": "readonly monitored: 'monitored';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"monitored\""
+              "returns": "'monitored'"
             },
             {
               "name": "cooperative",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cooperative: \"cooperative\";",
+              "signature": "readonly cooperative: 'cooperative';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cooperative\""
+              "returns": "'cooperative'"
             },
             {
               "name": "unsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unsupported: \"unsupported\";",
+              "signature": "readonly unsupported: 'unsupported';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"unsupported\""
+              "returns": "'unsupported'"
             }
           ],
           "composes": [],
           "aliasOf": "CapabilityLevel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const CapabilityLevel: { readonly enforced: \"enforced\"; readonly monitored: \"monitored\"; readonly cooperative: \"cooperative\"; readonly unsupported: \"unsupported\"; };",
+            "export declare const CapabilityLevel: { readonly enforced: 'enforced'; readonly monitored: 'monitored'; readonly cooperative: 'cooperative'; readonly unsupported: 'unsupported'; };",
             "export type CapabilityLevel = (typeof CapabilityLevel)[keyof typeof CapabilityLevel];"
           ],
           "overloadParameterDetails": [[], []],
@@ -502,7 +502,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:CapabilityLevel:export declare const CapabilityLevel: { readonly enforced: \"enforced\"; readonly monitored: \"monitored\"; readonly cooperative: \"cooperative\"; readonly unsupported: \"unsupported\"; };\nexport type CapabilityLevel = (typeof CapabilityLevel)[keyof typeof CapabilityLevel];",
+          "identity": "packages/supervision/dist/constants.d.ts:CapabilityLevel:export declare const CapabilityLevel: { readonly enforced: 'enforced'; readonly monitored: 'monitored'; readonly cooperative: 'cooperative'; readonly unsupported: 'unsupported'; };\nexport type CapabilityLevel = (typeof CapabilityLevel)[keyof typeof CapabilityLevel];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1251,7 +1251,7 @@
         {
           "name": "ExitReason",
           "kind": "const",
-          "signature": "export declare const ExitReason: { readonly exited: \"exited\"; readonly crashed: \"crashed\"; readonly stopped: \"stopped\"; readonly killed: \"killed\"; readonly abandoned: \"abandoned\"; readonly launchFailed: \"launch-failed\"; readonly startupTimeout: \"startup-timeout\"; readonly unhealthy: \"unhealthy\"; readonly resourceViolation: \"resource-violation\"; };\nexport type ExitReason = (typeof ExitReason)[keyof typeof ExitReason];",
+          "signature": "export declare const ExitReason: { readonly exited: 'exited'; readonly crashed: 'crashed'; readonly stopped: 'stopped'; readonly killed: 'killed'; readonly abandoned: 'abandoned'; readonly launchFailed: 'launch-failed'; readonly startupTimeout: 'startup-timeout'; readonly unhealthy: 'unhealthy'; readonly resourceViolation: 'resource-violation'; };\nexport type ExitReason = (typeof ExitReason)[keyof typeof ExitReason];",
           "declarationLine": 23,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Reasons attached to exit events and last-exit diagnostics. Values are stable public contract identifiers; use the matching table entries below.",
@@ -1268,89 +1268,89 @@
               "name": "exited",
               "kind": "property",
               "optional": false,
-              "signature": "readonly exited: \"exited\";",
+              "signature": "readonly exited: 'exited';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"exited\""
+              "returns": "'exited'"
             },
             {
               "name": "crashed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly crashed: \"crashed\";",
+              "signature": "readonly crashed: 'crashed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"crashed\""
+              "returns": "'crashed'"
             },
             {
               "name": "stopped",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stopped: \"stopped\";",
+              "signature": "readonly stopped: 'stopped';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stopped\""
+              "returns": "'stopped'"
             },
             {
               "name": "killed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly killed: \"killed\";",
+              "signature": "readonly killed: 'killed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"killed\""
+              "returns": "'killed'"
             },
             {
               "name": "abandoned",
               "kind": "property",
               "optional": false,
-              "signature": "readonly abandoned: \"abandoned\";",
+              "signature": "readonly abandoned: 'abandoned';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"abandoned\""
+              "returns": "'abandoned'"
             },
             {
               "name": "launchFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly launchFailed: \"launch-failed\";",
+              "signature": "readonly launchFailed: 'launch-failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"launch-failed\""
+              "returns": "'launch-failed'"
             },
             {
               "name": "startupTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly startupTimeout: \"startup-timeout\";",
+              "signature": "readonly startupTimeout: 'startup-timeout';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"startup-timeout\""
+              "returns": "'startup-timeout'"
             },
             {
               "name": "unhealthy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unhealthy: \"unhealthy\";",
+              "signature": "readonly unhealthy: 'unhealthy';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"unhealthy\""
+              "returns": "'unhealthy'"
             },
             {
               "name": "resourceViolation",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceViolation: \"resource-violation\";",
+              "signature": "readonly resourceViolation: 'resource-violation';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"resource-violation\""
+              "returns": "'resource-violation'"
             }
           ],
           "composes": [],
           "aliasOf": "ExitReason",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ExitReason: { readonly exited: \"exited\"; readonly crashed: \"crashed\"; readonly stopped: \"stopped\"; readonly killed: \"killed\"; readonly abandoned: \"abandoned\"; readonly launchFailed: \"launch-failed\"; readonly startupTimeout: \"startup-timeout\"; readonly unhealthy: \"unhealthy\"; readonly resourceViolation: \"resource-violation\"; };",
+            "export declare const ExitReason: { readonly exited: 'exited'; readonly crashed: 'crashed'; readonly stopped: 'stopped'; readonly killed: 'killed'; readonly abandoned: 'abandoned'; readonly launchFailed: 'launch-failed'; readonly startupTimeout: 'startup-timeout'; readonly unhealthy: 'unhealthy'; readonly resourceViolation: 'resource-violation'; };",
             "export type ExitReason = (typeof ExitReason)[keyof typeof ExitReason];"
           ],
           "overloadParameterDetails": [[], []],
@@ -1390,7 +1390,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:ExitReason:export declare const ExitReason: { readonly exited: \"exited\"; readonly crashed: \"crashed\"; readonly stopped: \"stopped\"; readonly killed: \"killed\"; readonly abandoned: \"abandoned\"; readonly launchFailed: \"launch-failed\"; readonly startupTimeout: \"startup-timeout\"; readonly unhealthy: \"unhealthy\"; readonly resourceViolation: \"resource-violation\"; };\nexport type ExitReason = (typeof ExitReason)[keyof typeof ExitReason];",
+          "identity": "packages/supervision/dist/constants.d.ts:ExitReason:export declare const ExitReason: { readonly exited: 'exited'; readonly crashed: 'crashed'; readonly stopped: 'stopped'; readonly killed: 'killed'; readonly abandoned: 'abandoned'; readonly launchFailed: 'launch-failed'; readonly startupTimeout: 'startup-timeout'; readonly unhealthy: 'unhealthy'; readonly resourceViolation: 'resource-violation'; };\nexport type ExitReason = (typeof ExitReason)[keyof typeof ExitReason];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2011,7 +2011,7 @@
         {
           "name": "IsolationMode",
           "kind": "const",
-          "signature": "export declare const IsolationMode: { readonly required: \"required\"; readonly bestEffort: \"best-effort\"; };\nexport type IsolationMode = (typeof IsolationMode)[keyof typeof IsolationMode];",
+          "signature": "export declare const IsolationMode: { readonly required: 'required'; readonly bestEffort: 'best-effort'; };\nexport type IsolationMode = (typeof IsolationMode)[keyof typeof IsolationMode];",
           "declarationLine": 63,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Admission strictness for launcher capability guarantees. Values are stable public contract identifiers; use the matching table entries below.",
@@ -2028,26 +2028,26 @@
               "name": "required",
               "kind": "property",
               "optional": false,
-              "signature": "readonly required: \"required\";",
+              "signature": "readonly required: 'required';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"required\""
+              "returns": "'required'"
             },
             {
               "name": "bestEffort",
               "kind": "property",
               "optional": false,
-              "signature": "readonly bestEffort: \"best-effort\";",
+              "signature": "readonly bestEffort: 'best-effort';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"best-effort\""
+              "returns": "'best-effort'"
             }
           ],
           "composes": [],
           "aliasOf": "IsolationMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const IsolationMode: { readonly required: \"required\"; readonly bestEffort: \"best-effort\"; };",
+            "export declare const IsolationMode: { readonly required: 'required'; readonly bestEffort: 'best-effort'; };",
             "export type IsolationMode = (typeof IsolationMode)[keyof typeof IsolationMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -2087,7 +2087,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:IsolationMode:export declare const IsolationMode: { readonly required: \"required\"; readonly bestEffort: \"best-effort\"; };\nexport type IsolationMode = (typeof IsolationMode)[keyof typeof IsolationMode];",
+          "identity": "packages/supervision/dist/constants.d.ts:IsolationMode:export declare const IsolationMode: { readonly required: 'required'; readonly bestEffort: 'best-effort'; };\nexport type IsolationMode = (typeof IsolationMode)[keyof typeof IsolationMode];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4275,7 +4275,7 @@
         {
           "name": "LaunchCause",
           "kind": "const",
-          "signature": "export declare const LaunchCause: { readonly start: \"start\"; readonly restart: \"restart\"; readonly replace: \"replace\"; readonly backoff: \"backoff\"; readonly cooldown: \"cooldown\"; };\nexport type LaunchCause = (typeof LaunchCause)[keyof typeof LaunchCause];",
+          "signature": "export declare const LaunchCause: { readonly start: 'start'; readonly restart: 'restart'; readonly replace: 'replace'; readonly backoff: 'backoff'; readonly cooldown: 'cooldown'; };\nexport type LaunchCause = (typeof LaunchCause)[keyof typeof LaunchCause];",
           "declarationLine": 97,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "The command or policy timer responsible for a launch attempt. Values are stable public contract identifiers; use the matching table entries below.",
@@ -4292,53 +4292,53 @@
               "name": "start",
               "kind": "property",
               "optional": false,
-              "signature": "readonly start: \"start\";",
+              "signature": "readonly start: 'start';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"start\""
+              "returns": "'start'"
             },
             {
               "name": "restart",
               "kind": "property",
               "optional": false,
-              "signature": "readonly restart: \"restart\";",
+              "signature": "readonly restart: 'restart';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"restart\""
+              "returns": "'restart'"
             },
             {
               "name": "replace",
               "kind": "property",
               "optional": false,
-              "signature": "readonly replace: \"replace\";",
+              "signature": "readonly replace: 'replace';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"replace\""
+              "returns": "'replace'"
             },
             {
               "name": "backoff",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backoff: \"backoff\";",
+              "signature": "readonly backoff: 'backoff';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"backoff\""
+              "returns": "'backoff'"
             },
             {
               "name": "cooldown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cooldown: \"cooldown\";",
+              "signature": "readonly cooldown: 'cooldown';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cooldown\""
+              "returns": "'cooldown'"
             }
           ],
           "composes": [],
           "aliasOf": "LaunchCause",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LaunchCause: { readonly start: \"start\"; readonly restart: \"restart\"; readonly replace: \"replace\"; readonly backoff: \"backoff\"; readonly cooldown: \"cooldown\"; };",
+            "export declare const LaunchCause: { readonly start: 'start'; readonly restart: 'restart'; readonly replace: 'replace'; readonly backoff: 'backoff'; readonly cooldown: 'cooldown'; };",
             "export type LaunchCause = (typeof LaunchCause)[keyof typeof LaunchCause];"
           ],
           "overloadParameterDetails": [[], []],
@@ -4378,7 +4378,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:LaunchCause:export declare const LaunchCause: { readonly start: \"start\"; readonly restart: \"restart\"; readonly replace: \"replace\"; readonly backoff: \"backoff\"; readonly cooldown: \"cooldown\"; };\nexport type LaunchCause = (typeof LaunchCause)[keyof typeof LaunchCause];",
+          "identity": "packages/supervision/dist/constants.d.ts:LaunchCause:export declare const LaunchCause: { readonly start: 'start'; readonly restart: 'restart'; readonly replace: 'replace'; readonly backoff: 'backoff'; readonly cooldown: 'cooldown'; };\nexport type LaunchCause = (typeof LaunchCause)[keyof typeof LaunchCause];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4387,7 +4387,7 @@
         {
           "name": "LaunchPhase",
           "kind": "const",
-          "signature": "export declare const LaunchPhase: { readonly launch: \"launch\"; readonly attach: \"attach\"; readonly ready: \"ready\"; };\nexport type LaunchPhase = (typeof LaunchPhase)[keyof typeof LaunchPhase];",
+          "signature": "export declare const LaunchPhase: { readonly launch: 'launch'; readonly attach: 'attach'; readonly ready: 'ready'; };\nexport type LaunchPhase = (typeof LaunchPhase)[keyof typeof LaunchPhase];",
           "declarationLine": 90,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Startup stage recorded in launch-failure diagnostics. Values are stable public contract identifiers; use the matching table entries below.",
@@ -4404,35 +4404,35 @@
               "name": "launch",
               "kind": "property",
               "optional": false,
-              "signature": "readonly launch: \"launch\";",
+              "signature": "readonly launch: 'launch';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"launch\""
+              "returns": "'launch'"
             },
             {
               "name": "attach",
               "kind": "property",
               "optional": false,
-              "signature": "readonly attach: \"attach\";",
+              "signature": "readonly attach: 'attach';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"attach\""
+              "returns": "'attach'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             }
           ],
           "composes": [],
           "aliasOf": "LaunchPhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LaunchPhase: { readonly launch: \"launch\"; readonly attach: \"attach\"; readonly ready: \"ready\"; };",
+            "export declare const LaunchPhase: { readonly launch: 'launch'; readonly attach: 'attach'; readonly ready: 'ready'; };",
             "export type LaunchPhase = (typeof LaunchPhase)[keyof typeof LaunchPhase];"
           ],
           "overloadParameterDetails": [[], []],
@@ -4472,7 +4472,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:LaunchPhase:export declare const LaunchPhase: { readonly launch: \"launch\"; readonly attach: \"attach\"; readonly ready: \"ready\"; };\nexport type LaunchPhase = (typeof LaunchPhase)[keyof typeof LaunchPhase];",
+          "identity": "packages/supervision/dist/constants.d.ts:LaunchPhase:export declare const LaunchPhase: { readonly launch: 'launch'; readonly attach: 'attach'; readonly ready: 'ready'; };\nexport type LaunchPhase = (typeof LaunchPhase)[keyof typeof LaunchPhase];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4481,7 +4481,7 @@
         {
           "name": "ReplaceStrategy",
           "kind": "const",
-          "signature": "export declare const ReplaceStrategy: { readonly stopThenStart: \"stop-then-start\"; readonly startThenSwitch: \"start-then-switch\"; };\nexport type ReplaceStrategy = (typeof ReplaceStrategy)[keyof typeof ReplaceStrategy];",
+          "signature": "export declare const ReplaceStrategy: { readonly stopThenStart: 'stop-then-start'; readonly startThenSwitch: 'start-then-switch'; };\nexport type ReplaceStrategy = (typeof ReplaceStrategy)[keyof typeof ReplaceStrategy];",
           "declarationLine": 49,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Orders retirement and candidate startup during replacement. Values are stable public contract identifiers; use the matching table entries below.",
@@ -4498,26 +4498,26 @@
               "name": "stopThenStart",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stopThenStart: \"stop-then-start\";",
+              "signature": "readonly stopThenStart: 'stop-then-start';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stop-then-start\""
+              "returns": "'stop-then-start'"
             },
             {
               "name": "startThenSwitch",
               "kind": "property",
               "optional": false,
-              "signature": "readonly startThenSwitch: \"start-then-switch\";",
+              "signature": "readonly startThenSwitch: 'start-then-switch';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"start-then-switch\""
+              "returns": "'start-then-switch'"
             }
           ],
           "composes": [],
           "aliasOf": "ReplaceStrategy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReplaceStrategy: { readonly stopThenStart: \"stop-then-start\"; readonly startThenSwitch: \"start-then-switch\"; };",
+            "export declare const ReplaceStrategy: { readonly stopThenStart: 'stop-then-start'; readonly startThenSwitch: 'start-then-switch'; };",
             "export type ReplaceStrategy = (typeof ReplaceStrategy)[keyof typeof ReplaceStrategy];"
           ],
           "overloadParameterDetails": [[], []],
@@ -4557,7 +4557,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:ReplaceStrategy:export declare const ReplaceStrategy: { readonly stopThenStart: \"stop-then-start\"; readonly startThenSwitch: \"start-then-switch\"; };\nexport type ReplaceStrategy = (typeof ReplaceStrategy)[keyof typeof ReplaceStrategy];",
+          "identity": "packages/supervision/dist/constants.d.ts:ReplaceStrategy:export declare const ReplaceStrategy: { readonly stopThenStart: 'stop-then-start'; readonly startThenSwitch: 'start-then-switch'; };\nexport type ReplaceStrategy = (typeof ReplaceStrategy)[keyof typeof ReplaceStrategy];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4566,7 +4566,7 @@
         {
           "name": "RestartMode",
           "kind": "const",
-          "signature": "export declare const RestartMode: { readonly never: \"never\"; readonly onFailure: \"on-failure\"; readonly always: \"always\"; };\nexport type RestartMode = (typeof RestartMode)[keyof typeof RestartMode];",
+          "signature": "export declare const RestartMode: { readonly never: 'never'; readonly onFailure: 'on-failure'; readonly always: 'always'; };\nexport type RestartMode = (typeof RestartMode)[keyof typeof RestartMode];",
           "declarationLine": 36,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Selects which exits trigger automatic restart scheduling. Values are stable public contract identifiers; use the matching table entries below.",
@@ -4583,35 +4583,35 @@
               "name": "never",
               "kind": "property",
               "optional": false,
-              "signature": "readonly never: \"never\";",
+              "signature": "readonly never: 'never';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"never\""
+              "returns": "'never'"
             },
             {
               "name": "onFailure",
               "kind": "property",
               "optional": false,
-              "signature": "readonly onFailure: \"on-failure\";",
+              "signature": "readonly onFailure: 'on-failure';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"on-failure\""
+              "returns": "'on-failure'"
             },
             {
               "name": "always",
               "kind": "property",
               "optional": false,
-              "signature": "readonly always: \"always\";",
+              "signature": "readonly always: 'always';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"always\""
+              "returns": "'always'"
             }
           ],
           "composes": [],
           "aliasOf": "RestartMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RestartMode: { readonly never: \"never\"; readonly onFailure: \"on-failure\"; readonly always: \"always\"; };",
+            "export declare const RestartMode: { readonly never: 'never'; readonly onFailure: 'on-failure'; readonly always: 'always'; };",
             "export type RestartMode = (typeof RestartMode)[keyof typeof RestartMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -4651,7 +4651,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:RestartMode:export declare const RestartMode: { readonly never: \"never\"; readonly onFailure: \"on-failure\"; readonly always: \"always\"; };\nexport type RestartMode = (typeof RestartMode)[keyof typeof RestartMode];",
+          "identity": "packages/supervision/dist/constants.d.ts:RestartMode:export declare const RestartMode: { readonly never: 'never'; readonly onFailure: 'on-failure'; readonly always: 'always'; };\nexport type RestartMode = (typeof RestartMode)[keyof typeof RestartMode];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4660,7 +4660,7 @@
         {
           "name": "StandardCapability",
           "kind": "const",
-          "signature": "export declare const StandardCapability: { readonly termination: \"termination\"; readonly faultIsolation: \"fault-isolation\"; };\nexport type StandardCapability = (typeof StandardCapability)[keyof typeof StandardCapability];",
+          "signature": "export declare const StandardCapability: { readonly termination: 'termination'; readonly faultIsolation: 'fault-isolation'; };\nexport type StandardCapability = (typeof StandardCapability)[keyof typeof StandardCapability];",
           "declarationLine": 118,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Capability names required by execution profiles beyond their own limits. Values are stable public contract identifiers; use the matching table entries below.",
@@ -4677,26 +4677,26 @@
               "name": "termination",
               "kind": "property",
               "optional": false,
-              "signature": "readonly termination: \"termination\";",
+              "signature": "readonly termination: 'termination';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"termination\""
+              "returns": "'termination'"
             },
             {
               "name": "faultIsolation",
               "kind": "property",
               "optional": false,
-              "signature": "readonly faultIsolation: \"fault-isolation\";",
+              "signature": "readonly faultIsolation: 'fault-isolation';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"fault-isolation\""
+              "returns": "'fault-isolation'"
             }
           ],
           "composes": [],
           "aliasOf": "StandardCapability",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StandardCapability: { readonly termination: \"termination\"; readonly faultIsolation: \"fault-isolation\"; };",
+            "export declare const StandardCapability: { readonly termination: 'termination'; readonly faultIsolation: 'fault-isolation'; };",
             "export type StandardCapability = (typeof StandardCapability)[keyof typeof StandardCapability];"
           ],
           "overloadParameterDetails": [[], []],
@@ -4736,7 +4736,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:StandardCapability:export declare const StandardCapability: { readonly termination: \"termination\"; readonly faultIsolation: \"fault-isolation\"; };\nexport type StandardCapability = (typeof StandardCapability)[keyof typeof StandardCapability];",
+          "identity": "packages/supervision/dist/constants.d.ts:StandardCapability:export declare const StandardCapability: { readonly termination: 'termination'; readonly faultIsolation: 'fault-isolation'; };\nexport type StandardCapability = (typeof StandardCapability)[keyof typeof StandardCapability];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4810,7 +4810,7 @@
         {
           "name": "SupervisionErrorCode",
           "kind": "const",
-          "signature": "export declare const SupervisionErrorCode: { /** Invalid constructor or profile option; callers must correct the configuration. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Required unit capability is not enforced or monitored; choose another launcher or isolation * mode. */ readonly capabilityUnsupported: \"CAPABILITY_UNSUPPORTED\"; /** * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause. */ readonly launchFailed: \"LAUNCH_FAILED\"; /** Startup did not reach ready within its deadline; inspect the stopped attempt. */ readonly startupTimeout: \"STARTUP_TIMEOUT\"; /** A running unit exited unexpectedly; inspect its original status or cause. */ readonly exitUnexpected: \"EXIT_UNEXPECTED\"; /** Health checks crossed the failure threshold; replace or restart the unit. */ readonly unhealthy: \"UNHEALTHY\"; /** A monitored resource limit was violated; inspect the limit detail before retrying. */ readonly resourceLimitExceeded: \"RESOURCE_LIMIT_EXCEEDED\"; /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */ readonly reapTimeout: \"REAP_TIMEOUT\"; /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */ readonly supervisionExhausted: \"SUPERVISION_EXHAUSTED\"; /** A command attempted to create a unit while disposal is in progress; wait for disposal. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** A command attempted to create a unit after disposal; create a new supervisor. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */ readonly heartbeatMissed: \"HEARTBEAT_MISSED\"; /** * Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection. */ readonly orphanReclaimFailed: \"ORPHAN_RECLAIM_FAILED\"; };",
+          "signature": "export declare const SupervisionErrorCode: { /** Invalid constructor or profile option; callers must correct the configuration. */ readonly invalidOption: 'INVALID_OPTION'; /** * Required unit capability is not enforced or monitored; choose another launcher or isolation * mode. */ readonly capabilityUnsupported: 'CAPABILITY_UNSUPPORTED'; /** * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause. */ readonly launchFailed: 'LAUNCH_FAILED'; /** Startup did not reach ready within its deadline; inspect the stopped attempt. */ readonly startupTimeout: 'STARTUP_TIMEOUT'; /** A running unit exited unexpectedly; inspect its original status or cause. */ readonly exitUnexpected: 'EXIT_UNEXPECTED'; /** Health checks crossed the failure threshold; replace or restart the unit. */ readonly unhealthy: 'UNHEALTHY'; /** A monitored resource limit was violated; inspect the limit detail before retrying. */ readonly resourceLimitExceeded: 'RESOURCE_LIMIT_EXCEEDED'; /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */ readonly reapTimeout: 'REAP_TIMEOUT'; /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */ readonly supervisionExhausted: 'SUPERVISION_EXHAUSTED'; /** A command attempted to create a unit while disposal is in progress; wait for disposal. */ readonly scopeClosed: 'SCOPE_CLOSED'; /** A command attempted to create a unit after disposal; create a new supervisor. */ readonly scopeTerminal: 'SCOPE_TERMINAL'; /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */ readonly heartbeatMissed: 'HEARTBEAT_MISSED'; /** * Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection. */ readonly orphanReclaimFailed: 'ORPHAN_RECLAIM_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/supervision/dist/error-code.d.ts",
           "purpose": "Stable semantic errors from supervisor construction and contained execution failures. Values are stable public contract identifiers; use the matching table entries below.",
@@ -4827,125 +4827,125 @@
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Invalid constructor or profile option; callers must correct the configuration.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "capabilityUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly capabilityUnsupported: \"CAPABILITY_UNSUPPORTED\";",
+              "signature": "readonly capabilityUnsupported: 'CAPABILITY_UNSUPPORTED';",
               "description": "Required unit capability is not enforced or monitored; choose another launcher or isolation * mode.",
               "parameterDetails": [],
-              "returns": "\"CAPABILITY_UNSUPPORTED\""
+              "returns": "'CAPABILITY_UNSUPPORTED'"
             },
             {
               "name": "launchFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly launchFailed: \"LAUNCH_FAILED\";",
+              "signature": "readonly launchFailed: 'LAUNCH_FAILED';",
               "description": "Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause.",
               "parameterDetails": [],
-              "returns": "\"LAUNCH_FAILED\""
+              "returns": "'LAUNCH_FAILED'"
             },
             {
               "name": "startupTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly startupTimeout: \"STARTUP_TIMEOUT\";",
+              "signature": "readonly startupTimeout: 'STARTUP_TIMEOUT';",
               "description": "Startup did not reach ready within its deadline; inspect the stopped attempt.",
               "parameterDetails": [],
-              "returns": "\"STARTUP_TIMEOUT\""
+              "returns": "'STARTUP_TIMEOUT'"
             },
             {
               "name": "exitUnexpected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly exitUnexpected: \"EXIT_UNEXPECTED\";",
+              "signature": "readonly exitUnexpected: 'EXIT_UNEXPECTED';",
               "description": "A running unit exited unexpectedly; inspect its original status or cause.",
               "parameterDetails": [],
-              "returns": "\"EXIT_UNEXPECTED\""
+              "returns": "'EXIT_UNEXPECTED'"
             },
             {
               "name": "unhealthy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unhealthy: \"UNHEALTHY\";",
+              "signature": "readonly unhealthy: 'UNHEALTHY';",
               "description": "Health checks crossed the failure threshold; replace or restart the unit.",
               "parameterDetails": [],
-              "returns": "\"UNHEALTHY\""
+              "returns": "'UNHEALTHY'"
             },
             {
               "name": "resourceLimitExceeded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceLimitExceeded: \"RESOURCE_LIMIT_EXCEEDED\";",
+              "signature": "readonly resourceLimitExceeded: 'RESOURCE_LIMIT_EXCEEDED';",
               "description": "A monitored resource limit was violated; inspect the limit detail before retrying.",
               "parameterDetails": [],
-              "returns": "\"RESOURCE_LIMIT_EXCEEDED\""
+              "returns": "'RESOURCE_LIMIT_EXCEEDED'"
             },
             {
               "name": "reapTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reapTimeout: \"REAP_TIMEOUT\";",
+              "signature": "readonly reapTimeout: 'REAP_TIMEOUT';",
               "description": "The unit did not exit within its recovery deadline; retain its lease until it actually exits.",
               "parameterDetails": [],
-              "returns": "\"REAP_TIMEOUT\""
+              "returns": "'REAP_TIMEOUT'"
             },
             {
               "name": "supervisionExhausted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly supervisionExhausted: \"SUPERVISION_EXHAUSTED\";",
+              "signature": "readonly supervisionExhausted: 'SUPERVISION_EXHAUSTED';",
               "description": "Restarts exceeded the policy window; inspect the final failure and reset explicitly.",
               "parameterDetails": [],
-              "returns": "\"SUPERVISION_EXHAUSTED\""
+              "returns": "'SUPERVISION_EXHAUSTED'"
             },
             {
               "name": "scopeClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeClosed: \"SCOPE_CLOSED\";",
+              "signature": "readonly scopeClosed: 'SCOPE_CLOSED';",
               "description": "A command attempted to create a unit while disposal is in progress; wait for disposal.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_CLOSED\""
+              "returns": "'SCOPE_CLOSED'"
             },
             {
               "name": "scopeTerminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeTerminal: \"SCOPE_TERMINAL\";",
+              "signature": "readonly scopeTerminal: 'SCOPE_TERMINAL';",
               "description": "A command attempted to create a unit after disposal; create a new supervisor.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_TERMINAL\""
+              "returns": "'SCOPE_TERMINAL'"
             },
             {
               "name": "heartbeatMissed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly heartbeatMissed: \"HEARTBEAT_MISSED\";",
+              "signature": "readonly heartbeatMissed: 'HEARTBEAT_MISSED';",
               "description": "A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively.",
               "parameterDetails": [],
-              "returns": "\"HEARTBEAT_MISSED\""
+              "returns": "'HEARTBEAT_MISSED'"
             },
             {
               "name": "orphanReclaimFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly orphanReclaimFailed: \"ORPHAN_RECLAIM_FAILED\";",
+              "signature": "readonly orphanReclaimFailed: 'ORPHAN_RECLAIM_FAILED';",
               "description": "Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection.",
               "parameterDetails": [],
-              "returns": "\"ORPHAN_RECLAIM_FAILED\""
+              "returns": "'ORPHAN_RECLAIM_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "SupervisionErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SupervisionErrorCode: { /** Invalid constructor or profile option; callers must correct the configuration. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Required unit capability is not enforced or monitored; choose another launcher or isolation * mode. */ readonly capabilityUnsupported: \"CAPABILITY_UNSUPPORTED\"; /** * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause. */ readonly launchFailed: \"LAUNCH_FAILED\"; /** Startup did not reach ready within its deadline; inspect the stopped attempt. */ readonly startupTimeout: \"STARTUP_TIMEOUT\"; /** A running unit exited unexpectedly; inspect its original status or cause. */ readonly exitUnexpected: \"EXIT_UNEXPECTED\"; /** Health checks crossed the failure threshold; replace or restart the unit. */ readonly unhealthy: \"UNHEALTHY\"; /** A monitored resource limit was violated; inspect the limit detail before retrying. */ readonly resourceLimitExceeded: \"RESOURCE_LIMIT_EXCEEDED\"; /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */ readonly reapTimeout: \"REAP_TIMEOUT\"; /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */ readonly supervisionExhausted: \"SUPERVISION_EXHAUSTED\"; /** A command attempted to create a unit while disposal is in progress; wait for disposal. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** A command attempted to create a unit after disposal; create a new supervisor. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */ readonly heartbeatMissed: \"HEARTBEAT_MISSED\"; /** * Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection. */ readonly orphanReclaimFailed: \"ORPHAN_RECLAIM_FAILED\"; };"
+            "export declare const SupervisionErrorCode: { /** Invalid constructor or profile option; callers must correct the configuration. */ readonly invalidOption: 'INVALID_OPTION'; /** * Required unit capability is not enforced or monitored; choose another launcher or isolation * mode. */ readonly capabilityUnsupported: 'CAPABILITY_UNSUPPORTED'; /** * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause. */ readonly launchFailed: 'LAUNCH_FAILED'; /** Startup did not reach ready within its deadline; inspect the stopped attempt. */ readonly startupTimeout: 'STARTUP_TIMEOUT'; /** A running unit exited unexpectedly; inspect its original status or cause. */ readonly exitUnexpected: 'EXIT_UNEXPECTED'; /** Health checks crossed the failure threshold; replace or restart the unit. */ readonly unhealthy: 'UNHEALTHY'; /** A monitored resource limit was violated; inspect the limit detail before retrying. */ readonly resourceLimitExceeded: 'RESOURCE_LIMIT_EXCEEDED'; /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */ readonly reapTimeout: 'REAP_TIMEOUT'; /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */ readonly supervisionExhausted: 'SUPERVISION_EXHAUSTED'; /** A command attempted to create a unit while disposal is in progress; wait for disposal. */ readonly scopeClosed: 'SCOPE_CLOSED'; /** A command attempted to create a unit after disposal; create a new supervisor. */ readonly scopeTerminal: 'SCOPE_TERMINAL'; /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */ readonly heartbeatMissed: 'HEARTBEAT_MISSED'; /** * Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection. */ readonly orphanReclaimFailed: 'ORPHAN_RECLAIM_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4984,7 +4984,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/error-code.d.ts:SupervisionErrorCode:export declare const SupervisionErrorCode: { /** Invalid constructor or profile option; callers must correct the configuration. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Required unit capability is not enforced or monitored; choose another launcher or isolation * mode. */ readonly capabilityUnsupported: \"CAPABILITY_UNSUPPORTED\"; /** * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause. */ readonly launchFailed: \"LAUNCH_FAILED\"; /** Startup did not reach ready within its deadline; inspect the stopped attempt. */ readonly startupTimeout: \"STARTUP_TIMEOUT\"; /** A running unit exited unexpectedly; inspect its original status or cause. */ readonly exitUnexpected: \"EXIT_UNEXPECTED\"; /** Health checks crossed the failure threshold; replace or restart the unit. */ readonly unhealthy: \"UNHEALTHY\"; /** A monitored resource limit was violated; inspect the limit detail before retrying. */ readonly resourceLimitExceeded: \"RESOURCE_LIMIT_EXCEEDED\"; /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */ readonly reapTimeout: \"REAP_TIMEOUT\"; /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */ readonly supervisionExhausted: \"SUPERVISION_EXHAUSTED\"; /** A command attempted to create a unit while disposal is in progress; wait for disposal. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** A command attempted to create a unit after disposal; create a new supervisor. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */ readonly heartbeatMissed: \"HEARTBEAT_MISSED\"; /** * Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection. */ readonly orphanReclaimFailed: \"ORPHAN_RECLAIM_FAILED\"; };",
+          "identity": "packages/supervision/dist/error-code.d.ts:SupervisionErrorCode:export declare const SupervisionErrorCode: { /** Invalid constructor or profile option; callers must correct the configuration. */ readonly invalidOption: 'INVALID_OPTION'; /** * Required unit capability is not enforced or monitored; choose another launcher or isolation * mode. */ readonly capabilityUnsupported: 'CAPABILITY_UNSUPPORTED'; /** * Launch, preacquired-unit adoption, attachment, or readiness failed; inspect detail.phase and * the original cause. */ readonly launchFailed: 'LAUNCH_FAILED'; /** Startup did not reach ready within its deadline; inspect the stopped attempt. */ readonly startupTimeout: 'STARTUP_TIMEOUT'; /** A running unit exited unexpectedly; inspect its original status or cause. */ readonly exitUnexpected: 'EXIT_UNEXPECTED'; /** Health checks crossed the failure threshold; replace or restart the unit. */ readonly unhealthy: 'UNHEALTHY'; /** A monitored resource limit was violated; inspect the limit detail before retrying. */ readonly resourceLimitExceeded: 'RESOURCE_LIMIT_EXCEEDED'; /** The unit did not exit within its recovery deadline; retain its lease until it actually exits. */ readonly reapTimeout: 'REAP_TIMEOUT'; /** Restarts exceeded the policy window; inspect the final failure and reset explicitly. */ readonly supervisionExhausted: 'SUPERVISION_EXHAUSTED'; /** A command attempted to create a unit while disposal is in progress; wait for disposal. */ readonly scopeClosed: 'SCOPE_CLOSED'; /** A command attempted to create a unit after disposal; create a new supervisor. */ readonly scopeTerminal: 'SCOPE_TERMINAL'; /** A coroutine stopped making progress; inspect its heartbeat and terminate it cooperatively. */ readonly heartbeatMissed: 'HEARTBEAT_MISSED'; /** * Registry listing or a prior process record recovery failed; inspect detail.step, retain * records, and retry after inspection. */ readonly orphanReclaimFailed: 'ORPHAN_RECLAIM_FAILED'; };",
           "guidance": [],
           "usageScore": 2,
           "configuration": [],
@@ -4993,7 +4993,7 @@
         {
           "name": "SupervisionErrorText",
           "kind": "const",
-          "signature": "export declare const SupervisionErrorText: { /** Construction and profile validation failures use this stable public diagnostic. */ readonly invalidOption: \"supervision option is invalid\"; /** Admission failure when a required capability lacks a sufficient guarantee. */ readonly capabilityUnsupported: \"supervision capability is unsupported\"; /** Wraps launcher, attachment, or ready-hook failure while retaining its cause. */ readonly launchFailed: \"unit launch failed\"; /** Startup deadline diagnostic for an attempt that never reached ready. */ readonly startupTimeout: \"unit startup timed out\"; /** Running or starting unit exit reported by the supervisor. */ readonly exitUnexpected: \"unit exited unexpectedly\"; /** Repeated health check failures and missed heartbeats surface through this text. */ readonly unhealthy: \"unit is unhealthy\"; /** Profile resource monitor failure text shared across unit kinds. */ readonly resourceLimitExceeded: \"unit resource limit exceeded\"; /** Bounded launch or exit recovery ended before the unit disappeared. */ readonly reapTimeout: \"unit recovery timed out\"; /** Restart policy exhausted its window and entered terminal state. */ readonly supervisionExhausted: \"supervision restart limit exhausted\"; /** Unit-producing command attempted while disposal is in progress. */ readonly scopeClosed: \"supervisor is closing\"; /** Unit-producing command attempted after disposal completed. */ readonly scopeTerminal: \"supervisor is disposed\"; /** Coroutine progress probe exceeded its configured heartbeat window. */ readonly heartbeatMissed: \"coroutine heartbeat missed\"; /** Prior-run process recovery failed while leaving its registry record available for retry. */ readonly orphanReclaimFailed: \"orphan process reclaim failed\"; };",
+          "signature": "export declare const SupervisionErrorText: { /** Construction and profile validation failures use this stable public diagnostic. */ readonly invalidOption: 'supervision option is invalid'; /** Admission failure when a required capability lacks a sufficient guarantee. */ readonly capabilityUnsupported: 'supervision capability is unsupported'; /** Wraps launcher, attachment, or ready-hook failure while retaining its cause. */ readonly launchFailed: 'unit launch failed'; /** Startup deadline diagnostic for an attempt that never reached ready. */ readonly startupTimeout: 'unit startup timed out'; /** Running or starting unit exit reported by the supervisor. */ readonly exitUnexpected: 'unit exited unexpectedly'; /** Repeated health check failures and missed heartbeats surface through this text. */ readonly unhealthy: 'unit is unhealthy'; /** Profile resource monitor failure text shared across unit kinds. */ readonly resourceLimitExceeded: 'unit resource limit exceeded'; /** Bounded launch or exit recovery ended before the unit disappeared. */ readonly reapTimeout: 'unit recovery timed out'; /** Restart policy exhausted its window and entered terminal state. */ readonly supervisionExhausted: 'supervision restart limit exhausted'; /** Unit-producing command attempted while disposal is in progress. */ readonly scopeClosed: 'supervisor is closing'; /** Unit-producing command attempted after disposal completed. */ readonly scopeTerminal: 'supervisor is disposed'; /** Coroutine progress probe exceeded its configured heartbeat window. */ readonly heartbeatMissed: 'coroutine heartbeat missed'; /** Prior-run process recovery failed while leaving its registry record available for retry. */ readonly orphanReclaimFailed: 'orphan process reclaim failed'; };",
           "declarationLine": 2,
           "source": "packages/supervision/dist/error-text.d.ts",
           "purpose": "Canonical diagnostic messages associated with the supervision error-code scenarios. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5010,125 +5010,125 @@
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"supervision option is invalid\";",
+              "signature": "readonly invalidOption: 'supervision option is invalid';",
               "description": "Construction and profile validation failures use this stable public diagnostic.",
               "parameterDetails": [],
-              "returns": "\"supervision option is invalid\""
+              "returns": "'supervision option is invalid'"
             },
             {
               "name": "capabilityUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly capabilityUnsupported: \"supervision capability is unsupported\";",
+              "signature": "readonly capabilityUnsupported: 'supervision capability is unsupported';",
               "description": "Admission failure when a required capability lacks a sufficient guarantee.",
               "parameterDetails": [],
-              "returns": "\"supervision capability is unsupported\""
+              "returns": "'supervision capability is unsupported'"
             },
             {
               "name": "launchFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly launchFailed: \"unit launch failed\";",
+              "signature": "readonly launchFailed: 'unit launch failed';",
               "description": "Wraps launcher, attachment, or ready-hook failure while retaining its cause.",
               "parameterDetails": [],
-              "returns": "\"unit launch failed\""
+              "returns": "'unit launch failed'"
             },
             {
               "name": "startupTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly startupTimeout: \"unit startup timed out\";",
+              "signature": "readonly startupTimeout: 'unit startup timed out';",
               "description": "Startup deadline diagnostic for an attempt that never reached ready.",
               "parameterDetails": [],
-              "returns": "\"unit startup timed out\""
+              "returns": "'unit startup timed out'"
             },
             {
               "name": "exitUnexpected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly exitUnexpected: \"unit exited unexpectedly\";",
+              "signature": "readonly exitUnexpected: 'unit exited unexpectedly';",
               "description": "Running or starting unit exit reported by the supervisor.",
               "parameterDetails": [],
-              "returns": "\"unit exited unexpectedly\""
+              "returns": "'unit exited unexpectedly'"
             },
             {
               "name": "unhealthy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unhealthy: \"unit is unhealthy\";",
+              "signature": "readonly unhealthy: 'unit is unhealthy';",
               "description": "Repeated health check failures and missed heartbeats surface through this text.",
               "parameterDetails": [],
-              "returns": "\"unit is unhealthy\""
+              "returns": "'unit is unhealthy'"
             },
             {
               "name": "resourceLimitExceeded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceLimitExceeded: \"unit resource limit exceeded\";",
+              "signature": "readonly resourceLimitExceeded: 'unit resource limit exceeded';",
               "description": "Profile resource monitor failure text shared across unit kinds.",
               "parameterDetails": [],
-              "returns": "\"unit resource limit exceeded\""
+              "returns": "'unit resource limit exceeded'"
             },
             {
               "name": "reapTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reapTimeout: \"unit recovery timed out\";",
+              "signature": "readonly reapTimeout: 'unit recovery timed out';",
               "description": "Bounded launch or exit recovery ended before the unit disappeared.",
               "parameterDetails": [],
-              "returns": "\"unit recovery timed out\""
+              "returns": "'unit recovery timed out'"
             },
             {
               "name": "supervisionExhausted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly supervisionExhausted: \"supervision restart limit exhausted\";",
+              "signature": "readonly supervisionExhausted: 'supervision restart limit exhausted';",
               "description": "Restart policy exhausted its window and entered terminal state.",
               "parameterDetails": [],
-              "returns": "\"supervision restart limit exhausted\""
+              "returns": "'supervision restart limit exhausted'"
             },
             {
               "name": "scopeClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeClosed: \"supervisor is closing\";",
+              "signature": "readonly scopeClosed: 'supervisor is closing';",
               "description": "Unit-producing command attempted while disposal is in progress.",
               "parameterDetails": [],
-              "returns": "\"supervisor is closing\""
+              "returns": "'supervisor is closing'"
             },
             {
               "name": "scopeTerminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeTerminal: \"supervisor is disposed\";",
+              "signature": "readonly scopeTerminal: 'supervisor is disposed';",
               "description": "Unit-producing command attempted after disposal completed.",
               "parameterDetails": [],
-              "returns": "\"supervisor is disposed\""
+              "returns": "'supervisor is disposed'"
             },
             {
               "name": "heartbeatMissed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly heartbeatMissed: \"coroutine heartbeat missed\";",
+              "signature": "readonly heartbeatMissed: 'coroutine heartbeat missed';",
               "description": "Coroutine progress probe exceeded its configured heartbeat window.",
               "parameterDetails": [],
-              "returns": "\"coroutine heartbeat missed\""
+              "returns": "'coroutine heartbeat missed'"
             },
             {
               "name": "orphanReclaimFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly orphanReclaimFailed: \"orphan process reclaim failed\";",
+              "signature": "readonly orphanReclaimFailed: 'orphan process reclaim failed';",
               "description": "Prior-run process recovery failed while leaving its registry record available for retry.",
               "parameterDetails": [],
-              "returns": "\"orphan process reclaim failed\""
+              "returns": "'orphan process reclaim failed'"
             }
           ],
           "composes": [],
           "aliasOf": "SupervisionErrorText",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SupervisionErrorText: { /** Construction and profile validation failures use this stable public diagnostic. */ readonly invalidOption: \"supervision option is invalid\"; /** Admission failure when a required capability lacks a sufficient guarantee. */ readonly capabilityUnsupported: \"supervision capability is unsupported\"; /** Wraps launcher, attachment, or ready-hook failure while retaining its cause. */ readonly launchFailed: \"unit launch failed\"; /** Startup deadline diagnostic for an attempt that never reached ready. */ readonly startupTimeout: \"unit startup timed out\"; /** Running or starting unit exit reported by the supervisor. */ readonly exitUnexpected: \"unit exited unexpectedly\"; /** Repeated health check failures and missed heartbeats surface through this text. */ readonly unhealthy: \"unit is unhealthy\"; /** Profile resource monitor failure text shared across unit kinds. */ readonly resourceLimitExceeded: \"unit resource limit exceeded\"; /** Bounded launch or exit recovery ended before the unit disappeared. */ readonly reapTimeout: \"unit recovery timed out\"; /** Restart policy exhausted its window and entered terminal state. */ readonly supervisionExhausted: \"supervision restart limit exhausted\"; /** Unit-producing command attempted while disposal is in progress. */ readonly scopeClosed: \"supervisor is closing\"; /** Unit-producing command attempted after disposal completed. */ readonly scopeTerminal: \"supervisor is disposed\"; /** Coroutine progress probe exceeded its configured heartbeat window. */ readonly heartbeatMissed: \"coroutine heartbeat missed\"; /** Prior-run process recovery failed while leaving its registry record available for retry. */ readonly orphanReclaimFailed: \"orphan process reclaim failed\"; };"
+            "export declare const SupervisionErrorText: { /** Construction and profile validation failures use this stable public diagnostic. */ readonly invalidOption: 'supervision option is invalid'; /** Admission failure when a required capability lacks a sufficient guarantee. */ readonly capabilityUnsupported: 'supervision capability is unsupported'; /** Wraps launcher, attachment, or ready-hook failure while retaining its cause. */ readonly launchFailed: 'unit launch failed'; /** Startup deadline diagnostic for an attempt that never reached ready. */ readonly startupTimeout: 'unit startup timed out'; /** Running or starting unit exit reported by the supervisor. */ readonly exitUnexpected: 'unit exited unexpectedly'; /** Repeated health check failures and missed heartbeats surface through this text. */ readonly unhealthy: 'unit is unhealthy'; /** Profile resource monitor failure text shared across unit kinds. */ readonly resourceLimitExceeded: 'unit resource limit exceeded'; /** Bounded launch or exit recovery ended before the unit disappeared. */ readonly reapTimeout: 'unit recovery timed out'; /** Restart policy exhausted its window and entered terminal state. */ readonly supervisionExhausted: 'supervision restart limit exhausted'; /** Unit-producing command attempted while disposal is in progress. */ readonly scopeClosed: 'supervisor is closing'; /** Unit-producing command attempted after disposal completed. */ readonly scopeTerminal: 'supervisor is disposed'; /** Coroutine progress probe exceeded its configured heartbeat window. */ readonly heartbeatMissed: 'coroutine heartbeat missed'; /** Prior-run process recovery failed while leaving its registry record available for retry. */ readonly orphanReclaimFailed: 'orphan process reclaim failed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5167,7 +5167,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/error-text.d.ts:SupervisionErrorText:export declare const SupervisionErrorText: { /** Construction and profile validation failures use this stable public diagnostic. */ readonly invalidOption: \"supervision option is invalid\"; /** Admission failure when a required capability lacks a sufficient guarantee. */ readonly capabilityUnsupported: \"supervision capability is unsupported\"; /** Wraps launcher, attachment, or ready-hook failure while retaining its cause. */ readonly launchFailed: \"unit launch failed\"; /** Startup deadline diagnostic for an attempt that never reached ready. */ readonly startupTimeout: \"unit startup timed out\"; /** Running or starting unit exit reported by the supervisor. */ readonly exitUnexpected: \"unit exited unexpectedly\"; /** Repeated health check failures and missed heartbeats surface through this text. */ readonly unhealthy: \"unit is unhealthy\"; /** Profile resource monitor failure text shared across unit kinds. */ readonly resourceLimitExceeded: \"unit resource limit exceeded\"; /** Bounded launch or exit recovery ended before the unit disappeared. */ readonly reapTimeout: \"unit recovery timed out\"; /** Restart policy exhausted its window and entered terminal state. */ readonly supervisionExhausted: \"supervision restart limit exhausted\"; /** Unit-producing command attempted while disposal is in progress. */ readonly scopeClosed: \"supervisor is closing\"; /** Unit-producing command attempted after disposal completed. */ readonly scopeTerminal: \"supervisor is disposed\"; /** Coroutine progress probe exceeded its configured heartbeat window. */ readonly heartbeatMissed: \"coroutine heartbeat missed\"; /** Prior-run process recovery failed while leaving its registry record available for retry. */ readonly orphanReclaimFailed: \"orphan process reclaim failed\"; };",
+          "identity": "packages/supervision/dist/error-text.d.ts:SupervisionErrorText:export declare const SupervisionErrorText: { /** Construction and profile validation failures use this stable public diagnostic. */ readonly invalidOption: 'supervision option is invalid'; /** Admission failure when a required capability lacks a sufficient guarantee. */ readonly capabilityUnsupported: 'supervision capability is unsupported'; /** Wraps launcher, attachment, or ready-hook failure while retaining its cause. */ readonly launchFailed: 'unit launch failed'; /** Startup deadline diagnostic for an attempt that never reached ready. */ readonly startupTimeout: 'unit startup timed out'; /** Running or starting unit exit reported by the supervisor. */ readonly exitUnexpected: 'unit exited unexpectedly'; /** Repeated health check failures and missed heartbeats surface through this text. */ readonly unhealthy: 'unit is unhealthy'; /** Profile resource monitor failure text shared across unit kinds. */ readonly resourceLimitExceeded: 'unit resource limit exceeded'; /** Bounded launch or exit recovery ended before the unit disappeared. */ readonly reapTimeout: 'unit recovery timed out'; /** Restart policy exhausted its window and entered terminal state. */ readonly supervisionExhausted: 'supervision restart limit exhausted'; /** Unit-producing command attempted while disposal is in progress. */ readonly scopeClosed: 'supervisor is closing'; /** Unit-producing command attempted after disposal completed. */ readonly scopeTerminal: 'supervisor is disposed'; /** Coroutine progress probe exceeded its configured heartbeat window. */ readonly heartbeatMissed: 'coroutine heartbeat missed'; /** Prior-run process recovery failed while leaving its registry record available for retry. */ readonly orphanReclaimFailed: 'orphan process reclaim failed'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5176,7 +5176,7 @@
         {
           "name": "SupervisorEventType",
           "kind": "const",
-          "signature": "export declare const SupervisorEventType: { readonly state: \"state\"; readonly exit: \"exit\"; readonly terminal: \"terminal\"; readonly switched: \"switched\"; /** Successful manual or automatic restart, not a generation-number inference. */ readonly restart: \"restart\"; /** The original admitted capability degradation set changed. */ readonly degraded: \"degraded\"; };\nexport type SupervisorEventType = (typeof SupervisorEventType)[keyof typeof SupervisorEventType];",
+          "signature": "export declare const SupervisorEventType: { readonly state: 'state'; readonly exit: 'exit'; readonly terminal: 'terminal'; readonly switched: 'switched'; /** Successful manual or automatic restart, not a generation-number inference. */ readonly restart: 'restart'; /** The original admitted capability degradation set changed. */ readonly degraded: 'degraded'; };\nexport type SupervisorEventType = (typeof SupervisorEventType)[keyof typeof SupervisorEventType];",
           "declarationLine": 106,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Discriminants of the synchronous supervisor observation stream. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5193,62 +5193,62 @@
               "name": "state",
               "kind": "property",
               "optional": false,
-              "signature": "readonly state: \"state\";",
+              "signature": "readonly state: 'state';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"state\""
+              "returns": "'state'"
             },
             {
               "name": "exit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly exit: \"exit\";",
+              "signature": "readonly exit: 'exit';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"exit\""
+              "returns": "'exit'"
             },
             {
               "name": "terminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly terminal: \"terminal\";",
+              "signature": "readonly terminal: 'terminal';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"terminal\""
+              "returns": "'terminal'"
             },
             {
               "name": "switched",
               "kind": "property",
               "optional": false,
-              "signature": "readonly switched: \"switched\";",
+              "signature": "readonly switched: 'switched';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"switched\""
+              "returns": "'switched'"
             },
             {
               "name": "restart",
               "kind": "property",
               "optional": false,
-              "signature": "readonly restart: \"restart\";",
+              "signature": "readonly restart: 'restart';",
               "description": "Successful manual or automatic restart, not a generation-number inference.",
               "parameterDetails": [],
-              "returns": "\"restart\""
+              "returns": "'restart'"
             },
             {
               "name": "degraded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly degraded: \"degraded\";",
+              "signature": "readonly degraded: 'degraded';",
               "description": "The original admitted capability degradation set changed.",
               "parameterDetails": [],
-              "returns": "\"degraded\""
+              "returns": "'degraded'"
             }
           ],
           "composes": [],
           "aliasOf": "SupervisorEventType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SupervisorEventType: { readonly state: \"state\"; readonly exit: \"exit\"; readonly terminal: \"terminal\"; readonly switched: \"switched\"; /** Successful manual or automatic restart, not a generation-number inference. */ readonly restart: \"restart\"; /** The original admitted capability degradation set changed. */ readonly degraded: \"degraded\"; };",
+            "export declare const SupervisorEventType: { readonly state: 'state'; readonly exit: 'exit'; readonly terminal: 'terminal'; readonly switched: 'switched'; /** Successful manual or automatic restart, not a generation-number inference. */ readonly restart: 'restart'; /** The original admitted capability degradation set changed. */ readonly degraded: 'degraded'; };",
             "export type SupervisorEventType = (typeof SupervisorEventType)[keyof typeof SupervisorEventType];"
           ],
           "overloadParameterDetails": [[], []],
@@ -5288,7 +5288,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:SupervisorEventType:export declare const SupervisorEventType: { readonly state: \"state\"; readonly exit: \"exit\"; readonly terminal: \"terminal\"; readonly switched: \"switched\"; /** Successful manual or automatic restart, not a generation-number inference. */ readonly restart: \"restart\"; /** The original admitted capability degradation set changed. */ readonly degraded: \"degraded\"; };\nexport type SupervisorEventType = (typeof SupervisorEventType)[keyof typeof SupervisorEventType];",
+          "identity": "packages/supervision/dist/constants.d.ts:SupervisorEventType:export declare const SupervisorEventType: { readonly state: 'state'; readonly exit: 'exit'; readonly terminal: 'terminal'; readonly switched: 'switched'; /** Successful manual or automatic restart, not a generation-number inference. */ readonly restart: 'restart'; /** The original admitted capability degradation set changed. */ readonly degraded: 'degraded'; };\nexport type SupervisorEventType = (typeof SupervisorEventType)[keyof typeof SupervisorEventType];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5297,7 +5297,7 @@
         {
           "name": "SupervisorState",
           "kind": "const",
-          "signature": "export declare const SupervisorState: { readonly idle: \"idle\"; readonly queued: \"queued\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly backoff: \"backoff\"; readonly stopping: \"stopping\"; readonly stopped: \"stopped\"; readonly terminal: \"terminal\"; readonly disposed: \"disposed\"; };\nexport type SupervisorState = (typeof SupervisorState)[keyof typeof SupervisorState];",
+          "signature": "export declare const SupervisorState: { readonly idle: 'idle'; readonly queued: 'queued'; readonly starting: 'starting'; readonly ready: 'ready'; readonly backoff: 'backoff'; readonly stopping: 'stopping'; readonly stopped: 'stopped'; readonly terminal: 'terminal'; readonly disposed: 'disposed'; };\nexport type SupervisorState = (typeof SupervisorState)[keyof typeof SupervisorState];",
           "declarationLine": 2,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Observable command and unit lifecycle states returned by state and inspect. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5314,89 +5314,89 @@
               "name": "idle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly idle: \"idle\";",
+              "signature": "readonly idle: 'idle';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"idle\""
+              "returns": "'idle'"
             },
             {
               "name": "queued",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queued: \"queued\";",
+              "signature": "readonly queued: 'queued';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"queued\""
+              "returns": "'queued'"
             },
             {
               "name": "starting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly starting: \"starting\";",
+              "signature": "readonly starting: 'starting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"starting\""
+              "returns": "'starting'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "backoff",
               "kind": "property",
               "optional": false,
-              "signature": "readonly backoff: \"backoff\";",
+              "signature": "readonly backoff: 'backoff';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"backoff\""
+              "returns": "'backoff'"
             },
             {
               "name": "stopping",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stopping: \"stopping\";",
+              "signature": "readonly stopping: 'stopping';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stopping\""
+              "returns": "'stopping'"
             },
             {
               "name": "stopped",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stopped: \"stopped\";",
+              "signature": "readonly stopped: 'stopped';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stopped\""
+              "returns": "'stopped'"
             },
             {
               "name": "terminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly terminal: \"terminal\";",
+              "signature": "readonly terminal: 'terminal';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"terminal\""
+              "returns": "'terminal'"
             },
             {
               "name": "disposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposed: \"disposed\";",
+              "signature": "readonly disposed: 'disposed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"disposed\""
+              "returns": "'disposed'"
             }
           ],
           "composes": [],
           "aliasOf": "SupervisorState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SupervisorState: { readonly idle: \"idle\"; readonly queued: \"queued\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly backoff: \"backoff\"; readonly stopping: \"stopping\"; readonly stopped: \"stopped\"; readonly terminal: \"terminal\"; readonly disposed: \"disposed\"; };",
+            "export declare const SupervisorState: { readonly idle: 'idle'; readonly queued: 'queued'; readonly starting: 'starting'; readonly ready: 'ready'; readonly backoff: 'backoff'; readonly stopping: 'stopping'; readonly stopped: 'stopped'; readonly terminal: 'terminal'; readonly disposed: 'disposed'; };",
             "export type SupervisorState = (typeof SupervisorState)[keyof typeof SupervisorState];"
           ],
           "overloadParameterDetails": [[], []],
@@ -5436,7 +5436,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:SupervisorState:export declare const SupervisorState: { readonly idle: \"idle\"; readonly queued: \"queued\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly backoff: \"backoff\"; readonly stopping: \"stopping\"; readonly stopped: \"stopped\"; readonly terminal: \"terminal\"; readonly disposed: \"disposed\"; };\nexport type SupervisorState = (typeof SupervisorState)[keyof typeof SupervisorState];",
+          "identity": "packages/supervision/dist/constants.d.ts:SupervisorState:export declare const SupervisorState: { readonly idle: 'idle'; readonly queued: 'queued'; readonly starting: 'starting'; readonly ready: 'ready'; readonly backoff: 'backoff'; readonly stopping: 'stopping'; readonly stopped: 'stopped'; readonly terminal: 'terminal'; readonly disposed: 'disposed'; };\nexport type SupervisorState = (typeof SupervisorState)[keyof typeof SupervisorState];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5445,7 +5445,7 @@
         {
           "name": "TerminalPolicyMode",
           "kind": "const",
-          "signature": "export declare const TerminalPolicyMode: { readonly stay: \"stay\"; readonly cooldown: \"cooldown\"; };\nexport type TerminalPolicyMode = (typeof TerminalPolicyMode)[keyof typeof TerminalPolicyMode];",
+          "signature": "export declare const TerminalPolicyMode: { readonly stay: 'stay'; readonly cooldown: 'cooldown'; };\nexport type TerminalPolicyMode = (typeof TerminalPolicyMode)[keyof typeof TerminalPolicyMode];",
           "declarationLine": 43,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Controls admission after the restart failure window is exhausted. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5462,26 +5462,26 @@
               "name": "stay",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stay: \"stay\";",
+              "signature": "readonly stay: 'stay';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stay\""
+              "returns": "'stay'"
             },
             {
               "name": "cooldown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cooldown: \"cooldown\";",
+              "signature": "readonly cooldown: 'cooldown';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cooldown\""
+              "returns": "'cooldown'"
             }
           ],
           "composes": [],
           "aliasOf": "TerminalPolicyMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TerminalPolicyMode: { readonly stay: \"stay\"; readonly cooldown: \"cooldown\"; };",
+            "export declare const TerminalPolicyMode: { readonly stay: 'stay'; readonly cooldown: 'cooldown'; };",
             "export type TerminalPolicyMode = (typeof TerminalPolicyMode)[keyof typeof TerminalPolicyMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -5521,7 +5521,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:TerminalPolicyMode:export declare const TerminalPolicyMode: { readonly stay: \"stay\"; readonly cooldown: \"cooldown\"; };\nexport type TerminalPolicyMode = (typeof TerminalPolicyMode)[keyof typeof TerminalPolicyMode];",
+          "identity": "packages/supervision/dist/constants.d.ts:TerminalPolicyMode:export declare const TerminalPolicyMode: { readonly stay: 'stay'; readonly cooldown: 'cooldown'; };\nexport type TerminalPolicyMode = (typeof TerminalPolicyMode)[keyof typeof TerminalPolicyMode];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5530,7 +5530,7 @@
         {
           "name": "TerminationMode",
           "kind": "const",
-          "signature": "export declare const TerminationMode: { readonly graceful: \"graceful\"; readonly force: \"force\"; };\nexport type TerminationMode = (typeof TerminationMode)[keyof typeof TerminationMode];",
+          "signature": "export declare const TerminationMode: { readonly graceful: 'graceful'; readonly force: 'force'; };\nexport type TerminationMode = (typeof TerminationMode)[keyof typeof TerminationMode];",
           "declarationLine": 69,
           "source": "packages/supervision/dist/constants.d.ts",
           "purpose": "Termination strength requested from a unit profile or process handle. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5547,26 +5547,26 @@
               "name": "graceful",
               "kind": "property",
               "optional": false,
-              "signature": "readonly graceful: \"graceful\";",
+              "signature": "readonly graceful: 'graceful';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"graceful\""
+              "returns": "'graceful'"
             },
             {
               "name": "force",
               "kind": "property",
               "optional": false,
-              "signature": "readonly force: \"force\";",
+              "signature": "readonly force: 'force';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"force\""
+              "returns": "'force'"
             }
           ],
           "composes": [],
           "aliasOf": "TerminationMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TerminationMode: { readonly graceful: \"graceful\"; readonly force: \"force\"; };",
+            "export declare const TerminationMode: { readonly graceful: 'graceful'; readonly force: 'force'; };",
             "export type TerminationMode = (typeof TerminationMode)[keyof typeof TerminationMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -5606,7 +5606,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/constants.d.ts:TerminationMode:export declare const TerminationMode: { readonly graceful: \"graceful\"; readonly force: \"force\"; };\nexport type TerminationMode = (typeof TerminationMode)[keyof typeof TerminationMode];",
+          "identity": "packages/supervision/dist/constants.d.ts:TerminationMode:export declare const TerminationMode: { readonly graceful: 'graceful'; readonly force: 'force'; };\nexport type TerminationMode = (typeof TerminationMode)[keyof typeof TerminationMode];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5634,7 +5634,7 @@
         {
           "name": "coroutineCapabilities",
           "kind": "const",
-          "signature": "export declare const coroutineCapabilities: Readonly<{ readonly termination: \"cooperative\"; readonly 'fault-isolation': \"unsupported\"; }>;",
+          "signature": "export declare const coroutineCapabilities: Readonly<{ readonly termination: 'cooperative'; readonly 'fault-isolation': 'unsupported'; }>;",
           "declarationLine": 8,
           "source": "packages/supervision/dist/coroutine/constants.d.ts",
           "purpose": "The cooperative launcher cannot isolate faults from its shared event loop. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5651,17 +5651,17 @@
               "name": "termination",
               "kind": "property",
               "optional": false,
-              "signature": "readonly termination: \"cooperative\";",
+              "signature": "readonly termination: 'cooperative';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cooperative\""
+              "returns": "'cooperative'"
             }
           ],
           "composes": [],
           "aliasOf": "coroutineCapabilities",
           "exportPath": "./coroutine",
           "overloadSignatures": [
-            "export declare const coroutineCapabilities: Readonly<{ readonly termination: \"cooperative\"; readonly 'fault-isolation': \"unsupported\"; }>;"
+            "export declare const coroutineCapabilities: Readonly<{ readonly termination: 'cooperative'; readonly 'fault-isolation': 'unsupported'; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5700,7 +5700,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/coroutine/constants.d.ts:coroutineCapabilities:export declare const coroutineCapabilities: Readonly<{ readonly termination: \"cooperative\"; readonly 'fault-isolation': \"unsupported\"; }>;",
+          "identity": "packages/supervision/dist/coroutine/constants.d.ts:coroutineCapabilities:export declare const coroutineCapabilities: Readonly<{ readonly termination: 'cooperative'; readonly 'fault-isolation': 'unsupported'; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5709,7 +5709,7 @@
         {
           "name": "CoroutineOutcome",
           "kind": "const",
-          "signature": "export declare const CoroutineOutcome: { readonly fulfilled: \"fulfilled\"; readonly rejected: \"rejected\"; };\nexport type CoroutineOutcome = (typeof CoroutineOutcome)[keyof typeof CoroutineOutcome];",
+          "signature": "export declare const CoroutineOutcome: { readonly fulfilled: 'fulfilled'; readonly rejected: 'rejected'; };\nexport type CoroutineOutcome = (typeof CoroutineOutcome)[keyof typeof CoroutineOutcome];",
           "declarationLine": 2,
           "source": "packages/supervision/dist/coroutine/constants.d.ts",
           "purpose": "Coroutine settlement is carried as data on the fulfilled exit Promise. Values are stable public contract identifiers; use the matching table entries below.",
@@ -5726,26 +5726,26 @@
               "name": "fulfilled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fulfilled: \"fulfilled\";",
+              "signature": "readonly fulfilled: 'fulfilled';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"fulfilled\""
+              "returns": "'fulfilled'"
             },
             {
               "name": "rejected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly rejected: \"rejected\";",
+              "signature": "readonly rejected: 'rejected';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"rejected\""
+              "returns": "'rejected'"
             }
           ],
           "composes": [],
           "aliasOf": "CoroutineOutcome",
           "exportPath": "./coroutine",
           "overloadSignatures": [
-            "export declare const CoroutineOutcome: { readonly fulfilled: \"fulfilled\"; readonly rejected: \"rejected\"; };",
+            "export declare const CoroutineOutcome: { readonly fulfilled: 'fulfilled'; readonly rejected: 'rejected'; };",
             "export type CoroutineOutcome = (typeof CoroutineOutcome)[keyof typeof CoroutineOutcome];"
           ],
           "overloadParameterDetails": [[], []],
@@ -5785,7 +5785,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/coroutine/constants.d.ts:CoroutineOutcome:export declare const CoroutineOutcome: { readonly fulfilled: \"fulfilled\"; readonly rejected: \"rejected\"; };\nexport type CoroutineOutcome = (typeof CoroutineOutcome)[keyof typeof CoroutineOutcome];",
+          "identity": "packages/supervision/dist/coroutine/constants.d.ts:CoroutineOutcome:export declare const CoroutineOutcome: { readonly fulfilled: 'fulfilled'; readonly rejected: 'rejected'; };\nexport type CoroutineOutcome = (typeof CoroutineOutcome)[keyof typeof CoroutineOutcome];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7182,7 +7182,7 @@
         {
           "name": "BootstrapVia",
           "kind": "const",
-          "signature": "export declare const BootstrapVia: { readonly stdin: \"stdin\"; readonly fd: \"fd\"; };\nexport type BootstrapVia = (typeof BootstrapVia)[keyof typeof BootstrapVia];",
+          "signature": "export declare const BootstrapVia: { readonly stdin: 'stdin'; readonly fd: 'fd'; };\nexport type BootstrapVia = (typeof BootstrapVia)[keyof typeof BootstrapVia];",
           "declarationLine": 43,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Permitted private bootstrap carriers keep payloads out of arguments and environment. Values are stable public contract identifiers; use the matching table entries below.",
@@ -7199,26 +7199,26 @@
               "name": "stdin",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stdin: \"stdin\";",
+              "signature": "readonly stdin: 'stdin';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stdin\""
+              "returns": "'stdin'"
             },
             {
               "name": "fd",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fd: \"fd\";",
+              "signature": "readonly fd: 'fd';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"fd\""
+              "returns": "'fd'"
             }
           ],
           "composes": [],
           "aliasOf": "BootstrapVia",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const BootstrapVia: { readonly stdin: \"stdin\"; readonly fd: \"fd\"; };",
+            "export declare const BootstrapVia: { readonly stdin: 'stdin'; readonly fd: 'fd'; };",
             "export type BootstrapVia = (typeof BootstrapVia)[keyof typeof BootstrapVia];"
           ],
           "overloadParameterDetails": [[], []],
@@ -7258,7 +7258,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:BootstrapVia:export declare const BootstrapVia: { readonly stdin: \"stdin\"; readonly fd: \"fd\"; };\nexport type BootstrapVia = (typeof BootstrapVia)[keyof typeof BootstrapVia];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:BootstrapVia:export declare const BootstrapVia: { readonly stdin: 'stdin'; readonly fd: 'fd'; };\nexport type BootstrapVia = (typeof BootstrapVia)[keyof typeof BootstrapVia];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8438,7 +8438,7 @@
         {
           "name": "DrainedStream",
           "kind": "const",
-          "signature": "export declare const DrainedStream: { readonly stdout: \"stdout\"; readonly stderr: \"stderr\"; };\nexport type DrainedStream = (typeof DrainedStream)[keyof typeof DrainedStream];",
+          "signature": "export declare const DrainedStream: { readonly stdout: 'stdout'; readonly stderr: 'stderr'; };\nexport type DrainedStream = (typeof DrainedStream)[keyof typeof DrainedStream];",
           "declarationLine": 21,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Identifies which drained process stream produced an observed byte chunk. Values are stable public contract identifiers; use the matching table entries below.",
@@ -8455,26 +8455,26 @@
               "name": "stdout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stdout: \"stdout\";",
+              "signature": "readonly stdout: 'stdout';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stdout\""
+              "returns": "'stdout'"
             },
             {
               "name": "stderr",
               "kind": "property",
               "optional": false,
-              "signature": "readonly stderr: \"stderr\";",
+              "signature": "readonly stderr: 'stderr';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"stderr\""
+              "returns": "'stderr'"
             }
           ],
           "composes": [],
           "aliasOf": "DrainedStream",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const DrainedStream: { readonly stdout: \"stdout\"; readonly stderr: \"stderr\"; };",
+            "export declare const DrainedStream: { readonly stdout: 'stdout'; readonly stderr: 'stderr'; };",
             "export type DrainedStream = (typeof DrainedStream)[keyof typeof DrainedStream];"
           ],
           "overloadParameterDetails": [[], []],
@@ -8514,7 +8514,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:DrainedStream:export declare const DrainedStream: { readonly stdout: \"stdout\"; readonly stderr: \"stderr\"; };\nexport type DrainedStream = (typeof DrainedStream)[keyof typeof DrainedStream];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:DrainedStream:export declare const DrainedStream: { readonly stdout: 'stdout'; readonly stderr: 'stderr'; };\nexport type DrainedStream = (typeof DrainedStream)[keyof typeof DrainedStream];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -10963,7 +10963,7 @@
         {
           "name": "OrphanProbeResult",
           "kind": "const",
-          "signature": "export declare const OrphanProbeResult: { readonly alive: \"alive\"; readonly gone: \"gone\"; readonly reused: \"reused\"; };\nexport type OrphanProbeResult = (typeof OrphanProbeResult)[keyof typeof OrphanProbeResult];",
+          "signature": "export declare const OrphanProbeResult: { readonly alive: 'alive'; readonly gone: 'gone'; readonly reused: 'reused'; };\nexport type OrphanProbeResult = (typeof OrphanProbeResult)[keyof typeof OrphanProbeResult];",
           "declarationLine": 49,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Fingerprint-aware recovery distinguishes a live original process from PID reuse. Values are stable public contract identifiers; use the matching table entries below.",
@@ -10980,35 +10980,35 @@
               "name": "alive",
               "kind": "property",
               "optional": false,
-              "signature": "readonly alive: \"alive\";",
+              "signature": "readonly alive: 'alive';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"alive\""
+              "returns": "'alive'"
             },
             {
               "name": "gone",
               "kind": "property",
               "optional": false,
-              "signature": "readonly gone: \"gone\";",
+              "signature": "readonly gone: 'gone';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"gone\""
+              "returns": "'gone'"
             },
             {
               "name": "reused",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reused: \"reused\";",
+              "signature": "readonly reused: 'reused';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"reused\""
+              "returns": "'reused'"
             }
           ],
           "composes": [],
           "aliasOf": "OrphanProbeResult",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const OrphanProbeResult: { readonly alive: \"alive\"; readonly gone: \"gone\"; readonly reused: \"reused\"; };",
+            "export declare const OrphanProbeResult: { readonly alive: 'alive'; readonly gone: 'gone'; readonly reused: 'reused'; };",
             "export type OrphanProbeResult = (typeof OrphanProbeResult)[keyof typeof OrphanProbeResult];"
           ],
           "overloadParameterDetails": [[], []],
@@ -11048,7 +11048,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:OrphanProbeResult:export declare const OrphanProbeResult: { readonly alive: \"alive\"; readonly gone: \"gone\"; readonly reused: \"reused\"; };\nexport type OrphanProbeResult = (typeof OrphanProbeResult)[keyof typeof OrphanProbeResult];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:OrphanProbeResult:export declare const OrphanProbeResult: { readonly alive: 'alive'; readonly gone: 'gone'; readonly reused: 'reused'; };\nexport type OrphanProbeResult = (typeof OrphanProbeResult)[keyof typeof OrphanProbeResult];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -11142,7 +11142,7 @@
         {
           "name": "ProcessCapability",
           "kind": "const",
-          "signature": "export declare const ProcessCapability: { readonly memoryLimit: \"memory-limit\"; readonly cpuTimeLimit: \"cpu-time-limit\"; readonly permissions: \"permissions\"; readonly bootstrapStdin: \"bootstrap-stdin\"; readonly bootstrapFd: \"bootstrap-fd\"; };\nexport type ProcessCapability = (typeof ProcessCapability)[keyof typeof ProcessCapability];",
+          "signature": "export declare const ProcessCapability: { readonly memoryLimit: 'memory-limit'; readonly cpuTimeLimit: 'cpu-time-limit'; readonly permissions: 'permissions'; readonly bootstrapStdin: 'bootstrap-stdin'; readonly bootstrapFd: 'bootstrap-fd'; };\nexport type ProcessCapability = (typeof ProcessCapability)[keyof typeof ProcessCapability];",
           "declarationLine": 27,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Process-specific guarantees inferred from launch specification fields. Values are stable public contract identifiers; use the matching table entries below.",
@@ -11159,53 +11159,53 @@
               "name": "memoryLimit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly memoryLimit: \"memory-limit\";",
+              "signature": "readonly memoryLimit: 'memory-limit';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"memory-limit\""
+              "returns": "'memory-limit'"
             },
             {
               "name": "cpuTimeLimit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cpuTimeLimit: \"cpu-time-limit\";",
+              "signature": "readonly cpuTimeLimit: 'cpu-time-limit';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cpu-time-limit\""
+              "returns": "'cpu-time-limit'"
             },
             {
               "name": "permissions",
               "kind": "property",
               "optional": false,
-              "signature": "readonly permissions: \"permissions\";",
+              "signature": "readonly permissions: 'permissions';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"permissions\""
+              "returns": "'permissions'"
             },
             {
               "name": "bootstrapStdin",
               "kind": "property",
               "optional": false,
-              "signature": "readonly bootstrapStdin: \"bootstrap-stdin\";",
+              "signature": "readonly bootstrapStdin: 'bootstrap-stdin';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"bootstrap-stdin\""
+              "returns": "'bootstrap-stdin'"
             },
             {
               "name": "bootstrapFd",
               "kind": "property",
               "optional": false,
-              "signature": "readonly bootstrapFd: \"bootstrap-fd\";",
+              "signature": "readonly bootstrapFd: 'bootstrap-fd';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"bootstrap-fd\""
+              "returns": "'bootstrap-fd'"
             }
           ],
           "composes": [],
           "aliasOf": "ProcessCapability",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const ProcessCapability: { readonly memoryLimit: \"memory-limit\"; readonly cpuTimeLimit: \"cpu-time-limit\"; readonly permissions: \"permissions\"; readonly bootstrapStdin: \"bootstrap-stdin\"; readonly bootstrapFd: \"bootstrap-fd\"; };",
+            "export declare const ProcessCapability: { readonly memoryLimit: 'memory-limit'; readonly cpuTimeLimit: 'cpu-time-limit'; readonly permissions: 'permissions'; readonly bootstrapStdin: 'bootstrap-stdin'; readonly bootstrapFd: 'bootstrap-fd'; };",
             "export type ProcessCapability = (typeof ProcessCapability)[keyof typeof ProcessCapability];"
           ],
           "overloadParameterDetails": [[], []],
@@ -11245,7 +11245,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:ProcessCapability:export declare const ProcessCapability: { readonly memoryLimit: \"memory-limit\"; readonly cpuTimeLimit: \"cpu-time-limit\"; readonly permissions: \"permissions\"; readonly bootstrapStdin: \"bootstrap-stdin\"; readonly bootstrapFd: \"bootstrap-fd\"; };\nexport type ProcessCapability = (typeof ProcessCapability)[keyof typeof ProcessCapability];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:ProcessCapability:export declare const ProcessCapability: { readonly memoryLimit: 'memory-limit'; readonly cpuTimeLimit: 'cpu-time-limit'; readonly permissions: 'permissions'; readonly bootstrapStdin: 'bootstrap-stdin'; readonly bootstrapFd: 'bootstrap-fd'; };\nexport type ProcessCapability = (typeof ProcessCapability)[keyof typeof ProcessCapability];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -11254,7 +11254,7 @@
         {
           "name": "ProcessLimit",
           "kind": "const",
-          "signature": "export declare const ProcessLimit: { readonly memoryBytes: \"memoryBytes\"; readonly cpuTimeMs: \"cpuTimeMs\"; readonly callWallTimeMs: \"callWallTimeMs\"; };\nexport type ProcessLimit = (typeof ProcessLimit)[keyof typeof ProcessLimit];",
+          "signature": "export declare const ProcessLimit: { readonly memoryBytes: 'memoryBytes'; readonly cpuTimeMs: 'cpuTimeMs'; readonly callWallTimeMs: 'callWallTimeMs'; };\nexport type ProcessLimit = (typeof ProcessLimit)[keyof typeof ProcessLimit];",
           "declarationLine": 36,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Stable field names used to report process resource-limit violations. Values are stable public contract identifiers; use the matching table entries below.",
@@ -11271,35 +11271,35 @@
               "name": "memoryBytes",
               "kind": "property",
               "optional": false,
-              "signature": "readonly memoryBytes: \"memoryBytes\";",
+              "signature": "readonly memoryBytes: 'memoryBytes';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"memoryBytes\""
+              "returns": "'memoryBytes'"
             },
             {
               "name": "cpuTimeMs",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cpuTimeMs: \"cpuTimeMs\";",
+              "signature": "readonly cpuTimeMs: 'cpuTimeMs';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cpuTimeMs\""
+              "returns": "'cpuTimeMs'"
             },
             {
               "name": "callWallTimeMs",
               "kind": "property",
               "optional": false,
-              "signature": "readonly callWallTimeMs: \"callWallTimeMs\";",
+              "signature": "readonly callWallTimeMs: 'callWallTimeMs';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"callWallTimeMs\""
+              "returns": "'callWallTimeMs'"
             }
           ],
           "composes": [],
           "aliasOf": "ProcessLimit",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const ProcessLimit: { readonly memoryBytes: \"memoryBytes\"; readonly cpuTimeMs: \"cpuTimeMs\"; readonly callWallTimeMs: \"callWallTimeMs\"; };",
+            "export declare const ProcessLimit: { readonly memoryBytes: 'memoryBytes'; readonly cpuTimeMs: 'cpuTimeMs'; readonly callWallTimeMs: 'callWallTimeMs'; };",
             "export type ProcessLimit = (typeof ProcessLimit)[keyof typeof ProcessLimit];"
           ],
           "overloadParameterDetails": [[], []],
@@ -11339,7 +11339,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:ProcessLimit:export declare const ProcessLimit: { readonly memoryBytes: \"memoryBytes\"; readonly cpuTimeMs: \"cpuTimeMs\"; readonly callWallTimeMs: \"callWallTimeMs\"; };\nexport type ProcessLimit = (typeof ProcessLimit)[keyof typeof ProcessLimit];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:ProcessLimit:export declare const ProcessLimit: { readonly memoryBytes: 'memoryBytes'; readonly cpuTimeMs: 'cpuTimeMs'; readonly callWallTimeMs: 'callWallTimeMs'; };\nexport type ProcessLimit = (typeof ProcessLimit)[keyof typeof ProcessLimit];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -11487,7 +11487,7 @@
         {
           "name": "StderrMode",
           "kind": "const",
-          "signature": "export declare const StderrMode: { readonly drain: \"drain\"; readonly ignore: \"ignore\"; };\nexport type StderrMode = (typeof StderrMode)[keyof typeof StderrMode];",
+          "signature": "export declare const StderrMode: { readonly drain: 'drain'; readonly ignore: 'ignore'; };\nexport type StderrMode = (typeof StderrMode)[keyof typeof StderrMode];",
           "declarationLine": 15,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Selects diagnostic draining or ignored standard error. Values are stable public contract identifiers; use the matching table entries below.",
@@ -11506,26 +11506,26 @@
               "name": "drain",
               "kind": "property",
               "optional": false,
-              "signature": "readonly drain: \"drain\";",
+              "signature": "readonly drain: 'drain';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"drain\""
+              "returns": "'drain'"
             },
             {
               "name": "ignore",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ignore: \"ignore\";",
+              "signature": "readonly ignore: 'ignore';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ignore\""
+              "returns": "'ignore'"
             }
           ],
           "composes": [],
           "aliasOf": "StderrMode",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const StderrMode: { readonly drain: \"drain\"; readonly ignore: \"ignore\"; };",
+            "export declare const StderrMode: { readonly drain: 'drain'; readonly ignore: 'ignore'; };",
             "export type StderrMode = (typeof StderrMode)[keyof typeof StderrMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -11565,7 +11565,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:StderrMode:export declare const StderrMode: { readonly drain: \"drain\"; readonly ignore: \"ignore\"; };\nexport type StderrMode = (typeof StderrMode)[keyof typeof StderrMode];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:StderrMode:export declare const StderrMode: { readonly drain: 'drain'; readonly ignore: 'ignore'; };\nexport type StderrMode = (typeof StderrMode)[keyof typeof StderrMode];",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -11574,7 +11574,7 @@
         {
           "name": "StdinMode",
           "kind": "const",
-          "signature": "export declare const StdinMode: { readonly channel: \"channel\"; readonly ignore: \"ignore\"; };\nexport type StdinMode = (typeof StdinMode)[keyof typeof StdinMode];",
+          "signature": "export declare const StdinMode: { readonly channel: 'channel'; readonly ignore: 'ignore'; };\nexport type StdinMode = (typeof StdinMode)[keyof typeof StdinMode];",
           "declarationLine": 2,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Selects the standard-input carrier supplied by a process launcher. Values are stable public contract identifiers; use the matching table entries below.",
@@ -11593,26 +11593,26 @@
               "name": "channel",
               "kind": "property",
               "optional": false,
-              "signature": "readonly channel: \"channel\";",
+              "signature": "readonly channel: 'channel';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"channel\""
+              "returns": "'channel'"
             },
             {
               "name": "ignore",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ignore: \"ignore\";",
+              "signature": "readonly ignore: 'ignore';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ignore\""
+              "returns": "'ignore'"
             }
           ],
           "composes": [],
           "aliasOf": "StdinMode",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const StdinMode: { readonly channel: \"channel\"; readonly ignore: \"ignore\"; };",
+            "export declare const StdinMode: { readonly channel: 'channel'; readonly ignore: 'ignore'; };",
             "export type StdinMode = (typeof StdinMode)[keyof typeof StdinMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -11652,7 +11652,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:StdinMode:export declare const StdinMode: { readonly channel: \"channel\"; readonly ignore: \"ignore\"; };\nexport type StdinMode = (typeof StdinMode)[keyof typeof StdinMode];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:StdinMode:export declare const StdinMode: { readonly channel: 'channel'; readonly ignore: 'ignore'; };\nexport type StdinMode = (typeof StdinMode)[keyof typeof StdinMode];",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -11661,7 +11661,7 @@
         {
           "name": "StdoutMode",
           "kind": "const",
-          "signature": "export declare const StdoutMode: { readonly channel: \"channel\"; readonly drain: \"drain\"; readonly ignore: \"ignore\"; };\nexport type StdoutMode = (typeof StdoutMode)[keyof typeof StdoutMode];",
+          "signature": "export declare const StdoutMode: { readonly channel: 'channel'; readonly drain: 'drain'; readonly ignore: 'ignore'; };\nexport type StdoutMode = (typeof StdoutMode)[keyof typeof StdoutMode];",
           "declarationLine": 8,
           "source": "packages/supervision/dist/process/constants.d.ts",
           "purpose": "Selects channel access, diagnostic draining or ignored standard output. Values are stable public contract identifiers; use the matching table entries below.",
@@ -11680,35 +11680,35 @@
               "name": "channel",
               "kind": "property",
               "optional": false,
-              "signature": "readonly channel: \"channel\";",
+              "signature": "readonly channel: 'channel';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"channel\""
+              "returns": "'channel'"
             },
             {
               "name": "drain",
               "kind": "property",
               "optional": false,
-              "signature": "readonly drain: \"drain\";",
+              "signature": "readonly drain: 'drain';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"drain\""
+              "returns": "'drain'"
             },
             {
               "name": "ignore",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ignore: \"ignore\";",
+              "signature": "readonly ignore: 'ignore';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ignore\""
+              "returns": "'ignore'"
             }
           ],
           "composes": [],
           "aliasOf": "StdoutMode",
           "exportPath": "./process",
           "overloadSignatures": [
-            "export declare const StdoutMode: { readonly channel: \"channel\"; readonly drain: \"drain\"; readonly ignore: \"ignore\"; };",
+            "export declare const StdoutMode: { readonly channel: 'channel'; readonly drain: 'drain'; readonly ignore: 'ignore'; };",
             "export type StdoutMode = (typeof StdoutMode)[keyof typeof StdoutMode];"
           ],
           "overloadParameterDetails": [[], []],
@@ -11748,7 +11748,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/process/constants.d.ts:StdoutMode:export declare const StdoutMode: { readonly channel: \"channel\"; readonly drain: \"drain\"; readonly ignore: \"ignore\"; };\nexport type StdoutMode = (typeof StdoutMode)[keyof typeof StdoutMode];",
+          "identity": "packages/supervision/dist/process/constants.d.ts:StdoutMode:export declare const StdoutMode: { readonly channel: 'channel'; readonly drain: 'drain'; readonly ignore: 'ignore'; };\nexport type StdoutMode = (typeof StdoutMode)[keyof typeof StdoutMode];",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -13484,7 +13484,7 @@
         {
           "name": "ThreadCapability",
           "kind": "const",
-          "signature": "export declare const ThreadCapability: { readonly heapLimit: \"heap-limit\"; readonly exitObservation: \"exit-observation\"; };\nexport type ThreadCapability = (typeof ThreadCapability)[keyof typeof ThreadCapability];",
+          "signature": "export declare const ThreadCapability: { readonly heapLimit: 'heap-limit'; readonly exitObservation: 'exit-observation'; };\nexport type ThreadCapability = (typeof ThreadCapability)[keyof typeof ThreadCapability];",
           "declarationLine": 7,
           "source": "packages/supervision/dist/threads/constants.d.ts",
           "purpose": "Native worker guarantees in addition to standard isolation capabilities. Values are stable public contract identifiers; use the matching table entries below.",
@@ -13501,26 +13501,26 @@
               "name": "heapLimit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly heapLimit: \"heap-limit\";",
+              "signature": "readonly heapLimit: 'heap-limit';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"heap-limit\""
+              "returns": "'heap-limit'"
             },
             {
               "name": "exitObservation",
               "kind": "property",
               "optional": false,
-              "signature": "readonly exitObservation: \"exit-observation\";",
+              "signature": "readonly exitObservation: 'exit-observation';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"exit-observation\""
+              "returns": "'exit-observation'"
             }
           ],
           "composes": [],
           "aliasOf": "ThreadCapability",
           "exportPath": "./threads",
           "overloadSignatures": [
-            "export declare const ThreadCapability: { readonly heapLimit: \"heap-limit\"; readonly exitObservation: \"exit-observation\"; };",
+            "export declare const ThreadCapability: { readonly heapLimit: 'heap-limit'; readonly exitObservation: 'exit-observation'; };",
             "export type ThreadCapability = (typeof ThreadCapability)[keyof typeof ThreadCapability];"
           ],
           "overloadParameterDetails": [[], []],
@@ -13560,7 +13560,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/threads/constants.d.ts:ThreadCapability:export declare const ThreadCapability: { readonly heapLimit: \"heap-limit\"; readonly exitObservation: \"exit-observation\"; };\nexport type ThreadCapability = (typeof ThreadCapability)[keyof typeof ThreadCapability];",
+          "identity": "packages/supervision/dist/threads/constants.d.ts:ThreadCapability:export declare const ThreadCapability: { readonly heapLimit: 'heap-limit'; readonly exitObservation: 'exit-observation'; };\nexport type ThreadCapability = (typeof ThreadCapability)[keyof typeof ThreadCapability];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -13569,7 +13569,7 @@
         {
           "name": "ThreadLimit",
           "kind": "const",
-          "signature": "export declare const ThreadLimit: { readonly heapBytes: \"heapBytes\"; };\nexport type ThreadLimit = (typeof ThreadLimit)[keyof typeof ThreadLimit];",
+          "signature": "export declare const ThreadLimit: { readonly heapBytes: 'heapBytes'; };\nexport type ThreadLimit = (typeof ThreadLimit)[keyof typeof ThreadLimit];",
           "declarationLine": 13,
           "source": "packages/supervision/dist/threads/constants.d.ts",
           "purpose": "Native worker limit reported in its final exit status. Values are stable public contract identifiers; use the matching table entries below.",
@@ -13586,17 +13586,17 @@
               "name": "heapBytes",
               "kind": "property",
               "optional": false,
-              "signature": "readonly heapBytes: \"heapBytes\";",
+              "signature": "readonly heapBytes: 'heapBytes';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"heapBytes\""
+              "returns": "'heapBytes'"
             }
           ],
           "composes": [],
           "aliasOf": "ThreadLimit",
           "exportPath": "./threads",
           "overloadSignatures": [
-            "export declare const ThreadLimit: { readonly heapBytes: \"heapBytes\"; };",
+            "export declare const ThreadLimit: { readonly heapBytes: 'heapBytes'; };",
             "export type ThreadLimit = (typeof ThreadLimit)[keyof typeof ThreadLimit];"
           ],
           "overloadParameterDetails": [[], []],
@@ -13636,7 +13636,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/threads/constants.d.ts:ThreadLimit:export declare const ThreadLimit: { readonly heapBytes: \"heapBytes\"; };\nexport type ThreadLimit = (typeof ThreadLimit)[keyof typeof ThreadLimit];",
+          "identity": "packages/supervision/dist/threads/constants.d.ts:ThreadLimit:export declare const ThreadLimit: { readonly heapBytes: 'heapBytes'; };\nexport type ThreadLimit = (typeof ThreadLimit)[keyof typeof ThreadLimit];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -13645,7 +13645,7 @@
         {
           "name": "ThreadUnitKind",
           "kind": "const",
-          "signature": "export declare const ThreadUnitKind: { readonly thread: \"thread\"; };\nexport type ThreadUnitKind = (typeof ThreadUnitKind)[keyof typeof ThreadUnitKind];",
+          "signature": "export declare const ThreadUnitKind: { readonly thread: 'thread'; };\nexport type ThreadUnitKind = (typeof ThreadUnitKind)[keyof typeof ThreadUnitKind];",
           "declarationLine": 2,
           "source": "packages/supervision/dist/threads/constants.d.ts",
           "purpose": "Fixed unit kind that links thread profiles to matching shared budgets. Values are stable public contract identifiers; use the matching table entries below.",
@@ -13664,17 +13664,17 @@
               "name": "thread",
               "kind": "property",
               "optional": false,
-              "signature": "readonly thread: \"thread\";",
+              "signature": "readonly thread: 'thread';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"thread\""
+              "returns": "'thread'"
             }
           ],
           "composes": [],
           "aliasOf": "ThreadUnitKind",
           "exportPath": "./threads",
           "overloadSignatures": [
-            "export declare const ThreadUnitKind: { readonly thread: \"thread\"; };",
+            "export declare const ThreadUnitKind: { readonly thread: 'thread'; };",
             "export type ThreadUnitKind = (typeof ThreadUnitKind)[keyof typeof ThreadUnitKind];"
           ],
           "overloadParameterDetails": [[], []],
@@ -13714,7 +13714,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/supervision/dist/threads/constants.d.ts:ThreadUnitKind:export declare const ThreadUnitKind: { readonly thread: \"thread\"; };\nexport type ThreadUnitKind = (typeof ThreadUnitKind)[keyof typeof ThreadUnitKind];",
+          "identity": "packages/supervision/dist/threads/constants.d.ts:ThreadUnitKind:export declare const ThreadUnitKind: { readonly thread: 'thread'; };\nexport type ThreadUnitKind = (typeof ThreadUnitKind)[keyof typeof ThreadUnitKind];",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],

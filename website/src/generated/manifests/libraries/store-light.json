@@ -5316,28 +5316,28 @@
               "name": "load",
               "kind": "property",
               "optional": false,
-              "signature": "readonly load: \"load\";",
+              "signature": "readonly load: 'load';",
               "description": "Loading or validating a factory-produced value failed.",
               "parameterDetails": [],
-              "returns": "\"load\""
+              "returns": "'load'"
             },
             {
               "name": "dispose",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dispose: \"dispose\";",
+              "signature": "readonly dispose: 'dispose';",
               "description": "Releasing a value or invoking terminal housekeeping failed.",
               "parameterDetails": [],
-              "returns": "\"dispose\""
+              "returns": "'dispose'"
             },
             {
               "name": "listener",
               "kind": "property",
               "optional": false,
-              "signature": "readonly listener: \"listener\";",
+              "signature": "readonly listener: 'listener';",
               "description": "Publishing a revision reached a throwing or rejecting subscriber.",
               "parameterDetails": [],
-              "returns": "\"listener\""
+              "returns": "'listener'"
             }
           ],
           "composes": [],
@@ -6482,7 +6482,7 @@
         {
           "name": "StoreFieldMode",
           "kind": "const",
-          "signature": "export declare const StoreFieldMode: { readonly sync: \"sync\"; readonly async: \"async\"; };",
+          "signature": "export declare const StoreFieldMode: { readonly sync: 'sync'; readonly async: 'async'; };",
           "declarationLine": 2,
           "source": "packages/store-light/dist/field-mode-constants.d.ts",
           "purpose": "Allowed `mode` values of field builders: `sync` or `async`.",
@@ -6501,26 +6501,26 @@
               "name": "sync",
               "kind": "property",
               "optional": false,
-              "signature": "readonly sync: \"sync\";",
+              "signature": "readonly sync: 'sync';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"sync\""
+              "returns": "'sync'"
             },
             {
               "name": "async",
               "kind": "property",
               "optional": false,
-              "signature": "readonly async: \"async\";",
+              "signature": "readonly async: 'async';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"async\""
+              "returns": "'async'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreFieldMode: { readonly sync: \"sync\"; readonly async: \"async\"; };"
+            "export declare const StoreFieldMode: { readonly sync: 'sync'; readonly async: 'async'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6559,7 +6559,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/field-mode-constants.d.ts:StoreFieldMode:export declare const StoreFieldMode: { readonly sync: \"sync\"; readonly async: \"async\"; };",
+          "identity": "packages/store-light/dist/field-mode-constants.d.ts:StoreFieldMode:export declare const StoreFieldMode: { readonly sync: 'sync'; readonly async: 'async'; };",
           "guidance": [
             {
               "id": "9-状态常量与错误构造工具",
@@ -6609,7 +6609,7 @@
         {
           "name": "StoreLightErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: \"STORE_DISPOSED\"; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: \"UNKNOWN_VERSION\"; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: \"IDENTITY_REQUIRED\"; /** * `storeReady()` receives an object with no initialization Promise registered by this module * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: \"NO_ASYNC_INIT\"; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: \"STORE_NOT_READY\"; /** * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\"; /** * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors. */ readonly fieldDisposeFailed: \"FIELD_DISPOSE_FAILED\"; /** * A FieldBuilder fails during initialization without an existing module error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying. */ readonly initializationFailed: \"INITIALIZATION_FAILED\"; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\"; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: 'STORE_DISPOSED'; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: 'UNKNOWN_VERSION'; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: 'IDENTITY_REQUIRED'; /** * `storeReady()` receives an object with no initialization Promise registered by this module * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: 'NO_ASYNC_INIT'; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: 'STORE_NOT_READY'; /** * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: 'INIT_AND_CLEANUP_FAILED'; /** * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors. */ readonly fieldDisposeFailed: 'FIELD_DISPOSE_FAILED'; /** * A FieldBuilder fails during initialization without an existing module error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying. */ readonly initializationFailed: 'INITIALIZATION_FAILED'; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: 'SYNC_FIELD_REQUIRED'; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: 'ACTION_BATCH_BOUNDARY'; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 11,
           "source": "packages/store-light/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
@@ -6626,134 +6626,134 @@
               "name": "storeDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storeDisposed: \"STORE_DISPOSED\";",
+              "signature": "readonly storeDisposed: 'STORE_DISPOSED';",
               "description": "Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance.",
               "parameterDetails": [],
-              "returns": "\"STORE_DISPOSED\""
+              "returns": "'STORE_DISPOSED'"
             },
             {
               "name": "resourceDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceDisposed: \"RESOURCE_DISPOSED\";",
+              "signature": "readonly resourceDisposed: 'RESOURCE_DISPOSED';",
               "description": "A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal.",
               "parameterDetails": [],
-              "returns": "\"RESOURCE_DISPOSED\""
+              "returns": "'RESOURCE_DISPOSED'"
             },
             {
               "name": "captureInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly captureInvalid: \"CAPTURE_INVALID\";",
+              "signature": "readonly captureInvalid: 'CAPTURE_INVALID';",
               "description": "A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once.",
               "parameterDetails": [],
-              "returns": "\"CAPTURE_INVALID\""
+              "returns": "'CAPTURE_INVALID'"
             },
             {
               "name": "unknownVersion",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unknownVersion: \"UNKNOWN_VERSION\";",
+              "signature": "readonly unknownVersion: 'UNKNOWN_VERSION';",
               "description": "A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads.",
               "parameterDetails": [],
-              "returns": "\"UNKNOWN_VERSION\""
+              "returns": "'UNKNOWN_VERSION'"
             },
             {
               "name": "identityRequired",
               "kind": "property",
               "optional": false,
-              "signature": "readonly identityRequired: \"IDENTITY_REQUIRED\";",
+              "signature": "readonly identityRequired: 'IDENTITY_REQUIRED';",
               "description": "A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity.",
               "parameterDetails": [],
-              "returns": "\"IDENTITY_REQUIRED\""
+              "returns": "'IDENTITY_REQUIRED'"
             },
             {
               "name": "noAsyncInit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly noAsyncInit: \"NO_ASYNC_INIT\";",
+              "signature": "readonly noAsyncInit: 'NO_ASYNC_INIT';",
               "description": "`storeReady()` receives an object with no initialization Promise registered by this package * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object.",
               "parameterDetails": [],
-              "returns": "\"NO_ASYNC_INIT\""
+              "returns": "'NO_ASYNC_INIT'"
             },
             {
               "name": "storeNotReady",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storeNotReady: \"STORE_NOT_READY\";",
+              "signature": "readonly storeNotReady: 'STORE_NOT_READY';",
               "description": "Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads.",
               "parameterDetails": [],
-              "returns": "\"STORE_NOT_READY\""
+              "returns": "'STORE_NOT_READY'"
             },
             {
               "name": "initAndCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\";",
+              "signature": "readonly initAndCleanupFailed: 'INIT_AND_CLEANUP_FAILED';",
               "description": "Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure.",
               "parameterDetails": [],
-              "returns": "\"INIT_AND_CLEANUP_FAILED\""
+              "returns": "'INIT_AND_CLEANUP_FAILED'"
             },
             {
               "name": "fieldDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fieldDisposeFailed: \"FIELD_DISPOSE_FAILED\";",
+              "signature": "readonly fieldDisposeFailed: 'FIELD_DISPOSE_FAILED';",
               "description": "A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors.",
               "parameterDetails": [],
-              "returns": "\"FIELD_DISPOSE_FAILED\""
+              "returns": "'FIELD_DISPOSE_FAILED'"
             },
             {
               "name": "initializationFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly initializationFailed: \"INITIALIZATION_FAILED\";",
+              "signature": "readonly initializationFailed: 'INITIALIZATION_FAILED';",
               "description": "A FieldBuilder fails during initialization without an existing package error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying.",
               "parameterDetails": [],
-              "returns": "\"INITIALIZATION_FAILED\""
+              "returns": "'INITIALIZATION_FAILED'"
             },
             {
               "name": "syncFieldRequired",
               "kind": "property",
               "optional": false,
-              "signature": "readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\";",
+              "signature": "readonly syncFieldRequired: 'SYNC_FIELD_REQUIRED';",
               "description": "An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders.",
               "parameterDetails": [],
-              "returns": "\"SYNC_FIELD_REQUIRED\""
+              "returns": "'SYNC_FIELD_REQUIRED'"
             },
             {
               "name": "actionBatchBoundary",
               "kind": "property",
               "optional": false,
-              "signature": "readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\";",
+              "signature": "readonly actionBatchBoundary: 'ACTION_BATCH_BOUNDARY';",
               "description": "A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`.",
               "parameterDetails": [],
-              "returns": "\"ACTION_BATCH_BOUNDARY\""
+              "returns": "'ACTION_BATCH_BOUNDARY'"
             },
             {
               "name": "envUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "signature": "readonly envUnsupported: 'ENV_UNSUPPORTED';",
               "description": "The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue.",
               "parameterDetails": [],
-              "returns": "\"ENV_UNSUPPORTED\""
+              "returns": "'ENV_UNSUPPORTED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreLightErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: \"STORE_DISPOSED\"; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: \"UNKNOWN_VERSION\"; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: \"IDENTITY_REQUIRED\"; /** * `storeReady()` receives an object with no initialization Promise registered by this module * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: \"NO_ASYNC_INIT\"; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: \"STORE_NOT_READY\"; /** * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\"; /** * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors. */ readonly fieldDisposeFailed: \"FIELD_DISPOSE_FAILED\"; /** * A FieldBuilder fails during initialization without an existing module error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying. */ readonly initializationFailed: \"INITIALIZATION_FAILED\"; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\"; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: 'STORE_DISPOSED'; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: 'UNKNOWN_VERSION'; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: 'IDENTITY_REQUIRED'; /** * `storeReady()` receives an object with no initialization Promise registered by this module * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: 'NO_ASYNC_INIT'; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: 'STORE_NOT_READY'; /** * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: 'INIT_AND_CLEANUP_FAILED'; /** * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors. */ readonly fieldDisposeFailed: 'FIELD_DISPOSE_FAILED'; /** * A FieldBuilder fails during initialization without an existing module error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying. */ readonly initializationFailed: 'INITIALIZATION_FAILED'; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: 'SYNC_FIELD_REQUIRED'; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: 'ACTION_BATCH_BOUNDARY'; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6792,7 +6792,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/error-code.d.ts:StoreLightErrorCode:export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: \"STORE_DISPOSED\"; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: \"UNKNOWN_VERSION\"; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: \"IDENTITY_REQUIRED\"; /** * `storeReady()` receives an object with no initialization Promise registered by this package * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: \"NO_ASYNC_INIT\"; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: \"STORE_NOT_READY\"; /** * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: \"INIT_AND_CLEANUP_FAILED\"; /** * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors. */ readonly fieldDisposeFailed: \"FIELD_DISPOSE_FAILED\"; /** * A FieldBuilder fails during initialization without an existing package error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying. */ readonly initializationFailed: \"INITIALIZATION_FAILED\"; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: \"SYNC_FIELD_REQUIRED\"; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: \"ACTION_BATCH_BOUNDARY\"; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/store-light/dist/error-code.d.ts:StoreLightErrorCode:export declare const StoreLightErrorCode: { /** * Store fields, snapshots, or subscriptions are accessed after disposal. * * Use `createStore()` or `createAsyncStore()` to create a new instance. */ readonly storeDisposed: 'STORE_DISPOSED'; /** * A resource is read, captured, or retained while closing or disposed, or its factory returns a * disposed value. * * Stop using the resource. The `disposed` state is terminal. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * A resource capture token is invalid or has already been consumed by `commit` or `discard`. * * Check the token lifecycle. A token is valid only before consumption and can be committed once. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * A retain or capture request names an unknown or no longer visible resource version. * * Read the version from the current snapshot instead of caching version IDs across reloads. */ readonly unknownVersion: 'UNKNOWN_VERSION'; /** * A resource factory with `dispose` returns a primitive value, so reference identity cannot track * ownership. * * Return an object or function for a resource with explicit disposal to provide `$dispose` or * reference identity. */ readonly identityRequired: 'IDENTITY_REQUIRED'; /** * `storeReady()` receives an object with no initialization Promise registered by this package * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness. * * Pass the actual constructed Store instead of an unrelated or foreign object. */ readonly noAsyncInit: 'NO_ASYNC_INIT'; /** * Asynchronous state is accessed while store initialization is pending or has failed. * * Await `storeReady()` before accessing asynchronous fields. Treat rejection as initialization * failure instead of retrying reads. */ readonly storeNotReady: 'STORE_NOT_READY'; /** * Store initialization and its subsequent cleanup both fail and cannot be attached to the primary * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own * identity and receive cleanup through cause instead. * * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13). * Treat this as initialization failure and inspect the cleanup failure. */ readonly initAndCleanupFailed: 'INIT_AND_CLEANUP_FAILED'; /** * A late FieldBuilder disposer fails after initialization is abandoned or the Store is disposed. * The owning Runtime receives the original native error when possible; non-extensible or * non-Error failures remain reachable through the coded fallback's cause/errors. */ readonly fieldDisposeFailed: 'FIELD_DISPOSE_FAILED'; /** * A FieldBuilder fails during initialization without an existing package error identity. Native * mutable errors keep their object and stack; fallback errors retain the original cause. Treat * creation as failed and inspect the original builder failure before retrying. */ readonly initializationFailed: 'INITIALIZATION_FAILED'; /** * An asynchronous `IFieldBuilder` is passed to the synchronous `createStore()` contract. * * Use `createAsyncStore()` for asynchronous field builders. */ readonly syncFieldRequired: 'SYNC_FIELD_REQUIRED'; /** * A diagnostic reports that writes after the first `await` in an asynchronous action are outside * its batch. * * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in * `$batch()`. */ readonly actionBatchBoundary: 'ACTION_BATCH_BOUNDARY'; /** * The host lacks `WeakRef` or `FinalizationRegistry` required by `ResourceCaptureRegistry`. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Input or field validation fails for reserved API keys, `keepAliveMs`, a non-writable `$set` * target, or an unknown `$hydrate` field. * * Correct the field or value named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "9-状态常量与错误构造工具",

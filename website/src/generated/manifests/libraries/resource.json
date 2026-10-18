@@ -2423,7 +2423,7 @@
         {
           "name": "ResourceErrorCode",
           "kind": "const",
-          "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: \"FETCH_FAILED\"; };",
+          "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; };",
           "declarationLine": 10,
           "source": "packages/resource/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package. Each key names one failure; the values are the strings found on `error.code`.",
@@ -2442,89 +2442,89 @@
               "name": "resourceDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceDisposed: \"RESOURCE_DISPOSED\";",
+              "signature": "readonly resourceDisposed: 'RESOURCE_DISPOSED';",
               "description": "Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations.",
               "parameterDetails": [],
-              "returns": "\"RESOURCE_DISPOSED\""
+              "returns": "'RESOURCE_DISPOSED'"
             },
             {
               "name": "requestAborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly requestAborted: \"REQUEST_ABORTED\";",
+              "signature": "readonly requestAborted: 'REQUEST_ABORTED';",
               "description": "Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly.",
               "parameterDetails": [],
-              "returns": "\"REQUEST_ABORTED\""
+              "returns": "'REQUEST_ABORTED'"
             },
             {
               "name": "requestCancelled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly requestCancelled: \"REQUEST_CANCELLED\";",
+              "signature": "readonly requestCancelled: 'REQUEST_CANCELLED';",
               "description": "Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state.",
               "parameterDetails": [],
-              "returns": "\"REQUEST_CANCELLED\""
+              "returns": "'REQUEST_CANCELLED'"
             },
             {
               "name": "cancellationCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\";",
+              "signature": "readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED';",
               "description": "Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled.",
               "parameterDetails": [],
-              "returns": "\"CANCELLATION_CLEANUP_FAILED\""
+              "returns": "'CANCELLATION_CLEANUP_FAILED'"
             },
             {
               "name": "noActivePromise",
               "kind": "property",
               "optional": false,
-              "signature": "readonly noActivePromise: \"NO_ACTIVE_PROMISE\";",
+              "signature": "readonly noActivePromise: 'NO_ACTIVE_PROMISE';",
               "description": "Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths.",
               "parameterDetails": [],
-              "returns": "\"NO_ACTIVE_PROMISE\""
+              "returns": "'NO_ACTIVE_PROMISE'"
             },
             {
               "name": "invalidSnapshot",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidSnapshot: \"INVALID_SNAPSHOT\";",
+              "signature": "readonly invalidSnapshot: 'INVALID_SNAPSHOT';",
               "description": "Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver.",
               "parameterDetails": [],
-              "returns": "\"INVALID_SNAPSHOT\""
+              "returns": "'INVALID_SNAPSHOT'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "suspenseProbeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\";",
+              "signature": "readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED';",
               "description": "Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure.",
               "parameterDetails": [],
-              "returns": "\"SUSPENSE_PROBE_FAILED\""
+              "returns": "'SUSPENSE_PROBE_FAILED'"
             },
             {
               "name": "fetchFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fetchFailed: \"FETCH_FAILED\";",
+              "signature": "readonly fetchFailed: 'FETCH_FAILED';",
               "description": "A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option.",
               "parameterDetails": [],
-              "returns": "\"FETCH_FAILED\""
+              "returns": "'FETCH_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "ResourceErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: \"FETCH_FAILED\"; };"
+            "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2563,7 +2563,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/error-code.d.ts:ResourceErrorCode:export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: \"RESOURCE_DISPOSED\"; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: \"REQUEST_CANCELLED\"; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: \"CANCELLATION_CLEANUP_FAILED\"; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: \"NO_ACTIVE_PROMISE\"; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: \"SUSPENSE_PROBE_FAILED\"; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: \"FETCH_FAILED\"; };",
+          "identity": "packages/resource/dist/error-code.d.ts:ResourceErrorCode:export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the * cleanup failure and continue treating the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2. * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; };",
           "guidance": [
             {
               "id": "错误码",
@@ -2643,7 +2643,7 @@
         {
           "name": "ResourceFetchStatus",
           "kind": "const",
-          "signature": "export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: \"idle\"; /** A request is running, with or without cached data. */ readonly fetching: \"fetching\"; };\nexport type ResourceFetchStatus = keyof typeof ResourceFetchStatus;",
+          "signature": "export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: 'idle'; /** A request is running, with or without cached data. */ readonly fetching: 'fetching'; };\nexport type ResourceFetchStatus = keyof typeof ResourceFetchStatus;",
           "declarationLine": 16,
           "source": "packages/resource/dist/state-constants.d.ts",
           "purpose": "Values of `resource.fetchStatus`: whether a request is running right now, independent of the data shown (a success state can be refreshing in the background).",
@@ -2663,26 +2663,26 @@
               "name": "idle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly idle: \"idle\";",
+              "signature": "readonly idle: 'idle';",
               "description": "No current request is running.",
               "parameterDetails": [],
-              "returns": "\"idle\""
+              "returns": "'idle'"
             },
             {
               "name": "fetching",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fetching: \"fetching\";",
+              "signature": "readonly fetching: 'fetching';",
               "description": "A request is running, with or without cached data.",
               "parameterDetails": [],
-              "returns": "\"fetching\""
+              "returns": "'fetching'"
             }
           ],
           "composes": [],
           "aliasOf": "ResourceFetchStatus",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: \"idle\"; /** A request is running, with or without cached data. */ readonly fetching: \"fetching\"; };",
+            "export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: 'idle'; /** A request is running, with or without cached data. */ readonly fetching: 'fetching'; };",
             "export type ResourceFetchStatus = keyof typeof ResourceFetchStatus;"
           ],
           "overloadParameterDetails": [[], []],
@@ -2722,7 +2722,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/state-constants.d.ts:ResourceFetchStatus:export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: \"idle\"; /** A request is running, with or without cached data. */ readonly fetching: \"fetching\"; };\nexport type ResourceFetchStatus = keyof typeof ResourceFetchStatus;",
+          "identity": "packages/resource/dist/state-constants.d.ts:ResourceFetchStatus:export declare const ResourceFetchStatus: { /** No current request is running. */ readonly idle: 'idle'; /** A request is running, with or without cached data. */ readonly fetching: 'fetching'; };\nexport type ResourceFetchStatus = keyof typeof ResourceFetchStatus;",
           "guidance": [
             {
               "id": "7-生命周期-错误与边界",
@@ -2754,7 +2754,7 @@
         {
           "name": "ResourceStatus",
           "kind": "const",
-          "signature": "export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: \"idle\"; /** Initial data is still being requested. */ readonly pending: \"pending\"; /** Cached data is available, including during background refresh. */ readonly success: \"success\"; /** The most recent request failed. */ readonly error: \"error\"; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: \"cancelled\"; };\nexport type ResourceStatus = keyof typeof ResourceStatus;",
+          "signature": "export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: 'idle'; /** Initial data is still being requested. */ readonly pending: 'pending'; /** Cached data is available, including during background refresh. */ readonly success: 'success'; /** The most recent request failed. */ readonly error: 'error'; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: 'cancelled'; };\nexport type ResourceStatus = keyof typeof ResourceStatus;",
           "declarationLine": 2,
           "source": "packages/resource/dist/state-constants.d.ts",
           "purpose": "Values of `state.status`: the five states of the data state machine (`idle`, `pending`, `success`, `error`, `cancelled`).",
@@ -2776,53 +2776,53 @@
               "name": "idle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly idle: \"idle\";",
+              "signature": "readonly idle: 'idle';",
               "description": "No data or request result has been published.",
               "parameterDetails": [],
-              "returns": "\"idle\""
+              "returns": "'idle'"
             },
             {
               "name": "pending",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pending: \"pending\";",
+              "signature": "readonly pending: 'pending';",
               "description": "Initial data is still being requested.",
               "parameterDetails": [],
-              "returns": "\"pending\""
+              "returns": "'pending'"
             },
             {
               "name": "success",
               "kind": "property",
               "optional": false,
-              "signature": "readonly success: \"success\";",
+              "signature": "readonly success: 'success';",
               "description": "Cached data is available, including during background refresh.",
               "parameterDetails": [],
-              "returns": "\"success\""
+              "returns": "'success'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": "The most recent request failed.",
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             },
             {
               "name": "cancelled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cancelled: \"cancelled\";",
+              "signature": "readonly cancelled: 'cancelled';",
               "description": "Explicit cancellation published a stable AbortError result.",
               "parameterDetails": [],
-              "returns": "\"cancelled\""
+              "returns": "'cancelled'"
             }
           ],
           "composes": [],
           "aliasOf": "ResourceStatus",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: \"idle\"; /** Initial data is still being requested. */ readonly pending: \"pending\"; /** Cached data is available, including during background refresh. */ readonly success: \"success\"; /** The most recent request failed. */ readonly error: \"error\"; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: \"cancelled\"; };",
+            "export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: 'idle'; /** Initial data is still being requested. */ readonly pending: 'pending'; /** Cached data is available, including during background refresh. */ readonly success: 'success'; /** The most recent request failed. */ readonly error: 'error'; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: 'cancelled'; };",
             "export type ResourceStatus = keyof typeof ResourceStatus;"
           ],
           "overloadParameterDetails": [[], []],
@@ -2862,7 +2862,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/state-constants.d.ts:ResourceStatus:export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: \"idle\"; /** Initial data is still being requested. */ readonly pending: \"pending\"; /** Cached data is available, including during background refresh. */ readonly success: \"success\"; /** The most recent request failed. */ readonly error: \"error\"; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: \"cancelled\"; };\nexport type ResourceStatus = keyof typeof ResourceStatus;",
+          "identity": "packages/resource/dist/state-constants.d.ts:ResourceStatus:export declare const ResourceStatus: { /** No data or request result has been published. */ readonly idle: 'idle'; /** Initial data is still being requested. */ readonly pending: 'pending'; /** Cached data is available, including during background refresh. */ readonly success: 'success'; /** The most recent request failed. */ readonly error: 'error'; /** Explicit cancellation published a stable AbortError result. */ readonly cancelled: 'cancelled'; };\nexport type ResourceStatus = keyof typeof ResourceStatus;",
           "guidance": [
             {
               "id": "7-生命周期-错误与边界",

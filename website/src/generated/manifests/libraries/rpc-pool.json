@@ -1381,7 +1381,7 @@
         {
           "name": "RpcPoolErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: \"POOL_CLOSED\"; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: \"QUEUE_FULL\"; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: \"CALL_ABORTED\"; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: \"CLOSE_FAILED\"; };",
+          "signature": "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: 'POOL_CLOSED'; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: 'QUEUE_FULL'; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: 'CALL_ABORTED'; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: 'CLOSE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-pool/dist/error-code.d.ts",
           "purpose": "Stable pool-owned semantic codes for invalid configuration, closed admission, queue overflow, queued abort and aggregated member cleanup. Native error classes and original causes remain intact.",
@@ -1398,53 +1398,53 @@
               "name": "invalidOptions",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOptions: \"INVALID_OPTIONS\";",
+              "signature": "readonly invalidOptions: 'INVALID_OPTIONS';",
               "description": "Invalid construction or resize arguments are rejected before any native acquisition.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTIONS\""
+              "returns": "'INVALID_OPTIONS'"
             },
             {
               "name": "poolClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly poolClosed: \"POOL_CLOSED\";",
+              "signature": "readonly poolClosed: 'POOL_CLOSED';",
               "description": "A closing pool rejects new work while draining operations already accepted.",
               "parameterDetails": [],
-              "returns": "\"POOL_CLOSED\""
+              "returns": "'POOL_CLOSED'"
             },
             {
               "name": "queueFull",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queueFull: \"QUEUE_FULL\";",
+              "signature": "readonly queueFull: 'QUEUE_FULL';",
               "description": "A full bounded FIFO rejects the new operation without calling a Peer.",
               "parameterDetails": [],
-              "returns": "\"QUEUE_FULL\""
+              "returns": "'QUEUE_FULL'"
             },
             {
               "name": "callAborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly callAborted: \"CALL_ABORTED\";",
+              "signature": "readonly callAborted: 'CALL_ABORTED';",
               "description": "Cancellation removes only an operation still waiting in the pool FIFO.",
               "parameterDetails": [],
-              "returns": "\"CALL_ABORTED\""
+              "returns": "'CALL_ABORTED'"
             },
             {
               "name": "closeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closeFailed: \"CLOSE_FAILED\";",
+              "signature": "readonly closeFailed: 'CLOSE_FAILED';",
               "description": "All member closes were attempted and their original failures are collected.",
               "parameterDetails": [],
-              "returns": "\"CLOSE_FAILED\""
+              "returns": "'CLOSE_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "RpcPoolErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: \"POOL_CLOSED\"; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: \"QUEUE_FULL\"; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: \"CALL_ABORTED\"; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: \"CLOSE_FAILED\"; };"
+            "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: 'POOL_CLOSED'; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: 'QUEUE_FULL'; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: 'CALL_ABORTED'; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: 'CLOSE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1483,7 +1483,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/error-code.d.ts:RpcPoolErrorCode:export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: \"POOL_CLOSED\"; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: \"QUEUE_FULL\"; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: \"CALL_ABORTED\"; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: \"CLOSE_FAILED\"; };",
+          "identity": "packages/rpc-pool/dist/error-code.d.ts:RpcPoolErrorCode:export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: 'POOL_CLOSED'; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: 'QUEUE_FULL'; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: 'CALL_ABORTED'; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: 'CLOSE_FAILED'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1492,7 +1492,7 @@
         {
           "name": "RpcPoolState",
           "kind": "const",
-          "signature": "export declare const RpcPoolState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly closed: \"closed\"; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "signature": "export declare const RpcPoolState: { readonly open: 'open'; readonly closing: 'closing'; readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
           "declarationLine": 15,
           "source": "packages/rpc-pool/dist/text.d.ts",
           "purpose": "Client scheduling lifecycle reported by stats(): open accepts work, closing drains accepted operations, closed records completed member cleanup attempts. It does not describe individual native supervisor generations.",
@@ -1509,35 +1509,35 @@
               "name": "open",
               "kind": "property",
               "optional": false,
-              "signature": "readonly open: \"open\";",
+              "signature": "readonly open: 'open';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"open\""
+              "returns": "'open'"
             },
             {
               "name": "closing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closing: \"closing\";",
+              "signature": "readonly closing: 'closing';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"closing\""
+              "returns": "'closing'"
             },
             {
               "name": "closed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closed: \"closed\";",
+              "signature": "readonly closed: 'closed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"closed\""
+              "returns": "'closed'"
             }
           ],
           "composes": [],
           "aliasOf": "RpcPoolState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcPoolState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly closed: \"closed\"; };",
+            "export declare const RpcPoolState: { readonly open: 'open'; readonly closing: 'closing'; readonly closed: 'closed'; };",
             "export type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];"
           ],
           "overloadParameterDetails": [[], []],
@@ -1577,7 +1577,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-pool/dist/text.d.ts:RpcPoolState:export declare const RpcPoolState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly closed: \"closed\"; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "identity": "packages/rpc-pool/dist/text.d.ts:RpcPoolState:export declare const RpcPoolState: { readonly open: 'open'; readonly closing: 'closing'; readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

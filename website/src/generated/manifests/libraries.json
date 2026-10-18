@@ -11068,14 +11068,6 @@
                 {
                   "type": "paragraph",
                   "text": "`@migaia/rpc-contract` 是 peer 依赖，两者版本必须一致（当前 `0.0.9`）。运行时依赖 `@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/event-subscriber`、`@migaia/serialize`、`@migaia/supervision`、`@migaia/utils`，随包安装。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "同一个页面或进程里只能加载一份 `@migaia/rpc-core`。依赖解析出两份副本时，第二份在取得任何资源前抛出 `@migaia/rpc/core` / `DUPLICATE_MODULE_INSTANCE`；请修正依赖，让所有 RPC 包解析到同一份。不同 Worker 各自独立，不受影响。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "此保证针对 `package.json` 的 `exports` 指向的构建产物；直接复制或导入 `src/` 不包含副本检测。"
                 }
               ]
             },
@@ -12137,11 +12129,6 @@
                       "修正输入对象"
                     ],
                     [
-                      "`DUPLICATE_MODULE_INSTANCE`",
-                      "同一环境加载了两份 rpc-core",
-                      "修正依赖解析，然后重新加载"
-                    ],
-                    [
                       "`CALLBACK_FAILED`",
                       "冷 Probe stage listener、中间件安装或诊断 reporter 失败",
                       "检查原错或 cause；reporter 失败进入既有宿主异常队列"
@@ -12265,10 +12252,6 @@
                 {
                   "type": "paragraph",
                   "text": "浏览器载体上高频调用被拒绝？ 非独占载体的重放账本有持续速率上限（第 8 节）。合并调用，或改用原生独占通道。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "两个包各装了一份 rpc-core？ 会得到 `DUPLICATE_MODULE_INSTANCE`。让所有 `@migaia/rpc-*` 包解析到同一份 `@migaia/rpc-core`。 这个检测覆盖 `exports` 指向的构建产物；直接复制或导入 `src/` 不包含检测。"
                 },
                 {
                   "type": "paragraph",

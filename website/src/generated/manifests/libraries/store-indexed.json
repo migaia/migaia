@@ -1813,7 +1813,7 @@
         {
           "name": "IndexedOperation",
           "kind": "const",
-          "signature": "export declare const IndexedOperation: { readonly read: \"read\"; readonly write: \"write\"; readonly delete: \"delete\"; };",
+          "signature": "export declare const IndexedOperation: { readonly read: 'read'; readonly write: 'write'; readonly delete: 'delete'; };",
           "declarationLine": 2,
           "source": "packages/store-indexed/dist/indexed-constants.d.ts",
           "purpose": "Public read/write/delete vocabulary for consumer diagnostics. Collection mutation guards receive concrete operation labels instead of these constants.",
@@ -1834,35 +1834,35 @@
               "name": "read",
               "kind": "property",
               "optional": false,
-              "signature": "readonly read: \"read\";",
+              "signature": "readonly read: 'read';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"read\""
+              "returns": "'read'"
             },
             {
               "name": "write",
               "kind": "property",
               "optional": false,
-              "signature": "readonly write: \"write\";",
+              "signature": "readonly write: 'write';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"write\""
+              "returns": "'write'"
             },
             {
               "name": "delete",
               "kind": "property",
               "optional": false,
-              "signature": "readonly delete: \"delete\";",
+              "signature": "readonly delete: 'delete';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"delete\""
+              "returns": "'delete'"
             }
           ],
           "composes": [],
           "aliasOf": "IndexedOperation",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const IndexedOperation: { readonly read: \"read\"; readonly write: \"write\"; readonly delete: \"delete\"; };"
+            "export declare const IndexedOperation: { readonly read: 'read'; readonly write: 'write'; readonly delete: 'delete'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1901,7 +1901,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-indexed/dist/indexed-constants.d.ts:IndexedOperation:export declare const IndexedOperation: { readonly read: \"read\"; readonly write: \"write\"; readonly delete: \"delete\"; };",
+          "identity": "packages/store-indexed/dist/indexed-constants.d.ts:IndexedOperation:export declare const IndexedOperation: { readonly read: 'read'; readonly write: 'write'; readonly delete: 'delete'; };",
           "guidance": [],
           "usageScore": 50,
           "configuration": [],
@@ -3779,7 +3779,7 @@
         {
           "name": "StoreIndexedErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };",
+          "signature": "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };",
           "declarationLine": 8,
           "source": "packages/store-indexed/dist/error-code.d.ts",
           "purpose": "Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs.",
@@ -3803,62 +3803,62 @@
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "collectionDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly collectionDisposed: \"COLLECTION_DISPOSED\";",
+              "signature": "readonly collectionDisposed: 'COLLECTION_DISPOSED';",
               "description": "Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance.",
               "parameterDetails": [],
-              "returns": "\"COLLECTION_DISPOSED\""
+              "returns": "'COLLECTION_DISPOSED'"
             },
             {
               "name": "callbackFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly callbackFailed: \"CALLBACK_FAILED\";",
+              "signature": "readonly callbackFailed: 'CALLBACK_FAILED';",
               "description": "A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back.",
               "parameterDetails": [],
-              "returns": "\"CALLBACK_FAILED\""
+              "returns": "'CALLBACK_FAILED'"
             },
             {
               "name": "indexOutOfRange",
               "kind": "property",
               "optional": false,
-              "signature": "readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\";",
+              "signature": "readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE';",
               "description": "Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input.",
               "parameterDetails": [],
-              "returns": "\"INDEX_OUT_OF_RANGE\""
+              "returns": "'INDEX_OUT_OF_RANGE'"
             },
             {
               "name": "invalidIndex",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidIndex: \"INVALID_INDEX\";",
+              "signature": "readonly invalidIndex: 'INVALID_INDEX';",
               "description": "Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers.",
               "parameterDetails": [],
-              "returns": "\"INVALID_INDEX\""
+              "returns": "'INVALID_INDEX'"
             },
             {
               "name": "crossRuntime",
               "kind": "property",
               "optional": false,
-              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "signature": "readonly crossRuntime: 'CROSS_RUNTIME';",
               "description": "Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt.",
               "parameterDetails": [],
-              "returns": "\"CROSS_RUNTIME\""
+              "returns": "'CROSS_RUNTIME'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreIndexedErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };"
+            "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3897,7 +3897,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-indexed/dist/error-code.d.ts:StoreIndexedErrorCode:export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: \"COLLECTION_DISPOSED\"; /** * A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: \"CALLBACK_FAILED\"; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: \"INDEX_OUT_OF_RANGE\"; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: \"INVALID_INDEX\"; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: \"CROSS_RUNTIME\"; };",
+          "identity": "packages/store-indexed/dist/error-code.d.ts:StoreIndexedErrorCode:export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };",
           "guidance": [
             {
               "id": "错误模块",

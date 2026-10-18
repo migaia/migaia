@@ -2363,7 +2363,7 @@
         {
           "name": "EventAdmissionPolicy",
           "kind": "const",
-          "signature": "export declare const EventAdmissionPolicy: { readonly multiple: \"multiple\"; readonly unique: \"unique\"; };",
+          "signature": "export declare const EventAdmissionPolicy: { readonly multiple: 'multiple'; readonly unique: 'unique'; };",
           "declarationLine": 14,
           "source": "packages/event-subscriber/dist/state-constants.d.ts",
           "purpose": "Values for the `admissionPolicy` option of `createEventChannel()`: whether subscribing the same listener function twice creates two registrations or reuses one.",
@@ -2380,26 +2380,26 @@
               "name": "multiple",
               "kind": "property",
               "optional": false,
-              "signature": "readonly multiple: \"multiple\";",
+              "signature": "readonly multiple: 'multiple';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"multiple\""
+              "returns": "'multiple'"
             },
             {
               "name": "unique",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unique: \"unique\";",
+              "signature": "readonly unique: 'unique';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"unique\""
+              "returns": "'unique'"
             }
           ],
           "composes": [],
           "aliasOf": "EventAdmissionPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventAdmissionPolicy: { readonly multiple: \"multiple\"; readonly unique: \"unique\"; };"
+            "export declare const EventAdmissionPolicy: { readonly multiple: 'multiple'; readonly unique: 'unique'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2438,7 +2438,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventAdmissionPolicy:export declare const EventAdmissionPolicy: { readonly multiple: \"multiple\"; readonly unique: \"unique\"; };",
+          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventAdmissionPolicy:export declare const EventAdmissionPolicy: { readonly multiple: 'multiple'; readonly unique: 'unique'; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -2447,7 +2447,7 @@
         {
           "name": "EventApiStyle",
           "kind": "const",
-          "signature": "export declare const EventApiStyle: { readonly subscribePublish: \"subscribe-publish\"; readonly onEmit: \"on-emit\"; readonly onTrigger: \"on-trigger\"; readonly listenFire: \"listen-fire\"; };\nexport type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle];",
+          "signature": "export declare const EventApiStyle: { readonly subscribePublish: 'subscribe-publish'; readonly onEmit: 'on-emit'; readonly onTrigger: 'on-trigger'; readonly listenFire: 'listen-fire'; };\nexport type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle];",
           "declarationLine": 2,
           "source": "packages/event-subscriber/dist/style.d.ts",
           "purpose": "Preset names for the `style` option of channels and hubs. Each preset adds alias methods next to the default `subscribe` / `publish`.",
@@ -2464,44 +2464,44 @@
               "name": "subscribePublish",
               "kind": "property",
               "optional": false,
-              "signature": "readonly subscribePublish: \"subscribe-publish\";",
+              "signature": "readonly subscribePublish: 'subscribe-publish';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"subscribe-publish\""
+              "returns": "'subscribe-publish'"
             },
             {
               "name": "onEmit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly onEmit: \"on-emit\";",
+              "signature": "readonly onEmit: 'on-emit';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"on-emit\""
+              "returns": "'on-emit'"
             },
             {
               "name": "onTrigger",
               "kind": "property",
               "optional": false,
-              "signature": "readonly onTrigger: \"on-trigger\";",
+              "signature": "readonly onTrigger: 'on-trigger';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"on-trigger\""
+              "returns": "'on-trigger'"
             },
             {
               "name": "listenFire",
               "kind": "property",
               "optional": false,
-              "signature": "readonly listenFire: \"listen-fire\";",
+              "signature": "readonly listenFire: 'listen-fire';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"listen-fire\""
+              "returns": "'listen-fire'"
             }
           ],
           "composes": [],
           "aliasOf": "EventApiStyle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventApiStyle: { readonly subscribePublish: \"subscribe-publish\"; readonly onEmit: \"on-emit\"; readonly onTrigger: \"on-trigger\"; readonly listenFire: \"listen-fire\"; };",
+            "export declare const EventApiStyle: { readonly subscribePublish: 'subscribe-publish'; readonly onEmit: 'on-emit'; readonly onTrigger: 'on-trigger'; readonly listenFire: 'listen-fire'; };",
             "export type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle];"
           ],
           "overloadParameterDetails": [[], []],
@@ -2541,7 +2541,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/style.d.ts:EventApiStyle:export declare const EventApiStyle: { readonly subscribePublish: \"subscribe-publish\"; readonly onEmit: \"on-emit\"; readonly onTrigger: \"on-trigger\"; readonly listenFire: \"listen-fire\"; };\nexport type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle];",
+          "identity": "packages/event-subscriber/dist/style.d.ts:EventApiStyle:export declare const EventApiStyle: { readonly subscribePublish: 'subscribe-publish'; readonly onEmit: 'on-emit'; readonly onTrigger: 'on-trigger'; readonly listenFire: 'listen-fire'; };\nexport type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle];",
           "guidance": [
             {
               "id": "api-style",
@@ -2636,7 +2636,7 @@
         {
           "name": "EventDispatchPolicy",
           "kind": "const",
-          "signature": "export declare const EventDispatchPolicy: { readonly recursive: \"recursive\"; readonly queued: \"queued\"; };",
+          "signature": "export declare const EventDispatchPolicy: { readonly recursive: 'recursive'; readonly queued: 'queued'; };",
           "declarationLine": 8,
           "source": "packages/event-subscriber/dist/state-constants.d.ts",
           "purpose": "Values for the `dispatchPolicy` option of `createEventChannel()`: how a `publish()` made by a listener during another publish is delivered.",
@@ -2653,26 +2653,26 @@
               "name": "recursive",
               "kind": "property",
               "optional": false,
-              "signature": "readonly recursive: \"recursive\";",
+              "signature": "readonly recursive: 'recursive';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"recursive\""
+              "returns": "'recursive'"
             },
             {
               "name": "queued",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queued: \"queued\";",
+              "signature": "readonly queued: 'queued';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"queued\""
+              "returns": "'queued'"
             }
           ],
           "composes": [],
           "aliasOf": "EventDispatchPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventDispatchPolicy: { readonly recursive: \"recursive\"; readonly queued: \"queued\"; };"
+            "export declare const EventDispatchPolicy: { readonly recursive: 'recursive'; readonly queued: 'queued'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2711,7 +2711,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventDispatchPolicy:export declare const EventDispatchPolicy: { readonly recursive: \"recursive\"; readonly queued: \"queued\"; };",
+          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventDispatchPolicy:export declare const EventDispatchPolicy: { readonly recursive: 'recursive'; readonly queued: 'queued'; };",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -2720,7 +2720,7 @@
         {
           "name": "EventRemovalPolicy",
           "kind": "const",
-          "signature": "export declare const EventRemovalPolicy: { readonly handle: \"handle\"; readonly listenerAll: \"listener-all\"; };",
+          "signature": "export declare const EventRemovalPolicy: { readonly handle: 'handle'; readonly listenerAll: 'listener-all'; };",
           "declarationLine": 21,
           "source": "packages/event-subscriber/dist/state-constants.d.ts",
           "purpose": "Values for the `removalPolicy` option of `createEventChannel()`: how many registrations a subscription handle removes when called.",
@@ -2737,26 +2737,26 @@
               "name": "handle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly handle: \"handle\";",
+              "signature": "readonly handle: 'handle';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"handle\""
+              "returns": "'handle'"
             },
             {
               "name": "listenerAll",
               "kind": "property",
               "optional": false,
-              "signature": "readonly listenerAll: \"listener-all\";",
+              "signature": "readonly listenerAll: 'listener-all';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"listener-all\""
+              "returns": "'listener-all'"
             }
           ],
           "composes": [],
           "aliasOf": "EventRemovalPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventRemovalPolicy: { readonly handle: \"handle\"; readonly listenerAll: \"listener-all\"; };"
+            "export declare const EventRemovalPolicy: { readonly handle: 'handle'; readonly listenerAll: 'listener-all'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2795,7 +2795,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventRemovalPolicy:export declare const EventRemovalPolicy: { readonly handle: \"handle\"; readonly listenerAll: \"listener-all\"; };",
+          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventRemovalPolicy:export declare const EventRemovalPolicy: { readonly handle: 'handle'; readonly listenerAll: 'listener-all'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -2804,7 +2804,7 @@
         {
           "name": "EventSubscriberErrorCode",
           "kind": "const",
-          "signature": "export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: \"VISITOR_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: \"SUBSCRIPTION_DISPOSE_FAILED\"; };",
+          "signature": "export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: 'INVALID_LISTENER'; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: 'INVALID_REPORTER'; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: 'INVALID_CHANNEL'; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: 'INVALID_SIGNAL'; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: 'ABORTED'; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: 'INVALID_SUBSCRIBER'; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: 'INVALID_EVENT_KEY'; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: 'TASK_NOT_FOUND'; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: 'TASK_NOT_UNIQUE'; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: 'INVALID_TASK_ID'; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: 'PUBLISH_FAILED'; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: 'VISITOR_FAILED'; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: 'VALUE_PROJECTION_FAILED'; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE'; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: 'SUBSCRIPTION_CLOSED'; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: 'INVOCATION_CLOSED'; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/event-subscriber/dist/error-code.d.ts",
           "purpose": "Every error code this package can throw or report. Errors keep their native type (`TypeError`, `AggregateError`) and carry `source` and `code`; branch on `code` instead of the message.",
@@ -2825,179 +2825,179 @@
               "name": "invalidListener",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidListener: \"INVALID_LISTENER\";",
+              "signature": "readonly invalidListener: 'INVALID_LISTENER';",
               "description": "Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER.",
               "parameterDetails": [],
-              "returns": "\"INVALID_LISTENER\""
+              "returns": "'INVALID_LISTENER'"
             },
             {
               "name": "invalidReporter",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidReporter: \"INVALID_REPORTER\";",
+              "signature": "readonly invalidReporter: 'INVALID_REPORTER';",
               "description": "Invalid report/terminalReport function; caller must provide a callable reporter or omit it.",
               "parameterDetails": [],
-              "returns": "\"INVALID_REPORTER\""
+              "returns": "'INVALID_REPORTER'"
             },
             {
               "name": "invalidChannel",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidChannel: \"INVALID_CHANNEL\";",
+              "signature": "readonly invalidChannel: 'INVALID_CHANNEL';",
               "description": "A helper received a malformed or non-canonical channel; caller must use a factory channel.",
               "parameterDetails": [],
-              "returns": "\"INVALID_CHANNEL\""
+              "returns": "'INVALID_CHANNEL'"
             },
             {
               "name": "invalidSignal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidSignal: \"INVALID_SIGNAL\";",
+              "signature": "readonly invalidSignal: 'INVALID_SIGNAL';",
               "description": "A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal.",
               "parameterDetails": [],
-              "returns": "\"INVALID_SIGNAL\""
+              "returns": "'INVALID_SIGNAL'"
             },
             {
               "name": "aborted",
               "kind": "property",
               "optional": false,
-              "signature": "readonly aborted: \"ABORTED\";",
+              "signature": "readonly aborted: 'ABORTED';",
               "description": "A canonical channel was subscribed with an already-aborted signal under strict admission.",
               "parameterDetails": [],
-              "returns": "\"ABORTED\""
+              "returns": "'ABORTED'"
             },
             {
               "name": "invalidSubscriber",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidSubscriber: \"INVALID_SUBSCRIBER\";",
+              "signature": "readonly invalidSubscriber: 'INVALID_SUBSCRIBER';",
               "description": "An object subscriber lacks handle(); caller must implement the typing contract.",
               "parameterDetails": [],
-              "returns": "\"INVALID_SUBSCRIBER\""
+              "returns": "'INVALID_SUBSCRIBER'"
             },
             {
               "name": "invalidEventKey",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidEventKey: \"INVALID_EVENT_KEY\";",
+              "signature": "readonly invalidEventKey: 'INVALID_EVENT_KEY';",
               "description": "A hub key is not string, number, or symbol; caller must use a valid property key.",
               "parameterDetails": [],
-              "returns": "\"INVALID_EVENT_KEY\""
+              "returns": "'INVALID_EVENT_KEY'"
             },
             {
               "name": "taskNotFound",
               "kind": "property",
               "optional": false,
-              "signature": "readonly taskNotFound: \"TASK_NOT_FOUND\";",
+              "signature": "readonly taskNotFound: 'TASK_NOT_FOUND';",
               "description": "Strict task publish found no registration; caller must fix the taskId or registration lifetime.",
               "parameterDetails": [],
-              "returns": "\"TASK_NOT_FOUND\""
+              "returns": "'TASK_NOT_FOUND'"
             },
             {
               "name": "taskNotUnique",
               "kind": "property",
               "optional": false,
-              "signature": "readonly taskNotUnique: \"TASK_NOT_UNIQUE\";",
+              "signature": "readonly taskNotUnique: 'TASK_NOT_UNIQUE';",
               "description": "Strict task publish found multiple registrations; caller must make the taskId unique.",
               "parameterDetails": [],
-              "returns": "\"TASK_NOT_UNIQUE\""
+              "returns": "'TASK_NOT_UNIQUE'"
             },
             {
               "name": "invalidTaskId",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidTaskId: \"INVALID_TASK_ID\";",
+              "signature": "readonly invalidTaskId: 'INVALID_TASK_ID';",
               "description": "A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed.",
               "parameterDetails": [],
-              "returns": "\"INVALID_TASK_ID\""
+              "returns": "'INVALID_TASK_ID'"
             },
             {
               "name": "invalidOptions",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOptions: \"INVALID_OPTIONS\";",
+              "signature": "readonly invalidOptions: 'INVALID_OPTIONS';",
               "description": "A public options object or field is malformed; caller must correct the option shape.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTIONS\""
+              "returns": "'INVALID_OPTIONS'"
             },
             {
               "name": "publishFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly publishFailed: \"PUBLISH_FAILED\";",
+              "signature": "readonly publishFailed: 'PUBLISH_FAILED';",
               "description": "A listener failed or the publish budget left snapshot/queued targets undelivered.",
               "parameterDetails": [],
-              "returns": "\"PUBLISH_FAILED\""
+              "returns": "'PUBLISH_FAILED'"
             },
             {
               "name": "visitorFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly visitorFailed: \"VISITOR_FAILED\";",
+              "signature": "readonly visitorFailed: 'VISITOR_FAILED';",
               "description": "A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary.",
               "parameterDetails": [],
-              "returns": "\"VISITOR_FAILED\""
+              "returns": "'VISITOR_FAILED'"
             },
             {
               "name": "valueProjectionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\";",
+              "signature": "readonly valueProjectionFailed: 'VALUE_PROJECTION_FAILED';",
               "description": "A configured value path was missing, blocked, or threw while delivering an event.",
               "parameterDetails": [],
-              "returns": "\"VALUE_PROJECTION_FAILED\""
+              "returns": "'VALUE_PROJECTION_FAILED'"
             },
             {
               "name": "unhandledListenerFailure",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\";",
+              "signature": "readonly unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE';",
               "description": "A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent.",
               "parameterDetails": [],
-              "returns": "\"UNHANDLED_LISTENER_FAILURE\""
+              "returns": "'UNHANDLED_LISTENER_FAILURE'"
             },
             {
               "name": "subscriptionClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\";",
+              "signature": "readonly subscriptionClosed: 'SUBSCRIPTION_CLOSED';",
               "description": "A callable subscription chain was closed; caller must retain a live handle.",
               "parameterDetails": [],
-              "returns": "\"SUBSCRIPTION_CLOSED\""
+              "returns": "'SUBSCRIPTION_CLOSED'"
             },
             {
               "name": "subscriptionHandleProjectionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\";",
+              "signature": "readonly subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED';",
               "description": "Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause.",
               "parameterDetails": [],
-              "returns": "\"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\""
+              "returns": "'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'"
             },
             {
               "name": "invocationClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invocationClosed: \"INVOCATION_CLOSED\";",
+              "signature": "readonly invocationClosed: 'INVOCATION_CLOSED';",
               "description": "A captured invocation was called after completion or more than once.",
               "parameterDetails": [],
-              "returns": "\"INVOCATION_CLOSED\""
+              "returns": "'INVOCATION_CLOSED'"
             },
             {
               "name": "subscriptionDisposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly subscriptionDisposeFailed: \"SUBSCRIPTION_DISPOSE_FAILED\";",
+              "signature": "readonly subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED';",
               "description": "Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged.",
               "parameterDetails": [],
-              "returns": "\"SUBSCRIPTION_DISPOSE_FAILED\""
+              "returns": "'SUBSCRIPTION_DISPOSE_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "EventSubscriberErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: \"VISITOR_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: \"SUBSCRIPTION_DISPOSE_FAILED\"; };"
+            "export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: 'INVALID_LISTENER'; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: 'INVALID_REPORTER'; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: 'INVALID_CHANNEL'; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: 'INVALID_SIGNAL'; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: 'ABORTED'; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: 'INVALID_SUBSCRIBER'; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: 'INVALID_EVENT_KEY'; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: 'TASK_NOT_FOUND'; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: 'TASK_NOT_UNIQUE'; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: 'INVALID_TASK_ID'; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: 'PUBLISH_FAILED'; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: 'VISITOR_FAILED'; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: 'VALUE_PROJECTION_FAILED'; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE'; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: 'SUBSCRIPTION_CLOSED'; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: 'INVOCATION_CLOSED'; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3036,7 +3036,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/error-code.d.ts:EventSubscriberErrorCode:export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: \"VISITOR_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: \"SUBSCRIPTION_DISPOSE_FAILED\"; };",
+          "identity": "packages/event-subscriber/dist/error-code.d.ts:EventSubscriberErrorCode:export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: 'INVALID_LISTENER'; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: 'INVALID_REPORTER'; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: 'INVALID_CHANNEL'; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: 'INVALID_SIGNAL'; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: 'ABORTED'; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: 'INVALID_SUBSCRIBER'; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: 'INVALID_EVENT_KEY'; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: 'TASK_NOT_FOUND'; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: 'TASK_NOT_UNIQUE'; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: 'INVALID_TASK_ID'; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: 'PUBLISH_FAILED'; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: 'VISITOR_FAILED'; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: 'VALUE_PROJECTION_FAILED'; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE'; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: 'SUBSCRIPTION_CLOSED'; /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the package rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: 'INVOCATION_CLOSED'; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED'; };",
           "guidance": [
             {
               "id": "错误码",
@@ -3195,7 +3195,7 @@
         {
           "name": "EventSubscriberState",
           "kind": "const",
-          "signature": "export declare const EventSubscriberState: { readonly abort: \"abort\"; readonly fulfilled: \"fulfilled\"; readonly rejected: \"rejected\"; };",
+          "signature": "export declare const EventSubscriberState: { readonly abort: 'abort'; readonly fulfilled: 'fulfilled'; readonly rejected: 'rejected'; };",
           "declarationLine": 2,
           "source": "packages/event-subscriber/dist/state-constants.d.ts",
           "purpose": "Protocol strings: `fulfilled` and `rejected` in `IListenerResult.status`, and `abort` as the signal event name. Registration `aborted` is a boolean. Compare against these constants instead of literal strings.",
@@ -3217,35 +3217,35 @@
               "name": "abort",
               "kind": "property",
               "optional": false,
-              "signature": "readonly abort: \"abort\";",
+              "signature": "readonly abort: 'abort';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"abort\""
+              "returns": "'abort'"
             },
             {
               "name": "fulfilled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fulfilled: \"fulfilled\";",
+              "signature": "readonly fulfilled: 'fulfilled';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"fulfilled\""
+              "returns": "'fulfilled'"
             },
             {
               "name": "rejected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly rejected: \"rejected\";",
+              "signature": "readonly rejected: 'rejected';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"rejected\""
+              "returns": "'rejected'"
             }
           ],
           "composes": [],
           "aliasOf": "EventSubscriberState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EventSubscriberState: { readonly abort: \"abort\"; readonly fulfilled: \"fulfilled\"; readonly rejected: \"rejected\"; };"
+            "export declare const EventSubscriberState: { readonly abort: 'abort'; readonly fulfilled: 'fulfilled'; readonly rejected: 'rejected'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3284,7 +3284,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventSubscriberState:export declare const EventSubscriberState: { readonly abort: \"abort\"; readonly fulfilled: \"fulfilled\"; readonly rejected: \"rejected\"; };",
+          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventSubscriberState:export declare const EventSubscriberState: { readonly abort: 'abort'; readonly fulfilled: 'fulfilled'; readonly rejected: 'rejected'; };",
           "guidance": [
             {
               "id": "常量与错误",

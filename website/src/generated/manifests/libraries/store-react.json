@@ -4654,7 +4654,7 @@
         {
           "name": "StoreProviderState",
           "kind": "const",
-          "signature": "export declare const StoreProviderState: { readonly pending: \"pending\"; readonly ready: \"ready\"; readonly error: \"error\"; };",
+          "signature": "export declare const StoreProviderState: { readonly pending: 'pending'; readonly ready: 'ready'; readonly error: 'error'; };",
           "declarationLine": 2,
           "source": "packages/store-react/dist/provider-state-constants.d.ts",
           "purpose": "Readiness state vocabulary selecting pending fallback, fulfilled subtree or render-time error propagation.",
@@ -4675,35 +4675,35 @@
               "name": "pending",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pending: \"pending\";",
+              "signature": "readonly pending: 'pending';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"pending\""
+              "returns": "'pending'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreProviderState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreProviderState: { readonly pending: \"pending\"; readonly ready: \"ready\"; readonly error: \"error\"; };"
+            "export declare const StoreProviderState: { readonly pending: 'pending'; readonly ready: 'ready'; readonly error: 'error'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4742,7 +4742,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/provider-state-constants.d.ts:StoreProviderState:export declare const StoreProviderState: { readonly pending: \"pending\"; readonly ready: \"ready\"; readonly error: \"error\"; };",
+          "identity": "packages/store-react/dist/provider-state-constants.d.ts:StoreProviderState:export declare const StoreProviderState: { readonly pending: 'pending'; readonly ready: 'ready'; readonly error: 'error'; };",
           "guidance": [
             {
               "id": "config-feature-flag",
@@ -4802,7 +4802,7 @@
         {
           "name": "StoreReactErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\"; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: \"PROVIDER_REQUIRED\"; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: \"FEATURE_DISABLED\"; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: \"STORE_MISSING\"; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: \"STORE_DUPLICATE\"; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: \"READY_REJECTED\"; };",
+          "signature": "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: 'READY_REJECTED'; };",
           "declarationLine": 11,
           "source": "packages/store-react/dist/error-code.d.ts",
           "purpose": "Stable codes for Registry admission/disposal, Provider requirements, feature gates and readiness failures.",
@@ -4819,89 +4819,89 @@
               "name": "registryDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly registryDisposed: \"REGISTRY_DISPOSED\";",
+              "signature": "readonly registryDisposed: 'REGISTRY_DISPOSED';",
               "description": "A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance.",
               "parameterDetails": [],
-              "returns": "\"REGISTRY_DISPOSED\""
+              "returns": "'REGISTRY_DISPOSED'"
             },
             {
               "name": "registryDisposalFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\";",
+              "signature": "readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED';",
               "description": "An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign package identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks.",
               "parameterDetails": [],
-              "returns": "\"REGISTRY_DISPOSAL_FAILED\""
+              "returns": "'REGISTRY_DISPOSAL_FAILED'"
             },
             {
               "name": "providerRequired",
               "kind": "property",
               "optional": false,
-              "signature": "readonly providerRequired: \"PROVIDER_REQUIRED\";",
+              "signature": "readonly providerRequired: 'PROVIDER_REQUIRED';",
               "description": "A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider.",
               "parameterDetails": [],
-              "returns": "\"PROVIDER_REQUIRED\""
+              "returns": "'PROVIDER_REQUIRED'"
             },
             {
               "name": "featureDisabled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly featureDisabled: \"FEATURE_DISABLED\";",
+              "signature": "readonly featureDisabled: 'FEATURE_DISABLED';",
               "description": "An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration.",
               "parameterDetails": [],
-              "returns": "\"FEATURE_DISABLED\""
+              "returns": "'FEATURE_DISABLED'"
             },
             {
               "name": "storeMissing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storeMissing: \"STORE_MISSING\";",
+              "signature": "readonly storeMissing: 'STORE_MISSING';",
               "description": "The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token.",
               "parameterDetails": [],
-              "returns": "\"STORE_MISSING\""
+              "returns": "'STORE_MISSING'"
             },
             {
               "name": "storeDuplicate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly storeDuplicate: \"STORE_DUPLICATE\";",
+              "signature": "readonly storeDuplicate: 'STORE_DUPLICATE';",
               "description": "The same token is registered twice. * * Remove duplicate registration or give each provider its own registry.",
               "parameterDetails": [],
-              "returns": "\"STORE_DUPLICATE\""
+              "returns": "'STORE_DUPLICATE'"
             },
             {
               "name": "crossRuntime",
               "kind": "property",
               "optional": false,
-              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "signature": "readonly crossRuntime: 'CROSS_RUNTIME';",
               "description": "A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected.",
               "parameterDetails": [],
-              "returns": "\"CROSS_RUNTIME\""
+              "returns": "'CROSS_RUNTIME'"
             },
             {
               "name": "invalidConfig",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidConfig: \"INVALID_CONFIG\";",
+              "signature": "readonly invalidConfig: 'INVALID_CONFIG';",
               "description": "Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error.",
               "parameterDetails": [],
-              "returns": "\"INVALID_CONFIG\""
+              "returns": "'INVALID_CONFIG'"
             },
             {
               "name": "readyRejected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly readyRejected: \"READY_REJECTED\";",
+              "signature": "readonly readyRejected: 'READY_REJECTED';",
               "description": "The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure.",
               "parameterDetails": [],
-              "returns": "\"READY_REJECTED\""
+              "returns": "'READY_REJECTED'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreReactErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\"; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: \"PROVIDER_REQUIRED\"; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: \"FEATURE_DISABLED\"; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: \"STORE_MISSING\"; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: \"STORE_DUPLICATE\"; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: \"READY_REJECTED\"; };"
+            "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: 'READY_REJECTED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4940,7 +4940,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/error-code.d.ts:StoreReactErrorCode:export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign package identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\"; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: \"PROVIDER_REQUIRED\"; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: \"FEATURE_DISABLED\"; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: \"STORE_MISSING\"; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: \"STORE_DUPLICATE\"; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: \"READY_REJECTED\"; };",
+          "identity": "packages/store-react/dist/error-code.d.ts:StoreReactErrorCode:export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign package identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: 'READY_REJECTED'; };",
           "guidance": [
             {
               "id": "5-错误处理完整参考",

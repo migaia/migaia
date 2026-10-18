@@ -2993,7 +2993,7 @@
         {
           "name": "DisposeTransactionKind",
           "kind": "const",
-          "signature": "export declare const DisposeTransactionKind: { readonly order: \"order\"; readonly plan: \"plan\"; };",
+          "signature": "export declare const DisposeTransactionKind: { readonly order: 'order'; readonly plan: 'plan'; };",
           "declarationLine": 22,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "Names the two release-order contracts: stable priority ordering or an authoritative caller plan. A transaction selects one mode at construction and does not combine priority and plan ordering.",
@@ -3012,26 +3012,26 @@
               "name": "order",
               "kind": "property",
               "optional": false,
-              "signature": "readonly order: \"order\";",
+              "signature": "readonly order: 'order';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"order\""
+              "returns": "'order'"
             },
             {
               "name": "plan",
               "kind": "property",
               "optional": false,
-              "signature": "readonly plan: \"plan\";",
+              "signature": "readonly plan: 'plan';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"plan\""
+              "returns": "'plan'"
             }
           ],
           "composes": [],
           "aliasOf": "DisposeTransactionKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const DisposeTransactionKind: { readonly order: \"order\"; readonly plan: \"plan\"; };"
+            "export declare const DisposeTransactionKind: { readonly order: 'order'; readonly plan: 'plan'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3070,7 +3070,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/state-constants.d.ts:DisposeTransactionKind:export declare const DisposeTransactionKind: { readonly order: \"order\"; readonly plan: \"plan\"; };",
+          "identity": "packages/lifecycle/dist/state-constants.d.ts:DisposeTransactionKind:export declare const DisposeTransactionKind: { readonly order: 'order'; readonly plan: 'plan'; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -5481,7 +5481,7 @@
         {
           "name": "LifecycleErrorCode",
           "kind": "const",
-          "signature": "export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: \"DELAY_FAILED\"; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: 'DELAY_FAILED'; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: 'SCOPE_CLOSED'; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: 'SCOPE_TERMINAL'; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: 'SCOPE_REENTRANT_DISPOSE'; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: 'SCOPE_REENTRANT_OWN'; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: 'SCOPE_SYNC_VIOLATION'; /** * Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: 'UNIT_START_FAILED'; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: 'GENERATION_SUPERSEDED'; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED'; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: 'GENERATION_DISPOSED'; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: 'GENERATION_TIMED_OUT'; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: 'QUIESCENCE_SEALED'; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: 'QUIESCENCE_UNSEALED_WAIT'; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: 'PROVISIONAL_SETTLED'; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: 'PROVISIONAL_PARENT_CLOSED'; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: 'QUEUE_ADMISSION_TIMEOUT'; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: 'QUEUE_SELF_DEPENDENCY'; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: 'RELEASE_FORCE_FAILED'; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 7,
           "source": "packages/lifecycle/dist/error-code.d.ts",
           "purpose": "Stable semantic error-code table for lifecycle boundaries, diagnostics and cancellation reasons. Compare source first, then inspect the selected code and the retained original cause or aggregate errors.",
@@ -5502,206 +5502,206 @@
               "name": "delayFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly delayFailed: \"DELAY_FAILED\";",
+              "signature": "readonly delayFailed: 'DELAY_FAILED';",
               "description": "An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code.",
               "parameterDetails": [],
-              "returns": "\"DELAY_FAILED\""
+              "returns": "'DELAY_FAILED'"
             },
             {
               "name": "scopeClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeClosed: \"SCOPE_CLOSED\";",
+              "signature": "readonly scopeClosed: 'SCOPE_CLOSED';",
               "description": "Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_CLOSED\""
+              "returns": "'SCOPE_CLOSED'"
             },
             {
               "name": "scopeTerminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeTerminal: \"SCOPE_TERMINAL\";",
+              "signature": "readonly scopeTerminal: 'SCOPE_TERMINAL';",
               "description": "Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_TERMINAL\""
+              "returns": "'SCOPE_TERMINAL'"
             },
             {
               "name": "scopeReentrantDispose",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\";",
+              "signature": "readonly scopeReentrantDispose: 'SCOPE_REENTRANT_DISPOSE';",
               "description": "Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_REENTRANT_DISPOSE\""
+              "returns": "'SCOPE_REENTRANT_DISPOSE'"
             },
             {
               "name": "scopeReentrantOwn",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\";",
+              "signature": "readonly scopeReentrantOwn: 'SCOPE_REENTRANT_OWN';",
               "description": "Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_REENTRANT_OWN\""
+              "returns": "'SCOPE_REENTRANT_OWN'"
             },
             {
               "name": "scopeSyncViolation",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\";",
+              "signature": "readonly scopeSyncViolation: 'SCOPE_SYNC_VIOLATION';",
               "description": "Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_SYNC_VIOLATION\""
+              "returns": "'SCOPE_SYNC_VIOLATION'"
             },
             {
               "name": "scopeDisposalFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\";",
+              "signature": "readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED';",
               "description": "Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_DISPOSAL_FAILED\""
+              "returns": "'SCOPE_DISPOSAL_FAILED'"
             },
             {
               "name": "unitStartFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unitStartFailed: \"UNIT_START_FAILED\";",
+              "signature": "readonly unitStartFailed: 'UNIT_START_FAILED';",
               "description": "Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions.",
               "parameterDetails": [],
-              "returns": "\"UNIT_START_FAILED\""
+              "returns": "'UNIT_START_FAILED'"
             },
             {
               "name": "generationSuperseded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationSuperseded: \"GENERATION_SUPERSEDED\";",
+              "signature": "readonly generationSuperseded: 'GENERATION_SUPERSEDED';",
               "description": "Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack.",
               "parameterDetails": [],
-              "returns": "\"GENERATION_SUPERSEDED\""
+              "returns": "'GENERATION_SUPERSEDED'"
             },
             {
               "name": "generationCancellationFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\";",
+              "signature": "readonly generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED';",
               "description": "Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation.",
               "parameterDetails": [],
-              "returns": "\"GENERATION_CANCELLATION_FAILED\""
+              "returns": "'GENERATION_CANCELLATION_FAILED'"
             },
             {
               "name": "generationDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationDisposed: \"GENERATION_DISPOSED\";",
+              "signature": "readonly generationDisposed: 'GENERATION_DISPOSED';",
               "description": "Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried.",
               "parameterDetails": [],
-              "returns": "\"GENERATION_DISPOSED\""
+              "returns": "'GENERATION_DISPOSED'"
             },
             {
               "name": "generationTimedOut",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationTimedOut: \"GENERATION_TIMED_OUT\";",
+              "signature": "readonly generationTimedOut: 'GENERATION_TIMED_OUT';",
               "description": "Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal.",
               "parameterDetails": [],
-              "returns": "\"GENERATION_TIMED_OUT\""
+              "returns": "'GENERATION_TIMED_OUT'"
             },
             {
               "name": "quiescenceSealed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly quiescenceSealed: \"QUIESCENCE_SEALED\";",
+              "signature": "readonly quiescenceSealed: 'QUIESCENCE_SEALED';",
               "description": "Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path.",
               "parameterDetails": [],
-              "returns": "\"QUIESCENCE_SEALED\""
+              "returns": "'QUIESCENCE_SEALED'"
             },
             {
               "name": "quiescenceUnsealedWait",
               "kind": "property",
               "optional": false,
-              "signature": "readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\";",
+              "signature": "readonly quiescenceUnsealedWait: 'QUIESCENCE_UNSEALED_WAIT';",
               "description": "Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself.",
               "parameterDetails": [],
-              "returns": "\"QUIESCENCE_UNSEALED_WAIT\""
+              "returns": "'QUIESCENCE_UNSEALED_WAIT'"
             },
             {
               "name": "provisionalSettled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalSettled: \"PROVISIONAL_SETTLED\";",
+              "signature": "readonly provisionalSettled: 'PROVISIONAL_SETTLED';",
               "description": "Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one.",
               "parameterDetails": [],
-              "returns": "\"PROVISIONAL_SETTLED\""
+              "returns": "'PROVISIONAL_SETTLED'"
             },
             {
               "name": "provisionalParentClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\";",
+              "signature": "readonly provisionalParentClosed: 'PROVISIONAL_PARENT_CLOSED';",
               "description": "Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually.",
               "parameterDetails": [],
-              "returns": "\"PROVISIONAL_PARENT_CLOSED\""
+              "returns": "'PROVISIONAL_PARENT_CLOSED'"
             },
             {
               "name": "queueAdmissionTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\";",
+              "signature": "readonly queueAdmissionTimeout: 'QUEUE_ADMISSION_TIMEOUT';",
               "description": "Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold.",
               "parameterDetails": [],
-              "returns": "\"QUEUE_ADMISSION_TIMEOUT\""
+              "returns": "'QUEUE_ADMISSION_TIMEOUT'"
             },
             {
               "name": "queueSelfDependency",
               "kind": "property",
               "optional": false,
-              "signature": "readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\";",
+              "signature": "readonly queueSelfDependency: 'QUEUE_SELF_DEPENDENCY';",
               "description": "Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed.",
               "parameterDetails": [],
-              "returns": "\"QUEUE_SELF_DEPENDENCY\""
+              "returns": "'QUEUE_SELF_DEPENDENCY'"
             },
             {
               "name": "releaseForceFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\";",
+              "signature": "readonly releaseForceFailed: 'RELEASE_FORCE_FAILED';",
               "description": "Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry.",
               "parameterDetails": [],
-              "returns": "\"RELEASE_FORCE_FAILED\""
+              "returns": "'RELEASE_FORCE_FAILED'"
             },
             {
               "name": "deadlineExceeded",
               "kind": "property",
               "optional": false,
-              "signature": "readonly deadlineExceeded: \"DEADLINE_EXCEEDED\";",
+              "signature": "readonly deadlineExceeded: 'DEADLINE_EXCEEDED';",
               "description": "Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code.",
               "parameterDetails": [],
-              "returns": "\"DEADLINE_EXCEEDED\""
+              "returns": "'DEADLINE_EXCEEDED'"
             },
             {
               "name": "envUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envUnsupported: \"ENV_UNSUPPORTED\";",
+              "signature": "readonly envUnsupported: 'ENV_UNSUPPORTED';",
               "description": "Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it.",
               "parameterDetails": [],
-              "returns": "\"ENV_UNSUPPORTED\""
+              "returns": "'ENV_UNSUPPORTED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             }
           ],
           "composes": [],
           "aliasOf": "LifecycleErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: \"DELAY_FAILED\"; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: 'DELAY_FAILED'; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: 'SCOPE_CLOSED'; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: 'SCOPE_TERMINAL'; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: 'SCOPE_REENTRANT_DISPOSE'; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: 'SCOPE_REENTRANT_OWN'; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: 'SCOPE_SYNC_VIOLATION'; /** * Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: 'UNIT_START_FAILED'; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: 'GENERATION_SUPERSEDED'; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED'; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: 'GENERATION_DISPOSED'; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: 'GENERATION_TIMED_OUT'; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: 'QUIESCENCE_SEALED'; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: 'QUIESCENCE_UNSEALED_WAIT'; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: 'PROVISIONAL_SETTLED'; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: 'PROVISIONAL_PARENT_CLOSED'; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: 'QUEUE_ADMISSION_TIMEOUT'; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: 'QUEUE_SELF_DEPENDENCY'; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: 'RELEASE_FORCE_FAILED'; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5740,7 +5740,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/error-code.d.ts:LifecycleErrorCode:export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: \"DELAY_FAILED\"; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/lifecycle/dist/error-code.d.ts:LifecycleErrorCode:export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: 'DELAY_FAILED'; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: 'SCOPE_CLOSED'; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: 'SCOPE_TERMINAL'; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: 'SCOPE_REENTRANT_DISPOSE'; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: 'SCOPE_REENTRANT_OWN'; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: 'SCOPE_SYNC_VIOLATION'; /** * Classifies untagged release failures in every error policy and aggregates multiple failures * under the throw policy. Native single failures retain identity; primitives retain cause. * Existing foreign semantic identities remain unchanged. Inspect cause/errors for originals. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: 'UNIT_START_FAILED'; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: 'GENERATION_SUPERSEDED'; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED'; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: 'GENERATION_DISPOSED'; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: 'GENERATION_TIMED_OUT'; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: 'QUIESCENCE_SEALED'; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: 'QUIESCENCE_UNSEALED_WAIT'; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: 'PROVISIONAL_SETTLED'; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: 'PROVISIONAL_PARENT_CLOSED'; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: 'QUEUE_ADMISSION_TIMEOUT'; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: 'QUEUE_SELF_DEPENDENCY'; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: 'RELEASE_FORCE_FAILED'; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Rejects invalid scheduler/task options and failures of admitted scheduler methods (including * task cancel/unref) at the lifecycle boundary. Native failures retain identity when annotatable. * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that * overflows, or cleanup observations without the error array required by `mergeCleanupResults`. * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "错误码",
@@ -5996,7 +5996,7 @@
         {
           "name": "LifecycleErrorPolicy",
           "kind": "const",
-          "signature": "export declare const LifecycleErrorPolicy: { readonly throw: \"throw\"; readonly collect: \"collect\"; readonly report: \"report\"; readonly firstError: \"firstError\"; };",
+          "signature": "export declare const LifecycleErrorPolicy: { readonly throw: 'throw'; readonly collect: 'collect'; readonly report: 'report'; readonly firstError: 'firstError'; };",
           "declarationLine": 15,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "Names the four release-failure outcomes consumed by scopes, transactions and collectors. It changes failure delivery after attempts continue; it does not select release ordering or suppress later resource attempts.",
@@ -6015,44 +6015,44 @@
               "name": "throw",
               "kind": "property",
               "optional": false,
-              "signature": "readonly throw: \"throw\";",
+              "signature": "readonly throw: 'throw';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"throw\""
+              "returns": "'throw'"
             },
             {
               "name": "collect",
               "kind": "property",
               "optional": false,
-              "signature": "readonly collect: \"collect\";",
+              "signature": "readonly collect: 'collect';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"collect\""
+              "returns": "'collect'"
             },
             {
               "name": "report",
               "kind": "property",
               "optional": false,
-              "signature": "readonly report: \"report\";",
+              "signature": "readonly report: 'report';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"report\""
+              "returns": "'report'"
             },
             {
               "name": "firstError",
               "kind": "property",
               "optional": false,
-              "signature": "readonly firstError: \"firstError\";",
+              "signature": "readonly firstError: 'firstError';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"firstError\""
+              "returns": "'firstError'"
             }
           ],
           "composes": [],
           "aliasOf": "LifecycleErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleErrorPolicy: { readonly throw: \"throw\"; readonly collect: \"collect\"; readonly report: \"report\"; readonly firstError: \"firstError\"; };"
+            "export declare const LifecycleErrorPolicy: { readonly throw: 'throw'; readonly collect: 'collect'; readonly report: 'report'; readonly firstError: 'firstError'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6091,7 +6091,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/state-constants.d.ts:LifecycleErrorPolicy:export declare const LifecycleErrorPolicy: { readonly throw: \"throw\"; readonly collect: \"collect\"; readonly report: \"report\"; readonly firstError: \"firstError\"; };",
+          "identity": "packages/lifecycle/dist/state-constants.d.ts:LifecycleErrorPolicy:export declare const LifecycleErrorPolicy: { readonly throw: 'throw'; readonly collect: 'collect'; readonly report: 'report'; readonly firstError: 'firstError'; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -6100,7 +6100,7 @@
         {
           "name": "LifecycleErrorText",
           "kind": "const",
-          "signature": "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
+          "signature": "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: '[lifecycle] abortable delay failed'; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function'; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: '[lifecycle] provisional cleanup failed'; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: '[lifecycle] dispose transaction failed'; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer'; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed'; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array'; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline'; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out'; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: '[lifecycle] generation cancellation failed'; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: '[lifecycle] disposal ledger is sealed'; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant'; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: '[lifecycle] required host capability is unavailable'; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: '[lifecycle] abort signal is invalid'; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed'; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: '[lifecycle] scheduler.schedule must return an object with a cancel() function'; /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */ readonly schedulerAccessorFailed: '[lifecycle] scheduler accessor failed'; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided'; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions'; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: '[lifecycle] scheduler time value must be a number'; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: '[lifecycle] scheduler time value must be finite'; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative'; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite'; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later. */ readonly errorPolicyReporterMissing: '[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback'; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: '[lifecycle] superseded by a new generation'; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: '[lifecycle] generation timed out'; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: '[lifecycle] unit disposed'; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: '[lifecycle] scope closed'; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: '[lifecycle] provisional scope rolled back'; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: '[lifecycle] provisional scope committed'; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: '[lifecycle] cannot retain a sealed quiescence key'; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait'; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: '[lifecycle] provisional scope has already committed or rolled back'; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: '[lifecycle] commitTo() target is already closing or terminal'; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: '[lifecycle] start() failed'; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: '[lifecycle] unit is terminal'; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: '[lifecycle] unit is closing'; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: '[lifecycle] cannot begin a new generation on a disposed GenerationController'; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: '[lifecycle] generation superseded before its result could be adopted'; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: '[lifecycle] shared deadline already passed before this graceful phase could start'; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: '[lifecycle] force() failed'; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits'; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: '[lifecycle] scope is terminal'; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: '[lifecycle] scope is closing'; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: '[lifecycle] cannot call own() from within this scope’s own dispose()'; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance'; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: '[lifecycle] sync lifecycle scope disposal failed'; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed'; };",
           "declarationLine": 2,
           "source": "packages/lifecycle/dist/error-text.d.ts",
           "purpose": "Stable public diagnostic messages used when lifecycle constructs or wraps errors. Keys explain scenarios rather than remediation policy; branch on source and code instead of matching these strings.",
@@ -6121,449 +6121,449 @@
               "name": "delayFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly delayFailed: \"[lifecycle] abortable delay failed\";",
+              "signature": "readonly delayFailed: '[lifecycle] abortable delay failed';",
               "description": "Fallback for a delay admission or cleanup failure that cannot retain native Error identity.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] abortable delay failed\""
+              "returns": "'[lifecycle] abortable delay failed'"
             },
             {
               "name": "waitCleanupReporterInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\";",
+              "signature": "readonly waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function';",
               "description": "Rejects a malformed optional wait-cleanup channel before any resource admission.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] wait cleanup reporter must be a function\""
+              "returns": "'[lifecycle] wait cleanup reporter must be a function'"
             },
             {
               "name": "provisionalCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\";",
+              "signature": "readonly provisionalCleanupFailed: '[lifecycle] provisional cleanup failed';",
               "description": "Fallback message for a provisional registration/cleanup wrapper around a non-Error throw.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] provisional cleanup failed\""
+              "returns": "'[lifecycle] provisional cleanup failed'"
             },
             {
               "name": "disposeTransactionFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\";",
+              "signature": "readonly disposeTransactionFailed: '[lifecycle] dispose transaction failed';",
               "description": "Stable finalization message for transaction-level failures.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] dispose transaction failed\""
+              "returns": "'[lifecycle] dispose transaction failed'"
             },
             {
               "name": "scopeReentrantDispose",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\";",
+              "signature": "readonly scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer';",
               "description": "Explains that a disposer attempted to join the scope disposal that is waiting for it.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] cannot join the same scope disposal from its disposer\""
+              "returns": "'[lifecycle] cannot join the same scope disposal from its disposer'"
             },
             {
               "name": "disposeDescriptorInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\";",
+              "signature": "readonly disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed';",
               "description": "Stable message for a descriptor that cannot be admitted into a release transaction.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] release descriptor admission failed\""
+              "returns": "'[lifecycle] release descriptor admission failed'"
             },
             {
               "name": "cleanupResultInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\";",
+              "signature": "readonly cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array';",
               "description": "Shared cleanup observation admission requires the error array used by the merge helper.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] cleanup result must provide a cleanupErrors array\""
+              "returns": "'[lifecycle] cleanup result must provide a cleanupErrors array'"
             },
             {
               "name": "syncGracefulOverBudget",
               "kind": "property",
               "optional": false,
-              "signature": "readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\";",
+              "signature": "readonly syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline';",
               "description": "Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] synchronous graceful completed after its deadline\""
+              "returns": "'[lifecycle] synchronous graceful completed after its deadline'"
             },
             {
               "name": "mutationAdmissionTimedOut",
               "kind": "property",
               "optional": false,
-              "signature": "readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\";",
+              "signature": "readonly mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out';",
               "description": "Fallback message for a queue timeout wrapper around a non-Error primary.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] mutation admission timed out\""
+              "returns": "'[lifecycle] mutation admission timed out'"
             },
             {
               "name": "generationCancellationFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\";",
+              "signature": "readonly generationCancellationFailed: '[lifecycle] generation cancellation failed';",
               "description": "Stable diagnostic for failed generation cancellation or complete timer/parent cleanup.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] generation cancellation failed\""
+              "returns": "'[lifecycle] generation cancellation failed'"
             },
             {
               "name": "disposalLedgerClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\";",
+              "signature": "readonly disposalLedgerClosed: '[lifecycle] disposal ledger is sealed';",
               "description": "Explains that a disposal ledger no longer accepts new item callbacks.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] disposal ledger is sealed\""
+              "returns": "'[lifecycle] disposal ledger is sealed'"
             },
             {
               "name": "disposalLedgerReentrant",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\";",
+              "signature": "readonly disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant';",
               "description": "Explains that a disposal ledger operation re-entered its active item boundary.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] disposal ledger operation is reentrant\""
+              "returns": "'[lifecycle] disposal ledger operation is reentrant'"
             },
             {
               "name": "envUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly envUnsupported: \"[lifecycle] required host capability is unavailable\";",
+              "signature": "readonly envUnsupported: '[lifecycle] required host capability is unavailable';",
               "description": "Explains that the host lacks a usable native AbortController capability.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] required host capability is unavailable\""
+              "returns": "'[lifecycle] required host capability is unavailable'"
             },
             {
               "name": "abortSignalInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\";",
+              "signature": "readonly abortSignalInvalid: '[lifecycle] abort signal is invalid';",
               "description": "Explains that an observed cancellation source lacks its required listener methods.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] abort signal is invalid\""
+              "returns": "'[lifecycle] abort signal is invalid'"
             },
             {
               "name": "schedulerTaskCancelGetterFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\";",
+              "signature": "readonly schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed';",
               "description": "Explains that a scheduled task's cancel accessor threw during admission.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler task cancel getter failed\""
+              "returns": "'[lifecycle] scheduler task cancel getter failed'"
             },
             {
               "name": "schedulerTaskInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\";",
+              "signature": "readonly schedulerTaskInvalid: '[lifecycle] scheduler.schedule must return an object with a cancel() function';",
               "description": "Explains that a scheduler returned a task without the required cancel function.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler.schedule must return an object with a cancel() function\""
+              "returns": "'[lifecycle] scheduler.schedule must return an object with a cancel() function'"
             },
             {
               "name": "schedulerAccessorFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\";",
+              "signature": "readonly schedulerAccessorFailed: '[lifecycle] scheduler accessor failed';",
               "description": "Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler accessor failed\""
+              "returns": "'[lifecycle] scheduler accessor failed'"
             },
             {
               "name": "schedulerDeferInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\";",
+              "signature": "readonly schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided';",
               "description": "Optional deferred registration must be callable before a scheduler owns any work.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler.defer must be a function when provided\""
+              "returns": "'[lifecycle] scheduler.defer must be a function when provided'"
             },
             {
               "name": "schedulerInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\";",
+              "signature": "readonly schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions';",
               "description": "Explains that an injected value is not a valid lifecycle scheduler.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler must provide now() and schedule() functions\""
+              "returns": "'[lifecycle] scheduler must provide now() and schedule() functions'"
             },
             {
               "name": "schedulerNumberType",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\";",
+              "signature": "readonly schedulerNumberType: '[lifecycle] scheduler time value must be a number';",
               "description": "Stable message for scheduler values whose runtime type is not numeric.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler time value must be a number\""
+              "returns": "'[lifecycle] scheduler time value must be a number'"
             },
             {
               "name": "schedulerNumberRange",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\";",
+              "signature": "readonly schedulerNumberRange: '[lifecycle] scheduler time value must be finite';",
               "description": "Stable message for scheduler values outside the finite numeric domain.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler time value must be finite\""
+              "returns": "'[lifecycle] scheduler time value must be finite'"
             },
             {
               "name": "schedulerDelayRange",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\";",
+              "signature": "readonly schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative';",
               "description": "Stable message for scheduler delays that are finite but negative.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler delay must be non-negative\""
+              "returns": "'[lifecycle] scheduler delay must be non-negative'"
             },
             {
               "name": "schedulerTimeOverflow",
               "kind": "property",
               "optional": false,
-              "signature": "readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\";",
+              "signature": "readonly schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite';",
               "description": "Stable message for scheduler arithmetic whose finite operands produce an infinite target.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scheduler time arithmetic must remain finite\""
+              "returns": "'[lifecycle] scheduler time arithmetic must remain finite'"
             },
             {
               "name": "errorPolicyReporterMissing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\";",
+              "signature": "readonly errorPolicyReporterMissing: '[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback';",
               "description": "Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\""
+              "returns": "'[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback'"
             },
             {
               "name": "generationSupersededReason",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\";",
+              "signature": "readonly generationSupersededReason: '[lifecycle] superseded by a new generation';",
               "description": "`signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] superseded by a new generation\""
+              "returns": "'[lifecycle] superseded by a new generation'"
             },
             {
               "name": "generationTimedOutReason",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationTimedOutReason: \"[lifecycle] generation timed out\";",
+              "signature": "readonly generationTimedOutReason: '[lifecycle] generation timed out';",
               "description": "`signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] generation timed out\""
+              "returns": "'[lifecycle] generation timed out'"
             },
             {
               "name": "unitDisposedReason",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unitDisposedReason: \"[lifecycle] unit disposed\";",
+              "signature": "readonly unitDisposedReason: '[lifecycle] unit disposed';",
               "description": "`signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] unit disposed\""
+              "returns": "'[lifecycle] unit disposed'"
             },
             {
               "name": "scopeClosedReason",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeClosedReason: \"[lifecycle] scope closed\";",
+              "signature": "readonly scopeClosedReason: '[lifecycle] scope closed';",
               "description": "`signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scope closed\""
+              "returns": "'[lifecycle] scope closed'"
             },
             {
               "name": "provisionalRolledBackReason",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\";",
+              "signature": "readonly provisionalRolledBackReason: '[lifecycle] provisional scope rolled back';",
               "description": "`signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] provisional scope rolled back\""
+              "returns": "'[lifecycle] provisional scope rolled back'"
             },
             {
               "name": "provisionalCommittedReason",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\";",
+              "signature": "readonly provisionalCommittedReason: '[lifecycle] provisional scope committed';",
               "description": "`signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] provisional scope committed\""
+              "returns": "'[lifecycle] provisional scope committed'"
             },
             {
               "name": "quiescenceSealed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\";",
+              "signature": "readonly quiescenceSealed: '[lifecycle] cannot retain a sealed quiescence key';",
               "description": "Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] cannot retain a sealed quiescence key\""
+              "returns": "'[lifecycle] cannot retain a sealed quiescence key'"
             },
             {
               "name": "quiescenceUnsealedWait",
               "kind": "property",
               "optional": false,
-              "signature": "readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\";",
+              "signature": "readonly quiescenceUnsealedWait: '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait';",
               "description": "Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\""
+              "returns": "'[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait'"
             },
             {
               "name": "provisionalSettled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\";",
+              "signature": "readonly provisionalSettled: '[lifecycle] provisional scope has already committed or rolled back';",
               "description": "Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] provisional scope has already committed or rolled back\""
+              "returns": "'[lifecycle] provisional scope has already committed or rolled back'"
             },
             {
               "name": "provisionalParentClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\";",
+              "signature": "readonly provisionalParentClosed: '[lifecycle] commitTo() target is already closing or terminal';",
               "description": "Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] commitTo() target is already closing or terminal\""
+              "returns": "'[lifecycle] commitTo() target is already closing or terminal'"
             },
             {
               "name": "unitStartFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unitStartFailed: \"[lifecycle] start() failed\";",
+              "signature": "readonly unitStartFailed: '[lifecycle] start() failed';",
               "description": "Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] start() failed\""
+              "returns": "'[lifecycle] start() failed'"
             },
             {
               "name": "unitTerminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unitTerminal: \"[lifecycle] unit is terminal\";",
+              "signature": "readonly unitTerminal: '[lifecycle] unit is terminal';",
               "description": "Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] unit is terminal\""
+              "returns": "'[lifecycle] unit is terminal'"
             },
             {
               "name": "unitClosing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unitClosing: \"[lifecycle] unit is closing\";",
+              "signature": "readonly unitClosing: '[lifecycle] unit is closing';",
               "description": "Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] unit is closing\""
+              "returns": "'[lifecycle] unit is closing'"
             },
             {
               "name": "generationDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\";",
+              "signature": "readonly generationDisposed: '[lifecycle] cannot begin a new generation on a disposed GenerationController';",
               "description": "Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] cannot begin a new generation on a disposed GenerationController\""
+              "returns": "'[lifecycle] cannot begin a new generation on a disposed GenerationController'"
             },
             {
               "name": "generationSupersededBeforeAdopt",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\";",
+              "signature": "readonly generationSupersededBeforeAdopt: '[lifecycle] generation superseded before its result could be adopted';",
               "description": "Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] generation superseded before its result could be adopted\""
+              "returns": "'[lifecycle] generation superseded before its result could be adopted'"
             },
             {
               "name": "sharedDeadlinePassed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\";",
+              "signature": "readonly sharedDeadlinePassed: '[lifecycle] shared deadline already passed before this graceful phase could start';",
               "description": "Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] shared deadline already passed before this graceful phase could start\""
+              "returns": "'[lifecycle] shared deadline already passed before this graceful phase could start'"
             },
             {
               "name": "releaseForceFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly releaseForceFailed: \"[lifecycle] force() failed\";",
+              "signature": "readonly releaseForceFailed: '[lifecycle] force() failed';",
               "description": "Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] force() failed\""
+              "returns": "'[lifecycle] force() failed'"
             },
             {
               "name": "syncCallbackReturnedThenable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\";",
+              "signature": "readonly syncCallbackReturnedThenable: '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits';",
               "description": "Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\""
+              "returns": "'[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits'"
             },
             {
               "name": "scopeTerminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeTerminal: \"[lifecycle] scope is terminal\";",
+              "signature": "readonly scopeTerminal: '[lifecycle] scope is terminal';",
               "description": "Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scope is terminal\""
+              "returns": "'[lifecycle] scope is terminal'"
             },
             {
               "name": "scopeClosing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeClosing: \"[lifecycle] scope is closing\";",
+              "signature": "readonly scopeClosing: '[lifecycle] scope is closing';",
               "description": "Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] scope is closing\""
+              "returns": "'[lifecycle] scope is closing'"
             },
             {
               "name": "scopeReentrantOwn",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\";",
+              "signature": "readonly scopeReentrantOwn: '[lifecycle] cannot call own() from within this scope’s own dispose()';",
               "description": "Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] cannot call own() from within this scope’s own dispose()\""
+              "returns": "'[lifecycle] cannot call own() from within this scope’s own dispose()'"
             },
             {
               "name": "syncScopeRequiresSyncSafe",
               "kind": "property",
               "optional": false,
-              "signature": "readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\";",
+              "signature": "readonly syncScopeRequiresSyncSafe: '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor';",
               "description": "Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\""
+              "returns": "'[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'"
             },
             {
               "name": "syncScopeOwnsAsyncOwner",
               "kind": "property",
               "optional": false,
-              "signature": "readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\";",
+              "signature": "readonly syncScopeOwnsAsyncOwner: '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance';",
               "description": "Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\""
+              "returns": "'[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance'"
             },
             {
               "name": "syncScopeDisposalFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\";",
+              "signature": "readonly syncScopeDisposalFailed: '[lifecycle] sync lifecycle scope disposal failed';",
               "description": "Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED).",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] sync lifecycle scope disposal failed\""
+              "returns": "'[lifecycle] sync lifecycle scope disposal failed'"
             },
             {
               "name": "generationTimeoutAccessorFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\";",
+              "signature": "readonly generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed';",
               "description": "Explains that a generation timeout option could not be read at its admission boundary.",
               "parameterDetails": [],
-              "returns": "\"[lifecycle] generation timeout option getter failed\""
+              "returns": "'[lifecycle] generation timeout option getter failed'"
             }
           ],
           "composes": [],
           "aliasOf": "LifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };"
+            "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: '[lifecycle] abortable delay failed'; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function'; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: '[lifecycle] provisional cleanup failed'; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: '[lifecycle] dispose transaction failed'; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer'; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed'; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array'; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline'; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out'; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: '[lifecycle] generation cancellation failed'; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: '[lifecycle] disposal ledger is sealed'; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant'; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: '[lifecycle] required host capability is unavailable'; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: '[lifecycle] abort signal is invalid'; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed'; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: '[lifecycle] scheduler.schedule must return an object with a cancel() function'; /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */ readonly schedulerAccessorFailed: '[lifecycle] scheduler accessor failed'; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided'; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions'; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: '[lifecycle] scheduler time value must be a number'; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: '[lifecycle] scheduler time value must be finite'; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative'; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite'; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later. */ readonly errorPolicyReporterMissing: '[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback'; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: '[lifecycle] superseded by a new generation'; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: '[lifecycle] generation timed out'; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: '[lifecycle] unit disposed'; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: '[lifecycle] scope closed'; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: '[lifecycle] provisional scope rolled back'; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: '[lifecycle] provisional scope committed'; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: '[lifecycle] cannot retain a sealed quiescence key'; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait'; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: '[lifecycle] provisional scope has already committed or rolled back'; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: '[lifecycle] commitTo() target is already closing or terminal'; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: '[lifecycle] start() failed'; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: '[lifecycle] unit is terminal'; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: '[lifecycle] unit is closing'; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: '[lifecycle] cannot begin a new generation on a disposed GenerationController'; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: '[lifecycle] generation superseded before its result could be adopted'; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: '[lifecycle] shared deadline already passed before this graceful phase could start'; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: '[lifecycle] force() failed'; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits'; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: '[lifecycle] scope is terminal'; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: '[lifecycle] scope is closing'; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: '[lifecycle] cannot call own() from within this scope’s own dispose()'; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance'; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: '[lifecycle] sync lifecycle scope disposal failed'; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6602,7 +6602,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/error-text.d.ts:LifecycleErrorText:export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
+          "identity": "packages/lifecycle/dist/error-text.d.ts:LifecycleErrorText:export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: '[lifecycle] abortable delay failed'; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function'; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: '[lifecycle] provisional cleanup failed'; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: '[lifecycle] dispose transaction failed'; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer'; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed'; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array'; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline'; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out'; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: '[lifecycle] generation cancellation failed'; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: '[lifecycle] disposal ledger is sealed'; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant'; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: '[lifecycle] required host capability is unavailable'; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: '[lifecycle] abort signal is invalid'; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed'; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: '[lifecycle] scheduler.schedule must return an object with a cancel() function'; /** Fallback when reading or invoking an admitted scheduler method fails at a lifecycle boundary. */ readonly schedulerAccessorFailed: '[lifecycle] scheduler accessor failed'; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided'; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions'; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: '[lifecycle] scheduler time value must be a number'; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: '[lifecycle] scheduler time value must be finite'; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative'; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite'; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`, * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the * failures later. */ readonly errorPolicyReporterMissing: '[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback'; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: '[lifecycle] superseded by a new generation'; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: '[lifecycle] generation timed out'; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: '[lifecycle] unit disposed'; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: '[lifecycle] scope closed'; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: '[lifecycle] provisional scope rolled back'; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: '[lifecycle] provisional scope committed'; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: '[lifecycle] cannot retain a sealed quiescence key'; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait'; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: '[lifecycle] provisional scope has already committed or rolled back'; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: '[lifecycle] commitTo() target is already closing or terminal'; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: '[lifecycle] start() failed'; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: '[lifecycle] unit is terminal'; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: '[lifecycle] unit is closing'; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: '[lifecycle] cannot begin a new generation on a disposed GenerationController'; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: '[lifecycle] generation superseded before its result could be adopted'; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: '[lifecycle] shared deadline already passed before this graceful phase could start'; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: '[lifecycle] force() failed'; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits'; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: '[lifecycle] scope is terminal'; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: '[lifecycle] scope is closing'; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: '[lifecycle] cannot call own() from within this scope’s own dispose()'; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance'; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: '[lifecycle] sync lifecycle scope disposal failed'; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed'; };",
           "guidance": [
             {
               "id": "错误基础设施模块",
@@ -6722,7 +6722,7 @@
         {
           "name": "LifecycleState",
           "kind": "const",
-          "signature": "export declare const LifecycleState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; };",
+          "signature": "export declare const LifecycleState: { readonly open: 'open'; readonly closing: 'closing'; readonly terminal: 'terminal'; };",
           "declarationLine": 2,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "Names the three irreversible resource-container survival states, independently of a unit’s loading status. Owners use these values to decide whether registration or terminal waiting remains possible.",
@@ -6741,35 +6741,35 @@
               "name": "open",
               "kind": "property",
               "optional": false,
-              "signature": "readonly open: \"open\";",
+              "signature": "readonly open: 'open';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"open\""
+              "returns": "'open'"
             },
             {
               "name": "closing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closing: \"closing\";",
+              "signature": "readonly closing: 'closing';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"closing\""
+              "returns": "'closing'"
             },
             {
               "name": "terminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly terminal: \"terminal\";",
+              "signature": "readonly terminal: 'terminal';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"terminal\""
+              "returns": "'terminal'"
             }
           ],
           "composes": [],
           "aliasOf": "LifecycleState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; };"
+            "export declare const LifecycleState: { readonly open: 'open'; readonly closing: 'closing'; readonly terminal: 'terminal'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6808,7 +6808,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/state-constants.d.ts:LifecycleState:export declare const LifecycleState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; };",
+          "identity": "packages/lifecycle/dist/state-constants.d.ts:LifecycleState:export declare const LifecycleState: { readonly open: 'open'; readonly closing: 'closing'; readonly terminal: 'terminal'; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],

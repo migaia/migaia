@@ -2551,7 +2551,7 @@
         {
           "name": "createAdapterWebByteIO",
           "kind": "function",
-          "signature": "export declare function createAdapterWebByteIO(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "signature": "export declare function createAdapterWebByteIO(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "declarationLine": 5,
           "source": "packages/rpc-process/dist/process/web-byte-stream.d.ts",
           "purpose": "Wraps a pair of Web Streams (`ReadableStream` / `WritableStream` of bytes) as a byte channel.",
@@ -2573,7 +2573,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -2582,7 +2582,7 @@
           "aliasOf": "createAdapterWebByteIO",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createAdapterWebByteIO(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterWebByteIO(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2599,7 +2599,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2636,7 +2636,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/web-byte-stream.d.ts:createAdapterWebByteIO:export declare function createAdapterWebByteIO(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/web-byte-stream.d.ts:createAdapterWebByteIO:export declare function createAdapterWebByteIO(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -12656,7 +12656,7 @@
         {
           "name": "ProcessPluginWire",
           "kind": "const",
-          "signature": "export declare const ProcessPluginWire: { readonly native: \"native\"; readonly jsonrpc: \"jsonrpc\"; };\nexport type ProcessPluginWire = (typeof ProcessPluginWire)[keyof typeof ProcessPluginWire];",
+          "signature": "export declare const ProcessPluginWire: { readonly native: 'native'; readonly jsonrpc: 'jsonrpc'; };\nexport type ProcessPluginWire = (typeof ProcessPluginWire)[keyof typeof ProcessPluginWire];",
           "declarationLine": 8,
           "source": "packages/rpc-process/dist/process/plugin/constants.d.ts",
           "purpose": "Protocols a process connection can speak: `native` (this library) or `jsonrpc` (other languages).",
@@ -12673,26 +12673,26 @@
               "name": "native",
               "kind": "property",
               "optional": false,
-              "signature": "readonly native: \"native\";",
+              "signature": "readonly native: 'native';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"native\""
+              "returns": "'native'"
             },
             {
               "name": "jsonrpc",
               "kind": "property",
               "optional": false,
-              "signature": "readonly jsonrpc: \"jsonrpc\";",
+              "signature": "readonly jsonrpc: 'jsonrpc';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"jsonrpc\""
+              "returns": "'jsonrpc'"
             }
           ],
           "composes": [],
           "aliasOf": "ProcessPluginWire",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ProcessPluginWire: { readonly native: \"native\"; readonly jsonrpc: \"jsonrpc\"; };",
+            "export declare const ProcessPluginWire: { readonly native: 'native'; readonly jsonrpc: 'jsonrpc'; };",
             "export type ProcessPluginWire = (typeof ProcessPluginWire)[keyof typeof ProcessPluginWire];"
           ],
           "overloadParameterDetails": [[], []],
@@ -12732,7 +12732,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/plugin/constants.d.ts:ProcessPluginWire:export declare const ProcessPluginWire: { readonly native: \"native\"; readonly jsonrpc: \"jsonrpc\"; };\nexport type ProcessPluginWire = (typeof ProcessPluginWire)[keyof typeof ProcessPluginWire];",
+          "identity": "packages/rpc-process/dist/process/plugin/constants.d.ts:ProcessPluginWire:export declare const ProcessPluginWire: { readonly native: 'native'; readonly jsonrpc: 'jsonrpc'; };\nexport type ProcessPluginWire = (typeof ProcessPluginWire)[keyof typeof ProcessPluginWire];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -12968,7 +12968,7 @@
         {
           "name": "RpcProcessErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcProcessErrorCode: { /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */ readonly usageSampleFailed: \"PROCESS_USAGE_SAMPLE_FAILED\"; /** Host options violate R1/R2 before launch; callers must correct the named field. */ readonly hostInvalidOption: \"PROCESS_HOST_INVALID_OPTION\"; /** Facade release has begun; callers must create a new facade instead of enqueueing work. */ readonly hostClosed: \"PROCESS_HOST_CLOSED\"; /** Handshake exceeded its scheduler deadline; caller must open a new channel. */ readonly handshakeTimeout: \"PROCESS_HANDSHAKE_TIMEOUT\"; /** Peer authorization failed; caller must not retry without valid credentials. */ readonly authRejected: \"PROCESS_CHANNEL_AUTH_REJECTED\"; /** * A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors. */ readonly channelClosed: \"PROCESS_CHANNEL_CLOSED\"; /** Dial or launch could not establish a channel; caller may inspect the original cause. */ readonly connectFailed: \"PROCESS_CHANNEL_CONNECT_FAILED\"; /** The requested local listener could not bind; caller must choose an available address. */ readonly listenFailed: \"PROCESS_CHANNEL_LISTEN_FAILED\"; /** * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field. */ readonly pluginInvalidOption: \"PROCESS_PLUGIN_INVALID_OPTION\"; /** * Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection. */ readonly resilienceInvalidOption: \"PROCESS_RESILIENCE_INVALID_OPTION\"; /** A connection, call-rate, or payload limit rejected admission before provider execution. */ readonly connectionLimit: \"PROCESS_CONNECTION_LIMIT\"; /** * A shared target is suspended after an explicit instance-health event until a ready replacement * exists. */ readonly instanceUnhealthy: \"PROCESS_INSTANCE_UNHEALTHY\"; /** * An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit. */ readonly healthPingFailed: \"PROCESS_HEALTH_PING_FAILED\"; /** A terminal registration rejects new remote calls before they reach its inactive generation. */ readonly terminalCall: \"PROCESS_TERMINAL_CALL\"; /** A liquidated registration cannot restart; the caller must create a new registration. */ readonly liquidated: \"PROCESS_LIQUIDATED\"; };",
+          "signature": "export declare const RpcProcessErrorCode: { /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */ readonly usageSampleFailed: 'PROCESS_USAGE_SAMPLE_FAILED'; /** Host options violate R1/R2 before launch; callers must correct the named field. */ readonly hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION'; /** Facade release has begun; callers must create a new facade instead of enqueueing work. */ readonly hostClosed: 'PROCESS_HOST_CLOSED'; /** Handshake exceeded its scheduler deadline; caller must open a new channel. */ readonly handshakeTimeout: 'PROCESS_HANDSHAKE_TIMEOUT'; /** Peer authorization failed; caller must not retry without valid credentials. */ readonly authRejected: 'PROCESS_CHANNEL_AUTH_REJECTED'; /** * A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors. */ readonly channelClosed: 'PROCESS_CHANNEL_CLOSED'; /** Dial or launch could not establish a channel; caller may inspect the original cause. */ readonly connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED'; /** The requested local listener could not bind; caller must choose an available address. */ readonly listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED'; /** * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field. */ readonly pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION'; /** * Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection. */ readonly resilienceInvalidOption: 'PROCESS_RESILIENCE_INVALID_OPTION'; /** A connection, call-rate, or payload limit rejected admission before provider execution. */ readonly connectionLimit: 'PROCESS_CONNECTION_LIMIT'; /** * A shared target is suspended after an explicit instance-health event until a ready replacement * exists. */ readonly instanceUnhealthy: 'PROCESS_INSTANCE_UNHEALTHY'; /** * An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit. */ readonly healthPingFailed: 'PROCESS_HEALTH_PING_FAILED'; /** A terminal registration rejects new remote calls before they reach its inactive generation. */ readonly terminalCall: 'PROCESS_TERMINAL_CALL'; /** A liquidated registration cannot restart; the caller must create a new registration. */ readonly liquidated: 'PROCESS_LIQUIDATED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-process/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
@@ -12988,143 +12988,143 @@
               "name": "usageSampleFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly usageSampleFailed: \"PROCESS_USAGE_SAMPLE_FAILED\";",
+              "signature": "readonly usageSampleFailed: 'PROCESS_USAGE_SAMPLE_FAILED';",
               "description": "D23: native PID sampling failed; report its cause and display unavailable without retrying.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_USAGE_SAMPLE_FAILED\""
+              "returns": "'PROCESS_USAGE_SAMPLE_FAILED'"
             },
             {
               "name": "hostInvalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostInvalidOption: \"PROCESS_HOST_INVALID_OPTION\";",
+              "signature": "readonly hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION';",
               "description": "Host options violate R1/R2 before launch; callers must correct the named field.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_HOST_INVALID_OPTION\""
+              "returns": "'PROCESS_HOST_INVALID_OPTION'"
             },
             {
               "name": "hostClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostClosed: \"PROCESS_HOST_CLOSED\";",
+              "signature": "readonly hostClosed: 'PROCESS_HOST_CLOSED';",
               "description": "Facade release has begun; callers must create a new facade instead of enqueueing work.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_HOST_CLOSED\""
+              "returns": "'PROCESS_HOST_CLOSED'"
             },
             {
               "name": "handshakeTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly handshakeTimeout: \"PROCESS_HANDSHAKE_TIMEOUT\";",
+              "signature": "readonly handshakeTimeout: 'PROCESS_HANDSHAKE_TIMEOUT';",
               "description": "Handshake exceeded its scheduler deadline; caller must open a new channel.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_HANDSHAKE_TIMEOUT\""
+              "returns": "'PROCESS_HANDSHAKE_TIMEOUT'"
             },
             {
               "name": "authRejected",
               "kind": "property",
               "optional": false,
-              "signature": "readonly authRejected: \"PROCESS_CHANNEL_AUTH_REJECTED\";",
+              "signature": "readonly authRejected: 'PROCESS_CHANNEL_AUTH_REJECTED';",
               "description": "Peer authorization failed; caller must not retry without valid credentials.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_CHANNEL_AUTH_REJECTED\""
+              "returns": "'PROCESS_CHANNEL_AUTH_REJECTED'"
             },
             {
               "name": "channelClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly channelClosed: \"PROCESS_CHANNEL_CLOSED\";",
+              "signature": "readonly channelClosed: 'PROCESS_CHANNEL_CLOSED';",
               "description": "A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_CHANNEL_CLOSED\""
+              "returns": "'PROCESS_CHANNEL_CLOSED'"
             },
             {
               "name": "connectFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly connectFailed: \"PROCESS_CHANNEL_CONNECT_FAILED\";",
+              "signature": "readonly connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED';",
               "description": "Dial or launch could not establish a channel; caller may inspect the original cause.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_CHANNEL_CONNECT_FAILED\""
+              "returns": "'PROCESS_CHANNEL_CONNECT_FAILED'"
             },
             {
               "name": "listenFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly listenFailed: \"PROCESS_CHANNEL_LISTEN_FAILED\";",
+              "signature": "readonly listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED';",
               "description": "The requested local listener could not bind; caller must choose an available address.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_CHANNEL_LISTEN_FAILED\""
+              "returns": "'PROCESS_CHANNEL_LISTEN_FAILED'"
             },
             {
               "name": "pluginInvalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pluginInvalidOption: \"PROCESS_PLUGIN_INVALID_OPTION\";",
+              "signature": "readonly pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION';",
               "description": "Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_PLUGIN_INVALID_OPTION\""
+              "returns": "'PROCESS_PLUGIN_INVALID_OPTION'"
             },
             {
               "name": "resilienceInvalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resilienceInvalidOption: \"PROCESS_RESILIENCE_INVALID_OPTION\";",
+              "signature": "readonly resilienceInvalidOption: 'PROCESS_RESILIENCE_INVALID_OPTION';",
               "description": "Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_RESILIENCE_INVALID_OPTION\""
+              "returns": "'PROCESS_RESILIENCE_INVALID_OPTION'"
             },
             {
               "name": "connectionLimit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly connectionLimit: \"PROCESS_CONNECTION_LIMIT\";",
+              "signature": "readonly connectionLimit: 'PROCESS_CONNECTION_LIMIT';",
               "description": "A connection, call-rate, or payload limit rejected admission before provider execution.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_CONNECTION_LIMIT\""
+              "returns": "'PROCESS_CONNECTION_LIMIT'"
             },
             {
               "name": "instanceUnhealthy",
               "kind": "property",
               "optional": false,
-              "signature": "readonly instanceUnhealthy: \"PROCESS_INSTANCE_UNHEALTHY\";",
+              "signature": "readonly instanceUnhealthy: 'PROCESS_INSTANCE_UNHEALTHY';",
               "description": "A shared target is suspended after an explicit instance-health event until a ready replacement * exists.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_INSTANCE_UNHEALTHY\""
+              "returns": "'PROCESS_INSTANCE_UNHEALTHY'"
             },
             {
               "name": "healthPingFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly healthPingFailed: \"PROCESS_HEALTH_PING_FAILED\";",
+              "signature": "readonly healthPingFailed: 'PROCESS_HEALTH_PING_FAILED';",
               "description": "An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_HEALTH_PING_FAILED\""
+              "returns": "'PROCESS_HEALTH_PING_FAILED'"
             },
             {
               "name": "terminalCall",
               "kind": "property",
               "optional": false,
-              "signature": "readonly terminalCall: \"PROCESS_TERMINAL_CALL\";",
+              "signature": "readonly terminalCall: 'PROCESS_TERMINAL_CALL';",
               "description": "A terminal registration rejects new remote calls before they reach its inactive generation.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_TERMINAL_CALL\""
+              "returns": "'PROCESS_TERMINAL_CALL'"
             },
             {
               "name": "liquidated",
               "kind": "property",
               "optional": false,
-              "signature": "readonly liquidated: \"PROCESS_LIQUIDATED\";",
+              "signature": "readonly liquidated: 'PROCESS_LIQUIDATED';",
               "description": "A liquidated registration cannot restart; the caller must create a new registration.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_LIQUIDATED\""
+              "returns": "'PROCESS_LIQUIDATED'"
             }
           ],
           "composes": [],
           "aliasOf": "RpcProcessErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcProcessErrorCode: { /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */ readonly usageSampleFailed: \"PROCESS_USAGE_SAMPLE_FAILED\"; /** Host options violate R1/R2 before launch; callers must correct the named field. */ readonly hostInvalidOption: \"PROCESS_HOST_INVALID_OPTION\"; /** Facade release has begun; callers must create a new facade instead of enqueueing work. */ readonly hostClosed: \"PROCESS_HOST_CLOSED\"; /** Handshake exceeded its scheduler deadline; caller must open a new channel. */ readonly handshakeTimeout: \"PROCESS_HANDSHAKE_TIMEOUT\"; /** Peer authorization failed; caller must not retry without valid credentials. */ readonly authRejected: \"PROCESS_CHANNEL_AUTH_REJECTED\"; /** * A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors. */ readonly channelClosed: \"PROCESS_CHANNEL_CLOSED\"; /** Dial or launch could not establish a channel; caller may inspect the original cause. */ readonly connectFailed: \"PROCESS_CHANNEL_CONNECT_FAILED\"; /** The requested local listener could not bind; caller must choose an available address. */ readonly listenFailed: \"PROCESS_CHANNEL_LISTEN_FAILED\"; /** * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field. */ readonly pluginInvalidOption: \"PROCESS_PLUGIN_INVALID_OPTION\"; /** * Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection. */ readonly resilienceInvalidOption: \"PROCESS_RESILIENCE_INVALID_OPTION\"; /** A connection, call-rate, or payload limit rejected admission before provider execution. */ readonly connectionLimit: \"PROCESS_CONNECTION_LIMIT\"; /** * A shared target is suspended after an explicit instance-health event until a ready replacement * exists. */ readonly instanceUnhealthy: \"PROCESS_INSTANCE_UNHEALTHY\"; /** * An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit. */ readonly healthPingFailed: \"PROCESS_HEALTH_PING_FAILED\"; /** A terminal registration rejects new remote calls before they reach its inactive generation. */ readonly terminalCall: \"PROCESS_TERMINAL_CALL\"; /** A liquidated registration cannot restart; the caller must create a new registration. */ readonly liquidated: \"PROCESS_LIQUIDATED\"; };"
+            "export declare const RpcProcessErrorCode: { /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */ readonly usageSampleFailed: 'PROCESS_USAGE_SAMPLE_FAILED'; /** Host options violate R1/R2 before launch; callers must correct the named field. */ readonly hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION'; /** Facade release has begun; callers must create a new facade instead of enqueueing work. */ readonly hostClosed: 'PROCESS_HOST_CLOSED'; /** Handshake exceeded its scheduler deadline; caller must open a new channel. */ readonly handshakeTimeout: 'PROCESS_HANDSHAKE_TIMEOUT'; /** Peer authorization failed; caller must not retry without valid credentials. */ readonly authRejected: 'PROCESS_CHANNEL_AUTH_REJECTED'; /** * A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors. */ readonly channelClosed: 'PROCESS_CHANNEL_CLOSED'; /** Dial or launch could not establish a channel; caller may inspect the original cause. */ readonly connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED'; /** The requested local listener could not bind; caller must choose an available address. */ readonly listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED'; /** * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field. */ readonly pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION'; /** * Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection. */ readonly resilienceInvalidOption: 'PROCESS_RESILIENCE_INVALID_OPTION'; /** A connection, call-rate, or payload limit rejected admission before provider execution. */ readonly connectionLimit: 'PROCESS_CONNECTION_LIMIT'; /** * A shared target is suspended after an explicit instance-health event until a ready replacement * exists. */ readonly instanceUnhealthy: 'PROCESS_INSTANCE_UNHEALTHY'; /** * An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit. */ readonly healthPingFailed: 'PROCESS_HEALTH_PING_FAILED'; /** A terminal registration rejects new remote calls before they reach its inactive generation. */ readonly terminalCall: 'PROCESS_TERMINAL_CALL'; /** A liquidated registration cannot restart; the caller must create a new registration. */ readonly liquidated: 'PROCESS_LIQUIDATED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -13163,7 +13163,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/error-code.d.ts:RpcProcessErrorCode:export declare const RpcProcessErrorCode: { /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */ readonly usageSampleFailed: \"PROCESS_USAGE_SAMPLE_FAILED\"; /** Host options violate R1/R2 before launch; callers must correct the named field. */ readonly hostInvalidOption: \"PROCESS_HOST_INVALID_OPTION\"; /** Facade release has begun; callers must create a new facade instead of enqueueing work. */ readonly hostClosed: \"PROCESS_HOST_CLOSED\"; /** Handshake exceeded its scheduler deadline; caller must open a new channel. */ readonly handshakeTimeout: \"PROCESS_HANDSHAKE_TIMEOUT\"; /** Peer authorization failed; caller must not retry without valid credentials. */ readonly authRejected: \"PROCESS_CHANNEL_AUTH_REJECTED\"; /** * A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors. */ readonly channelClosed: \"PROCESS_CHANNEL_CLOSED\"; /** Dial or launch could not establish a channel; caller may inspect the original cause. */ readonly connectFailed: \"PROCESS_CHANNEL_CONNECT_FAILED\"; /** The requested local listener could not bind; caller must choose an available address. */ readonly listenFailed: \"PROCESS_CHANNEL_LISTEN_FAILED\"; /** * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field. */ readonly pluginInvalidOption: \"PROCESS_PLUGIN_INVALID_OPTION\"; /** * Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection. */ readonly resilienceInvalidOption: \"PROCESS_RESILIENCE_INVALID_OPTION\"; /** A connection, call-rate, or payload limit rejected admission before provider execution. */ readonly connectionLimit: \"PROCESS_CONNECTION_LIMIT\"; /** * A shared target is suspended after an explicit instance-health event until a ready replacement * exists. */ readonly instanceUnhealthy: \"PROCESS_INSTANCE_UNHEALTHY\"; /** * An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit. */ readonly healthPingFailed: \"PROCESS_HEALTH_PING_FAILED\"; /** A terminal registration rejects new remote calls before they reach its inactive generation. */ readonly terminalCall: \"PROCESS_TERMINAL_CALL\"; /** A liquidated registration cannot restart; the caller must create a new registration. */ readonly liquidated: \"PROCESS_LIQUIDATED\"; };",
+          "identity": "packages/rpc-process/dist/error-code.d.ts:RpcProcessErrorCode:export declare const RpcProcessErrorCode: { /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */ readonly usageSampleFailed: 'PROCESS_USAGE_SAMPLE_FAILED'; /** Host options violate R1/R2 before launch; callers must correct the named field. */ readonly hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION'; /** Facade release has begun; callers must create a new facade instead of enqueueing work. */ readonly hostClosed: 'PROCESS_HOST_CLOSED'; /** Handshake exceeded its scheduler deadline; caller must open a new channel. */ readonly handshakeTimeout: 'PROCESS_HANDSHAKE_TIMEOUT'; /** Peer authorization failed; caller must not retry without valid credentials. */ readonly authRejected: 'PROCESS_CHANNEL_AUTH_REJECTED'; /** * A closed channel rejected work or its close observer/resource cleanup failed; inspect * cause/errors. */ readonly channelClosed: 'PROCESS_CHANNEL_CLOSED'; /** Dial or launch could not establish a channel; caller may inspect the original cause. */ readonly connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED'; /** The requested local listener could not bind; caller must choose an available address. */ readonly listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED'; /** * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named * field. */ readonly pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION'; /** * Invalid resilience limits, ownership, or health configuration; correct the named field before * opening a connection. */ readonly resilienceInvalidOption: 'PROCESS_RESILIENCE_INVALID_OPTION'; /** A connection, call-rate, or payload limit rejected admission before provider execution. */ readonly connectionLimit: 'PROCESS_CONNECTION_LIMIT'; /** * A shared target is suspended after an explicit instance-health event until a ready replacement * exists. */ readonly instanceUnhealthy: 'PROCESS_INSTANCE_UNHEALTHY'; /** * An enabled native health ping returned false before its supervision deadline; the owner must * restart the unit. */ readonly healthPingFailed: 'PROCESS_HEALTH_PING_FAILED'; /** A terminal registration rejects new remote calls before they reach its inactive generation. */ readonly terminalCall: 'PROCESS_TERMINAL_CALL'; /** A liquidated registration cannot restart; the caller must create a new registration. */ readonly liquidated: 'PROCESS_LIQUIDATED'; };",
           "guidance": [
             {
               "id": "错误的形状",
@@ -14317,7 +14317,7 @@
         {
           "name": "createAdapterChildStdio",
           "kind": "function",
-          "signature": "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "signature": "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "declarationLine": 13,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Wraps the stdio pipes of a Node `ChildProcess` you started as a byte channel.",
@@ -14331,7 +14331,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -14340,7 +14340,7 @@
           "aliasOf": "createAdapterChildStdio",
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
-            "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -14352,7 +14352,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -14389,7 +14389,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterChildStdio:export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterChildStdio:export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -14559,7 +14559,7 @@
         {
           "name": "createAdapterProcessStdio",
           "kind": "function",
-          "signature": "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "signature": "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "declarationLine": 22,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Child side: wraps the process own `stdin` / `stdout` as a byte channel.",
@@ -14573,7 +14573,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -14582,7 +14582,7 @@
           "aliasOf": "createAdapterProcessStdio",
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
-            "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -14594,7 +14594,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -14631,7 +14631,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterProcessStdio:export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterProcessStdio:export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -15178,7 +15178,7 @@
         {
           "name": "createAdapterSocketByteIO",
           "kind": "function",
-          "signature": "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "signature": "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "declarationLine": 31,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Wraps a Node `Duplex` stream (such as a `net.Socket`) as a byte channel.",
@@ -15192,7 +15192,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -15203,7 +15203,7 @@
           "aliasOf": "createAdapterSocketByteIO",
           "exportPath": "./adapters/node-socket",
           "overloadSignatures": [
-            "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -15215,7 +15215,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -15252,7 +15252,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterSocketByteIO:export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterSocketByteIO:export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],

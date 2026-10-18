@@ -4994,7 +4994,7 @@
         {
           "name": "LoggerColorMode",
           "kind": "const",
-          "signature": "export declare const LoggerColorMode: { readonly auto: \"auto\"; readonly always: \"always\"; readonly never: \"never\"; };",
+          "signature": "export declare const LoggerColorMode: { readonly auto: 'auto'; readonly always: 'always'; readonly never: 'never'; };",
           "declarationLine": 10,
           "source": "packages/logger/dist/plugin-constants.d.ts",
           "purpose": "Allowed values of the `color` option of `color()`: `auto`, `always`, `never`.",
@@ -5011,35 +5011,35 @@
               "name": "auto",
               "kind": "property",
               "optional": false,
-              "signature": "readonly auto: \"auto\";",
+              "signature": "readonly auto: 'auto';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"auto\""
+              "returns": "'auto'"
             },
             {
               "name": "always",
               "kind": "property",
               "optional": false,
-              "signature": "readonly always: \"always\";",
+              "signature": "readonly always: 'always';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"always\""
+              "returns": "'always'"
             },
             {
               "name": "never",
               "kind": "property",
               "optional": false,
-              "signature": "readonly never: \"never\";",
+              "signature": "readonly never: 'never';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"never\""
+              "returns": "'never'"
             }
           ],
           "composes": [],
           "aliasOf": "LoggerColorMode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LoggerColorMode: { readonly auto: \"auto\"; readonly always: \"always\"; readonly never: \"never\"; };"
+            "export declare const LoggerColorMode: { readonly auto: 'auto'; readonly always: 'always'; readonly never: 'never'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5078,7 +5078,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugin-constants.d.ts:LoggerColorMode:export declare const LoggerColorMode: { readonly auto: \"auto\"; readonly always: \"always\"; readonly never: \"never\"; };",
+          "identity": "packages/logger/dist/plugin-constants.d.ts:LoggerColorMode:export declare const LoggerColorMode: { readonly auto: 'auto'; readonly always: 'always'; readonly never: 'never'; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -5087,7 +5087,7 @@
         {
           "name": "LoggerErrorCode",
           "kind": "const",
-          "signature": "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date. */ readonly pipelineEntryInvalid: \"PIPELINE_ENTRY_INVALID\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling. */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch. */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload. */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting. */ readonly hookFailed: \"HOOK_FAILED\"; /** * Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets. */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle. */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\"; };",
+          "signature": "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run. */ readonly invalidOption: 'INVALID_OPTION'; /** * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date. */ readonly pipelineEntryInvalid: 'PIPELINE_ENTRY_INVALID'; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** * Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** * Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch. */ readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE'; /** * Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: 'INVALID_RETRY_COUNT'; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: 'LIFECYCLE_DEADLINE'; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; /** * Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting. */ readonly hookFailed: 'HOOK_FAILED'; /** * Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets. */ readonly extendsSelf: 'EXTENDS_SELF'; /** * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle. */ readonly extendsCycle: 'EXTENDS_CYCLE'; /** * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback. */ readonly batchOverflow: 'BATCH_OVERFLOW'; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'; };",
           "declarationLine": 10,
           "source": "packages/logger/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
@@ -5104,161 +5104,161 @@
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "pipelineEntryInvalid",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pipelineEntryInvalid: \"PIPELINE_ENTRY_INVALID\";",
+              "signature": "readonly pipelineEntryInvalid: 'PIPELINE_ENTRY_INVALID';",
               "description": "A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date.",
               "parameterDetails": [],
-              "returns": "\"PIPELINE_ENTRY_INVALID\""
+              "returns": "'PIPELINE_ENTRY_INVALID'"
             },
             {
               "name": "runtimeShuttingDown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\";",
+              "signature": "readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN';",
               "description": "Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin.",
               "parameterDetails": [],
-              "returns": "\"RUNTIME_SHUTTING_DOWN\""
+              "returns": "'RUNTIME_SHUTTING_DOWN'"
             },
             {
               "name": "pluginConfigConflict",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\";",
+              "signature": "readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT';",
               "description": "Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling.",
               "parameterDetails": [],
-              "returns": "\"PLUGIN_CONFIG_CONFLICT\""
+              "returns": "'PLUGIN_CONFIG_CONFLICT'"
             },
             {
               "name": "transportUnavailable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\";",
+              "signature": "readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE';",
               "description": "Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch.",
               "parameterDetails": [],
-              "returns": "\"TRANSPORT_UNAVAILABLE\""
+              "returns": "'TRANSPORT_UNAVAILABLE'"
             },
             {
               "name": "serializeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly serializeFailed: \"SERIALIZE_FAILED\";",
+              "signature": "readonly serializeFailed: 'SERIALIZE_FAILED';",
               "description": "Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload.",
               "parameterDetails": [],
-              "returns": "\"SERIALIZE_FAILED\""
+              "returns": "'SERIALIZE_FAILED'"
             },
             {
               "name": "deliveryFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly deliveryFailed: \"DELIVERY_FAILED\";",
+              "signature": "readonly deliveryFailed: 'DELIVERY_FAILED';",
               "description": "HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure.",
               "parameterDetails": [],
-              "returns": "\"DELIVERY_FAILED\""
+              "returns": "'DELIVERY_FAILED'"
             },
             {
               "name": "invalidRetryCount",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidRetryCount: \"INVALID_RETRY_COUNT\";",
+              "signature": "readonly invalidRetryCount: 'INVALID_RETRY_COUNT';",
               "description": "HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger.",
               "parameterDetails": [],
-              "returns": "\"INVALID_RETRY_COUNT\""
+              "returns": "'INVALID_RETRY_COUNT'"
             },
             {
               "name": "lifecycleDeadline",
               "kind": "property",
               "optional": false,
-              "signature": "readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\";",
+              "signature": "readonly lifecycleDeadline: 'LIFECYCLE_DEADLINE';",
               "description": "A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered.",
               "parameterDetails": [],
-              "returns": "\"LIFECYCLE_DEADLINE\""
+              "returns": "'LIFECYCLE_DEADLINE'"
             },
             {
               "name": "processInstallRollbackFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\";",
+              "signature": "readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED';",
               "description": "Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation.",
               "parameterDetails": [],
-              "returns": "\"PROCESS_INSTALL_ROLLBACK_FAILED\""
+              "returns": "'PROCESS_INSTALL_ROLLBACK_FAILED'"
             },
             {
               "name": "pluginUninstallCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\";",
+              "signature": "readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED';",
               "description": "Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`.",
               "parameterDetails": [],
-              "returns": "\"PLUGIN_UNINSTALL_CLEANUP_FAILED\""
+              "returns": "'PLUGIN_UNINSTALL_CLEANUP_FAILED'"
             },
             {
               "name": "pluginShutdownCleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\";",
+              "signature": "readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED';",
               "description": "Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue.",
               "parameterDetails": [],
-              "returns": "\"PLUGIN_SHUTDOWN_CLEANUP_FAILED\""
+              "returns": "'PLUGIN_SHUTDOWN_CLEANUP_FAILED'"
             },
             {
               "name": "hookFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hookFailed: \"HOOK_FAILED\";",
+              "signature": "readonly hookFailed: 'HOOK_FAILED';",
               "description": "Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting.",
               "parameterDetails": [],
-              "returns": "\"HOOK_FAILED\""
+              "returns": "'HOOK_FAILED'"
             },
             {
               "name": "extendsSelf",
               "kind": "property",
               "optional": false,
-              "signature": "readonly extendsSelf: \"EXTENDS_SELF\";",
+              "signature": "readonly extendsSelf: 'EXTENDS_SELF';",
               "description": "Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets.",
               "parameterDetails": [],
-              "returns": "\"EXTENDS_SELF\""
+              "returns": "'EXTENDS_SELF'"
             },
             {
               "name": "extendsCycle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly extendsCycle: \"EXTENDS_CYCLE\";",
+              "signature": "readonly extendsCycle: 'EXTENDS_CYCLE';",
               "description": "Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle.",
               "parameterDetails": [],
-              "returns": "\"EXTENDS_CYCLE\""
+              "returns": "'EXTENDS_CYCLE'"
             },
             {
               "name": "batchOverflow",
               "kind": "property",
               "optional": false,
-              "signature": "readonly batchOverflow: \"BATCH_OVERFLOW\";",
+              "signature": "readonly batchOverflow: 'BATCH_OVERFLOW';",
               "description": "A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback.",
               "parameterDetails": [],
-              "returns": "\"BATCH_OVERFLOW\""
+              "returns": "'BATCH_OVERFLOW'"
             },
             {
               "name": "fileSinkUnavailable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\";",
+              "signature": "readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE';",
               "description": "File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition.",
               "parameterDetails": [],
-              "returns": "\"FILE_SINK_UNAVAILABLE\""
+              "returns": "'FILE_SINK_UNAVAILABLE'"
             }
           ],
           "composes": [],
           "aliasOf": "LoggerErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date. */ readonly pipelineEntryInvalid: \"PIPELINE_ENTRY_INVALID\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling. */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch. */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload. */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting. */ readonly hookFailed: \"HOOK_FAILED\"; /** * Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets. */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle. */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\"; };"
+            "export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run. */ readonly invalidOption: 'INVALID_OPTION'; /** * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date. */ readonly pipelineEntryInvalid: 'PIPELINE_ENTRY_INVALID'; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** * Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** * Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch. */ readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE'; /** * Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: 'INVALID_RETRY_COUNT'; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: 'LIFECYCLE_DEADLINE'; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; /** * Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting. */ readonly hookFailed: 'HOOK_FAILED'; /** * Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets. */ readonly extendsSelf: 'EXTENDS_SELF'; /** * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle. */ readonly extendsCycle: 'EXTENDS_CYCLE'; /** * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback. */ readonly batchOverflow: 'BATCH_OVERFLOW'; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5297,7 +5297,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/error-code.d.ts:LoggerErrorCode:export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date. */ readonly pipelineEntryInvalid: \"PIPELINE_ENTRY_INVALID\"; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\"; /** * Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling. */ readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\"; /** * Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch. */ readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\"; /** * Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload. */ readonly serializeFailed: \"SERIALIZE_FAILED\"; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: \"DELIVERY_FAILED\"; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: \"INVALID_RETRY_COUNT\"; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\"; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\"; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`. */ readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\"; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\"; /** * Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting. */ readonly hookFailed: \"HOOK_FAILED\"; /** * Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets. */ readonly extendsSelf: \"EXTENDS_SELF\"; /** * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle. */ readonly extendsCycle: \"EXTENDS_CYCLE\"; /** * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback. */ readonly batchOverflow: \"BATCH_OVERFLOW\"; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\"; };",
+          "identity": "packages/logger/dist/error-code.d.ts:LoggerErrorCode:export declare const LoggerErrorCode: { /** * Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists. Also rejects shutdown clock failure after admitted plugin cleanup has run. */ readonly invalidOption: 'INVALID_OPTION'; /** * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date. */ readonly pipelineEntryInvalid: 'PIPELINE_ENTRY_INVALID'; /** * Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** * Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** * Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch. */ readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE'; /** * Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** * HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** * HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger. */ readonly invalidRetryCount: 'INVALID_RETRY_COUNT'; /** * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered. */ readonly lifecycleDeadline: 'LIFECYCLE_DEADLINE'; /** * Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** * Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; /** * Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting. */ readonly hookFailed: 'HOOK_FAILED'; /** * Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets. */ readonly extendsSelf: 'EXTENDS_SELF'; /** * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle. */ readonly extendsCycle: 'EXTENDS_CYCLE'; /** * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback. */ readonly batchOverflow: 'BATCH_OVERFLOW'; /** * File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition. */ readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'; };",
           "guidance": [
             {
               "id": "错误码速查",
@@ -5400,7 +5400,7 @@
         {
           "name": "LoggerLevel",
           "kind": "const",
-          "signature": "export declare const LoggerLevel: { readonly debug: \"debug\"; readonly info: \"info\"; readonly warn: \"warn\"; readonly error: \"error\"; readonly fatal: \"fatal\"; };",
+          "signature": "export declare const LoggerLevel: { readonly debug: 'debug'; readonly info: 'info'; readonly warn: 'warn'; readonly error: 'error'; readonly fatal: 'fatal'; };",
           "declarationLine": 2,
           "source": "packages/logger/dist/plugin-constants.d.ts",
           "purpose": "The five level names used by `level()`, from lowest to highest.",
@@ -5417,53 +5417,53 @@
               "name": "debug",
               "kind": "property",
               "optional": false,
-              "signature": "readonly debug: \"debug\";",
+              "signature": "readonly debug: 'debug';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"debug\""
+              "returns": "'debug'"
             },
             {
               "name": "info",
               "kind": "property",
               "optional": false,
-              "signature": "readonly info: \"info\";",
+              "signature": "readonly info: 'info';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"info\""
+              "returns": "'info'"
             },
             {
               "name": "warn",
               "kind": "property",
               "optional": false,
-              "signature": "readonly warn: \"warn\";",
+              "signature": "readonly warn: 'warn';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"warn\""
+              "returns": "'warn'"
             },
             {
               "name": "error",
               "kind": "property",
               "optional": false,
-              "signature": "readonly error: \"error\";",
+              "signature": "readonly error: 'error';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"error\""
+              "returns": "'error'"
             },
             {
               "name": "fatal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly fatal: \"fatal\";",
+              "signature": "readonly fatal: 'fatal';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"fatal\""
+              "returns": "'fatal'"
             }
           ],
           "composes": [],
           "aliasOf": "LoggerLevel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LoggerLevel: { readonly debug: \"debug\"; readonly info: \"info\"; readonly warn: \"warn\"; readonly error: \"error\"; readonly fatal: \"fatal\"; };"
+            "export declare const LoggerLevel: { readonly debug: 'debug'; readonly info: 'info'; readonly warn: 'warn'; readonly error: 'error'; readonly fatal: 'fatal'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5502,7 +5502,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugin-constants.d.ts:LoggerLevel:export declare const LoggerLevel: { readonly debug: \"debug\"; readonly info: \"info\"; readonly warn: \"warn\"; readonly error: \"error\"; readonly fatal: \"fatal\"; };",
+          "identity": "packages/logger/dist/plugin-constants.d.ts:LoggerLevel:export declare const LoggerLevel: { readonly debug: 'debug'; readonly info: 'info'; readonly warn: 'warn'; readonly error: 'error'; readonly fatal: 'fatal'; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -5511,7 +5511,7 @@
         {
           "name": "LoggerReasoningPhase",
           "kind": "const",
-          "signature": "export declare const LoggerReasoningPhase: { readonly idle: \"idle\"; readonly thinking: \"thinking\"; readonly responding: \"responding\"; };",
+          "signature": "export declare const LoggerReasoningPhase: { readonly idle: 'idle'; readonly thinking: 'thinking'; readonly responding: 'responding'; };",
           "declarationLine": 16,
           "source": "packages/logger/dist/plugin-constants.d.ts",
           "purpose": "Phases of the `reasoning()` stream: `idle`, `thinking`, `responding`.",
@@ -5528,35 +5528,35 @@
               "name": "idle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly idle: \"idle\";",
+              "signature": "readonly idle: 'idle';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"idle\""
+              "returns": "'idle'"
             },
             {
               "name": "thinking",
               "kind": "property",
               "optional": false,
-              "signature": "readonly thinking: \"thinking\";",
+              "signature": "readonly thinking: 'thinking';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"thinking\""
+              "returns": "'thinking'"
             },
             {
               "name": "responding",
               "kind": "property",
               "optional": false,
-              "signature": "readonly responding: \"responding\";",
+              "signature": "readonly responding: 'responding';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"responding\""
+              "returns": "'responding'"
             }
           ],
           "composes": [],
           "aliasOf": "LoggerReasoningPhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LoggerReasoningPhase: { readonly idle: \"idle\"; readonly thinking: \"thinking\"; readonly responding: \"responding\"; };"
+            "export declare const LoggerReasoningPhase: { readonly idle: 'idle'; readonly thinking: 'thinking'; readonly responding: 'responding'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5595,7 +5595,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugin-constants.d.ts:LoggerReasoningPhase:export declare const LoggerReasoningPhase: { readonly idle: \"idle\"; readonly thinking: \"thinking\"; readonly responding: \"responding\"; };",
+          "identity": "packages/logger/dist/plugin-constants.d.ts:LoggerReasoningPhase:export declare const LoggerReasoningPhase: { readonly idle: 'idle'; readonly thinking: 'thinking'; readonly responding: 'responding'; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -5604,7 +5604,7 @@
         {
           "name": "LoggerStatus",
           "kind": "const",
-          "signature": "export declare const LoggerStatus: { readonly active: \"active\"; readonly flushing: \"flushing\"; readonly shuttingDown: \"shutting-down\"; readonly closed: \"closed\"; };",
+          "signature": "export declare const LoggerStatus: { readonly active: 'active'; readonly flushing: 'flushing'; readonly shuttingDown: 'shutting-down'; readonly closed: 'closed'; };",
           "declarationLine": 2,
           "source": "packages/logger/dist/state-constants.d.ts",
           "purpose": "Lifecycle phases a logger goes through: `active`, `flushing` during `flush()`, `shutting-down`, `closed`. The instance does not expose its current phase; the constant names the states behind `flush()` and `shutdown()` behaviour.",
@@ -5621,44 +5621,44 @@
               "name": "active",
               "kind": "property",
               "optional": false,
-              "signature": "readonly active: \"active\";",
+              "signature": "readonly active: 'active';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"active\""
+              "returns": "'active'"
             },
             {
               "name": "flushing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly flushing: \"flushing\";",
+              "signature": "readonly flushing: 'flushing';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"flushing\""
+              "returns": "'flushing'"
             },
             {
               "name": "shuttingDown",
               "kind": "property",
               "optional": false,
-              "signature": "readonly shuttingDown: \"shutting-down\";",
+              "signature": "readonly shuttingDown: 'shutting-down';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"shutting-down\""
+              "returns": "'shutting-down'"
             },
             {
               "name": "closed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly closed: \"closed\";",
+              "signature": "readonly closed: 'closed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"closed\""
+              "returns": "'closed'"
             }
           ],
           "composes": [],
           "aliasOf": "LoggerStatus",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LoggerStatus: { readonly active: \"active\"; readonly flushing: \"flushing\"; readonly shuttingDown: \"shutting-down\"; readonly closed: \"closed\"; };"
+            "export declare const LoggerStatus: { readonly active: 'active'; readonly flushing: 'flushing'; readonly shuttingDown: 'shutting-down'; readonly closed: 'closed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5697,7 +5697,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/state-constants.d.ts:LoggerStatus:export declare const LoggerStatus: { readonly active: \"active\"; readonly flushing: \"flushing\"; readonly shuttingDown: \"shutting-down\"; readonly closed: \"closed\"; };",
+          "identity": "packages/logger/dist/state-constants.d.ts:LoggerStatus:export declare const LoggerStatus: { readonly active: 'active'; readonly flushing: 'flushing'; readonly shuttingDown: 'shutting-down'; readonly closed: 'closed'; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -5806,7 +5806,7 @@
         {
           "name": "ANSIS_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const ANSIS_PLUGIN_NAME: \"ansis\";",
+          "signature": "export declare const ANSIS_PLUGIN_NAME: 'ansis';",
           "declarationLine": 32,
           "source": "packages/logger/dist/plugins/color.d.ts",
           "purpose": "Registered name of the `color()` plugin (`ansis`); pass it to `unUse()` or `config.get()`.",
@@ -5822,7 +5822,7 @@
           "composes": [],
           "aliasOf": "ANSIS_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const ANSIS_PLUGIN_NAME: \"ansis\";"],
+          "overloadSignatures": ["export declare const ANSIS_PLUGIN_NAME: 'ansis';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -5860,7 +5860,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/color.d.ts:ANSIS_PLUGIN_NAME:export declare const ANSIS_PLUGIN_NAME: \"ansis\";",
+          "identity": "packages/logger/dist/plugins/color.d.ts:ANSIS_PLUGIN_NAME:export declare const ANSIS_PLUGIN_NAME: 'ansis';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6223,7 +6223,7 @@
         {
           "name": "BATCH_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const BATCH_PLUGIN_NAME: \"batch\";",
+          "signature": "export declare const BATCH_PLUGIN_NAME: 'batch';",
           "declarationLine": 44,
           "source": "packages/logger/dist/plugins/batch.d.ts",
           "purpose": "Registered name of the `batch()` plugin (`batch`); pass it to `unUse()` or `config.get()`.",
@@ -6239,7 +6239,7 @@
           "composes": [],
           "aliasOf": "BATCH_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const BATCH_PLUGIN_NAME: \"batch\";"],
+          "overloadSignatures": ["export declare const BATCH_PLUGIN_NAME: 'batch';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -6277,7 +6277,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/batch.d.ts:BATCH_PLUGIN_NAME:export declare const BATCH_PLUGIN_NAME: \"batch\";",
+          "identity": "packages/logger/dist/plugins/batch.d.ts:BATCH_PLUGIN_NAME:export declare const BATCH_PLUGIN_NAME: 'batch';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6987,7 +6987,7 @@
         {
           "name": "HTTP_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const HTTP_PLUGIN_NAME: \"http\";",
+          "signature": "export declare const HTTP_PLUGIN_NAME: 'http';",
           "declarationLine": 27,
           "source": "packages/logger/dist/plugins/http.d.ts",
           "purpose": "Registered name of the `http()` plugin (`http`); pass it to `unUse()` or `config.update()`.",
@@ -7003,7 +7003,7 @@
           "composes": [],
           "aliasOf": "HTTP_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const HTTP_PLUGIN_NAME: \"http\";"],
+          "overloadSignatures": ["export declare const HTTP_PLUGIN_NAME: 'http';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -7041,7 +7041,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/http.d.ts:HTTP_PLUGIN_NAME:export declare const HTTP_PLUGIN_NAME: \"http\";",
+          "identity": "packages/logger/dist/plugins/http.d.ts:HTTP_PLUGIN_NAME:export declare const HTTP_PLUGIN_NAME: 'http';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8607,7 +8607,7 @@
         {
           "name": "LEVEL_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const LEVEL_PLUGIN_NAME: \"level\";",
+          "signature": "export declare const LEVEL_PLUGIN_NAME: 'level';",
           "declarationLine": 24,
           "source": "packages/logger/dist/plugins/level.d.ts",
           "purpose": "Registered name of the `level()` plugin (`level`); pass it to `unUse()` or `config.get()`.",
@@ -8623,7 +8623,7 @@
           "composes": [],
           "aliasOf": "LEVEL_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const LEVEL_PLUGIN_NAME: \"level\";"],
+          "overloadSignatures": ["export declare const LEVEL_PLUGIN_NAME: 'level';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -8661,7 +8661,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/level.d.ts:LEVEL_PLUGIN_NAME:export declare const LEVEL_PLUGIN_NAME: \"level\";",
+          "identity": "packages/logger/dist/plugins/level.d.ts:LEVEL_PLUGIN_NAME:export declare const LEVEL_PLUGIN_NAME: 'level';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8918,7 +8918,7 @@
         {
           "name": "PROCESS_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const PROCESS_PLUGIN_NAME: \"process\";",
+          "signature": "export declare const PROCESS_PLUGIN_NAME: 'process';",
           "declarationLine": 17,
           "source": "packages/logger/dist/plugins/process.d.ts",
           "purpose": "Registered name of the `process()` plugin (`process`); pass it to `unUse()`.",
@@ -8934,7 +8934,7 @@
           "composes": [],
           "aliasOf": "PROCESS_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const PROCESS_PLUGIN_NAME: \"process\";"],
+          "overloadSignatures": ["export declare const PROCESS_PLUGIN_NAME: 'process';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -8972,7 +8972,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/process.d.ts:PROCESS_PLUGIN_NAME:export declare const PROCESS_PLUGIN_NAME: \"process\";",
+          "identity": "packages/logger/dist/plugins/process.d.ts:PROCESS_PLUGIN_NAME:export declare const PROCESS_PLUGIN_NAME: 'process';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -9142,7 +9142,7 @@
         {
           "name": "REASONING_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const REASONING_PLUGIN_NAME: \"reasoning\";",
+          "signature": "export declare const REASONING_PLUGIN_NAME: 'reasoning';",
           "declarationLine": 23,
           "source": "packages/logger/dist/plugins/reasoning.d.ts",
           "purpose": "Registered name of the `reasoning()` plugin (`reasoning`); pass it to `unUse()`.",
@@ -9158,7 +9158,7 @@
           "composes": [],
           "aliasOf": "REASONING_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const REASONING_PLUGIN_NAME: \"reasoning\";"],
+          "overloadSignatures": ["export declare const REASONING_PLUGIN_NAME: 'reasoning';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -9196,7 +9196,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/reasoning.d.ts:REASONING_PLUGIN_NAME:export declare const REASONING_PLUGIN_NAME: \"reasoning\";",
+          "identity": "packages/logger/dist/plugins/reasoning.d.ts:REASONING_PLUGIN_NAME:export declare const REASONING_PLUGIN_NAME: 'reasoning';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -9313,7 +9313,7 @@
         {
           "name": "UUID_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const UUID_PLUGIN_NAME: \"uuid\";",
+          "signature": "export declare const UUID_PLUGIN_NAME: 'uuid';",
           "declarationLine": 11,
           "source": "packages/logger/dist/plugins/uuid.d.ts",
           "purpose": "Registered name of the `uuid()` plugin (`uuid`); pass it to `unUse()` or `config.update()`.",
@@ -9329,7 +9329,7 @@
           "composes": [],
           "aliasOf": "UUID_PLUGIN_NAME",
           "exportPath": "./plugins",
-          "overloadSignatures": ["export declare const UUID_PLUGIN_NAME: \"uuid\";"],
+          "overloadSignatures": ["export declare const UUID_PLUGIN_NAME: 'uuid';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -9367,7 +9367,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/uuid.d.ts:UUID_PLUGIN_NAME:export declare const UUID_PLUGIN_NAME: \"uuid\";",
+          "identity": "packages/logger/dist/plugins/uuid.d.ts:UUID_PLUGIN_NAME:export declare const UUID_PLUGIN_NAME: 'uuid';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -9711,7 +9711,7 @@
         {
           "name": "FILE_PLUGIN_NAME",
           "kind": "const",
-          "signature": "export declare const FILE_PLUGIN_NAME: \"file\";",
+          "signature": "export declare const FILE_PLUGIN_NAME: 'file';",
           "declarationLine": 16,
           "source": "packages/logger/dist/plugins/file-core.d.ts",
           "purpose": "Registered name of the `file()` plugin (`file`); pass it to `unUse()` or `config.get()`.",
@@ -9727,7 +9727,7 @@
           "composes": [],
           "aliasOf": "FILE_PLUGIN_NAME",
           "exportPath": "./plugins/file",
-          "overloadSignatures": ["export declare const FILE_PLUGIN_NAME: \"file\";"],
+          "overloadSignatures": ["export declare const FILE_PLUGIN_NAME: 'file';"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -9765,7 +9765,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/file-core.d.ts:FILE_PLUGIN_NAME:export declare const FILE_PLUGIN_NAME: \"file\";",
+          "identity": "packages/logger/dist/plugins/file-core.d.ts:FILE_PLUGIN_NAME:export declare const FILE_PLUGIN_NAME: 'file';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

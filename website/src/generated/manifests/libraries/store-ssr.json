@@ -5797,7 +5797,7 @@
         {
           "name": "SsrWireType",
           "kind": "const",
-          "signature": "export declare const SsrWireType: { readonly json: \"json\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
+          "signature": "export declare const SsrWireType: { readonly json: 'json'; readonly text: 'text'; readonly bytes: 'bytes'; };",
           "declarationLine": 8,
           "source": "packages/store-ssr/dist/ssr-constants.d.ts",
           "purpose": "JSON codec identifier and text/bytes chunk-kind labels used by SSR.",
@@ -5818,35 +5818,35 @@
               "name": "json",
               "kind": "property",
               "optional": false,
-              "signature": "readonly json: \"json\";",
+              "signature": "readonly json: 'json';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"json\""
+              "returns": "'json'"
             },
             {
               "name": "text",
               "kind": "property",
               "optional": false,
-              "signature": "readonly text: \"text\";",
+              "signature": "readonly text: 'text';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"text\""
+              "returns": "'text'"
             },
             {
               "name": "bytes",
               "kind": "property",
               "optional": false,
-              "signature": "readonly bytes: \"bytes\";",
+              "signature": "readonly bytes: 'bytes';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"bytes\""
+              "returns": "'bytes'"
             }
           ],
           "composes": [],
           "aliasOf": "SsrWireType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SsrWireType: { readonly json: \"json\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };"
+            "export declare const SsrWireType: { readonly json: 'json'; readonly text: 'text'; readonly bytes: 'bytes'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5885,7 +5885,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr-constants.d.ts:SsrWireType:export declare const SsrWireType: { readonly json: \"json\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
+          "identity": "packages/store-ssr/dist/ssr-constants.d.ts:SsrWireType:export declare const SsrWireType: { readonly json: 'json'; readonly text: 'text'; readonly bytes: 'bytes'; };",
           "guidance": [],
           "usageScore": 68,
           "configuration": [],
@@ -6131,7 +6131,7 @@
         {
           "name": "StoreSsrErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: \"SCOPE_DISPOSED\"; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: \"HYDRATE_FAILED\"; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: \"INVALID_STATE_SCRIPT\"; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: \"INVALID_STORE_KEY\"; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: \"SERIALIZE_UNSUPPORTED\"; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: \"CODEC_CONTRACT\"; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: \"RESOURCE_ROUND_LIMIT\"; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: \"RESOURCE_TIMEOUT\"; };",
+          "signature": "export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: 'SCOPE_DISPOSED'; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: 'HYDRATE_FAILED'; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: 'INVALID_STATE_SCRIPT'; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: 'INVALID_STORE_KEY'; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: 'SERIALIZE_UNSUPPORTED'; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: 'CODEC_CONTRACT'; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: 'RESOURCE_ROUND_LIMIT'; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: 'RESOURCE_TIMEOUT'; };",
           "declarationLine": 11,
           "source": "packages/store-ssr/dist/error-code.d.ts",
           "purpose": "Stable public error codes, interpreted together with source and cause/errors chains.",
@@ -6155,116 +6155,116 @@
               "name": "scopeDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeDisposed: \"SCOPE_DISPOSED\";",
+              "signature": "readonly scopeDisposed: 'SCOPE_DISPOSED';",
               "description": "Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_DISPOSED\""
+              "returns": "'SCOPE_DISPOSED'"
             },
             {
               "name": "scopeDisposalFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\";",
+              "signature": "readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED';",
               "description": "Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure.",
               "parameterDetails": [],
-              "returns": "\"SCOPE_DISPOSAL_FAILED\""
+              "returns": "'SCOPE_DISPOSAL_FAILED'"
             },
             {
               "name": "hydrateFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hydrateFailed: \"HYDRATE_FAILED\";",
+              "signature": "readonly hydrateFailed: 'HYDRATE_FAILED';",
               "description": "`hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure.",
               "parameterDetails": [],
-              "returns": "\"HYDRATE_FAILED\""
+              "returns": "'HYDRATE_FAILED'"
             },
             {
               "name": "invalidSnapshot",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidSnapshot: \"INVALID_SNAPSHOT\";",
+              "signature": "readonly invalidSnapshot: 'INVALID_SNAPSHOT';",
               "description": "An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure.",
               "parameterDetails": [],
-              "returns": "\"INVALID_SNAPSHOT\""
+              "returns": "'INVALID_SNAPSHOT'"
             },
             {
               "name": "invalidStateScript",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidStateScript: \"INVALID_STATE_SCRIPT\";",
+              "signature": "readonly invalidStateScript: 'INVALID_STATE_SCRIPT';",
               "description": "The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version.",
               "parameterDetails": [],
-              "returns": "\"INVALID_STATE_SCRIPT\""
+              "returns": "'INVALID_STATE_SCRIPT'"
             },
             {
               "name": "invalidStoreKey",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidStoreKey: \"INVALID_STORE_KEY\";",
+              "signature": "readonly invalidStoreKey: 'INVALID_STORE_KEY';",
               "description": "An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key.",
               "parameterDetails": [],
-              "returns": "\"INVALID_STORE_KEY\""
+              "returns": "'INVALID_STORE_KEY'"
             },
             {
               "name": "serializeUnsupported",
               "kind": "property",
               "optional": false,
-              "signature": "readonly serializeUnsupported: \"SERIALIZE_UNSUPPORTED\";",
+              "signature": "readonly serializeUnsupported: 'SERIALIZE_UNSUPPORTED';",
               "description": "The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values.",
               "parameterDetails": [],
-              "returns": "\"SERIALIZE_UNSUPPORTED\""
+              "returns": "'SERIALIZE_UNSUPPORTED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "crossRuntime",
               "kind": "property",
               "optional": false,
-              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "signature": "readonly crossRuntime: 'CROSS_RUNTIME';",
               "description": "A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`.",
               "parameterDetails": [],
-              "returns": "\"CROSS_RUNTIME\""
+              "returns": "'CROSS_RUNTIME'"
             },
             {
               "name": "codecContract",
               "kind": "property",
               "optional": false,
-              "signature": "readonly codecContract: \"CODEC_CONTRACT\";",
+              "signature": "readonly codecContract: 'CODEC_CONTRACT';",
               "description": "A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading.",
               "parameterDetails": [],
-              "returns": "\"CODEC_CONTRACT\""
+              "returns": "'CODEC_CONTRACT'"
             },
             {
               "name": "resourceRoundLimit",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceRoundLimit: \"RESOURCE_ROUND_LIMIT\";",
+              "signature": "readonly resourceRoundLimit: 'RESOURCE_ROUND_LIMIT';",
               "description": "Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain.",
               "parameterDetails": [],
-              "returns": "\"RESOURCE_ROUND_LIMIT\""
+              "returns": "'RESOURCE_ROUND_LIMIT'"
             },
             {
               "name": "resourceTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resourceTimeout: \"RESOURCE_TIMEOUT\";",
+              "signature": "readonly resourceTimeout: 'RESOURCE_TIMEOUT';",
               "description": "A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client.",
               "parameterDetails": [],
-              "returns": "\"RESOURCE_TIMEOUT\""
+              "returns": "'RESOURCE_TIMEOUT'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreSsrErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: \"SCOPE_DISPOSED\"; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: \"HYDRATE_FAILED\"; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: \"INVALID_STATE_SCRIPT\"; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: \"INVALID_STORE_KEY\"; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: \"SERIALIZE_UNSUPPORTED\"; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: \"CODEC_CONTRACT\"; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: \"RESOURCE_ROUND_LIMIT\"; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: \"RESOURCE_TIMEOUT\"; };"
+            "export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: 'SCOPE_DISPOSED'; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: 'HYDRATE_FAILED'; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: 'INVALID_STATE_SCRIPT'; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: 'INVALID_STORE_KEY'; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: 'SERIALIZE_UNSUPPORTED'; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: 'CODEC_CONTRACT'; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: 'RESOURCE_ROUND_LIMIT'; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: 'RESOURCE_TIMEOUT'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6303,7 +6303,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/error-code.d.ts:StoreSsrErrorCode:export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: \"SCOPE_DISPOSED\"; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: \"HYDRATE_FAILED\"; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: \"INVALID_SNAPSHOT\"; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: \"INVALID_STATE_SCRIPT\"; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: \"INVALID_STORE_KEY\"; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: \"SERIALIZE_UNSUPPORTED\"; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: \"CODEC_CONTRACT\"; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: \"RESOURCE_ROUND_LIMIT\"; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: \"RESOURCE_TIMEOUT\"; };",
+          "identity": "packages/store-ssr/dist/error-code.d.ts:StoreSsrErrorCode:export declare const StoreSsrErrorCode: { /** * Registration, dehydration, or reads continue after request scope disposal. * * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope. */ readonly scopeDisposed: 'SCOPE_DISPOSED'; /** * Multiple stores or resources fail to clean up during request scope disposal. An * `AggregateError` exposes each cause through `errors[]`. * * Treat this as a disposal failure. */ readonly scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED'; /** * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and * non-atomic. An `AggregateError` exposes each cause through `errors[]`. * * Treat this as a hydration failure. */ readonly hydrateFailed: 'HYDRATE_FAILED'; /** * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource * snapshot field is invalid, or accessing input snapshot properties fails. Keep the original * reflective failure reachable and correct the supplied data before retrying. * * Check the supplied `ISSRState` structure. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * The inline state script ID is invalid, JSON payload parsing fails, or `ISSRState.version` is * not the supported version `1`. Syntax errors retain their native class and stack. * * Use a valid ID and the supported version. */ readonly invalidStateScript: 'INVALID_STATE_SCRIPT'; /** * An SSR store or resource registration key is empty or equals `__proto__`. * * Use a non-empty, non-reserved string key. */ readonly invalidStoreKey: 'INVALID_STORE_KEY'; /** * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain * objects, non-JSON types, or exceeds node or depth limits. * * Restrict state to JSON-serializable plain values. */ readonly serializeUnsupported: 'SERIALIZE_UNSUPPORTED'; /** * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or * duplicate keys. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; /** * A registered store or resource belongs to another `Runtime` and does not share this request * scope isolation. * * Create and register the store or resource within the same `Runtime`. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * A codec violates its output or registration contract. `encode` returns a value chunk instead of * wire data, or the payload names a codec type not registered on the reader. * * Correct the codec output or register the codec before reading. */ readonly codecContract: 'CODEC_CONTRACT'; /** * Resources keep registering new resources during `awaitResources()` and exceed the convergence * round limit. * * Check resource factories and dependencies for an infinite registration chain. */ readonly resourceRoundLimit: 'RESOURCE_ROUND_LIMIT'; /** * A registered resource did not settle before the SSR deadline. The caller may render without * that resource or retry on the client. */ readonly resourceTimeout: 'RESOURCE_TIMEOUT'; };",
           "guidance": [
             {
               "id": "13-2-storessrerrorcode-与错误工厂",

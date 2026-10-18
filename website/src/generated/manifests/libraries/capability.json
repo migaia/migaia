@@ -1594,7 +1594,7 @@
         {
           "name": "CapabilityEnableStatus",
           "kind": "const",
-          "signature": "export declare const CapabilityEnableStatus: { readonly enabled: \"enabled\"; readonly gated: \"gated\"; readonly cancelled: \"cancelled\"; readonly failed: \"failed\"; };",
+          "signature": "export declare const CapabilityEnableStatus: { readonly enabled: 'enabled'; readonly gated: 'gated'; readonly cancelled: 'cancelled'; readonly failed: 'failed'; };",
           "declarationLine": 9,
           "source": "packages/capability/dist/state-constants.d.ts",
           "purpose": "Structured activation outcomes; denial and cancellation are return states. Compare these exported values when handling the documented branch.",
@@ -1617,43 +1617,43 @@
               "name": "enabled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly enabled: \"enabled\";",
+              "signature": "readonly enabled: 'enabled';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"enabled\""
+              "returns": "'enabled'"
             },
             {
               "name": "gated",
               "kind": "property",
               "optional": false,
-              "signature": "readonly gated: \"gated\";",
+              "signature": "readonly gated: 'gated';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"gated\""
+              "returns": "'gated'"
             },
             {
               "name": "cancelled",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cancelled: \"cancelled\";",
+              "signature": "readonly cancelled: 'cancelled';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cancelled\""
+              "returns": "'cancelled'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             }
           ],
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const CapabilityEnableStatus: { readonly enabled: \"enabled\"; readonly gated: \"gated\"; readonly cancelled: \"cancelled\"; readonly failed: \"failed\"; };"
+            "export declare const CapabilityEnableStatus: { readonly enabled: 'enabled'; readonly gated: 'gated'; readonly cancelled: 'cancelled'; readonly failed: 'failed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1692,7 +1692,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/state-constants.d.ts:CapabilityEnableStatus:export declare const CapabilityEnableStatus: { readonly enabled: \"enabled\"; readonly gated: \"gated\"; readonly cancelled: \"cancelled\"; readonly failed: \"failed\"; };",
+          "identity": "packages/capability/dist/state-constants.d.ts:CapabilityEnableStatus:export declare const CapabilityEnableStatus: { readonly enabled: 'enabled'; readonly gated: 'gated'; readonly cancelled: 'cancelled'; readonly failed: 'failed'; };",
           "guidance": [
             {
               "id": "组合工作流示例-懒加载-错误上报-优雅收尾",
@@ -1717,7 +1717,7 @@
         {
           "name": "CapabilityErrorCode",
           "kind": "const",
-          "signature": "export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived. */ readonly hostDisposed: \"HOST_DISPOSED\"; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks. */ readonly hostTransitioning: \"HOST_TRANSITIONING\"; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first. */ readonly notRegistered: \"NOT_REGISTERED\"; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host. */ readonly alreadyRegistered: \"ALREADY_REGISTERED\"; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying. */ readonly invalidName: \"INVALID_NAME\"; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`. */ readonly invalidActivate: \"INVALID_ACTIVATE\"; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`. */ readonly invalidHandle: \"INVALID_HANDLE\"; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error. */ readonly gated: \"GATED\"; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived. */ readonly hostDisposed: 'HOST_DISPOSED'; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks. */ readonly hostTransitioning: 'HOST_TRANSITIONING'; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first. */ readonly notRegistered: 'NOT_REGISTERED'; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host. */ readonly alreadyRegistered: 'ALREADY_REGISTERED'; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying. */ readonly invalidName: 'INVALID_NAME'; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`. */ readonly invalidActivate: 'INVALID_ACTIVATE'; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`. */ readonly invalidHandle: 'INVALID_HANDLE'; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error. */ readonly gated: 'GATED'; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 14,
           "source": "packages/capability/dist/error-code.d.ts",
           "purpose": "Native host errors tagged with source @migaia/capability; inspect source and code together. Compare these exported values when handling the documented branch.",
@@ -1739,89 +1739,89 @@
               "name": "hostDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostDisposed: \"HOST_DISPOSED\";",
+              "signature": "readonly hostDisposed: 'HOST_DISPOSED';",
               "description": "Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived.",
               "parameterDetails": [],
-              "returns": "\"HOST_DISPOSED\""
+              "returns": "'HOST_DISPOSED'"
             },
             {
               "name": "hostTransitioning",
               "kind": "property",
               "optional": false,
-              "signature": "readonly hostTransitioning: \"HOST_TRANSITIONING\";",
+              "signature": "readonly hostTransitioning: 'HOST_TRANSITIONING';",
               "description": "Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks.",
               "parameterDetails": [],
-              "returns": "\"HOST_TRANSITIONING\""
+              "returns": "'HOST_TRANSITIONING'"
             },
             {
               "name": "notRegistered",
               "kind": "property",
               "optional": false,
-              "signature": "readonly notRegistered: \"NOT_REGISTERED\";",
+              "signature": "readonly notRegistered: 'NOT_REGISTERED';",
               "description": "Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first.",
               "parameterDetails": [],
-              "returns": "\"NOT_REGISTERED\""
+              "returns": "'NOT_REGISTERED'"
             },
             {
               "name": "alreadyRegistered",
               "kind": "property",
               "optional": false,
-              "signature": "readonly alreadyRegistered: \"ALREADY_REGISTERED\";",
+              "signature": "readonly alreadyRegistered: 'ALREADY_REGISTERED';",
               "description": "Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host.",
               "parameterDetails": [],
-              "returns": "\"ALREADY_REGISTERED\""
+              "returns": "'ALREADY_REGISTERED'"
             },
             {
               "name": "invalidName",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidName: \"INVALID_NAME\";",
+              "signature": "readonly invalidName: 'INVALID_NAME';",
               "description": "Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying.",
               "parameterDetails": [],
-              "returns": "\"INVALID_NAME\""
+              "returns": "'INVALID_NAME'"
             },
             {
               "name": "invalidActivate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidActivate: \"INVALID_ACTIVATE\";",
+              "signature": "readonly invalidActivate: 'INVALID_ACTIVATE';",
               "description": "Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`.",
               "parameterDetails": [],
-              "returns": "\"INVALID_ACTIVATE\""
+              "returns": "'INVALID_ACTIVATE'"
             },
             {
               "name": "invalidHandle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidHandle: \"INVALID_HANDLE\";",
+              "signature": "readonly invalidHandle: 'INVALID_HANDLE';",
               "description": "Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`.",
               "parameterDetails": [],
-              "returns": "\"INVALID_HANDLE\""
+              "returns": "'INVALID_HANDLE'"
             },
             {
               "name": "gated",
               "kind": "property",
               "optional": false,
-              "signature": "readonly gated: \"GATED\";",
+              "signature": "readonly gated: 'GATED';",
               "description": "Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error.",
               "parameterDetails": [],
-              "returns": "\"GATED\""
+              "returns": "'GATED'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             }
           ],
           "composes": [],
           "aliasOf": "CapabilityErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived. */ readonly hostDisposed: \"HOST_DISPOSED\"; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks. */ readonly hostTransitioning: \"HOST_TRANSITIONING\"; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first. */ readonly notRegistered: \"NOT_REGISTERED\"; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host. */ readonly alreadyRegistered: \"ALREADY_REGISTERED\"; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying. */ readonly invalidName: \"INVALID_NAME\"; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`. */ readonly invalidActivate: \"INVALID_ACTIVATE\"; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`. */ readonly invalidHandle: \"INVALID_HANDLE\"; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error. */ readonly gated: \"GATED\"; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived. */ readonly hostDisposed: 'HOST_DISPOSED'; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks. */ readonly hostTransitioning: 'HOST_TRANSITIONING'; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first. */ readonly notRegistered: 'NOT_REGISTERED'; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host. */ readonly alreadyRegistered: 'ALREADY_REGISTERED'; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying. */ readonly invalidName: 'INVALID_NAME'; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`. */ readonly invalidActivate: 'INVALID_ACTIVATE'; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`. */ readonly invalidHandle: 'INVALID_HANDLE'; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error. */ readonly gated: 'GATED'; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1860,7 +1860,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/error-code.d.ts:CapabilityErrorCode:export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived. */ readonly hostDisposed: \"HOST_DISPOSED\"; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks. */ readonly hostTransitioning: \"HOST_TRANSITIONING\"; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first. */ readonly notRegistered: \"NOT_REGISTERED\"; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host. */ readonly alreadyRegistered: \"ALREADY_REGISTERED\"; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying. */ readonly invalidName: \"INVALID_NAME\"; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`. */ readonly invalidActivate: \"INVALID_ACTIVATE\"; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`. */ readonly invalidHandle: \"INVALID_HANDLE\"; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error. */ readonly gated: \"GATED\"; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/capability/dist/error-code.d.ts:CapabilityErrorCode:export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a * new host to enable capabilities again. A disposed host cannot be revived. */ readonly hostDisposed: 'HOST_DISPOSED'; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations * outside lifecycle callbacks. */ readonly hostTransitioning: 'HOST_TRANSITIONING'; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability * first. */ readonly notRegistered: 'NOT_REGISTERED'; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host. */ readonly alreadyRegistered: 'ALREADY_REGISTERED'; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before * retrying. */ readonly invalidName: 'INVALID_NAME'; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable * `activate`. */ readonly invalidActivate: 'INVALID_ACTIVATE'; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate` * returns a handle with `dispose`. */ readonly invalidHandle: 'INVALID_HANDLE'; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability * `blocked`. Branch on the return value instead of catching an error. */ readonly gated: 'GATED'; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object * before retrying. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "错误码与错误结构",
@@ -2020,7 +2020,7 @@
         {
           "name": "CapabilityState",
           "kind": "const",
-          "signature": "export declare const CapabilityState: { readonly off: \"off\"; readonly gated: \"gated\"; readonly activating: \"activating\"; readonly on: \"on\"; readonly failed: \"failed\"; };",
+          "signature": "export declare const CapabilityState: { readonly off: 'off'; readonly gated: 'gated'; readonly activating: 'activating'; readonly on: 'on'; readonly failed: 'failed'; };",
           "declarationLine": 2,
           "source": "packages/capability/dist/state-constants.d.ts",
           "purpose": "Gate lifecycle state, separate from dependency graph availability. Compare these exported values when handling the documented branch.",
@@ -2044,52 +2044,52 @@
               "name": "off",
               "kind": "property",
               "optional": false,
-              "signature": "readonly off: \"off\";",
+              "signature": "readonly off: 'off';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"off\""
+              "returns": "'off'"
             },
             {
               "name": "gated",
               "kind": "property",
               "optional": false,
-              "signature": "readonly gated: \"gated\";",
+              "signature": "readonly gated: 'gated';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"gated\""
+              "returns": "'gated'"
             },
             {
               "name": "activating",
               "kind": "property",
               "optional": false,
-              "signature": "readonly activating: \"activating\";",
+              "signature": "readonly activating: 'activating';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"activating\""
+              "returns": "'activating'"
             },
             {
               "name": "on",
               "kind": "property",
               "optional": false,
-              "signature": "readonly on: \"on\";",
+              "signature": "readonly on: 'on';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"on\""
+              "returns": "'on'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             }
           ],
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const CapabilityState: { readonly off: \"off\"; readonly gated: \"gated\"; readonly activating: \"activating\"; readonly on: \"on\"; readonly failed: \"failed\"; };"
+            "export declare const CapabilityState: { readonly off: 'off'; readonly gated: 'gated'; readonly activating: 'activating'; readonly on: 'on'; readonly failed: 'failed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2128,7 +2128,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/state-constants.d.ts:CapabilityState:export declare const CapabilityState: { readonly off: \"off\"; readonly gated: \"gated\"; readonly activating: \"activating\"; readonly on: \"on\"; readonly failed: \"failed\"; };",
+          "identity": "packages/capability/dist/state-constants.d.ts:CapabilityState:export declare const CapabilityState: { readonly off: 'off'; readonly gated: 'gated'; readonly activating: 'activating'; readonly on: 'on'; readonly failed: 'failed'; };",
           "guidance": [
             {
               "id": "宿主创建与生命周期方法",
@@ -2741,7 +2741,7 @@
         {
           "name": "GraphReadinessState",
           "kind": "const",
-          "signature": "export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: \"ready\"; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: \"blocked\"; /** Admission failed; the paired snapshot error explains why. */ readonly failed: \"failed\"; };\nexport type GraphReadinessState = keyof typeof GraphReadinessState;",
+          "signature": "export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: 'ready'; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: 'blocked'; /** Admission failed; the paired snapshot error explains why. */ readonly failed: 'failed'; };\nexport type GraphReadinessState = keyof typeof GraphReadinessState;",
           "declarationLine": 7,
           "source": "packages/capability/dist/graph-readiness.d.ts",
           "purpose": "Availability captured from a composition owner before admission. Compare these exported values when handling the documented branch.",
@@ -2758,35 +2758,35 @@
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": "Admission may proceed using the current readiness snapshot.",
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "blocked",
               "kind": "property",
               "optional": false,
-              "signature": "readonly blocked: \"blocked\";",
+              "signature": "readonly blocked: 'blocked';",
               "description": "Admission is unavailable without declaring a terminal startup failure.",
               "parameterDetails": [],
-              "returns": "\"blocked\""
+              "returns": "'blocked'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": "Admission failed; the paired snapshot error explains why.",
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             }
           ],
           "composes": [],
           "aliasOf": "GraphReadinessState",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: \"ready\"; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: \"blocked\"; /** Admission failed; the paired snapshot error explains why. */ readonly failed: \"failed\"; };",
+            "export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: 'ready'; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: 'blocked'; /** Admission failed; the paired snapshot error explains why. */ readonly failed: 'failed'; };",
             "export type GraphReadinessState = keyof typeof GraphReadinessState;"
           ],
           "overloadParameterDetails": [[], []],
@@ -2826,7 +2826,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph-readiness.d.ts:GraphReadinessState:export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: \"ready\"; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: \"blocked\"; /** Admission failed; the paired snapshot error explains why. */ readonly failed: \"failed\"; };\nexport type GraphReadinessState = keyof typeof GraphReadinessState;",
+          "identity": "packages/capability/dist/graph-readiness.d.ts:GraphReadinessState:export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: 'ready'; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: 'blocked'; /** Admission failed; the paired snapshot error explains why. */ readonly failed: 'failed'; };\nexport type GraphReadinessState = keyof typeof GraphReadinessState;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -5408,7 +5408,7 @@
         {
           "name": "CapabilityGraphErrorCode",
           "kind": "const",
-          "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
+          "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: 'GRAPH_DISPOSED'; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: 'GRAPH_FROZEN'; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: 'GRAPH_INVALID_NODE'; /** A second node uses an already registered ID. */ readonly duplicateNode: 'GRAPH_DUPLICATE_NODE'; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER'; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE'; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE'; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE'; /** A node start failed and the graph entered failed state. */ readonly startFailed: 'GRAPH_START_FAILED'; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: 'GRAPH_DISPOSE_FAILED'; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED'; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: 'GRAPH_UNKNOWN_NODE'; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION'; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: 'GRAPH_INVALID_OPTION'; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS'; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT'; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED'; };",
           "declarationLine": 4,
           "source": "packages/capability/dist/graph/error-code.d.ts",
           "purpose": "Graph-owned stable codes under source @migaia/capability/graph; original causes stay reachable. Compare the documented exported values when handling this branch.",
@@ -5427,161 +5427,161 @@
               "name": "graphDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly graphDisposed: \"GRAPH_DISPOSED\";",
+              "signature": "readonly graphDisposed: 'GRAPH_DISPOSED';",
               "description": "Graph mutation/query reaches terminal state; create a new graph.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_DISPOSED\""
+              "returns": "'GRAPH_DISPOSED'"
             },
             {
               "name": "graphFrozen",
               "kind": "property",
               "optional": false,
-              "signature": "readonly graphFrozen: \"GRAPH_FROZEN\";",
+              "signature": "readonly graphFrozen: 'GRAPH_FROZEN';",
               "description": "Registration is attempted after readiness froze the static registry.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_FROZEN\""
+              "returns": "'GRAPH_FROZEN'"
             },
             {
               "name": "invalidNode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidNode: \"GRAPH_INVALID_NODE\";",
+              "signature": "readonly invalidNode: 'GRAPH_INVALID_NODE';",
               "description": "A node, dependency, or start result fails structural admission.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_INVALID_NODE\""
+              "returns": "'GRAPH_INVALID_NODE'"
             },
             {
               "name": "duplicateNode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\";",
+              "signature": "readonly duplicateNode: 'GRAPH_DUPLICATE_NODE';",
               "description": "A second node uses an already registered ID.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_DUPLICATE_NODE\""
+              "returns": "'GRAPH_DUPLICATE_NODE'"
             },
             {
               "name": "unknownProvider",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\";",
+              "signature": "readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER';",
               "description": "A dependency names a provider absent from the frozen registry.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_UNKNOWN_PROVIDER\""
+              "returns": "'GRAPH_UNKNOWN_PROVIDER'"
             },
             {
               "name": "duplicateEdge",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\";",
+              "signature": "readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE';",
               "description": "A consumer repeats the same provider edge.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_DUPLICATE_EDGE\""
+              "returns": "'GRAPH_DUPLICATE_EDGE'"
             },
             {
               "name": "dependencyCycle",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\";",
+              "signature": "readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE';",
               "description": "The required dependency graph contains a self-loop or cycle.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_DEPENDENCY_CYCLE\""
+              "returns": "'GRAPH_DEPENDENCY_CYCLE'"
             },
             {
               "name": "providerUnavailable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\";",
+              "signature": "readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE';",
               "description": "A direct provider lookup is not declared and ready.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_PROVIDER_UNAVAILABLE\""
+              "returns": "'GRAPH_PROVIDER_UNAVAILABLE'"
             },
             {
               "name": "startFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly startFailed: \"GRAPH_START_FAILED\";",
+              "signature": "readonly startFailed: 'GRAPH_START_FAILED';",
               "description": "A node start failed and the graph entered failed state.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_START_FAILED\""
+              "returns": "'GRAPH_START_FAILED'"
             },
             {
               "name": "disposeFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\";",
+              "signature": "readonly disposeFailed: 'GRAPH_DISPOSE_FAILED';",
               "description": "Release of one or more graph-owned node resources failed.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_DISPOSE_FAILED\""
+              "returns": "'GRAPH_DISPOSE_FAILED'"
             },
             {
               "name": "admissionClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\";",
+              "signature": "readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED';",
               "description": "Startup or new work is rejected while the graph is quiescing.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_ADMISSION_CLOSED\""
+              "returns": "'GRAPH_ADMISSION_CLOSED'"
             },
             {
               "name": "unknownNode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unknownNode: \"GRAPH_UNKNOWN_NODE\";",
+              "signature": "readonly unknownNode: 'GRAPH_UNKNOWN_NODE';",
               "description": "Diagnostic or direct value query names an absent node; correct the id before retrying.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_UNKNOWN_NODE\""
+              "returns": "'GRAPH_UNKNOWN_NODE'"
             },
             {
               "name": "reentrantOperation",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\";",
+              "signature": "readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION';",
               "description": "A lifecycle callback synchronously re-enters the same graph operation.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_REENTRANT_OPERATION\""
+              "returns": "'GRAPH_REENTRANT_OPERATION'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"GRAPH_INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'GRAPH_INVALID_OPTION';",
               "description": "Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_INVALID_OPTION\""
+              "returns": "'GRAPH_INVALID_OPTION'"
             },
             {
               "name": "nodeHasDependents",
               "kind": "property",
               "optional": false,
-              "signature": "readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\";",
+              "signature": "readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS';",
               "description": "A reject-policy mutation targets a node that still has required dependents.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_NODE_HAS_DEPENDENTS\""
+              "returns": "'GRAPH_NODE_HAS_DEPENDENTS'"
             },
             {
               "name": "mutationAdmissionTimeout",
               "kind": "property",
               "optional": false,
-              "signature": "readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\";",
+              "signature": "readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT';",
               "description": "A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_MUTATION_ADMISSION_TIMEOUT\""
+              "returns": "'GRAPH_MUTATION_ADMISSION_TIMEOUT'"
             },
             {
               "name": "nodeNotSuspended",
               "kind": "property",
               "optional": false,
-              "signature": "readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\";",
+              "signature": "readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED';",
               "description": "`resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running.",
               "parameterDetails": [],
-              "returns": "\"GRAPH_NODE_NOT_SUSPENDED\""
+              "returns": "'GRAPH_NODE_NOT_SUSPENDED'"
             }
           ],
           "composes": [],
           "aliasOf": "CapabilityGraphErrorCode",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };"
+            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: 'GRAPH_DISPOSED'; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: 'GRAPH_FROZEN'; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: 'GRAPH_INVALID_NODE'; /** A second node uses an already registered ID. */ readonly duplicateNode: 'GRAPH_DUPLICATE_NODE'; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER'; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE'; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE'; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE'; /** A node start failed and the graph entered failed state. */ readonly startFailed: 'GRAPH_START_FAILED'; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: 'GRAPH_DISPOSE_FAILED'; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED'; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: 'GRAPH_UNKNOWN_NODE'; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION'; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: 'GRAPH_INVALID_OPTION'; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS'; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT'; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5620,7 +5620,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
+          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: 'GRAPH_DISPOSED'; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: 'GRAPH_FROZEN'; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: 'GRAPH_INVALID_NODE'; /** A second node uses an already registered ID. */ readonly duplicateNode: 'GRAPH_DUPLICATE_NODE'; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER'; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE'; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE'; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE'; /** A node start failed and the graph entered failed state. */ readonly startFailed: 'GRAPH_START_FAILED'; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: 'GRAPH_DISPOSE_FAILED'; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED'; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: 'GRAPH_UNKNOWN_NODE'; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION'; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: 'GRAPH_INVALID_OPTION'; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS'; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT'; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED'; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -5629,7 +5629,7 @@
         {
           "name": "CapabilityGraphNodeState",
           "kind": "const",
-          "signature": "export declare const CapabilityGraphNodeState: { readonly registered: \"registered\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly suspended: \"suspended\"; readonly failed: \"failed\"; readonly blocked: \"blocked\"; readonly rolledBack: \"rolled-back\"; readonly released: \"released\"; };",
+          "signature": "export declare const CapabilityGraphNodeState: { readonly registered: 'registered'; readonly starting: 'starting'; readonly ready: 'ready'; readonly suspended: 'suspended'; readonly failed: 'failed'; readonly blocked: 'blocked'; readonly rolledBack: 'rolled-back'; readonly released: 'released'; };",
           "declarationLine": 11,
           "source": "packages/capability/dist/graph/state-constants.d.ts",
           "purpose": "Per-node lifecycle states, including dependency blocking and rollback. Compare the documented exported values when handling this branch.",
@@ -5646,80 +5646,80 @@
               "name": "registered",
               "kind": "property",
               "optional": false,
-              "signature": "readonly registered: \"registered\";",
+              "signature": "readonly registered: 'registered';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"registered\""
+              "returns": "'registered'"
             },
             {
               "name": "starting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly starting: \"starting\";",
+              "signature": "readonly starting: 'starting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"starting\""
+              "returns": "'starting'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "suspended",
               "kind": "property",
               "optional": false,
-              "signature": "readonly suspended: \"suspended\";",
+              "signature": "readonly suspended: 'suspended';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"suspended\""
+              "returns": "'suspended'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             },
             {
               "name": "blocked",
               "kind": "property",
               "optional": false,
-              "signature": "readonly blocked: \"blocked\";",
+              "signature": "readonly blocked: 'blocked';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"blocked\""
+              "returns": "'blocked'"
             },
             {
               "name": "rolledBack",
               "kind": "property",
               "optional": false,
-              "signature": "readonly rolledBack: \"rolled-back\";",
+              "signature": "readonly rolledBack: 'rolled-back';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"rolled-back\""
+              "returns": "'rolled-back'"
             },
             {
               "name": "released",
               "kind": "property",
               "optional": false,
-              "signature": "readonly released: \"released\";",
+              "signature": "readonly released: 'released';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"released\""
+              "returns": "'released'"
             }
           ],
           "composes": [],
           "aliasOf": "CapabilityGraphNodeState",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CapabilityGraphNodeState: { readonly registered: \"registered\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly suspended: \"suspended\"; readonly failed: \"failed\"; readonly blocked: \"blocked\"; readonly rolledBack: \"rolled-back\"; readonly released: \"released\"; };"
+            "export declare const CapabilityGraphNodeState: { readonly registered: 'registered'; readonly starting: 'starting'; readonly ready: 'ready'; readonly suspended: 'suspended'; readonly failed: 'failed'; readonly blocked: 'blocked'; readonly rolledBack: 'rolled-back'; readonly released: 'released'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5758,7 +5758,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/state-constants.d.ts:CapabilityGraphNodeState:export declare const CapabilityGraphNodeState: { readonly registered: \"registered\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly suspended: \"suspended\"; readonly failed: \"failed\"; readonly blocked: \"blocked\"; readonly rolledBack: \"rolled-back\"; readonly released: \"released\"; };",
+          "identity": "packages/capability/dist/graph/state-constants.d.ts:CapabilityGraphNodeState:export declare const CapabilityGraphNodeState: { readonly registered: 'registered'; readonly starting: 'starting'; readonly ready: 'ready'; readonly suspended: 'suspended'; readonly failed: 'failed'; readonly blocked: 'blocked'; readonly rolledBack: 'rolled-back'; readonly released: 'released'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5767,7 +5767,7 @@
         {
           "name": "CapabilityGraphState",
           "kind": "const",
-          "signature": "export declare const CapabilityGraphState: { readonly open: \"open\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly failed: \"failed\"; readonly quiescing: \"quiescing\"; readonly terminal: \"terminal\"; };",
+          "signature": "export declare const CapabilityGraphState: { readonly open: 'open'; readonly starting: 'starting'; readonly ready: 'ready'; readonly failed: 'failed'; readonly quiescing: 'quiescing'; readonly terminal: 'terminal'; };",
           "declarationLine": 2,
           "source": "packages/capability/dist/graph/state-constants.d.ts",
           "purpose": "Container lifecycle shared by static and dynamic graphs, distinct from node state. Compare the documented exported values when handling this branch.",
@@ -5784,62 +5784,62 @@
               "name": "open",
               "kind": "property",
               "optional": false,
-              "signature": "readonly open: \"open\";",
+              "signature": "readonly open: 'open';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"open\""
+              "returns": "'open'"
             },
             {
               "name": "starting",
               "kind": "property",
               "optional": false,
-              "signature": "readonly starting: \"starting\";",
+              "signature": "readonly starting: 'starting';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"starting\""
+              "returns": "'starting'"
             },
             {
               "name": "ready",
               "kind": "property",
               "optional": false,
-              "signature": "readonly ready: \"ready\";",
+              "signature": "readonly ready: 'ready';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"ready\""
+              "returns": "'ready'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             },
             {
               "name": "quiescing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly quiescing: \"quiescing\";",
+              "signature": "readonly quiescing: 'quiescing';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"quiescing\""
+              "returns": "'quiescing'"
             },
             {
               "name": "terminal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly terminal: \"terminal\";",
+              "signature": "readonly terminal: 'terminal';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"terminal\""
+              "returns": "'terminal'"
             }
           ],
           "composes": [],
           "aliasOf": "CapabilityGraphState",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CapabilityGraphState: { readonly open: \"open\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly failed: \"failed\"; readonly quiescing: \"quiescing\"; readonly terminal: \"terminal\"; };"
+            "export declare const CapabilityGraphState: { readonly open: 'open'; readonly starting: 'starting'; readonly ready: 'ready'; readonly failed: 'failed'; readonly quiescing: 'quiescing'; readonly terminal: 'terminal'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5878,7 +5878,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/state-constants.d.ts:CapabilityGraphState:export declare const CapabilityGraphState: { readonly open: \"open\"; readonly starting: \"starting\"; readonly ready: \"ready\"; readonly failed: \"failed\"; readonly quiescing: \"quiescing\"; readonly terminal: \"terminal\"; };",
+          "identity": "packages/capability/dist/graph/state-constants.d.ts:CapabilityGraphState:export declare const CapabilityGraphState: { readonly open: 'open'; readonly starting: 'starting'; readonly ready: 'ready'; readonly failed: 'failed'; readonly quiescing: 'quiescing'; readonly terminal: 'terminal'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5984,7 +5984,7 @@
         {
           "name": "GraphBlockedReason",
           "kind": "const",
-          "signature": "export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: \"missing\"; /** A required provider or its ancestor is suspended. */ readonly suspended: \"suspended\"; /** A required provider was explicitly removed from this graph. */ readonly removed: \"removed\"; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: \"failed\"; };\nexport type GraphBlockedReason = keyof typeof GraphBlockedReason;",
+          "signature": "export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: 'missing'; /** A required provider or its ancestor is suspended. */ readonly suspended: 'suspended'; /** A required provider was explicitly removed from this graph. */ readonly removed: 'removed'; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: 'failed'; };\nexport type GraphBlockedReason = keyof typeof GraphBlockedReason;",
           "declarationLine": 24,
           "source": "packages/capability/dist/graph/state-constants.d.ts",
           "purpose": "Provider-unavailability reasons carried by diagnostics rather than thrown codes. Compare the documented exported values when handling this branch.",
@@ -6001,44 +6001,44 @@
               "name": "missing",
               "kind": "property",
               "optional": false,
-              "signature": "readonly missing: \"missing\";",
+              "signature": "readonly missing: 'missing';",
               "description": "A required provider is absent from the current graph.",
               "parameterDetails": [],
-              "returns": "\"missing\""
+              "returns": "'missing'"
             },
             {
               "name": "suspended",
               "kind": "property",
               "optional": false,
-              "signature": "readonly suspended: \"suspended\";",
+              "signature": "readonly suspended: 'suspended';",
               "description": "A required provider or its ancestor is suspended.",
               "parameterDetails": [],
-              "returns": "\"suspended\""
+              "returns": "'suspended'"
             },
             {
               "name": "removed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly removed: \"removed\";",
+              "signature": "readonly removed: 'removed';",
               "description": "A required provider was explicitly removed from this graph.",
               "parameterDetails": [],
-              "returns": "\"removed\""
+              "returns": "'removed'"
             },
             {
               "name": "failed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly failed: \"failed\";",
+              "signature": "readonly failed: 'failed';",
               "description": "A required provider failed to start or belongs to an unattributable failed batch.",
               "parameterDetails": [],
-              "returns": "\"failed\""
+              "returns": "'failed'"
             }
           ],
           "composes": [],
           "aliasOf": "GraphBlockedReason",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: \"missing\"; /** A required provider or its ancestor is suspended. */ readonly suspended: \"suspended\"; /** A required provider was explicitly removed from this graph. */ readonly removed: \"removed\"; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: \"failed\"; };",
+            "export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: 'missing'; /** A required provider or its ancestor is suspended. */ readonly suspended: 'suspended'; /** A required provider was explicitly removed from this graph. */ readonly removed: 'removed'; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: 'failed'; };",
             "export type GraphBlockedReason = keyof typeof GraphBlockedReason;"
           ],
           "overloadParameterDetails": [[], []],
@@ -6078,7 +6078,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/state-constants.d.ts:GraphBlockedReason:export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: \"missing\"; /** A required provider or its ancestor is suspended. */ readonly suspended: \"suspended\"; /** A required provider was explicitly removed from this graph. */ readonly removed: \"removed\"; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: \"failed\"; };\nexport type GraphBlockedReason = keyof typeof GraphBlockedReason;",
+          "identity": "packages/capability/dist/graph/state-constants.d.ts:GraphBlockedReason:export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: 'missing'; /** A required provider or its ancestor is suspended. */ readonly suspended: 'suspended'; /** A required provider was explicitly removed from this graph. */ readonly removed: 'removed'; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: 'failed'; };\nexport type GraphBlockedReason = keyof typeof GraphBlockedReason;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -7378,9 +7378,9 @@
           "ownerFragment": "capability-graph/topology--ITopologyNode"
         },
         {
-          "identity": "packages/capability/dist/graph/topology.d.ts:TopologyInvalidReason:export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: \"invalid-node\"; /** Two node descriptors use the same ID. */ readonly duplicateNode: \"duplicate-node\"; /** A node repeats one required provider edge. */ readonly duplicateEdge: \"duplicate-edge\"; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: \"duplicate-ordinal\"; /** A topology operation references a node that is not currently present. */ readonly unknownNode: \"unknown-node\"; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: \"transaction-open\"; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: \"transaction-closed\"; };",
+          "identity": "packages/capability/dist/graph/topology.d.ts:TopologyInvalidReason:export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: 'invalid-node'; /** Two node descriptors use the same ID. */ readonly duplicateNode: 'duplicate-node'; /** A node repeats one required provider edge. */ readonly duplicateEdge: 'duplicate-edge'; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: 'duplicate-ordinal'; /** A topology operation references a node that is not currently present. */ readonly unknownNode: 'unknown-node'; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: 'transaction-open'; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: 'transaction-closed'; };",
           "name": "TopologyInvalidReason",
-          "signature": "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: \"invalid-node\"; /** Two node descriptors use the same ID. */ readonly duplicateNode: \"duplicate-node\"; /** A node repeats one required provider edge. */ readonly duplicateEdge: \"duplicate-edge\"; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: \"duplicate-ordinal\"; /** A topology operation references a node that is not currently present. */ readonly unknownNode: \"unknown-node\"; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: \"transaction-open\"; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: \"transaction-closed\"; };",
+          "signature": "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: 'invalid-node'; /** Two node descriptors use the same ID. */ readonly duplicateNode: 'duplicate-node'; /** A node repeats one required provider edge. */ readonly duplicateEdge: 'duplicate-edge'; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: 'duplicate-ordinal'; /** A topology operation references a node that is not currently present. */ readonly unknownNode: 'unknown-node'; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: 'transaction-open'; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: 'transaction-closed'; };",
           "source": "packages/capability/dist/graph/topology.d.ts",
           "exportPath": "./graph",
           "ownerExportPath": "./graph/topology",
@@ -7496,7 +7496,7 @@
         {
           "name": "DependencyAction",
           "kind": "const",
-          "signature": "export declare const DependencyAction: { readonly release: \"release\"; readonly disable: \"disable\"; readonly suspend: \"suspend\"; readonly resume: \"resume\"; readonly rebind: \"rebind\"; readonly restart: \"restart\"; readonly activate: \"activate\"; readonly invalidate: \"invalidate\"; };\nexport type DependencyAction = keyof typeof DependencyAction;",
+          "signature": "export declare const DependencyAction: { readonly release: 'release'; readonly disable: 'disable'; readonly suspend: 'suspend'; readonly resume: 'resume'; readonly rebind: 'rebind'; readonly restart: 'restart'; readonly activate: 'activate'; readonly invalidate: 'invalidate'; };\nexport type DependencyAction = keyof typeof DependencyAction;",
           "declarationLine": 13,
           "source": "packages/capability/dist/graph/dependency.d.ts",
           "purpose": "Proposed lifecycle work emitted by planners; callers execute these actions. Select the documented value for its own operation; the table does not execute lifecycle work.",
@@ -7513,79 +7513,79 @@
               "name": "release",
               "kind": "property",
               "optional": false,
-              "signature": "readonly release: \"release\";",
+              "signature": "readonly release: 'release';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"release\""
+              "returns": "'release'"
             },
             {
               "name": "disable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disable: \"disable\";",
+              "signature": "readonly disable: 'disable';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"disable\""
+              "returns": "'disable'"
             },
             {
               "name": "suspend",
               "kind": "property",
               "optional": false,
-              "signature": "readonly suspend: \"suspend\";",
+              "signature": "readonly suspend: 'suspend';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"suspend\""
+              "returns": "'suspend'"
             },
             {
               "name": "resume",
               "kind": "property",
               "optional": false,
-              "signature": "readonly resume: \"resume\";",
+              "signature": "readonly resume: 'resume';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"resume\""
+              "returns": "'resume'"
             },
             {
               "name": "rebind",
               "kind": "property",
               "optional": false,
-              "signature": "readonly rebind: \"rebind\";",
+              "signature": "readonly rebind: 'rebind';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"rebind\""
+              "returns": "'rebind'"
             },
             {
               "name": "restart",
               "kind": "property",
               "optional": false,
-              "signature": "readonly restart: \"restart\";",
+              "signature": "readonly restart: 'restart';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"restart\""
+              "returns": "'restart'"
             },
             {
               "name": "activate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly activate: \"activate\";",
+              "signature": "readonly activate: 'activate';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"activate\""
+              "returns": "'activate'"
             },
             {
               "name": "invalidate",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidate: \"invalidate\";",
+              "signature": "readonly invalidate: 'invalidate';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"invalidate\""
+              "returns": "'invalidate'"
             }
           ],
           "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
-            "export declare const DependencyAction: { readonly release: \"release\"; readonly disable: \"disable\"; readonly suspend: \"suspend\"; readonly resume: \"resume\"; readonly rebind: \"rebind\"; readonly restart: \"restart\"; readonly activate: \"activate\"; readonly invalidate: \"invalidate\"; };",
+            "export declare const DependencyAction: { readonly release: 'release'; readonly disable: 'disable'; readonly suspend: 'suspend'; readonly resume: 'resume'; readonly rebind: 'rebind'; readonly restart: 'restart'; readonly activate: 'activate'; readonly invalidate: 'invalidate'; };",
             "export type DependencyAction = keyof typeof DependencyAction;"
           ],
           "overloadParameterDetails": [[], []],
@@ -7625,7 +7625,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyAction:export declare const DependencyAction: { readonly release: \"release\"; readonly disable: \"disable\"; readonly suspend: \"suspend\"; readonly resume: \"resume\"; readonly rebind: \"rebind\"; readonly restart: \"restart\"; readonly activate: \"activate\"; readonly invalidate: \"invalidate\"; };\nexport type DependencyAction = keyof typeof DependencyAction;",
+          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyAction:export declare const DependencyAction: { readonly release: 'release'; readonly disable: 'disable'; readonly suspend: 'suspend'; readonly resume: 'resume'; readonly rebind: 'rebind'; readonly restart: 'restart'; readonly activate: 'activate'; readonly invalidate: 'invalidate'; };\nexport type DependencyAction = keyof typeof DependencyAction;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7634,7 +7634,7 @@
         {
           "name": "DependencyEdgeStatus",
           "kind": "const",
-          "signature": "export declare const DependencyEdgeStatus: { readonly optionalAbsent: \"optional-absent\"; };",
+          "signature": "export declare const DependencyEdgeStatus: { readonly optionalAbsent: 'optional-absent'; };",
           "declarationLine": 24,
           "source": "packages/capability/dist/graph/dependency.d.ts",
           "purpose": "Optional relationship metadata returned by pure dependency planners. Select the documented value for its own operation; the table does not execute lifecycle work.",
@@ -7651,16 +7651,16 @@
               "name": "optionalAbsent",
               "kind": "property",
               "optional": false,
-              "signature": "readonly optionalAbsent: \"optional-absent\";",
+              "signature": "readonly optionalAbsent: 'optional-absent';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"optional-absent\""
+              "returns": "'optional-absent'"
             }
           ],
           "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
-            "export declare const DependencyEdgeStatus: { readonly optionalAbsent: \"optional-absent\"; };"
+            "export declare const DependencyEdgeStatus: { readonly optionalAbsent: 'optional-absent'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7699,7 +7699,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyEdgeStatus:export declare const DependencyEdgeStatus: { readonly optionalAbsent: \"optional-absent\"; };",
+          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyEdgeStatus:export declare const DependencyEdgeStatus: { readonly optionalAbsent: 'optional-absent'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7708,7 +7708,7 @@
         {
           "name": "DependencyMutationKind",
           "kind": "const",
-          "signature": "export declare const DependencyMutationKind: { readonly remove: \"remove\"; readonly disable: \"disable\"; };\nexport type DependencyMutationKind = keyof typeof DependencyMutationKind;",
+          "signature": "export declare const DependencyMutationKind: { readonly remove: 'remove'; readonly disable: 'disable'; };\nexport type DependencyMutationKind = keyof typeof DependencyMutationKind;",
           "declarationLine": 8,
           "source": "packages/capability/dist/graph/dependency.d.ts",
           "purpose": "Root mutation intent interpreted independently of the selected dependent policy. Select the documented value for its own operation; the table does not execute lifecycle work.",
@@ -7727,25 +7727,25 @@
               "name": "remove",
               "kind": "property",
               "optional": false,
-              "signature": "readonly remove: \"remove\";",
+              "signature": "readonly remove: 'remove';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"remove\""
+              "returns": "'remove'"
             },
             {
               "name": "disable",
               "kind": "property",
               "optional": false,
-              "signature": "readonly disable: \"disable\";",
+              "signature": "readonly disable: 'disable';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"disable\""
+              "returns": "'disable'"
             }
           ],
           "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
-            "export declare const DependencyMutationKind: { readonly remove: \"remove\"; readonly disable: \"disable\"; };",
+            "export declare const DependencyMutationKind: { readonly remove: 'remove'; readonly disable: 'disable'; };",
             "export type DependencyMutationKind = keyof typeof DependencyMutationKind;"
           ],
           "overloadParameterDetails": [[], []],
@@ -7785,7 +7785,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyMutationKind:export declare const DependencyMutationKind: { readonly remove: \"remove\"; readonly disable: \"disable\"; };\nexport type DependencyMutationKind = keyof typeof DependencyMutationKind;",
+          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyMutationKind:export declare const DependencyMutationKind: { readonly remove: 'remove'; readonly disable: 'disable'; };\nexport type DependencyMutationKind = keyof typeof DependencyMutationKind;",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -7794,7 +7794,7 @@
         {
           "name": "DependencyPolicy",
           "kind": "const",
-          "signature": "export declare const DependencyPolicy: { readonly reject: \"reject\"; readonly cascade: \"cascade\"; readonly suspend: \"suspend\"; };\nexport type DependencyPolicy = keyof typeof DependencyPolicy;",
+          "signature": "export declare const DependencyPolicy: { readonly reject: 'reject'; readonly cascade: 'cascade'; readonly suspend: 'suspend'; };\nexport type DependencyPolicy = keyof typeof DependencyPolicy;",
           "declarationLine": 2,
           "source": "packages/capability/dist/graph/dependency.d.ts",
           "purpose": "How pure mutation planning treats required consumers of a changed provider. Select the documented value for its own operation; the table does not execute lifecycle work.",
@@ -7813,34 +7813,34 @@
               "name": "reject",
               "kind": "property",
               "optional": false,
-              "signature": "readonly reject: \"reject\";",
+              "signature": "readonly reject: 'reject';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"reject\""
+              "returns": "'reject'"
             },
             {
               "name": "cascade",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cascade: \"cascade\";",
+              "signature": "readonly cascade: 'cascade';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"cascade\""
+              "returns": "'cascade'"
             },
             {
               "name": "suspend",
               "kind": "property",
               "optional": false,
-              "signature": "readonly suspend: \"suspend\";",
+              "signature": "readonly suspend: 'suspend';",
               "description": null,
               "parameterDetails": [],
-              "returns": "\"suspend\""
+              "returns": "'suspend'"
             }
           ],
           "composes": [],
           "exportPath": "./graph/dependency",
           "overloadSignatures": [
-            "export declare const DependencyPolicy: { readonly reject: \"reject\"; readonly cascade: \"cascade\"; readonly suspend: \"suspend\"; };",
+            "export declare const DependencyPolicy: { readonly reject: 'reject'; readonly cascade: 'cascade'; readonly suspend: 'suspend'; };",
             "export type DependencyPolicy = keyof typeof DependencyPolicy;"
           ],
           "overloadParameterDetails": [[], []],
@@ -7880,7 +7880,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyPolicy:export declare const DependencyPolicy: { readonly reject: \"reject\"; readonly cascade: \"cascade\"; readonly suspend: \"suspend\"; };\nexport type DependencyPolicy = keyof typeof DependencyPolicy;",
+          "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyPolicy:export declare const DependencyPolicy: { readonly reject: 'reject'; readonly cascade: 'cascade'; readonly suspend: 'suspend'; };\nexport type DependencyPolicy = keyof typeof DependencyPolicy;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -9533,7 +9533,7 @@
         {
           "name": "GraphBindingReleaseReason",
           "kind": "const",
-          "signature": "export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: \"remove\"; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: \"replace\"; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: \"dispose\"; };\nexport type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;",
+          "signature": "export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: 'remove'; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: 'replace'; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: 'dispose'; };\nexport type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;",
           "declarationLine": 36,
           "source": "packages/capability/dist/graph/state-constants.d.ts",
           "purpose": "Stable remove, replace and dispose reasons passed to releaseBinding after exact instance cleanup. They identify custody changes rather than graph errors or permission states.",
@@ -9550,35 +9550,35 @@
               "name": "remove",
               "kind": "property",
               "optional": false,
-              "signature": "readonly remove: \"remove\";",
+              "signature": "readonly remove: 'remove';",
               "description": "The definition and its exact binding leave the graph.",
               "parameterDetails": [],
-              "returns": "\"remove\""
+              "returns": "'remove'"
             },
             {
               "name": "replace",
               "kind": "property",
               "optional": false,
-              "signature": "readonly replace: \"replace\";",
+              "signature": "readonly replace: 'replace';",
               "description": "Replacement relinquishes custody of the previous binding generation.",
               "parameterDetails": [],
-              "returns": "\"replace\""
+              "returns": "'replace'"
             },
             {
               "name": "dispose",
               "kind": "property",
               "optional": false,
-              "signature": "readonly dispose: \"dispose\";",
+              "signature": "readonly dispose: 'dispose';",
               "description": "Terminal graph teardown relinquishes every remaining binding.",
               "parameterDetails": [],
-              "returns": "\"dispose\""
+              "returns": "'dispose'"
             }
           ],
           "composes": [],
           "aliasOf": "GraphBindingReleaseReason",
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: \"remove\"; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: \"replace\"; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: \"dispose\"; };",
+            "export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: 'remove'; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: 'replace'; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: 'dispose'; };",
             "export type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;"
           ],
           "overloadParameterDetails": [[], []],
@@ -9618,7 +9618,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/state-constants.d.ts:GraphBindingReleaseReason:export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: \"remove\"; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: \"replace\"; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: \"dispose\"; };\nexport type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;",
+          "identity": "packages/capability/dist/graph/state-constants.d.ts:GraphBindingReleaseReason:export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: 'remove'; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: 'replace'; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: 'dispose'; };\nexport type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -12150,7 +12150,7 @@
         {
           "name": "TopologyInvalidReason",
           "kind": "const",
-          "signature": "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: \"invalid-node\"; /** Two node descriptors use the same ID. */ readonly duplicateNode: \"duplicate-node\"; /** A node repeats one required provider edge. */ readonly duplicateEdge: \"duplicate-edge\"; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: \"duplicate-ordinal\"; /** A topology operation references a node that is not currently present. */ readonly unknownNode: \"unknown-node\"; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: \"transaction-open\"; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: \"transaction-closed\"; };",
+          "signature": "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: 'invalid-node'; /** Two node descriptors use the same ID. */ readonly duplicateNode: 'duplicate-node'; /** A node repeats one required provider edge. */ readonly duplicateEdge: 'duplicate-edge'; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: 'duplicate-ordinal'; /** A topology operation references a node that is not currently present. */ readonly unknownNode: 'unknown-node'; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: 'transaction-open'; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: 'transaction-closed'; };",
           "declarationLine": 3,
           "source": "packages/capability/dist/graph/topology.d.ts",
           "purpose": "Structural and transaction reasons supplied to the application error adapter. Select the documented value for its own operation; the table does not execute lifecycle work.",
@@ -12167,70 +12167,70 @@
               "name": "invalidNode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidNode: \"invalid-node\";",
+              "signature": "readonly invalidNode: 'invalid-node';",
               "description": "A node descriptor is structurally invalid.",
               "parameterDetails": [],
-              "returns": "\"invalid-node\""
+              "returns": "'invalid-node'"
             },
             {
               "name": "duplicateNode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateNode: \"duplicate-node\";",
+              "signature": "readonly duplicateNode: 'duplicate-node';",
               "description": "Two node descriptors use the same ID.",
               "parameterDetails": [],
-              "returns": "\"duplicate-node\""
+              "returns": "'duplicate-node'"
             },
             {
               "name": "duplicateEdge",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateEdge: \"duplicate-edge\";",
+              "signature": "readonly duplicateEdge: 'duplicate-edge';",
               "description": "A node repeats one required provider edge.",
               "parameterDetails": [],
-              "returns": "\"duplicate-edge\""
+              "returns": "'duplicate-edge'"
             },
             {
               "name": "duplicateOrdinal",
               "kind": "property",
               "optional": false,
-              "signature": "readonly duplicateOrdinal: \"duplicate-ordinal\";",
+              "signature": "readonly duplicateOrdinal: 'duplicate-ordinal';",
               "description": "Two node descriptors use the same registration ordinal.",
               "parameterDetails": [],
-              "returns": "\"duplicate-ordinal\""
+              "returns": "'duplicate-ordinal'"
             },
             {
               "name": "unknownNode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unknownNode: \"unknown-node\";",
+              "signature": "readonly unknownNode: 'unknown-node';",
               "description": "A topology operation references a node that is not currently present.",
               "parameterDetails": [],
-              "returns": "\"unknown-node\""
+              "returns": "'unknown-node'"
             },
             {
               "name": "transactionOpen",
               "kind": "property",
               "optional": false,
-              "signature": "readonly transactionOpen: \"transaction-open\";",
+              "signature": "readonly transactionOpen: 'transaction-open';",
               "description": "A nested transaction or base-index mutation is attempted while a transaction is open.",
               "parameterDetails": [],
-              "returns": "\"transaction-open\""
+              "returns": "'transaction-open'"
             },
             {
               "name": "transactionClosed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly transactionClosed: \"transaction-closed\";",
+              "signature": "readonly transactionClosed: 'transaction-closed';",
               "description": "A settled transaction is used after commit or rollback.",
               "parameterDetails": [],
-              "returns": "\"transaction-closed\""
+              "returns": "'transaction-closed'"
             }
           ],
           "composes": [],
           "exportPath": "./graph/topology",
           "overloadSignatures": [
-            "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: \"invalid-node\"; /** Two node descriptors use the same ID. */ readonly duplicateNode: \"duplicate-node\"; /** A node repeats one required provider edge. */ readonly duplicateEdge: \"duplicate-edge\"; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: \"duplicate-ordinal\"; /** A topology operation references a node that is not currently present. */ readonly unknownNode: \"unknown-node\"; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: \"transaction-open\"; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: \"transaction-closed\"; };"
+            "export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: 'invalid-node'; /** Two node descriptors use the same ID. */ readonly duplicateNode: 'duplicate-node'; /** A node repeats one required provider edge. */ readonly duplicateEdge: 'duplicate-edge'; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: 'duplicate-ordinal'; /** A topology operation references a node that is not currently present. */ readonly unknownNode: 'unknown-node'; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: 'transaction-open'; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: 'transaction-closed'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -12269,7 +12269,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/topology.d.ts:TopologyInvalidReason:export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: \"invalid-node\"; /** Two node descriptors use the same ID. */ readonly duplicateNode: \"duplicate-node\"; /** A node repeats one required provider edge. */ readonly duplicateEdge: \"duplicate-edge\"; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: \"duplicate-ordinal\"; /** A topology operation references a node that is not currently present. */ readonly unknownNode: \"unknown-node\"; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: \"transaction-open\"; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: \"transaction-closed\"; };",
+          "identity": "packages/capability/dist/graph/topology.d.ts:TopologyInvalidReason:export declare const TopologyInvalidReason: { /** A node descriptor is structurally invalid. */ readonly invalidNode: 'invalid-node'; /** Two node descriptors use the same ID. */ readonly duplicateNode: 'duplicate-node'; /** A node repeats one required provider edge. */ readonly duplicateEdge: 'duplicate-edge'; /** Two node descriptors use the same registration ordinal. */ readonly duplicateOrdinal: 'duplicate-ordinal'; /** A topology operation references a node that is not currently present. */ readonly unknownNode: 'unknown-node'; /** A nested transaction or base-index mutation is attempted while a transaction is open. */ readonly transactionOpen: 'transaction-open'; /** A settled transaction is used after commit or rollback. */ readonly transactionClosed: 'transaction-closed'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

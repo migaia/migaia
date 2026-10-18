@@ -2913,7 +2913,7 @@
         {
           "name": "StoreDevtoolsErrorCode",
           "kind": "const",
-          "signature": "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: \"CALLBACK_FAILED\"; };",
+          "signature": "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: 'SESSION_DISPOSED'; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY'; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: 'INVALID_OPTION'; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: 'CALLBACK_FAILED'; };",
           "declarationLine": 8,
           "source": "packages/store-devtools/dist/error-code.d.ts",
           "purpose": "Stable failure codes under source @migaia/store-devtools; native error types are retained. Consult each member before interpreting a diagnostic or implementing your own bridge.",
@@ -2938,53 +2938,53 @@
               "name": "sessionDisposed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly sessionDisposed: \"SESSION_DISPOSED\";",
+              "signature": "readonly sessionDisposed: 'SESSION_DISPOSED';",
               "description": "Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal.",
               "parameterDetails": [],
-              "returns": "\"SESSION_DISPOSED\""
+              "returns": "'SESSION_DISPOSED'"
             },
             {
               "name": "unknownHistoryEntry",
               "kind": "property",
               "optional": false,
-              "signature": "readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\";",
+              "signature": "readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY';",
               "description": "Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry.",
               "parameterDetails": [],
-              "returns": "\"UNKNOWN_HISTORY_ENTRY\""
+              "returns": "'UNKNOWN_HISTORY_ENTRY'"
             },
             {
               "name": "invalidOption",
               "kind": "property",
               "optional": false,
-              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
               "description": "Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying.",
               "parameterDetails": [],
-              "returns": "\"INVALID_OPTION\""
+              "returns": "'INVALID_OPTION'"
             },
             {
               "name": "cleanupFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly cleanupFailed: \"CLEANUP_FAILED\";",
+              "signature": "readonly cleanupFailed: 'CLEANUP_FAILED';",
               "description": "Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived.",
               "parameterDetails": [],
-              "returns": "\"CLEANUP_FAILED\""
+              "returns": "'CLEANUP_FAILED'"
             },
             {
               "name": "callbackFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly callbackFailed: \"CALLBACK_FAILED\";",
+              "signature": "readonly callbackFailed: 'CALLBACK_FAILED';",
               "description": "A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause.",
               "parameterDetails": [],
-              "returns": "\"CALLBACK_FAILED\""
+              "returns": "'CALLBACK_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "StoreDevtoolsErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: \"CALLBACK_FAILED\"; };"
+            "export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: 'SESSION_DISPOSED'; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY'; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: 'INVALID_OPTION'; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: 'CALLBACK_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3023,7 +3023,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/error-code.d.ts:StoreDevtoolsErrorCode:export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: \"SESSION_DISPOSED\"; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: \"UNKNOWN_HISTORY_ENTRY\"; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: \"CALLBACK_FAILED\"; };",
+          "identity": "packages/store-devtools/dist/error-code.d.ts:StoreDevtoolsErrorCode:export declare const StoreDevtoolsErrorCode: { /** * Rejects mutations on a disposed `createStoreDevTools` session. Create a new session instead of * reusing it. Readonly queues remain readable after disposal. */ readonly sessionDisposed: 'SESSION_DISPOSED'; /** * Rejects a `jumpTo(id)` whose entry is absent from history or trimmed by `maxHistory`. Check * whether `id` remains in `history`. Correct the parameter instead of retrying the same missing * entry. */ readonly unknownHistoryEntry: 'UNKNOWN_HISTORY_ENTRY'; /** * Options are not an object, an option getter fails, a configured callback is not a function, a * queue limit is not a positive safe integer, or tree depth is not a non-negative safe integer. * Correct the configuration before retrying. */ readonly invalidOption: 'INVALID_OPTION'; /** * Multiple subscription cleanups failed, or construction failed together with rollback cleanup. * The caller must inspect `errors[]`, whose first entry retains the construction failure; the * session is terminal and cannot be revived. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * A diagnostic clock, snapshot clone, or action property read failed without an existing semantic * identity. Manual calls throw; automatic diagnostics report the failure without interrupting * business writes. Correct the callback or input; the original error remains the same instance or * reachable by cause. */ readonly callbackFailed: 'CALLBACK_FAILED'; };",
           "guidance": [
             {
               "id": "错误模块",

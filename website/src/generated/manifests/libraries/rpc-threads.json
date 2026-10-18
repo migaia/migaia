@@ -6627,7 +6627,7 @@
         {
           "name": "RpcThreadErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\"; };",
+          "signature": "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-threads/dist/error-code.d.ts",
           "purpose": "Error codes owned by this package; currently only `THREAD_USAGE_SAMPLE_FAILED`.",
@@ -6646,17 +6646,17 @@
               "name": "usageSampleFailed",
               "kind": "property",
               "optional": false,
-              "signature": "readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\";",
+              "signature": "readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED';",
               "description": "D23: native Worker sampling failed; retain its cause and display unavailable.",
               "parameterDetails": [],
-              "returns": "\"THREAD_USAGE_SAMPLE_FAILED\""
+              "returns": "'THREAD_USAGE_SAMPLE_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "RpcThreadErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\"; };"
+            "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6695,7 +6695,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/error-code.d.ts:RpcThreadErrorCode:export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\"; };",
+          "identity": "packages/rpc-threads/dist/error-code.d.ts:RpcThreadErrorCode:export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -6788,7 +6788,7 @@
         {
           "name": "createElectronMainThreadChannelFactory",
           "kind": "function",
-          "signature": "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "signature": "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "declarationLine": 12,
           "source": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts",
           "purpose": "Creates the channel factory paired with `createElectronMainThreadLauncher()`: it opens the RPC channel on each launched Worker port.",
@@ -6802,7 +6802,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "returns": "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -6810,7 +6810,7 @@
           "composes": [],
           "exportPath": "./adapters/electron-main",
           "overloadSignatures": [
-            "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+            "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -6822,7 +6822,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+            "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -6872,7 +6872,7 @@
               "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
             }
           ],
-          "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadChannelFactory:export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadChannelFactory:export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [
@@ -6898,7 +6898,7 @@
         {
           "name": "createElectronMainThreadLauncher",
           "kind": "function",
-          "signature": "export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; };",
+          "signature": "export declare function createElectronMainThreadLauncher(): { launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; capabilities: { readonly termination: 'unsupported'; readonly 'exit-observation': 'unsupported'; readonly 'heap-limit': 'unsupported'; }; };",
           "declarationLine": 3,
           "source": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts",
           "purpose": "Creates the launcher that starts Electron main process `worker_threads` for a full `spawn` source. Termination, exit observation and heap limits are declared unsupported; requesting termination does not prove execution stopped.",
@@ -6906,7 +6906,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "{ capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; }",
+          "returns": "{ launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; capabilities: { readonly termination: 'unsupported'; readonly 'exit-observation': 'unsupported'; readonly 'heap-limit': 'unsupported'; }; }",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -6914,11 +6914,11 @@
           "composes": [],
           "exportPath": "./adapters/electron-main",
           "overloadSignatures": [
-            "export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; };"
+            "export declare function createElectronMainThreadLauncher(): { launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; capabilities: { readonly termination: 'unsupported'; readonly 'exit-observation': 'unsupported'; readonly 'heap-limit': 'unsupported'; }; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "{ capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; }"
+            "{ launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; capabilities: { readonly termination: 'unsupported'; readonly 'exit-observation': 'unsupported'; readonly 'heap-limit': 'unsupported'; }; }"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -6955,7 +6955,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadLauncher:export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; };",
+          "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadLauncher:export declare function createElectronMainThreadLauncher(): { launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; capabilities: { readonly termination: 'unsupported'; readonly 'exit-observation': 'unsupported'; readonly 'heap-limit': 'unsupported'; }; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -6983,7 +6983,7 @@
         {
           "name": "createNodeThreadChannelFactory",
           "kind": "function",
-          "signature": "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "signature": "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "declarationLine": 10,
           "source": "packages/rpc-threads/dist/threads/adapters/node.d.ts",
           "purpose": "Creates the channel factory paired with `createNodeThreadLauncher()`: it opens the RPC channel on each launched Worker port.",
@@ -6997,7 +6997,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "returns": "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -7009,7 +7009,7 @@
           "composes": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
-            "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+            "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -7021,7 +7021,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+            "Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -7071,7 +7071,7 @@
               "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
             }
           ],
-          "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"../node-launcher.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: 'negotiated' | 'static'; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 44,
           "configuration": [
