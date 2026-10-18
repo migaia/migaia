@@ -1879,6 +1879,30 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigCombineOptions: {
+      scenarios: [
+        t(
+          'Keep both default and user-supplied menu entries by declaring array concatenation options for combineConfig().',
+          '合并默认菜单与用户菜单时，用这个选项类型指定数组前后拼接。'
+        )
+      ],
+      example: t(
+        `/** Keep both default and user-supplied menu entries by declaring array concatenation options for combineConfig(). */
+import { combineConfig, ownConfig, type IConfigCombineOptions } from '@migaia/utils/config'
+const menuOptions: IConfigCombineOptions = { strategies: { array: 'concat' } }
+const menu = combineConfig([
+  ownConfig({ items: ['home'] }),
+  ownConfig({ items: ['help'] })
+], menuOptions)
+console.log(menu.items)`,
+        `/** 合并默认菜单与用户菜单时，用这个选项类型指定数组前后拼接。 */
+import { combineConfig, ownConfig, type IConfigCombineOptions } from '@migaia/utils/config'
+const menuOptions: IConfigCombineOptions = { strategies: { array: 'concat' } }
+const menu = combineConfig([
+  ownConfig({ items: ['home'] }),
+  ownConfig({ items: ['help'] })
+], menuOptions)
+console.log(menu.items)`
+      ),
       summary: t(
         'Options of `combineConfig()`.',
         '`combineConfig()` 的选项：合并策略、按路径规则与冲突裁决。'
@@ -1976,6 +2000,28 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigConflictContext: {
+      scenarios: [
+        t(
+          'Read the conflicting path in a merge callback to protect the default port while accepting other overrides.',
+          '合并配置时，把冲突回调参数写成这个类型，按冲突路径保留默认端口。'
+        )
+      ],
+      example: t(
+        `/** Read the conflicting path in a merge callback to protect the default port while accepting other overrides. */
+import { combineConfig, ownConfig, type IConfigConflictContext } from '@migaia/utils/config'
+const settings = combineConfig([ownConfig({ port: 8080 }), ownConfig({ port: 9000 })], {
+  onConflict: (conflict: IConfigConflictContext) =>
+    conflict.path[0] === 'port' ? { kind: 'left' } : { kind: 'right' }
+})
+console.log(settings.port)`,
+        `/** 合并配置时，把冲突回调参数写成这个类型，按冲突路径保留默认端口。 */
+import { combineConfig, ownConfig, type IConfigConflictContext } from '@migaia/utils/config'
+const settings = combineConfig([ownConfig({ port: 8080 }), ownConfig({ port: 9000 })], {
+  onConflict: (conflict: IConfigConflictContext) =>
+    conflict.path[0] === 'port' ? { kind: 'left' } : { kind: 'right' }
+})
+console.log(settings.port)`
+      ),
       summary: t('Argument of `onConflict`.', '`onConflict` 回调收到的冲突信息：路径与两侧的值。'),
       members: {
         path: { summary: t('Path of the conflicting values.', '发生冲突的值所在的路径。') },
@@ -1994,6 +2040,32 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigConflictDecision: {
+      scenarios: [
+        t(
+          'Give a conflict resolver an explicit return type when replacing two different timeout values with one application-selected value.',
+          '需要把冲突的超时值统一成应用指定值时，用这个类型声明裁决函数的返回值。'
+        )
+      ],
+      example: t(
+        `/** Give a conflict resolver an explicit return type when replacing two different timeout values with one application-selected value. */
+import { combineConfig, ownConfig, type IConfigConflictDecision } from '@migaia/utils/config'
+function chooseTimeout(): IConfigConflictDecision {
+  return { kind: 'value', value: 1500 }
+}
+const settings = combineConfig([ownConfig({ timeout: 1000 }), ownConfig({ timeout: 2000 })], {
+  onConflict: chooseTimeout
+})
+console.log(settings.timeout)`,
+        `/** 需要把冲突的超时值统一成应用指定值时，用这个类型声明裁决函数的返回值。 */
+import { combineConfig, ownConfig, type IConfigConflictDecision } from '@migaia/utils/config'
+function chooseTimeout(): IConfigConflictDecision {
+  return { kind: 'value', value: 1500 }
+}
+const settings = combineConfig([ownConfig({ timeout: 1000 }), ownConfig({ timeout: 2000 })], {
+  onConflict: chooseTimeout
+})
+console.log(settings.timeout)`
+      ),
       summary: t(
         'Caller-authored return of the configuration conflict hook, selecting an existing side, deletion or an explicit replacement.',
         '配置冲突钩子由调用方编写的返回值，选择已有一侧、删除或显式替换。'
@@ -2032,6 +2104,30 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigLimits: {
+      scenarios: [
+        t(
+          'Keep a complete size policy in a typed variable before passing it to ownConfig() for a small settings document.',
+          '接收小型设置文档时，用这个类型保存完整的规模上限，再交给 ownConfig()。'
+        )
+      ],
+      example: t(
+        `/** Keep a complete size policy in a typed variable before passing it to ownConfig() for a small settings document. */
+import { ownConfig, type IConfigLimits } from '@migaia/utils/config'
+const settingsLimits: IConfigLimits = {
+  maxDepth: 8, maxNodes: 100, maxKeys: 1000,
+  maxPathLength: 256, maxSegmentLength: 64
+}
+const settings = ownConfig({ display: { scale: 2 } }, { limits: settingsLimits })
+console.log(settings.display.scale)`,
+        `/** 接收小型设置文档时，用这个类型保存完整的规模上限，再交给 ownConfig()。 */
+import { ownConfig, type IConfigLimits } from '@migaia/utils/config'
+const settingsLimits: IConfigLimits = {
+  maxDepth: 8, maxNodes: 100, maxKeys: 1000,
+  maxPathLength: 256, maxSegmentLength: 64
+}
+const settings = ownConfig({ display: { scale: 2 } }, { limits: settingsLimits })
+console.log(settings.display.scale)`
+      ),
       summary: t(
         'Safety limits of owned configuration; options can only tighten them.',
         '已拥有配置的安全上限；选项只能收紧，不能放宽。'
@@ -2064,6 +2160,34 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigMergeStrategies: {
+      scenarios: [
+        t(
+          'Store one complete merge policy for application settings so records merge while arrays are replaced.',
+          '为应用配置保存一份完整合并策略，明确对象逐键合并、数组整体替换。'
+        )
+      ],
+      example: t(
+        `/** Store one complete merge policy for application settings so records merge while arrays are replaced. */
+import { combineConfig, ownConfig, type IConfigMergeStrategies } from '@migaia/utils/config'
+const settingsStrategies: IConfigMergeStrategies = {
+  record: 'merge', array: 'replace', map: 'replace', set: 'replace', undefined: 'ignore'
+}
+const settings = combineConfig([
+  ownConfig({ display: { theme: 'light' }, pages: ['home'] }),
+  ownConfig({ display: { scale: 2 }, pages: ['help'] })
+], { strategies: settingsStrategies })
+console.log(settings)`,
+        `/** 为应用配置保存一份完整合并策略，明确对象逐键合并、数组整体替换。 */
+import { combineConfig, ownConfig, type IConfigMergeStrategies } from '@migaia/utils/config'
+const settingsStrategies: IConfigMergeStrategies = {
+  record: 'merge', array: 'replace', map: 'replace', set: 'replace', undefined: 'ignore'
+}
+const settings = combineConfig([
+  ownConfig({ display: { theme: 'light' }, pages: ['home'] }),
+  ownConfig({ display: { scale: 2 }, pages: ['help'] })
+], { strategies: settingsStrategies })
+console.log(settings)`
+      ),
       summary: t('Merge strategy per value kind.', '两侧都有值时各类值使用的合并策略。'),
       members: {
         record: {
@@ -2119,11 +2243,55 @@ const text = converted.threw ? '[无法显示]' : converted.value`
         }
       }
     },
-    IConfigPatch: alias(
-      'Patch accepted by `patchConfig()`: partial values plus `CONFIG_DELETE`.',
-      '`patchConfig()` 接受的补丁：部分取值，外加用于删除的 `CONFIG_DELETE`。'
-    ),
+    IConfigPatch: {
+      ...alias(
+        'Patch accepted by `patchConfig()`: partial values plus `CONFIG_DELETE`.',
+        '`patchConfig()` 接受的补丁：部分取值，外加用于删除的 `CONFIG_DELETE`。'
+      ),
+      scenarios: [
+        t(
+          'Type a saved settings edit as a partial patch, using CONFIG_DELETE to remove an obsolete field.',
+          '保存设置编辑结果时，用补丁类型表示局部修改，并用 CONFIG_DELETE 删除不再需要的字段。'
+        )
+      ],
+      example: t(
+        `/** Type a saved settings edit as a partial patch, using CONFIG_DELETE to remove an obsolete field. */
+import { CONFIG_DELETE, ownConfig, patchConfig, type IConfigPatch } from '@migaia/utils/config'
+type IPreferences = { theme: string; legacyColor?: string }
+const preferences = ownConfig<IPreferences>({ theme: 'light', legacyColor: 'blue' })
+const edit: IConfigPatch<IPreferences> = { theme: 'dark', legacyColor: CONFIG_DELETE }
+const updated = patchConfig(preferences, edit)
+console.log(updated.theme, updated.legacyColor)`,
+        `/** 保存设置编辑结果时，用补丁类型表示局部修改，并用 CONFIG_DELETE 删除不再需要的字段。 */
+import { CONFIG_DELETE, ownConfig, patchConfig, type IConfigPatch } from '@migaia/utils/config'
+type IPreferences = { theme: string; legacyColor?: string }
+const preferences = ownConfig<IPreferences>({ theme: 'light', legacyColor: 'blue' })
+const edit: IConfigPatch<IPreferences> = { theme: 'dark', legacyColor: CONFIG_DELETE }
+const updated = patchConfig(preferences, edit)
+console.log(updated.theme, updated.legacyColor)`
+      )
+    },
     IConfigPatchOptions: {
+      scenarios: [
+        t(
+          'Choose a fresh root for an empty patch when a caller needs a separate configuration object.',
+          '调用方需要独立配置对象时，用这个选项类型关闭空补丁的根对象复用。'
+        )
+      ],
+      example: t(
+        `/** Choose a fresh root for an empty patch when a caller needs a separate configuration object. */
+import { ownConfig, patchConfig, type IConfigPatchOptions } from '@migaia/utils/config'
+const copyOptions: IConfigPatchOptions = { reuseUnchangedRoot: false }
+const original = ownConfig({ theme: 'light' })
+const copy = patchConfig(original, {}, copyOptions)
+console.log(copy === original)`,
+        `/** 调用方需要独立配置对象时，用这个选项类型关闭空补丁的根对象复用。 */
+import { ownConfig, patchConfig, type IConfigPatchOptions } from '@migaia/utils/config'
+const copyOptions: IConfigPatchOptions = { reuseUnchangedRoot: false }
+const original = ownConfig({ theme: 'light' })
+const copy = patchConfig(original, {}, copyOptions)
+console.log(copy === original)`
+      ),
       summary: t('Options of `patchConfig()`.', '`patchConfig()` 的选项：复用策略、档位与上限。'),
       members: {
         reuseUnchangedRoot: {
@@ -2151,6 +2319,30 @@ const text = converted.threw ? '[无法显示]' : converted.value`
       }
     },
     IConfigPathRule: {
+      scenarios: [
+        t(
+          'Concatenate menu entries under one configuration branch while other arrays keep the global replacement policy.',
+          '只有菜单分支需要拼接数组时，用这个类型声明按路径生效的规则，其余数组沿用全局替换策略。'
+        )
+      ],
+      example: t(
+        `/** Concatenate menu entries under one configuration branch while other arrays keep the global replacement policy. */
+import { combineConfig, ownConfig, type IConfigPathRule } from '@migaia/utils/config'
+const menuRule: IConfigPathRule = { prefix: ['menu'], strategies: { array: 'concat' } }
+const settings = combineConfig([
+  ownConfig({ menu: { items: ['home'] }, tags: ['default'] }),
+  ownConfig({ menu: { items: ['help'] }, tags: ['custom'] })
+], { pathRules: [menuRule] })
+console.log(settings)`,
+        `/** 只有菜单分支需要拼接数组时，用这个类型声明按路径生效的规则，其余数组沿用全局替换策略。 */
+import { combineConfig, ownConfig, type IConfigPathRule } from '@migaia/utils/config'
+const menuRule: IConfigPathRule = { prefix: ['menu'], strategies: { array: 'concat' } }
+const settings = combineConfig([
+  ownConfig({ menu: { items: ['home'] }, tags: ['default'] }),
+  ownConfig({ menu: { items: ['help'] }, tags: ['custom'] })
+], { pathRules: [menuRule] })
+console.log(settings)`
+      ),
       summary: t(
         'One path-prefix rule of `combineConfig()`.',
         '`combineConfig()` 中的一条按路径前缀覆盖策略的规则。'
@@ -2160,10 +2352,29 @@ const text = converted.threw ? '[无法显示]' : converted.value`
         strategies: { summary: t('Strategies used under that prefix.', '该前缀下使用的合并策略。') }
       }
     },
-    IConfigProfile: alias(
-      'Union of `ConfigProfile` values.',
-      '`ConfigProfile` 全部取值组成的联合类型。'
-    ),
+    IConfigProfile: {
+      ...alias('Union of `ConfigProfile` values.', '`ConfigProfile` 全部取值组成的联合类型。'),
+      scenarios: [
+        t(
+          'Accept a named validation profile in your own configuration loader and pass it through to ownConfig().',
+          '自己的配置加载函数需要选择校验档位时，用这个类型约束参数，再传给 ownConfig()。'
+        )
+      ],
+      example: t(
+        `/** Accept a named validation profile in your own configuration loader and pass it through to ownConfig(). */
+import { ConfigProfile, ownConfig, type IConfigProfile } from '@migaia/utils/config'
+function loadSettings(profile: IConfigProfile) {
+  return ownConfig({ theme: 'light' }, { profile })
+}
+console.log(loadSettings(ConfigProfile.data))`,
+        `/** 自己的配置加载函数需要选择校验档位时，用这个类型约束参数，再传给 ownConfig()。 */
+import { ConfigProfile, ownConfig, type IConfigProfile } from '@migaia/utils/config'
+function loadSettings(profile: IConfigProfile) {
+  return ownConfig({ theme: 'light' }, { profile })
+}
+console.log(loadSettings(ConfigProfile.data))`
+      )
+    },
     IConfigReadResult: {
       summary: t(
         'Result of `readConfigPath()`, distinguishing an absent path from a present value that may itself be undefined.',
@@ -2175,8 +2386,16 @@ const text = converted.threw ? '[无法显示]' : converted.value`
           '读取配置时区分不存在的键与已存在但值为空的键。'
         )
       ],
-      example: `const result = readConfigPath(ownConfig({ port: 8080 }), 'port')
+      example: t(
+        `import { readConfigPath, ownConfig } from '@migaia/utils/config'
+
+const result = readConfigPath(ownConfig({ port: 8080 }), 'port')
 if (result.kind === 'value') console.log(result.value)`,
+        `import { readConfigPath, ownConfig } from '@migaia/utils/config'
+
+const result = readConfigPath(ownConfig({ port: 8080 }), 'port')
+if (result.kind === 'value') console.log(result.value)`
+      ),
       members: {
         kind: {
           summary: t(
@@ -2202,11 +2421,48 @@ if (result.kind === 'value') console.log(result.value)`,
         }
       }
     },
-    IConfigRecord: alias(
-      'A configuration object (plain record).',
-      '配置对象的类型，即普通键值记录。'
-    ),
+    IConfigRecord: {
+      ...alias('A configuration object (plain record).', '配置对象的类型，即普通键值记录。'),
+      scenarios: [
+        t(
+          'Accept a configuration record with application-defined keys before ownConfig() validates and copies it.',
+          '封装配置入口且字段由应用决定时，用这个类型接收键值记录，再交给 ownConfig() 校验和复制。'
+        )
+      ],
+      example: t(
+        `/** Accept a configuration record with application-defined keys before ownConfig() validates and copies it. */
+import { ownConfig, type IConfigRecord } from '@migaia/utils/config'
+function importSettings(input: IConfigRecord) {
+  return ownConfig(input)
+}
+console.log(importSettings({ locale: 'zh-CN', pageSize: 20 }))`,
+        `/** 封装配置入口且字段由应用决定时，用这个类型接收键值记录，再交给 ownConfig() 校验和复制。 */
+import { ownConfig, type IConfigRecord } from '@migaia/utils/config'
+function importSettings(input: IConfigRecord) {
+  return ownConfig(input)
+}
+console.log(importSettings({ locale: 'zh-CN', pageSize: 20 }))`
+      )
+    },
     IOwnConfigOptions: {
+      scenarios: [
+        t(
+          'Reuse a pure-data validation policy with a tighter nesting limit when importing user settings.',
+          '导入用户设置时，用这个选项类型保存纯数据档位和更小的嵌套上限，供多次导入复用。'
+        )
+      ],
+      example: t(
+        `/** Reuse a pure-data validation policy with a tighter nesting limit when importing user settings. */
+import { ConfigProfile, ownConfig, type IOwnConfigOptions } from '@migaia/utils/config'
+const importOptions: IOwnConfigOptions = { profile: ConfigProfile.data, limits: { maxDepth: 8 } }
+const imported = ownConfig({ locale: 'en-GB' }, importOptions)
+console.log(imported.locale)`,
+        `/** 导入用户设置时，用这个选项类型保存纯数据档位和更小的嵌套上限，供多次导入复用。 */
+import { ConfigProfile, ownConfig, type IOwnConfigOptions } from '@migaia/utils/config'
+const importOptions: IOwnConfigOptions = { profile: ConfigProfile.data, limits: { maxDepth: 8 } }
+const imported = ownConfig({ locale: 'en-GB' }, importOptions)
+console.log(imported.locale)`
+      ),
       summary: t('Options of `ownConfig()`.', '`ownConfig()` 的选项：校验档位与规模上限。'),
       members: {
         profile: {
@@ -2229,15 +2485,81 @@ if (result.kind === 'value') console.log(result.value)`,
         }
       }
     },
-    IOwnedConfig: alias(
-      'A configuration registered by `ownConfig()`; accepted by the other config functions.',
-      '由 `ownConfig()` 登记的配置，可被其它配置函数接受。'
-    ),
-    IErrorChainData: alias(
-      'Plain JSON data allowed in a serialized error `data` field.',
-      '序列化错误的 `data` 字段中允许的纯 JSON 数据。'
-    ),
+    IOwnedConfig: {
+      ...alias(
+        'A configuration registered by `ownConfig()`; accepted by the other config functions.',
+        '由 `ownConfig()` 登记的配置，可被其它配置函数接受。'
+      ),
+      scenarios: [
+        t(
+          'Require callers to pass a configuration produced by ownConfig() before applying a settings patch.',
+          '封装设置修改函数时，用这个类型标注已由 ownConfig() 生成的配置参数，再调用 patchConfig()。'
+        )
+      ],
+      example: t(
+        `/** Require callers to pass a configuration produced by ownConfig() before applying a settings patch. */
+import { ownConfig, patchConfig, type IOwnedConfig } from '@migaia/utils/config'
+type ISettings = { pageSize: number }
+function changePageSize(settings: IOwnedConfig<ISettings>) {
+  return patchConfig(settings, { pageSize: 50 })
+}
+console.log(changePageSize(ownConfig({ pageSize: 20 })))`,
+        `/** 封装设置修改函数时，用这个类型标注已由 ownConfig() 生成的配置参数，再调用 patchConfig()。 */
+import { ownConfig, patchConfig, type IOwnedConfig } from '@migaia/utils/config'
+type ISettings = { pageSize: number }
+function changePageSize(settings: IOwnedConfig<ISettings>) {
+  return patchConfig(settings, { pageSize: 50 })
+}
+console.log(changePageSize(ownConfig({ pageSize: 20 })))`
+      )
+    },
+    IErrorChainData: {
+      ...alias(
+        'Plain JSON data allowed in a serialized error `data` field.',
+        '序列化错误的 `data` 字段中允许的纯 JSON 数据。'
+      ),
+      scenarios: [
+        t(
+          'Type additional error details as portable JSON data before including them in a serialized error.',
+          '需要随序列化错误发送重试次数等附加信息时，用这个类型约束可传输的纯数据。'
+        )
+      ],
+      example: t(
+        `/** Type additional error details as portable JSON data before including them in a serialized error. */
+import { serializeErrorChain, type IErrorChainData } from '@migaia/utils/error'
+const details: IErrorChainData = { attempts: 3, retryable: false }
+const failure = Object.assign(new Error(), { data: details })
+console.log(serializeErrorChain(failure).data)`,
+        `/** 需要随序列化错误发送重试次数等附加信息时，用这个类型约束可传输的纯数据。 */
+import { serializeErrorChain, type IErrorChainData } from '@migaia/utils/error'
+const details: IErrorChainData = { attempts: 3, retryable: false }
+const failure = Object.assign(new Error(), { data: details })
+console.log(serializeErrorChain(failure).data)`
+      )
+    },
     IErrorChainStrategy: {
+      scenarios: [
+        t(
+          'Set a smaller node and text budget when serializing errors for a diagnostic message.',
+          '诊断消息需要限制体积时，用这个策略类型给错误序列化设置更小的节点数与文本预算。'
+        )
+      ],
+      example: t(
+        `/** Set a smaller node and text budget when serializing errors for a diagnostic message. */
+import { serializeErrorChain, type IErrorChainStrategy } from '@migaia/utils/error'
+const messagePolicy: IErrorChainStrategy = {
+  limits: { maxNodes: 8, maxBytes: 4096, maxStringBytes: 512 }
+}
+const failure = new TypeError()
+console.log(serializeErrorChain(failure, messagePolicy))`,
+        `/** 诊断消息需要限制体积时，用这个策略类型给错误序列化设置更小的节点数与文本预算。 */
+import { serializeErrorChain, type IErrorChainStrategy } from '@migaia/utils/error'
+const messagePolicy: IErrorChainStrategy = {
+  limits: { maxNodes: 8, maxBytes: 4096, maxStringBytes: 512 }
+}
+const failure = new TypeError()
+console.log(serializeErrorChain(failure, messagePolicy))`
+      ),
       summary: t(
         'Boundary policy of error serialization: fields, limits, privacy, data and restoration.',
         '错误序列化的边界策略：字段、上限、隐私、数据与还原方式。'
@@ -2315,6 +2637,26 @@ if (result.kind === 'value') console.log(result.value)`,
       }
     },
     IErrorIdentity: {
+      scenarios: [
+        t(
+          'Keep an application error identity in a typed object and attach it to an existing native error.',
+          '应用需要稳定识别一种错误时，用这个类型保存来源和错误码，再附加到已有的原生错误上。'
+        )
+      ],
+      example: t(
+        `/** Keep an application error identity in a typed object and attach it to an existing native error. */
+import { attachErrorIdentity, type IErrorIdentity } from '@migaia/utils/error'
+const identity: IErrorIdentity = { source: 'settings-app', code: 'INVALID_PORT' }
+const failure = new RangeError()
+const tagged = attachErrorIdentity(failure, identity)
+console.log(tagged === failure, tagged instanceof RangeError)`,
+        `/** 应用需要稳定识别一种错误时，用这个类型保存来源和错误码，再附加到已有的原生错误上。 */
+import { attachErrorIdentity, type IErrorIdentity } from '@migaia/utils/error'
+const identity: IErrorIdentity = { source: 'settings-app', code: 'INVALID_PORT' }
+const failure = new RangeError()
+const tagged = attachErrorIdentity(failure, identity)
+console.log(tagged === failure, tagged instanceof RangeError)`
+      ),
       summary: t(
         'Identity attached by `attachErrorIdentity()`.',
         '`attachErrorIdentity()` 附加到错误上的身份信息。'
@@ -2331,6 +2673,34 @@ if (result.kind === 'value') console.log(result.value)`,
       }
     },
     IErrorIdentityHooks: {
+      scenarios: [
+        t(
+          'Preserve an existing identity when another caller tries to attach a different code, recording the conflict through your hook.',
+          '另一调用方尝试写入不同错误码时，用这个钩子类型记录冲突并保留原有身份。'
+        )
+      ],
+      example: t(
+        `/** Preserve an existing identity when another caller tries to attach a different code, recording the conflict through your hook. */
+import { attachErrorIdentity, type IErrorIdentityHooks } from '@migaia/utils/error'
+const failure = attachErrorIdentity(new Error(), { source: 'settings-app', code: 'FIRST' })
+const preserveIdentity: IErrorIdentityHooks<Error> = {
+  onConflict: ({ target, key }) => {
+    console.warn(key)
+    return target
+  }
+}
+attachErrorIdentity(failure, { source: 'settings-app', code: 'SECOND' }, preserveIdentity)`,
+        `/** 另一调用方尝试写入不同错误码时，用这个钩子类型记录冲突并保留原有身份。 */
+import { attachErrorIdentity, type IErrorIdentityHooks } from '@migaia/utils/error'
+const failure = attachErrorIdentity(new Error(), { source: 'settings-app', code: 'FIRST' })
+const preserveIdentity: IErrorIdentityHooks<Error> = {
+  onConflict: ({ target, key }) => {
+    console.warn(key)
+    return target
+  }
+}
+attachErrorIdentity(failure, { source: 'settings-app', code: 'SECOND' }, preserveIdentity)`
+      ),
       summary: t(
         'Hooks of `attachErrorIdentity()`.',
         '`attachErrorIdentity()` 的钩子，处理冲突与定义失败。'
@@ -2361,9 +2731,18 @@ if (result.kind === 'value') console.log(result.value)`,
           '只检查不可信访问器一次，由调用方决定回退或重新抛错。'
         )
       ],
-      example: `const result = tryReadProperty({ value: 1 }, 'value')
+      example: t(
+        `import { tryReadProperty } from '@migaia/utils/error'
+
+const result = tryReadProperty({ value: 1 }, 'value')
 if (result.threw) console.error(result.error)
 else console.log(result.value)`,
+        `import { tryReadProperty } from '@migaia/utils/error'
+
+const result = tryReadProperty({ value: 1 }, 'value')
+if (result.threw) console.error(result.error)
+else console.log(result.value)`
+      ),
       members: {
         threw: {
           summary: t(
@@ -2406,14 +2785,18 @@ else console.log(result.value)`,
           '把 worker 或子进程中的错误发送到主线程。'
         )
       ],
-      example: {
-        en: `const tree = serializeErrorChain(new Error('outer', { cause: new TypeError('inner') }))
+      example: t(
+        `import { serializeErrorChain, deserializeErrorChain } from '@migaia/utils/error'
+
+const tree = serializeErrorChain(new Error('outer', { cause: new TypeError('inner') }))
 console.log(tree.cause?.name) // 'TypeError'
 const restored = deserializeErrorChain(tree)`,
-        zh: `const tree = serializeErrorChain(new Error('外层', { cause: new TypeError('内层') }))
+        `import { serializeErrorChain, deserializeErrorChain } from '@migaia/utils/error'
+
+const tree = serializeErrorChain(new Error('外层', { cause: new TypeError('内层') }))
 console.log(tree.cause?.name) // 'TypeError'
 const restored = deserializeErrorChain(tree)`
-      },
+      ),
       members: {
         source: {
           summary: t(
@@ -2560,10 +2943,43 @@ const restored = deserializeErrorChain(tree)`
         }
       }
     },
-    IUtilsErrorCode: alias(
-      'Union of `UtilsErrorCode` values.',
-      '`UtilsErrorCode` 全部取值组成的联合类型。'
-    ),
+    IUtilsErrorCode: {
+      ...alias('Union of `UtilsErrorCode` values.', '`UtilsErrorCode` 全部取值组成的联合类型。'),
+      scenarios: [
+        t(
+          'Store a Utils error code after isUtilsError() has checked an unknown caught value.',
+          '捕获未知错误后，先用 isUtilsError() 判断，再用这个类型保存已确认的工具库错误码。'
+        )
+      ],
+      example: t(
+        `/** Store a Utils error code after isUtilsError() has checked an unknown caught value. */
+import { isUtilsError, type IUtilsErrorCode } from '@migaia/utils/error'
+import { sleep } from '@migaia/utils/promise'
+try {
+  await sleep(-1)
+} catch (error) {
+  if (isUtilsError(error)) {
+    const code: IUtilsErrorCode = error.code
+    console.warn(code)
+  } else {
+    throw error
+  }
+}`,
+        `/** 捕获未知错误后，先用 isUtilsError() 判断，再用这个类型保存已确认的工具库错误码。 */
+import { isUtilsError, type IUtilsErrorCode } from '@migaia/utils/error'
+import { sleep } from '@migaia/utils/promise'
+try {
+  await sleep(-1)
+} catch (error) {
+  if (isUtilsError(error)) {
+    const code: IUtilsErrorCode = error.code
+    console.warn(code)
+  } else {
+    throw error
+  }
+}`
+      )
+    },
     IThenableInspection: {
       summary: t(
         'Single-read inspection returned by `inspectThenable()`, preserving a captured then function or the original accessor failure.',
@@ -2575,9 +2991,18 @@ const restored = deserializeErrorChain(tree)`
           '观察意外异步的回调结果，避免重复读取其异步方法属性。'
         )
       ],
-      example: `const value = Promise.resolve(1)
+      example: t(
+        `import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
+
+const value = Promise.resolve(1)
 const inspection = inspectThenable(value)
 observeThenableRejection(value, inspection, console.error)`,
+        `import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
+
+const value = Promise.resolve(1)
+const inspection = inspectThenable(value)
+observeThenableRejection(value, inspection, console.error)`
+      ),
       members: {
         // oxlint-disable-next-line unicorn/no-thenable -- This key stores IMemberDoc metadata, not a Promise implementation.
         then: {
@@ -2619,10 +3044,20 @@ observeThenableRejection(value, inspection, console.error)`,
           '选择同步处理、单次异步归化或明确处理访问器失败。'
         )
       ],
-      example: `const value = Promise.resolve(1)
+      example: t(
+        `import { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'
+
+const value = Promise.resolve(1)
 const probe = probeThenable(value)
 if (probe.kind === 'thenable') console.log(await assimilateCapturedThen(probe.thenFn, value))
 else if (probe.kind === 'failed') console.error(probe.error)`,
+        `import { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'
+
+const value = Promise.resolve(1)
+const probe = probeThenable(value)
+if (probe.kind === 'thenable') console.log(await assimilateCapturedThen(probe.thenFn, value))
+else if (probe.kind === 'failed') console.error(probe.error)`
+      ),
       members: {
         kind: {
           summary: t(
@@ -2660,6 +3095,26 @@ else if (probe.kind === 'failed') console.error(probe.error)`,
       }
     },
     INumberFormatOptions: {
+      scenarios: [
+        t(
+          'Reuse a locale and decimal precision policy when displaying prices in a table.',
+          '表格中的价格需要统一地区格式和小数位数时，用这个选项类型保存显示规则。'
+        )
+      ],
+      example: t(
+        `/** Reuse a locale and decimal precision policy when displaying prices in a table. */
+import { formatNumber, type INumberFormatOptions } from '@migaia/utils/number'
+const priceOptions: INumberFormatOptions = {
+  locales: 'en-GB', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+}
+console.log(formatNumber(12.5, priceOptions))`,
+        `/** 表格中的价格需要统一地区格式和小数位数时，用这个选项类型保存显示规则。 */
+import { formatNumber, type INumberFormatOptions } from '@migaia/utils/number'
+const priceOptions: INumberFormatOptions = {
+  locales: 'en-GB', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+}
+console.log(formatNumber(12.5, priceOptions))`
+      ),
       summary: t(
         'Options shared by the number formatting functions.',
         '所有数字格式化函数共用的选项。'
@@ -2684,14 +3139,58 @@ else if (probe.kind === 'failed') console.error(probe.error)`,
         }
       }
     },
-    INumberFormatter: alias(
-      'Reusable formatter `(value) => string` from `createNumberFormatter()`.',
-      '`createNumberFormatter()` 返回的可复用格式化函数 `(value) => string`。'
-    ),
-    INumericValue: alias(
-      'Numbers accepted by the formatters: `number` or `bigint` (no strings).',
-      '格式化函数接受的数值：`number` 或 `bigint`（不接受字符串）。'
-    ),
+    INumberFormatter: {
+      ...alias(
+        'Reusable formatter `(value) => string` from `createNumberFormatter()`.',
+        '`createNumberFormatter()` 返回的可复用格式化函数 `(value) => string`。'
+      ),
+      scenarios: [
+        t(
+          'Pass a reusable number formatter to a table column instead of rebuilding display options for every row.',
+          '表格列需要反复格式化数字时，用这个函数类型接收已创建的格式化函数。'
+        )
+      ],
+      example: t(
+        `/** Pass a reusable number formatter to a table column instead of rebuilding display options for every row. */
+import { createNumberFormatter, type INumberFormatter } from '@migaia/utils/number'
+function displayStock(formatStock: INumberFormatter): string[] {
+  return [12, 1200, 3000n].map((stock) => formatStock(stock))
+}
+console.log(displayStock(createNumberFormatter({ locales: 'en-US' })))`,
+        `/** 表格列需要反复格式化数字时，用这个函数类型接收已创建的格式化函数。 */
+import { createNumberFormatter, type INumberFormatter } from '@migaia/utils/number'
+function displayStock(formatStock: INumberFormatter): string[] {
+  return [12, 1200, 3000n].map((stock) => formatStock(stock))
+}
+console.log(displayStock(createNumberFormatter({ locales: 'en-US' })))`
+      )
+    },
+    INumericValue: {
+      ...alias(
+        'Numbers accepted by the formatters: `number` or `bigint` (no strings).',
+        '格式化函数接受的数值：`number` 或 `bigint`（不接受字符串）。'
+      ),
+      scenarios: [
+        t(
+          'Allow both ordinary counts and bigint totals in your own numeric display function without accepting numeric strings.',
+          '自己的数量显示函数同时接收普通数值和大整数时，用这个类型限制输入，不接收数字字符串。'
+        )
+      ],
+      example: t(
+        `/** Allow both ordinary counts and bigint totals in your own numeric display function without accepting numeric strings. */
+import { formatInteger, type INumericValue } from '@migaia/utils/number'
+function displayCount(count: INumericValue): string {
+  return formatInteger(count, { locales: 'en-US' })
+}
+console.log(displayCount(1200), displayCount(9007199254740993n))`,
+        `/** 自己的数量显示函数同时接收普通数值和大整数时，用这个类型限制输入，不接收数字字符串。 */
+import { formatInteger, type INumericValue } from '@migaia/utils/number'
+function displayCount(count: INumericValue): string {
+  return formatInteger(count, { locales: 'en-US' })
+}
+console.log(displayCount(1200), displayCount(9007199254740993n))`
+      )
+    },
     IDiagnosticSnapshot: {
       summary: t(
         'Result of `diagnosticSnapshot()` and `structuredDiagnosticSnapshot()`.',
@@ -2703,8 +3202,22 @@ else if (probe.kind === 'failed') console.error(probe.error)`,
           '即使某个字段无法克隆，也保留整份遥测数据。'
         )
       ],
-      example: `const { value, diagnostics } = diagnosticSnapshot(payload)
-for (const item of diagnostics) console.warn(item.path.join('.'), item.reason)`,
+      example: t(
+        `import { diagnosticSnapshot, type IDiagnosticSnapshot } from '@migaia/utils/object'
+
+/** The diagnostic projection can be logged without invoking the accessor. */
+const snapshot: IDiagnosticSnapshot<{ user: string }> = diagnosticSnapshot({
+  get user() { return 'Ada' }
+})
+for (const item of snapshot.diagnostics) console.warn(item.path.join('.'), item.reason)`,
+        `import { diagnosticSnapshot, type IDiagnosticSnapshot } from '@migaia/utils/object'
+
+/** 诊断投影用于记录输入，不调用访问器。 */
+const snapshot: IDiagnosticSnapshot<{ user: string }> = diagnosticSnapshot({
+  get user() { return 'Ada' }
+})
+for (const item of snapshot.diagnostics) console.warn(item.path.join('.'), item.reason)`
+      ),
       members: {
         value: {
           summary: t(
@@ -2728,9 +3241,18 @@ for (const item of diagnostics) console.warn(item.path.join('.'), item.reason)`,
           '不执行对象访问器地检查自身形状，并明确处理捕获失败。'
         )
       ],
-      example: `const snapshot = snapshotOwnDescriptors({ value: 1 })
+      example: t(
+        `import { snapshotOwnDescriptors } from '@migaia/utils/object'
+
+const snapshot = snapshotOwnDescriptors({ value: 1 })
 if (snapshot.ok) console.log(snapshot.descriptors.value)
 else console.error(snapshot.error)`,
+        `import { snapshotOwnDescriptors } from '@migaia/utils/object'
+
+const snapshot = snapshotOwnDescriptors({ value: 1 })
+if (snapshot.ok) console.log(snapshot.descriptors.value)
+else console.error(snapshot.error)`
+      ),
       members: {
         kind: {
           summary: t(
@@ -2789,9 +3311,18 @@ else console.error(snapshot.error)`,
           '读取可能缺失的属性，并区分访问器失败与值缺失。'
         )
       ],
-      example: `const result = probeProperty<number>({ value: 1 }, 'value')
+      example: t(
+        `import { probeProperty } from '@migaia/utils/object'
+
+const result = probeProperty<number>({ value: 1 }, 'value')
 if (result.kind === 'value') console.log(result.value)
 else if (result.kind === 'failed') console.error(result.error)`,
+        `import { probeProperty } from '@migaia/utils/object'
+
+const result = probeProperty<number>({ value: 1 }, 'value')
+if (result.kind === 'value') console.log(result.value)
+else if (result.kind === 'failed') console.error(result.error)`
+      ),
       members: {
         kind: {
           summary: t(
@@ -2828,6 +3359,28 @@ else if (result.kind === 'failed') console.error(result.error)`,
       }
     },
     ISnapshotDiagnostic: {
+      scenarios: [
+        t(
+          'Inspect field paths and reasons when a best-effort snapshot reports a property read or an unsupported value.',
+          '尽力复制对象后，需要查看属性读取或不支持值的路径和原因时，用这个类型声明诊断处理函数的参数。'
+        )
+      ],
+      example: t(
+        `/** Inspect field paths and reasons when a best-effort snapshot reports a property read or an unsupported value. */
+import { diagnosticSnapshot, type ISnapshotDiagnostic } from '@migaia/utils/object'
+function reportField(problem: ISnapshotDiagnostic): void {
+  console.warn(problem.path, problem.reason, problem.cause)
+}
+const snapshot = diagnosticSnapshot({ get current() { return 42 } })
+snapshot.diagnostics.forEach(reportField)`,
+        `/** 尽力复制对象后，需要查看属性读取或不支持值的路径和原因时，用这个类型声明诊断处理函数的参数。 */
+import { diagnosticSnapshot, type ISnapshotDiagnostic } from '@migaia/utils/object'
+function reportField(problem: ISnapshotDiagnostic): void {
+  console.warn(problem.path, problem.reason, problem.cause)
+}
+const snapshot = diagnosticSnapshot({ get current() { return 42 } })
+snapshot.diagnostics.forEach(reportField)`
+      ),
       summary: t(
         'One path that `diagnosticSnapshot()` could not copy.',
         '`diagnosticSnapshot()` 无法完整复制的一个路径及其原因。'
@@ -2856,22 +3409,171 @@ else if (result.kind === 'failed') console.error(result.error)`,
         cause: { summary: t('The value or the thrown error.', '对应的值，或读取时抛出的错误。') }
       }
     },
-    IObjectPath: alias('All dot-path strings of a type.', '某个类型所有合法的点路径字符串。'),
-    IObjectPathInput: alias(
-      'A path given as dot string or segment tuple.',
-      '路径的输入形式：点路径字符串或路径段元组。'
-    ),
-    IObjectPathSegment: alias(
-      'One path segment: property name or array index.',
-      '单个路径段：属性名或数组下标。'
-    ),
-    IObjectPathTuple: alias('A parsed path: array of segments.', '解析后的路径：路径段数组。'),
-    IObjectPathTupleFor: alias('Tuple paths valid for a given type.', '对某个类型合法的元组路径。'),
-    IObjectPathValue: alias('Type of the value at a path.', '某个路径处的值的类型。'),
-    IObjectPathWriteValue: alias(
-      'Type accepted when writing at a path (literals widened).',
-      '在某个路径写入时可接受的类型（字面量会被放宽）。'
-    ),
+    IObjectPath: {
+      ...alias('All dot-path strings of a type.', '某个类型所有合法的点路径字符串。'),
+      scenarios: [
+        t(
+          'Restrict a settings selector to string paths that exist in the settings type.',
+          '设置选择器只接收字符串路径时，用这个类型让编译器检查字段是否存在。'
+        )
+      ],
+      example: t(
+        `/** Restrict a settings selector to string paths that exist in the settings type. */
+import { createPathAccessor, type IObjectPath } from '@migaia/utils/object-path'
+type ISettings = { service: { port: number } }
+const portPath: IObjectPath<ISettings> = 'service.port'
+const settings = createPathAccessor<ISettings>({ service: { port: 8080 } })
+console.log(settings.get(portPath))`,
+        `/** 设置选择器只接收字符串路径时，用这个类型让编译器检查字段是否存在。 */
+import { createPathAccessor, type IObjectPath } from '@migaia/utils/object-path'
+type ISettings = { service: { port: number } }
+const portPath: IObjectPath<ISettings> = 'service.port'
+const settings = createPathAccessor<ISettings>({ service: { port: 8080 } })
+console.log(settings.get(portPath))`
+      )
+    },
+    IObjectPathInput: {
+      ...alias(
+        'A path given as dot string or segment tuple.',
+        '路径的输入形式：点路径字符串或路径段元组。'
+      ),
+      scenarios: [
+        t(
+          'Let a form field selector accept either a checked string path or a checked tuple path.',
+          '表单字段选择器需要同时支持字符串和元组路径时，用这个类型约束两种输入。'
+        )
+      ],
+      example: t(
+        `/** Let a form field selector accept either a checked string path or a checked tuple path. */
+import { createPathAccessor, type IObjectPathInput } from '@migaia/utils/object-path'
+type IForm = { contact: { email: string } }
+const form = createPathAccessor<IForm>({ contact: { email: 'ada@example.com' } })
+function readField(path: IObjectPathInput<IForm>) {
+  return form.get(path)
+}
+console.log(readField('contact.email'), readField(['contact', 'email']))`,
+        `/** 表单字段选择器需要同时支持字符串和元组路径时，用这个类型约束两种输入。 */
+import { createPathAccessor, type IObjectPathInput } from '@migaia/utils/object-path'
+type IForm = { contact: { email: string } }
+const form = createPathAccessor<IForm>({ contact: { email: 'ada@example.com' } })
+function readField(path: IObjectPathInput<IForm>) {
+  return form.get(path)
+}
+console.log(readField('contact.email'), readField(['contact', 'email']))`
+      )
+    },
+    IObjectPathSegment: {
+      ...alias('One path segment: property name or array index.', '单个路径段：属性名或数组下标。'),
+      scenarios: [
+        t(
+          'Build one array-index segment separately before assembling a tuple path for a selected table row.',
+          '按表格所选行组装元组路径时，用这个类型标注单个数组下标段。'
+        )
+      ],
+      example: t(
+        `/** Build one array-index segment separately before assembling a tuple path for a selected table row. */
+import { parseObjectPath, type IObjectPathSegment } from '@migaia/utils/object-path'
+const selectedRow: IObjectPathSegment = 2
+console.log(parseObjectPath(['rows', selectedRow, 'name']))`,
+        `/** 按表格所选行组装元组路径时，用这个类型标注单个数组下标段。 */
+import { parseObjectPath, type IObjectPathSegment } from '@migaia/utils/object-path'
+const selectedRow: IObjectPathSegment = 2
+console.log(parseObjectPath(['rows', selectedRow, 'name']))`
+      )
+    },
+    IObjectPathTuple: {
+      ...alias('A parsed path: array of segments.', '解析后的路径：路径段数组。'),
+      scenarios: [
+        t(
+          'Store the parsed segments of a path for logging or later inspection without claiming they belong to a particular object type.',
+          '需要记录或检查解析后的路径段时，用这个类型保存结果；它本身不证明字段属于某个对象。'
+        )
+      ],
+      example: t(
+        `/** Store the parsed segments of a path for logging or later inspection without claiming they belong to a particular object type. */
+import { parseObjectPath, type IObjectPathTuple } from '@migaia/utils/object-path'
+const segments: IObjectPathTuple = parseObjectPath('orders.[0].total')
+console.log(segments.length, segments[1])`,
+        `/** 需要记录或检查解析后的路径段时，用这个类型保存结果；它本身不证明字段属于某个对象。 */
+import { parseObjectPath, type IObjectPathTuple } from '@migaia/utils/object-path'
+const segments: IObjectPathTuple = parseObjectPath('orders.[0].total')
+console.log(segments.length, segments[1])`
+      )
+    },
+    IObjectPathTupleFor: {
+      ...alias('Tuple paths valid for a given type.', '对某个类型合法的元组路径。'),
+      scenarios: [
+        t(
+          'Select an array element with a numeric segment while checking the rest of the tuple against the document type.',
+          '用数值下标选择数组元素时，用这个类型检查整条元组路径是否符合文档类型。'
+        )
+      ],
+      example: t(
+        `/** Select an array element with a numeric segment while checking the rest of the tuple against the document type. */
+import { createPathAccessor, type IObjectPathTupleFor } from '@migaia/utils/object-path'
+type IInvoice = { lines: { total: number }[] }
+const totalPath: IObjectPathTupleFor<IInvoice> = ['lines', 0, 'total']
+const invoice = createPathAccessor<IInvoice>({ lines: [{ total: 25 }] })
+console.log(invoice.get(totalPath))`,
+        `/** 用数值下标选择数组元素时，用这个类型检查整条元组路径是否符合文档类型。 */
+import { createPathAccessor, type IObjectPathTupleFor } from '@migaia/utils/object-path'
+type IInvoice = { lines: { total: number }[] }
+const totalPath: IObjectPathTupleFor<IInvoice> = ['lines', 0, 'total']
+const invoice = createPathAccessor<IInvoice>({ lines: [{ total: 25 }] })
+console.log(invoice.get(totalPath))`
+      )
+    },
+    IObjectPathValue: {
+      ...alias('Type of the value at a path.', '某个路径处的值的类型。'),
+      scenarios: [
+        t(
+          'Derive a callback parameter from a nested field so its value type stays aligned with the document.',
+          '回调接收嵌套字段的值时，用这个类型从文档类型推导参数，避免另写一份字段类型。'
+        )
+      ],
+      example: t(
+        `/** Derive a callback parameter from a nested field so its value type stays aligned with the document. */
+import type { IObjectPathValue } from '@migaia/utils/object-path'
+type IOrder = { payment: { amount: number } }
+function displayAmount(amount: IObjectPathValue<IOrder, 'payment.amount'>): string {
+  return amount.toFixed(2)
+}
+console.log(displayAmount(19.5))`,
+        `/** 回调接收嵌套字段的值时，用这个类型从文档类型推导参数，避免另写一份字段类型。 */
+import type { IObjectPathValue } from '@migaia/utils/object-path'
+type IOrder = { payment: { amount: number } }
+function displayAmount(amount: IObjectPathValue<IOrder, 'payment.amount'>): string {
+  return amount.toFixed(2)
+}
+console.log(displayAmount(19.5))`
+      )
+    },
+    IObjectPathWriteValue: {
+      ...alias(
+        'Type accepted when writing at a path (literals widened).',
+        '在某个路径写入时可接受的类型（字面量会被放宽）。'
+      ),
+      scenarios: [
+        t(
+          'Accept a new theme string even when the document type records the current theme as a single literal.',
+          '文档类型把当前主题写成固定字面量，但编辑器需要接收另一个字符串时，用这个类型描述替换值。'
+        )
+      ],
+      example: t(
+        `/** Accept a new theme string even when the document type records the current theme as a single literal. */
+import { createPathAccessor, type IObjectPathWriteValue } from '@migaia/utils/object-path'
+type ITheme = { mode: 'light' }
+const replacement: IObjectPathWriteValue<ITheme, 'mode'> = 'dark'
+const theme = createPathAccessor<ITheme>({ mode: 'light' })
+console.log(theme.set('mode', replacement))`,
+        `/** 文档类型把当前主题写成固定字面量，但编辑器需要接收另一个字符串时，用这个类型描述替换值。 */
+import { createPathAccessor, type IObjectPathWriteValue } from '@migaia/utils/object-path'
+type ITheme = { mode: 'light' }
+const replacement: IObjectPathWriteValue<ITheme, 'mode'> = 'dark'
+const theme = createPathAccessor<ITheme>({ mode: 'light' })
+console.log(theme.set('mode', replacement))`
+      )
+    },
     IPathAccessor: {
       summary: t(
         'Stateful path reader/writer from `createPathAccessor()`.',
@@ -2887,11 +3589,22 @@ else if (result.kind === 'failed') console.error(result.error)`,
           '在值到达界面之前，审计或脱敏按路径读取的值。'
         )
       ],
-      example: `const settings = createPathAccessor({ theme: { mode: 'light' } }, {
-  ifMissing: (probe) => console.warn('缺少路径', probe.segments)
+      example: t(
+        `import { createPathAccessor } from '@migaia/utils/object-path'
+
+const settings = createPathAccessor({ theme: { mode: 'light' } }, {
+  ifMissing: (probe) => console.warn('Missing path', probe.segments)
 })
 settings.set('theme.mode', 'dark')
 console.log(settings.get('theme.mode')) // 'dark'`,
+        `import { createPathAccessor } from '@migaia/utils/object-path'
+
+const settings = createPathAccessor({ theme: { mode: 'light' } }, {
+  ifMissing: (probe) => console.warn('缺少路径', probe.segments)
+})
+settings.set('theme.mode', 'dark')
+console.log(settings.get('theme.mode')) // 'dark'`
+      ),
       members: {
         value: {
           summary: t('Current root after the latest `set`.', '最近一次 `set` 之后的当前根对象。')
@@ -2938,6 +3651,30 @@ console.log(settings.get('theme.mode')) // 'dark'`,
       }
     },
     IPathAccessorOptions: {
+      scenarios: [
+        t(
+          'Keep a typed read policy that trims a display name whenever a path accessor reads it.',
+          '界面每次读取姓名都需要去掉首尾空白时，用这个选项类型保存读取处理规则。'
+        )
+      ],
+      example: t(
+        `/** Keep a typed read policy that trims a display name whenever a path accessor reads it. */
+import { createPathAccessor, type IPathAccessorOptions } from '@migaia/utils/object-path'
+type IProfile = { name: string }
+const displayPolicy: IPathAccessorOptions<IProfile> = {
+  onGet: (event) => event.replace(event.value.trim())
+}
+const profile = createPathAccessor<IProfile>({ name: ' Ada ' }, displayPolicy)
+console.log(profile.get('name'))`,
+        `/** 界面每次读取姓名都需要去掉首尾空白时，用这个选项类型保存读取处理规则。 */
+import { createPathAccessor, type IPathAccessorOptions } from '@migaia/utils/object-path'
+type IProfile = { name: string }
+const displayPolicy: IPathAccessorOptions<IProfile> = {
+  onGet: (event) => event.replace(event.value.trim())
+}
+const profile = createPathAccessor<IProfile>({ name: ' Ada ' }, displayPolicy)
+console.log(profile.get('name'))`
+      ),
       summary: t(
         'Hooks of `createPathAccessor()`.',
         '`createPathAccessor()` 的钩子选项，用于观察和改写每次读写。'
@@ -2984,6 +3721,32 @@ console.log(settings.get('theme.mode')) // 'dark'`,
       }
     },
     IPathBlockedProbe: {
+      scenarios: [
+        t(
+          'Handle a path that stops at a null parent separately from an absent property.',
+          '路径读取在空的父级值处停止时，用这个类型接收阻断信息，区别于属性不存在。'
+        )
+      ],
+      example: t(
+        `/** Handle a path that stops at a null parent separately from an absent property. */
+import { createPathAccessor, type IPathBlockedProbe } from '@migaia/utils/object-path'
+function showBlocked(problem: IPathBlockedProbe): void {
+  console.warn(problem.failedKey, problem.parent)
+}
+const profile = createPathAccessor<{ user: { name: string } | null }>({ user: null }, {
+  ifBlocked: showBlocked
+})
+profile.get('user.name')`,
+        `/** 路径读取在空的父级值处停止时，用这个类型接收阻断信息，区别于属性不存在。 */
+import { createPathAccessor, type IPathBlockedProbe } from '@migaia/utils/object-path'
+function showBlocked(problem: IPathBlockedProbe): void {
+  console.warn(problem.failedKey, problem.parent)
+}
+const profile = createPathAccessor<{ user: { name: string } | null }>({ user: null }, {
+  ifBlocked: showBlocked
+})
+profile.get('user.name')`
+      ),
       summary: t(
         'Probe result: a non-object was met on the way.',
         '探测结果：读取途中遇到了非对象值。'
@@ -2991,6 +3754,28 @@ console.log(settings.get('theme.mode')) // 'dark'`,
       members: probeMembers('blocked')
     },
     IPathFailedProbe: {
+      scenarios: [
+        t(
+          'Report the original thrown value when reading a path invokes a getter that fails.',
+          '按路径读取属性时，如果取值函数抛错，用这个类型接收并报告原始错误。'
+        )
+      ],
+      example: t(
+        `/** Report the original thrown value when reading a path invokes a getter that fails. */
+import { probeObjectPath, type IPathFailedProbe } from '@migaia/utils/object-path'
+function reportReadFailure(problem: IPathFailedProbe): void {
+  console.error(problem.failedKey, problem.error)
+}
+const result = probeObjectPath({ get balance(): number { throw new TypeError() } }, 'balance')
+if (result.kind === 'failed') reportReadFailure(result)`,
+        `/** 按路径读取属性时，如果取值函数抛错，用这个类型接收并报告原始错误。 */
+import { probeObjectPath, type IPathFailedProbe } from '@migaia/utils/object-path'
+function reportReadFailure(problem: IPathFailedProbe): void {
+  console.error(problem.failedKey, problem.error)
+}
+const result = probeObjectPath({ get balance(): number { throw new TypeError() } }, 'balance')
+if (result.kind === 'failed') reportReadFailure(result)`
+      ),
       summary: t(
         'Probe result: a getter or proxy threw.',
         '探测结果：某个 getter 或 Proxy 抛出了错误。'
@@ -2998,10 +3783,60 @@ console.log(settings.get('theme.mode')) // 'dark'`,
       members: probeMembers('failed')
     },
     IPathMissingProbe: {
+      scenarios: [
+        t(
+          'Report which segment is absent when an optional settings branch has not been created.',
+          '可选设置分支尚未建立时，用这个类型报告路径中缺失的具体字段。'
+        )
+      ],
+      example: t(
+        `/** Report which segment is absent when an optional settings branch has not been created. */
+import { createPathAccessor, type IPathMissingProbe } from '@migaia/utils/object-path'
+function showMissing(problem: IPathMissingProbe): void {
+  console.warn(problem.failedKey, problem.resolvedPath)
+}
+const settings = createPathAccessor<{ display?: { scale: number } }>({}, {
+  ifMissing: showMissing
+})
+settings.get('display.scale')`,
+        `/** 可选设置分支尚未建立时，用这个类型报告路径中缺失的具体字段。 */
+import { createPathAccessor, type IPathMissingProbe } from '@migaia/utils/object-path'
+function showMissing(problem: IPathMissingProbe): void {
+  console.warn(problem.failedKey, problem.resolvedPath)
+}
+const settings = createPathAccessor<{ display?: { scale: number } }>({}, {
+  ifMissing: showMissing
+})
+settings.get('display.scale')`
+      ),
       summary: t('Probe result: a segment does not exist.', '探测结果：某个路径段不存在。'),
       members: probeMembers('missing')
     },
     IPathValueProbe: {
+      scenarios: [
+        t(
+          'Pass a successful path result to a function that only accepts a confirmed numeric field value.',
+          '探测已确认读到数值后，用这个类型把成功结果传给只处理该字段的函数。'
+        )
+      ],
+      example: t(
+        `/** Pass a successful path result to a function that only accepts a confirmed numeric field value. */
+import { probeObjectPath, type IPathValueProbe } from '@migaia/utils/object-path'
+type IStock = { available: number }
+function displayAvailable(result: IPathValueProbe<IStock, 'available'>): string {
+  return String(result.value)
+}
+const result = probeObjectPath<IStock, 'available'>({ available: 12 }, 'available')
+if (result.kind === 'value') console.log(displayAvailable(result))`,
+        `/** 探测已确认读到数值后，用这个类型把成功结果传给只处理该字段的函数。 */
+import { probeObjectPath, type IPathValueProbe } from '@migaia/utils/object-path'
+type IStock = { available: number }
+function displayAvailable(result: IPathValueProbe<IStock, 'available'>): string {
+  return String(result.value)
+}
+const result = probeObjectPath<IStock, 'available'>({ available: 12 }, 'available')
+if (result.kind === 'value') console.log(displayAvailable(result))`
+      ),
       summary: t('Probe result: the value was read.', '探测结果：成功读取到了值。'),
       members: {
         kind: {
@@ -3025,12 +3860,45 @@ console.log(settings.get('theme.mode')) // 'dark'`,
           '检查嵌套配置时区分缺失路径、非对象中间值和读取抛错。'
         )
       ],
-      example: `const result = probeObjectPath({ user: { name: 'Ada' } }, 'user.name')
+      example: t(
+        `import { probeObjectPath } from '@migaia/utils/object-path'
+
+const result = probeObjectPath({ user: { name: 'Ada' } }, 'user.name')
 if (result.kind === 'value') console.log(result.value)
 else console.log(result.kind, result.failedAt)`,
+        `import { probeObjectPath } from '@migaia/utils/object-path'
+
+const result = probeObjectPath({ user: { name: 'Ada' } }, 'user.name')
+if (result.kind === 'value') console.log(result.value)
+else console.log(result.kind, result.failedAt)`
+      ),
       members: {}
     },
     IPathGetEvent: {
+      scenarios: [
+        t(
+          'Declare a reusable read hook that replaces an empty display name before returning it to a caller.',
+          '读取显示姓名时需要为空字符串提供替代值，可用这个类型声明可复用的读取回调参数。'
+        )
+      ],
+      example: t(
+        `/** Declare a reusable read hook that replaces an empty display name before returning it to a caller. */
+import { createPathAccessor, type IPathGetEvent } from '@migaia/utils/object-path'
+type IProfile = { name: string }
+function fillDisplayName(event: IPathGetEvent<IProfile>): void {
+  if (event.value === '') event.replace('Guest')
+}
+const profile = createPathAccessor<IProfile>({ name: '' }, { onGet: fillDisplayName })
+console.log(profile.get('name'))`,
+        `/** 读取显示姓名时需要为空字符串提供替代值，可用这个类型声明可复用的读取回调参数。 */
+import { createPathAccessor, type IPathGetEvent } from '@migaia/utils/object-path'
+type IProfile = { name: string }
+function fillDisplayName(event: IPathGetEvent<IProfile>): void {
+  if (event.value === '') event.replace('Guest')
+}
+const profile = createPathAccessor<IProfile>({ name: '' }, { onGet: fillDisplayName })
+console.log(profile.get('name'))`
+      ),
       summary: t('Event passed to `onGet`.', '每次成功读取后传给 `onGet` 的事件对象。'),
       members: {
         originKey: {
@@ -3049,6 +3917,30 @@ else console.log(result.kind, result.failedAt)`,
       }
     },
     IPathSetEvent: {
+      scenarios: [
+        t(
+          'Declare a reusable write hook that keeps an edited page size within the application limit.',
+          '编辑每页条数时需要限制最大值，可用这个类型声明写入回调参数，再替换本次写入值。'
+        )
+      ],
+      example: t(
+        `/** Declare a reusable write hook that keeps an edited page size within the application limit. */
+import { createPathAccessor, type IPathSetEvent } from '@migaia/utils/object-path'
+type IPagination = { pageSize: number }
+function limitPageSize(event: IPathSetEvent<IPagination>): void {
+  event.replace(Math.min(100, Math.max(1, event.value)))
+}
+const pagination = createPathAccessor<IPagination>({ pageSize: 20 }, { onSet: limitPageSize })
+console.log(pagination.set('pageSize', 500))`,
+        `/** 编辑每页条数时需要限制最大值，可用这个类型声明写入回调参数，再替换本次写入值。 */
+import { createPathAccessor, type IPathSetEvent } from '@migaia/utils/object-path'
+type IPagination = { pageSize: number }
+function limitPageSize(event: IPathSetEvent<IPagination>): void {
+  event.replace(Math.min(100, Math.max(1, event.value)))
+}
+const pagination = createPathAccessor<IPagination>({ pageSize: 20 }, { onSet: limitPageSize })
+console.log(pagination.set('pageSize', 500))`
+      ),
       summary: t('Event passed to `onSet`.', '每次写入生效前传给 `onSet` 的事件对象。'),
       members: {
         originKey: {
@@ -3075,6 +3967,28 @@ else console.log(result.kind, result.failedAt)`,
       }
     },
     IAbortSignal: {
+      scenarios: [
+        t(
+          'Accept a caller cancellation signal in a shared delay function without requiring a particular signal class.',
+          '封装延时函数并接收调用方的取消信号时，用这个结构类型约束参数，不要求继承特定信号类。'
+        )
+      ],
+      example: t(
+        `/** Accept a caller cancellation signal in a shared delay function without requiring a particular signal class. */
+import { sleep, type IAbortSignal } from '@migaia/utils/promise'
+function waitBeforeRefresh(signal: IAbortSignal): Promise<void> {
+  return sleep(250, { signal })
+}
+const controller = new AbortController()
+await waitBeforeRefresh(controller.signal)`,
+        `/** 封装延时函数并接收调用方的取消信号时，用这个结构类型约束参数，不要求继承特定信号类。 */
+import { sleep, type IAbortSignal } from '@migaia/utils/promise'
+function waitBeforeRefresh(signal: IAbortSignal): Promise<void> {
+  return sleep(250, { signal })
+}
+const controller = new AbortController()
+await waitBeforeRefresh(controller.signal)`
+      ),
       summary: t(
         'Structural shape of an `AbortSignal` accepted by this package.',
         '本包接受的 `AbortSignal` 结构形状，原生信号天然满足。'
@@ -3106,10 +4020,36 @@ else console.log(result.kind, result.failedAt)`,
         }
       }
     },
-    IAbortOperation: alias(
-      'Operation of `raceWithAbort()`: `({ signal }) => value | Promise`.',
-      '`raceWithAbort()` 执行的操作函数，接收信号：`({ signal }) => value | Promise`。'
-    ),
+    IAbortOperation: {
+      ...alias(
+        'Operation of `raceWithAbort()`: `({ signal }) => value | Promise`.',
+        '`raceWithAbort()` 执行的操作函数，接收信号：`({ signal }) => value | Promise`。'
+      ),
+      scenarios: [
+        t(
+          'Name a cancellable request operation before passing it to raceWithAbort() with a caller-owned signal.',
+          '需要先定义可取消的请求操作，再由调用方信号控制 raceWithAbort() 时，用这个函数类型。'
+        )
+      ],
+      example: t(
+        `/** Name a cancellable request operation before passing it to raceWithAbort() with a caller-owned signal. */
+import { raceWithAbort, type IAbortOperation } from '@migaia/utils/promise'
+const loadProfile: IAbortOperation<string> = async ({ signal }) => {
+  const response = await fetch('/api/profile', { signal })
+  return response.text()
+}
+const controller = new AbortController()
+console.log(await raceWithAbort(loadProfile, { signal: controller.signal }))`,
+        `/** 需要先定义可取消的请求操作，再由调用方信号控制 raceWithAbort() 时，用这个函数类型。 */
+import { raceWithAbort, type IAbortOperation } from '@migaia/utils/promise'
+const loadProfile: IAbortOperation<string> = async ({ signal }) => {
+  const response = await fetch('/api/profile', { signal })
+  return response.text()
+}
+const controller = new AbortController()
+console.log(await raceWithAbort(loadProfile, { signal: controller.signal }))`
+      )
+    },
     IAbortSignalAdmission: {
       summary: t(
         'One structural signal admission result returned by `admitAbortSignal()`, preserving a captured aborted flag or rejection reason.',
@@ -3121,9 +4061,18 @@ else console.log(result.kind, result.failedAt)`,
           '接纳调用方信号，同时不订阅也不读取取消原因。'
         )
       ],
-      example: `const result = admitAbortSignal(new AbortController().signal)
+      example: t(
+        `import { admitAbortSignal } from '@migaia/utils/promise'
+
+const result = admitAbortSignal(new AbortController().signal)
 if (result.kind === 'valid') console.log(result.aborted)
 else console.error(result.reason, result.cause)`,
+        `import { admitAbortSignal } from '@migaia/utils/promise'
+
+const result = admitAbortSignal(new AbortController().signal)
+if (result.kind === 'valid') console.log(result.aborted)
+else console.error(result.reason, result.cause)`
+      ),
       members: {
         kind: {
           summary: t(
@@ -3185,10 +4134,34 @@ else console.error(result.reason, result.cause)`,
         }
       }
     },
-    IAbortSignalRejection: alias(
-      'Reasons why `admitAbortSignal()` rejects a value.',
-      '`admitAbortSignal()` 拒绝某个值的原因取值。'
-    ),
+    IAbortSignalRejection: {
+      ...alias(
+        'Reasons why `admitAbortSignal()` rejects a value.',
+        '`admitAbortSignal()` 拒绝某个值的原因取值。'
+      ),
+      scenarios: [
+        t(
+          'Store the rejection reason from admitAbortSignal() when checking an unknown signal supplied by another component.',
+          '检查其他组件传来的未知信号时，用这个类型保存 admitAbortSignal() 返回的拒绝原因。'
+        )
+      ],
+      example: t(
+        `/** Store the rejection reason from admitAbortSignal() when checking an unknown signal supplied by another component. */
+import { admitAbortSignal, type IAbortSignalRejection } from '@migaia/utils/promise'
+const checked = admitAbortSignal({ aborted: 'no' })
+if (checked.kind === 'invalid') {
+  const rejection: IAbortSignalRejection = checked.reason
+  console.warn(rejection)
+}`,
+        `/** 检查其他组件传来的未知信号时，用这个类型保存 admitAbortSignal() 返回的拒绝原因。 */
+import { admitAbortSignal, type IAbortSignalRejection } from '@migaia/utils/promise'
+const checked = admitAbortSignal({ aborted: 'no' })
+if (checked.kind === 'invalid') {
+  const rejection: IAbortSignalRejection = checked.reason
+  console.warn(rejection)
+}`
+      )
+    },
     IAbortTimeoutSignal: {
       summary: t(
         'Result of `createAbortTimeoutSignal()`.',
@@ -3200,12 +4173,26 @@ else console.error(result.reason, result.cause)`,
           '让同一事务中的多个并行请求共享同一个截止时间。'
         )
       ],
-      example: `const deadline = createAbortTimeoutSignal({ signal: request.signal, timeoutMs: 500 })
+      example: t(
+        `import { createAbortTimeoutSignal, sleep, type IAbortTimeoutSignal } from '@migaia/utils/promise'
+
+/** Two parallel waits share one deadline and its cleanup. */
+const deadline: IAbortTimeoutSignal = createAbortTimeoutSignal({ timeoutMs: 500 })
 try {
-  await Promise.all([loadUser(deadline.signal), loadOrders(deadline.signal)])
+  await Promise.all([sleep(10, { signal: deadline.signal }), sleep(20, { signal: deadline.signal })])
 } finally {
   deadline.dispose()
 }`,
+        `import { createAbortTimeoutSignal, sleep, type IAbortTimeoutSignal } from '@migaia/utils/promise'
+
+/** 两个并行等待共用一个截止时间和清理函数。 */
+const deadline: IAbortTimeoutSignal = createAbortTimeoutSignal({ timeoutMs: 500 })
+try {
+  await Promise.all([sleep(10, { signal: deadline.signal }), sleep(20, { signal: deadline.signal })])
+} finally {
+  deadline.dispose()
+}`
+      ),
       members: {
         signal: {
           summary: t(
@@ -3222,6 +4209,34 @@ try {
       }
     },
     IAbortTimeoutSignalOptions: {
+      scenarios: [
+        t(
+          'Prepare a combined caller signal and timeout for an adapter that consumes a cancellation signal.',
+          '适配器只接收取消信号，但调用方还需要超时时，用这个选项类型配置外部信号与时限。'
+        )
+      ],
+      example: t(
+        `/** Prepare a combined caller signal and timeout for an adapter that consumes a cancellation signal. */
+import { createAbortTimeoutSignal, type IAbortTimeoutSignalOptions } from '@migaia/utils/promise'
+const controller = new AbortController()
+const requestOptions: IAbortTimeoutSignalOptions = { signal: controller.signal, timeoutMs: 1000 }
+const request = createAbortTimeoutSignal(requestOptions)
+try {
+  console.log(request.signal?.aborted)
+} finally {
+  request.dispose()
+}`,
+        `/** 适配器只接收取消信号，但调用方还需要超时时，用这个选项类型配置外部信号与时限。 */
+import { createAbortTimeoutSignal, type IAbortTimeoutSignalOptions } from '@migaia/utils/promise'
+const controller = new AbortController()
+const requestOptions: IAbortTimeoutSignalOptions = { signal: controller.signal, timeoutMs: 1000 }
+const request = createAbortTimeoutSignal(requestOptions)
+try {
+  console.log(request.signal?.aborted)
+} finally {
+  request.dispose()
+}`
+      ),
       summary: t(
         'Options of `createAbortTimeoutSignal()`.',
         '`createAbortTimeoutSignal()` 的选项：外部信号、截止时间与计时器。'
@@ -3262,6 +4277,26 @@ try {
       }
     },
     IAsyncControls: {
+      scenarios: [
+        t(
+          'Share one caller signal across several waits without repeating the cancellation options at every call.',
+          '多个等待步骤共用调用方的取消信号时，用这个类型保存并传递公共控制选项。'
+        )
+      ],
+      example: t(
+        `/** Share one caller signal across several waits without repeating the cancellation options at every call. */
+import { sleep, type IAsyncControls } from '@migaia/utils/promise'
+const controller = new AbortController()
+const refreshControls: IAsyncControls = { signal: controller.signal }
+await sleep(100, refreshControls)
+await sleep(200, refreshControls)`,
+        `/** 多个等待步骤共用调用方的取消信号时，用这个类型保存并传递公共控制选项。 */
+import { sleep, type IAsyncControls } from '@migaia/utils/promise'
+const controller = new AbortController()
+const refreshControls: IAsyncControls = { signal: controller.signal }
+await sleep(100, refreshControls)
+await sleep(200, refreshControls)`
+      ),
       summary: t(
         'Cancellation and timing options shared by the promise helpers.',
         'promise 系列函数共用的取消与计时选项。'
@@ -3283,10 +4318,34 @@ try {
           '在单个进程内保护有限流的接口免受突发请求冲击。'
         )
       ],
-      example: `const limiter = createConcurrencyLimiter({ concurrency: 4 })
-const results = await Promise.allSettled(urls.map((url) => limiter.run(({ signal }) => fetch(url, { signal }))))
-console.log(limiter.activeCount, limiter.pendingCount) // 0 0
-await limiter.dispose()`,
+      example: t(
+        `import { createConcurrencyLimiter, type IConcurrencyLimiter } from '@migaia/utils/promise'
+
+/** Preparation jobs share two available execution slots. */
+const limiter: IConcurrencyLimiter = createConcurrencyLimiter({ concurrency: 2 })
+try {
+  /** Each job produces one prepared label. */
+  const results = await Promise.allSettled(['cover', 'index', 'appendix'].map((section) =>
+    limiter.run(async () => section.toUpperCase())
+  ))
+  console.log(results, limiter.activeCount, limiter.pendingCount)
+} finally {
+  await limiter.dispose()
+}`,
+        `import { createConcurrencyLimiter, type IConcurrencyLimiter } from '@migaia/utils/promise'
+
+/** 准备任务共用两个可执行名额。 */
+const limiter: IConcurrencyLimiter = createConcurrencyLimiter({ concurrency: 2 })
+try {
+  /** 每个任务生成一个准备完成的标签。 */
+  const results = await Promise.allSettled(['cover', 'index', 'appendix'].map((section) =>
+    limiter.run(async () => section.toUpperCase())
+  ))
+  console.log(results, limiter.activeCount, limiter.pendingCount)
+} finally {
+  await limiter.dispose()
+}`
+      ),
       members: {
         run: {
           summary: t(
@@ -3346,10 +4405,32 @@ await limiter.dispose()`,
         }
       }
     },
-    IDeadlineOnlyOperation: alias(
-      'Operation of `withTimeout({ cooperativeCancellation: false })`; receives a never-aborting signal.',
-      '`withTimeout({ cooperativeCancellation: false })` 的操作函数，收到的是永不中止的信号。'
-    ),
+    IDeadlineOnlyOperation: {
+      ...alias(
+        'Operation of `withTimeout({ cooperativeCancellation: false })`; receives a never-aborting signal.',
+        '`withTimeout({ cooperativeCancellation: false })` 的操作函数，收到的是永不中止的信号。'
+      ),
+      scenarios: [
+        t(
+          'Limit how long a caller waits for work that has no cancellation support, without treating the supplied signal as a native host signal.',
+          '底层工作不支持取消、但调用方需要限制等待时间时，用这个函数类型配合关闭协作取消的选项。'
+        )
+      ],
+      example: t(
+        `/** Limit how long a caller waits for work that has no cancellation support, without treating the supplied signal as a native host signal. */
+import { withTimeout, type IDeadlineOnlyOperation } from '@migaia/utils/promise'
+const readCachedTitle: IDeadlineOnlyOperation<string> = () => Promise.resolve('Dashboard')
+console.log(await withTimeout(readCachedTitle, {
+  timeoutMs: 500, cooperativeCancellation: false
+}))`,
+        `/** 底层工作不支持取消、但调用方需要限制等待时间时，用这个函数类型配合关闭协作取消的选项。 */
+import { withTimeout, type IDeadlineOnlyOperation } from '@migaia/utils/promise'
+const readCachedTitle: IDeadlineOnlyOperation<string> = () => Promise.resolve('Dashboard')
+console.log(await withTimeout(readCachedTitle, {
+  timeoutMs: 500, cooperativeCancellation: false
+}))`
+      )
+    },
     IDeferred: {
       summary: t(
         'A Promise with its resolve and reject functions.',
@@ -3361,10 +4442,20 @@ await limiter.dispose()`,
           '把事件接口桥接为另一组件等待的 Promise。'
         )
       ],
-      example: `const ready = deferred<void>()
-socket.addEventListener('open', () => ready.resolve(), { once: true })
-socket.addEventListener('error', (event) => ready.reject(event), { once: true })
-await ready.promise`,
+      example: t(
+        `import { deferred, type IDeferred } from '@migaia/utils/promise'
+
+/** A callback completes a promise that its caller can await. */
+const ready: IDeferred<string> = deferred<string>()
+queueMicrotask(() => ready.resolve('connected'))
+console.log(await ready.promise)`,
+        `import { deferred, type IDeferred } from '@migaia/utils/promise'
+
+/** 回调完成一个可供调用方等待的承诺。 */
+const ready: IDeferred<string> = deferred<string>()
+queueMicrotask(() => ready.resolve('connected'))
+console.log(await ready.promise)`
+      ),
       members: {
         promise: {
           summary: t(
@@ -3386,11 +4477,59 @@ await ready.promise`,
         }
       }
     },
-    INativeAbortSignal: alias(
-      'The host `AbortSignal` type passed to operations.',
-      '传给操作函数的宿主原生 `AbortSignal` 类型。'
-    ),
+    INativeAbortSignal: {
+      ...alias(
+        'The host `AbortSignal` type passed to operations.',
+        '传给操作函数的宿主原生 `AbortSignal` 类型。'
+      ),
+      scenarios: [
+        t(
+          'Type the signal parameter of a request function that receives the host signal produced by withTimeout().',
+          '请求函数接收 withTimeout() 生成并传入的宿主信号时，用这个类型声明信号参数，再交给宿主请求接口。'
+        )
+      ],
+      example: t(
+        `/** Type the signal parameter of a request function that receives the host signal produced by withTimeout(). */
+import { withTimeout, type INativeAbortSignal } from '@migaia/utils/promise'
+async function requestTitle(signal: INativeAbortSignal): Promise<string> {
+  const response = await fetch('/api/title', { signal })
+  return response.text()
+}
+console.log(await withTimeout(({ signal }) => requestTitle(signal), { timeoutMs: 1000 }))`,
+        `/** 请求函数接收 withTimeout() 生成并传入的宿主信号时，用这个类型声明信号参数，再交给宿主请求接口。 */
+import { withTimeout, type INativeAbortSignal } from '@migaia/utils/promise'
+async function requestTitle(signal: INativeAbortSignal): Promise<string> {
+  const response = await fetch('/api/title', { signal })
+  return response.text()
+}
+console.log(await withTimeout(({ signal }) => requestTitle(signal), { timeoutMs: 1000 }))`
+      )
+    },
     IRetryContext: {
+      scenarios: [
+        t(
+          'Read the attempt number and pass the attempt signal to a request inside a reusable retry operation.',
+          '编写可重用的重试操作时，用这个参数类型读取当前尝试次数，并把本次信号交给请求。'
+        )
+      ],
+      example: t(
+        `/** Read the attempt number and pass the attempt signal to a request inside a reusable retry operation. */
+import { retry, type IRetryContext } from '@migaia/utils/promise'
+async function loadStatus(context: IRetryContext): Promise<string> {
+  console.log(context.attempt)
+  const response = await fetch('/api/status', { signal: context.signal })
+  return response.text()
+}
+console.log(await retry(loadStatus, { maxAttempts: 3, shouldRetry: () => true }))`,
+        `/** 编写可重用的重试操作时，用这个参数类型读取当前尝试次数，并把本次信号交给请求。 */
+import { retry, type IRetryContext } from '@migaia/utils/promise'
+async function loadStatus(context: IRetryContext): Promise<string> {
+  console.log(context.attempt)
+  const response = await fetch('/api/status', { signal: context.signal })
+  return response.text()
+}
+console.log(await retry(loadStatus, { maxAttempts: 3, shouldRetry: () => true }))`
+      ),
       summary: t('Context passed to each retry attempt.', '每次重试尝试收到的上下文。'),
       members: {
         attempt: { summary: t('Attempt number, starting at 1.', '当前尝试的序号，从 1 开始。') },
@@ -3409,6 +4548,34 @@ await ready.promise`,
       }
     },
     IRetryFailureContext: {
+      scenarios: [
+        t(
+          'Use the current attempt and attempt limit in a retry policy that also reports each failed request.',
+          '重试策略需要依据当前次数和次数上限作决定时，用这个类型声明失败回调的上下文，并报告失败。'
+        )
+      ],
+      example: t(
+        `/** Use the current attempt and attempt limit in a retry policy that also reports each failed request. */
+import { retry, type IRetryFailureContext } from '@migaia/utils/promise'
+function retryRequest(error: unknown, context: IRetryFailureContext): boolean {
+  console.warn(context.attempt, error)
+  return context.attempt < context.maxAttempts
+}
+const response = await retry(() => fetch('/api/status'), {
+  maxAttempts: 3, shouldRetry: retryRequest
+})
+console.log(response.status)`,
+        `/** 重试策略需要依据当前次数和次数上限作决定时，用这个类型声明失败回调的上下文，并报告失败。 */
+import { retry, type IRetryFailureContext } from '@migaia/utils/promise'
+function retryRequest(error: unknown, context: IRetryFailureContext): boolean {
+  console.warn(context.attempt, error)
+  return context.attempt < context.maxAttempts
+}
+const response = await retry(() => fetch('/api/status'), {
+  maxAttempts: 3, shouldRetry: retryRequest
+})
+console.log(response.status)`
+      ),
       summary: t(
         'Context passed to `shouldRetry` and `delay`.',
         '每次尝试失败后传给 `shouldRetry` 与 `delay` 的上下文。'
@@ -3426,14 +4593,64 @@ await ready.promise`,
         }
       }
     },
-    ITimeoutOperation: alias(
-      'Operation of `withTimeout()`: `({ signal }) => value | Promise`.',
-      '`withTimeout()` 限时执行的操作函数，接收信号：`({ signal }) => value | Promise`。'
-    ),
-    IUtilsReporter: alias(
-      'Reporter `(error, { operation, phase, attempt? }) => void` for late failures.',
-      '接收迟到失败与清理错误的上报函数 `(error, { operation, phase, attempt? }) => void`。'
-    ),
+    ITimeoutOperation: {
+      ...alias(
+        'Operation of `withTimeout()`: `({ signal }) => value | Promise`.',
+        '`withTimeout()` 限时执行的操作函数，接收信号：`({ signal }) => value | Promise`。'
+      ),
+      scenarios: [
+        t(
+          'Declare a request operation separately from its timeout so different callers can choose their own waiting limit.',
+          '同一请求操作需要由不同调用方设置时限时，用这个函数类型先定义操作，再交给 withTimeout()。'
+        )
+      ],
+      example: t(
+        `/** Declare a request operation separately from its timeout so different callers can choose their own waiting limit. */
+import { withTimeout, type ITimeoutOperation } from '@migaia/utils/promise'
+const loadName: ITimeoutOperation<string> = async ({ signal }) => {
+  const response = await fetch('/api/name', { signal })
+  return response.text()
+}
+console.log(await withTimeout(loadName, { timeoutMs: 800 }))`,
+        `/** 同一请求操作需要由不同调用方设置时限时，用这个函数类型先定义操作，再交给 withTimeout()。 */
+import { withTimeout, type ITimeoutOperation } from '@migaia/utils/promise'
+const loadName: ITimeoutOperation<string> = async ({ signal }) => {
+  const response = await fetch('/api/name', { signal })
+  return response.text()
+}
+console.log(await withTimeout(loadName, { timeoutMs: 800 }))`
+      )
+    },
+    IUtilsReporter: {
+      ...alias(
+        'Reporter `(error, { operation, phase, attempt? }) => void` for late failures.',
+        '接收迟到失败与清理错误的上报函数 `(error, { operation, phase, attempt? }) => void`。'
+      ),
+      scenarios: [
+        t(
+          'Supply a typed reporter for cleanup failures or work that rejects after the public timeout result has already settled.',
+          '限时调用结束后仍可能收到迟到失败或清理错误时，用这个函数类型接入应用的错误上报。'
+        )
+      ],
+      example: t(
+        `/** Supply a typed reporter for cleanup failures or work that rejects after the public timeout result has already settled. */
+import { withTimeout, type IUtilsReporter } from '@migaia/utils/promise'
+const reportBackgroundFailure: IUtilsReporter = (error, context) => {
+  console.error(context.operation, context.phase, error)
+}
+console.log(await withTimeout(() => Promise.resolve('ready'), {
+  timeoutMs: 500, report: reportBackgroundFailure
+}))`,
+        `/** 限时调用结束后仍可能收到迟到失败或清理错误时，用这个函数类型接入应用的错误上报。 */
+import { withTimeout, type IUtilsReporter } from '@migaia/utils/promise'
+const reportBackgroundFailure: IUtilsReporter = (error, context) => {
+  console.error(context.operation, context.phase, error)
+}
+console.log(await withTimeout(() => Promise.resolve('ready'), {
+  timeoutMs: 500, report: reportBackgroundFailure
+}))`
+      )
+    },
     IManualScheduler: {
       summary: t(
         'Deterministic scheduler from `createManualScheduler()`.',
@@ -3442,12 +4659,28 @@ await ready.promise`,
       scenarios: [
         t('Test timeouts and retries without real waiting.', '无需真实等待即可测试超时与重试。')
       ],
-      example: `import { createManualScheduler } from '@migaia/utils/testing'
+      example: t(
+        `import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'
+import { withTimeout } from '@migaia/utils/promise'
 
-const scheduler = createManualScheduler()
-const pending = withTimeout(() => new Promise(() => {}), { timeoutMs: 100, scheduler })
-scheduler.advance(100) // 立即触发超时
-await pending.catch((error) => console.log(error.code))`,
+/** Virtual time makes this deadline observable without real waiting. */
+const scheduler: IManualScheduler = createManualScheduler()
+/** Observe the rejection before advancing the clock. */
+const pending = withTimeout(() => new Promise<void>(() => {}), { timeoutMs: 100, scheduler })
+  .catch((error: unknown) => console.log(error))
+scheduler.advance(100)
+await pending`,
+        `import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'
+import { withTimeout } from '@migaia/utils/promise'
+
+/** 使用虚拟时间观察截止行为，无需真实等待。 */
+const scheduler: IManualScheduler = createManualScheduler()
+/** 先接住拒绝结果，再推进时钟。 */
+const pending = withTimeout(() => new Promise<void>(() => {}), { timeoutMs: 100, scheduler })
+  .catch((error: unknown) => console.log(error))
+scheduler.advance(100)
+await pending`
+      ),
       members: {
         advance: {
           summary: t(
@@ -3504,12 +4737,20 @@ await pending.catch((error) => console.log(error.code))`,
           '让 Node 进程在周期性计时器仍在等待时可以正常退出。'
         )
       ],
-      example: `const task = systemScheduler.schedule(() => controller.abort(), 5000)
-try {
-  await work(controller.signal)
-} finally {
-  task.cancel()
-}`,
+      example: t(
+        `import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
+
+/** Keep the cancellation handle when a view schedules a refresh. */
+const refresh: IScheduledTask = systemScheduler.schedule(() => console.log('refresh'), 1000)
+/** Leaving the view cancels the pending refresh. */
+refresh.cancel()`,
+        `import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
+
+/** 视图安排刷新时保留取消凭证。 */
+const refresh: IScheduledTask = systemScheduler.schedule(() => console.log('refresh'), 1000)
+/** 离开视图时取消尚未执行的刷新。 */
+refresh.cancel()`
+      ),
       members: {
         cancel: {
           summary: t(
@@ -3533,6 +4774,28 @@ try {
       }
     },
     IScheduler: {
+      scenarios: [
+        t(
+          'Accept the scheduler contract in a delayed notification function, using the system scheduler for ordinary calls.',
+          '延时通知函数需要允许调用方选择计时器时，用这个类型约束参数，普通调用传系统调度器。'
+        )
+      ],
+      example: t(
+        `/** Accept the scheduler contract in a delayed notification function, using the system scheduler for ordinary calls. */
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+function scheduleNotice(scheduler: IScheduler) {
+  return scheduler.schedule(() => console.log('ready'), 250)
+}
+const notice = scheduleNotice(systemScheduler)
+notice.cancel()`,
+        `/** 延时通知函数需要允许调用方选择计时器时，用这个类型约束参数，普通调用传系统调度器。 */
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+function scheduleNotice(scheduler: IScheduler) {
+  return scheduler.schedule(() => console.log('ready'), 250)
+}
+const notice = scheduleNotice(systemScheduler)
+notice.cancel()`
+      ),
       summary: t(
         'The scheduler contract: monotonic `now()`, `schedule()` and optional `defer()`.',
         '调度器约定：单调的 `now()`、`schedule()` 以及可选的 `defer()`。'
@@ -3567,6 +4830,26 @@ try {
       }
     },
     IWallClock: {
+      scenarios: [
+        t(
+          'Accept a clock for diagnostic timestamps while keeping elapsed-time scheduling separate.',
+          '诊断记录需要时间戳时，用这个类型接收时钟；计算经过时间仍由调度器负责。'
+        )
+      ],
+      example: t(
+        `/** Accept a clock for diagnostic timestamps while keeping elapsed-time scheduling separate. */
+import { systemWallClock, type IWallClock } from '@migaia/utils/scheduler'
+function stampNotice(clock: IWallClock) {
+  return { timestamp: clock.timestamp(), event: 'ready' }
+}
+console.log(stampNotice(systemWallClock))`,
+        `/** 诊断记录需要时间戳时，用这个类型接收时钟；计算经过时间仍由调度器负责。 */
+import { systemWallClock, type IWallClock } from '@migaia/utils/scheduler'
+function stampNotice(clock: IWallClock) {
+  return { timestamp: clock.timestamp(), event: 'ready' }
+}
+console.log(stampNotice(systemWallClock))`
+      ),
       summary: t('Epoch clock for diagnostic timestamps.', '用于诊断时间戳的纪元时钟。'),
       members: {
         timestamp: {
@@ -3579,6 +4862,22 @@ try {
       }
     },
     IFormatOptions: {
+      scenarios: [
+        t(
+          'Choose how a display template handles absent fields and null values in one typed options object.',
+          '显示模板需要约定缺失字段和空值的显示方式时，用这个选项类型保存规则。'
+        )
+      ],
+      example: t(
+        `/** Choose how a display template handles absent fields and null values in one typed options object. */
+import { format, type IFormatOptions } from '@migaia/utils/string'
+const displayOptions: IFormatOptions = { missing: 'empty', nullish: 'empty' }
+console.log(format('{name}: {note} {suffix}', { name: 'Ada', note: null }, displayOptions))`,
+        `/** 显示模板需要约定缺失字段和空值的显示方式时，用这个选项类型保存规则。 */
+import { format, type IFormatOptions } from '@migaia/utils/string'
+const displayOptions: IFormatOptions = { missing: 'empty', nullish: 'empty' }
+console.log(format('{name}: {note} {suffix}', { name: 'Ada', note: null }, displayOptions))`
+      ),
       summary: t(
         'Options of `format()`: delimiters, missing and nullish handling.',
         '`format()` 的选项：占位符边界、缺失值与空值的处理方式。'
@@ -3620,6 +4919,22 @@ try {
       }
     },
     IFormatPlaceholder: {
+      scenarios: [
+        t(
+          'Choose different placeholder delimiters when curly braces already have another meaning in a display template.',
+          '显示模板中的花括号另有用途时，用这个类型声明另一组占位符边界。'
+        )
+      ],
+      example: t(
+        `/** Choose different placeholder delimiters when curly braces already have another meaning in a display template. */
+import { format, type IFormatPlaceholder } from '@migaia/utils/string'
+const templateDelimiters: IFormatPlaceholder = { open: '[[', close: ']]' }
+console.log(format('Hello [[name]]', { name: 'Ada' }, { placeholder: templateDelimiters }))`,
+        `/** 显示模板中的花括号另有用途时，用这个类型声明另一组占位符边界。 */
+import { format, type IFormatPlaceholder } from '@migaia/utils/string'
+const templateDelimiters: IFormatPlaceholder = { open: '[[', close: ']]' }
+console.log(format('Hello [[name]]', { name: 'Ada' }, { placeholder: templateDelimiters }))`
+      ),
       summary: t('Placeholder delimiters of `format()`.', '`format()` 使用的占位符边界字符。'),
       members: {
         open: { summary: t('Opening delimiter, e.g. `{`.', '占位符的左边界字符，例如 `{`。') },
@@ -3637,9 +4952,18 @@ try {
           '从不可信值构造诊断，同时保留可检查的恶意转换失败。'
         )
       ],
-      example: `const result = tryString(42)
+      example: t(
+        `import { tryString } from '@migaia/utils/string'
+
+const result = tryString(42)
 if (result.threw) console.error(result.error)
 else console.log(result.value)`,
+        `import { tryString } from '@migaia/utils/string'
+
+const result = tryString(42)
+if (result.threw) console.error(result.error)
+else console.log(result.value)`
+      ),
       members: {
         threw: {
           summary: t(
@@ -3671,14 +4995,74 @@ else console.log(result.value)`,
         }
       }
     },
-    IDiscriminatedByField: alias(
-      'Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.',
-      '按顶层判别字段对联合类型分组的类型工具。需要为最外层字段的每个种类提供处理函数，并让函数只接收对应成员时使用。'
-    ),
-    IDiscriminatedByPath: alias(
-      'Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.',
-      '按嵌套判别路径对联合类型分组的类型工具。种类字段位于深层时使用；建立处理表前先检查结果键名，因为路径缺失或叶值不能用作键时，可能遗漏成员或没有任何键。'
-    ),
+    IDiscriminatedByField: {
+      ...alias(
+        'Groups a discriminated union by a top-level tag field. Use it to require one handler for every top-level kind, with each handler receiving its corresponding member.',
+        '按顶层判别字段对联合类型分组的类型工具。需要为最外层字段的每个种类提供处理函数，并让函数只接收对应成员时使用。'
+      ),
+      scenarios: [
+        t(
+          'Build a complete handler table for messages whose kind is stored directly on each message.',
+          '消息把种类放在最外层字段时，用这个类型建立完整处理表，让每个处理函数接收对应消息。'
+        )
+      ],
+      example: t(
+        `/** Build a complete handler table for messages whose kind is stored directly on each message. */
+import type { IDiscriminatedByField } from '@migaia/utils/typing'
+type IMessage = { kind: 'text'; body: string } | { kind: 'image'; url: string }
+type IMessagesByKind = IDiscriminatedByField<'kind', IMessage>
+const renderers: { [K in keyof IMessagesByKind]: (message: IMessagesByKind[K]) => string } = {
+  text: (message) => message.body,
+  image: (message) => message.url
+}
+console.log(renderers.text({ kind: 'text', body: 'Hello' }))`,
+        `/** 消息把种类放在最外层字段时，用这个类型建立完整处理表，让每个处理函数接收对应消息。 */
+import type { IDiscriminatedByField } from '@migaia/utils/typing'
+type IMessage = { kind: 'text'; body: string } | { kind: 'image'; url: string }
+type IMessagesByKind = IDiscriminatedByField<'kind', IMessage>
+const renderers: { [K in keyof IMessagesByKind]: (message: IMessagesByKind[K]) => string } = {
+  text: (message) => message.body,
+  image: (message) => message.url
+}
+console.log(renderers.text({ kind: 'text', body: 'Hello' }))`
+      )
+    },
+    IDiscriminatedByPath: {
+      ...alias(
+        'Groups a discriminated union by a nested tag path. Use it when the kind is nested; inspect the result keys before building a handler table, because missing paths or non-key values can leave members out or produce no keys.',
+        '按嵌套判别路径对联合类型分组的类型工具。种类字段位于深层时使用；建立处理表前先检查结果键名，因为路径缺失或叶值不能用作键时，可能遗漏成员或没有任何键。'
+      ),
+      scenarios: [
+        t(
+          'Group notifications by a kind stored inside metadata before defining a handler for each nested kind.',
+          '通知的种类字段位于元信息内部时，用这个类型按嵌套路径分组，再为每个种类定义处理函数。'
+        )
+      ],
+      example: t(
+        `/** Group notifications by a kind stored inside metadata before defining a handler for each nested kind. */
+import type { IDiscriminatedByPath } from '@migaia/utils/typing'
+type INotice =
+  | { meta: { kind: 'email' }; address: string }
+  | { meta: { kind: 'sms' }; phone: string }
+type INoticesByKind = IDiscriminatedByPath<INotice, 'meta.kind'>
+const destinations: { [K in keyof INoticesByKind]: (notice: INoticesByKind[K]) => string } = {
+  email: (notice) => notice.address,
+  sms: (notice) => notice.phone
+}
+console.log(destinations.sms({ meta: { kind: 'sms' }, phone: '12345' }))`,
+        `/** 通知的种类字段位于元信息内部时，用这个类型按嵌套路径分组，再为每个种类定义处理函数。 */
+import type { IDiscriminatedByPath } from '@migaia/utils/typing'
+type INotice =
+  | { meta: { kind: 'email' }; address: string }
+  | { meta: { kind: 'sms' }; phone: string }
+type INoticesByKind = IDiscriminatedByPath<INotice, 'meta.kind'>
+const destinations: { [K in keyof INoticesByKind]: (notice: INoticesByKind[K]) => string } = {
+  email: (notice) => notice.address,
+  sms: (notice) => notice.phone
+}
+console.log(destinations.sms({ meta: { kind: 'sms' }, phone: '12345' }))`
+      )
+    },
     IUrlLike: {
       summary: t(
         'Caller-supplied URL input as a string or an object exposing a string href, including native URL objects.',
@@ -3690,6 +5074,24 @@ else console.log(result.value)`,
           '共享模块的接口若要同时接收网址文本和原生网址对象，又不要求使用者引入浏览器或服务器宿主类型声明，可使用此类型。详见[类型工具指南](/zh/docs/utils/type-utilities#shared-signatures)。'
         )
       ],
+      example: t(
+        `import type { IUrlLike } from '@migaia/utils/typing'
+
+/** Accept URL text and objects without requiring a host-specific URL type. */
+function endpointText(value: IUrlLike): string {
+  return typeof value === 'string' ? value : value.href
+}
+console.log(endpointText('https://example.com/api'))
+console.log(endpointText({ href: 'https://example.com/api' }))`,
+        `import type { IUrlLike } from '@migaia/utils/typing'
+
+/** 同时接收网址文本与对象，无须依赖宿主的网址类型。 */
+function endpointText(value: IUrlLike): string {
+  return typeof value === 'string' ? value : value.href
+}
+console.log(endpointText('https://example.com/api'))
+console.log(endpointText({ href: 'https://example.com/api' }))`
+      ),
       members: {
         href: {
           summary: t(
@@ -3699,10 +5101,32 @@ else console.log(result.value)`,
         }
       }
     },
-    IPrimitive: alias(
-      'The seven JavaScript primitive types.',
-      'JavaScript 的七种原始类型组成的联合类型。'
-    )
+    IPrimitive: {
+      ...alias(
+        'The seven JavaScript primitive types.',
+        'JavaScript 的七种原始类型组成的联合类型。'
+      ),
+      scenarios: [
+        t(
+          'Accept only primitive values in a display helper that should not traverse arrays or objects.',
+          '显示辅助函数只处理原始值、不遍历数组或对象时，用这个类型声明参数。'
+        )
+      ],
+      example: t(
+        `/** Accept only primitive values in a display helper that should not traverse arrays or objects. */
+import type { IPrimitive } from '@migaia/utils/value'
+function displayCell(value: IPrimitive): string {
+  return value == null ? '' : String(value)
+}
+console.log(displayCell(false), displayCell(0), displayCell(null))`,
+        `/** 显示辅助函数只处理原始值、不遍历数组或对象时，用这个类型声明参数。 */
+import type { IPrimitive } from '@migaia/utils/value'
+function displayCell(value: IPrimitive): string {
+  return value == null ? '' : String(value)
+}
+console.log(displayCell(false), displayCell(0), displayCell(null))`
+      )
+    }
   },
   enums: {
     UtilsErrorCode: {
