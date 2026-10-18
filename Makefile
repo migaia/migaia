@@ -199,6 +199,7 @@ dependencies-check:
 	@test -x node_modules/.bin/oxlint || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/tsc || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/vitest || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
+	@test -x website/node_modules/.bin/oxfmt || { echo "Missing website dependencies; run pnpm install --frozen-lockfile (its postinstall runs bun install in website/)" >&2; exit 1; }
 	@$(FIND_MISSING_TOOLCHAINS) \
 	if [ -n "$$missing_tools" ]; then \
 		echo "==> rpc/test:conformance 跳过：缺少工具链$$missing_tools"; \

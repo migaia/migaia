@@ -1,7 +1,6 @@
 packages:
   - apps/*
   - packages/*
-  - website
 
 allowBuilds:
   cbor-extract: true
