@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest'
 import * as SubscriberEntry from '../src/subscriber.js'
 
 describe('public exports', () => {
+  it('ES-T202 keeps literal style inference in TypeScript without a runtime identity helper', () => {
+    expect('defineEventApiStyle' in EventSubscriber).toBe(false)
+  })
   it('ES-T182 exposes subscription helpers through the focused subscriber entry', () => {
     expect(SubscriberEntry.subscribeOnce).toBeTypeOf('function')
     expect('subscribeOnce' in EventSubscriber).toBe(false)

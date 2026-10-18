@@ -1,6 +1,10 @@
 import { EventSubscriberErrorCode } from './error-code.js'
-import { createCanonicalChannel } from './channel.js'
-import { createEventValueProjectionPlan, type IEventProjectionPlan } from './value-projection.js'
+import { createCanonicalChannel, createChannelWithProjection } from './channel.js'
+import {
+  copyEventProjection,
+  createEventValueProjectionPlan,
+  type IEventProjectionPlan
+} from './value-projection.js'
 import { createEventTypeError, eventErrorText } from './errors.js'
 import type {
   ICanonicalEventChannel,
@@ -152,7 +156,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
         valueConfig: valueConfig as IEventChannelOptions<unknown, undefined, V>['valueConfig']
       }
       channel = projectionPlan
-        ? createCanonicalChannel<unknown, void, V>(channelOptions, projectionPlan)
+        ? createChannelWithProjection<unknown, void, V>(channelOptions, projectionPlan)
         : createCanonicalChannel<unknown, void, V>(channelOptions)
       channels.set(validated, channel)
     }
@@ -210,8 +214,6 @@ export function createEventHub<C extends IEventMap, V = undefined>(
       )
     }
     const { channel, validated } = getChannel(key)
-    /** Alias the channel context carries; the hub copies only this data key, never `abort`. */
-    const alias = projectionPlan?.alias
     let deactivateRegistration: (() => void) | undefined
     const channelRelease = channel.subscribe((event) => {
       const context = {
@@ -235,15 +237,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
           event.setTaskId(taskId)
         }
       }
-      // Copy only the projection alias. A reflective copy would also copy the channel's own
-      // `abort`/`setTaskId` data properties over the wrappers above, so `deactivate` never ran.
-      if (alias !== undefined)
-        Object.defineProperty(context, alias, {
-          configurable: false,
-          enumerable: true,
-          writable: false,
-          value: (event as unknown as Record<string, unknown>)[alias]
-        })
+      copyEventProjection(context, event, projectionPlan)
       return listener(context as never)
     })
     totalSize += 1

@@ -67,12 +67,13 @@ export const attachEventErrorCode = <T extends object>(
 export const createEventTypeError = (
   code: IEventSubscriberErrorCode,
   message: string,
-  cause?: unknown
+  ...causes: [] | [unknown]
 ): TypeError & {
   readonly source: typeof EVENT_SUBSCRIBER_SOURCE
   readonly code: IEventSubscriberErrorCode
 } => {
-  const error = new TypeError(message, cause === undefined ? undefined : { cause })
+  /** Presence and payload differ when a visitor explicitly throws undefined. */
+  const error = new TypeError(message, causes.length === 0 ? undefined : { cause: causes[0] })
   return attachEventErrorCode(error, code)
 }
 
@@ -129,6 +130,7 @@ const eventErrorTextByCode: Record<IEventSubscriberErrorCode, string> = {
   [EventSubscriberErrorCode.invalidTaskId]: EventSubscriberErrorText.invalidTaskId,
   [EventSubscriberErrorCode.invalidOptions]: EventSubscriberErrorText.invalidOptions,
   [EventSubscriberErrorCode.publishFailed]: EventSubscriberErrorText.publishFailed,
+  [EventSubscriberErrorCode.visitorFailed]: EventSubscriberErrorText.visitorFailed,
   [EventSubscriberErrorCode.valueProjectionFailed]: EventSubscriberErrorText.valueProjectionFailed,
   [EventSubscriberErrorCode.subscriptionClosed]: EventSubscriberErrorText.subscriptionClosed,
   [EventSubscriberErrorCode.unhandledListenerFailure]:

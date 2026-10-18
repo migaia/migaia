@@ -3,7 +3,7 @@ export const EVENT_SUBSCRIBER_SOURCE = '@migaia/event-subscriber'
 
 /** The package-local error code declaration site. */
 export const EventSubscriberErrorCode = {
-  /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */
+  /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */
   invalidListener: 'INVALID_LISTENER',
   /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */
   invalidReporter: 'INVALID_REPORTER',
@@ -31,8 +31,14 @@ export const EventSubscriberErrorCode = {
   invalidTaskId: 'INVALID_TASK_ID',
   /** A public options object or field is malformed; caller must correct the option shape. */
   invalidOptions: 'INVALID_OPTIONS',
-  /** One or more listeners failed after the full target snapshot was processed. */
+  /** A listener failed or the publish budget left snapshot/queued targets undelivered. */
   publishFailed: 'PUBLISH_FAILED',
+  /**
+   * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated
+   * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or
+   * handle the visitor failure; captured invocations are closed before it leaves the boundary.
+   */
+  visitorFailed: 'VISITOR_FAILED',
   /** A configured value path was missing, blocked, or threw while delivering an event. */
   valueProjectionFailed: 'VALUE_PROJECTION_FAILED',
   /**

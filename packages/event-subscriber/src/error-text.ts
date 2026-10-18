@@ -24,6 +24,8 @@ export const EventSubscriberErrorText = {
   invalidOptions: 'event-subscriber options are invalid',
   /** Stable text for synchronous listener failures; used by awaited publish helpers. */
   publishFailed: 'event-subscriber publish failed',
+  /** Fallback for invocation visitor failures that cannot retain an annotated native identity. */
+  visitorFailed: 'event-subscriber invocation visitor failed',
   /** Stable text for a value alias path that could not be projected during delivery. */
   valueProjectionFailed: 'event-subscriber value projection failed',
   /** Stable text for fire-and-forget failures that reached terminal diagnostics. */

@@ -16,7 +16,7 @@ export {
   EventRemovalPolicy,
   EventSubscriberState
 } from './state-constants.js'
-export { defineEventApiStyle, EventApiStyle } from './style.js'
+export { EventApiStyle } from './style.js'
 export type { IEventSubscriberErrorCode } from './error-code.js'
 export type {
   IEventAdmissionPolicy,

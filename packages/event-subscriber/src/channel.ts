@@ -49,6 +49,7 @@ import {
 } from './internal/terminal-runtime.js'
 import {
   addEventProjection,
+  copyEventProjection,
   createEventValueProjectionPlan,
   projectEventValue,
   reportEventProjectionFailure,
@@ -295,12 +296,12 @@ export const withSnapshotEntries = <T, R, V = undefined>(
       },
       (error: unknown) => {
         close()
-        throw error
+        throw codeExistingError(error, EventSubscriberErrorCode.visitorFailed)
       }
     )
   } catch (error) {
     close()
-    throw error
+    throw codeExistingError(error, EventSubscriberErrorCode.visitorFailed)
   }
 }
 
@@ -432,10 +433,6 @@ export function createCanonicalChannel<T, R = void, const V = undefined>(
 ): ICanonicalEventChannel<T, R, 'listen-fire', V> & IStyledEventChannel<T, R, 'listen-fire', V>
 export function createCanonicalChannel<T, R = void, const V = undefined>(
   options?: IEventChannelOptions<T, undefined, V>
-): ICanonicalEventChannel<T, R, undefined, V>
-export function createCanonicalChannel<T, R = void, V = undefined>(
-  options: IEventChannelOptions<T, IEventApiStyle | undefined, V>,
-  projectionPlan: IEventProjectionPlan
 ): ICanonicalEventChannel<T, R, undefined, V>
 export function createCanonicalChannel<T, R = void, V = undefined>(
   options: IEventChannelOptions<T, IEventApiStyle | undefined, V> = {},
@@ -623,6 +620,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   }
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
   let remaining: number
+  /** Records omitted snapshot targets even when no nested value remains queued. */
+  let budgetExhausted = false
   let failures: unknown[] = []
   let nativeDepth = 0
   let spillCapture: T[] | undefined
@@ -637,7 +636,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         : undefined
       for (const snapshot of snapshots) {
         // Budget exhaustion stops delivery but still reaches the projection report below.
-        if (!remaining) break
+        if (!remaining) {
+          budgetExhausted = true
+          break
+        }
         --remaining
         if (nativeDepth >= MAX_NATIVE_RECURSION_DEPTH) spillCapture = []
         let result: R | PromiseLike<R>
@@ -682,6 +684,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     const rootTransaction = !nativeDepth && !publishing
     if (rootTransaction) {
       remaining = publishBudget!
+      budgetExhausted = false
       failures = []
       pendingValues.length = 0
       pendingIndex = 0
@@ -707,7 +710,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         publishing = false
       }
     }
-    if (rootTransaction && failures.length + pendingValues.length - pendingIndex) {
+    if (
+      rootTransaction &&
+      (budgetExhausted || failures.length + pendingValues.length - pendingIndex)
+    ) {
       const error = createEventAggregateError(
         EventSubscriberErrorCode.publishFailed,
         failures,
@@ -886,7 +892,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
             projection.outcome.diagnostic
           )
       }
-      if (visitorFailed) throw primaryError
+      if (visitorFailed)
+        throw codeExistingError(primaryError, EventSubscriberErrorCode.visitorFailed)
     }
   }
   try {
@@ -900,6 +907,15 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   )
   return channel
 }
+
+/**
+ * Internal Hub injection boundary over the same factory identity, without a runtime wrapper. Public
+ * overloads accept only options; the Hub alone reuses its already-admitted projection plan.
+ */
+export const createChannelWithProjection = createCanonicalChannel as <T, R = void, V = undefined>(
+  options: IEventChannelOptions<T, IEventApiStyle | undefined, V>,
+  projectionPlan: IEventProjectionPlan
+) => ICanonicalEventChannel<T, R, undefined, V>
 
 /** Registers a subscriber object without introducing a class hierarchy. */
 export const subscribeSubscriber = <T, R>(
@@ -1064,26 +1080,31 @@ export const subscribeUntil = <T, R, V = undefined>(
       throw codeExistingError(error, EventSubscriberErrorCode.invalidSignal)
     }
   }
-  const eventWrapper = (sourceEvent: IEventContext<T>): IEventContext<T> => ({
-    get value() {
-      return sourceEvent.value
-    },
-    get aborted() {
-      return overlayAborted || sourceEvent.aborted
-    },
-    get abortReason() {
-      return overlayAborted ? overlayReason : sourceEvent.abortReason
-    },
-    get taskId() {
-      return sourceEvent.taskId
-    },
-    abort(reason?: unknown) {
-      sourceEvent.abort(reason)
-    },
-    setTaskId(taskId: string | undefined) {
-      sourceEvent.setTaskId(taskId)
-    }
-  })
+  const eventWrapper = (sourceEvent: IEventContext<T>): IEventContext<T> =>
+    copyEventProjection(
+      {
+        get value() {
+          return sourceEvent.value
+        },
+        get aborted() {
+          return overlayAborted || sourceEvent.aborted
+        },
+        get abortReason() {
+          return overlayAborted ? overlayReason : sourceEvent.abortReason
+        },
+        get taskId() {
+          return sourceEvent.taskId
+        },
+        abort(reason?: unknown) {
+          sourceEvent.abort(reason)
+        },
+        setTaskId(taskId: string | undefined) {
+          sourceEvent.setTaskId(taskId)
+        }
+      },
+      sourceEvent,
+      channelCapabilities.get(channel as object)?.plan
+    )
   const completeAbort = (removeSignalListener: boolean): void => {
     let primary: unknown
     let hasPrimary = false

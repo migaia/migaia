@@ -333,7 +333,7 @@ export type IEventChannelOptions<
   readonly publishBudget?: number
   /**
    * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the
-   * default returns a rejected receipt without invoking listeners.
+   * default returns a callable no-op unsubscribe without invoking listeners.
    */
   readonly throwOnAborted?: boolean
   readonly style?: IEventApiStyleOption<S>

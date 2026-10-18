@@ -85,16 +85,16 @@ stop.off()
 
 这段代码选择 `on-emit` 命名风格：`on()` 登记监听器，并返回只属于这次订阅的取消句柄 `stop`；`emit(1)` 同步把值 `1` 交给当前监听器；`stop.off()` 删除这条 registration，之后再次 `emit()` 不会再调用它。这里的 `on`、`emit`、`off` 只是 `subscribe`、`publish`、`unsubscribe` 的别名，不会改变同步交付、错误聚合或退订语义。
 
-内置 preset：`subscribe-publish`（默认）、`on-emit`、`on-trigger`、`listen-fire`。自定义 style 使用语义到名称的对象映射；预声明变量可用 `defineEventApiStyle()` 保留字面量：
+内置 preset：`subscribe-publish`（默认）、`on-emit`、`on-trigger`、`listen-fire`。自定义 style 使用语义到名称的对象映射；预声明变量可用 `as const satisfies IEventApiStyleNames` 保留字面量：
 
 ```ts
-import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'
+import { createEventChannel, type IEventApiStyleNames } from '@migaia/event-subscriber'
 
-const style = defineEventApiStyle({
+const style = {
   subscribe: 'observe',
   publish: 'dispatch',
   unsubscribe: 'dispose'
-})
+} as const satisfies IEventApiStyleNames
 const events = createEventChannel<number, void, typeof style>({ style })
 const handle = events.observe((event) => console.log(event.value))
 events.dispatch(1)
@@ -323,7 +323,7 @@ if (error.code === EventSubscriberErrorCode.publishFailed) {
 }
 ```
 
-全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。
+全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、`publishFailed`(`PUBLISH_FAILED`)、`visitorFailed`(`VISITOR_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。
 
 **`EVENT_SUBSCRIBER_SOURCE`｜3 秒上手** —— 常量字符串 `'@migaia/event-subscriber'`，等同任意包边界错误的 `source` 字段。
 

@@ -3,6 +3,7 @@ import {
   probeObjectPathSegments,
   type IObjectPathInput,
   type IObjectPathTuple,
+  type IObjectPathTupleFor,
   type IPathProbe
 } from '@migaia/utils/object-path'
 import { EventSubscriberErrorCode } from './error-code.js'
@@ -103,10 +104,10 @@ export function projectEventValue<T>(
   plan: IEventProjectionPlan | undefined
 ): IEventProjectionOutcome {
   if (!plan) return { value: undefined, diagnostic: undefined }
-  const probe = probeObjectPathSegments(value, plan.segments as IObjectPathInput<T>) as IPathProbe<
-    T,
-    IObjectPathInput<T>
-  >
+  const probe = probeObjectPathSegments(
+    value,
+    plan.segments as IObjectPathTupleFor<T>
+  ) as IPathProbe<T, IObjectPathInput<T>>
   if (probe.kind === 'value') return { value: probe.value, diagnostic: undefined }
   const diagnostic = createEventTypeError(
     EventSubscriberErrorCode.valueProjectionFailed,
@@ -135,6 +136,19 @@ export function addEventProjection<T>(
     value: outcome.value
   })
   return context
+}
+
+/** Copies only canonical projection data so overlays retain ownership of their control methods. */
+export function copyEventProjection<T>(
+  context: IEventContext<T>,
+  source: IEventContext<T>,
+  plan: IEventProjectionPlan | undefined
+): IEventContext<T> {
+  if (!plan) return context
+  return addEventProjection(context, plan, {
+    value: (source as unknown as Record<string, unknown>)[plan.alias],
+    diagnostic: undefined
+  })
 }
 
 /** Reports one projection diagnostic through the existing report and terminal failure chain. */

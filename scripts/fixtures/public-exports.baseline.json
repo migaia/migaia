@@ -55,7 +55,6 @@
         "EventSubscriberState",
         "createEventChannel",
         "createEventHub",
-        "defineEventApiStyle",
         "invokeEachLive",
         "invokeParallel",
         "invokeParallelSettled",

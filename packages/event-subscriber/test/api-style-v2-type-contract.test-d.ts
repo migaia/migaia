@@ -1,9 +1,4 @@
-import {
-  createEventChannel,
-  createEventHub,
-  defineEventApiStyle,
-  type IEventApiStyleNames
-} from '../src/index.js'
+import { createEventChannel, createEventHub, type IEventApiStyleNames } from '../src/index.js'
 
 // ESV2-T06/T07/T09/T20/T21: custom styles require explicit generic placement and retain exact keys.
 const inlineChannel = createEventChannel<
@@ -19,7 +14,10 @@ inlineChannel.dispatch(1)
 // @ts-expect-error custom Channel names cannot be inferred after an explicit payload type.
 createEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } })
 
-const declaredStyle = defineEventApiStyle({ subscribe: 'listen', publish: 'fire' })
+const declaredStyle = {
+  subscribe: 'listen',
+  publish: 'fire'
+} as const satisfies IEventApiStyleNames
 const declaredChannel = createEventChannel<number, void, typeof declaredStyle>({
   style: declaredStyle
 })
@@ -38,11 +36,11 @@ const asConstChannel = createEventChannel<number, void, typeof asConstStyle>({
 asConstChannel.watch(() => undefined)
 asConstChannel.send(1)
 
-const fullStyle = defineEventApiStyle({
+const fullStyle = {
   subscribe: 'observe',
   publish: 'dispatch',
   unsubscribe: 'dispose'
-})
+} as const satisfies IEventApiStyleNames
 const fullChannel = createEventChannel<number, void, typeof fullStyle>({ style: fullStyle })
 fullChannel.observe(() => undefined)
 fullChannel.dispatch(1)

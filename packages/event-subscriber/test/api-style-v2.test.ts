@@ -6,12 +6,11 @@ import { resolve } from 'node:path'
 import {
   createEventChannel,
   createEventHub,
-  defineEventApiStyle,
   EventApiStyle,
   EventSubscriberErrorCode,
   invokeParallelSettled
 } from '../src/index.js'
-import type { IEventContext } from '../src/index.js'
+import type { IEventApiStyleNames, IEventContext } from '../src/index.js'
 import { createRawSubscriptionOwner } from '../src/internal/subscription.js'
 import { normalizeEventApiStyle, projectEventApiStyle } from '../src/style.js'
 
@@ -161,11 +160,11 @@ describe('event API style projection', () => {
   })
 
   it('ES-T139 ESV2H-T09/T10: projects custom and listen-fire cancellation identities', () => {
-    const customStyle = defineEventApiStyle({
+    const customStyle = {
       subscribe: 'observe',
       publish: 'dispatch',
       unsubscribe: 'dispose'
-    })
+    } as const satisfies IEventApiStyleNames
     const customChannel = createEventChannel<number, void, typeof customStyle>({
       style: customStyle
     })
@@ -393,7 +392,10 @@ describe('event API style projection', () => {
     expect(values).toEqual(['ready'])
     expect(hub.size(warningKey)).toBe(1)
     subscription.unsubscribe()
-    const style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch' })
+    const style = {
+      subscribe: 'observe',
+      publish: 'dispatch'
+    } as const satisfies IEventApiStyleNames
     const styledHub = createEventHub<{ ready: number }, typeof style>({ style })
     const styledValues: number[] = []
     const stop = styledHub.observe('ready', (event) => {
@@ -417,7 +419,7 @@ describe('event API style projection', () => {
     expect(styledHub.size()).toBe(0)
   })
 
-  it('ES-T126 ESV2-T06/T07: preserves custom literals inline and through the helper', () => {
+  it('ES-T126 ESV2-T06/T07: preserves custom literals inline and with as const satisfies', () => {
     const inline = createEventChannel<
       number,
       void,
@@ -428,7 +430,7 @@ describe('event API style projection', () => {
     >({
       style: { subscribe: 'observe', publish: 'dispatch' }
     })
-    const style = defineEventApiStyle({ subscribe: 'flush', publish: 'fire' })
+    const style = { subscribe: 'flush', publish: 'fire' } as const satisfies IEventApiStyleNames
     const declared = createEventChannel<number, void, typeof style>({ style })
     const observed: number[] = []
 
@@ -441,7 +443,6 @@ describe('event API style projection', () => {
     inline.dispatch(1)
     declared.fire(2)
     expect(observed).toEqual([1, 2])
-    expect(defineEventApiStyle(style)).toBe(style)
   })
 
   it('ES-T127 ESV2-T02/T09/T16: installs custom aliases as immutable non-enumerable data properties', () => {

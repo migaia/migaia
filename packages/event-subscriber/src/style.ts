@@ -140,9 +140,6 @@ type IEventApiStyleNamesAreDistinct<
     ? false
     : true
 
-/** Returns the input identity while preserving literal names for predeclared style objects. */
-export const defineEventApiStyle = <const S extends IEventApiStyleNames>(style: S): S => style
-
 /** Resolves a public style value and rejects collisions before a surface can escape. */
 export const normalizeEventApiStyle = (value: unknown): IEventApiStylePlan => {
   if (value === undefined)

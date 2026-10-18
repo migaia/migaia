@@ -9,7 +9,7 @@
 - [异步调用模块](#async-模块)：`invokeParallel`/`invokeParallelSettled`、`invokeSerial`/`invokeSerialSettled`、`invokeTask`/`invokeTaskSettled`
 - [Hub 模块](#hub-模块)：`createEventHub`
 - [订阅句柄](#订阅句柄)：`IEventChannelSubscription`、`IEventHubSubscription`
-- [错误码](#错误码)：`EventSubscriberErrorCode`（17 个码）逐条语义
+- [错误码](#错误码)：`EventSubscriberErrorCode`（19 个码）逐条语义
 - [诊断消息](#诊断消息)：内部稳定文本与公开使用边界
 - [状态常量](#状态常量)：`EventSubscriberState`
 - [高阶组合示例](#高阶组合示例)
@@ -40,38 +40,18 @@ import {
 ### `createEventChannel`
 
 ```ts
-function createEventChannel<T, R = void>(
-  options?: IEventChannelOptions<T>
-): ICanonicalEventChannel<T, R>
+import type { IEventChannelOptions, IEventApiStyleNames, IEventApiStyle } from '@migaia/event-subscriber'
 
-type IEventChannelOptions<T> = {
-  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>
-  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
-  readonly dispatchPolicy?: EventDispatchPolicy
-  readonly admissionPolicy?: EventAdmissionPolicy
-  readonly removalPolicy?: 'handle' | 'listener-all'
-  readonly publishBudget?: number
-  readonly throwOnAborted?: boolean
-  readonly style?: IEventApiStyle
-  readonly valueConfig?: IValidatedEventValueConfig<T>
-}
+// 默认 style 的调用形状；自定义 style 泛型用法见下节。
+function createEventChannel<T, R = void, const V = undefined>(
+  options?: IEventChannelOptions<T, undefined, V>
+): ICanonicalEventChannel<T, R, undefined, V>
 
-type IEventApiStyleNames<
-  TSubscribe extends string = string,
-  TPublish extends string = string,
-  TUnsubscribe extends string = string
-> = {
-  readonly subscribe: TSubscribe
-  readonly publish: TPublish
-  readonly unsubscribe?: TUnsubscribe
-}
+// 使用公开 IEventChannelOptions<T, S, V>，不要复制内部准入条件类型。
+// dispatchPolicy/admissionPolicy/removalPolicy 分别是 IEventDispatchPolicy、
+// IEventAdmissionPolicy、IEventRemovalPolicy；style/valueConfig 由 S/V 精确约束。
 
-type IEventApiStyle =
-  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames
-
-declare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S
-
-type IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }
+// IEventReport<T, V>、IEventApiStyleNames 和 IEventApiStyle 均使用包的公开声明。
 ```
 
 创建一个事件 channel（O(1) 链表存储登记）：
@@ -83,7 +63,7 @@ channel.publish({ text: 'ready' })
 unsubscribe()
 ```
 
-类型参数：`T`（payload 类型）、`R`（listener 结果类型，默认 `void`）。`options.report`：处理 `publish()` 之后**迟到**的 Promise/thenable rejection（同步 listener 失败不走这里，会在 `publish()` 遍历完成后聚合抛出）；`options.terminalReport`：`report` 缺失、抛错，或其返回的 thenable reject 时的兜底诊断出口；`report`/`terminalReport` 提供但不是函数抛 `INVALID_REPORTER`；`options` 本身不是普通对象（`null`/数组/非对象）抛 `INVALID_OPTIONS`。若 `report`/`terminalReport`（包括其返回的 Promise）都失败或缺失，最终会尝试 `runtime.reportError`（如全局 `reportError` 钩子）→ `console.error` → 排入下一个宏任务重新抛出，逐级降级，绝不静默吞掉。
+类型参数：`T`（payload 类型）、`R`（listener 结果类型，默认 `void`）。`options.report`：处理 `publish()` 之后**迟到**的 Promise/thenable rejection（同步 listener 失败不走这里，会在 `publish()` 遍历完成后聚合抛出）；`options.terminalReport`：`report` 缺失、抛错，或其返回的 thenable reject 时的兜底诊断出口；`report`/`terminalReport` 提供但不是函数抛 `INVALID_REPORTER`；`options` 本身不是普通对象（`null`/数组/非对象）抛 `INVALID_OPTIONS`。若 `report`/`terminalReport`（包括其返回的 Promise）都失败或缺失，最终会尝试 `runtime.reportError`（如全局 `reportError` 钩子）→ `console.error` → 通过 queueMicrotask 排入微任务重新抛出；没有该能力时同步抛出，逐级降级，绝不静默吞掉。
 
 `dispatchPolicy` 默认是 `EventDispatchPolicy.recursive`，保持 canonical channel 的同步 nested publish trace。需要当前 snapshot 完成后再交付重入值的消费者必须显式传入 `EventDispatchPolicy.queued`；该 opt-in 不改变其他消费者的默认行为。
 
@@ -132,21 +112,21 @@ style 是构造阶段的一次性命名投影。四个 preset 映射如下：
 | `on-trigger`        | `on`            | `trigger`     | `off`              |
 | `listen-fire`       | `listen`        | `fire`        | `unlisten`         |
 
-自定义对象的方向固定为 `{ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' }`，其中 `unsubscribe` 可省略并回退为 canonical `unsubscribe`。Channel 泛型顺序是 `<T, R, S>`，Hub 是 `<C, S>`；显式提供 payload/event map 后，custom style 必须显式提供对应的 `S`，不会依赖 partial generic inference。预声明对象推荐 `defineEventApiStyle()`，也可以使用 TypeScript 的 `as const`；widened 为普通 `string` 的对象不会产生任意字符串 index signature，因此不能据此声称存在精确 alias。
+自定义对象的方向固定为 `{ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' }`，其中 `unsubscribe` 可省略并回退为 canonical `unsubscribe`。Channel 泛型顺序是 `<T, R, S>`，Hub 是 `<C, S>`；显式提供 payload/event map 后，custom style 必须显式提供对应的 `S`，不会依赖 partial generic inference。预声明对象推荐 `as const satisfies IEventApiStyleNames`，也可以使用 TypeScript 的 `as const`；widened 为普通 `string` 的对象不会产生任意字符串 index signature，因此不能据此声称存在精确 alias。
 
 ```ts
-import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'
+import { createEventChannel, type IEventApiStyleNames } from '@migaia/event-subscriber'
 
 const events = createEventChannel<number>({ style: 'on-trigger' })
 const off = events.on((event) => console.log(event.value))
 events.trigger(1)
 off.off()
 
-const style = defineEventApiStyle({
+const style = {
   subscribe: 'observe',
   publish: 'dispatch',
   unsubscribe: 'dispose'
-})
+} as const satisfies IEventApiStyleNames
 const custom = createEventChannel<number, void, typeof style>({ style })
 const customHandle = custom.observe((event) => console.log(event.value))
 custom.dispatch(1)
@@ -235,7 +215,7 @@ subscribeUntil(channel, controller.signal, (event) => consume(event.value))
 controller.abort('owner closed')
 ```
 
-`channel`、`signal`、`listener` 均必填；`options.taskId` 可选。`signal` 结构上兼容标准 `AbortSignal`（原生 `AbortSignal` 可直接传入）。已 `aborted` 的 `signal` 直接返回 no-op unsubscribe，不创建任何 registration。`abort()` 只撤销 registration，**不会中断已经开始执行**的 listener。`signal` 不满足结构契约（缺 `addEventListener`/`removeEventListener`，或 `aborted` 不是布尔值）抛 `INVALID_SIGNAL`；`listener` 非函数抛 `INVALID_LISTENER`。返回的 `IUnsubscribe` 可重复调用，幂等。
+`channel`、`signal`、`listener` 均必填；`options.taskId` 可选。`signal` 结构上兼容标准 `AbortSignal`（原生 `AbortSignal` 可直接传入）。已 `aborted` 的 signal 在默认 `throwOnAborted: false` 时返回 no-op unsubscribe，不创建 registration；canonical channel 设置 `throwOnAborted: true` 时同步抛 `ABORTED` TypeError。`abort()` 只撤销 registration，**不会中断已经开始执行**的 listener。`signal` 不满足结构契约（缺 `addEventListener`/`removeEventListener`，或 `aborted` 不是布尔值）抛 `INVALID_SIGNAL`；`listener` 非函数抛 `INVALID_LISTENER`。返回的 `IUnsubscribe` 可重复调用，幂等。
 
 ### `subscribeSubscriber`
 
@@ -299,11 +279,11 @@ type IListenerResult<R> =
 
 ### `withSnapshotEntries`
 
-高级集成入口：读取一次不可变 listener 快照并把 `IEventInvocation[]` 交给 visitor。每个 invocation 的 `invoke()` 最多调用一次；visitor 同步返回或返回的 Promise settle 后，所有 invocation 都会关闭，再次调用抛 `INVOCATION_CLOSED`。visitor 抛出或 reject 时原错误原样传播，同时仍会关闭全部 invocation。普通并行、串行或按 task 调用应优先使用下方 `invoke*` helper。
+高级集成入口：读取一次不可变 listener 快照并把 `IEventInvocation[]` 交给 visitor。每个 invocation 的 `invoke()` 最多调用一次；visitor 同步返回或返回的 Promise settle 后，所有 invocation 都会关闭，再次调用抛 `INVOCATION_CLOSED`。visitor 抛出或 reject 时以 `VISITOR_FAILED` 标识；可附码的原生错误保留实例/stack，冲突或不可变错误以 cause 保留原值，同时仍会关闭全部 invocation。普通并行、串行或按 task 调用应优先使用下方 `invoke*` helper。
 
 ### `invokeEachLive`
 
-更底层的同步遍历入口：在本次访问期间新追加的订阅者也可被当前访问看到，每个注册最多访问一次；visitor 必须同步完成。即使 visitor 抛错，内部遍历状态也会释放，原错误保持身份向上抛出。该 API 只适合需要 append-live 语义的框架集成；普通发布必须优先使用快照型 `invoke*` helper，避免一次发布的目标集合随回调副作用变化。
+更底层的同步遍历入口：在本次访问期间新追加的订阅者也可被当前访问看到，每个注册最多访问一次；visitor 必须同步完成。即使 visitor 抛错，内部遍历状态也会释放，错误以 `VISITOR_FAILED` 标识；可附码的原生实例保持身份，冲突或不可变错误通过 cause 保留。该 API 只适合需要 append-live 语义的框架集成；普通发布必须优先使用快照型 `invoke*` helper，避免一次发布的目标集合随回调副作用变化。
 
 ### `invokeParallelSettled` / `invokeParallel`
 
@@ -413,21 +393,18 @@ import {
 ### `createEventHub`
 
 ```ts
-function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>
+import type { IEventHubOptions, IEventHubReport } from '@migaia/event-subscriber'
 
-type IEventMap = object // 事件名到 payload 类型的映射
-type IEventHubOptions<C extends IEventMap> = {
-  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>
-  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
-  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style
-  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致
-}
-type IEventHubReport<C extends IEventMap> = {
-  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }
-}[keyof C]
+// 默认 style；自定义 style 的 S 使用下一节描述的显式泛型。
+function createEventHub<C extends IEventMap, const V = undefined>(
+  options?: IEventHubOptions<C, undefined, V>
+): IEventHub<C, undefined, V>
+
+// 完整选项类型为 IEventHubOptions<C, S, V>。report 使用 IEventHubReport<C, V>，
+// 按 key 关联 payload/context；style/valueConfig 分别由 S/V 约束。
 ```
 
-多事件类型的按 key 懒创建路由（每个 key 首次被 `subscribe()`/`publish()` 时才内部创建一个 canonical channel）：
+多事件类型的按 key 懒创建路由（每个 key 首次被 `subscribe()` 时才内部创建一个 canonical channel；未订阅 key 的 `publish()` 为 no-op）：
 
 ```ts
 type IEvents = { ready: { readonly at: number }; warning: { readonly message: string } }
@@ -525,7 +502,7 @@ import {
 } from '@migaia/event-subscriber'
 ```
 
-稳定错误码表，**17 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。
+稳定错误码表，**19 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；有原始失败时，聚合 errors/cause 保留它；仅预算耗尽时 errors 可以为空。
 
 | `EventSubscriberErrorCode` 键        | 码值                                    | 触发条件                                                                                                                                                 |
 | ------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -540,7 +517,8 @@ import {
 | `invalidTaskId`                      | `INVALID_TASK_ID`                       | 传入的 `taskId` 为空或不是字符串                                                                                                                         |
 | `invalidOptions`                     | `INVALID_OPTIONS`                       | 公开 options 对象或字段结构非法                                                                                                                          |
 | `aborted`                            | `ABORTED`                               | 设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`                                                                 |
-| `publishFailed`                      | `PUBLISH_FAILED`                        | 完整目标快照处理完毕后，一个或多个 listener 失败（`publish()`/`invokeParallel`/`invokeSerial`/`invokeTask` 的抛出通道）                                  |
+| `publishFailed`                      | `PUBLISH_FAILED`                        | listener 失败或预算耗尽仍有目标未交付（`publish()`/`invokeParallel`/`invokeSerial`/`invokeTask` 的抛出通道）                                  |
+| `visitorFailed` | `VISITOR_FAILED` | snapshot/live visitor 同步抛错或 snapshot visitor 异步拒绝；可附码 native 保留身份，否则 cause 保留原值 |
 | `valueProjectionFailed`              | `VALUE_PROJECTION_FAILED`               | listener 的 value alias 路径缺失、被阻断或 getter 抛错                                                                                                   |
 | `unhandledListenerFailure`           | `UNHANDLED_LISTENER_FAILURE`            | fire-and-forget 的迟到 listener 失败在 `report` 处理失败或缺失后，到达终端诊断通道                                                                       |
 | `subscriptionClosed`                 | `SUBSCRIPTION_CLOSED`                   | 订阅句柄链已关闭后又调用其 `.subscribe()` 追加新订阅                                                                                                     |
@@ -558,7 +536,7 @@ import {
 
 `EventSubscriberErrorText` 是包内维护错误文案的唯一来源，但**不是公开导出**，业务代码不能从 `@migaia/event-subscriber` 导入它。生产代码应按上方公开的 `error.source` 与 `error.code` 分支；测试若要锁定面向用户的文案，可以直接断言实际抛出错误的 `message`，不要依赖内部源码路径。
 
-内部文本与 18 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`、`subscriptionDisposeFailed`。
+内部文本与 19 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`visitorFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`、`subscriptionDisposeFailed`。
 
 ---
 
