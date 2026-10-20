@@ -12,8 +12,9 @@ import {
   useNavigation,
   useNavigationType
 } from 'react-router'
-// Self-hosted variable fonts are bundled with the site; no font request leaves its origin.
-import '@fontsource-variable/inter/wght.css'
+// Self-hosted variable fonts are bundled with the site; no font request leaves its origin. Inter
+// loads with its optical-size axis, so large headings automatically use the tighter display cut.
+import '@fontsource-variable/inter/opsz.css'
 import '@fontsource-variable/jetbrains-mono/wght.css'
 import './app.css'
 import faviconHref from './favicon.svg?url'
@@ -444,7 +445,11 @@ function RouteProgress() {
 
   useEffect(() => {
     if (destination === undefined) settleRouteContent()
-    else if (destination !== pathname) dissolveRouteContent()
+    else if (destination !== pathname) {
+      dissolveRouteContent()
+      // The resting brand mark turns once per route change, marking the release of the old page.
+      whirlBrandMark(document.querySelector('.site-header .brand-mark'))
+    }
   }, [destination, pathname])
 
   // Layout effect: the new blocks must be hidden before their first paint, or they would flash in.
@@ -454,6 +459,8 @@ function RouteProgress() {
       return
     }
     emergeRouteContent()
+    // Instant navigations never report loading; a whirl already running from it is left alone.
+    whirlBrandMark(document.querySelector('.site-header .brand-mark'))
   }, [pathname])
 
   return (

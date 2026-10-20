@@ -157,8 +157,8 @@ const ARCHITECTURE_FAMILIES = [
 
 /**
  * Renders the single docs home, which is also the language home. The hero (title, search entry,
- * library counts over the shared background field) leads into outcome-first starters, then every
- * library grouped by architectural role. Each card opens that library's learning path.
+ * library counts over the shared background field) leads into large outcome-first starter cards, then a compact list of every
+ * library grouped by architectural role. Each entry opens that library's learning path.
  */
 function DocsIndex({ locale }: { locale: ILocale }) {
   const ui = interfaceCopyFor(locale)

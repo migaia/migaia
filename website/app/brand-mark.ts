@@ -10,15 +10,16 @@ export const BRAND_BLADE_PATH = 'M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.
 
 /** Duration of the hover whirl, in milliseconds. */
 const WHIRL_MS = 1100
-/** Fast start, long smooth stop: the whirl decelerates into the slow idle spin. */
+/** Fast start, long smooth stop: the whirl decelerates to rest. */
 const WHIRL_EASING = 'cubic-bezier(0.1, 0.75, 0.2, 1)'
 /** Animation id that marks a running whirl, so repeated hovers do not restart it mid-turn. */
 const WHIRL_ID = 'brand-mark-whirl'
 
 /**
- * Spins the header mark one fast full turn against its idle CSS spin. Uses the `rotate` property,
- * which composes with the idle `transform` animation, so the mark ends where it would have been. A
- * whirl already running is left to finish; reduced motion skips it.
+ * Spins the header mark one fast full turn. The mark rests between events: it turns once on page
+ * load (CSS `brand-mark-arrive`), on hover, and when a route change starts. Uses the `rotate`
+ * property, which composes with the load `transform` animation, so the mark ends where it started.
+ * A whirl already running is left to finish; reduced motion skips it.
  */
 export function whirlBrandMark(mark: Element | null): void {
   if (!mark || matchMedia('(prefers-reduced-motion: reduce)').matches) return

@@ -4,10 +4,13 @@
  * the card's edge light can speed up and flicker. Decorative only: it never changes navigation.
  */
 
-/** Link cards that react to the pointer (`language.tsx` journey and library cards). */
-export const CARD_LINK_SELECTOR = 'a.journey-item, a.library-item'
+/**
+ * Link cards that react to the pointer: the `language.tsx` journey cards. Library index rows are a
+ * plain list and stay out of the field effect, so the light marks the few primary entries only.
+ */
+export const CARD_LINK_SELECTOR = 'a.journey-item'
 
-/** Edge-light playback rate while a card is focused; the idle comet runs at 1. */
+/** Edge-light playback rate while a card is focused; the comet only runs while focused. */
 const FOCUSED_EDGE_RATE = 1.3
 /** Half period of the focused edge flicker, in milliseconds. */
 const EDGE_FLICKER_MS = 650

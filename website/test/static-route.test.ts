@@ -460,7 +460,7 @@ test('keeps Chinese navigation and introductions localized', () => {
   const chineseHome = readFileSync(join(buildRoot, 'zh/index.html'), 'utf8')
 
   assert.match(chineseHome, /<html[^>]+lang="zh"/)
-  assert.match(chineseHome, /找到你需要的 API。/)
+  assert.match(chineseHome, /找到你需要的 API</)
   assert.match(chineseHome, /你现在想完成什么？/)
   assert.match(chineseHome, /类库索引/)
   assert.doesNotMatch(chineseHome, /href="\/zh\/docs"[^>]*>文档<\/a>/)

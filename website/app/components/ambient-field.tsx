@@ -2,20 +2,28 @@ import { useEffect, useRef } from 'react'
 import { useLocation, useNavigation, useNavigationType } from 'react-router'
 import { prefersReducedMotion } from '../motion.js'
 import { trackCardFocus } from '../card-focus.js'
+import { domainPath, LOCALES } from '../route-contract.js'
 
 /**
  * WGSL program for the site-wide background. A slow aurora (domain-warped noise in the brand
  * indigo/teal pair) sits under a sparse field of drifting particles. Motion comes from accumulated
  * offsets (`flow` for the aurora, `drift` for the particles) that the host advances faster while a
  * route transition runs, so speed changes never make the field jump. `level` (0..1) is the eased
- * transition strength: particles stretch along the travel direction and lose some contrast. Faint
+ * transition strength: particles stretch along the travel direction and lose some contrast.
+ * `release` (0..1) tells the route story: while the old page releases what it owned, particles shrink
+ * and pull back to their cell centres; once the new route commits, `release` falls while `level` is
+ * still held, and the difference blooms the particles back out, larger and brighter. `hero` is the
+ * docs home glass search box, a standing window like the focused card. `corner`
+ * (0..1) is set on the docs home: the aurora and contour waves gain strength as they flow through the
+ * top-right of the viewport, so the light is carried by the moving waves, not painted on. Faint
  * topographic contour lines cover the whole viewport as texture behind the text. Output is
  * premultiplied alpha so the page `--canvas` color shows through.
  */
 const AMBIENT_SHADER = /* wgsl */ `
 struct Uniforms {
   res: vec2f, time: f32, dark: f32, level: f32, flow: f32, drift: vec2f,
-  focus: vec4f, focusLevel: f32
+  focus: vec4f, focusLevel: f32, release: f32, corner: f32,
+  hero: vec4f, heroLevel: f32
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
@@ -48,27 +56,37 @@ fn fbm(p0: vec2f) -> f32 {
   let n = fbm(p * 1.1 + vec2f(t, -t * 0.7));
   let m = fbm(p * 1.8 - vec2f(t * 0.6, t) + n * 1.4);
   let auroraColor = mix(indigo, teal, smoothstep(0.35, 0.7, n));
-  let aurora = smoothstep(0.42, 0.85, m) * mix(0.07, 0.11, u.dark) * (1.0 - 0.55 * uv.y);
+  // Docs home: waves passing the top-right corner swell; empty sky there stays empty.
+  let cornerWeight = u.corner * (1.0 - smoothstep(0.1, 1.05, length(p - vec2f(aspect, 0.0))));
+  let aurora = smoothstep(0.38 - 0.08 * cornerWeight, 0.85, m) * mix(0.07, 0.11, u.dark)
+    * (1.0 - 0.55 * uv.y) * (1.0 + 2.4 * cornerWeight);
 
   // Particles: one jittered point per grid cell, carried by the accumulated drift.
   let grid = 30.0;
   let q = p * grid + u.drift;
   let id = floor(q);
   let h = hash(id);
-  let jitter = (vec2f(hash(id + 1.3), hash(id + 7.1)) - 0.5) * 0.55;
+  // Release pulls every particle back to its cell centre; bloom is the re-forming after commit.
+  let bloom = max(u.level - u.release, 0.0);
+  let jitter = (vec2f(hash(id + 1.3), hash(id + 7.1)) - 0.5) * 0.55 * (1.0 - 0.85 * u.release);
   var d = fract(q) - 0.5 - jitter;
   // Motion streak while transitioning: stretch along x, softer edge, lower peak.
   d.x = d.x / (1.0 + u.level * 1.2);
-  let radius = mix(0.05, 0.11, h);
+  let radius = mix(0.05, 0.11, h) * (1.0 - 0.75 * u.release) * (1.0 + 0.6 * bloom);
   let dotMask = smoothstep(radius, radius * mix(0.35, 0.0, u.level), length(d)) * step(0.62, h);
-  let twinkle = 0.55 + 0.45 * sin(u.time * 0.7 + h * 40.0);
-  let particles = dotMask * mix(0.14, 0.2, u.dark) * twinkle * (1.0 - u.level * 0.35);
+  let twinkle = 0.55 + 0.45 * sin(u.time * 0.9 + h * 40.0);
+  let particles = dotMask * mix(0.14, 0.2, u.dark) * twinkle * (1.0 - u.level * 0.35)
+    * (1.0 - 0.5 * u.release) * (1.0 + 1.4 * bloom);
   let particleColor = mix(indigo, teal, h);
 
   // Focused card: inside the hovered card's rect the aurora thickens and a second, finer particle
   // layer appears, so the card reads as a window onto denser light. Soft 24px falloff at the edge.
   let edge = min(min(pos.x - u.focus.x, u.focus.z - pos.x), min(pos.y - u.focus.y, u.focus.w - pos.y));
-  let inside = smoothstep(-24.0, 16.0, edge) * u.focusLevel;
+  // Docs home: the glass search box is a standing window of the same kind. The strength fades in
+  // over 16 buffer pixels inside the box edge, so it stays within the border and rounded corners.
+  let heroEdge = min(min(pos.x - u.hero.x, u.hero.z - pos.x), min(pos.y - u.hero.y, u.hero.w - pos.y));
+  let heroInside = smoothstep(0.0, 16.0, heroEdge) * u.heroLevel;
+  let inside = max(smoothstep(-24.0, 16.0, edge) * u.focusLevel, heroInside);
   let q2 = p * grid * 2.1 + u.drift * 1.7 + vec2f(13.7, 5.1);
   let id2 = floor(q2);
   let h2 = hash(id2);
@@ -77,8 +95,10 @@ fn fbm(p0: vec2f) -> f32 {
   let radius2 = mix(0.06, 0.12, h2);
   let dotMask2 = smoothstep(radius2, radius2 * 0.3, length(d2)) * step(0.5, h2);
   let twinkle2 = 0.5 + 0.5 * sin(u.time * 1.3 + h2 * 50.0);
-  let focusParticles = dotMask2 * mix(0.2, 0.28, u.dark) * twinkle2 * inside;
-  let focusAurora = smoothstep(0.3, 0.8, m) * mix(0.12, 0.18, u.dark) * inside;
+  // The hero window runs hotter than a hovered card: it is the page's standing visual centre.
+  let heroBoost = 1.0 + 1.3 * heroInside;
+  let focusParticles = dotMask2 * mix(0.2, 0.28, u.dark) * twinkle2 * inside * heroBoost;
+  let focusAurora = smoothstep(0.26, 0.8, m) * mix(0.12, 0.18, u.dark) * inside * heroBoost;
 
   // Full-viewport contours: warped topographic lines, kept faint behind the text.
   let c = (pos.xy - 0.5 * u.res) / u.res.y;
@@ -88,7 +108,8 @@ fn fbm(p0: vec2f) -> f32 {
   let band = abs(fract(f * 9.0) - 0.5);
   let line = smoothstep(0.035, 0.0, band) * (0.55 + 0.45 * smoothstep(0.3, 0.8, f));
   let glow = smoothstep(0.25, 0.95, f);
-  let contour = (glow * 0.008 + line * mix(0.065, 0.05, u.dark)) * (1.0 - 0.3 * uv.y);
+  let contour = (glow * (0.008 + 0.05 * cornerWeight) + line * mix(0.065, 0.05, u.dark)
+    * (1.0 + 1.6 * cornerWeight)) * (1.0 - 0.3 * uv.y);
   let contourColor = mix(indigo, teal, smoothstep(0.35, 0.75, w.x));
 
   let a = clamp(aurora + particles + contour + focusParticles + focusAurora, 0.0, 1.0);
@@ -112,7 +133,7 @@ const TRANSITION_HOLD_MS = 450
 const TRANSITION_EASE_SECONDS = 0.22
 
 /** Idle motion speeds (units per second): aurora flow, particle drift along x and y. */
-const IDLE_SPEED = { flow: 0.018, driftX: 0.108, driftY: -0.12 } as const
+const IDLE_SPEED = { flow: 0.024, driftX: 0.14, driftY: -0.156 } as const
 
 /**
  * Extra speed at full transition strength. Particles race along the navigation direction (x, signed
@@ -140,9 +161,53 @@ const UNIFORM_COPY_DST_USAGE = 0x40 | 0x08
 
 /**
  * Uniform block size in bytes: res, time, dark, level, flow, drift (8 × f32), the focused card rect
- * (vec4f at offset 32) and its strength (f32 at 48), padded to the struct's 16-byte alignment.
+ * (vec4f at offset 32), its strength (f32 at 48), the release strength (f32 at 52), the corner
+ * strength (f32 at 56), the docs home search rect (vec4f at 64) and its strength (f32 at 80),
+ * padded to the struct's 16-byte alignment.
  */
-const UNIFORM_BYTES = 64
+const UNIFORM_BYTES = 96
+
+/**
+ * Minimum time (ms) the release phase stays engaged after a route commits. Prerendered routes often
+ * load too fast for the loading state alone to show the particles being collected.
+ */
+const RELEASE_HOLD_MS = 180
+
+/** Time constant (seconds) of the release ease; quicker than the transition so the bloom shows. */
+const RELEASE_EASE_SECONDS = 0.12
+
+/** Time constant (seconds) of the corner strength ease when entering or leaving the docs home. */
+const CORNER_EASE_SECONDS = 0.6
+
+/** Scroll distance, in viewport heights, over which the corner strength fades out on the home. */
+const CORNER_SCROLL_FADE = 0.8
+
+/** Docs home search box (`language.tsx`) whose rect becomes the shader's standing hero window. */
+const HERO_WINDOW_SELECTOR = '.docs-hero-search'
+
+/**
+ * Open command palette overlay (`components/ui/dialog.tsx`). While it is open the field is lifted
+ * above the overlay (app.css), so the search window must fade out or it would show through.
+ */
+const OPEN_PALETTE_SELECTOR = ".search-overlay[data-state='open']"
+
+/** Empty rect in CSS pixels, used before a docs home block has been measured. */
+const EMPTY_RECT = { left: 0, top: 0, right: 0, bottom: 0 } as const
+
+/**
+ * Returns the viewport rect of the first element matching `selector`, or null when the page has
+ * none. The blocks scroll with the page while the canvas is fixed, so callers read it every step.
+ */
+function viewportRect(selector: string): DOMRect | null {
+  return document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() ?? null
+}
+
+/** Returns true when `pathname` is a language home, which is also the docs home. */
+function isDocsHome(pathname: string): boolean {
+  /** Pathname without a trailing slash, matching `domainPath` output. */
+  const path = pathname.replace(/\/+$/, '')
+  return LOCALES.some((locale) => path === domainPath(locale))
+}
 
 /** Time constant (seconds) of the ease toward and away from a focused card. */
 const FOCUS_EASE_SECONDS = 0.18
@@ -170,10 +235,13 @@ export default function AmbientField() {
    * whether a navigation is loading, and the time until which a committed route keeps the effect
    * engaged. The loop eases its strength toward this target.
    */
-  const transitionRef = useRef({ dir: 1, loading: false, holdUntil: 0 })
+  const transitionRef = useRef({ dir: 1, loading: false, holdUntil: 0, releaseUntil: 0 })
   /** Render-loop resume hook, installed once the device is ready. */
   const wakeRef = useRef<() => void>(() => {})
   const { pathname } = useLocation()
+  /** Whether the current route is the docs home; read by the render loop each step. */
+  const homeRef = useRef(isDocsHome(pathname))
+  homeRef.current = isDocsHome(pathname)
   const navigationType = useNavigationType()
   const navigation = useNavigation()
   /** Previous pathname and history index, used to skip the first render and infer direction. */
@@ -198,6 +266,7 @@ export default function AmbientField() {
         : 1
     transitionRef.current.dir = dir
     transitionRef.current.holdUntil = performance.now() + TRANSITION_HOLD_MS
+    transitionRef.current.releaseUntil = performance.now() + RELEASE_HOLD_MS
     wakeRef.current()
   }, [navigationType, pathname])
 
@@ -252,6 +321,14 @@ export default function AmbientField() {
       let lastStep = performance.now()
       /** Eased transition strength (0 idle, 1 full). */
       let level = 0
+      /** Eased corner strength (0 elsewhere, 1 at the top of the docs home). */
+      let corner = 0
+      /** Eased hero window strength (0 elsewhere, 1 on the docs home). */
+      let heroLevel = 0
+      /** Union rect of the hero window blocks in CSS pixels, read every step while on the home. */
+      let heroRect: { left: number; top: number; right: number; bottom: number } = EMPTY_RECT
+      /** Eased release strength (0 settled, 1 old page fully collected). */
+      let release = 0
       /** Accumulated aurora flow; integrating speed keeps motion continuous across speed changes. */
       let flow = 0
       /** Accumulated particle drift along x (signed by navigation direction during transitions). */
@@ -288,6 +365,20 @@ export default function AmbientField() {
         const target = transition.loading || now < transition.holdUntil ? 1 : 0
         level += (target - level) * (1 - Math.exp(-dt / TRANSITION_EASE_SECONDS))
         if (target === 0 && level < TRANSITION_EPSILON) level = 0
+        const releaseTarget = transition.loading || now < transition.releaseUntil ? 1 : 0
+        release += (releaseTarget - release) * (1 - Math.exp(-dt / RELEASE_EASE_SECONDS))
+        if (releaseTarget === 0 && release < TRANSITION_EPSILON) release = 0
+        const cornerTarget = homeRef.current
+          ? Math.max(0, 1 - window.scrollY / (window.innerHeight * CORNER_SCROLL_FADE))
+          : 0
+        corner += (cornerTarget - corner) * (1 - Math.exp(-dt / CORNER_EASE_SECONDS))
+        /** Docs home search box rect; null away from the docs home. */
+        const search =
+          homeRef.current && !document.querySelector(OPEN_PALETTE_SELECTOR)
+            ? viewportRect(HERO_WINDOW_SELECTOR)
+            : null
+        heroLevel += ((search ? 1 : 0) - heroLevel) * (1 - Math.exp(-dt / CORNER_EASE_SECONDS))
+        if (search) heroRect = search
         flow += dt * (IDLE_SPEED.flow + level * TRANSITION_SPEED.flow)
         driftX += dt * (IDLE_SPEED.driftX + level * TRANSITION_SPEED.driftX * transition.dir)
         driftY += dt * (IDLE_SPEED.driftY + level * TRANSITION_SPEED.driftY)
@@ -320,6 +411,13 @@ export default function AmbientField() {
         uniforms[10] = focusRect.right * scale
         uniforms[11] = focusRect.bottom * scale
         uniforms[12] = focusLevel
+        uniforms[13] = release
+        uniforms[14] = corner
+        uniforms[16] = heroRect.left * scale
+        uniforms[17] = heroRect.top * scale
+        uniforms[18] = heroRect.right * scale
+        uniforms[19] = heroRect.bottom * scale
+        uniforms[20] = heroLevel
         gpuDevice.queue.writeBuffer(uniformBuffer, 0, uniforms)
         const encoder = gpuDevice.createCommandEncoder()
         const pass = encoder.beginRenderPass({

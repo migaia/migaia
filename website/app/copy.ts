@@ -49,7 +49,7 @@ export const WebsiteCopy = {
     missingEntryBody: 'Choose a current library from the index to continue.',
     browse: 'Browse',
     domainTitle: {
-      docs: 'Find the API you need.',
+      docs: 'Find the API you need',
       guides: 'Reach a practical result.',
       architecture: 'Build a system mental model.'
     },
@@ -105,7 +105,7 @@ export const WebsiteCopy = {
     missingEntryBody: '请从索引中选择当前可用的类库继续。',
     browse: '浏览',
     domainTitle: {
-      docs: '找到你需要的 API。',
+      docs: '找到你需要的 API',
       guides: '完成一个可验证的实际结果。',
       architecture: '建立系统架构心智模型。'
     },
