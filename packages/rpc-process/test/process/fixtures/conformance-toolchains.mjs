@@ -1,8 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import { createRequire } from 'node:module'
-
-/** Installed TypeScript is resolved locally; this harness never invokes a package downloader. */
-const require = createRequire(import.meta.url)
 
 /** Freezes these tool minima; Rust and Cargo are recorded independently. */
 export const ConformanceToolchainMinimum = Object.freeze({
@@ -10,8 +6,7 @@ export const ConformanceToolchainMinimum = Object.freeze({
   rust: '1.96.0',
   cargo: '1.96.0',
   go: '1.26.4',
-  node: '24.16.0',
-  typescript: '6.0.2'
+  node: '24.16.0'
 })
 
 /** Stable fixture admission outcomes distinguish absent tools from unsupported lower versions. */
@@ -35,14 +30,6 @@ export function inspectInstalledToolchain(tool, options = {}) {
   /** Tests trace this exact command boundary; no installation or download path exists. */
   const execute = options.execute ?? execFileSync
   try {
-    if (tool === 'typescript') {
-      /** The local compiler path also serves as the receipt's executable identity. */
-      const path = require.resolve('typescript/bin/tsc')
-      return {
-        path,
-        output: execute(process.execPath, [path, '--version'], { encoding: 'utf8' })
-      }
-    }
     /** Version probes have fixed commands and arguments, never shell interpolation. */
     const command = {
       python: 'python3',

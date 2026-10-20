@@ -623,7 +623,7 @@
     {
       "id": "toolchain-admission",
       "evidenceOwner": "H / E peer admission; G config preparation",
-      "supportUnits": "Python3.9.6 Rust/Cargo1.96.0 Go1.26.4 Node24.16.0 TS6.0.2",
+      "supportUnits": "Python3.9.6 Rust/Cargo1.96.0 Go1.26.4 Node24.16.0",
       "assertions": [
         {
           "id": "toolchain-admission.1",

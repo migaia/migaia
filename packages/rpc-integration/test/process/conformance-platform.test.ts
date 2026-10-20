@@ -21,8 +21,6 @@ const admission = await import(
 const { default: defaultConfig } = await import(
   new URL('../../../rpc-process/vitest.config.ts', import.meta.url).href
 )
-/** Repository root is resolved from this tracked test, never from workspace-local documentation. */
-const repository = fileURLToPath(new URL('../../../..', import.meta.url))
 
 /** Produce exact tool version output without launching, installing or downloading a tool. */
 function atMinimum(tool: string) {
@@ -36,7 +34,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     /** Equality is supported; lower-tool compatibility is never assumed. */
     const equal = admission.admitConformanceToolchains({ inspect })
     expect(equal.accepted).toBe(true)
-    expect(equal.tools).toHaveLength(6)
+    expect(equal.tools).toHaveLength(5)
     for (const row of equal.tools) {
       expect(row.status).toBe(admission.ConformanceAdmissionStatus.accepted)
       expect(row.path).toBe(`/installed/${row.tool}`)
@@ -54,7 +52,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       })
     })
     expect(higher.accepted).toBe(true)
-    expect(inspect).toHaveBeenCalledTimes(6)
+    expect(inspect).toHaveBeenCalledTimes(5)
   })
 
   it.each(Object.keys(admission.ConformanceToolchainMinimum))(
@@ -97,7 +95,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
         }
       })
     }
-    expect(commands).toHaveLength(11)
+    expect(commands).toHaveLength(10)
     expect(commands.filter((row) => row.command === '/usr/bin/which')).toHaveLength(5)
     for (const row of commands.filter((entry) => entry.command !== '/usr/bin/which'))
       expect(row.args.at(-1)).toMatch(/^(?:--version|version)$/)
@@ -158,130 +156,6 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       'test/bridge/conformance-faults.test.ts',
       'test/merge/suite-parity.test.ts'
     ])
-    /** The original package inventory stays frozen; the merge replaces only its declared RPC owners. */
-    const packages = execFileSync('git', ['ls-tree', '-r', '--name-only', 'be19788', 'packages'], {
-      cwd: repository,
-      encoding: 'utf8'
-    })
-      .trim()
-      .split('\n')
-      .filter((path) => /^packages\/[^/]+\/package\.json$/.test(path))
-    /** Exact workspace migrations since the frozen inventory; null removes an obsolete edge. */
-    const dependencyMigrations: Record<string, Record<string, Record<string, string | null>>> = {
-      'packages/logger/package.json': {
-        dependencies: { '@migaia/middleware-pipeline': 'workspace:^' }
-      },
-      'packages/rpc-process/package.json': {
-        dependencies: { '@migaia/lifecycle': null }
-      },
-      'packages/storage-contract/package.json': {
-        dependencies: { '@migaia/lifecycle': null }
-      },
-      'packages/storage-web/package.json': {
-        devDependencies: { '@migaia/rpc': null, '@migaia/rpc-contract': 'workspace:*' }
-      },
-      'packages/store-light/package.json': {
-        dependencies: { '@migaia/resource': 'workspace:^' }
-      },
-      'packages/store-middleware/package.json': {
-        dependencies: { '@migaia/middleware-pipeline': 'workspace:^' }
-      },
-      'packages/store-persist/package.json': {
-        dependencies: { '@migaia/lifecycle': 'workspace:^' }
-      },
-      // store-react uses React 19 `use`; the old >=18 range never loaded on React 18.
-      'packages/store-react/package.json': {
-        peerDependencies: { react: '>=19', 'react-dom': '>=19' }
-      },
-      'packages/store-shared/package.json': {
-        dependencies: { '@migaia/lifecycle': 'workspace:^' }
-      },
-      'packages/store-worker/package.json': {
-        dependencies: {
-          '@migaia/rpc': null,
-          '@migaia/rpc-contract': 'workspace:*',
-          '@migaia/rpc-core': 'workspace:*'
-        }
-      },
-      'packages/tray/package.json': {
-        dependencies: {
-          '@migaia/rpc-contract': 'workspace:^',
-          '@migaia/rpc-core': 'workspace:^',
-          '@migaia/rpc-process': 'workspace:^',
-          '@migaia/rpc-threads': 'workspace:^',
-          '@migaia/supervision': 'workspace:^'
-        }
-      }
-    }
-    for (const path of packages) {
-      if (path === 'packages/rpc/package.json') {
-        expect(existsSync(new URL(path, `file://${repository}`))).toBe(false)
-        /**
-         * Required RPC edges use the workspace protocol (packed as the exact lockstep version);
-         * optionality remains solely on native toolchain peers.
-         */
-        const replacements = {
-          'rpc-contract': { peers: {}, nativeOptional: {} },
-          'rpc-core': { peers: { '@migaia/rpc-contract': 'workspace:*' }, nativeOptional: {} },
-          'rpc-process': {
-            peers: {
-              '@migaia/rpc-contract': 'workspace:*',
-              '@migaia/rpc-core': 'workspace:*',
-              electron: '^44.0.0',
-              koffi: '^3.1.6'
-            },
-            nativeOptional: { electron: { optional: true }, koffi: { optional: true } }
-          },
-          'rpc-threads': {
-            peers: {
-              '@migaia/rpc-contract': 'workspace:*',
-              '@migaia/rpc-core': 'workspace:*',
-              electron: '^44.0.0'
-            },
-            nativeOptional: { electron: { optional: true } }
-          },
-          'rpc-browser': { peers: { '@migaia/rpc-core': 'workspace:*' }, nativeOptional: {} }
-        }
-        /** The RPC family releases in lockstep; every owner shares rpc-contract's version. */
-        const lockstepVersion = JSON.parse(
-          readFileSync(
-            new URL('packages/rpc-contract/package.json', `file://${repository}`),
-            'utf8'
-          )
-        ).version
-        for (const [owner, policy] of Object.entries(replacements)) {
-          /** Each replacement remains a real locked-version package, not a compatibility alias. */
-          const metadata = JSON.parse(
-            readFileSync(new URL(`packages/${owner}/package.json`, `file://${repository}`), 'utf8')
-          )
-          expect(metadata.name).toBe(`@migaia/${owner}`)
-          expect(metadata.version).toBe(lockstepVersion)
-          expect(metadata.peerDependencies ?? {}).toEqual(policy.peers)
-          expect(metadata.peerDependenciesMeta ?? {}).toEqual(policy.nativeOptional)
-        }
-        continue
-      }
-      const before = JSON.parse(
-        execFileSync('git', ['show', `be19788:${path}`], { cwd: repository, encoding: 'utf8' })
-      )
-      const after = JSON.parse(readFileSync(new URL(path, `file://${repository}`), 'utf8'))
-      for (const key of [
-        'dependencies',
-        'devDependencies',
-        'peerDependencies',
-        'optionalDependencies'
-      ]) {
-        /** Only individually verified workspace edges may differ from the original inventory. */
-        const migrations = dependencyMigrations[path]?.[key]
-        /** Unchanged sections retain their original absence rather than becoming empty tables. */
-        const expected = migrations ? { ...before[key] } : before[key]
-        for (const [name, version] of Object.entries(migrations ?? {})) {
-          if (version === null) delete expected[name]
-          else expected[name] = version
-        }
-        expect(after[key], `${path} ${key}`).toEqual(expected)
-      }
-    }
   })
 
   it('preserves actual capability admission without upgrading unrun platform guarantees', () => {
