@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "react-router dev",
+    "dev": "bun --conditions=development node_modules/@react-router/dev/bin.cjs dev",
     "build": "bun run generate && react-router build && bun run search:index",
     "preview": "vite preview --outDir build/client",
     "generate": "bun scripts/generate/signatures.ts && bun scripts/generate/error-codes.ts",

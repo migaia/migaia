@@ -1,5 +1,7 @@
 [run]
 # Node-shebang CLIs (react-router, vite, pagefind) run on bun; the website needs no Node runtime.
+# Bun ignores NODE_OPTIONS, so `react-router dev` cannot relaunch itself with the `development`
+# export condition; the package.json dev script passes `--conditions=development` to bun instead.
 bun = true
 
 [install]
