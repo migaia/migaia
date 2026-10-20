@@ -2640,7 +2640,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "设计文档：`docs/lifecycle/lifecycle-extraction.sdd.md`（SDD 1/3）；错误码契约：`docs/contracts/error-codes.md`。"
+                  "text": "错误码契约：`docs/contracts/error-codes.md`。"
                 }
               ]
             },
@@ -3339,7 +3339,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。"
+                  "text": "验收用例位于 `test/` 目录。"
                 }
               ]
             },
@@ -4595,7 +4595,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。"
+                  "text": "验收用例位于 `test/` 目录。"
                 }
               ]
             },
@@ -6725,7 +6725,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "插件可选声明 `beforeRelease(context)`：Host 在释放已安装的该代注册之前调用一次，钩子期间该注册仍可服务已有调用；结束后才排空租约并执行 `dispose` 和资源清理。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 的调度器及 `disposeStepTimeoutMs`；禁用、挂起或未激活惰性注册本身不触发释放。钩子失败或超时作为清理错误收集，已提交的卸载仍继续。迁移 BC1：`unUse` 的真实执行结果两种分支均带冻结 `affected: { policy, order, steps, edges }`；`dryRun: true` 返回计划且无 `ok`，旧读者若对 `{ok:true}` 做严格相等，应改为检查 `ok` 并读取 `affected`。迁移 BC2：TypeScript 读者用字面量 `dryRun: true` 选择计划重载，省略或传 `false` 选择执行重载；宽 `boolean` 先按值分支。迁移 BC3：旧定义里的非函数 `beforeRelease` 现在准入时抛 `INVALID_OPTION`。"
+                  "text": "插件可选声明 `beforeRelease(context)`：Host 在释放已安装的该代注册之前调用一次，钩子期间该注册仍可服务已有调用；结束后才排空租约并执行 `dispose` 和资源清理。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 的调度器及 `disposeStepTimeoutMs`；禁用、挂起或未激活惰性注册本身不触发释放。钩子失败或超时作为清理错误收集，已提交的卸载仍继续。卸载结果迁移：`unUse` 的真实执行结果两种分支均带冻结 `affected: { policy, order, steps, edges }`；`dryRun: true` 返回计划且无 `ok`，旧读者若对 `{ok:true}` 做严格相等，应改为检查 `ok` 并读取 `affected`。类型迁移：TypeScript 读者用字面量 `dryRun: true` 选择计划重载，省略或传 `false` 选择执行重载；宽 `boolean` 先按值分支。定义迁移：旧定义里的非函数 `beforeRelease` 现在准入时抛 `INVALID_OPTION`。"
                 }
               ]
             },
@@ -7727,7 +7727,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "卸载迁移（BC1–BC3）：真实 `unUse` 的成功和清理失败结果现在都带冻结的 `affected: { policy, order, steps, edges }`，只记录已生效步骤；原先严格比较 `{ok:true}` 的读者改为检查 `ok` 并读取 `affected`。TypeScript 的 `unUse(name, {dryRun:true})` 返回计划，省略 `dryRun` 或传字面量 `false` 返回执行结果；宽 `boolean` 须先按值分支。插件定义可增加 `beforeRelease(context)`，在该代已安装注册撤销前运行一次；以前被当作普通元数据的同名非函数值现在于定义或准入时以原生 `TypeError`（`INVALID_OPTION`）拒绝。钩子 throw/reject 作为 `PLUGIN_DISPOSE_FAILED` 收集，原错误在 `cause`；超时内层为 `DISPOSE_STEP_TIMEOUT`，清理继续。"
+                  "text": "卸载迁移：真实 `unUse` 的成功和清理失败结果现在都带冻结的 `affected: { policy, order, steps, edges }`，只记录已生效步骤；原先严格比较 `{ok:true}` 的读者改为检查 `ok` 并读取 `affected`。TypeScript 的 `unUse(name, {dryRun:true})` 返回计划，省略 `dryRun` 或传字面量 `false` 返回执行结果；宽 `boolean` 须先按值分支。插件定义可增加 `beforeRelease(context)`，在该代已安装注册撤销前运行一次；以前被当作普通元数据的同名非函数值现在于定义或准入时以原生 `TypeError`（`INVALID_OPTION`）拒绝。钩子 throw/reject 作为 `PLUGIN_DISPOSE_FAILED` 收集，原错误在 `cause`；超时内层为 `DISPOSE_STEP_TIMEOUT`，清理继续。"
                 }
               ]
             },
@@ -8271,7 +8271,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。"
+                  "text": "通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。"
                 }
               ]
             },
@@ -10237,7 +10237,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Metadata 只读取已知 native backing/view 长度，字符串及容器为 -1；capture 默认关闭。直接且实际转移的 bytes 按 SC9(a) 保留，nested transferable 保持原容器引用，可能在 transfer 后分离，getter 不被捕获逻辑遍历。Detail 是复用引用，保留数值需显式消费或快照。"
+                  "text": "Metadata 只读取已知 native backing/view 长度，字符串及容器为 -1；capture 默认关闭。直接且实际转移的 bytes 按字节保留，nested transferable 保持原容器引用，可能在 transfer 后分离，getter 不被捕获逻辑遍历。Detail 是复用引用，保留数值需显式消费或快照。"
                 }
               ]
             }
@@ -11189,7 +11189,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "事件 view 仅在 `emit` 调用期间有效。需保留它时显式调用 `snapshotProbeEvent(view)`（SC9c）；快照复制顶层字段，`detail`、`error` 与 `content` 仍保留引用，调用方稍后修改对象时这些引用可见修改。录制 codec 在格式转换边界形成新表示（SC9b）。`methods` 只过滤 `message` 与 `envelope`；其它阶段只按采样过滤。采样使用 `(senderId, messageId)` 的稳定 FNV-1a 32 位键。"
+                  "text": "事件 view 仅在 `emit` 调用期间有效。需保留它时显式调用 `snapshotProbeEvent(view)`；快照复制顶层字段，`detail`、`error` 与 `content` 仍保留引用，调用方稍后修改对象时这些引用可见修改。录制 codec 在格式转换边界形成新表示。`methods` 只过滤 `message` 与 `envelope`；其它阶段只按采样过滤。采样使用 `(senderId, messageId)` 的稳定 FNV-1a 32 位键。"
                 },
                 {
                   "type": "paragraph",
@@ -12335,11 +12335,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'\n\n/** 此示例选择保留事件；分配发生在消费者，而非 Core 观察点。 */\nconst saved: Readonly<IRpcProbeEventView>[] = []\n/** 内容捕获按 frame/protected 显式启用，随后统一脱敏。 */\nconst probe = defineProbe({\n  stages: ['frame', 'protected'],\n  capture: ['frame', 'protected'],\n  redact() {\n    return '<redacted>'\n  },\n  emit(view) {\n    // SC9(c)：调用方显式请求顶层事件快照。\n    saved.push(snapshotProbeEvent(view))\n  }\n})\n\nprobe.setStages([]) // 暂停，captureMask 保持原值。\nprobe.setStages(['frame', 'protected']) // 恢复选定阶段。"
+                  "code": "import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'\n\n/** 此示例选择保留事件；分配发生在消费者，而非 Core 观察点。 */\nconst saved: Readonly<IRpcProbeEventView>[] = []\n/** 内容捕获按 frame/protected 显式启用，随后统一脱敏。 */\nconst probe = defineProbe({\n  stages: ['frame', 'protected'],\n  capture: ['frame', 'protected'],\n  redact() {\n    return '<redacted>'\n  },\n  emit(view) {\n    // 调用方显式请求顶层事件快照。\n    saved.push(snapshotProbeEvent(view))\n  }\n})\n\nprobe.setStages([]) // 暂停，captureMask 保持原值。\nprobe.setStages(['frame', 'protected']) // 恢复选定阶段。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`snapshotProbeEvent` 是显式复制请求（SC9c）：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。按照 SC9，普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界（SC9b），或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。"
+                  "text": "`snapshotProbeEvent` 是显式复制请求：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界，或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。"
                 },
                 {
                   "type": "paragraph",
@@ -12400,7 +12400,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "捕获容器中的 nested transferable 保留原引用，不遍历 getter、不深扫描或复制；其成员可能在实际 transfer 后分离。只有直接捕获且确会分离的 backing/view 按 SC9(a) 保存字节。"
+                  "text": "捕获容器中的 nested transferable 保留原引用，不遍历 getter、不深扫描或复制；其成员可能在实际 transfer 后分离。只有直接捕获且确会分离的 backing/view 才保存字节。"
                 },
                 {
                   "type": "code",
@@ -12690,7 +12690,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "按照 SC9，采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据（SC9c），内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示（SC9b）。"
+                  "text": "采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据，内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示。"
                 },
                 {
                   "type": "paragraph",
@@ -12780,7 +12780,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "引用语义（SC9）： Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。排序不改变记录文件/sequence 顺序或事件对象引用。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。"
+                  "text": "引用语义： Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。排序不改变记录文件/sequence 顺序或事件对象引用。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。"
                 },
                 {
                   "type": "paragraph",
@@ -34561,68 +34561,68 @@
                   "headers": [
                     "`topicInvalid`",
                     "`TRAY_TOPIC_INVALID`",
-                    "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
+                    "The mesh requires a non-empty topic string; correct the topic before publishing or subscribing.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   "rows": [
                     [
                       "`hostInvalid`",
                       "`TRAY_HOST_INVALID`",
-                      "Host definition violates instances R1; provide an admitted host DSL.",
+                      "Host definition is invalid; provide an admitted host DSL.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`hostUnknown`",
                       "`TRAY_HOST_UNKNOWN`",
-                      "Spawn names an unregistered host in R3; register the host before spawning.",
+                      "Spawn names an unregistered host; register the host before spawning.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`hostMismatch`",
                       "`TRAY_HOST_MISMATCH`",
-                      "Remote host differs from the admission in R6; select the record's host.",
+                      "Remote host differs from the admission; select the record's host.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`reservedName`",
                       "`TRAY_RESERVED_NAME`",
-                      "Expose uses a reserved internal plugin in R1; rename the business plugin.",
+                      "Expose uses a reserved internal plugin; rename the business plugin.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`valueNotPortable`",
                       "`TRAY_VALUE_NOT_PORTABLE`",
-                      "Config or payload violates R3/R6 portable data; remove unsupported values.",
+                      "Config or payload is not portable data; remove unsupported values.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceDuplicate`",
                       "`TRAY_INSTANCE_DUPLICATE`",
-                      "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
+                      "Spawn reuses an admitted id; choose a free id or remove the admission.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceStartFailed`",
                       "`TRAY_INSTANCE_START_FAILED`",
-                      "Install or generation init fails in R3/R5; inspect the preserved cause.",
+                      "Install or generation init fails; inspect the preserved cause.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`pathNotExposed`",
                       "`TRAY_PATH_NOT_EXPOSED`",
-                      "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
+                      "Dispatcher receives a path outside the exposure; use an exposed Feature method.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`childStateInvalid`",
                       "`TRAY_CHILD_STATE_INVALID`",
-                      "Child init repeats or names another host in R2; init once per generation.",
+                      "Child init repeats or names another host; init once per generation.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`disposed`",
                       "`TRAY_DISPOSED`",
-                      "Operation enters a closing registry in R3; create a new Tray.",
+                      "Operation enters a closing registry; create a new Tray.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ]
                   ]
@@ -34632,32 +34632,32 @@
                   "headers": [
                     "`hostUnavailable`",
                     "`TRAY_HOST_UNAVAILABLE`",
-                    "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
+                    "The mesh has no ready host candidate; await a ready instance before calling again.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   "rows": [
                     [
                       "`routingUnknown`",
                       "`TRAY_ROUTING_UNKNOWN`",
-                      "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
+                      "The routing policy is absent from registration or declaration; register its branded definition.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`routingInvalid`",
                       "`TRAY_ROUTING_INVALID`",
-                      "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
+                      "Routing policy name or pick is invalid; provide a named synchronous policy.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceUnknown`",
                       "`TRAY_INSTANCE_UNKNOWN`",
-                      "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
+                      "Lookup or remote uses an ended admission; obtain a fresh remote.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceNotReady`",
                       "`TRAY_INSTANCE_NOT_READY`",
-                      "Call targets a non-ready instance in R6; await its ready transition.",
+                      "Call targets a non-ready instance; await its ready transition.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ]
                   ]

@@ -6627,7 +6627,7 @@
         {
           "name": "RpcThreadErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
+          "signature": "export declare const RpcThreadErrorCode: { /** Native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-threads/dist/error-code.d.ts",
           "purpose": "Error codes owned by this package; currently only `THREAD_USAGE_SAMPLE_FAILED`.",
@@ -6647,7 +6647,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED';",
-              "description": "D23: native Worker sampling failed; retain its cause and display unavailable.",
+              "description": "Native Worker sampling failed; retain its cause and display unavailable.",
               "parameterDetails": [],
               "returns": "'THREAD_USAGE_SAMPLE_FAILED'"
             }
@@ -6656,7 +6656,7 @@
           "aliasOf": "RpcThreadErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };"
+            "export declare const RpcThreadErrorCode: { /** Native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6695,7 +6695,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/error-code.d.ts:RpcThreadErrorCode:export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
+          "identity": "packages/rpc-threads/dist/error-code.d.ts:RpcThreadErrorCode:export declare const RpcThreadErrorCode: { /** Native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],

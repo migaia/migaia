@@ -262,7 +262,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "按照 SC9，采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据（SC9c），内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示（SC9b）。"
+                "text": "采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据，内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示。"
               },
               {
                 "type": "paragraph",
@@ -352,7 +352,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "引用语义（SC9）： Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。排序不改变记录文件/sequence 顺序或事件对象引用。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。"
+                "text": "引用语义： Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。排序不改变记录文件/sequence 顺序或事件对象引用。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。"
               },
               {
                 "type": "paragraph",
@@ -1075,9 +1075,9 @@
           "ownerFragment": "rpc-devtools-contract--RPC_DEVTOOLS_SOURCE"
         },
         {
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Runtime is absent or the instance is closed; install the runtime or create a live instance . */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement. */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use. */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "name": "RpcDevtoolsErrorCode",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Runtime is absent or the instance is closed; install the runtime or create a live instance . */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement. */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use. */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./contract",
@@ -1518,7 +1518,7 @@
           "name": "IRpcDevtoolsErrorCode",
           "kind": "type",
           "signature": "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
-          "declarationLine": 36,
+          "declarationLine": 30,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Value union of the devtools semantic code table; classify with RPC_DEVTOOLS_SOURCE and preserve original cause chains.",
           "core": "Value union of the devtools semantic code table; classify with RPC_DEVTOOLS_SOURCE and preserve original cause chains.",
@@ -3045,7 +3045,7 @@
         {
           "name": "RpcDevtoolsErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Runtime is absent or the instance is closed; install the runtime or create a live instance . */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement. */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use. */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Stable semantic error vocabulary for options, collector lifecycle, recording, portable service conversion and hub target ownership. Original causes remain reachable through native error chains.",
@@ -3063,7 +3063,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID';",
-              "description": "Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure.",
+              "description": "Captured service data cannot be encoded; inspect cause or disable content exposure.",
               "parameterDetails": [],
               "returns": "'SERVICE_RESULT_INVALID'"
             },
@@ -3072,7 +3072,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidOption: 'INVALID_OPTION';",
-              "description": "Collector/hub options violate their supported domain; fix the option before construction (R5).",
+              "description": "Collector/hub options violate their supported domain; fix the option before construction.",
               "parameterDetails": [],
               "returns": "'INVALID_OPTION'"
             },
@@ -3081,7 +3081,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly closed: 'CLOSED';",
-              "description": "Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5).",
+              "description": "Runtime is absent or the instance is closed; install the runtime or create a live instance .",
               "parameterDetails": [],
               "returns": "'CLOSED'"
             },
@@ -3090,7 +3090,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly recordActive: 'RECORD_ACTIVE';",
-              "description": "A recording already owns the collector; stop it before starting another (collector R3).",
+              "description": "A recording already owns the collector; stop it before starting another.",
               "parameterDetails": [],
               "returns": "'RECORD_ACTIVE'"
             },
@@ -3099,7 +3099,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly recordNotActive: 'RECORD_NOT_ACTIVE';",
-              "description": "No recording remains active; start one before stopping it (collector R3).",
+              "description": "No recording remains active; start one before stopping it.",
               "parameterDetails": [],
               "returns": "'RECORD_NOT_ACTIVE'"
             },
@@ -3108,7 +3108,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID';",
-              "description": "Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4).",
+              "description": "Record header or NDJSON is invalid; inspect cause and supply a version-1 record.",
               "parameterDetails": [],
               "returns": "'RECORD_FORMAT_INVALID'"
             },
@@ -3117,7 +3117,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly redactFailed: 'REDACT_FAILED';",
-              "description": "Redaction failed; report the original cause and discard content (collector §5).",
+              "description": "Redaction failed; report the original cause and discard content (collector).",
               "parameterDetails": [],
               "returns": "'REDACT_FAILED'"
             },
@@ -3126,7 +3126,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly targetDuplicate: 'TARGET_DUPLICATE';",
-              "description": "A hub target name is registered; remove it before replacement (hub R1).",
+              "description": "A hub target name is registered; remove it before replacement.",
               "parameterDetails": [],
               "returns": "'TARGET_DUPLICATE'"
             },
@@ -3135,7 +3135,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly targetUnknown: 'TARGET_UNKNOWN';",
-              "description": "A hub operation names an unknown target; register it before use (hub R1).",
+              "description": "A hub operation names an unknown target; register it before use.",
               "parameterDetails": [],
               "returns": "'TARGET_UNKNOWN'"
             },
@@ -3153,7 +3153,7 @@
           "aliasOf": "RpcDevtoolsErrorCode",
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };"
+            "export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Runtime is absent or the instance is closed; install the runtime or create a live instance . */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement. */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use. */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3192,7 +3192,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION'; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector/hub options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Runtime is absent or the instance is closed; install the runtime or create a live instance . */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; /** A hub target name is registered; remove it before replacement. */ readonly targetDuplicate: 'TARGET_DUPLICATE'; /** A hub operation names an unknown target; register it before use. */ readonly targetUnknown: 'TARGET_UNKNOWN'; /** * Hub close reports failed target iterator returns; inspect original cause/errors and fix * cleanup. */ readonly targetReleaseFailed: 'TARGET_RELEASE_FAILED'; };",
           "guidance": [
             {
               "id": "4-错误身份",

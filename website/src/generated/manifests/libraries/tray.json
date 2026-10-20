@@ -649,68 +649,68 @@
                 "headers": [
                   "`topicInvalid`",
                   "`TRAY_TOPIC_INVALID`",
-                  "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
+                  "The mesh requires a non-empty topic string; correct the topic before publishing or subscribing.",
                   "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                 ],
                 "rows": [
                   [
                     "`hostInvalid`",
                     "`TRAY_HOST_INVALID`",
-                    "Host definition violates instances R1; provide an admitted host DSL.",
+                    "Host definition is invalid; provide an admitted host DSL.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`hostUnknown`",
                     "`TRAY_HOST_UNKNOWN`",
-                    "Spawn names an unregistered host in R3; register the host before spawning.",
+                    "Spawn names an unregistered host; register the host before spawning.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`hostMismatch`",
                     "`TRAY_HOST_MISMATCH`",
-                    "Remote host differs from the admission in R6; select the record's host.",
+                    "Remote host differs from the admission; select the record's host.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`reservedName`",
                     "`TRAY_RESERVED_NAME`",
-                    "Expose uses a reserved internal plugin in R1; rename the business plugin.",
+                    "Expose uses a reserved internal plugin; rename the business plugin.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`valueNotPortable`",
                     "`TRAY_VALUE_NOT_PORTABLE`",
-                    "Config or payload violates R3/R6 portable data; remove unsupported values.",
+                    "Config or payload is not portable data; remove unsupported values.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`instanceDuplicate`",
                     "`TRAY_INSTANCE_DUPLICATE`",
-                    "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
+                    "Spawn reuses an admitted id; choose a free id or remove the admission.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`instanceStartFailed`",
                     "`TRAY_INSTANCE_START_FAILED`",
-                    "Install or generation init fails in R3/R5; inspect the preserved cause.",
+                    "Install or generation init fails; inspect the preserved cause.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`pathNotExposed`",
                     "`TRAY_PATH_NOT_EXPOSED`",
-                    "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
+                    "Dispatcher receives a path outside the exposure; use an exposed Feature method.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`childStateInvalid`",
                     "`TRAY_CHILD_STATE_INVALID`",
-                    "Child init repeats or names another host in R2; init once per generation.",
+                    "Child init repeats or names another host; init once per generation.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`disposed`",
                     "`TRAY_DISPOSED`",
-                    "Operation enters a closing registry in R3; create a new Tray.",
+                    "Operation enters a closing registry; create a new Tray.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ]
                 ]
@@ -720,32 +720,32 @@
                 "headers": [
                   "`hostUnavailable`",
                   "`TRAY_HOST_UNAVAILABLE`",
-                  "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
+                  "The mesh has no ready host candidate; await a ready instance before calling again.",
                   "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                 ],
                 "rows": [
                   [
                     "`routingUnknown`",
                     "`TRAY_ROUTING_UNKNOWN`",
-                    "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
+                    "The routing policy is absent from registration or declaration; register its branded definition.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`routingInvalid`",
                     "`TRAY_ROUTING_INVALID`",
-                    "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
+                    "Routing policy name or pick is invalid; provide a named synchronous policy.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`instanceUnknown`",
                     "`TRAY_INSTANCE_UNKNOWN`",
-                    "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
+                    "Lookup or remote uses an ended admission; obtain a fresh remote.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   [
                     "`instanceNotReady`",
                     "`TRAY_INSTANCE_NOT_READY`",
-                    "Call targets a non-ready instance in R6; await its ready transition.",
+                    "Call targets a non-ready instance; await its ready transition.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ]
                 ]
@@ -6816,68 +6816,68 @@
                   "headers": [
                     "`topicInvalid`",
                     "`TRAY_TOPIC_INVALID`",
-                    "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
+                    "The mesh requires a non-empty topic string; correct the topic before publishing or subscribing.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   "rows": [
                     [
                       "`hostInvalid`",
                       "`TRAY_HOST_INVALID`",
-                      "Host definition violates instances R1; provide an admitted host DSL.",
+                      "Host definition is invalid; provide an admitted host DSL.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`hostUnknown`",
                       "`TRAY_HOST_UNKNOWN`",
-                      "Spawn names an unregistered host in R3; register the host before spawning.",
+                      "Spawn names an unregistered host; register the host before spawning.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`hostMismatch`",
                       "`TRAY_HOST_MISMATCH`",
-                      "Remote host differs from the admission in R6; select the record's host.",
+                      "Remote host differs from the admission; select the record's host.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`reservedName`",
                       "`TRAY_RESERVED_NAME`",
-                      "Expose uses a reserved internal plugin in R1; rename the business plugin.",
+                      "Expose uses a reserved internal plugin; rename the business plugin.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`valueNotPortable`",
                       "`TRAY_VALUE_NOT_PORTABLE`",
-                      "Config or payload violates R3/R6 portable data; remove unsupported values.",
+                      "Config or payload is not portable data; remove unsupported values.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceDuplicate`",
                       "`TRAY_INSTANCE_DUPLICATE`",
-                      "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
+                      "Spawn reuses an admitted id; choose a free id or remove the admission.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceStartFailed`",
                       "`TRAY_INSTANCE_START_FAILED`",
-                      "Install or generation init fails in R3/R5; inspect the preserved cause.",
+                      "Install or generation init fails; inspect the preserved cause.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`pathNotExposed`",
                       "`TRAY_PATH_NOT_EXPOSED`",
-                      "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
+                      "Dispatcher receives a path outside the exposure; use an exposed Feature method.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`childStateInvalid`",
                       "`TRAY_CHILD_STATE_INVALID`",
-                      "Child init repeats or names another host in R2; init once per generation.",
+                      "Child init repeats or names another host; init once per generation.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`disposed`",
                       "`TRAY_DISPOSED`",
-                      "Operation enters a closing registry in R3; create a new Tray.",
+                      "Operation enters a closing registry; create a new Tray.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ]
                   ]
@@ -6887,32 +6887,32 @@
                   "headers": [
                     "`hostUnavailable`",
                     "`TRAY_HOST_UNAVAILABLE`",
-                    "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
+                    "The mesh has no ready host candidate; await a ready instance before calling again.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   "rows": [
                     [
                       "`routingUnknown`",
                       "`TRAY_ROUTING_UNKNOWN`",
-                      "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
+                      "The routing policy is absent from registration or declaration; register its branded definition.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`routingInvalid`",
                       "`TRAY_ROUTING_INVALID`",
-                      "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
+                      "Routing policy name or pick is invalid; provide a named synchronous policy.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceUnknown`",
                       "`TRAY_INSTANCE_UNKNOWN`",
-                      "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
+                      "Lookup or remote uses an ended admission; obtain a fresh remote.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceNotReady`",
                       "`TRAY_INSTANCE_NOT_READY`",
-                      "Call targets a non-ready instance in R6; await its ready transition.",
+                      "Call targets a non-ready instance; await its ready transition.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ]
                   ]
@@ -6954,7 +6954,7 @@
         {
           "name": "TrayErrorCode",
           "kind": "const",
-          "signature": "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
+          "signature": "export declare const TrayErrorCode: { /** The mesh has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** The routing policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick is invalid; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition is invalid; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload is not portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside the exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
           "declarationLine": 2,
           "source": "packages/tray/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
@@ -6975,7 +6975,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE';",
-              "description": "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
+              "description": "The mesh has no ready host candidate; await a ready instance before calling again.",
               "parameterDetails": [],
               "returns": "'TRAY_HOST_UNAVAILABLE'"
             },
@@ -6984,7 +6984,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN';",
-              "description": "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
+              "description": "The routing policy is absent from registration or declaration; register its branded definition.",
               "parameterDetails": [],
               "returns": "'TRAY_ROUTING_UNKNOWN'"
             },
@@ -6993,7 +6993,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly topicInvalid: 'TRAY_TOPIC_INVALID';",
-              "description": "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
+              "description": "The mesh requires a non-empty topic string; correct the topic before publishing or subscribing.",
               "parameterDetails": [],
               "returns": "'TRAY_TOPIC_INVALID'"
             },
@@ -7002,7 +7002,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly routingInvalid: 'TRAY_ROUTING_INVALID';",
-              "description": "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
+              "description": "Routing policy name or pick is invalid; provide a named synchronous policy.",
               "parameterDetails": [],
               "returns": "'TRAY_ROUTING_INVALID'"
             },
@@ -7011,7 +7011,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly hostInvalid: 'TRAY_HOST_INVALID';",
-              "description": "Host definition violates instances R1; provide an admitted host DSL.",
+              "description": "Host definition is invalid; provide an admitted host DSL.",
               "parameterDetails": [],
               "returns": "'TRAY_HOST_INVALID'"
             },
@@ -7020,7 +7020,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly hostUnknown: 'TRAY_HOST_UNKNOWN';",
-              "description": "Spawn names an unregistered host in R3; register the host before spawning.",
+              "description": "Spawn names an unregistered host; register the host before spawning.",
               "parameterDetails": [],
               "returns": "'TRAY_HOST_UNKNOWN'"
             },
@@ -7029,7 +7029,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly hostMismatch: 'TRAY_HOST_MISMATCH';",
-              "description": "Remote host differs from the admission in R6; select the record's host.",
+              "description": "Remote host differs from the admission; select the record's host.",
               "parameterDetails": [],
               "returns": "'TRAY_HOST_MISMATCH'"
             },
@@ -7038,7 +7038,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly reservedName: 'TRAY_RESERVED_NAME';",
-              "description": "Expose uses a reserved internal plugin in R1; rename the business plugin.",
+              "description": "Expose uses a reserved internal plugin; rename the business plugin.",
               "parameterDetails": [],
               "returns": "'TRAY_RESERVED_NAME'"
             },
@@ -7047,7 +7047,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE';",
-              "description": "Config or payload violates R3/R6 portable data; remove unsupported values.",
+              "description": "Config or payload is not portable data; remove unsupported values.",
               "parameterDetails": [],
               "returns": "'TRAY_VALUE_NOT_PORTABLE'"
             },
@@ -7056,7 +7056,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE';",
-              "description": "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
+              "description": "Spawn reuses an admitted id; choose a free id or remove the admission.",
               "parameterDetails": [],
               "returns": "'TRAY_INSTANCE_DUPLICATE'"
             },
@@ -7065,7 +7065,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN';",
-              "description": "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
+              "description": "Lookup or remote uses an ended admission; obtain a fresh remote.",
               "parameterDetails": [],
               "returns": "'TRAY_INSTANCE_UNKNOWN'"
             },
@@ -7074,7 +7074,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY';",
-              "description": "Call targets a non-ready instance in R6; await its ready transition.",
+              "description": "Call targets a non-ready instance; await its ready transition.",
               "parameterDetails": [],
               "returns": "'TRAY_INSTANCE_NOT_READY'"
             },
@@ -7083,7 +7083,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED';",
-              "description": "Install or generation init fails in R3/R5; inspect the preserved cause.",
+              "description": "Install or generation init fails; inspect the preserved cause.",
               "parameterDetails": [],
               "returns": "'TRAY_INSTANCE_START_FAILED'"
             },
@@ -7092,7 +7092,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED';",
-              "description": "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
+              "description": "Dispatcher receives a path outside the exposure; use an exposed Feature method.",
               "parameterDetails": [],
               "returns": "'TRAY_PATH_NOT_EXPOSED'"
             },
@@ -7101,7 +7101,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID';",
-              "description": "Child init repeats or names another host in R2; init once per generation.",
+              "description": "Child init repeats or names another host; init once per generation.",
               "parameterDetails": [],
               "returns": "'TRAY_CHILD_STATE_INVALID'"
             },
@@ -7110,7 +7110,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly disposed: 'TRAY_DISPOSED';",
-              "description": "Operation enters a closing registry in R3; create a new Tray.",
+              "description": "Operation enters a closing registry; create a new Tray.",
               "parameterDetails": [],
               "returns": "'TRAY_DISPOSED'"
             },
@@ -7254,7 +7254,7 @@
           "aliasOf": "TrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };"
+            "export declare const TrayErrorCode: { /** The mesh has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** The routing policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick is invalid; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition is invalid; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload is not portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside the exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7293,7 +7293,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
+          "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** The mesh has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** The routing policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick is invalid; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition is invalid; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload is not portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside the exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
           "guidance": [
             {
               "id": "7-错误码",
@@ -7404,68 +7404,68 @@
                   "headers": [
                     "`topicInvalid`",
                     "`TRAY_TOPIC_INVALID`",
-                    "Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing.",
+                    "The mesh requires a non-empty topic string; correct the topic before publishing or subscribing.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   "rows": [
                     [
                       "`hostInvalid`",
                       "`TRAY_HOST_INVALID`",
-                      "Host definition violates instances R1; provide an admitted host DSL.",
+                      "Host definition is invalid; provide an admitted host DSL.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`hostUnknown`",
                       "`TRAY_HOST_UNKNOWN`",
-                      "Spawn names an unregistered host in R3; register the host before spawning.",
+                      "Spawn names an unregistered host; register the host before spawning.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`hostMismatch`",
                       "`TRAY_HOST_MISMATCH`",
-                      "Remote host differs from the admission in R6; select the record's host.",
+                      "Remote host differs from the admission; select the record's host.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`reservedName`",
                       "`TRAY_RESERVED_NAME`",
-                      "Expose uses a reserved internal plugin in R1; rename the business plugin.",
+                      "Expose uses a reserved internal plugin; rename the business plugin.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`valueNotPortable`",
                       "`TRAY_VALUE_NOT_PORTABLE`",
-                      "Config or payload violates R3/R6 portable data; remove unsupported values.",
+                      "Config or payload is not portable data; remove unsupported values.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceDuplicate`",
                       "`TRAY_INSTANCE_DUPLICATE`",
-                      "Spawn reuses an admitted id in R3; choose a free id or remove the admission.",
+                      "Spawn reuses an admitted id; choose a free id or remove the admission.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceStartFailed`",
                       "`TRAY_INSTANCE_START_FAILED`",
-                      "Install or generation init fails in R3/R5; inspect the preserved cause.",
+                      "Install or generation init fails; inspect the preserved cause.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`pathNotExposed`",
                       "`TRAY_PATH_NOT_EXPOSED`",
-                      "Dispatcher receives a path outside R2 exposure; use an exposed Feature method.",
+                      "Dispatcher receives a path outside the exposure; use an exposed Feature method.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`childStateInvalid`",
                       "`TRAY_CHILD_STATE_INVALID`",
-                      "Child init repeats or names another host in R2; init once per generation.",
+                      "Child init repeats or names another host; init once per generation.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`disposed`",
                       "`TRAY_DISPOSED`",
-                      "Operation enters a closing registry in R3; create a new Tray.",
+                      "Operation enters a closing registry; create a new Tray.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ]
                   ]
@@ -7475,32 +7475,32 @@
                   "headers": [
                     "`hostUnavailable`",
                     "`TRAY_HOST_UNAVAILABLE`",
-                    "Mesh R1 has no ready host candidate; await a ready instance before calling again.",
+                    "The mesh has no ready host candidate; await a ready instance before calling again.",
                     "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                   ],
                   "rows": [
                     [
                       "`routingUnknown`",
                       "`TRAY_ROUTING_UNKNOWN`",
-                      "Mesh R1 policy is absent from registration or declaration; register its branded definition.",
+                      "The routing policy is absent from registration or declaration; register its branded definition.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`routingInvalid`",
                       "`TRAY_ROUTING_INVALID`",
-                      "Routing policy name or pick violates instances R1; provide a named synchronous policy.",
+                      "Routing policy name or pick is invalid; provide a named synchronous policy.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceUnknown`",
                       "`TRAY_INSTANCE_UNKNOWN`",
-                      "Lookup or remote uses an ended admission in R6; obtain a fresh remote.",
+                      "Lookup or remote uses an ended admission; obtain a fresh remote.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ],
                     [
                       "`instanceNotReady`",
                       "`TRAY_INSTANCE_NOT_READY`",
-                      "Call targets a non-ready instance in R6; await its ready transition.",
+                      "Call targets a non-ready instance; await its ready transition.",
                       "修正输入或先满足对应接纳/生命周期条件，再按 cause 排查"
                     ]
                   ]

@@ -622,7 +622,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Metadata 只读取已知 native backing/view 长度，字符串及容器为 -1；capture 默认关闭。直接且实际转移的 bytes 按 SC9(a) 保留，nested transferable 保持原容器引用，可能在 transfer 后分离，getter 不被捕获逻辑遍历。Detail 是复用引用，保留数值需显式消费或快照。"
+                "text": "Metadata 只读取已知 native backing/view 长度，字符串及容器为 -1；capture 默认关闭。直接且实际转移的 bytes 按字节保留，nested transferable 保持原容器引用，可能在 transfer 后分离，getter 不被捕获逻辑遍历。Detail 是复用引用，保留数值需显式消费或快照。"
               }
             ]
           }
@@ -949,7 +949,7 @@
           "name": "IRpcBrowserErrorCode",
           "kind": "type",
           "signature": "export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode];",
-          "declarationLine": 28,
+          "declarationLine": 22,
           "source": "packages/rpc-browser/dist/error-code.d.ts",
           "purpose": "Union of `RpcBrowserErrorCode` values.",
           "core": "Union of `RpcBrowserErrorCode` values.",
@@ -2016,7 +2016,7 @@
         {
           "name": "RpcBrowserErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED'; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE'; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND'; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: 'INVALID_PEER_SOURCE'; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED'; };",
+          "signature": "export declare const RpcBrowserErrorCode: { /** Requires a nonempty explicit Window origin; provide the destination origin before connecting. */ readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED'; /** Requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE'; /** Allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND'; /** Rejects conflicting or unsupported sources; supply one concrete connect source or listen scope. */ readonly invalidPeerSource: 'INVALID_PEER_SOURCE'; /** Rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED'; };",
           "declarationLine": 10,
           "source": "packages/rpc-browser/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
@@ -2034,7 +2034,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED';",
-              "description": "BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting.",
+              "description": "Requires a nonempty explicit Window origin; provide the destination origin before connecting.",
               "parameterDetails": [],
               "returns": "'WINDOW_ORIGIN_REQUIRED'"
             },
@@ -2043,7 +2043,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE';",
-              "description": "BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API.",
+              "description": "Requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API.",
               "parameterDetails": [],
               "returns": "'RTC_CHANNEL_UNRELIABLE'"
             },
@@ -2052,7 +2052,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND';",
-              "description": "BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first.",
+              "description": "Allows one active listener per SharedWorker scope; close or reuse that listener first.",
               "parameterDetails": [],
               "returns": "'LISTENER_ALREADY_BOUND'"
             },
@@ -2061,7 +2061,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidPeerSource: 'INVALID_PEER_SOURCE';",
-              "description": "BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope.",
+              "description": "Rejects conflicting or unsupported sources; supply one concrete connect source or listen scope.",
               "parameterDetails": [],
               "returns": "'INVALID_PEER_SOURCE'"
             },
@@ -2070,7 +2070,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED';",
-              "description": "BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input.",
+              "description": "Rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input.",
               "parameterDetails": [],
               "returns": "'MESSAGE_DECODE_FAILED'"
             }
@@ -2079,7 +2079,7 @@
           "aliasOf": "RpcBrowserErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED'; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE'; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND'; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: 'INVALID_PEER_SOURCE'; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED'; };"
+            "export declare const RpcBrowserErrorCode: { /** Requires a nonempty explicit Window origin; provide the destination origin before connecting. */ readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED'; /** Requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE'; /** Allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND'; /** Rejects conflicting or unsupported sources; supply one concrete connect source or listen scope. */ readonly invalidPeerSource: 'INVALID_PEER_SOURCE'; /** Rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2118,7 +2118,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-browser/dist/error-code.d.ts:RpcBrowserErrorCode:export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED'; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE'; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND'; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: 'INVALID_PEER_SOURCE'; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED'; };",
+          "identity": "packages/rpc-browser/dist/error-code.d.ts:RpcBrowserErrorCode:export declare const RpcBrowserErrorCode: { /** Requires a nonempty explicit Window origin; provide the destination origin before connecting. */ readonly windowOriginRequired: 'WINDOW_ORIGIN_REQUIRED'; /** Requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: 'RTC_CHANNEL_UNRELIABLE'; /** Allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: 'LISTENER_ALREADY_BOUND'; /** Rejects conflicting or unsupported sources; supply one concrete connect source or listen scope. */ readonly invalidPeerSource: 'INVALID_PEER_SOURCE'; /** Rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: 'MESSAGE_DECODE_FAILED'; };",
           "guidance": [
             {
               "id": "10-错误与生命周期",

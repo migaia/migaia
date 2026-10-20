@@ -3589,9 +3589,9 @@
           "ownerFragment": "serialize-core--IEncodeStreamOptions"
         },
         {
-          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
+          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host * `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "name": "IFrameBudgetOptions",
-          "signature": "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
+          "signature": "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host * `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "source": "packages/serialize/dist/stream.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -7783,7 +7783,7 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": false,
-              "description": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`."
+              "description": "Required runtime-neutral scheduler. Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`."
             }
           ],
           "identity": "packages/serialize/dist/stream.d.ts:encodeStream:export declare function encodeStream<T>(registry: ISerializeRegistry, items: readonly T[], options: IEncodeStreamOptions): AsyncGenerator<ISerializeChunk, void, undefined>;",
@@ -7998,7 +7998,7 @@
               "type": "IScheduler",
               "optional": false,
               "description": "`options`（含继承自 `IFrameBudgetOptions` 的 `scheduler`）同样是必填参数。与 `registry.encode()` 的区别：`registry.encode()` 会把所有分段合并成一整块返回，适合\"最终要一个完整 blob\"的场景；`encodeStream()` 面向落 IndexedDB、写文件、发 fetch body 这类能逐片消费的下游——拼装反而会白白制造一次全量大对象的峰值内存。",
-              "descriptionEn": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`.",
+              "descriptionEn": "Required runtime-neutral scheduler. Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`.",
               "descriptionZh": "`options`（含继承自 `IFrameBudgetOptions` 的 `scheduler`）同样是必填参数。与 `registry.encode()` 的区别：`registry.encode()` 会把所有分段合并成一整块返回，适合\"最终要一个完整 blob\"的场景；`encodeStream()` 面向落 IndexedDB、写文件、发 fetch body 这类能逐片消费的下游——拼装反而会白白制造一次全量大对象的峰值内存。"
             }
           ],
@@ -8197,7 +8197,7 @@
         {
           "name": "IFrameBudgetOptions",
           "kind": "type",
-          "signature": "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
+          "signature": "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host * `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "declarationLine": 17,
           "source": "packages/serialize/dist/stream.d.ts",
           "purpose": "Adaptive slice settings captured once before stream work. A scheduler is required; all item counts are positive safe integers and targetMs is a finite positive duration.",
@@ -8274,7 +8274,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly scheduler: IScheduler;",
-              "description": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`.",
+              "description": "Required runtime-neutral scheduler. Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`.",
               "parameterDetails": [],
               "returns": "IScheduler"
             }
@@ -8283,7 +8283,7 @@
           "aliasOf": "IFrameBudgetOptions",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };"
+            "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host * `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8322,7 +8322,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
+          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host * `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "guidance": [],
           "usageScore": 54,
           "configuration": [],
@@ -8639,7 +8639,7 @@
           "name": "ISerializeErrorCode",
           "kind": "type",
           "signature": "export type ISerializeErrorCode = (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode];",
-          "declarationLine": 76,
+          "declarationLine": 75,
           "source": "packages/serialize/dist/error-code.d.ts",
           "purpose": "Value union of SerializeErrorCode for package-boundary failure classification; codes remain stable independently from message text.",
           "core": "Value union of SerializeErrorCode for package-boundary failure classification; codes remain stable independently from message text.",
@@ -11134,7 +11134,7 @@
           "name": "SerializeErrorCode",
           "kind": "const",
           "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
-          "declarationLine": 11,
+          "declarationLine": 10,
           "source": "packages/serialize/dist/error-code.d.ts",
           "purpose": "Package semantic error codes; classify with source rather than matching messages.",
           "core": "registryDisposed: The registry has closed or begun disposal; create another registry for new work.\ncodecNotFound: No parser matches the requested format tag; register the format or correct the envelope.\nencodeFailed: A parser or stream encoder failed, or a registry parser produced no chunks.\ndecodeFailed: A parser or stream decoder failed; retain the cause and position fields for diagnosis.\ninvalidChunk: A chunk tuple, payload kind or wire-only conversion is invalid; inspect parser output or stored data.\naborted: Cancellation won the operation; retry only with suitable application policy and a fresh signal.\ninvalidOption: A registration, scheduler, version, frame option or portable output input is invalid.\nenvUnsupported: Required host encoding capability is absent; inject a compatible encoder or decoder.",
@@ -11531,7 +11531,7 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": false,
-              "description": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`."
+              "description": "Required runtime-neutral scheduler. Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`."
             }
           ],
           "identity": "packages/serialize/dist/stream.d.ts:sliceByFrameBudget:export declare function sliceByFrameBudget<T>(items: readonly T[], options: IFrameBudgetOptions): AsyncGenerator<readonly T[], void, undefined>;",
@@ -11711,7 +11711,7 @@
               "type": "IScheduler",
               "optional": false,
               "description": "`options` 本身是必填参数，因为 `scheduler` 没有默认值——`/core` 不假定任何宿主全局 timer，一律经 `scheduler` 注入（`setTimeout`/`performance.now`/`Date.now` 都不会被直接调用）。主入口/`/registry` 场景下通常传 `@migaia/utils/scheduler` 的 `systemScheduler`。",
-              "descriptionEn": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`.",
+              "descriptionEn": "Required runtime-neutral scheduler. Core has no default timer and never directly accesses host `setTimeout`, `performance`, or `Date.now`.",
               "descriptionZh": "`options` 本身是必填参数，因为 `scheduler` 没有默认值——`/core` 不假定任何宿主全局 timer，一律经 `scheduler` 注入（`setTimeout`/`performance.now`/`Date.now` 都不会被直接调用）。主入口/`/registry` 场景下通常传 `@migaia/utils/scheduler` 的 `systemScheduler`。"
             }
           ],

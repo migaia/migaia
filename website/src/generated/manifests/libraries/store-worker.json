@@ -2008,7 +2008,7 @@
           "name": "IStoreWorkerErrorCode",
           "kind": "type",
           "signature": "export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];",
-          "declarationLine": 50,
+          "declarationLine": 49,
           "source": "packages/store-worker/dist/error-code.d.ts",
           "purpose": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions.",
           "core": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions.",
@@ -2643,7 +2643,7 @@
           "name": "StoreWorkerErrorCode",
           "kind": "const",
           "signature": "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
-          "declarationLine": 11,
+          "declarationLine": 10,
           "source": "packages/store-worker/dist/error-code.d.ts",
           "purpose": "Stable Worker bridge and serializer failure codes; canonical RPC/Resource failures may retain their own package identity.",
           "core": "invalidOption: Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered CLEANUP_FAILED AggregateError retains both. A single cleanup failure keeps its existing identity and does not receive this aggregate code.",
@@ -3337,7 +3337,7 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. * Missing host capabilities fail immediately instead of silently falling back to microtasks."
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays. Defaults to * utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of * silently falling back to microtasks."
             }
           ],
           "identity": "packages/store-worker/dist/worker.d.ts:workerComputed:export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Input, Output>): Resource<Output>;",
@@ -3429,7 +3429,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "`debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致",
-              "descriptionEn": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`. * Missing host capabilities fail immediately instead of silently falling back to microtasks.",
+              "descriptionEn": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays. Defaults to * utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of * silently falling back to microtasks.",
               "descriptionZh": "`debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致"
             }
           ],

@@ -170,7 +170,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。"
+                "text": "通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。"
               }
             ]
           },
