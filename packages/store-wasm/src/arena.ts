@@ -16,7 +16,6 @@ export function ensureWasm(): Promise<WebAssembly.Memory> {
   // Keep the settled promise identity as well as the memory value. A ready
   // barrier is a generation token for React/SSR callers; wrapping the value
   // in Promise.resolve() on each call would create a new generation forever.
-  if (wasmMemory && wasmReady) return wasmReady
   if (wasmReady) return wasmReady
   const pending = initWasm().then((o) => (wasmMemory = o.memory))
   wasmReady = pending
@@ -198,19 +197,6 @@ function completeAllocation(
 export function allocateOwnedSync(byteLen: number): IWasmAllocation {
   const result = allocateSync(byteLen)
   return allocation(result.memory, result.id, result.ptr)
-}
-
-export async function allocate(byteLen: number) {
-  if (!Number.isSafeInteger(byteLen) || byteLen < 0 || byteLen > MAX_WASM32_ALLOCATION) {
-    throw createStoreWasmRangeError(
-      StoreWasmErrorCode.invalidOption,
-      StoreWasmErrorText.allocationLimit
-    )
-  }
-  const memory = await ensureWasm()
-  assertNotPoisoned()
-  const id = callArena(() => alloc_bytes(byteLen))
-  return completeAllocation(memory, id)
 }
 
 /** Allocate after explicit WASM initialization; never starts async work. */

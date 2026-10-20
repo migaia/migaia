@@ -251,7 +251,7 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 
 | 触发条件                                                                    | 错误类型     | 信息                                                                                        |
 | --------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------- |
-| `allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数 | `RangeError` | `wasm.allocate: byteLen must fit an unsigned 32-bit integer`                                |
+| `allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数 | `RangeError` | `wasm.allocate: byteLen must fit an unsigned 32-bit integer`                                |
 | 字段构造时 WASM 尚未就绪（未 `await ensureWasm()`）                         | `Error`      | `[store] WASM is not initialized; await ensureWasm() or use StoreProvider`                  |
 | 字段构造时 signal 已 aborted | 原生 reason（通常 DOMException/AbortError）或带 cause 的 Error | 未编码 native reason 原位附 INIT_ABORTED；foreign identity 保留；无法附码时原值在 cause，message/stack 按原值保留 |
 | `number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`                | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
@@ -376,7 +376,6 @@ record shape 保留 dispose/disposed 两个生命周期名；record(shape) 先�
 | 内部符号（非公开导出）       | 参数类型             | 同步/异步 | 作用                                                                                                                                      |
 | ---------------------------- | -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `allocateOwnedSync(byteLen)` | `byteLen: number`    | 同步      | 同步分配一块内存并返回 `IWasmAllocation`（`memory`/`id`/`ptr`/`register`/`unregister`/`dispose`），供字段构造器在自己的 `create()` 里使用 |
-| `allocate(byteLen)`          | `byteLen: number`    | 异步      | 异步分配：内部先 `await ensureWasm()` 再分配，适合在 WASM 尚未就绪时也能发起分配请求的场景                                                |
 | `allocateSync(byteLen)`      | `byteLen: number`    | 同步      | 同步分配：要求 WASM 已就绪，否则抛 `[store] WASM is not initialized...`                                                                   |
 | `deallocate(id)`             | `id: number`         | 同步      | 释放指定分配 id；对未知/已释放的 id 是 no-op，天然抗重复调用                                                                              |
 | `registry`                   | 不适用（非函数导出） | 不适用    | 对 `FinalizationRegistry` 的薄封装（`register`/`unregister`），运行时不支持时静默降级为 no-op                                             |
