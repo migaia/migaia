@@ -66674,13 +66674,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`createGenerationController()`',
-                    '切换页面或搜索条件后，只接受最新请求的结果。',
-                    '[请求替换](/zh/docs/lifecycle/generation)'
-                  ],
-                  [
-                    '`createGenerationController()`',
-                    '由应用保存加载状态，只接收当前请求的结果。',
-                    '[应用加载状态](/zh/docs/lifecycle/application-load-state)'
+                    '切换页面或搜索条件后，只接受最新请求的结果。加载状态可以由应用自己保存。',
+                    '[请求替换](/zh/docs/lifecycle/generation) / [应用加载状态](/zh/docs/lifecycle/application-load-state)'
                   ],
                   [
                     '`createMutationQueue()`',
@@ -66694,7 +66689,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`createObjectLeaseRegistry()` / `createStringLeaseRegistry()`',
-                    '用租约的名称调用上面两个计数器，方法相同。',
+                    '换成租约的名称使用上面的计数器，方法相同。',
                     '[租约计数](/zh/docs/lifecycle/quiescence)'
                   ],
                   [
@@ -66891,13 +66886,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`createGenerationController()`',
-                    'Accept the current request after a page or search changes.',
-                    '[Replacing requests](/en/docs/lifecycle/generation)'
-                  ],
-                  [
-                    '`createGenerationController()`',
-                    'Let the application keep loading state and accept only the current result.',
-                    '[Application loading state](/en/docs/lifecycle/application-load-state)'
+                    'Accept only the current request after a page or search changes. The application can keep its own loading state.',
+                    '[Replacing requests](/en/docs/lifecycle/generation) / [Application loading state](/en/docs/lifecycle/application-load-state)'
                   ],
                   [
                     '`createMutationQueue()`',
