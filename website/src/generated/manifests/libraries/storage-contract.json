@@ -163,6 +163,7 @@
                 "items": [
                   "`getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>`",
                   "`setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>`",
+                  "`removeBytes(key: string, ctx?: IOperationContext): Promise<void>` —— 仅删除字节通道中的该键；不存在时成功",
                   "`clearBytes(ctx?: IOperationContext): Promise<void>`",
                   "`getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>`",
                   "`putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>` —— 未传 `key` 时由后端生成",
@@ -173,6 +174,10 @@
                   "`iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>`",
                   "`transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>`"
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`remove` 仅删除 values 通道，`removeBytes` 仅删除 bytes 通道，`deleteRecord` 仅删除 records 通道；三者均保留其他通道的数据。"
               },
               {
                 "type": "paragraph",
@@ -800,11 +805,19 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};"
+                "code": "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};"
               },
               {
                 "type": "paragraph",
                 "text": "`IRecordStore<T>` 是 L1：结构化后端额外提供的字节通道、结构化记录（`IStorageKey` 主键而非字符串）、范围迭代与事务。`putRecord` 未传 `key` 时由后端生成并返回该键。`metadata` 是后端自有、供可恢复的维护迁移使用的可选通道，与 `records`/`bytes`/`values` 通道相互独立，不受 `clearAll`/`clearRecords` 影响。`clearAll` 覆盖 L0 定义，同时清空 values/bytes/records 三个通道。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`removeBytes(key, ctx?)` 仅删除 bytes 通道中的该键，键不存在时成功，因此重复删除是幂等的。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道；这些单键删除操作均保留其他通道的数据。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`removeBytes` 是 L1 必需方法：自定义 `IRecordStore` 实现需补齐此方法；缺失时 `isRecordStore` 返回 `false`，`asRecordStore` 拒绝。完整 L0 准入不受影响。"
               },
               {
                 "type": "code",
@@ -822,7 +835,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。"
+                "text": "在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。"
               },
               {
                 "type": "code",
@@ -1283,7 +1296,7 @@
           "name": "asRecordStore",
           "kind": "const",
           "signature": "export declare const asRecordStore: <T = unknown>(store: IKeyValueStore) => IRecordStore<T>;",
-          "declarationLine": 103,
+          "declarationLine": 108,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks a supplied L0 store for the full record, binary, transaction and iteration surface. Returns the original object after capability narrowing, and fails explicitly instead of constructing a backend or silently falling back.",
           "core": "store: Existing application-supplied `IKeyValueStore`, obtained from a concrete backend package.\nThe exact store as `IRecordStore<T>`; insufficient shape or capabilities throws `UNSUPPORTED_CAPABILITY`. An original reflection or accessor failure remains reachable through `cause`.",
@@ -1411,7 +1424,7 @@
               ]
             }
           ],
-          "usageScore": 82,
+          "usageScore": 86,
           "configuration": [],
           "fragment": "storage-contract-index--asRecordStore"
         },
@@ -3318,7 +3331,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';",
             "const range: IKeyRange = { lower: 'a', upper: 'z', upperOpen: true };"
@@ -3551,7 +3564,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "function isKeyValueStore(store: unknown): store is IKeyValueStore;",
             "function isRecordStore(store: IKeyValueStore): store is IRecordStore;",
             "function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;",
@@ -3785,7 +3798,7 @@
           "name": "IKeyValueStoreAdmission",
           "kind": "type",
           "signature": "export type IKeyValueStoreAdmission = { readonly valid: true; readonly store: IKeyValueStore; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; readonly dispose: () => Promise<void>; readonly receiver: object; } | { readonly valid: false; readonly cause: unknown; };",
-          "declarationLine": 70,
+          "declarationLine": 75,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Discriminated single-read store admission returned by `snapshotKeyValueStoreDetailed()`, retaining either source facts or the exact failure.",
           "core": "valid: Admission discriminant: true carries the captured store facts, false carries the original observed failure.\nThe inspected base store shape and capabilities were accepted.\nThe candidate shape failed admission without invoking storage operations.\nstore: Exact original backend object supplied to admission; no method facade or store clone is created.\nbackend: Implementation family declared by the backend; use capabilities rather than this label to choose optional operations.\nLocal browser key-value storage whose data normally survives browsing sessions.\nSession-scoped browser key-value storage with the host’s session lifetime.\nCookie storage subject to document visibility, scope and small value limits.\nStructured browser database backend; inspect capability flags before using record extensions.\nIn-process memory implementation whose data lifetime is owned by the concrete backend.\ncapabilities: Backend-supplied `IStorageCapabilities` describing callable channels and their limits; admission snapshots these facts once.\ndispose: Raw dispose function captured from the candidate exactly once; invoke it with the separately retained receiver.\nBackend-owned cleanup promise; the original receiver must remain attached at invocation.\nreceiver: Exact candidate object retained to invoke the captured disposer with its original receiver semantics.\ncause: Exact observed reflection or getter failure for invalid admission, or undefined when rejection was a plain shape mismatch.",
@@ -4004,7 +4017,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "function snapshotOperationContext(\n  ctx: IOperationContext | undefined\n): IOperationContextSnapshot | undefined;",
             "function assertOperationContext(ctx: IOperationContext | undefined): void;",
@@ -4212,7 +4225,7 @@
               ]
             }
           ],
-          "usageScore": 182,
+          "usageScore": 188,
           "configuration": [],
           "fragment": "storage-contract-index--IOperationContext"
         },
@@ -4988,7 +5001,7 @@
         {
           "name": "IRecordStore",
           "kind": "type",
-          "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
           "declarationLine": 44,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Base store plus independent byte and structured-record channels, bounded iteration and backend-owned transactional callbacks.",
@@ -5000,7 +5013,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "function isRecordStore(store: IKeyValueStore): store is IRecordStore;",
             "function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;",
             "import {\n  isKeyValueStore,\n  asRecordStore,\n  isRecordStore,\n  type IKeyValueStore,\n  type ISyncKeyValueStore,\n  type IRecordStore,\n  type ISyncCapableStore\n} from '@migaia/storage-contract';",
@@ -5047,6 +5060,26 @@
                 {
                   "name": "ctx",
                   "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "removeBytes",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeBytes(key: string, ctx?: IOperationContext): Promise<void>;",
+              "description": "Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed without mutation; asynchronous backends resolve only after the deletion commits.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
                   "optional": true
                 }
               ],
@@ -5216,7 +5249,7 @@
           "aliasOf": "IRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
+            "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5255,9 +5288,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
           "guidance": [],
-          "usageScore": 56,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "storage-contract-index--IRecordStore"
         },
@@ -5642,7 +5675,7 @@
           "name": "isKeyValueStore",
           "kind": "const",
           "signature": "export declare const isKeyValueStore: (store: unknown) => store is IKeyValueStore;",
-          "declarationLine": 98,
+          "declarationLine": 103,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks an unknown object’s backend name, capability descriptor and every L0 callable method without invoking a storage operation. Accessor failures become an invalid result rather than escaping the predicate.",
           "core": "store: Unknown candidate from application injection or an extension boundary.\nTrue when the inspected shape is a valid `IKeyValueStore`, otherwise false; this is shape admission, not behavioral verification.",
@@ -5711,7 +5744,7 @@
           "name": "isRecordStore",
           "kind": "const",
           "signature": "export declare const isRecordStore: (store: IKeyValueStore) => store is IRecordStore;",
-          "declarationLine": 104,
+          "declarationLine": 109,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks the complete record-store method set and required record, binary, transaction and iteration flags. Missing capability or a throwing accessor returns false without performing storage I/O.",
           "core": "store: Existing `IKeyValueStore` from the caller’s concrete backend.\nA boolean type guard narrowing to `IRecordStore` on success.",
@@ -5835,7 +5868,7 @@
               ]
             }
           ],
-          "usageScore": 50,
+          "usageScore": 54,
           "configuration": [],
           "fragment": "storage-contract-index--isRecordStore"
         },
@@ -6778,7 +6811,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "function assertStorageKey(\n  value: unknown,\n  backend: IBackendKind,\n  label?: string\n): asserts value is IStorageKey;",
             "function snapshotStorageKey(value: unknown, backend: IBackendKind, label?: string): IStorageKey;",
@@ -7531,7 +7564,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\ntype ITransactionScope<TValue = unknown> = {\n  get(key: IStorageKey): Promise<TValue | undefined>;\n  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;\n  delete(key: IStorageKey): Promise<void>;\n};",
             "import {\n  assertTransactionCallback,\n  readTransactionConflictPolicy,\n  type ITransactionScope,\n  type ITransactionWriteOptions\n} from '@migaia/storage-contract';",
             "await store.transaction(async (tx: ITransactionScope<MyRecord>) => {\n  const current = await tx.get('k');\n  await tx.put({ ...current, count: (current?.count ?? 0) + 1 }, 'k');\n});",
@@ -7737,7 +7770,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
@@ -8163,7 +8196,7 @@
           "name": "snapshotKeyValueStore",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStore: (store: unknown) => { readonly store: IKeyValueStore; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; } | undefined;",
-          "declarationLine": 86,
+          "declarationLine": 91,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Reads the L0 boundary once and returns the original store with captured backend and normalized capabilities. The returned wrapper is ordinary data, while store behavior remains owned by the original object.",
           "core": "store: Unknown candidate supplied by the application’s backend factory or plugin.\n`{ store, backend, capabilities }` on valid admission, otherwise undefined; captured capabilities are a fresh plain snapshot.",
@@ -8228,7 +8261,7 @@
           "name": "snapshotKeyValueStoreDetailed",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStoreDetailed: (store: unknown) => IKeyValueStoreAdmission;",
-          "declarationLine": 84,
+          "declarationLine": 89,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Performs one L0 admission while retaining the exact reflection or accessor failure for its owning boundary. A valid result also captures the raw disposer and its original receiver so later cleanup need not reread mutable accessors.",
           "core": "store: Unknown application-injected store candidate whose public fields are inspected once.\nAn `IKeyValueStoreAdmission`; invalid plain shapes carry undefined cause, while observed reflection or getter failures retain their exact thrown value.",
@@ -8489,7 +8522,7 @@
           "name": "snapshotRecordStore",
           "kind": "const",
           "signature": "export declare const snapshotRecordStore: <T = unknown>(store: unknown) => { readonly store: IRecordStore<T>; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; } | undefined;",
-          "declarationLine": 92,
+          "declarationLine": 97,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Captures the complete L1 shape and required capabilities once, returning the original record store and normalized facts. It neither clones records nor wraps backend methods.",
           "core": "store: Unknown existing store supplied by the caller; the record capability set must be complete.\n`{ store: IRecordStore<T>, backend, capabilities }` or undefined on missing shape, capability or failed access.",

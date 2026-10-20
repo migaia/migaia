@@ -618,15 +618,30 @@ export const storePersistReference: ILibraryReference = {
     removeEnvelope: {
       role: 'operation',
       purpose: t(
-        'Forwards removal of exactly one archive key to the injected backend, without touching source memory or decoding the current value.',
-        '将单个存档键的移除交给注入后端，不触碰源内存，也不解码当前值。'
+        'Removes exactly one archive through the codec-selected backend channel without decoding its value or changing source memory. A binary codec with a binary-capable backend uses removeBytes; all other calls retain text removal, including existing three-argument calls.',
+        '根据编解码器选择的后端通道移除单个存档，不解码当前值，也不修改源内存。二进制编解码器遇到支持二进制的后端时使用 `removeBytes`；其他调用沿用文本移除，已有三个参数的调用保持有效。'
       ),
-      params: { storage, key, ctx },
+      params: {
+        storage: t(
+          'Caller-injected storage-contract projection. Text removal uses remove; a binary codec with binary capability additionally requires removeBytes from IRecordStore.',
+          '调用方注入的存储契约投影。文本移除使用 `remove`；二进制编解码器遇到声明 binary 能力的后端时，另需 `IRecordStore` 的 `removeBytes`。'
+        ),
+        key,
+        ctx: t(
+          'Required context object; its optional caller-owned signal is forwarded to the selected backend removal.',
+          '必需的上下文对象；其中可选的调用方所有 signal 会传递给所选后端的移除操作。'
+        ),
+        codec: t(
+          'Optional fourth argument, defaulting to defaultJsonCodec. Pass the same storage-contract ICodec selected for writeEnvelope and readEnvelope to remove a binary archive from its byte channel.',
+          '可选的第四个参数，默认 `defaultJsonCodec`。传入为 `writeEnvelope` 与 `readEnvelope` 选择的同一存储契约 `ICodec`，可从字节通道移除二进制存档。'
+        )
+      },
       returns: t(
-        'Promise resolving after backend removal; backend failure rejects unchanged.',
-        '后端移除后承诺完成；后端失败原样拒绝。'
+        'Promise resolving after the selected backend removal. When a binary codec is selected, a binary-capable backend missing removeBytes rejects with a BACKEND_CAPABILITY TypeError; backend failures reject unchanged.',
+        '所选后端完成移除后承诺完成。选择二进制编解码器时，支持二进制的后端缺少 `removeBytes` 会以 `BACKEND_CAPABILITY` 类型错误拒绝；后端失败原样拒绝。'
       ),
-      example: "await removeEnvelope(storage, 'counter', {})"
+      example:
+        "await removeEnvelope(storage, 'counter', {})\nawait removeEnvelope(storage, 'binary-counter', {}, codec)"
     },
     createStorePersistError: errorFactory('createStorePersistError', 'Error', 'options'),
     createStorePersistTypeError: errorFactory(

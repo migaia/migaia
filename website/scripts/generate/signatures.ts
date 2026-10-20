@@ -25,6 +25,8 @@ const PACKAGES = [
   'rpc-browser',
   'rpc-devtools',
   'logger',
+  'store-persist',
+  'store-wasm',
   'storage-web'
 ]
 
@@ -83,6 +85,8 @@ function mergeLibraryProjection(name: string, next: Record<string, unknown>, lib
     if (!Array.isArray(entries) || !Array.isArray(priorEntries))
       throw new Error(`Invalid ${name} entries`)
     if (!entries.some((entry) => (entry as { library?: unknown }).library === library)) {
+      if (!priorEntries.some((entry) => (entry as { library?: unknown }).library === library))
+        return previous
       throw new Error(`Missing ${library} ${name} entries`)
     }
     return {

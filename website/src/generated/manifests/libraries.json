@@ -17770,6 +17770,7 @@
                   "items": [
                     "`getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>`",
                     "`setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>`",
+                    "`removeBytes(key: string, ctx?: IOperationContext): Promise<void>` —— 仅删除字节通道中的该键；不存在时成功",
                     "`clearBytes(ctx?: IOperationContext): Promise<void>`",
                     "`getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>`",
                     "`putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>` —— 未传 `key` 时由后端生成",
@@ -17780,6 +17781,10 @@
                     "`iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>`",
                     "`transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>`"
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`remove` 仅删除 values 通道，`removeBytes` 仅删除 bytes 通道，`deleteRecord` 仅删除 records 通道；三者均保留其他通道的数据。"
                 },
                 {
                   "type": "paragraph",
@@ -18407,11 +18412,19 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};"
+                  "code": "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};"
                 },
                 {
                   "type": "paragraph",
                   "text": "`IRecordStore<T>` 是 L1：结构化后端额外提供的字节通道、结构化记录（`IStorageKey` 主键而非字符串）、范围迭代与事务。`putRecord` 未传 `key` 时由后端生成并返回该键。`metadata` 是后端自有、供可恢复的维护迁移使用的可选通道，与 `records`/`bytes`/`values` 通道相互独立，不受 `clearAll`/`clearRecords` 影响。`clearAll` 覆盖 L0 定义，同时清空 values/bytes/records 三个通道。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`removeBytes(key, ctx?)` 仅删除 bytes 通道中的该键，键不存在时成功，因此重复删除是幂等的。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道；这些单键删除操作均保留其他通道的数据。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`removeBytes` 是 L1 必需方法：自定义 `IRecordStore` 实现需补齐此方法；缺失时 `isRecordStore` 返回 `false`，`asRecordStore` 拒绝。完整 L0 准入不受影响。"
                 },
                 {
                   "type": "code",
@@ -18429,7 +18442,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。"
+                  "text": "在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。"
                 },
                 {
                   "type": "code",
@@ -19085,7 +19098,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数 `store: IKeyValueStore`，均无选项。判定同时检查 `backend` 是否为已知种类、`capabilities.records/binary/transactions/iteration` 是否全为 `true`，以及 L1 全部方法（`getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）是否都是函数。"
+                  "text": "单参数 `store: IKeyValueStore`，均无选项。判定同时检查 `backend` 是否为已知种类、`capabilities.records/binary/transactions/iteration` 是否全为 `true`，以及 L1 全部方法（`getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）是否都是函数。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`removeBytes(key: string, ctx?: IOperationContext): Promise<void>` 仅删除 bytes 通道中的该键，缺失时成功。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道；这些单键删除操作均保留其他通道的数据。"
                 },
                 {
                   "type": "paragraph",
@@ -19854,6 +19871,7 @@
                   "items": [
                     "`getBytes(key, ctx?)`：从 `bytesStoreName` 读取。IndexedDB 的 structured clone 可能把写入的 `Uint8Array` 还原为 `ArrayBuffer`（取决于实现），源码用 `@migaia/utils/bytes` 的 `isUint8Array` / `isArrayBuffer` 内部槽 guard 处理两种还原形态；它们不依赖 `instanceof` 或可伪造的 `constructor.name`，能正确覆盖 fake-indexeddb、jsdom、iframe 与 Worker 的跨 realm 值。不存在返回 `null`。",
                     "`setBytes(key, value, ctx?)`：`value` 必须是 `Uint8Array`（`isUint8Array`），否则抛 `INVALID_CONFIG`。写入前会 `.slice()` 出一份独立副本再走 `writeWithConflict('bytes', ...)`，避免调用方在异步边界之外继续修改同一份底层缓冲区。",
+                    "`removeBytes(key, ctx?)`：仅删除 `bytesStoreName` 中该 key，缺失时成功；保留 values/records 通道中的数据。等事务 commit 后 resolve，仅实际删除已有字节时发布变更。",
                     "`clearBytes(ctx?)`：清空 `bytesStoreName`。"
                   ]
                 }
@@ -19995,6 +20013,7 @@
                   "type": "list",
                   "items": [
                     "`sync` 通道只暴露 L0（`get`/`set`/`remove`/`has`/`keys`/`clearValues`）；异步 L0/L1/事务方法是完整实现，不是对 `sync` 的包装。",
+                    "`removeBytes(key, ctx?)` 仅删除 bytes 通道中的该键，缺失时成功，且仅实际删除已有字节时发布变更。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道，均保留其他通道的数据。",
                     "跨通道冲突检测（value/bytes/record 共享同一逻辑 key）与 `indexedDbHost` 遵循相同的 `planChannelWrite` 规则（见契约与能力模块）。",
                     "`transaction(run, ctx?)`：与 IndexedDB 相同的乐观并发模型——草稿隔离、提交前比对 `recordEpoch`（对应 `clearAll`）与每个访问过的 key 的 revision；不一致抛 `TRANSACTION_CONFLICT`。与旧实现的关键差异：草稿在提交前完全不触碰真实的 `documents` Map；早期实现直接在真实 Map 上写入、失败时用开头拍的快照整体覆盖回去——如果事务执行期间（`run(scope)` 内任意一次 `await` 之间）有其他并发的 `putRecord` 或另一个事务成功提交，那次快照恢复会把那次无关的成功写入一起抹掉。当前实现下失败只需丢弃草稿，真实数据从未被动过；成功时的合并循环是纯同步的（没有 `await`），不会被其他调用交错。",
                     "`iterateRecords(range?, ctx?)`：对当前全部记录按 `compareStorageKeys` 排序后再按 range 过滤 yield；不分页（内存数据集通常不需要）。",
@@ -20028,7 +20047,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "1. `store.backend` 是已知种类之一（`'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'`）； 2. `store.capabilities` 是完整、合法的 `IStorageCapabilities` 描述符，且 `records`/`binary`/`transactions`/`iteration` 全部为 `true`； 3. L0 全部方法（`get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose`）与 L1 全部方法（`getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）均为函数。"
+                  "text": "1. `store.backend` 是已知种类之一（`'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'`）； 2. `store.capabilities` 是完整、合法的 `IStorageCapabilities` 描述符，且 `records`/`binary`/`transactions`/`iteration` 全部为 `true`； 3. L0 全部方法（`get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose`）与 L1 全部方法（`getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）均为函数。"
                 },
                 {
                   "type": "paragraph",
@@ -20101,7 +20120,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IKeyValueStore = {\n  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'\n  readonly capabilities: IStorageCapabilities\n  get(key: string, ctx?: IOperationContext): Promise<string | null>\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>\n  remove(key: string, ctx?: IOperationContext): Promise<void>\n  has(key: string, ctx?: IOperationContext): Promise<boolean>\n  keys(ctx?: IOperationContext): Promise<string[]>\n  clearValues(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  dispose(): Promise<void>\n  readonly sync?: ISyncKeyValueStore // 仅同步后端提供\n}\n\ntype IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>\n  clearBytes(ctx?: IOperationContext): Promise<void>\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>\n  clearRecords(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>\n    delete(key: string, ctx?: IOperationContext): Promise<void>\n  }\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}\n\ntype IStorageCapabilities = {\n  readonly syncRead: boolean\n  readonly binary: boolean\n  readonly records: boolean\n  readonly transactions: boolean\n  readonly iteration: boolean\n  readonly secondaryIndexes: boolean\n  readonly changeFeed: boolean\n  readonly maxValueBytes: number | undefined\n  readonly opaqueEntries: boolean\n}\n\ntype IOperationContext = {\n  readonly signal?: IAbortSignal // 协作式取消\n  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者\n  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128\n}\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }\n\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]\ntype IKeyRange = {\n  readonly lower?: IStorageKey\n  readonly lowerOpen?: boolean\n  readonly upper?: IStorageKey\n  readonly upperOpen?: boolean\n}"
+                  "code": "type IKeyValueStore = {\n  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'\n  readonly capabilities: IStorageCapabilities\n  get(key: string, ctx?: IOperationContext): Promise<string | null>\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>\n  remove(key: string, ctx?: IOperationContext): Promise<void>\n  has(key: string, ctx?: IOperationContext): Promise<boolean>\n  keys(ctx?: IOperationContext): Promise<string[]>\n  clearValues(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  dispose(): Promise<void>\n  readonly sync?: ISyncKeyValueStore // 仅同步后端提供\n}\n\ntype IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>\n  clearBytes(ctx?: IOperationContext): Promise<void>\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>\n  clearRecords(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>\n    delete(key: string, ctx?: IOperationContext): Promise<void>\n  }\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}\n\ntype IStorageCapabilities = {\n  readonly syncRead: boolean\n  readonly binary: boolean\n  readonly records: boolean\n  readonly transactions: boolean\n  readonly iteration: boolean\n  readonly secondaryIndexes: boolean\n  readonly changeFeed: boolean\n  readonly maxValueBytes: number | undefined\n  readonly opaqueEntries: boolean\n}\n\ntype IOperationContext = {\n  readonly signal?: IAbortSignal // 协作式取消\n  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者\n  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128\n}\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }\n\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]\ntype IKeyRange = {\n  readonly lower?: IStorageKey\n  readonly lowerOpen?: boolean\n  readonly upper?: IStorageKey\n  readonly upperOpen?: boolean\n}"
                 },
                 {
                   "type": "paragraph",
@@ -27238,7 +27257,7 @@
                   "type": "list",
                   "items": [
                     "`key: string`（必填）—— 存档在 storage 里的键",
-                    "`storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 另需 `getBytes`/`setBytes`",
+                    "`storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 读写另需 `getBytes`/`setBytes`，清除另需 canonical `removeBytes`",
                     "`codec?: ICodec` —— 默认 `defaultJsonCodec`（原生支持 Map/Set 往返）",
                     "`version?: number` —— 默认 `0`，必须是安全非负整数",
                     "`migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>` —— `version` 与存档不一致时的转换函数，不提供则版本不一致直接 hydrate 失败",
@@ -27361,12 +27380,16 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "`clear()` 对 binary 存档使用后端的 `removeBytes(key, ctx)`，只删除该 byte key，不清空 sibling bytes 或 text/record 通道。旧的 text-only 最小适配器仍有效；binary 适配器缺少删除能力时，clear 以 `BACKEND_CAPABILITY` TypeError 拒绝。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`handle.flush()` / `handle.clear()`｜5 秒上手："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await handle.flush(); // 立即写并等待完成；dispose 期间以 AbortError 结束\nawait handle.clear(); // 排队删除存档，不重置内存状态"
+                  "code": "await handle.flush(); // 立即写并等待完成；dispose 期间以 AbortError 结束\nawait handle.clear(); // 排队删除当前 codec 通道的单个存档，不重置内存状态"
                 },
                 {
                   "type": "paragraph",
@@ -27488,7 +27511,7 @@
                       "`{ capabilities, get, set, remove, keys }`",
                       "必填",
                       "无",
-                      "遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+                      "遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
                     ],
                     ["`codec`", "`ICodec`", "可选", "`defaultJsonCodec`", "见 §7"],
                     ["`version`", "`number`", "可选", "`0`", "schema 版本，必须是安全非负整数"],
@@ -27558,7 +27581,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IPersistStorage = Pick<import('@migaia/storage-contract').IKeyValueStore,\n  'capabilities' | 'get' | 'set' | 'remove' | 'keys'> & {\n  readonly getBytes?: import('@migaia/storage-contract').IRecordStore['getBytes'];\n  readonly setBytes?: import('@migaia/storage-contract').IRecordStore['setBytes'];\n};"
+                  "code": "type IPersistStorage = Pick<import('@migaia/storage-contract').IKeyValueStore,\n  'capabilities' | 'get' | 'set' | 'remove' | 'keys'> & {\n  readonly getBytes?: import('@migaia/storage-contract').IRecordStore['getBytes'];\n  readonly setBytes?: import('@migaia/storage-contract').IRecordStore['setBytes'];\n  readonly removeBytes?: import('@migaia/storage-contract').IRecordStore['removeBytes'];\n};"
                 }
               ]
             },
@@ -27755,7 +27778,12 @@
                       "异步",
                       "立即写并等待完成；这次写入失败会 reject 给调用方"
                     ],
-                    ["`clear()`", "`() => Promise<void>`", "异步", "删除存档，不重置内存状态"],
+                    [
+                      "`clear()`",
+                      "`() => Promise<void>`",
+                      "异步",
+                      "按当前 codec 通道删除单个存档，不重置内存状态"
+                    ],
                     ["`disposed`", "`boolean`", "同步", "是否已 `dispose()`"],
                     ["`dispose()`", "`() => void`", "同步", "退订、清防抖 timer、abort 在途 I/O"]
                   ]
@@ -27772,7 +27800,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可： `memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需 `getBytes`/`setBytes`。"
+                  "text": "`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可： `memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需 `getBytes`/`setBytes` 供读写，`removeBytes` 供按 key 清除。"
                 },
                 {
                   "type": "paragraph",
@@ -27791,16 +27819,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "传 binary codec 时，后端必须具备字节通道："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDbHost({ dbName: 'app' }),\n  codec: binaryCodec\n});"
+                  "text": "传 binary codec 时，后端必须具备字节通道，codec 必须编码完整的 `{ version, state }` envelope。例如可将 `defaultJsonCodec` 的字符串编码为 UTF-8 bytes，并在 decode 时反向转换；`clear()` 会按同一 codec 选择 `removeBytes`。`storage-web` 的 `binaryCodec` 直接处理 Uint8Array payload，适合公开 `writeEnvelope`/`readEnvelope` helper 的原始字节操作；用于 `persist*` 时需有完整 envelope 的编码层。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败。不会自动 base64 降级。"
+                  "text": "本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 读写在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败；binary clear 缺 `removeBytes` 时同样拒绝，不回落到 text 删除。不会自动 base64 降级。"
                 }
               ]
             },
@@ -27829,7 +27852,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -27877,7 +27900,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -27940,14 +27963,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -32326,7 +32349,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -32517,12 +32540,6 @@
                       "`byteLen: number`",
                       "同步",
                       "同步分配一块内存并返回 `IWasmAllocation`（`memory`/`id`/`ptr`/`register`/`unregister`/`dispose`），供字段构造器在自己的 `create()` 里使用"
-                    ],
-                    [
-                      "`allocate(byteLen)`",
-                      "`byteLen: number`",
-                      "异步",
-                      "异步分配：内部先 `await ensureWasm()` 再分配，适合在 WASM 尚未就绪时也能发起分配请求的场景"
                     ],
                     [
                       "`allocateSync(byteLen)`",

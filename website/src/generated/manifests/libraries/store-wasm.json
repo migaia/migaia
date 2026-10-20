@@ -686,7 +686,7 @@
                 "headers": ["触发条件", "错误类型", "信息"],
                 "rows": [
                   [
-                    "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                    "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                     "`RangeError`",
                     "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                   ],
@@ -874,12 +874,6 @@
                     "`byteLen: number`",
                     "同步",
                     "同步分配一块内存并返回 `IWasmAllocation`（`memory`/`id`/`ptr`/`register`/`unregister`/`dispose`），供字段构造器在自己的 `create()` 里使用"
-                  ],
-                  [
-                    "`allocate(byteLen)`",
-                    "`byteLen: number`",
-                    "异步",
-                    "异步分配：内部先 `await ensureWasm()` 再分配，适合在 WASM 尚未就绪时也能发起分配请求的场景"
                   ],
                   [
                     "`allocateSync(byteLen)`",
@@ -1110,7 +1104,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -1278,7 +1272,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -2445,7 +2439,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -2620,7 +2614,7 @@
               ]
             }
           ],
-          "usageScore": 164,
+          "usageScore": 160,
           "configuration": [],
           "fragment": "store-wasm-index--ensureWasm"
         },
@@ -3065,7 +3059,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -3154,7 +3148,7 @@
               ]
             }
           ],
-          "usageScore": 336,
+          "usageScore": 332,
           "configuration": [],
           "fragment": "store-wasm-index--number"
         },
@@ -3269,7 +3263,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -4100,7 +4094,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],

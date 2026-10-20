@@ -106,7 +106,7 @@
                 "type": "list",
                 "items": [
                   "`key: string`（必填）—— 存档在 storage 里的键",
-                  "`storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 另需 `getBytes`/`setBytes`",
+                  "`storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 读写另需 `getBytes`/`setBytes`，清除另需 canonical `removeBytes`",
                   "`codec?: ICodec` —— 默认 `defaultJsonCodec`（原生支持 Map/Set 往返）",
                   "`version?: number` —— 默认 `0`，必须是安全非负整数",
                   "`migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>` —— `version` 与存档不一致时的转换函数，不提供则版本不一致直接 hydrate 失败",
@@ -229,12 +229,16 @@
               },
               {
                 "type": "paragraph",
+                "text": "`clear()` 对 binary 存档使用后端的 `removeBytes(key, ctx)`，只删除该 byte key，不清空 sibling bytes 或 text/record 通道。旧的 text-only 最小适配器仍有效；binary 适配器缺少删除能力时，clear 以 `BACKEND_CAPABILITY` TypeError 拒绝。"
+              },
+              {
+                "type": "paragraph",
                 "text": "`handle.flush()` / `handle.clear()`｜5 秒上手："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "await handle.flush(); // 立即写并等待完成；dispose 期间以 AbortError 结束\nawait handle.clear(); // 排队删除存档，不重置内存状态"
+                "code": "await handle.flush(); // 立即写并等待完成；dispose 期间以 AbortError 结束\nawait handle.clear(); // 排队删除当前 codec 通道的单个存档，不重置内存状态"
               },
               {
                 "type": "paragraph",
@@ -356,7 +360,7 @@
                     "`{ capabilities, get, set, remove, keys }`",
                     "必填",
                     "无",
-                    "遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+                    "遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
                   ],
                   ["`codec`", "`ICodec`", "可选", "`defaultJsonCodec`", "见 §7"],
                   ["`version`", "`number`", "可选", "`0`", "schema 版本，必须是安全非负整数"],
@@ -426,7 +430,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IPersistStorage = Pick<import('@migaia/storage-contract').IKeyValueStore,\n  'capabilities' | 'get' | 'set' | 'remove' | 'keys'> & {\n  readonly getBytes?: import('@migaia/storage-contract').IRecordStore['getBytes'];\n  readonly setBytes?: import('@migaia/storage-contract').IRecordStore['setBytes'];\n};"
+                "code": "type IPersistStorage = Pick<import('@migaia/storage-contract').IKeyValueStore,\n  'capabilities' | 'get' | 'set' | 'remove' | 'keys'> & {\n  readonly getBytes?: import('@migaia/storage-contract').IRecordStore['getBytes'];\n  readonly setBytes?: import('@migaia/storage-contract').IRecordStore['setBytes'];\n  readonly removeBytes?: import('@migaia/storage-contract').IRecordStore['removeBytes'];\n};"
               }
             ]
           },
@@ -623,7 +627,12 @@
                     "异步",
                     "立即写并等待完成；这次写入失败会 reject 给调用方"
                   ],
-                  ["`clear()`", "`() => Promise<void>`", "异步", "删除存档，不重置内存状态"],
+                  [
+                    "`clear()`",
+                    "`() => Promise<void>`",
+                    "异步",
+                    "按当前 codec 通道删除单个存档，不重置内存状态"
+                  ],
                   ["`disposed`", "`boolean`", "同步", "是否已 `dispose()`"],
                   ["`dispose()`", "`() => void`", "同步", "退订、清防抖 timer、abort 在途 I/O"]
                 ]
@@ -640,7 +649,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可： `memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需 `getBytes`/`setBytes`。"
+                "text": "`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可： `memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需 `getBytes`/`setBytes` 供读写，`removeBytes` 供按 key 清除。"
               },
               {
                 "type": "paragraph",
@@ -659,16 +668,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "传 binary codec 时，后端必须具备字节通道："
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDbHost({ dbName: 'app' }),\n  codec: binaryCodec\n});"
+                "text": "传 binary codec 时，后端必须具备字节通道，codec 必须编码完整的 `{ version, state }` envelope。例如可将 `defaultJsonCodec` 的字符串编码为 UTF-8 bytes，并在 decode 时反向转换；`clear()` 会按同一 codec 选择 `removeBytes`。`storage-web` 的 `binaryCodec` 直接处理 Uint8Array payload，适合公开 `writeEnvelope`/`readEnvelope` helper 的原始字节操作；用于 `persist*` 时需有完整 envelope 的编码层。"
               },
               {
                 "type": "paragraph",
-                "text": "本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败。不会自动 base64 降级。"
+                "text": "本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 读写在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败；binary clear 缺 `removeBytes` 时同样拒绝，不回落到 text 删除。不会自动 base64 降级。"
               }
             ]
           },
@@ -697,7 +701,7 @@
                   [
                     "`backendCapability`",
                     "`BACKEND_CAPABILITY`",
-                    "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                    "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                   ],
                   [
                     "`envelopeInvalid`",
@@ -745,7 +749,7 @@
                   ],
                   ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                   [
-                    "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                    "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                     "`TypeError`",
                     "同上"
                   ],
@@ -808,14 +812,14 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
               },
               {
                 "type": "list",
                 "items": [
                   "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                   "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                  "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                  "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                 ]
               },
               {
@@ -1030,14 +1034,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -1197,14 +1201,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -1364,14 +1368,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -1538,14 +1542,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -1721,14 +1725,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -1781,7 +1785,8 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
-            "const defaultJsonCodec: ICodec; // { name: 'migaia-collections-json-v1', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }"
+            "const defaultJsonCodec: ICodec; // { name: 'migaia-collections-json-v1', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }",
+            "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
           ],
           "members": [],
           "composes": ["ICodec"],
@@ -1852,7 +1857,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -1900,7 +1905,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -1952,14 +1957,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -1983,7 +1988,7 @@
               ]
             }
           ],
-          "usageScore": 36,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "store-persist-index--defaultJsonCodec"
         },
@@ -2104,14 +2109,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -2234,14 +2239,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -2272,7 +2277,7 @@
         {
           "name": "IPersistHandle",
           "kind": "type",
-          "signature": "export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
+          "signature": "export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** * Removes the codec's archive channel without resetting live state; disposal rejects with * `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
           "declarationLine": 26,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "Caller-owned hydration and serialized-write lifecycle from persistUnit or an adapter; it does not dispose the source state or injected backend.",
@@ -2394,7 +2399,7 @@
               "kind": "method",
               "optional": false,
               "signature": "clear(): Promise<void>;",
-              "description": "Queues archive removal. Disposal during the wait ends it with `AbortError`.",
+              "description": "Removes the codec's archive channel without resetting live state; disposal rejects with `AbortError`.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             },
@@ -2421,7 +2426,7 @@
           "aliasOf": "IPersistHandle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };"
+            "export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** * Removes the codec's archive channel without resetting live state; disposal rejects with * `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2460,7 +2465,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistHandle:export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
+          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistHandle:export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** * Removes the codec's archive channel without resetting live state; disposal rejects with * `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -2496,14 +2501,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -2691,14 +2696,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -2863,14 +2868,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -2902,7 +2907,7 @@
           "name": "IPersistUnitOptions",
           "kind": "type",
           "signature": "export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; /** Quiet interval before enqueueing a write; zero writes without debounce. */ debounceMs?: number; /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */ maxWaitMs?: number; /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */ scheduler?: IScheduler; };",
-          "declarationLine": 50,
+          "declarationLine": 53,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "Complete generic engine configuration, including caller-owned runtime, backend and synchronous state transformation callbacks.",
           "core": "key: Archive key selected by the application and reused for reading, writing and removal.\nruntime: Owning IRuntime from the source Store, collection or AtomStore; persistence status signals are created in that graph.\nstorage: Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.\ncodec: ICodec from storage-contract encoding the complete version/state envelope. Text and binary routes are supported; structured writes reject.\ndefaultJsonCodec with Map/Set round trips and legacy-tag reading.\nversion: Application schema version, a safe nonnegative integer compared with each saved envelope version.\n0; an unequal saved version requires migrate.\nmigrate: Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.\nmigrate.persisted: Decoded archive state before merging into current memory.\nmigrate.fromVersion: Schema version read from the stored envelope.\nSynchronous state compatible with the configured version.\nOmitted: version mismatch fails hydration with ENVELOPE_INVALID.\npartialize: Synchronous callback before each write, receiving the latest unit snapshot and selecting its persisted portion. Throws and thenables become write failures.\npartialize.state: Latest synchronous source snapshot taken when the write executes.\nSynchronous complete or partial state placed inside the envelope.\nIdentity: persist the complete snapshot.\nmerge: Synchronous hydration callback receiving persisted partial state and the latest current state; return the complete state to restore. Throws or thenables fail hydration.\nmerge.persisted: Decoded and optionally migrated partial archive state.\nmerge.current: Current source snapshot immediately before restoration.\nSynchronous complete source state for restore.\nPlain objects retain current fields changed since the original startup snapshot and accept persisted values for unchanged fields. Arrays, Map, Set and other shapes replace completely.\ndebounceMs: Quiet interval before requesting a serialized write; finite milliseconds in [0, 2147483647]. It does not bound storage latency.\n0: enqueue a write without a debounce timer.\nmaxWaitMs: Maximum debounce window from the first post-hydration change; finite milliseconds in [0, 2147483647]. Relevant only when debounceMs is positive.\nOmitted: only the quiet interval controls enqueueing.\nscheduler: Caller-selected IScheduler from @migaia/utils/scheduler; its monotonic now and cancellable schedule own the debounce window.\nCanonical systemScheduler resolved through lifecycle scheduler admission.",
@@ -3142,7 +3147,7 @@
           "name": "IStorePersistErrorCode",
           "kind": "type",
           "signature": "export type IStorePersistErrorCode = (typeof StorePersistErrorCode)[keyof typeof StorePersistErrorCode];",
-          "declarationLine": 67,
+          "declarationLine": 68,
           "source": "packages/store-persist/dist/error-code.d.ts",
           "purpose": "All stable StorePersistErrorCode values for typed error handling.",
           "core": "All stable StorePersistErrorCode values for typed error handling.",
@@ -3233,14 +3238,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -3363,14 +3368,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -3524,14 +3529,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -3676,7 +3681,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -3724,7 +3729,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -3776,14 +3781,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -3982,14 +3987,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -4203,14 +4208,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -4256,9 +4261,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -4471,14 +4476,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -4502,23 +4507,24 @@
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 22,
           "configuration": [],
           "fragment": "store-persist-index--readEnvelope"
         },
         {
           "name": "removeEnvelope",
           "kind": "function",
-          "signature": "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;",
-          "declarationLine": 16,
+          "signature": "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }, codec?: ICodec): Promise<void>;",
+          "declarationLine": 21,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
-          "purpose": "Forwards removal of exactly one archive key to the injected backend, without touching source memory or decoding the current value.",
-          "core": "storage: Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; optional signal comes from the caller AbortController and is forwarded to the codec and storage operation.\nPromise resolving after backend removal; backend failure rejects unchanged.",
+          "purpose": "Removes exactly one archive through the codec-selected backend channel without decoding its value or changing source memory. A binary codec with a binary-capable backend uses removeBytes; all other calls retain text removal, including existing three-argument calls.",
+          "core": "storage: Caller-injected storage-contract projection. Text removal uses remove; a binary codec with binary capability additionally requires removeBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; its optional caller-owned signal is forwarded to the selected backend removal.\ncodec: Optional fourth argument, defaulting to defaultJsonCodec. Pass the same storage-contract ICodec selected for writeEnvelope and readEnvelope to remove a binary archive from its byte channel.\nPromise resolving after the selected backend removal. When a binary codec is selected, a binary-capable backend missing removeBytes rejects with a BACKEND_CAPABILITY TypeError; backend failures reject unchanged.",
           "advanced": "",
           "parameters": [
             "storage: IPersistStorage",
             "key: string",
-            "ctx: { signal?: IAbortSignal; }"
+            "ctx: { signal?: IAbortSignal; }",
+            "codec: ICodec (optional)"
           ],
           "parameterDetails": [
             {
@@ -4535,6 +4541,11 @@
               "name": "ctx",
               "type": "{ signal?: IAbortSignal; }",
               "optional": false
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true
             }
           ],
           "returns": "Promise<void>",
@@ -4546,7 +4557,7 @@
           "aliasOf": "removeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;"
+            "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }, codec?: ICodec): Promise<void>;"
           ],
           "overloadParameterDetails": [
             [
@@ -4564,6 +4575,11 @@
                 "name": "ctx",
                 "type": "{ signal?: IAbortSignal; }",
                 "optional": false
+              },
+              {
+                "name": "codec",
+                "type": "ICodec",
+                "optional": true
               }
             ]
           ],
@@ -4574,7 +4590,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Forwards removal of exactly one archive key to the injected backend, without touching source memory or decoding the current value."
+              "content": "Removes exactly one archive through the codec-selected backend channel without decoding its value or changing source memory. A binary codec with a binary-capable backend uses removeBytes; all other calls retain text removal, including existing three-argument calls."
             },
             {
               "id": "getting-started",
@@ -4594,7 +4610,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "storage: Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; optional signal comes from the caller AbortController and is forwarded to the codec and storage operation.\nPromise resolving after backend removal; backend failure rejects unchanged."
+              "content": "storage: Caller-injected storage-contract projection. Text removal uses remove; a binary codec with binary capability additionally requires removeBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; its optional caller-owned signal is forwarded to the selected backend removal.\ncodec: Optional fourth argument, defaulting to defaultJsonCodec. Pass the same storage-contract ICodec selected for writeEnvelope and readEnvelope to remove a binary archive from its byte channel.\nPromise resolving after the selected backend removal. When a binary codec is selected, a binary-capable backend missing removeBytes rejects with a BACKEND_CAPABILITY TypeError; backend failures reject unchanged."
             },
             {
               "id": "advanced-usage",
@@ -4603,7 +4619,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/storage/codec.d.ts:removeEnvelope:export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;",
+          "identity": "packages/store-persist/dist/storage/codec.d.ts:removeEnvelope:export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }, codec?: ICodec): Promise<void>;",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -4639,14 +4655,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -4771,14 +4787,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -4809,7 +4825,7 @@
         {
           "name": "StorePersistErrorCode",
           "kind": "const",
-          "signature": "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "signature": "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "declarationLine": 10,
           "source": "packages/store-persist/dist/error-code.d.ts",
           "purpose": "Stable persistence failure codes covering configuration, envelope, codec, backend and disposal cancellation failures.",
@@ -4845,7 +4861,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly backendCapability: 'BACKEND_CAPABILITY';",
-              "description": "A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec.",
+              "description": "A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec.",
               "parameterDetails": [],
               "returns": "'BACKEND_CAPABILITY'"
             },
@@ -4899,7 +4915,7 @@
           "aliasOf": "StorePersistErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };"
+            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4938,7 +4954,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "8-错误参考",
@@ -4965,7 +4981,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -5013,7 +5029,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -5065,14 +5081,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -5255,14 +5271,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -5286,7 +5302,7 @@
               ]
             }
           ],
-          "usageScore": 22,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "store-persist-index--writeEnvelope"
         }
@@ -5599,7 +5615,6 @@
           "examples": [
             "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\nimport { persistCollection } from '@migaia/store-persist/indexed';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, {\n  key: 'cart:v1',\n  storage: localStorageHost()\n});\n\ncart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）",
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IPersistStorage, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\n// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加首次水合前捕获的 value 快照（不是实时 AtomStore 值）\ntype IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };",
-            "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDbHost({ dbName: 'app' }),\n  codec: binaryCodec\n});",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
             "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorageHost() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
@@ -5758,14 +5773,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -5789,7 +5804,7 @@
               ]
             }
           ],
-          "usageScore": 132,
+          "usageScore": 126,
           "configuration": [
             {
               "name": "key",
@@ -5803,9 +5818,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -6118,7 +6133,7 @@
               "kind": "method",
               "optional": false,
               "signature": "clear(): Promise<void>;",
-              "description": "Queues archive removal. Disposal during the wait ends it with `AbortError`.",
+              "description": "Removes the codec's archive channel without resetting live state; disposal rejects with `AbortError`.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             },
@@ -6534,7 +6549,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -6582,7 +6597,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -6634,14 +6649,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -6665,7 +6680,7 @@
               ]
             }
           ],
-          "usageScore": 128,
+          "usageScore": 132,
           "configuration": [
             {
               "name": "namespace",
@@ -6679,9 +6694,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -7208,7 +7223,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -7256,7 +7271,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -7308,14 +7323,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -7339,7 +7354,7 @@
               ]
             }
           ],
-          "usageScore": 288,
+          "usageScore": 296,
           "configuration": [
             {
               "name": "key",
@@ -7353,9 +7368,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",

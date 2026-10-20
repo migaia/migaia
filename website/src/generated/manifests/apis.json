@@ -166890,7 +166890,7 @@
           "name": "asRecordStore",
           "kind": "const",
           "signature": "export declare const asRecordStore: <T = unknown>(\n  store: IKeyValueStore,\n) => IRecordStore<T>;",
-          "declarationLine": 103,
+          "declarationLine": 108,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks a supplied L0 store for the full record, binary, transaction and iteration surface. Returns the original object after capability narrowing, and fails explicitly instead of constructing a backend or silently falling back.",
           "core": "store: Existing application-supplied `IKeyValueStore`, obtained from a concrete backend package.\nThe exact store as `IRecordStore<T>`; insufficient shape or capabilities throws `UNSUPPORTED_CAPABILITY`. An original reflection or accessor failure remains reachable through `cause`.",
@@ -167018,7 +167018,7 @@
               ]
             }
           ],
-          "usageScore": 82,
+          "usageScore": 86,
           "configuration": [],
           "fragment": "storage-contract-index--asRecordStore"
         },
@@ -168925,7 +168925,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';",
             "const range: IKeyRange = { lower: 'a', upper: 'z', upperOpen: true };"
@@ -169158,7 +169158,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "function isKeyValueStore(store: unknown): store is IKeyValueStore;",
             "function isRecordStore(store: IKeyValueStore): store is IRecordStore;",
             "function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;",
@@ -169392,7 +169392,7 @@
           "name": "IKeyValueStoreAdmission",
           "kind": "type",
           "signature": "export type IKeyValueStoreAdmission =\n  | {\n      readonly valid: true;\n      readonly store: IKeyValueStore;\n      readonly backend: IBackendKind;\n      readonly capabilities: IStorageCapabilities;\n      readonly dispose: () => Promise<void>;\n      readonly receiver: object;\n    }\n  | { readonly valid: false; readonly cause: unknown };",
-          "declarationLine": 70,
+          "declarationLine": 75,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Discriminated single-read store admission returned by `snapshotKeyValueStoreDetailed()`, retaining either source facts or the exact failure.",
           "core": "valid: Admission discriminant: true carries the captured store facts, false carries the original observed failure.\nThe inspected base store shape and capabilities were accepted.\nThe candidate shape failed admission without invoking storage operations.\nstore: Exact original backend object supplied to admission; no method facade or store clone is created.\nbackend: Implementation family declared by the backend; use capabilities rather than this label to choose optional operations.\nLocal browser key-value storage whose data normally survives browsing sessions.\nSession-scoped browser key-value storage with the host’s session lifetime.\nCookie storage subject to document visibility, scope and small value limits.\nStructured browser database backend; inspect capability flags before using record extensions.\nIn-process memory implementation whose data lifetime is owned by the concrete backend.\ncapabilities: Backend-supplied `IStorageCapabilities` describing callable channels and their limits; admission snapshots these facts once.\ndispose: Raw dispose function captured from the candidate exactly once; invoke it with the separately retained receiver.\nBackend-owned cleanup promise; the original receiver must remain attached at invocation.\nreceiver: Exact candidate object retained to invoke the captured disposer with its original receiver semantics.\ncause: Exact observed reflection or getter failure for invalid admission, or undefined when rejection was a plain shape mismatch.",
@@ -169611,7 +169611,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "function snapshotOperationContext(\n  ctx: IOperationContext | undefined\n): IOperationContextSnapshot | undefined;",
             "function assertOperationContext(ctx: IOperationContext | undefined): void;",
@@ -169819,7 +169819,7 @@
               ]
             }
           ],
-          "usageScore": 182,
+          "usageScore": 188,
           "configuration": [],
           "fragment": "storage-contract-index--IOperationContext"
         },
@@ -170595,7 +170595,7 @@
         {
           "name": "IRecordStore",
           "kind": "type",
-          "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(\n    value: TValue,\n    key?: IStorageKey,\n    ctx?: IWriteOptions,\n  ): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext,\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext,\n  ): Promise<T>;\n};",
+          "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(\n    key: string,\n    ctx?: IOperationContext,\n  ): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(\n    value: TValue,\n    key?: IStorageKey,\n    ctx?: IWriteOptions,\n  ): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext,\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext,\n  ): Promise<T>;\n};",
           "declarationLine": 44,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Base store plus independent byte and structured-record channels, bounded iteration and backend-owned transactional callbacks.",
@@ -170607,7 +170607,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "function isRecordStore(store: IKeyValueStore): store is IRecordStore;",
             "function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;",
             "import {\n  isKeyValueStore,\n  asRecordStore,\n  isRecordStore,\n  type IKeyValueStore,\n  type ISyncKeyValueStore,\n  type IRecordStore,\n  type ISyncCapableStore\n} from '@migaia/storage-contract';",
@@ -170654,6 +170654,26 @@
                 {
                   "name": "ctx",
                   "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "removeBytes",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeBytes(key: string, ctx?: IOperationContext): Promise<void>;",
+              "description": "Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed without mutation; asynchronous backends resolve only after the deletion commits.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
                   "optional": true
                 }
               ],
@@ -170823,7 +170843,7 @@
           "aliasOf": "IRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
+            "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -170862,9 +170882,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
           "guidance": [],
-          "usageScore": 56,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "storage-contract-index--IRecordStore"
         },
@@ -171249,7 +171269,7 @@
           "name": "isKeyValueStore",
           "kind": "const",
           "signature": "export declare const isKeyValueStore: (store: unknown) => store is IKeyValueStore;",
-          "declarationLine": 98,
+          "declarationLine": 103,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks an unknown object’s backend name, capability descriptor and every L0 callable method without invoking a storage operation. Accessor failures become an invalid result rather than escaping the predicate.",
           "core": "store: Unknown candidate from application injection or an extension boundary.\nTrue when the inspected shape is a valid `IKeyValueStore`, otherwise false; this is shape admission, not behavioral verification.",
@@ -171318,7 +171338,7 @@
           "name": "isRecordStore",
           "kind": "const",
           "signature": "export declare const isRecordStore: (store: IKeyValueStore) => store is IRecordStore;",
-          "declarationLine": 104,
+          "declarationLine": 109,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Checks the complete record-store method set and required record, binary, transaction and iteration flags. Missing capability or a throwing accessor returns false without performing storage I/O.",
           "core": "store: Existing `IKeyValueStore` from the caller’s concrete backend.\nA boolean type guard narrowing to `IRecordStore` on success.",
@@ -171442,7 +171462,7 @@
               ]
             }
           ],
-          "usageScore": 50,
+          "usageScore": 54,
           "configuration": [],
           "fragment": "storage-contract-index--isRecordStore"
         },
@@ -172385,7 +172405,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "function assertStorageKey(\n  value: unknown,\n  backend: IBackendKind,\n  label?: string\n): asserts value is IStorageKey;",
             "function snapshotStorageKey(value: unknown, backend: IBackendKind, label?: string): IStorageKey;",
@@ -173138,7 +173158,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\ntype ITransactionScope<TValue = unknown> = {\n  get(key: IStorageKey): Promise<TValue | undefined>;\n  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;\n  delete(key: IStorageKey): Promise<void>;\n};",
             "import {\n  assertTransactionCallback,\n  readTransactionConflictPolicy,\n  type ITransactionScope,\n  type ITransactionWriteOptions\n} from '@migaia/storage-contract';",
             "await store.transaction(async (tx: ITransactionScope<MyRecord>) => {\n  const current = await tx.get('k');\n  await tx.put({ ...current, count: (current?.count ?? 0) + 1 }, 'k');\n});",
@@ -173344,7 +173364,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
+            "type IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;\n  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;\n  clearBytes(ctx?: IOperationContext): Promise<void>;\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;\n  clearRecords(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;\n    delete(key: string, ctx?: IOperationContext): Promise<void>;\n  };\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>;\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>;\n};",
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
@@ -173770,7 +173790,7 @@
           "name": "snapshotKeyValueStore",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStore: (\n  store: unknown,\n) =>\n  | {\n      readonly store: IKeyValueStore;\n      readonly backend: IBackendKind;\n      readonly capabilities: IStorageCapabilities;\n    }\n  | undefined;",
-          "declarationLine": 86,
+          "declarationLine": 91,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Reads the L0 boundary once and returns the original store with captured backend and normalized capabilities. The returned wrapper is ordinary data, while store behavior remains owned by the original object.",
           "core": "store: Unknown candidate supplied by the application’s backend factory or plugin.\n`{ store, backend, capabilities }` on valid admission, otherwise undefined; captured capabilities are a fresh plain snapshot.",
@@ -173835,7 +173855,7 @@
           "name": "snapshotKeyValueStoreDetailed",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStoreDetailed: (\n  store: unknown,\n) => IKeyValueStoreAdmission;",
-          "declarationLine": 84,
+          "declarationLine": 89,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Performs one L0 admission while retaining the exact reflection or accessor failure for its owning boundary. A valid result also captures the raw disposer and its original receiver so later cleanup need not reread mutable accessors.",
           "core": "store: Unknown application-injected store candidate whose public fields are inspected once.\nAn `IKeyValueStoreAdmission`; invalid plain shapes carry undefined cause, while observed reflection or getter failures retain their exact thrown value.",
@@ -174096,7 +174116,7 @@
           "name": "snapshotRecordStore",
           "kind": "const",
           "signature": "export declare const snapshotRecordStore: <T = unknown>(\n  store: unknown,\n) =>\n  | {\n      readonly store: IRecordStore<T>;\n      readonly backend: IBackendKind;\n      readonly capabilities: IStorageCapabilities;\n    }\n  | undefined;",
-          "declarationLine": 92,
+          "declarationLine": 97,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Captures the complete L1 shape and required capabilities once, returning the original record store and normalized facts. It neither clones records nor wraps backend methods.",
           "core": "store: Unknown existing store supplied by the caller; the record capability set must be complete.\n`{ store: IRecordStore<T>, backend, capabilities }` or undefined on missing shape, capability or failed access.",
@@ -185134,7 +185154,7 @@
         {
           "name": "memoryBackendPlugin",
           "kind": "const",
-          "signature": "export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(\n  options?: IBuiltInPluginId<TId>,\n) => import('../host.js').IStorageBackendPlugin<\n  import('@migaia/storage-contract').IKeyValueStore & {\n    getBytes(\n      key: string,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<Uint8Array | null>;\n    setBytes(\n      key: string,\n      value: Uint8Array,\n      ctx?: import('@migaia/storage-contract').IWriteOptions,\n    ): Promise<void>;\n    clearBytes(\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    getRecord(\n      key: import('@migaia/storage-contract').IStorageKey,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<unknown>;\n    putRecord(\n      value: unknown,\n      key?: import('@migaia/storage-contract').IStorageKey,\n      ctx?: import('@migaia/storage-contract').IWriteOptions,\n    ): Promise<import('@migaia/storage-contract').IStorageKey>;\n    deleteRecord(\n      key: import('@migaia/storage-contract').IStorageKey,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    clearRecords(\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    clearAll(ctx?: import('@migaia/storage-contract').IOperationContext): Promise<void>;\n    readonly metadata?: {\n      get(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<unknown | undefined>;\n      set(\n        key: string,\n        value: unknown,\n        ctx?: import('@migaia/storage-contract').IWriteOptions,\n      ): Promise<void>;\n      delete(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n    };\n    iterateRecords(\n      range?: import('@migaia/storage-contract').IKeyRange,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): AsyncIterableIterator<[import('@migaia/storage-contract').IStorageKey, unknown]>;\n    transaction<T>(\n      run: (\n        tx: import('@migaia/storage-contract').ITransactionScope<unknown>,\n      ) => Promise<T>,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<T>;\n  } & { readonly sync: import('@migaia/storage-contract').ISyncKeyValueStore } & {\n    subscribeChanges(\n      listener: (change: import('@migaia/storage-contract').IStorageChange) => void,\n    ): () => void;\n  },\n  import('../host.js').IStorageBackendKind<\n    'memory',\n    import('@migaia/storage-contract').IKeyValueStore & {\n      getBytes(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<Uint8Array | null>;\n      setBytes(\n        key: string,\n        value: Uint8Array,\n        ctx?: import('@migaia/storage-contract').IWriteOptions,\n      ): Promise<void>;\n      clearBytes(\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      getRecord(\n        key: import('@migaia/storage-contract').IStorageKey,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<unknown>;\n      putRecord(\n        value: unknown,\n        key?: import('@migaia/storage-contract').IStorageKey,\n        ctx?: import('@migaia/storage-contract').IWriteOptions,\n      ): Promise<import('@migaia/storage-contract').IStorageKey>;\n      deleteRecord(\n        key: import('@migaia/storage-contract').IStorageKey,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      clearRecords(\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      clearAll(\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      readonly metadata?: {\n        get(\n          key: string,\n          ctx?: import('@migaia/storage-contract').IOperationContext,\n        ): Promise<unknown | undefined>;\n        set(\n          key: string,\n          value: unknown,\n          ctx?: import('@migaia/storage-contract').IWriteOptions,\n        ): Promise<void>;\n        delete(\n          key: string,\n          ctx?: import('@migaia/storage-contract').IOperationContext,\n        ): Promise<void>;\n      };\n      iterateRecords(\n        range?: import('@migaia/storage-contract').IKeyRange,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): AsyncIterableIterator<\n        [import('@migaia/storage-contract').IStorageKey, unknown]\n      >;\n      transaction<T>(\n        run: (\n          tx: import('@migaia/storage-contract').ITransactionScope<unknown>,\n        ) => Promise<T>,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<T>;\n    } & { readonly sync: import('@migaia/storage-contract').ISyncKeyValueStore } & {\n      subscribeChanges(\n        listener: (change: import('@migaia/storage-contract').IStorageChange) => void,\n      ): () => void;\n    }\n  >,\n  TId,\n  false\n>;",
+          "signature": "export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(\n  options?: IBuiltInPluginId<TId>,\n) => import('../host.js').IStorageBackendPlugin<\n  import('@migaia/storage-contract').IKeyValueStore & {\n    getBytes(\n      key: string,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<Uint8Array | null>;\n    setBytes(\n      key: string,\n      value: Uint8Array,\n      ctx?: import('@migaia/storage-contract').IWriteOptions,\n    ): Promise<void>;\n    removeBytes(\n      key: string,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    clearBytes(\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    getRecord(\n      key: import('@migaia/storage-contract').IStorageKey,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<unknown>;\n    putRecord(\n      value: unknown,\n      key?: import('@migaia/storage-contract').IStorageKey,\n      ctx?: import('@migaia/storage-contract').IWriteOptions,\n    ): Promise<import('@migaia/storage-contract').IStorageKey>;\n    deleteRecord(\n      key: import('@migaia/storage-contract').IStorageKey,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    clearRecords(\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<void>;\n    clearAll(ctx?: import('@migaia/storage-contract').IOperationContext): Promise<void>;\n    readonly metadata?: {\n      get(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<unknown | undefined>;\n      set(\n        key: string,\n        value: unknown,\n        ctx?: import('@migaia/storage-contract').IWriteOptions,\n      ): Promise<void>;\n      delete(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n    };\n    iterateRecords(\n      range?: import('@migaia/storage-contract').IKeyRange,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): AsyncIterableIterator<[import('@migaia/storage-contract').IStorageKey, unknown]>;\n    transaction<T>(\n      run: (\n        tx: import('@migaia/storage-contract').ITransactionScope<unknown>,\n      ) => Promise<T>,\n      ctx?: import('@migaia/storage-contract').IOperationContext,\n    ): Promise<T>;\n  } & { readonly sync: import('@migaia/storage-contract').ISyncKeyValueStore } & {\n    subscribeChanges(\n      listener: (change: import('@migaia/storage-contract').IStorageChange) => void,\n    ): () => void;\n  },\n  import('../host.js').IStorageBackendKind<\n    'memory',\n    import('@migaia/storage-contract').IKeyValueStore & {\n      getBytes(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<Uint8Array | null>;\n      setBytes(\n        key: string,\n        value: Uint8Array,\n        ctx?: import('@migaia/storage-contract').IWriteOptions,\n      ): Promise<void>;\n      removeBytes(\n        key: string,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      clearBytes(\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      getRecord(\n        key: import('@migaia/storage-contract').IStorageKey,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<unknown>;\n      putRecord(\n        value: unknown,\n        key?: import('@migaia/storage-contract').IStorageKey,\n        ctx?: import('@migaia/storage-contract').IWriteOptions,\n      ): Promise<import('@migaia/storage-contract').IStorageKey>;\n      deleteRecord(\n        key: import('@migaia/storage-contract').IStorageKey,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      clearRecords(\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      clearAll(\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<void>;\n      readonly metadata?: {\n        get(\n          key: string,\n          ctx?: import('@migaia/storage-contract').IOperationContext,\n        ): Promise<unknown | undefined>;\n        set(\n          key: string,\n          value: unknown,\n          ctx?: import('@migaia/storage-contract').IWriteOptions,\n        ): Promise<void>;\n        delete(\n          key: string,\n          ctx?: import('@migaia/storage-contract').IOperationContext,\n        ): Promise<void>;\n      };\n      iterateRecords(\n        range?: import('@migaia/storage-contract').IKeyRange,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): AsyncIterableIterator<\n        [import('@migaia/storage-contract').IStorageKey, unknown]\n      >;\n      transaction<T>(\n        run: (\n          tx: import('@migaia/storage-contract').ITransactionScope<unknown>,\n        ) => Promise<T>,\n        ctx?: import('@migaia/storage-contract').IOperationContext,\n      ): Promise<T>;\n    } & { readonly sync: import('@migaia/storage-contract').ISyncKeyValueStore } & {\n      subscribeChanges(\n        listener: (change: import('@migaia/storage-contract').IStorageChange) => void,\n      ): () => void;\n    }\n  >,\n  TId,\n  false\n>;",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/plugins/memory.d.ts",
           "purpose": "Plugin that installs an in-memory record store into a storage host under an id (default `memory`); no reactive capability.",
@@ -185154,7 +185174,7 @@
           "composes": [],
           "exportPath": "./plugins/memory",
           "overloadSignatures": [
-            "export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;"
+            "export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; removeBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; removeBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -185200,7 +185220,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-web/dist/plugins/memory.d.ts:memoryBackendPlugin:export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
+          "identity": "packages/storage-web/dist/plugins/memory.d.ts:memoryBackendPlugin:export declare const memoryBackendPlugin: <const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>) => import(\"../host.js\").IStorageBackendPlugin<import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; removeBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }, import(\"../host.js\").IStorageBackendKind<\"memory\", import(\"@migaia/storage-contract\").IKeyValueStore & { getBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; removeBytes(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearBytes(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; getRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown>; putRecord(value: unknown, key?: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<import(\"@migaia/storage-contract\").IStorageKey>; deleteRecord(key: import(\"@migaia/storage-contract\").IStorageKey, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearRecords(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; clearAll(ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; readonly metadata?: { get(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: import(\"@migaia/storage-contract\").IWriteOptions): Promise<void>; delete(key: string, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<void>; }; iterateRecords(range?: import(\"@migaia/storage-contract\").IKeyRange, ctx?: import(\"@migaia/storage-contract\").IOperationContext): AsyncIterableIterator<[import(\"@migaia/storage-contract\").IStorageKey, unknown]>; transaction<T>(run: (tx: import(\"@migaia/storage-contract\").ITransactionScope<unknown>) => Promise<T>, ctx?: import(\"@migaia/storage-contract\").IOperationContext): Promise<T>; } & { readonly sync: import(\"@migaia/storage-contract\").ISyncKeyValueStore; } & { subscribeChanges(listener: (change: import(\"@migaia/storage-contract\").IStorageChange) => void): () => void; }>, TId, false>;",
           "guidance": [],
           "usageScore": 52,
           "configuration": [
@@ -213199,14 +213219,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -213366,14 +213386,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -213533,14 +213553,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -213707,14 +213727,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -213890,14 +213910,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -213950,7 +213970,8 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
-            "const defaultJsonCodec: ICodec; // { name: 'migaia-collections-json-v1', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }"
+            "const defaultJsonCodec: ICodec; // { name: 'migaia-collections-json-v1', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }",
+            "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
           ],
           "members": [],
           "composes": ["ICodec"],
@@ -214021,7 +214042,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -214069,7 +214090,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -214121,14 +214142,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -214152,7 +214173,7 @@
               ]
             }
           ],
-          "usageScore": 36,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "store-persist-index--defaultJsonCodec"
         },
@@ -214273,14 +214294,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -214403,14 +214424,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -214441,7 +214462,7 @@
         {
           "name": "IPersistHandle",
           "kind": "type",
-          "signature": "export type IPersistHandle = {\n  status: IReactiveComputed<IPersistStatus>;\n  error: IReactiveComputed<unknown>;\n  hydrated: IReactiveComputed<boolean>;\n  hydrationStatus: IReadonlyPersistValue<IHydrationStatus>;\n  hydrationError: IReadonlyPersistValue<unknown>;\n  writeStatus: IReadonlyPersistValue<IWriteStatus>;\n  writeError: IReadonlyPersistValue<unknown>;\n  /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>;\n  /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>;\n  /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>;\n  /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>;\n  /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>;\n  readonly disposed: boolean;\n  dispose(): void;\n};",
+          "signature": "export type IPersistHandle = {\n  status: IReactiveComputed<IPersistStatus>;\n  error: IReactiveComputed<unknown>;\n  hydrated: IReactiveComputed<boolean>;\n  hydrationStatus: IReadonlyPersistValue<IHydrationStatus>;\n  hydrationError: IReadonlyPersistValue<unknown>;\n  writeStatus: IReadonlyPersistValue<IWriteStatus>;\n  writeError: IReadonlyPersistValue<unknown>;\n  /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>;\n  /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>;\n  /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>;\n  /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>;\n  /** * Removes the codec's archive channel without resetting live state; disposal rejects with * `AbortError`. */ clear(): Promise<void>;\n  readonly disposed: boolean;\n  dispose(): void;\n};",
           "declarationLine": 26,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "Caller-owned hydration and serialized-write lifecycle from persistUnit or an adapter; it does not dispose the source state or injected backend.",
@@ -214563,7 +214584,7 @@
               "kind": "method",
               "optional": false,
               "signature": "clear(): Promise<void>;",
-              "description": "Queues archive removal. Disposal during the wait ends it with `AbortError`.",
+              "description": "Removes the codec's archive channel without resetting live state; disposal rejects with `AbortError`.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             },
@@ -214590,7 +214611,7 @@
           "aliasOf": "IPersistHandle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };"
+            "export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** * Removes the codec's archive channel without resetting live state; disposal rejects with * `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -214629,7 +214650,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistHandle:export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
+          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistHandle:export type IPersistHandle = { status: IReactiveComputed<IPersistStatus>; error: IReactiveComputed<unknown>; hydrated: IReactiveComputed<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when the first hydration succeeds; rejects on failure or disposal before completion. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** * Removes the codec's archive channel without resetting live state; disposal rejects with * `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -214665,14 +214686,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -214860,14 +214881,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -215032,14 +215053,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -215071,7 +215092,7 @@
           "name": "IPersistUnitOptions",
           "kind": "type",
           "signature": "export type IPersistUnitOptions<TState> = {\n  key: string;\n  /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime;\n  storage: IPersistStorage;\n  /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  /** Quiet interval before enqueueing a write; zero writes without debounce. */ debounceMs?: number;\n  /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */ maxWaitMs?: number;\n  /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */ scheduler?: IScheduler;\n};",
-          "declarationLine": 50,
+          "declarationLine": 53,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "Complete generic engine configuration, including caller-owned runtime, backend and synchronous state transformation callbacks.",
           "core": "key: Archive key selected by the application and reused for reading, writing and removal.\nruntime: Owning IRuntime from the source Store, collection or AtomStore; persistence status signals are created in that graph.\nstorage: Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.\ncodec: ICodec from storage-contract encoding the complete version/state envelope. Text and binary routes are supported; structured writes reject.\ndefaultJsonCodec with Map/Set round trips and legacy-tag reading.\nversion: Application schema version, a safe nonnegative integer compared with each saved envelope version.\n0; an unequal saved version requires migrate.\nmigrate: Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.\nmigrate.persisted: Decoded archive state before merging into current memory.\nmigrate.fromVersion: Schema version read from the stored envelope.\nSynchronous state compatible with the configured version.\nOmitted: version mismatch fails hydration with ENVELOPE_INVALID.\npartialize: Synchronous callback before each write, receiving the latest unit snapshot and selecting its persisted portion. Throws and thenables become write failures.\npartialize.state: Latest synchronous source snapshot taken when the write executes.\nSynchronous complete or partial state placed inside the envelope.\nIdentity: persist the complete snapshot.\nmerge: Synchronous hydration callback receiving persisted partial state and the latest current state; return the complete state to restore. Throws or thenables fail hydration.\nmerge.persisted: Decoded and optionally migrated partial archive state.\nmerge.current: Current source snapshot immediately before restoration.\nSynchronous complete source state for restore.\nPlain objects retain current fields changed since the original startup snapshot and accept persisted values for unchanged fields. Arrays, Map, Set and other shapes replace completely.\ndebounceMs: Quiet interval before requesting a serialized write; finite milliseconds in [0, 2147483647]. It does not bound storage latency.\n0: enqueue a write without a debounce timer.\nmaxWaitMs: Maximum debounce window from the first post-hydration change; finite milliseconds in [0, 2147483647]. Relevant only when debounceMs is positive.\nOmitted: only the quiet interval controls enqueueing.\nscheduler: Caller-selected IScheduler from @migaia/utils/scheduler; its monotonic now and cancellable schedule own the debounce window.\nCanonical systemScheduler resolved through lifecycle scheduler admission.",
@@ -215311,7 +215332,7 @@
           "name": "IStorePersistErrorCode",
           "kind": "type",
           "signature": "export type IStorePersistErrorCode =\n  (typeof StorePersistErrorCode)[keyof typeof StorePersistErrorCode];",
-          "declarationLine": 67,
+          "declarationLine": 68,
           "source": "packages/store-persist/dist/error-code.d.ts",
           "purpose": "All stable StorePersistErrorCode values for typed error handling.",
           "core": "All stable StorePersistErrorCode values for typed error handling.",
@@ -215402,14 +215423,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -215532,14 +215553,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -215693,14 +215714,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -215845,7 +215866,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -215893,7 +215914,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -215945,14 +215966,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -216151,14 +216172,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -216372,14 +216393,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -216425,9 +216446,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -216640,14 +216661,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -216671,23 +216692,24 @@
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 22,
           "configuration": [],
           "fragment": "store-persist-index--readEnvelope"
         },
         {
           "name": "removeEnvelope",
           "kind": "function",
-          "signature": "export declare function removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: IAbortSignal },\n): Promise<void>;",
-          "declarationLine": 16,
+          "signature": "export declare function removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: IAbortSignal },\n  codec?: ICodec,\n): Promise<void>;",
+          "declarationLine": 21,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
-          "purpose": "Forwards removal of exactly one archive key to the injected backend, without touching source memory or decoding the current value.",
-          "core": "storage: Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; optional signal comes from the caller AbortController and is forwarded to the codec and storage operation.\nPromise resolving after backend removal; backend failure rejects unchanged.",
+          "purpose": "Removes exactly one archive through the codec-selected backend channel without decoding its value or changing source memory. A binary codec with a binary-capable backend uses removeBytes; all other calls retain text removal, including existing three-argument calls.",
+          "core": "storage: Caller-injected storage-contract projection. Text removal uses remove; a binary codec with binary capability additionally requires removeBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; its optional caller-owned signal is forwarded to the selected backend removal.\ncodec: Optional fourth argument, defaulting to defaultJsonCodec. Pass the same storage-contract ICodec selected for writeEnvelope and readEnvelope to remove a binary archive from its byte channel.\nPromise resolving after the selected backend removal. When a binary codec is selected, a binary-capable backend missing removeBytes rejects with a BACKEND_CAPABILITY TypeError; backend failures reject unchanged.",
           "advanced": "",
           "parameters": [
             "storage: IPersistStorage",
             "key: string",
-            "ctx: { signal?: IAbortSignal; }"
+            "ctx: { signal?: IAbortSignal; }",
+            "codec: ICodec (optional)"
           ],
           "parameterDetails": [
             {
@@ -216704,6 +216726,11 @@
               "name": "ctx",
               "type": "{ signal?: IAbortSignal; }",
               "optional": false
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true
             }
           ],
           "returns": "Promise<void>",
@@ -216715,7 +216742,7 @@
           "aliasOf": "removeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;"
+            "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }, codec?: ICodec): Promise<void>;"
           ],
           "overloadParameterDetails": [
             [
@@ -216733,6 +216760,11 @@
                 "name": "ctx",
                 "type": "{ signal?: IAbortSignal; }",
                 "optional": false
+              },
+              {
+                "name": "codec",
+                "type": "ICodec",
+                "optional": true
               }
             ]
           ],
@@ -216743,7 +216775,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Forwards removal of exactly one archive key to the injected backend, without touching source memory or decoding the current value."
+              "content": "Removes exactly one archive through the codec-selected backend channel without decoding its value or changing source memory. A binary codec with a binary-capable backend uses removeBytes; all other calls retain text removal, including existing three-argument calls."
             },
             {
               "id": "getting-started",
@@ -216763,7 +216795,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "storage: Caller-injected storage-contract IKeyValueStore projection: capabilities, get, set, remove and keys. Binary output additionally requires getBytes and setBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; optional signal comes from the caller AbortController and is forwarded to the codec and storage operation.\nPromise resolving after backend removal; backend failure rejects unchanged."
+              "content": "storage: Caller-injected storage-contract projection. Text removal uses remove; a binary codec with binary capability additionally requires removeBytes from IRecordStore.\nkey: Archive key selected by the application and reused for reading, writing and removal.\nctx: Required context object; its optional caller-owned signal is forwarded to the selected backend removal.\ncodec: Optional fourth argument, defaulting to defaultJsonCodec. Pass the same storage-contract ICodec selected for writeEnvelope and readEnvelope to remove a binary archive from its byte channel.\nPromise resolving after the selected backend removal. When a binary codec is selected, a binary-capable backend missing removeBytes rejects with a BACKEND_CAPABILITY TypeError; backend failures reject unchanged."
             },
             {
               "id": "advanced-usage",
@@ -216772,7 +216804,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/storage/codec.d.ts:removeEnvelope:export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;",
+          "identity": "packages/store-persist/dist/storage/codec.d.ts:removeEnvelope:export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }, codec?: ICodec): Promise<void>;",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -216808,14 +216840,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -216940,14 +216972,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -216978,7 +217010,7 @@
         {
           "name": "StorePersistErrorCode",
           "kind": "const",
-          "signature": "export declare const StorePersistErrorCode: {\n  /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED';\n  /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH';\n  /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY';\n  /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID';\n  /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED';\n  /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED';\n  /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE';\n  /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION';\n};",
+          "signature": "export declare const StorePersistErrorCode: {\n  /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED';\n  /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH';\n  /** * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY';\n  /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID';\n  /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED';\n  /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED';\n  /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE';\n  /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION';\n};",
           "declarationLine": 10,
           "source": "packages/store-persist/dist/error-code.d.ts",
           "purpose": "Stable persistence failure codes covering configuration, envelope, codec, backend and disposal cancellation failures.",
@@ -217014,7 +217046,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly backendCapability: 'BACKEND_CAPABILITY';",
-              "description": "A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec.",
+              "description": "A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec.",
               "parameterDetails": [],
               "returns": "'BACKEND_CAPABILITY'"
             },
@@ -217068,7 +217100,7 @@
           "aliasOf": "StorePersistErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };"
+            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -217107,7 +217139,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: 'CODEC_NOT_RESOLVED'; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH'; /** * A binary read/write requires `getBytes` and `setBytes`, or archive removal requires * `removeBytes`, but the storage backend lacks the required operation. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: 'BACKEND_CAPABILITY'; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, its properties inaccessible, or its version different without a * migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: 'ENVELOPE_INVALID'; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED'; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: 'ABORTED_BY_DISPOSE'; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [
             {
               "id": "8-错误参考",
@@ -217134,7 +217166,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -217182,7 +217214,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -217234,14 +217266,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -217424,14 +217456,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -217455,7 +217487,7 @@
               ]
             }
           ],
-          "usageScore": 22,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "store-persist-index--writeEnvelope"
         }
@@ -217768,7 +217800,6 @@
           "examples": [
             "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\nimport { persistCollection } from '@migaia/store-persist/indexed';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, {\n  key: 'cart:v1',\n  storage: localStorageHost()\n});\n\ncart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）",
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IPersistStorage, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\n// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加首次水合前捕获的 value 快照（不是实时 AtomStore 值）\ntype IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };",
-            "import { binaryCodec } from '@migaia/storage-web/serialize';\n\nconst handle = persistCollection(bigDataset, {\n  key: 'big',\n  storage: indexedDbHost({ dbName: 'app' }),\n  codec: binaryCodec\n});",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\n// 1. 扁平设置\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\n// 2. 最近浏览过的商品（indexed）\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\n// 3. 按用户的 session（keyed，只存 refreshToken）\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(userId: string, activeHandle: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeHandle.dispose();\n}",
             "import { observableMap } from '@migaia/store-indexed';\nimport { localStorageHost } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorageHost() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
@@ -217927,14 +217958,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -217958,7 +217989,7 @@
               ]
             }
           ],
-          "usageScore": 132,
+          "usageScore": 126,
           "configuration": [
             {
               "name": "key",
@@ -217972,9 +218003,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -218287,7 +218318,7 @@
               "kind": "method",
               "optional": false,
               "signature": "clear(): Promise<void>;",
-              "description": "Queues archive removal. Disposal during the wait ends it with `AbortError`.",
+              "description": "Removes the codec's archive channel without resetting live state; disposal rejects with `AbortError`.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             },
@@ -218703,7 +218734,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -218751,7 +218782,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -218803,14 +218834,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -218834,7 +218865,7 @@
               ]
             }
           ],
-          "usageScore": 128,
+          "usageScore": 132,
           "configuration": [
             {
               "name": "namespace",
@@ -218848,9 +218879,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -219377,7 +219408,7 @@
                     [
                       "`backendCapability`",
                       "`BACKEND_CAPABILITY`",
-                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                      "binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec"
                     ],
                     [
                       "`envelopeInvalid`",
@@ -219425,7 +219456,7 @@
                     ],
                     ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
                     [
-                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes`",
                       "`TypeError`",
                       "同上"
                     ],
@@ -219477,14 +219508,14 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal },\n  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用\n): Promise<void>;"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
                     "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
-                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                    "`removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。"
                   ]
                 },
                 {
@@ -219508,7 +219539,7 @@
               ]
             }
           ],
-          "usageScore": 288,
+          "usageScore": 296,
           "configuration": [
             {
               "name": "key",
@@ -219522,9 +219553,9 @@
               "name": "storage",
               "type": "IPersistStorage",
               "optional": false,
-              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear",
               "descriptionEn": "",
-              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear"
             },
             {
               "name": "codec",
@@ -234817,7 +234848,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -234985,7 +235016,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -236152,7 +236183,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -236327,7 +236358,7 @@
               ]
             }
           ],
-          "usageScore": 164,
+          "usageScore": 160,
           "configuration": [],
           "fragment": "store-wasm-index--ensureWasm"
         },
@@ -236772,7 +236803,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -236861,7 +236892,7 @@
               ]
             }
           ],
-          "usageScore": 336,
+          "usageScore": 332,
           "configuration": [],
           "fragment": "store-wasm-index--number"
         },
@@ -236976,7 +237007,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
@@ -237807,7 +237838,7 @@
                   "headers": ["触发条件", "错误类型", "信息"],
                   "rows": [
                     [
-                      "`allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
+                      "`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数",
                       "`RangeError`",
                       "`wasm.allocate: byteLen must fit an unsigned 32-bit integer`"
                     ],
