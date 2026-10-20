@@ -6,8 +6,12 @@ import {
   domainPath,
   guidePath,
   isCallableApiSymbol,
+  packApis,
+  packLinks,
   resolveDocsSelection,
   symbolSlug,
+  unpackApis,
+  unpackLinks,
   type IApi,
   type IApiMember,
   type IApiSymbol,
@@ -15,7 +19,9 @@ import {
   type ILibrary,
   type IMaintainedBlock,
   type IMaintainedDocument,
-  type ILocale
+  type ILocale,
+  type IPackedApi,
+  type IPackedLink
 } from '../content-contract.js'
 import type { IGuideApiLink, ILibraryRouteContent } from '../content-loader.js'
 import { apiKindLabel, copyFor, domainDescription, domainTitle, interfaceCopyFor } from '../copy.js'
@@ -49,10 +55,12 @@ import {
   type IInstanceSurface
 } from '../reference/surface.js'
 
-type IDocsLoaderData = ILibraryRouteContent & {
-  readonly apiLinks?: readonly IGuideApiLink[]
+/** Route data as serialized: API symbols and sidebar links arrive packed (see `packApis`). */
+type IDocsLoaderData = Omit<ILibraryRouteContent, 'apis'> & {
+  readonly apis: readonly IPackedApi[]
+  readonly apiLinks?: readonly IPackedLink<IGuideApiLink>[]
   /** Every type exported by the library's type-only entry, shown as its own sidebar group. */
-  readonly typeEntryLinks?: readonly IGuideApiLink[]
+  readonly typeEntryLinks?: readonly IPackedLink<IGuideApiLink>[]
   readonly guide?: IApiGuide
   /** Search metadata may use a guide purpose even when the article uses authored reference text. */
   readonly metaPurpose?: string
@@ -284,8 +292,9 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   )
   return {
     ...content,
-    apiLinks,
-    typeEntryLinks,
+    apis: packApis(content.apis),
+    apiLinks: packLinks(apiLinks),
+    typeEntryLinks: packLinks(typeEntryLinks),
     guide: hasAuthoredSymbol ? undefined : guide,
     metaPurpose: hasAuthoredSymbol ? guide?.purpose : undefined,
     journey: journeyExists
@@ -316,10 +325,12 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, params })
       { title: `${domainTitle(locale, 'docs')} · migaia` },
       { name: 'description', content: domainDescription(locale, 'docs') }
     ]
+  /** Complete API symbols restored from the packed route data. */
+  const apis = unpackApis(data.apis)
   /** Resolve nested modules before interpreting the final segment as an API name. */
-  const selection = resolveDocsSelection(parts.slice(2), data.apis)
+  const selection = resolveDocsSelection(parts.slice(2), apis)
   /** Selected runtime declaration owns the API title and its one-sentence purpose. */
-  const api = data.apis.find((candidate) => candidate.module === selection.moduleName)
+  const api = apis.find((candidate) => candidate.module === selection.moduleName)
   /** Legacy type pages use their declaration identity even when rendered under the module. */
   const symbol = api?.symbols.find(
     (candidate) => symbolSlug(candidate, api.symbols) === selection.symbolPath
@@ -362,7 +373,12 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
   const domain = pageKind(parts)
   const librarySlug = parts.shift()
   const library = loaderData?.library
-  const libraryApis = loaderData?.apis ?? []
+  /** Complete API symbols restored from the packed route data. */
+  const libraryApis = unpackApis(loaderData?.apis ?? [])
+  /** Sidebar links with their derivable paths restored. */
+  const apiLinks = unpackLinks(loaderData?.apiLinks ?? [])
+  /** Type-only entry links with their derivable paths restored. */
+  const typeEntryLinks = unpackLinks(loaderData?.typeEntryLinks ?? [])
   /** API pages drop the `api` segment; guide pages keep their topic path. */
   const modulePath =
     domain === 'docs' ? parts.slice(1).join('/') || 'index' : parts.join('/') || undefined
@@ -375,8 +391,8 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
         guide={loaderData?.guide}
         locale={locale}
         library={library}
-        apiLinks={loaderData?.apiLinks ?? []}
-        typeEntryLinks={loaderData?.typeEntryLinks ?? []}
+        apiLinks={apiLinks}
+        typeEntryLinks={typeEntryLinks}
         journeyTopics={loaderData?.journeyTopics ?? []}
         libraryApis={libraryApis}
         modulePath={modulePath}
@@ -390,8 +406,8 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
     <DomainLibrary
       locale={locale}
       library={library}
-      apiLinks={loaderData?.apiLinks ?? []}
-      typeEntryLinks={loaderData?.typeEntryLinks ?? []}
+      apiLinks={apiLinks}
+      typeEntryLinks={typeEntryLinks}
       libraryApis={libraryApis}
       modulePath={modulePath}
       journey={loaderData?.journey}

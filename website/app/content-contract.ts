@@ -174,3 +174,100 @@ export function isCallableApiSymbol(
   const escapedName = symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`export declare const ${escapedName}:\\s*(?:<|\\()`).test(symbol.signature)
 }
+
+/**
+ * Empty values of the required symbol fields. Route data omits a field holding exactly this value,
+ * because most projected symbols (navigation and link entries) leave nearly every field empty and
+ * every docs page would otherwise serialize those empty fields twice: once inlined for hydration and
+ * once in its `.data` file. `unpackApis` restores them, so components always see complete symbols.
+ */
+const EMPTY_SYMBOL_FIELDS = {
+  signature: '',
+  source: '',
+  purpose: '',
+  core: '',
+  advanced: '',
+  parameters: [],
+  returns: '',
+  errors: [],
+  lifecycleConcurrency: '',
+  parameterDetails: [],
+  members: [],
+  examples: [],
+  guidance: [],
+  configuration: [],
+  whenToUse: '',
+  notUse: '',
+  sections: [],
+  exportPath: '',
+  usageScore: 0
+} as const satisfies Partial<IApiSymbol>
+
+/** Required symbol fields that route data may omit when empty. */
+type IEmptySymbolField = keyof typeof EMPTY_SYMBOL_FIELDS
+
+/** Symbol as sent in route data: fields equal to their empty value are absent. */
+export type IPackedApiSymbol = Omit<IApiSymbol, IEmptySymbolField> &
+  Partial<Pick<IApiSymbol, IEmptySymbolField>>
+
+/** API module as sent in route data, carrying packed symbols. */
+export type IPackedApi = Omit<IApi, 'symbols'> & { readonly symbols: readonly IPackedApiSymbol[] }
+
+/**
+ * Drops every symbol field that holds its empty value, for route data only, plus a `false`
+ * `callable` flag, which readers only test for truthiness. Pair with `unpackApis` on the reading
+ * side; the round trip returns symbols that read the same as the input.
+ */
+export function packApis(apis: readonly IApi[]): readonly IPackedApi[] {
+  return apis.map((api) => ({
+    ...api,
+    symbols: api.symbols.map((symbol) => {
+      /** Mutable copy that loses its empty fields below. */
+      const packed: Record<string, unknown> = { ...symbol }
+      for (const field of Object.keys(EMPTY_SYMBOL_FIELDS) as IEmptySymbolField[]) {
+        /** Field value on the source symbol. */
+        const value = symbol[field]
+        if (value === EMPTY_SYMBOL_FIELDS[field] || (Array.isArray(value) && value.length === 0))
+          delete packed[field]
+      }
+      if (packed['callable'] === false) delete packed['callable']
+      return packed as IPackedApiSymbol
+    })
+  }))
+}
+
+/** Restores the empty fields `packApis` dropped, so readers receive complete symbols again. */
+export function unpackApis(apis: readonly IPackedApi[]): readonly IApi[] {
+  return apis.map((api) => ({
+    ...api,
+    symbols: api.symbols.map((symbol) => ({ ...EMPTY_SYMBOL_FIELDS, ...symbol }))
+  }))
+}
+
+/** Sidebar link fields this module packs; `symbolPath` is usually the encoded symbol name. */
+type ISymbolLink = { readonly name: string; readonly symbolPath: string }
+
+/** Link as sent in route data: `symbolPath` is absent when it equals the encoded name. */
+export type IPackedLink<T extends ISymbolLink> = Omit<T, 'symbolPath'> & {
+  readonly symbolPath?: string
+}
+
+/**
+ * Omits each link's `symbolPath` when it is just `encodeURIComponent(name)`, which holds for every
+ * symbol without a case-folding collision. Pair with `unpackLinks` on the reading side.
+ */
+export function packLinks<T extends ISymbolLink>(links: readonly T[]): readonly IPackedLink<T>[] {
+  return links.map((link) => {
+    if (link.symbolPath !== encodeURIComponent(link.name)) return link
+    /** Link without its derivable path. */
+    const { symbolPath: _derivable, ...packed } = link
+    return packed
+  })
+}
+
+/** Restores the `symbolPath` that `packLinks` omitted. */
+export function unpackLinks<T extends ISymbolLink>(links: readonly IPackedLink<T>[]): readonly T[] {
+  return links.map(
+    (link) => ({ ...link, symbolPath: link.symbolPath ?? encodeURIComponent(link.name) }) as T
+  )
+}
