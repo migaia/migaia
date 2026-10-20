@@ -57,7 +57,10 @@ export type IPersistHandle = {
    * `AbortError`.
    */
   flush(): Promise<void>
-  /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */
+  /**
+   * Removes the codec's archive channel without resetting live state; disposal rejects with
+   * `AbortError`.
+   */
   clear(): Promise<void>
   readonly disposed: boolean
   dispose(): void
@@ -101,8 +104,10 @@ export type IPersistStorage = Pick<
 > & {
   readonly getBytes?: IRecordStore['getBytes']
   readonly setBytes?: IRecordStore['setBytes']
+  /** Binary archive clearing uses the canonical per-key byte deletion operation. */
+  readonly removeBytes?: IRecordStore['removeBytes']
 }
 
-/** Provides byte storage capabilities after the binary branch applies its internal guard. */
+/** Provides byte read/write capabilities after the binary branch applies its internal guard. */
 export type IPersistByteStorage = IPersistStorage &
   Required<Pick<IPersistStorage, 'getBytes' | 'setBytes'>>

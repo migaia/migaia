@@ -51,6 +51,12 @@
   `ownerOf()` returns their runtime instead of `undefined`, and `assertOwnedBy()`
   rejects a different runtime with the existing `CROSS_RUNTIME` error.
 
+- `@migaia/store-persist` binary `clear()` removes the byte archive instead
+  of leaving it behind after text-only removal. Backends without `removeBytes`
+  reject with the existing `BACKEND_CAPABILITY` TypeError. `removeEnvelope()`
+  accepts an optional fourth `codec` argument; three-argument text calls retain
+  their behavior.
+
 - Plugin-host rejects synchronous hook calls to `activate()` before returning a shared
   activation Promise. Outside callers still share that Promise while a hook is pending.
   After an `await`, hook origin cannot be distinguished: activating the same registration

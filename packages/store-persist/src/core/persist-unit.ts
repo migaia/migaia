@@ -551,7 +551,7 @@ export function persistUnit<TState>(
       const operation = writeChain.then(async () => {
         assertActive()
         await runWriteOperation(() =>
-          runAdapterOperation((signal) => removeEnvelope(storage, key, { signal }))
+          runAdapterOperation((signal) => removeEnvelope(storage, key, { signal }, codec))
         )
       })
       writeChain = operation.catch(() => undefined)

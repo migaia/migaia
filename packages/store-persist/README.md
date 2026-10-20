@@ -66,7 +66,7 @@ handle.dispose(); // 停止订阅、清计时器、abort 在途 I/O
 `IPersistOptions` 全部字段：
 
 - `key: string`（必填）—— 存档在 storage 里的键
-- `storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 另需 `getBytes`/`setBytes`
+- `storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 读写另需 `getBytes`/`setBytes`，清除另需 canonical `removeBytes`
 - `codec?: ICodec` —— 默认 `defaultJsonCodec`（原生支持 Map/Set 往返）
 - `version?: number` —— 默认 `0`，必须是安全非负整数
 - `migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>` —— `version` 与存档不一致时的转换函数，不提供则版本不一致直接 hydrate 失败
@@ -168,11 +168,13 @@ await handle.ready; // hydrate 成功 resolve，失败 reject
 await handle.settled; // 不管成功失败都 resolve
 ```
 
+`clear()` 对 binary 存档使用后端的 `removeBytes(key, ctx)`，只删除该 byte key，不清空 sibling bytes 或 text/record 通道。旧的 text-only 最小适配器仍有效；binary 适配器缺少删除能力时，clear 以 `BACKEND_CAPABILITY` TypeError 拒绝。
+
 **`handle.flush()` / `handle.clear()`｜5 秒上手**：
 
 ```ts
 await handle.flush(); // 立即写并等待完成；dispose 期间以 AbortError 结束
-await handle.clear(); // 排队删除存档，不重置内存状态
+await handle.clear(); // 排队删除当前 codec 通道的单个存档，不重置内存状态
 ```
 
 均无参数；`dispose()` 之后调用两者都会立即以 `name: 'AbortError'` 的错误 reject。

@@ -41,7 +41,7 @@ function persistUnit<TState>(
 | ------------ | --------------------------------------------------------- | ------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `key`        | `string`                                                  | 必填   | 无                                                                   | 存档在 storage 里的键                                                                                                       |
 | `runtime`    | `IRuntime`                                                | 必填   | 无                                                                   | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
-| `storage`    | `{ capabilities, get, set, remove, keys }`                | 必填   | 无                                                                   | 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec |
+| `storage`    | `{ capabilities, get, set, remove, keys }`                | 必填   | 无                                                                   | 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary 读写，`removeBytes` 支持 binary clear |
 | `codec`      | `ICodec`                                                  | 可选   | `defaultJsonCodec`                                                   | 见 [§7](#7-与-storage-web-的-codec-集成)                                                                                    |
 | `version`    | `number`                                                  | 可选   | `0`                                                                  | schema 版本，必须是安全非负整数                                                                                             |
 | `migrate`    | `(persisted: TState, fromVersion: number) => TState`      | 可选   | 无                                                                   | 见 [§5](#5-存档格式与版本迁移)                                                                                              |
@@ -71,6 +71,7 @@ type IPersistStorage = Pick<import('@migaia/storage-contract').IKeyValueStore,
   'capabilities' | 'get' | 'set' | 'remove' | 'keys'> & {
   readonly getBytes?: import('@migaia/storage-contract').IRecordStore['getBytes'];
   readonly setBytes?: import('@migaia/storage-contract').IRecordStore['setBytes'];
+  readonly removeBytes?: import('@migaia/storage-contract').IRecordStore['removeBytes'];
 };
 ```
 
@@ -279,7 +280,7 @@ async function logout(userId: string) {
 | `settled`                            | `Promise<void>`                                                 | 异步      | 不管成功失败都 resolve                                            |
 | `retryHydrate()`                     | `() => Promise<void>`                                           | 异步      | 首次 hydrate 失败后重新读取；成功后恢复有序写入                    |
 | `flush()`                            | `() => Promise<void>`                                           | 异步      | 立即写并等待完成；这次写入失败会 reject 给调用方                  |
-| `clear()`                            | `() => Promise<void>`                                           | 异步      | 删除存档，不重置内存状态                                          |
+| `clear()`                            | `() => Promise<void>`                                           | 异步      | 按当前 codec 通道删除单个存档，不重置内存状态                                          |
 | `disposed`                           | `boolean`                                                       | 同步      | 是否已 `dispose()`                                                |
 | `dispose()`                          | `() => void`                                                    | 同步      | 退订、清防抖 timer、abort 在途 I/O                                |
 
@@ -291,7 +292,7 @@ async function logout(userId: string) {
 
 `storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可：
 `memoryStorageHost()`、`localStorageHost()` 或 `indexedDbHost()` 的返回值即可。binary codec 另需
-`getBytes`/`setBytes`。
+`getBytes`/`setBytes` 供读写，`removeBytes` 供按 key 清除。
 
 `codec` 默认是本包自带的 `defaultJsonCodec`（`name: 'migaia-collections-json-v1'`、`output: 'text'`，遵循 `@migaia/storage-contract` 的 `ICodec` 契约；本包不运行时依赖 storage-web 的具体 codec 值）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
 
@@ -300,19 +301,9 @@ async function logout(userId: string) {
 
 这不是可选的锦上添花——`JSON.stringify(new Map(...))` 产出 `"{}"`，**静默丢光内容而不报错**，`persistCollection()` 接的 `ObservableMap`/`ObservableSet` 的 `snapshot()` 就是真实的 `Map`/`Set` 实例，不处理这个坑会导致 keyed/indexed 场景下的 Map/Set 数据悄悄消失。
 
-传 binary codec 时，后端必须具备字节通道：
+传 binary codec 时，后端必须具备字节通道，codec 必须编码完整的 `{ version, state }` envelope。例如可将 `defaultJsonCodec` 的字符串编码为 UTF-8 bytes，并在 decode 时反向转换；`clear()` 会按同一 codec 选择 `removeBytes`。`storage-web` 的 `binaryCodec` 直接处理 Uint8Array payload，适合公开 `writeEnvelope`/`readEnvelope` helper 的原始字节操作；用于 `persist*` 时需有完整 envelope 的编码层。
 
-```ts
-import { binaryCodec } from '@migaia/storage-web/serialize';
-
-const handle = persistCollection(bigDataset, {
-  key: 'big',
-  storage: indexedDbHost({ dbName: 'app' }),
-  codec: binaryCodec
-});
-```
-
-本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败。不会自动 base64 降级。
+本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 读写在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败；binary clear 缺 `removeBytes` 时同样拒绝，不回落到 text 删除。不会自动 base64 降级。
 
 ---
 
@@ -327,7 +318,7 @@ const handle = persistCollection(bigDataset, {
 | --- | --- | --- |
 | `codecNotResolved` | `CODEC_NOT_RESOLVED` | 没有为 key 解析到 codec；显式提供 codec 或修复默认解析 |
 | `codecOutputMismatch` | `CODEC_OUTPUT_MISMATCH` | codec output 与实际 payload/后端能力不一致；修正 codec 实现或选路 |
-| `backendCapability` | `BACKEND_CAPABILITY` | binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec |
+| `backendCapability` | `BACKEND_CAPABILITY` | binary 读写缺 `getBytes`/`setBytes`，或 clear 缺 `removeBytes`；换完整后端或 text codec |
 | `envelopeInvalid` | `ENVELOPE_INVALID` | 存档 envelope/版本非法；修复数据或提供 migrate |
 | `encodeFailed` | `ENCODE_FAILED` | 值无法编码；检查 `cause` 与待存值 |
 | `hydrateAndWriteFailed` | `HYDRATE_AND_WRITE_FAILED` | hydrate 与随后的写回都失败；展开 `AggregateError.errors` |
@@ -342,7 +333,7 @@ const handle = persistCollection(bigDataset, {
 | `version` 与存档不一致且未提供 `migrate`                     | `Error`                                    | 消息含 `provide migrate()`                                |
 | codec 编码失败（比如值包含循环引用）                         | `TypeError`                                | `defaultJsonCodec` 保留原始错误为 `cause` 并附加 `ENCODE_FAILED` |
 | `codec.output === 'structured'` 但存储不支持                 | `TypeError`                                | 见 [§7](#7-与-storage-web-的-codec-集成)                  |
-| `codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes` | `TypeError`                                | 同上                                                      |
+| binary 读写缺 `getBytes`/`setBytes` 或 clear 缺 `removeBytes` | `TypeError`                                | 同上                                                      |
 | `persistKeyed()` 未传 `namespace`                            | TypeScript 编译期错误                      | namespace 既有编译期约束，也在运行时校验字符串，非法值抛 INVALID_OPTION TypeError                    |
 | `dispose()` 后调用 `flush()`/`clear()`                       | `Error`（`name: 'AbortError'`）            | 消息为 `[store] persist operation was aborted by dispose` |
 
@@ -447,13 +438,14 @@ function readEnvelope(
 function removeEnvelope(
   storage: IPersistStorage,
   key: string,
-  ctx: { signal?: AbortSignal }
+  ctx: { signal?: AbortSignal },
+  codec?: ICodec // 默认 defaultJsonCodec，保留原三参数 text 调用
 ): Promise<void>;
 ```
 
 - `writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。
 - `readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。
-- `removeEnvelope`：委托 `storage.remove(key, ctx)`。
+- `removeEnvelope`：默认委托 text `storage.remove(key, ctx)`；第四参数选择 binary codec 且后端声明 binary 时，委托 `storage.removeBytes(key, ctx)`。缺少 byte 删除能力抛携带 `BACKEND_CAPABILITY` 的原生 TypeError，后端错误原样保留。`persist`/`persistCollection`/`persistKeyed` 的 clear 自动传入其 codec，不重置 live state、不删除其他 key/channel。
 
 ```ts
 const PersistState: { idle; loading; writing; ready; success; error; disposed }; // 见下
