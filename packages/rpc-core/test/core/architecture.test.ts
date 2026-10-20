@@ -85,7 +85,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
           /export\s+(\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
         )) {
           if (!/(?:\/internal\/|(?:^|\/)(?:wire|endpoint)\.js$)/.test(specifier)) continue
-          /** C3's two complete Core error operations retain private metadata inside their owner. */
+          /** 's two complete Core error operations retain private metadata inside their owner. */
           if (
             path === '../../src/core/index.ts' &&
             specifier === './internal/error-wire-metadata.js' &&
@@ -99,7 +99,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     expect(violations).toEqual([])
   })
 
-  it('WRC-C-T72 requires canonical PluginHost and capability topology owners', () => {
+  it('requires canonical PluginHost and capability topology owners', () => {
     const manifest = JSON.parse(Object.values(PACKAGE_MANIFESTS)[0] ?? '{}') as {
       dependencies?: Record<string, string>
       devDependencies?: Record<string, string>
@@ -116,7 +116,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     expect(pipelineImports).toEqual([])
   })
 
-  it('WRC-C-B12c06 has one activation/projection and one physical subscribe owner', () => {
+  it('has one activation/projection and one physical subscribe owner', () => {
     const coreSource = SOURCES['../../src/core/composed.ts']
     const kernelSource = SOURCES['../../src/core/endpoint-kernel.ts']
     const activationSource = SOURCES['../../src/core/internal/transport-activation.ts']
@@ -131,7 +131,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     expect(coreSource).toContain('createEndpointProjection')
   })
 
-  it('WRC-C-T60/T61 keeps the outbound sender domain-owned and stage-free by default', () => {
+  it('keeps the outbound sender domain-owned and stage-free by default', () => {
     const senderSource = SOURCES['../../src/core/internal/outbound-sender.ts']
     const outboundAttachmentSource = SOURCES['../../src/core/internal/outbound-attachment.ts']
     expect(senderSource).toBeDefined()

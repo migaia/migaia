@@ -87,14 +87,17 @@ export const RpcFirstPartyRoleSchema: Readonly<
   })
 })
 
-/** Candidate-independent control role name owned by the B12c04 contract boundary. */
+/** Candidate-independent control role name owned by the control contract boundary. */
 export const RpcControlRole = Object.freeze({
   control: 'control'
 } as const)
 
 export type IRpcControlRole = (typeof RpcControlRole)[keyof typeof RpcControlRole]
 
-/** Deeply frozen native control claims; this contract is declarative until B12c04 implementation. */
+/**
+ * Deeply frozen native control claims; this contract is declarative until the control
+ * implementation.
+ */
 export type IRpcControlRoleContract = {
   readonly sharedProvides: readonly PropertyKey[]
   readonly sharedConsumes: readonly PropertyKey[]
@@ -103,7 +106,7 @@ export type IRpcControlRoleContract = {
   readonly exposedKeys: readonly string[]
 }
 
-/** Package-owned authority from which control RED variants must derive their claims. */
+/** Package-owned authority from which control failure variants must derive their claims. */
 export const RpcControlRoleSchema: Readonly<Record<IRpcControlRole, IRpcControlRoleContract>> =
   Object.freeze({
     control: Object.freeze({
@@ -120,7 +123,7 @@ export const RpcControlRoleSchema: Readonly<Record<IRpcControlRole, IRpcControlR
     })
   })
 
-/** Candidate-independent provider role name admitted by the B12c02 inventory. */
+/** Candidate-independent provider role name admitted by the provider inventory. */
 export const RpcProviderRole = Object.freeze({
   provider: 'provider'
 } as const)
@@ -140,7 +143,10 @@ export type IRpcProviderRoleContract = {
   readonly installOrder: readonly ['outbound', 'provider']
 }
 
-/** Immutable candidate-independent provider contract used by admission and permanent RED tests. */
+/**
+ * Immutable candidate-independent provider contract used by admission and permanent regression
+ * tests.
+ */
 export const RpcProviderRoleSchema: Readonly<Record<IRpcProviderRole, IRpcProviderRoleContract>> =
   Object.freeze({
     provider: Object.freeze({

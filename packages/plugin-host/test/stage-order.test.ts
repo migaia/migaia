@@ -36,7 +36,7 @@ const stagePlugin = (name: string, label = name) =>
   })
 
 describe('stage allocation order', () => {
-  it('A20 preserves host and plugin allocation positions across visibility and generations', async () => {
+  it('preserves host and plugin allocation positions across visibility and generations', async () => {
     /** Provider gives a a real required dependency for suspend and restart transitions. */
     const value = defineFeature(() => ({ value: 1 }))
     /** First provider generation, installed before any stage slot exists. */
@@ -87,7 +87,7 @@ describe('stage allocation order', () => {
     await host.dispose()
   })
 
-  it('A21 switches the visible generation at publication before rebind hooks run', async () => {
+  it('switches the visible generation at publication before rebind hooks run', async () => {
     /** Host whose hook reads a fresh pipeline snapshot during replacement. */
     const host = new StageOrderHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -135,7 +135,7 @@ describe('stage allocation order', () => {
     await host.dispose()
   })
 
-  it('A22 retains a host stage registered while an async install is pending', async () => {
+  it('retains a host stage registered while an async install is pending', async () => {
     /** Releases the plugin install only after the host stage is registered. */
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
@@ -168,7 +168,7 @@ describe('stage allocation order', () => {
     await host.dispose()
   })
 
-  it('A24 keeps identical stage functions as independent owner entries', async () => {
+  it('keeps identical stage functions as independent owner entries', async () => {
     const host = new StageOrderHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -210,7 +210,7 @@ describe('stage allocation order', () => {
     await host.dispose()
   })
 
-  it('A25 omits draining stages from new runs during removal and restart', async () => {
+  it('omits draining stages from new runs during removal and restart', async () => {
     /** Builds one stage that holds its first run until the mutation enters drain. */
     const createGate = () => {
       let release!: () => void
@@ -295,7 +295,7 @@ describe('stage allocation order', () => {
     expect(await host.run()).toBe('d')
     await host.dispose()
   })
-  it('A28 rejects a prepared admission whose data-order slot was retired before commit', async () => {
+  it('rejects a prepared admission whose data-order slot was retired before commit', async () => {
     const host = new StageOrderHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

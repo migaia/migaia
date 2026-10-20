@@ -9,7 +9,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 35; index++) await Promise.resolve()
 }
 
-describe('A10 profile admission and hooks', () => {
+describe('profile admission and hooks', () => {
   it('rejects a mismatched budget and unsupported required termination', () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()

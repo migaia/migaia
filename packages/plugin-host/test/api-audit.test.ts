@@ -7,7 +7,7 @@ import * as composition from '../src/composition-entry.js'
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
 describe('audited plugin host contracts', () => {
-  it('D01 keeps managed-host registration authority inside the package', async () => {
+  it('keeps managed-host registration authority inside the package', async () => {
     expect('registerManagedHost' in composition).toBe(false)
     expect('buildManagedPort' in composition).toBe(false)
     /** Public factories are the legitimate writers of managed-host provenance. */
@@ -22,7 +22,7 @@ describe('audited plugin host contracts', () => {
     await host.dispose()
   })
 
-  it('D02 rejects prepared removal of a replaced generation before repeating its cleanup', async () => {
+  it('rejects prepared removal of a replaced generation before repeating its cleanup', async () => {
     /** Counts stay generation-local even though both registrations use one public name. */
     let oldDisposals = 0
     let newDisposals = 0
@@ -68,7 +68,7 @@ describe('audited plugin host contracts', () => {
     expect(oldDisposals).toBe(1)
     expect(newDisposals).toBe(1)
   })
-  it('D03 publishes the factory disposal promise before middleware reenters', async () => {
+  it('publishes the factory disposal promise before middleware reenters', async () => {
     /** Reentrant call observes the one disposal chain while middleware still executes synchronously. */
     let nested: Promise<unknown> | undefined
     let middlewareCalls = 0
@@ -89,7 +89,7 @@ describe('audited plugin host contracts', () => {
     expect(host.dispose()).toBe(outer)
   })
 
-  it('D03 publishes the runtime disposal promise before synchronous abort notification', async () => {
+  it('publishes the runtime disposal promise before synchronous abort notification', async () => {
     /** Subclassing uses the existing protected pipeline entry, without exposing a new runtime seam. */
     class DispatchHost extends PluginHost<object, string> {
       /** Runs a supported sync pipeline to capture its host-owned signal. */
@@ -120,12 +120,12 @@ describe('audited plugin host contracts', () => {
     expect(nested).toBe(outer)
     expect(host.dispose()).toBe(outer)
   })
-  it('D04 assimilates one legal update thenable once under a finite deadline', async () => {
+  it('assimilates one legal update thenable once under a finite deadline', async () => {
     /** Only the custom result counts assimilation; the native Promise delegates its generic typing. */
     let thenCalls = 0
     /** A valid lifecycle PromiseLike makes each extra assimilation observable. */
     const thenable: PromiseLike<void> = {
-      // oxlint-disable-next-line unicorn/no-thenable -- D04 exercises the supported PromiseLike contract.
+      // oxlint-disable-next-line unicorn/no-thenable -- exercises the supported PromiseLike contract.
       then(onFulfilled, onRejected) {
         thenCalls++
         return Promise.resolve().then(onFulfilled, onRejected)
@@ -148,7 +148,7 @@ describe('audited plugin host contracts', () => {
     await host.dispose()
   })
   it.each(['recipe', 'update', 'dispose'] as const)(
-    'D07 identifies a native public %s callback failure without replacing it',
+    'identifies a native public %s callback failure without replacing it',
     async (kind) => {
       /** Callback errors retain their native constructor, stack, and mutable object identity. */
       const original = new RangeError('callback failed')
@@ -196,7 +196,7 @@ describe('audited plugin host contracts', () => {
   )
 
   it.each(['primitive', 'frozen'] as const)(
-    'D07 retains a %s callback cause when identity cannot attach in place',
+    'retains a %s callback cause when identity cannot attach in place',
     async (kind) => {
       /** Both JavaScript throw values and immutable Errors are valid failure payloads. */
       const original =
@@ -216,7 +216,7 @@ describe('audited plugin host contracts', () => {
       await host.dispose()
     }
   )
-  it('D08 reports the original rejection of an async install refused by useSync', async () => {
+  it('reports the original rejection of an async install refused by useSync', async () => {
     /** The rejected installation is invalid for sync admission but its failure still has an owner. */
     const original = new Error('async install rejected')
     const errors: unknown[] = []
@@ -251,7 +251,7 @@ describe('audited plugin host contracts', () => {
     expect(errors).toContain(original)
   })
 
-  it('D09 reports incomplete pipeline drain while continuing the documented bounded removal', async () => {
+  it('reports incomplete pipeline drain while continuing the documented bounded removal', async () => {
     /** Only the caller can release this in-memory stage. */
     const gate = deferred<void>()
     let cleaned = 0
@@ -306,7 +306,7 @@ describe('audited plugin host contracts', () => {
     expect(done).toBe(1)
     expect(cleaned).toBe(1)
   })
-  it('D01 does not grant a caller object managed provenance through a retired receiver option', async () => {
+  it('does not grant a caller object managed provenance through a retired receiver option', async () => {
     /** A caller-owned object is an extension context, not a package-constructed Host. */
     const ordinary = {}
     // @ts-expect-error Receiver aliasing is not a public provenance registration path.

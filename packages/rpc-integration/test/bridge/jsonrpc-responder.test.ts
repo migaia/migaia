@@ -48,7 +48,7 @@ function responderEndpoint(
   )
 }
 
-it('[BC14/A60] installed Core provider receives foreign invoke and ID-less notify on the same bridge', async () => {
+it('installed Core provider receives foreign invoke and ID-less notify on the same bridge', async () => {
   const fixture = bridgeFixture()
   const channel = await fixture.open()
   const endpoint = await responderEndpoint(channel)
@@ -83,7 +83,7 @@ it('[BC14/A60] installed Core provider receives foreign invoke and ID-less notif
   }
 })
 
-it('[BC14/A60] full provider error cause retains source/code/name/message/stack on the correlated wire id', async () => {
+it('full provider error cause retains source/code/name/message/stack on the correlated wire id', async () => {
   const fixture = bridgeFixture()
   const channel = await fixture.open()
   const endpoint = await responderEndpoint(channel)
@@ -117,7 +117,7 @@ it('[BC14/A60] full provider error cause retains source/code/name/message/stack 
 /** Caller-defined failed codes remain result metadata, not new Core error-code declarations. */
 const failureCode = 'BUSINESS_DECLINED'
 it.each(['failed', 'not-settled'] as const)(
-  '[BC14/A60/F2] %s and replay retain the same full failure wire graph',
+  '%s and replay retain the same full failure wire graph',
   async (mode) => {
     /** Actual hello negotiates original idempotency metadata before any keyed business call. */
     const fixture = bridgeFixture()
@@ -170,7 +170,7 @@ it.each(['failed', 'not-settled'] as const)(
   }
 )
 
-it('[BC14/A60/F3] frozen scope error keeps native name/stack/cause without mutation', async () => {
+it('frozen scope error keeps native name/stack/cause without mutation', async () => {
   const fixture = bridgeFixture()
   const channel = await fixture.open({
     offer: { ...fixture.options.offer, capabilities: ['deadline@1', 'trace@1', 'idempotency@1'] }

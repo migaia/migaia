@@ -33,7 +33,7 @@ export function fixtureAuthentication() {
     /** Process's native carrier declares string; MessagePort's any category also admits strings. */
     encodedType: RpcTransportEncoding.string,
     /**
-     * SC9(b): sign the actual encrypted representation and encode its signed envelope as wire text.
+     * Sign the actual encrypted representation and encode its signed envelope as wire text.
      *
      * @param {unknown} value Actual encrypted representation supplied by Core.
      * @returns {string} Base64 CBOR text accepted by the actual Process and MessagePort transports.
@@ -49,7 +49,7 @@ export function fixtureAuthentication() {
       ).toString(AuthText.encoding)
     },
     /**
-     * SC9(b): decode signed wire text and verify its encrypted representation before exposing it.
+     * Decode signed wire text and verify its encrypted representation before exposing it.
      *
      * @param {unknown} input Protected string received through Core's actual transport.
      * @returns {string} Original encrypted text produced by the paired encrypt transform.
@@ -69,7 +69,7 @@ export function fixtureAuthentication() {
       return signed.value
     },
     /**
-     * SC9(b): encrypt the original frame and encode its GCM envelope as native-compatible text.
+     * Encrypt the original frame and encode its GCM envelope as native-compatible text.
      *
      * @param {unknown} value Original replay-bound frame supplied by Core.
      * @returns {string} GCM envelope represented as CBOR plus Base64 text.
@@ -90,7 +90,7 @@ export function fixtureAuthentication() {
       ).toString(AuthText.encoding)
     },
     /**
-     * SC9(b): decode GCM text and restore the exact original frame representation expected by Core.
+     * Decode GCM text and restore the exact original frame representation expected by Core.
      *
      * @param {unknown} input Verified encrypted text returned by the paired verify transform.
      * @returns {unknown} Original Process string or structured/byte MessagePort frame.

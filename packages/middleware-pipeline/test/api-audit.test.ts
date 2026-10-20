@@ -4,7 +4,7 @@ import { walkErrorCauses } from '@migaia/utils/error'
 
 describe('audited middleware contracts', () => {
   it.each(['generator', 'async-generator'] as const)(
-    'MP-D01 uses %s runner signals when lifting sync stages',
+    'uses %s runner signals when lifting sync stages',
     async (mode) => {
       /** One runner owns all three sentinel identities, including those returned by lifted stages. */
       const signals = {
@@ -28,7 +28,7 @@ describe('audited middleware contracts', () => {
   )
 
   it.each(['abort', 'inactive'] as const)(
-    'MP-D02 checks %s after an outer stage returns from done',
+    'checks %s after an outer stage returns from done',
     async (kind) => {
       /** Cancellation and host authority may change in supported onion tail work. */
       const controller = new AbortController()
@@ -61,7 +61,7 @@ describe('audited middleware contracts', () => {
     }
   )
 
-  it('MP-D03 reads and validates one immutable option snapshot with getter causes', () => {
+  it('reads and validates one immutable option snapshot with getter causes', () => {
     /** A mode getter cannot change the admitted execution algebra on a second read. */
     let reads = 0
     const pipeline = createPipeline<number>({
@@ -90,7 +90,7 @@ describe('audited middleware contracts', () => {
   })
 
   it.each(['sync', 'async', 'generator', 'async-generator'] as const)(
-    'MP-D04 identifies the original native stage failure in %s mode',
+    'identifies the original native stage failure in %s mode',
     async (mode) => {
       /** A native error keeps its identity and stack while gaining the owning boundary's code. */
       const original = new RangeError('stage failed')
@@ -118,7 +118,7 @@ describe('audited middleware contracts', () => {
   )
 
   it.each([false, true])(
-    'MP-D05 retains both failures when the error combiner throws (frozen: %s)',
+    'retains both failures when the error combiner throws (frozen: %s)',
     async (frozen) => {
       /** Three independently occurring failures must remain distinguishable through the boundary. */
       const stageFailure = new Error('stage failed')
@@ -153,34 +153,31 @@ describe('audited middleware contracts', () => {
     }
   )
 
-  it.each([false, true])(
-    'MP-D06 propagates one downstream failure once (lifted: %s)',
-    async (lifted) => {
-      /** Awaiting next propagates the same failure; it does not create an independent stage failure. */
-      const original = new TypeError('downstream failed')
-      const pipeline = createPipeline<number>({ mode: 'async' })
-      const outer = lifted
-        ? pipeline.lift((value, next) => next(value), 'sync')
-        : async (value: number, next: (value: number) => Promise<void>) => {
-            await next(value)
+  it.each([false, true])('propagates one downstream failure once (lifted: %s)', async (lifted) => {
+    /** Awaiting next propagates the same failure; it does not create an independent stage failure. */
+    const original = new TypeError('downstream failed')
+    const pipeline = createPipeline<number>({ mode: 'async' })
+    const outer = lifted
+      ? pipeline.lift((value, next) => next(value), 'sync')
+      : async (value: number, next: (value: number) => Promise<void>) => {
+          await next(value)
+        }
+    const failure = await pipeline
+      .run(
+        [
+          outer,
+          () => {
+            throw original
           }
-      const failure = await pipeline
-        .run(
-          [
-            outer,
-            () => {
-              throw original
-            }
-          ],
-          1,
-          () => undefined
-        )
-        .catch((error: unknown) => error)
-      expect(failure).toBe(original)
-      expect(failure).not.toBeInstanceOf(AggregateError)
-    }
-  )
-  it('MP-D04 identifies a violation callback failure reached by a late captured next', () => {
+        ],
+        1,
+        () => undefined
+      )
+      .catch((error: unknown) => error)
+    expect(failure).toBe(original)
+    expect(failure).not.toBeInstanceOf(AggregateError)
+  })
+  it('identifies a violation callback failure reached by a late captured next', () => {
     /** A captured next remains callable after run returns; its reporter owns this failure boundary. */
     let late!: (value: number) => void
     const original = new Error('late violation reporter failed')

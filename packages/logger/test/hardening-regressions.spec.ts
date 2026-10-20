@@ -214,7 +214,6 @@ describe('#6 shutdown 失败会把实例卡在 shutting-down', () => {
 
 describe('third adversarial pass', () => {
   it('rejects invalid HTTP retry counts before installation', () => {
-    // LG-T6-8
     for (const retries of [-1, Infinity]) {
       try {
         http({ url: 'https://example.test/logs', retries })
@@ -226,7 +225,6 @@ describe('third adversarial pass', () => {
   })
 
   it('rolls back process listeners when runtime installation fails partway through', async () => {
-    // LG-T6-9
     const listeners = new Map<string, Set<(...args: any[]) => void>>()
     const runtimeProcess = {
       env: {},
@@ -520,7 +518,7 @@ describe('#8（批次0）#snapshotEntry 只隔离 sink，"after" hook 的变更�
 })
 
 describe('second adversarial pass', () => {
-  it('LG-R4-1: batch flush returns after deadline when onBatch never settles', async () => {
+  it('batch flush returns after deadline when onBatch never settles', async () => {
     vi.useFakeTimers()
     try {
       const log: any = new Logger({
@@ -538,7 +536,7 @@ describe('second adversarial pass', () => {
     }
   })
 
-  it('LG-R4-2: one flush shares one absolute deadline across phases and extends targets', async () => {
+  it('one flush shares one absolute deadline across phases and extends targets', async () => {
     vi.useFakeTimers()
     try {
       const log: any = new Logger({
@@ -570,7 +568,7 @@ describe('second adversarial pass', () => {
     expect(outcome).toBe('still-pending')
   })
 
-  it('LG-R3-2 fixed: cross-realm-style thenables (not instanceof Promise) are tracked by flush', async () => {
+  it('fixed: cross-realm-style thenables (not instanceof Promise) are tracked by flush', async () => {
     const log: any = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -592,7 +590,7 @@ describe('second adversarial pass', () => {
     expect(settled).toBe(true) // flush() now waits for the thenable instead of missing it entirely
   })
 
-  it('LG-R3-3 fixed: reentrant shutdown() calls alias to the same in-flight promise instead of starting a second pass', async () => {
+  it('fixed: reentrant shutdown() calls alias to the same in-flight promise instead of starting a second pass', async () => {
     const log: any = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -635,9 +633,9 @@ describe('second adversarial pass', () => {
 })
 
 describe('fifth adversarial pass', () => {
-  it('LG-R5-1: a never-settling onShutdown handler no longer blocks shutdown() past the shared deadline', async () => {
-    // #drain()/flusher()/extends-target waits are all bounded by an absolute deadline (LG-R3-1,
-    // LG-R4-2/3). The onShutdown handler loop that runs *before* any of that was still a raw,
+  it('a never-settling onShutdown handler no longer blocks shutdown() past the shared deadline', async () => {
+    // #drain()/flusher()/extends-target waits are all bounded by an absolute deadline (
+    // /3). The onShutdown handler loop that runs *before* any of that was still a raw,
     // unbounded `await handler(reason)` — a handler shaped like "flush a client then resolve" that
     // has a bug and never settles hangs shutdown() forever, the exact failure mode already closed
     // for every other pending source.
@@ -659,7 +657,7 @@ describe('fifth adversarial pass', () => {
     }
   })
 
-  it('LG-R5-1: shutdown handlers registered after a stuck one are still invoked, only their wait is bounded', async () => {
+  it('shutdown handlers registered after a stuck one are still invoked, only their wait is bounded', async () => {
     vi.useFakeTimers()
     try {
       const log: any = new Logger({
@@ -682,7 +680,7 @@ describe('fifth adversarial pass', () => {
     }
   })
 
-  it('LG-R5-2: waitUntil clears its deadline timer once the raced task settles first', async () => {
+  it('waitUntil clears its deadline timer once the raced task settles first', async () => {
     vi.useFakeTimers()
     try {
       await waitUntil(Promise.resolve('done'), systemScheduler.now() + 3_000)
@@ -692,7 +690,7 @@ describe('fifth adversarial pass', () => {
     }
   })
 
-  it('LG-R5-2: #drain clears its per-round deadline timer once pending work settles before the deadline', async () => {
+  it('#drain clears its per-round deadline timer once pending work settles before the deadline', async () => {
     vi.useFakeTimers()
     try {
       const log: any = new Logger({
@@ -707,8 +705,8 @@ describe('fifth adversarial pass', () => {
     }
   })
 
-  it('LG-R5-3: waitUntil must observe a task even when the deadline has already elapsed, or a later rejection goes unhandled', async () => {
-    // Every waitUntil() call site (flusher loop, extends-target loop, and the LG-R5-1 shutdown
+  it('waitUntil must observe a task even when the deadline has already elapsed, or a later rejection goes unhandled', async () => {
+    // Every waitUntil() call site (flusher loop, extends-target loop, and the shutdown
     // handler loop) can be reached *after* #drain() has already burned the whole deadline — at
     // that point waitUntil's early "deadline already elapsed" branch returns false without ever
     // touching `task`. If the caller built that task fresh (e.g. `Promise.resolve(handler(reason))`)
@@ -731,7 +729,7 @@ describe('fifth adversarial pass', () => {
   })
 })
 
-describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
+describe('scheduler and terminal reporter boundaries', () => {
   it('uses one scheduler snapshot for the host disposer, logger lifecycle, and plugin core', async () => {
     vi.useFakeTimers()
     const schedulerReads = { now: 0, schedule: 0 }
@@ -867,8 +865,8 @@ describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
   })
 })
 
-describe('Round18 logger scheduler and uninstall regressions', () => {
-  it('LG-T19 / AF-126 aggregates uninstall cleanup failures, resets runtime state, and permits reinstall', async () => {
+describe('logger scheduler and uninstall regressions', () => {
+  it('aggregates uninstall cleanup failures, resets runtime state, and permits reinstall', async () => {
     const listeners = new Map<string, Set<(...args: any[]) => void>>()
     const originalExit = (() => undefined as never) as (code?: number) => never
     let exitValue = originalExit
@@ -902,7 +900,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round18-uninstall',
+      randomUUID: () => 'uninstall',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -936,7 +934,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     }
   })
 
-  it('LG-T20 / AF-128 settles HTTP flush when scheduler task cancellation throws and reports once', async () => {
+  it('settles HTTP flush when scheduler task cancellation throws and reports once', async () => {
     const cancelError = new Error('http-timer-cancel-failed')
     const scheduled: Array<() => void> = []
     let cancelCalls = 0
@@ -958,7 +956,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     }
     const failures: unknown[] = []
     const restore = setLoggerRuntimeManager({
-      randomUUID: () => 'round18-http-cancel',
+      randomUUID: () => 'http-cancel',
       defer: (task) => task(),
       write: () => undefined,
       fetch: async () => ({ ok: true, status: 200, headers: { get: () => null } })
@@ -986,7 +984,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     expect(unhandled).toEqual([])
   })
 
-  it('LG-T21/LG-T22/LG-T23 / AF-129 drives process, batch, and HTTP timers through one manual scheduler', async () => {
+  it('drives process, batch, and HTTP timers through one manual scheduler', async () => {
     const scheduler = createManualScheduler()
     const processListeners = new Map<string, (...args: any[]) => void>()
     const exits: number[] = []
@@ -1005,7 +1003,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round18-manual',
+      randomUUID: () => 'manual',
       defer: (task) => task(),
       write: () => undefined,
       fetch: async () => {
@@ -1081,7 +1079,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
   })
 })
 
-describe('Round21 ProcessPlugin scheduler-domain admission', () => {
+describe('ProcessPlugin scheduler-domain admission', () => {
   it('accepts two cores from one injected scheduler source despite separate snapshots', async () => {
     const listeners = new Map<string, Set<(...args: any[]) => void>>()
     const runtimeProcess = {
@@ -1099,7 +1097,7 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
     const scheduler = createManualScheduler()
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round21-same-source',
+      randomUUID: () => 'same-source',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -1149,7 +1147,7 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
     const secondScheduler = createManualScheduler()
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round21-different-domain',
+      randomUUID: () => 'different-domain',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -1214,7 +1212,7 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round21-hostile-option',
+      randomUUID: () => 'hostile-option',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -1232,7 +1230,7 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
   })
 })
 
-describe('Round23 HTTP response-commit cleanup failures', () => {
+describe('HTTP response-commit cleanup failures', () => {
   /** Installs an AbortController whose listener removal fails without affecting abort state. */
   const stubRemovalFailure = (
     removeError: Error,
@@ -1262,9 +1260,9 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
     return () => vi.stubGlobal('AbortController', originalAbortController)
   }
 
-  it('LG-T28 does not retry a successful POST when timer and listener cleanup both fail', async () => {
-    const cancelError = new Error('round23-timer-cancel')
-    const removeError = new Error('round23-listener-remove')
+  it('does not retry a successful POST when timer and listener cleanup both fail', async () => {
+    const cancelError = new Error('timer-cancel')
+    const removeError = new Error('listener-remove')
     const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }))
     const scheduler = {
       now: () => 0,
@@ -1284,7 +1282,7 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
     }
     const restoreAbortController = stubRemovalFailure(removeError)
     const restoreRuntime = setLoggerRuntimeManager({
-      randomUUID: () => 'round23-success-cleanup',
+      randomUUID: () => 'success-cleanup',
       defer: (task) => task(),
       write: () => undefined,
       fetch
@@ -1297,7 +1295,7 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
       logger.onFailure(({ error }: { error: unknown }) => failures.push(error))
-      logger.log('info', 'round23-success')
+      logger.log('info', 'success')
 
       await expect(logger.flush()).resolves.toBeUndefined()
       expect(fetch).toHaveBeenCalledOnce()
@@ -1317,9 +1315,9 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
     expect(unhandled).toEqual([])
   })
 
-  it('LG-T29 keeps status retry count while retaining 503 primary and cleanup errors', async () => {
-    const cancelError = new Error('round23-status-timer-cancel')
-    const removeError = new Error('round23-status-listener-remove')
+  it('keeps status retry count while retaining 503 primary and cleanup errors', async () => {
+    const cancelError = new Error('status-timer-cancel')
+    const removeError = new Error('status-listener-remove')
     const fetch = vi.fn(async () => ({ ok: false, status: 503, headers: { get: () => '0' } }))
     const scheduler = {
       now: () => 0,
@@ -1339,7 +1337,7 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
     }
     const restoreAbortController = stubRemovalFailure(removeError, (call) => call % 2 === 1)
     const restoreRuntime = setLoggerRuntimeManager({
-      randomUUID: () => 'round23-status-cleanup',
+      randomUUID: () => 'status-cleanup',
       defer: (task) => task(),
       write: () => undefined,
       fetch
@@ -1352,7 +1350,7 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
         plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
       })
       logger.onFailure(({ error }: { error: unknown }) => failures.push(error))
-      logger.log('info', 'round23-status')
+      logger.log('info', 'status')
 
       await expect(logger.flush()).resolves.toBeUndefined()
       expect(fetch).toHaveBeenCalledTimes(2)
@@ -1467,8 +1465,8 @@ describe('Logger-owned scheduler option admission', () => {
   })
 })
 
-describe('Round20 logger uninstall isolation', () => {
-  it('LG-T24 / LG-R23 drains buffered items, cancels every batcher, and isolates reinstall', async () => {
+describe('logger uninstall isolation', () => {
+  it('drains buffered items, cancels every batcher, and isolates reinstall', async () => {
     const scheduled: Array<() => void> = []
     const cancelError = new Error('batch-cancel-failed')
     let cancelCalls = 0
@@ -1490,7 +1488,7 @@ describe('Round20 logger uninstall isolation', () => {
     const oldBatches: string[][] = []
     const newBatches: string[][] = []
     const restore = setLoggerRuntimeManager({
-      randomUUID: () => `round20-${scheduled.length}`,
+      randomUUID: () => `scheduled-${scheduled.length}`,
       defer: (task) => {
         deferCalls += 1
         task()
@@ -1568,7 +1566,7 @@ describe('Round20 logger uninstall isolation', () => {
     }
   })
 
-  it('LG-T25 / LG-R23 contains synchronous batch callback failure without throwing from push', async () => {
+  it('contains synchronous batch callback failure without throwing from push', async () => {
     const callbackError = new Error('batch-callback-failed')
     const failures: Array<{ source: string; error: unknown }> = []
     const logger: any = new Logger({

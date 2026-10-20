@@ -31,7 +31,7 @@ describe('contract guarded property policy', () => {
     ])
   })
 
-  it('[A107] forwarding metadata adds no own-property trap to ordinary errors', () => {
+  it('forwarding metadata adds no own-property trap to ordinary errors', () => {
     /** Original error serialization reads fixed fields, never unrelated own descriptors. */
     let ownReads = 0
     /** The proxy is an ordinary supported thrown error with no package-minted route. */

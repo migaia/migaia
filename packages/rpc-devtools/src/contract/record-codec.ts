@@ -15,7 +15,7 @@ import {
   type IRpcDevtoolsRecordHeader
 } from './record.js'
 
-/** SC9(b): convert captured bytes to the record's Base64 text without changing their backing. */
+/** Convert captured bytes to the record's Base64 text without changing their backing. */
 function encodeBytes(bytes: Uint8Array): string {
   /** The result belongs to this one offline conversion; collection never executes this loop. */
   let text = ''
@@ -38,7 +38,7 @@ function decodeBytes(text: unknown): Uint8Array {
     throw new TypeError(RpcDevtoolsErrorText.recordBytesInvalid)
   /** Padding determines the exact owned result size, including an empty byte payload. */
   const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0
-  /** SC9(b): decoding Base64 text requires a new byte representation owned by the imported record. */
+  /** Decoding Base64 text requires a new byte representation owned by the imported record. */
   const bytes = new Uint8Array((text.length / 4) * 3 - padding)
   for (let i = 0, offset = 0; i < text.length; i += 4) {
     /** The low unused bits of the final quartet must be zero for canonical encoding. */
@@ -97,13 +97,13 @@ function assertEvent(value: unknown): asserts value is IRpcDevtoolsRecordEvent {
     throw new TypeError(RpcDevtoolsErrorText.recordEventInvalid)
 }
 
-/** SC9(b): byte-tag objects provide the record representation; other values keep their references. */
+/** Byte-tag objects provide the record representation; other values keep their references. */
 function replaceBytes(this: object, key: string, value: unknown): unknown {
-  /** SC9(b): retain the original data-slot reference before a byte subtype's toJSON hides its brand. */
+  /** Retain the original data-slot reference before a byte subtype's toJSON hides its brand. */
   const original: unknown = Object.getOwnPropertyDescriptor(this, key)?.value ?? value
   if (original instanceof Uint8Array)
     return { [RpcDevtoolsRecordField.bytes]: encodeBytes(original) }
-  /** SC9(b): this byte view changes representation only and shares the original ArrayBuffer. */
+  /** This byte view changes representation only and shares the original ArrayBuffer. */
   if (original instanceof ArrayBuffer)
     return { [RpcDevtoolsRecordField.bytes]: encodeBytes(new Uint8Array(original)) }
   return value
@@ -139,13 +139,13 @@ function invalidRecord(cause: unknown): never {
 export function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string {
   try {
     assertHeader(record.header)
-    /** SC9(b): encode the header as NDJSON text; no retained input object is copied. */
+    /** Encode the header as NDJSON text; no retained input object is copied. */
     const lines = [JSON.stringify(record.header)]
     for (const event of record.events) {
       assertEvent(event)
       /**
-       * SC9(b): the encode wrapper substitutes the serialized error graph required by NDJSON; every
-       * other event field retains its reference, including content and detail.
+       * The encode wrapper substitutes the serialized error graph required by NDJSON; every other
+       * event field retains its reference, including content and detail.
        */
       const wire =
         event.error === undefined
@@ -185,16 +185,16 @@ export function decodeRpcDevtoolsRecord(text: string): IRpcDevtoolsRecord {
      */
     const lines = text.split('\n')
     if (lines[lines.length - 1] === '') lines.pop()
-    /** SC9(b): record text becomes a new header representation; byte revival applies only to events. */
+    /** Record text becomes a new header representation; byte revival applies only to events. */
     const header: unknown = JSON.parse(lines[0])
     assertHeader(header)
     /** Retained event order is file order; importing never sorts or aligns the timestamps. */
     const events: IRpcDevtoolsRecordEvent[] = []
     for (let i = 1; i < lines.length; i++) {
-      /** SC9(b): each NDJSON line becomes its required event/byte representation once. */
+      /** Each NDJSON line becomes its required event/byte representation once. */
       const event: unknown = JSON.parse(lines[i], reviveBytes)
       assertEvent(event)
-      /** SC9(b): the decode wrapper replaces wire error with native error and retains other fields. */
+      /** The decode wrapper replaces wire error with native error and retains other fields. */
       events.push(
         event.error === undefined ? event : { ...event, error: deserializeRpcError(event.error) }
       )

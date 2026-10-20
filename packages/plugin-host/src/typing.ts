@@ -133,8 +133,8 @@ export type IPluginSetup<TConfig extends IPluginConfig, TSetup> = (
 
 /**
  * Reexports error codes from their canonical `./error-code.ts` declaration site.
- * `docs/contracts/error-codes.md` §3.5 requires one `src/error-code.ts` per package. This preserves
- * the existing import path without changing code values. New code imports directly from
+ * `docs/contracts/error-codes.md` requires one `src/error-code.ts` per package. This preserves the
+ * existing import path without changing code values. New code imports directly from
  * `./error-code.js`.
  */
 export { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.js'

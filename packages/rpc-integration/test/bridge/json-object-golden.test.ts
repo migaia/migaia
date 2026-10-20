@@ -28,8 +28,8 @@ function observeInner(value: unknown): unknown {
   }
 }
 
-describe('I21 C2 fixed-seed frame equivalence', () => {
-  it('[EQ1] compares every physical frame and inner result for 10000 seeded payloads', async () => {
+describe('fixed-seed frame equivalence', () => {
+  it('compares every physical frame and inner result for 10000 seeded payloads', async () => {
     /** Two independently assembled endpoints differ only by the public fallback middleware. */
     const fixtures = [bridgeFixture(), bridgeFixture()]
     /** Both negotiated channels use identical peer contract, clocks and deterministic IDs. */

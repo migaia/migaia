@@ -3,7 +3,7 @@ import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contr
 import { peerFrame } from './fixture.js'
 
 describe('JSON-RPC byte framing', () => {
-  it('[A11] preserves the same excerpt-free JSON engine failure', () => {
+  it('preserves the same excerpt-free JSON engine failure', () => {
     const originalParse = JSON.parse
     let original: unknown
     const spy = vi.spyOn(JSON, 'parse').mockImplementation((text, reviver) => {
@@ -26,7 +26,7 @@ describe('JSON-RPC byte framing', () => {
     expect(wrapped).toMatchObject({ code: 'JSONRPC_FRAME_INVALID' })
     expect((wrapped as Error).cause).toBe(original)
   })
-  it('[A1] splits multibyte bodies at every byte and delivers concatenated frames once', () => {
+  it('splits multibyte bodies at every byte and delivers concatenated frames once', () => {
     const first = { jsonrpc: '2.0', id: 'first', result: '你好🙂' }
     const second = { jsonrpc: '2.0', id: 'second', result: null }
     const encoded = encodeJsonRpcFrame(first)
@@ -45,7 +45,7 @@ describe('JSON-RPC byte framing', () => {
     'X-Trace: one\r\ncontent-length: 12',
     'Content-Type: application/vscode-jsonrpc; charset=utf8\r\nContent-Length: 12',
     'Content-Type: application/json; charset=UTF-8\r\nContent-Length: 12'
-  ])('[A1] accepts compatible header %s', (header) => {
+  ])('accepts compatible header %s', (header) => {
     expect(createJsonRpcFrameDecoder().push(Buffer.from(`${header}\r\n\r\n{"value":12}`))).toEqual([
       { value: 12 }
     ])
@@ -59,13 +59,13 @@ describe('JSON-RPC byte framing', () => {
     'Content-Length: 12\n',
     'Content-Type: text/plain; charset=latin1\r\nContent-Length: 12',
     `X-Trace: ${'x'.repeat(1024)}\r\nContent-Length: 12`
-  ])('[A1] rejects invalid header %s', (header) => {
+  ])('rejects invalid header %s', (header) => {
     expect(() =>
       createJsonRpcFrameDecoder().push(Buffer.from(`${header}\r\n\r\n{"value":12}`))
     ).toThrow(expect.objectContaining({ code: 'JSONRPC_FRAME_INVALID' }))
   })
   it.each([Uint8Array.of(0xff), Buffer.from('\ufeff{}'), Buffer.from('not-json')])(
-    '[A1] rejects invalid body encoding/JSON',
+    'rejects invalid body encoding/JSON',
     (body) => {
       const bytes = Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body])
       expect(() => createJsonRpcFrameDecoder().push(bytes)).toThrow(
@@ -74,7 +74,7 @@ describe('JSON-RPC byte framing', () => {
     }
   )
   it.each(['Content-Len', 'Content-Length: 12\r\n\r\n{"value":'])(
-    '[A1] rejects truncated EOF and clears retained bytes on release',
+    'rejects truncated EOF and clears retained bytes on release',
     (text) => {
       const decoder = createJsonRpcFrameDecoder()
       decoder.push(Buffer.from(text))

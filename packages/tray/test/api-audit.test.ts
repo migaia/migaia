@@ -49,7 +49,7 @@ describe('Tray API audit', () => {
   })
 })
 
-/** S01 observes the native caller listener and the public loader context after successful commit. */
+/** Observes the native caller listener and the public loader context after successful commit. */
 it('Tray-S01 ends admission cancellation while generation custody keeps the artifact', async () => {
   /** Actual managed Host owns the installed generation until explicit cleanup. */
   const host = await createHost({

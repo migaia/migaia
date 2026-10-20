@@ -23,7 +23,7 @@ const entry = fileURLToPath(new URL('./fixtures/plugin-probe-child.ts', import.m
 type ICounts = Record<string, { inbound: number; outbound: number }>
 
 for (const family of ['process', 'thread', 'coroutine'] as const) {
-  it(`[A4] ${family} Plugin probe observes both sides of two genuine connections`, async () => {
+  it(`${family} Plugin probe observes both sides of two genuine connections`, async () => {
     /** A real parent Host owns both distinct Plugin installations and original resource scopes. */
     const host = coroutineTestHost()
     /** Shared observer must observe each connection independently rather than one aggregate count. */
@@ -106,7 +106,7 @@ for (const family of ['process', 'thread', 'coroutine'] as const) {
           /** Raw channel belongs to this exact launcher handle. */
           let handle: Awaited<ReturnType<typeof launcher.launch>> | undefined
           /** Authentication fixture data is confined to native bootstrap and transport handshake. */
-          const token = `a4-process-fixture-${index}`
+          const token = `process-fixture-${index}`
           /** This complete existing deployment delegates execution and channel ownership inward. */
           const spawn: ISpawnProcessPluginDeployment = {
             kind: 'spawn',
@@ -114,7 +114,7 @@ for (const family of ['process', 'thread', 'coroutine'] as const) {
             wire: 'native',
             token,
             supervision: {
-              id: `a4-process-${index}`,
+              id: `process-${index}`,
               spec: {
                 command: process.execPath,
                 args: [entry],
@@ -221,17 +221,17 @@ for (const family of ['process', 'thread', 'coroutine'] as const) {
         assert.equal(
           Object.keys(child.counts).length,
           1,
-          '[A4] child Plugin forwards its probe to its actual endpoint'
+          'child Plugin forwards its probe to its actual endpoint'
         )
         for (const count of Object.values(child.counts)) {
-          assert.ok(count.inbound > 0, '[A4] child sees inbound business requests')
-          assert.ok(count.outbound > 0, '[A4] child sees outbound reverse requests')
+          assert.ok(count.inbound > 0, 'child sees inbound business requests')
+          assert.ok(count.outbound > 0, 'child sees outbound reverse requests')
         }
         /** No aggregate threshold can hide a missing second parent connection. */
         const parent = counts[`a4-${family}-parent-${index}`]
-        assert.ok(parent, '[A4] parent probe records every installed connection')
-        assert.ok(parent.inbound > 0, '[A4] parent sees reverse business requests')
-        assert.ok(parent.outbound > 0, '[A4] parent sees forward business requests')
+        assert.ok(parent, 'parent probe records every installed connection')
+        assert.ok(parent.inbound > 0, 'parent sees reverse business requests')
+        assert.ok(parent.outbound > 0, 'parent sees forward business requests')
       }
       assert.equal(Object.keys(counts).length, 2)
     } finally {

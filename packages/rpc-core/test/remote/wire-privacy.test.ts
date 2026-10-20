@@ -29,8 +29,8 @@ function contractReadFailure(original: Error): Error {
   return failure!
 }
 
-/** K232 keeps hostile-input failures observable locally without disclosing their causes remotely. */
-describe('K232 local contract error privacy', () => {
+/** Keeps hostile-input failures observable locally without disclosing their causes remotely. */
+describe('local contract error privacy', () => {
   it.each(['remote', 'contract'] as const)(
     'preserves %s original cause locally and sends only code/message',
     async (kind) => {

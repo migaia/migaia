@@ -106,7 +106,7 @@ function objectFixture(codec: string = RpcCodecId.json) {
 }
 
 describe('held object channel sequencing and retirement', () => {
-  it('[HC30] refuses exchange/open before admission and retains the first raw close reason', async () => {
+  it('refuses exchange/open before admission and retains the first raw close reason', async () => {
     /** This held resource has no prepared offer or accepted handshake. */
     const fixture = objectFixture()
     /** Construction exposes operations while keeping actual I/O cold. */
@@ -129,7 +129,7 @@ describe('held object channel sequencing and retirement', () => {
     await fixture.closing
   })
 
-  it('[HC31] shares one negotiation Promise and rejects replacing an in-flight local offer', async () => {
+  it('shares one negotiation Promise and rejects replacing an in-flight local offer', async () => {
     /** The real peer reply passes the common handshake grammar before activation. */
     const fixture = objectFixture()
     /** Only this held connection retains its prepared offer and published negotiation operation. */
@@ -147,7 +147,7 @@ describe('held object channel sequencing and retirement', () => {
     await connection.close()
   })
 
-  it('[HC32] rejects an accepted non-JSON codec before activating the held object resource', async () => {
+  it('rejects an accepted non-JSON codec before activating the held object resource', async () => {
     /** A syntactically valid offered codec can negotiate but cannot supply this JSON object carrier. */
     const fixture = objectFixture('fixture-codec')
     /** The actual exchange still passes canonical handshake admission before the carrier rejects it. */
@@ -162,7 +162,7 @@ describe('held object channel sequencing and retirement', () => {
     await connection.close()
   })
 
-  it('[HC33] reuses its opened channel, default scheduler and diagnostic close Promise', async () => {
+  it('reuses its opened channel, default scheduler and diagnostic close Promise', async () => {
     /** Genuine JSON negotiation supplies the one internally retained accepted agreement. */
     const fixture = objectFixture()
     /** The held owner constructs its transport only after the actual peer reply completes. */
@@ -297,7 +297,7 @@ async function listenerFixture() {
 
 describe('runtime adapter source preparation operations', () => {
   it.each(['selected', 'explicit', 'defaulted'] as const)(
-    '[HC16] gives %s local identity its established precedence and reuses its compiled context',
+    'gives %s local identity its established precedence and reuses its compiled context',
     async (kind) => {
       /** Explicit caller identity must keep precedence over adapter-selected local defaults. */
       const explicit = { name: 'explicit', instanceId: 'explicit-1' }
@@ -323,7 +323,7 @@ describe('runtime adapter source preparation operations', () => {
   )
 
   it.each(['wrongPeer', 'unsupportedCapability'] as const)(
-    '[HC17] rejects %s offers before invoking any resource factory',
+    'rejects %s offers before invoking any resource factory',
     (kind) => {
       /** One Core preparation owns compiled local roots and any original Host context. */
       const preparation = prepareAdapterPeer(
@@ -344,7 +344,7 @@ describe('runtime adapter source preparation operations', () => {
   )
 
   it.each([undefined, 'child-label'])(
-    '[HC18] retains actual launch request metadata for child name %s and removes it after launch',
+    'retains actual launch request metadata for child name %s and removes it after launch',
     async (childName) => {
       /** One Core preparation owns compiled local roots and any original Host context. */
       const preparation = prepareAdapterPeer(
@@ -371,7 +371,7 @@ describe('runtime adapter source preparation operations', () => {
     }
   )
 
-  it('[HC19] narrowed views retain real signals, ownership and providers without recreating preparation', async () => {
+  it('narrowed views retain real signals, ownership and providers without recreating preparation', async () => {
     /** The original startup signal stays attached to this preparation through narrowing. */
     const initial = new AbortController().signal
     /** The Host shutdown signal keeps its original identity on every narrowing view. */
@@ -408,7 +408,7 @@ describe('runtime adapter source preparation operations', () => {
     )
   })
 
-  it('[HC20] an unowned narrowed view preserves fallback providers without closing borrowed resources', () => {
+  it('an unowned narrowed view preserves fallback providers without closing borrowed resources', () => {
     /** This cached view changes transfer policy while sharing original context and resource owners. */
     const narrowed = prepareAdapterPeer({ report: vi.fn() }, 'local').withoutTransfer()
     /** Ordinary local providers remain available when no Host snapshot owns their selection. */
@@ -422,7 +422,7 @@ describe('runtime adapter source preparation operations', () => {
     expect(narrowed.lifecycleSignal).toBeUndefined()
   })
 
-  it('[HC21] rejects a copied message resource before calling its acquisition operations', async () => {
+  it('rejects a copied message resource before calling its acquisition operations', async () => {
     /** Only this canonical held resource can supply initial-capture preparation provenance. */
     const genuine = createEventEmitterMessageResource({
       postMessage: vi.fn(),
@@ -443,7 +443,7 @@ describe('runtime adapter source preparation operations', () => {
   })
 
   it.each(['name', 'instanceId'] as const)(
-    '[HC28] refuses an automatic resource %s mismatch and removes its initial capture',
+    'refuses an automatic resource %s mismatch and removes its initial capture',
     async (field) => {
       /** The actual raw initial receiver supplies Core's admitted child identity. */
       const events = new EventEmitter()
@@ -492,7 +492,7 @@ describe('runtime adapter source preparation operations', () => {
 })
 
 describe('listener resource custody and selection', () => {
-  it('[HC22] refuses copied operations, missing preparation and another connection governor', async () => {
+  it('refuses copied operations, missing preparation and another connection governor', async () => {
     /** The fixture keeps the accepted channel, session, scope and cleanup operations together. */
     const owner = await listenerFixture()
     try {
@@ -553,7 +553,7 @@ describe('listener resource custody and selection', () => {
   })
 
   it.each(['absent', 'ambiguous', 'foreign'] as const)(
-    '[HC23] refuses %s current services before request/notify/stream/group/outcome dispatch',
+    'refuses %s current services before request/notify/stream/group/outcome dispatch',
     (kind) => {
       /** Local configuration supplies source policy without asserting accepted resource provenance. */
       const options = { self: { name: 'local', instanceId: 'local-1' }, report: vi.fn() }
@@ -607,7 +607,7 @@ describe('listener resource custody and selection', () => {
   )
 
   it.each([false, true])(
-    '[HC24] empty listener descriptions reflect native closed=%s without inventing sessions',
+    'empty listener descriptions reflect native closed=%s without inventing sessions',
     async (closed) => {
       /** Local configuration supplies source policy without asserting accepted resource provenance. */
       const options = { self: { name: 'local', instanceId: 'local-1' }, report: vi.fn() }
@@ -642,7 +642,7 @@ describe('listener resource custody and selection', () => {
     }
   )
 
-  it('[HC25] genuine session attachment and peering join one resource and retain original close Promise', async () => {
+  it('genuine session attachment and peering join one resource and retain original close Promise', async () => {
     /** The fixture keeps the accepted channel, session, scope and cleanup operations together. */
     const owner = await listenerFixture()
     try {
@@ -693,7 +693,7 @@ describe('listener resource custody and selection', () => {
 })
 
 describe('adapter registration and provider scope policies', () => {
-  it('[HC29] reports one rejected observer while preserving the other observer and selected invalid limits', async () => {
+  it('reports one rejected observer while preserving the other observer and selected invalid limits', async () => {
     /** The fixture keeps the accepted channel, session, scope and cleanup operations together. */
     const owner = await listenerFixture()
     try {
@@ -734,7 +734,7 @@ describe('adapter registration and provider scope policies', () => {
   })
 
   it.each(['none', 'installed', 'close', 'both'] as const)(
-    '[HC26] retains %s lifecycle callbacks through actual PluginHost installation and disposal',
+    'retains %s lifecycle callbacks through actual PluginHost installation and disposal',
     async (kind) => {
       /**
        * Reuse existing endpoint and lifecycle observations rather than add another registration
@@ -779,7 +779,7 @@ describe('adapter registration and provider scope policies', () => {
     }
   )
 
-  it('[HC27] retains a selected idempotency store and refuses unconstructed principal metadata', async () => {
+  it('retains a selected idempotency store and refuses unconstructed principal metadata', async () => {
     /** The fixture keeps the accepted channel, session, scope and cleanup operations together. */
     const owner = await listenerFixture()
     try {

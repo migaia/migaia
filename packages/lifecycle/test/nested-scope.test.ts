@@ -4,13 +4,13 @@ import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
 import { LifecycleErrorCode } from '../src/error-code'
 
 /**
- * L-T18（`lifecycle-extraction.sdd.md` §4.5, §5.4）: "异步父可收纳同步子错误；同步父拒绝异步子 scope"。
+ * "异步父可收纳同步子错误；同步父拒绝异步子 scope"。
  *
  * `SyncLifecycleScope` 拒绝拥有 `LifecycleScope`/`ProvisionalScope` 实例已由
- * `sync-lifecycle-scope.test.ts`（L-T4）覆盖。本文件补上此前缺失的另一半：一个真实的异步 `LifecycleScope` 拥有一个真实的同步
+ * `sync-lifecycle-scope.test.ts`覆盖。本文件补上此前缺失的另一半：一个真实的异步 `LifecycleScope` 拥有一个真实的同步
  * `SyncLifecycleScope` 子容器，子容器内部失败时， 错误必须折进外层的错误策略——既不会绕过外层策略直接抛穿，也不会在外层完全不知情的情况下丢失。
  */
-describe('L-T18 nested scope: an async LifecycleScope can absorb a sync child scope’s error', () => {
+describe('nested scope: an async LifecycleScope can absorb a sync child scope’s error', () => {
   it('the child’s AggregateError (thrown synchronously by its own throw policy) is folded into the parent’s `collect` result, not thrown past it', async () => {
     const child = createSyncLifecycleScope({ errorPolicy: 'throw' })
     child.own(
@@ -118,7 +118,7 @@ describe('L-T18 nested scope: an async LifecycleScope can absorb a sync child sc
     expect((reported[0] as Error).message).toBe('child failure, only reported')
   })
 
-  it('L-T4 cross-check: a real SyncLifecycleScope still rejects owning a real LifecycleScope instance', () => {
+  it('cross-check: a real SyncLifecycleScope still rejects owning a real LifecycleScope instance', () => {
     const asyncChild = createLifecycleScope()
     const syncParent = createSyncLifecycleScope()
     expect(() =>

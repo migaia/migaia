@@ -6,7 +6,7 @@ import { createNativeProcessOffer, createProcessTransport } from '@migaia/rpc-pr
 import { RpcBatchPhysical } from '@migaia/rpc-contract'
 import { bridgeFixture, flush, request } from '../bridge/fixture.js'
 
-it('[closure A3] observes one physical JSON-RPC batch with its existing member count', async () => {
+it('observes one physical JSON-RPC batch with its existing member count', async () => {
   /** The existing bridge fixture negotiates the real batch capability and physical writer. */
   const fixture = bridgeFixture()
   /** No observation wrapper or parser replacement surrounds the final public channel. */
@@ -34,7 +34,7 @@ it('[closure A3] observes one physical JSON-RPC batch with its existing member c
   }
 })
 
-it('[closure A3] preserves byte send settlement and measures a real false-write drain through IPC', async () => {
+it('preserves byte send settlement and measures a real false-write drain through IPC', async () => {
   /** These native streams exercise backpressure without introducing another carrier implementation. */
   const inputs = [new PassThrough(), new PassThrough()] as const
   /** A one-byte high-water mark makes each framed write use Node's actual false/drain contract. */

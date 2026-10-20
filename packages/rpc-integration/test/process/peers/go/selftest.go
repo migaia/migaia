@@ -464,7 +464,7 @@ func streamVectors(suite *vectorSuite, vector record) {
 	suite.check("stream/handshake/minor", compatible && chosen.Minor == integerField(handshake, "negotiatedMinor") && !slices.Contains(chosen.Capabilities, "stream@1"))
 }
 
-// runSelftest executes the current wire vectors and U36 runtime baseline without obsolete v1 contracts.
+// runSelftest executes the current wire vectors and the runtime baseline without obsolete v1 contracts.
 func runSelftest(directory string) int {
 	suite := &vectorSuite{}
 	if directory == "" {
@@ -603,7 +603,7 @@ func u36Request(id, method string, payload any) record {
 func u36Replies(output *bytes.Buffer) ([]record, error) {
 	accepted, err := receive(output, true)
 	if err != nil || accepted["step"] != "accept" {
-		return nil, errors.New("U36 session did not accept")
+		return nil, errors.New("runtime baseline session did not accept")
 	}
 	var replies []record
 	for {

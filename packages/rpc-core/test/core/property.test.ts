@@ -214,7 +214,7 @@ describe('property invariants', () => {
   it('roundtrips every canonically framed string in physical order', () => {
     fc.assert(
       fc.property(fc.string(), fc.integer({ min: 4, max: 32 }), (value, chunkBytes) => {
-        /** Uses D13's canonical framer instead of the removed WebRPC chunk owner. */
+        /** Uses the canonical framer instead of the removed WebRPC chunk owner. */
         const framer = createStringFramer({
           chunkBytes,
           maxMessageBytes: Math.max(chunkBytes, value.length)

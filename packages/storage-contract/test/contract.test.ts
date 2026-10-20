@@ -210,13 +210,13 @@ describe('信号结构等价（真实 AbortSignal 满足 IAbortSignal）', () =>
 })
 
 describe('V2 capability contracts', () => {
-  it('SWV2-T04 exports runtime-neutral capability protocols', () => {
+  it('exports runtime-neutral capability protocols', () => {
     expect(typeof isStorageCapabilities).toBe('function')
     expect(typeof isSecondaryIndexRecordStore).toBe('function')
     expect(typeof isChangeFeedStore).toBe('function')
   })
 
-  it('SWV2-T04 capability modules have no host-layer imports', () => {
+  it('capability modules have no host-layer imports', () => {
     const sourceRoot = resolve(process.cwd(), 'src')
     for (const moduleName of ['secondary-index.ts', 'change-feed.ts']) {
       const source = readFileSync(resolve(sourceRoot, moduleName), 'utf8')
@@ -227,7 +227,7 @@ describe('V2 capability contracts', () => {
     }
   })
 
-  it('SWV2-T05 legacy capability descriptors default new flags to false', () => {
+  it('legacy capability descriptors default new flags to false', () => {
     const capabilities = {
       syncRead: true,
       binary: false,
@@ -244,7 +244,7 @@ describe('V2 capability contracts', () => {
     })
   })
 
-  it('SWV2-T05 secondary-index and change-feed guards fail closed on partial shapes', () => {
+  it('secondary-index and change-feed guards fail closed on partial shapes', () => {
     const partial = { ensureRecordIndexes: () => Promise.resolve() }
     expect(isSecondaryIndexRecordStore(partial)).toBe(false)
     expect(isChangeFeedStore({ subscribeChanges: 1 })).toBe(false)
@@ -256,7 +256,7 @@ describe('V2 capability contracts', () => {
     )
   })
 
-  it('SWV2-T05 snapshots base capabilities once before added-method inspection', () => {
+  it('snapshots base capabilities once before added-method inspection', () => {
     let capabilityReads = 0
     const capabilities = {
       syncRead: false,
@@ -304,7 +304,7 @@ describe('V2 capability contracts', () => {
     expect(capabilityReads).toBe(1)
   })
 
-  it('SWV2-T05 positively narrows complete secondary-index and change-feed stores', () => {
+  it('positively narrows complete secondary-index and change-feed stores', () => {
     const capabilities = {
       syncRead: false,
       binary: true,
@@ -364,7 +364,7 @@ describe('V2 capability contracts', () => {
     expect(changeMethodReads).toBe(2)
   })
 
-  it('SWV2-T05 rejects throwing and alternating capability accessors without escaping', () => {
+  it('rejects throwing and alternating capability accessors without escaping', () => {
     const base = {
       backend: 'memory' as const,
       get: async () => null,
@@ -414,7 +414,7 @@ describe('V2 capability contracts', () => {
     expect(subscribeReads).toBe(2)
   })
 
-  it('SWV2-T05 asChangeFeedStore reads a hostile method once and preserves unsupported identity', () => {
+  it('asChangeFeedStore reads a hostile method once and preserves unsupported identity', () => {
     let subscribeReads = 0
     const store = {
       backend: 'memory' as const,

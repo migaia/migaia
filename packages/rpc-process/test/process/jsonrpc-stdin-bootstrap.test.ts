@@ -37,11 +37,11 @@ const descriptor = {
 }
 
 describe('JSON-RPC supervised stdin bootstrap', () => {
-  it('[DX6b] admits a stdin bootstrap through the public descriptor parser', () => {
+  it('admits a stdin bootstrap through the public descriptor parser', () => {
     expect(parseProcessPluginDescriptor(descriptor)).toMatchObject(descriptor)
   })
 
-  it('[DX6b] passes the raw token bootstrap to a supervised JSON-RPC launcher', async () => {
+  it('passes the raw token bootstrap to a supervised JSON-RPC launcher', async () => {
     /** One sentinel launch failure stops before channel assembly without creating an OS child. */
     const launchFailure = new Error('fixture launch boundary reached')
     /** The native preparation reveals whether the public source injected a TS-only bootstrap. */

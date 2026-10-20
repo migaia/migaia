@@ -1,86 +1,86 @@
 {
-  "revision": "I20-lane-H-2026-10-02",
+  "revision": "lane-H-2026-10-02",
   "status": "implemented",
   "supportUnitsFrozen": true,
-  "supportUnitsFreezePrerequisite": "Frozen supported native20 and bridge48; K251 user ruling removes mandatory public TypeScript JSON-RPC responder, initiator retained. No supported unit removed.",
+  "supportUnitsFreezePrerequisite": "Frozen supported native20 and bridge48; a user ruling removes mandatory public TypeScript JSON-RPC responder, initiator retained. No supported unit removed.",
   "acceptance": [
     {
-      "id": "A1",
+      "id": "peer-delivery",
       "evidenceOwner": "H / E peer delivery",
       "supportUnits": "native \u00d7 python,rust,go,typescript \u00d7 spawn-stdio,rendezvous-unix",
       "assertions": [
         {
-          "id": "A1.1",
+          "id": "peer-delivery.1",
           "assertion": "hello/describe before publication; json only",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.2",
+          "id": "peer-delivery.2",
           "assertion": "request value and error source/code/stack/two cause layers",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.3",
+          "id": "peer-delivery.3",
           "assertion": "one-way independent received count and order",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.4",
+          "id": "peer-delivery.4",
           "assertion": "cancel reason restored",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.5",
+          "id": "peer-delivery.5",
           "assertion": "generator and async-generator each >=3 yields in order",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.6",
+          "id": "peer-delivery.6",
           "assertion": "Plugin owned tree exits / borrowed PID and listener remain usable",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.7",
+          "id": "peer-delivery.7",
           "assertion": "Host use/describe/proxy request/local name-config resolver",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.8",
+          "id": "peer-delivery.8",
           "assertion": "Host unUse removes registration; release respects PID ownership",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.9",
+          "id": "peer-delivery.9",
           "assertion": "TS peer imports public built exports; no codec/frame/handshake implementation",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.10",
+          "id": "peer-delivery.10",
           "assertion": "native idle 20000ms, >=3 pong, zero unhealthy restart, stable PID",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
           "note": "Public facade feature calls; cause/cancel/core trace use the exact public composed endpoint created by that facade. Tree evidence is separately in conformance-resources.test.ts."
         },
         {
-          "id": "A1.11",
+          "id": "peer-delivery.11",
           "assertion": "release sends exactly one close; peer sends no new request afterwards",
           "status": "verified",
           "evidence": "conformance.test.ts: 20 native facade cases +5 actual 20s default-health receipts; h-native-focused.log; h-resource-final-focused.log",
@@ -89,68 +89,68 @@
       ]
     },
     {
-      "id": "A2",
+      "id": "upstream-vectors",
       "evidenceOwner": "H / E peer delivery",
       "supportUnits": "all applicable upstream cases \u00d7 four languages",
       "assertions": [
         {
-          "id": "A2.1",
+          "id": "upstream-vectors.1",
           "assertion": "control frozen 1.0 acceptance and warning sequence unchanged",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.2",
+          "id": "upstream-vectors.2",
           "assertion": "stream 1.1 evolvable reclassification without frozen-byte change",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.3",
+          "id": "upstream-vectors.3",
           "assertion": "missing required 1.1 capabilities rejected",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.4",
+          "id": "upstream-vectors.4",
           "assertion": "first violation/pointer exactly matches vector",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.5",
+          "id": "upstream-vectors.5",
           "assertion": "wire-error graph/source/code/stack/cause matches; only absent case may skip by ID",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.6",
+          "id": "upstream-vectors.6",
           "assertion": "remote schema/mode/idempotent and Host retained-method vectors",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.7",
+          "id": "upstream-vectors.7",
           "assertion": "stream credit/seq/measurement matches",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.8",
+          "id": "upstream-vectors.8",
           "assertion": "4-byte big-endian framing/truncation/limit vectors byte equality",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
           "note": "Native missing stream capability is refused by the public composed stream admission port after legal negotiation; no invented handshake requirement."
         },
         {
-          "id": "A2.9",
+          "id": "upstream-vectors.9",
           "assertion": "non-JS independently evaluates; totals or JSON.parse insufficient",
           "status": "verified",
           "evidence": "conformance-vectors.test.ts: actual four independent selftests plus four real missing-stream/zero-write cells; h-vector-finish-focused.log",
@@ -159,208 +159,208 @@
       ]
     },
     {
-      "id": "A3",
+      "id": "bridge-responder",
       "evidenceOwner": "H / E peer delivery / bridge owner",
       "supportUnits": "jsonrpc responder: python, rust, go; both deployments, public Plugin/Host",
       "assertions": [
         {
-          "id": "A3.1",
+          "id": "bridge-responder.1",
           "assertion": "Content-Length hello/describe/request/one-way/error/cancel",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.2",
+          "id": "bridge-responder.2",
           "assertion": "spawn token only dedicated proven fd; first stdin byte ASCII C",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.3",
+          "id": "bridge-responder.3",
           "assertion": "sentinel six-character substrings absent from error cause/inspect/serialized reject/report/snapshots",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.4",
+          "id": "bridge-responder.4",
           "assertion": "original string id, relative deadline, idempotency key retained",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.5",
+          "id": "bridge-responder.5",
           "assertion": "notification has no id/meta; independent receipt count/order",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.6",
+          "id": "bridge-responder.6",
           "assertion": "Host local resolver/use/inspect catalog/proxy request/unUse projection",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.7",
+          "id": "bridge-responder.7",
           "assertion": "release owned child exits / borrowed PID remains",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.8",
+          "id": "bridge-responder.8",
           "assertion": "core send trace equals meta.trace; late cancelled response reports only",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.9",
+          "id": "bridge-responder.9",
           "assertion": "missing method/capability, invalid frame, stream description/batch/reverse/NDJSON reject at specified code/time",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.10",
+          "id": "bridge-responder.10",
           "assertion": "bridge stream sends zero; other connection remains usable",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         },
         {
-          "id": "A3.11",
+          "id": "bridge-responder.11",
           "assertion": "four mandatory peers handwrite profile; no existing-library PASS claim",
           "status": "implemented",
           "evidence": "conformance.test.ts: 12 real non-JS JSON-RPC public facade paths, h-bridge-focused-final.log and h-resource-final-focused.log",
-          "note": "2026-10-02 user ruling K251: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. K231 health-none prerequisite has separate receipts."
+          "note": "2026-10-02 user ruling: bridge only publishes initiator, TS responder removed from acceptance; non-JS cells retain all original assertions. The health-none prerequisite has separate receipts."
         }
       ]
     },
     {
-      "id": "A4",
+      "id": "health-failure",
       "evidenceOwner": "H / resilience+host owners",
       "supportUnits": "native/jsonrpc \u00d7 owned/borrowed \u00d7 crash/hang",
       "assertions": [
         {
-          "id": "A4.1",
+          "id": "health-failure.1",
           "assertion": "native default health failure at third ping t=17000ms",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.2",
+          "id": "health-failure.2",
           "assertion": "bridge health none; no default process detection; call deadline settles",
           "status": "blocked",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "K231 public connect deployment lacks wire selector for default-health none; allowed explicit custom health does not establish required default."
+          "note": "The public connect deployment lacks wire selector for default-health none; allowed explicit custom health does not establish required default."
         },
         {
-          "id": "A4.3",
+          "id": "health-failure.3",
           "assertion": "owned old tree exits before replacement ready; borrowed socket redials without killing PID",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.4",
+          "id": "health-failure.4",
           "assertion": "local Host remains alive",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.5",
+          "id": "health-failure.5",
           "assertion": "eligible sent idempotent call retransmits exact key once; stable scope/store side effect once",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.6",
+          "id": "health-failure.6",
           "assertion": "cancel/expired/released/no-ready-generation retry count zero",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.7",
+          "id": "health-failure.7",
           "assertion": "sent non-idempotent REMOTE_RESULT_UNKNOWN; unsent REMOTE_CLOSED with zero frame",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.8",
+          "id": "health-failure.8",
           "assertion": "stream never resumes",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.9",
+          "id": "health-failure.9",
           "assertion": "terminal Plugin request/one-way/first stream next and Host use/inspect reject PROCESS_TERMINAL_CALL before frame",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         },
         {
-          "id": "A4.10",
+          "id": "health-failure.10",
           "assertion": "timers/subscriptions released; Host restart never replays use",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
-          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. K231 default bridge health none blocks A4.2 only."
+          "note": "Independent HF implementation/verification is in progress; root will update exact per-assertion results. The default bridge health none blocks health-failure.2 only."
         }
       ]
     },
     {
-      "id": "A5",
+      "id": "channel-limits",
       "evidenceOwner": "H / channel+IPC owners",
       "supportUnits": "each native language + independent healthy session",
       "assertions": [
         {
-          "id": "A5.1",
+          "id": "channel-limits.1",
           "assertion": "raw 16MiB accepted and 16MiB+1 rejected without allocating payload",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
           "note": "Independent HF fault implementation/verification is in progress, not an unsupported producer classification."
         },
         {
-          "id": "A5.2",
+          "id": "channel-limits.2",
           "assertion": "business payload uses encoded frame budget: stream chunks or zero-write rejection",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
           "note": "Independent HF fault implementation/verification is in progress, not an unsupported producer classification."
         },
         {
-          "id": "A5.3",
+          "id": "channel-limits.3",
           "assertion": "malicious length, half header/body EOF, invalid UTF-8/JSON, coalesced frames",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
           "note": "Independent HF fault implementation/verification is in progress, not an unsupported producer classification."
         },
         {
-          "id": "A5.4",
+          "id": "channel-limits.4",
           "assertion": "capacity one slow consumer: pending send / OVERLOADED and backlog report",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
           "note": "Independent HF fault implementation/verification is in progress, not an unsupported producer classification."
         },
         {
-          "id": "A5.5",
+          "id": "channel-limits.5",
           "assertion": "healthy session still requests; resources return to zero",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
           "note": "Independent HF fault implementation/verification is in progress, not an unsupported producer classification."
         },
         {
-          "id": "A5.6",
+          "id": "channel-limits.6",
           "assertion": "bridge Content-Length physical boundaries also checked",
           "status": "pending",
           "evidence": "HF: conformance-faults.test.ts; root-owned receipt integration pending",
@@ -369,33 +369,33 @@
       ]
     },
     {
-      "id": "A6",
+      "id": "supervision-cleanup",
       "evidenceOwner": "H / supervision owner",
       "supportUnits": "four spawn languages, 250 rotations each",
       "assertions": [
         {
-          "id": "A6.1",
+          "id": "supervision-cleanup.1",
           "assertion": "parent kill -9: child and descendants disappear within 10s",
           "status": "verified",
           "evidence": "conformance-resources.test.ts; h-resource-final-focused.log +h-resource-attribution-focused-second.log; actual PID receipts /tmp/m2-h-evidence",
           "note": "Native macOS libproc FD/child/status/rusage observation; builtin Node RSS unsupported, caller-owned native sampleUsage proves monitored limit. Full1000 receipt is root-only and remains implemented."
         },
         {
-          "id": "A6.2",
+          "id": "supervision-cleanup.2",
           "assertion": "1000 actual launch/exit cycles; fd stable; zombies zero; leases zero",
           "status": "implemented",
           "evidence": "conformance-resources.test.ts; h-resource-final-focused.log +h-resource-attribution-focused-second.log; actual PID receipts /tmp/m2-h-evidence",
           "note": "Default dedicated suite runs1000 non-skipped; H only resource preparation4 rows. Exact root command: rtk pnpm --filter @migaia/rpc test:conformance test/process/conformance-resources.test.ts -t \"1000 actual\". No environment toggle."
         },
         {
-          "id": "A6.3",
+          "id": "supervision-cleanup.3",
           "assertion": "maxUnits=2 never exceeded; full-budget queue/rejection policy",
           "status": "verified",
           "evidence": "conformance-resources.test.ts; h-resource-final-focused.log +h-resource-attribution-focused-second.log; actual PID receipts /tmp/m2-h-evidence",
           "note": "Native macOS libproc FD/child/status/rusage observation; builtin Node RSS unsupported, caller-owned native sampleUsage proves monitored limit. Full1000 receipt is root-only and remains implemented."
         },
         {
-          "id": "A6.4",
+          "id": "supervision-cleanup.4",
           "assertion": "RSS limit terminates owned child; exited observed independently",
           "status": "verified",
           "evidence": "conformance-resources.test.ts; h-resource-final-focused.log +h-resource-attribution-focused-second.log; actual PID receipts /tmp/m2-h-evidence",
@@ -404,103 +404,103 @@
       ]
     },
     {
-      "id": "A7",
+      "id": "connection-admission",
       "evidenceOwner": "H / resilience+host owners",
       "supportUnits": "shared/per-connection \u00d7 two sessions + flooding/untrusted registration",
       "assertions": [
         {
-          "id": "A7.1",
+          "id": "connection-admission.1",
           "assertion": "connection limit rejects and frees fd; no-token registration never installs",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.2",
+          "id": "connection-admission.2",
           "assertion": "native malformed hello/verifier failure sentinel absent from cause/inspect/serialize/report/reject",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.3",
+          "id": "connection-admission.3",
           "assertion": "split stderr sentinel becomes fixed sanitized text with connection identity only",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.4",
+          "id": "connection-admission.4",
           "assertion": "request id/abort/replay/context/result isolated per session",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.5",
+          "id": "connection-admission.5",
           "assertion": "same principal stable method/key scope shares one result and execution across sessions",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.6",
+          "id": "connection-admission.6",
           "assertion": "different principals same key remain isolated",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.7",
+          "id": "connection-admission.7",
           "assertion": "shared repeated timeout closes offending session only; explicit health event owns instance restart",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         },
         {
-          "id": "A7.8",
+          "id": "connection-admission.8",
           "assertion": "per-connection other instance survives; connect close never kills borrowed PID",
           "status": "pending",
           "evidence": "HI: conformance-isolation.test.ts; root-owned receipt integration pending",
-          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known K232/K234 related Host getter/registration owner blockers must not be hidden by partial acceptance."
+          "note": "HI has its own focused receipt; exact assertion closure is root integration-owned. Known Host getter/registration owner blockers must not be hidden by partial acceptance."
         }
       ]
     },
     {
-      "id": "A8",
+      "id": "trace-routing",
       "evidenceOwner": "H / IPC+bridge owners",
       "supportUnits": "native four languages \u00d7 both deployments; bridge trace route",
       "assertions": [
         {
-          "id": "A8.1",
+          "id": "trace-routing.1",
           "assertion": "core ISendOptions.trace t1/t2 preserved through provider/error/route/backlog",
           "status": "implemented",
           "evidence": "conformance.test.ts actual provider/core trace routes; 6ea3657/698f940",
           "note": "Provider/route/missing trace real receipts exist; error/backlog diagnosis and stderr pseudo-trace integration receipts pending HF/HI."
         },
         {
-          "id": "A8.2",
+          "id": "trace-routing.2",
           "assertion": "peer independently returns observed trace; missing trace stays absent",
           "status": "verified",
           "evidence": "conformance.test.ts actual provider/core trace routes; 6ea3657/698f940",
           "note": "Public core trace t1/t2/null across real native/facade-created endpoints, wire route fields and bridge meta; facade calls never invent trace."
         },
         {
-          "id": "A8.3",
+          "id": "trace-routing.3",
           "assertion": "bridge meta.trace equals supplied core trace",
           "status": "verified",
           "evidence": "conformance.test.ts actual provider/core trace routes; 6ea3657/698f940",
           "note": "Public core trace t1/t2/null across real native/facade-created endpoints, wire route fields and bridge meta; facade calls never invent trace."
         },
         {
-          "id": "A8.4",
+          "id": "trace-routing.4",
           "assertion": "Plugin/Host facade missing trace never invents it",
           "status": "verified",
           "evidence": "conformance.test.ts actual provider/core trace routes; 6ea3657/698f940",
           "note": "Public core trace t1/t2/null across real native/facade-created endpoints, wire route fields and bridge meta; facade calls never invent trace."
         },
         {
-          "id": "A8.5",
+          "id": "trace-routing.5",
           "assertion": "stderr pseudo-trace ignored; sessions never share current trace; cause remains reachable",
           "status": "implemented",
           "evidence": "conformance.test.ts actual provider/core trace routes; 6ea3657/698f940",
@@ -509,26 +509,26 @@
       ]
     },
     {
-      "id": "A9",
+      "id": "platform-capabilities",
       "evidenceOwner": "H / platform owners",
       "supportUnits": "every platform/carrier/runtime capability cell",
       "assertions": [
         {
-          "id": "A9.1",
+          "id": "platform-capabilities.1",
           "assertion": "macOS supported units record actual command/version/PID/capability/result/grade",
           "status": "verified",
           "evidence": "Root exact conformance-platform.test.ts blob682f005; h-resource-final-focused.log",
           "note": "Grades are machine evidence only; unrun Windows/Electron/Deno/Linux/browser/TinyJS remain non-PASS. Does not claim all future platforms supported."
         },
         {
-          "id": "A9.2",
+          "id": "platform-capabilities.2",
           "assertion": "Windows Job, Electron bootstrap, Deno, Linux, browser, TinyJS unrun never PASS",
           "status": "verified",
           "evidence": "Root exact conformance-platform.test.ts blob682f005; h-resource-final-focused.log",
           "note": "Grades are machine evidence only; unrun Windows/Electron/Deno/Linux/browser/TinyJS remain non-PASS. Does not claim all future platforms supported."
         },
         {
-          "id": "A9.3",
+          "id": "platform-capabilities.3",
           "assertion": "future fixture path present; install/typecheck/Node substitution insufficient",
           "status": "verified",
           "evidence": "Root exact conformance-platform.test.ts blob682f005; h-resource-final-focused.log",
@@ -537,82 +537,82 @@
       ]
     },
     {
-      "id": "A10",
+      "id": "measurement-preparation",
       "evidenceOwner": "root performance owner / G measurement preparation",
       "supportUnits": "payload 64B,1KiB,64KiB,1MiB \u00d7 supported codec/carrier/runtime; bridge separately JSON/Content-Length",
       "assertions": [
         {
-          "id": "A10.1",
-          "assertion": "freeze effective units only after integrated I19 and actual capability/start checks",
+          "id": "measurement-preparation.1",
+          "assertion": "freeze effective units only after integrated freezing and actual capability/start checks",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.2",
+          "id": "measurement-preparation.2",
           "assertion": "same payload bytes/codec/carrier/runtime/concurrency/echo; isolated sides and serial exclusive execution",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.3",
+          "id": "measurement-preparation.3",
           "assertion": ">=3 alternating bare-RPC/RPC-bare pairs; >=1000 settled samples each side each round",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.4",
+          "id": "measurement-preparation.4",
           "assertion": "ready then warmup; all metrics exclude warmup and use window to last settlement",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.5",
+          "id": "measurement-preparation.5",
           "assertion": "nearest-rank p50/p99; throughput settled count/window",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.6",
+          "id": "measurement-preparation.6",
           "assertion": "CPU parent+peer PID user+sys deltas/request; no RUSAGE_CHILDREN",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.7",
+          "id": "measurement-preparation.7",
           "assertion": "RSS per-PID absolute window peaks sum; thread same PID once; no baseline subtraction",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.8",
+          "id": "measurement-preparation.8",
           "assertion": "observer method/interval recorded; no spawned sampling subprocess in window",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.9",
+          "id": "measurement-preparation.9",
           "assertion": "bad round retained; insufficient sample/missing RSS/nonpositive bare latency-throughput-CPU fails",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.10",
+          "id": "measurement-preparation.10",
           "assertion": "round ratios and medians; p99<=3 throughput>=0.5 CPU<=3 RSS<=2 all required",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
           "note": "68 frozen required units=20native+48bridge. No >=1000 measurement window has run in H. Every required unit remains non-PASS until root serial paired receipt; no threshold relaxed."
         },
         {
-          "id": "A10.11",
+          "id": "measurement-preparation.11",
           "assertion": "frozen unit launch/measurement/threshold failure never reclassified unsupported",
           "status": "implemented",
           "evidence": "bench/ipc.mjs +ipc-side.mjs +ipc-session.mjs; conformance-bench.test.ts cold preparation71 PASS",
@@ -621,54 +621,54 @@
       ]
     },
     {
-      "id": "A11",
+      "id": "toolchain-admission",
       "evidenceOwner": "H / E peer admission; G config preparation",
       "supportUnits": "Python3.9.6 Rust/Cargo1.96.0 Go1.26.4 Node24.16.0 TS6.0.2",
       "assertions": [
         {
-          "id": "A11.1",
+          "id": "toolchain-admission.1",
           "assertion": "equal/higher version records executable and actual version",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
           "note": "6 installed tools admitted before preparation; missing/lower rejected with zero download/install. Peer-build caches keyed by checkout, all build products outside Git tree."
         },
         {
-          "id": "A11.2",
+          "id": "toolchain-admission.2",
           "assertion": "lower version rejects before launch; missing tool environment failure; zero download/install",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
           "note": "6 installed tools admitted before preparation; missing/lower rejected with zero download/install. Peer-build caches keyed by checkout, all build products outside Git tree."
         },
         {
-          "id": "A11.3",
+          "id": "toolchain-admission.3",
           "assertion": "cargo build --offline --locked; zero crates",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
           "note": "6 installed tools admitted before preparation; missing/lower rejected with zero download/install. Peer-build caches keyed by checkout, all build products outside Git tree."
         },
         {
-          "id": "A11.4",
+          "id": "toolchain-admission.4",
           "assertion": "GOTOOLCHAIN=local; zero external Go modules",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
           "note": "6 installed tools admitted before preparation; missing/lower rejected with zero download/install. Peer-build caches keyed by checkout, all build products outside Git tree."
         },
         {
-          "id": "A11.5",
+          "id": "toolchain-admission.5",
           "assertion": "Python stdlib only, no __pycache__; artifacts only system temporary directory",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
           "note": "6 installed tools admitted before preparation; missing/lower rejected with zero download/install. Peer-build caches keyed by checkout, all build products outside Git tree."
         },
         {
-          "id": "A11.6",
+          "id": "toolchain-admission.6",
           "assertion": "package dependency sets unchanged; no untracked build artifacts",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
           "note": "6 installed tools admitted before preparation; missing/lower rejected with zero download/install. Peer-build caches keyed by checkout, all build products outside Git tree."
         },
         {
-          "id": "A11.7",
+          "id": "toolchain-admission.7",
           "assertion": "resolved default config excludes exact conformance pattern while preserving Vitest default exclusions",
           "status": "verified",
           "evidence": "conformance-platform.test.ts +shared fixtures/conformance-toolchains.mjs; actual beforeAll/pairedMain/runIpcSide wiring; h-resource-final-focused.log",
@@ -677,104 +677,104 @@
       ]
     },
     {
-      "id": "A12",
+      "id": "receipt-delivery",
       "evidenceOwner": "root integration owner / H receipt delivery",
-      "supportUnits": "all mandatory A1-A11 cells and all program children",
+      "supportUnits": "all mandatory acceptance cells and all program children",
       "assertions": [
         {
-          "id": "A12.1",
-          "assertion": "bridge \u00a78 receives per-non-JS-language/path S4 receipts; Host A1-A8 actual verified evidence",
+          "id": "receipt-delivery.1",
+          "assertion": "bridge receives per-non-JS-language/path receipts; Host actual verified evidence for every row",
           "status": "blocked",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
-          "note": "Required TS bridge responderCF1, K231/K232/K234/K238 and child closure dependencies remain explicit; no SHIP."
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
+          "note": "Required TS bridge responder, Host health/registration blockers and child closure dependencies remain explicit; no SHIP."
         },
         {
-          "id": "A12.2",
-          "assertion": "root six A-total assertions each have command/date/count/commit or dirty baseline",
+          "id": "receipt-delivery.2",
+          "assertion": "root six integration assertions each have command/date/count/commit or dirty baseline",
           "status": "pending",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
         },
         {
-          "id": "A12.3",
+          "id": "receipt-delivery.3",
           "assertion": "old names tracked + nonignored untracked scan zero",
           "status": "pending",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
         },
         {
-          "id": "A12.4",
+          "id": "receipt-delivery.4",
           "assertion": "fingerprint oracle PASS and child+external seam validators no stale fingerprint/pin diagnosis",
           "status": "pending",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
         },
         {
-          "id": "A12.5",
-          "assertion": "all package/direct-consumer/repository/preflight gate:true checks; IG3 unscoped registry and script tests",
+          "id": "receipt-delivery.5",
+          "assertion": "all package/direct-consumer/repository/preflight gate:true checks; unscoped registry and script tests",
           "status": "pending",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
         },
         {
-          "id": "A12.6",
+          "id": "receipt-delivery.6",
           "assertion": "explicit test:conformance and bench:ipc; four languages/two paths/vectors/performance no missing receipt",
           "status": "pending",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
         },
         {
-          "id": "A12.7",
-          "assertion": "child \u00a78 manual audit; tracked test/bench never reads local documentation",
+          "id": "receipt-delivery.7",
+          "assertion": "child manual audit; tracked test/bench never reads local documentation",
           "status": "pending",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
           "note": "H does not run root full gates, 1000 rotations or measured benchmark; actual existing blockers remain non-SHIP."
         },
         {
-          "id": "A12.8",
-          "assertion": "X9 and required child delivery closed; no mock-only or design-only SHIP",
+          "id": "receipt-delivery.8",
+          "assertion": "Required child delivery closed; no mock-only or design-only SHIP",
           "status": "blocked",
-          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/A-total receipts",
-          "note": "Required TS bridge responderCF1, K231/K232/K234/K238 and child closure dependencies remain explicit; no SHIP."
+          "evidence": "Root integration owner: actual full/consumer/registry/custody/fingerprint/integration receipts",
+          "note": "Required TS bridge responder, Host health/registration blockers and child closure dependencies remain explicit; no SHIP."
         }
       ]
     }
   ],
-  "rootATotal": [
+  "rootIntegration": [
     {
-      "id": "A-total.1",
+      "id": "integration.1",
       "evidenceOwner": "root integration owner",
       "status": "pending",
-      "assertion": "tracked and nonignored-untracked old package names absent (rpc-merge A6)"
+      "assertion": "tracked and nonignored-untracked old package names absent"
     },
     {
-      "id": "A-total.2",
+      "id": "integration.2",
       "evidenceOwner": "root integration owner",
       "status": "implemented",
-      "assertion": "real Node child request and provider restored abort reason (channel A1/A2, control A1)",
-      "evidence": "H actual Node stdio facade request/provider restored RangeError stop receipt; root final A-total execution pending"
+      "assertion": "real Node child request and provider restored abort reason",
+      "evidence": "H actual Node stdio facade request/provider restored RangeError stop receipt; root final integration execution pending"
     },
     {
-      "id": "A-total.3",
+      "id": "integration.3",
       "evidenceOwner": "root integration owner",
       "status": "implemented",
-      "assertion": "real child core error source @migaia/rpc/core, Rpc name and complete cause chain (layering A3, error-format A1)",
-      "evidence": "H actual core error Rpc* name, source/code/full original wire-stack cause graph; root final A-total execution pending"
+      "assertion": "real child core error source @migaia/rpc/core, Rpc name and complete cause chain",
+      "evidence": "H actual core error Rpc* name, source/code/full original wire-stack cause graph; root final integration execution pending"
     },
     {
-      "id": "A-total.4",
+      "id": "integration.4",
       "evidenceOwner": "root integration owner",
       "status": "pending",
-      "assertion": "real stopped-reader flow-control overflow policy and backlog report (IPC A1/A8)"
+      "assertion": "real stopped-reader flow-control overflow policy and backlog report"
     },
     {
-      "id": "A-total.5",
+      "id": "integration.5",
       "evidenceOwner": "root integration owner",
       "status": "pending",
-      "assertion": "all child gate:true, package/consumer/repository, registry IG3, conformance and bench receipts; website separately"
+      "assertion": "all child gate:true, package/consumer/repository, registry, conformance and bench receipts; website separately"
     },
     {
-      "id": "A-total.6",
+      "id": "integration.6",
       "evidenceOwner": "root integration owner",
       "status": "pending",
       "assertion": "all frozen supported performance cells satisfy four paired ratio medians; absolute dual-end RSS ratio <=2"

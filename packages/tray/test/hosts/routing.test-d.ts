@@ -23,7 +23,7 @@ const host = defineTrayHost({
           (_core, deps) => {
             deps.tray.routing.aaa(host)
             deps.tray.routing('roundRobin', host)
-            // @ts-expect-error A5: parent options do not declare a child policy.
+            // @ts-expect-error parent options do not declare a child policy.
             deps.tray.routing.bbb(host)
             return {}
           },
@@ -43,11 +43,11 @@ function check() {
   tray.routing.bbb(host)
   tray.routing('aaa', host).request('node.svc.echo', 'ok')
   tray.routing('roundRobin', host)
-  // @ts-expect-error A5: unregistered member remains outside the closed name union.
+  // @ts-expect-error unregistered member remains outside the closed name union.
   tray.routing.nope(host)
-  // @ts-expect-error A5: callable names have the same closed domain.
+  // @ts-expect-error callable names have the same closed domain.
   tray.routing('nope', host)
-  // @ts-expect-error A5: routed methods preserve their required payload type.
+  // @ts-expect-error routed methods preserve their required payload type.
   tray.routing.aaa(host).request('node.svc.echo', 1)
   const policy: ITrayRoutingPolicy<'aaa'> = aaa
   const routing: ITrayRouting<'aaa', readonly [typeof host]> = tray.routing
@@ -144,7 +144,7 @@ function checkWide() {
   const tray = createTray({ hosts })
   tray.routing.h0A(hosts[0]).request('node.svc.echo', 'ok')
   tray.routing('h63D', hosts[63])
-  // @ts-expect-error A5: scale never widens policy names to arbitrary strings.
+  // @ts-expect-error scale never widens policy names to arbitrary strings.
   tray.routing('missing', hosts[0])
 }
 void check

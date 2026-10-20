@@ -13,7 +13,7 @@ export const RpcDevtoolsRecordField = { bytes: '$bytes' } as const
 export const RpcDevtoolsRecordBase64Alphabet =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
-/** No clock/descriptor metadata is invented; the current SDD defines only the format identity. */
+/** No clock/descriptor metadata is invented; the current contract defines only the format identity. */
 export type IRpcDevtoolsRecordHeader = Readonly<typeof RpcDevtoolsRecordFormat>
 
 /** Record inputs accept service wire errors and native errors; decoding restores native errors. */

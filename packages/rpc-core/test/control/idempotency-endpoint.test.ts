@@ -7,7 +7,7 @@ import { connect } from '../../dist/core/middleware/connect.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
 
-describe('keyed provider execution (A7)', () => {
+describe('keyed provider execution', () => {
   it('retains a transfer result without detaching the provider buffer', async () => {
     const [clientWire, serverWire] = createMemoryTransportPair()
     const buffer = new Uint8Array([1, 2, 3])

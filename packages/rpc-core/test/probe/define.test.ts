@@ -19,7 +19,7 @@ import {
 } from '../../dist/core/probe/index.js'
 import { readProbeState, subscribeProbeStages } from '../../dist/core/probe/internal.js'
 
-describe('probe contract A1', () => {
+describe('probe contract', () => {
   it('compiles a frozen handle and retains the original sink and compiled method membership', () => {
     /** The actual application sink must remain directly callable by the later single-probe emitter. */
     const emit = vi.fn()

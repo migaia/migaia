@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { IRecordStore, IKeyValueStore } from '../../src/types'
 import type { ITransactionScope } from '../../src/core/transaction'
 
-/** 后端契约一致性套件。与后端无关的用例工厂，供每个后端各跑一遍（§12.2）。 能力缺失时不允许跳过，只允许按 capabilities 分支断言为预期抛错。 */
+/** 后端契约一致性套件。与后端无关的用例工厂，供每个后端各跑一遍。 能力缺失时不允许跳过，只允许按 capabilities 分支断言为预期抛错。 */
 export const kvConformance = (
   name: string,
   create: () => IKeyValueStore | Promise<IKeyValueStore>

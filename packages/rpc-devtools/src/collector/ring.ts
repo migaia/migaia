@@ -64,7 +64,7 @@ export class EventRing {
   #resolvedCarrierSeq: Float64Array
   /** A cold observed reset limits each retained origin to children before that collector sequence. */
   #carrierValidUntil: Float64Array
-  /** Cached wire projections are built once per slot at a real query/service boundary (SC9b). */
+  /** Cached wire projections are built once per slot at a real query/service boundary. */
   #wire: (IRpcDevtoolsWireEvent | undefined)[]
   /** Metadata service projections separately enforce the content exposure boundary. */
   #metadata: (IRpcDevtoolsWireEvent | undefined)[]
@@ -147,7 +147,7 @@ export class EventRing {
     this.count--
   }
 
-  /** Snapshot primitives immediately; content/detail/error remain references under root SC9. */
+  /** Snapshot primitives immediately; content/detail/error remain references without cloning. */
   write(view: IRpcProbeEventView, seq: number, content: unknown, contentBytes: number): number {
     if (this.count === this.capacity) this.drop()
     /** All writes share one physical slot, calculated without allocating a row. */
@@ -188,7 +188,7 @@ export class EventRing {
     return slot
   }
 
-  /** One SC9b conversion per retained slot; repeated queries return the stored projection. */
+  /** One representation conversion per retained slot; repeated queries return the stored projection. */
   event(
     slot: number,
     exposeContent: boolean,
@@ -198,7 +198,7 @@ export class EventRing {
     /** Recording wants original errors; wire queries use their canonical serialized graph. */
     const cached = exposeContent ? this.#wire[slot] : this.#metadata[slot]
     if (!nativeError && cached) return cached
-    /** Conversion at the query/service/record representation boundary is permitted by SC9b. */
+    /** Conversion at the query/service/record representation boundary is the permitted copy point. */
     const c = this.columns
     /** Every optional scalar is restored from the columns, never from the reusable input view. */
     const event: IRpcDevtoolsRecordEvent = {

@@ -14,7 +14,7 @@ import {
 } from '@migaia/rpc-threads/adapters/node'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 
-it('[A48][A57] borrowed connections reject every native control and retain ordinary business', async () => {
+it('borrowed connections reject every native control and retain ordinary business', async () => {
   /** Two real local registrations own channels, not execution on the opposite side. */
   const hosts = [
     runtimeTestHost({
@@ -47,7 +47,7 @@ it('[A48][A57] borrowed connections reject every native control and retain ordin
       assert.equal(
         Reflect.get(result as object, 'code'),
         'CAPABILITY_CONFLICT',
-        `[A48] ${command} cannot mutate a borrowed target`
+        `${command} cannot mutate a borrowed target`
       )
     }
     assert.equal(await hosts[0].thread!.request('borrowed', 'echo', 42), 42)
@@ -57,7 +57,7 @@ it('[A48][A57] borrowed connections reject every native control and retain ordin
   }
 })
 
-it('[A47][A48] owned Worker controls upgrade the original pending drain once and preserve restart outcomes', async () => {
+it('owned Worker controls upgrade the original pending drain once and preserve restart outcomes', async () => {
   /** The original budget counts the native lease independently from facade command completion. */
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
   /** Native launcher handles remain the sole exit and termination owners. */
@@ -138,7 +138,7 @@ it('[A47][A48] owned Worker controls upgrade the original pending drain once and
       restart(name: string): Promise<{ generation: number }>
       replace(name: string, spec?: unknown): Promise<{ switched: boolean }>
     }
-    assert.equal(typeof outlet.stop, 'function', '[A47] controls exist on the original outlet')
+    assert.equal(typeof outlet.stop, 'function', 'controls exist on the original outlet')
     for (const signal of ['SIGTERM', new AbortController().signal, undefined])
       assert.throws(() => outlet.stop('owned', { signal }), { code: 'INVALID_CONFIG' })
     for (const graceMs of [-1, NaN, Infinity])
@@ -161,14 +161,14 @@ it('[A47][A48] owned Worker controls upgrade the original pending drain once and
     await draining
     const stopped = outlet.stop('owned', { graceMs: 1000 })
     await vi.waitFor(
-      () => assert.equal(drains, 1, '[A47] one original close announcement precedes native force'),
+      () => assert.equal(drains, 1, 'one original close announcement precedes native force'),
       { timeout: 500 }
     )
     const killed = outlet.kill('owned')
-    assert.equal(killed, stopped, '[A47] force joins the original pending stop Promise')
+    assert.equal(killed, stopped, 'force joins the original pending stop Promise')
     await killed
     await request
-    assert.equal(terminated, 1, '[A47] the pending original drain receives one immediate force')
+    assert.equal(terminated, 1, 'the pending original drain receives one immediate force')
     assert.equal(budget.inUse, 0)
     assert.equal(events.filter((event) => event.type === 'exit').length, 1)
     assert.equal(
@@ -201,7 +201,7 @@ it('[A47][A48] owned Worker controls upgrade the original pending drain once and
     assert.equal(
       events.filter((event) => event.type === 'liquidated').length,
       0,
-      '[A52] Worker exit/restart never fabricate an unavailable liquidation owner'
+      'Worker exit/restart never fabricate an unavailable liquidation owner'
     )
     await outlet.kill('owned')
   } finally {

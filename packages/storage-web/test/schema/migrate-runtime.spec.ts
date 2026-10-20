@@ -4,8 +4,8 @@ import { defineEntity } from '../../src/entity/index.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 
 /**
- * T-14(6)/(7) 运行时归属门禁：公开 `runMigrations()` 内部创建「恰好一个」runtime/reporter； 内部
- * `runMigrationsWithRuntime()` 复用所属 operation 的 runtime，不创建第二个 reporter。
+ * /(7) 运行时归属门禁：公开 `runMigrations()` 内部创建「恰好一个」runtime/reporter； 内部 `runMigrationsWithRuntime()`
+ * 复用所属 operation 的 runtime，不创建第二个 reporter。
  *
  * 用 `vi.hoisted` 先把 `createStorageOperationRuntime` 换成 spy，再 mock 整个 `operation-reporter` 模块，让
  * schema/entity/backend 里所有对它的引用都指向同一个 spy。
@@ -23,19 +23,19 @@ vi.mock('../../src/core/operation-reporter.js', async (importOriginal) => {
   }
 })
 
-describe('migration runtime ownership (§4.4 T-14(6)/(7))', () => {
+describe('migration runtime ownership', () => {
   beforeEach(() => {
     runtimeSpies.createStorageOperationRuntime.mockClear()
   })
 
-  it('T-14(6): 公开 runMigrations() 恰好创建一个 runtime/reporter', async () => {
+  it('公开 runMigrations() 恰好创建一个 runtime/reporter', async () => {
     await runMigrations({ id: 'u1' }, 0, 1, {
       1: async (value) => value
     })
     expect(runtimeSpies.createStorageOperationRuntime).toHaveBeenCalledTimes(1)
   })
 
-  it('T-14(7): runMigrationsWithRuntime() 复用所属 runtime，不自行创建第二个 reporter', async () => {
+  it('runMigrationsWithRuntime() 复用所属 runtime，不自行创建第二个 reporter', async () => {
     const runtime = { reporter: vi.fn() }
     await runMigrationsWithRuntime(runtime, { id: 'u1' }, 0, 1, {
       1: async (value) => value
@@ -43,7 +43,7 @@ describe('migration runtime ownership (§4.4 T-14(6)/(7))', () => {
     expect(runtimeSpies.createStorageOperationRuntime).not.toHaveBeenCalled()
   })
 
-  it('T-14(7): repository 读取旧版本触发迁移时不额外创建 reporter', async () => {
+  it('repository 读取旧版本触发迁移时不额外创建 reporter', async () => {
     const store = memoryStorageHost()
     const v1 = defineEntity<{ id: string; name: string }>({
       name: 'rt-people',

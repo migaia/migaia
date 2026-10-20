@@ -192,7 +192,7 @@ export class CollectorWatcher {
           }
           if (this.#count === 0) continue
         }
-        /** Result array and its event projections are the watch representation boundary (SC9b). */
+        /** Result array and its event projections are the watch representation boundary. */
         const events: IRpcDevtoolsWireEvent[] = []
         /** Removing one queue entry transfers its retained event ownership to the result array. */
         const length = this.#lengths[this.#head]!

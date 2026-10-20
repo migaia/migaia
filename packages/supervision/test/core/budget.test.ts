@@ -8,7 +8,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 12; index++) await Promise.resolve()
 }
 
-describe('A2 unit budget', () => {
+describe('unit budget', () => {
   it('grants leases in FIFO order, releases once, and times out pending work', async () => {
     const scheduler = createManualScheduler()
     const budget = createUnitBudget({
@@ -155,7 +155,7 @@ describe('A2 unit budget', () => {
   })
 })
 
-describe('SV-P2 rolling timestamp prefix', () => {
+describe('rolling timestamp prefix', () => {
   it('expires only the old grant while preserving the later grant at each exact boundary', () => {
     /** Two distinct grant times distinguish a rolling window from clearing all history. */
     const scheduler = createManualScheduler()

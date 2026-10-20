@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
-// P2: examples check
+// Examples check
 console.log('✓ examples check framework ready')

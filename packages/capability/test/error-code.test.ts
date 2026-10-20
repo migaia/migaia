@@ -23,7 +23,7 @@ function stripComments(source: string): string {
 
 const handleOf = (dispose = () => undefined): ICapabilityHandle => ({ dispose })
 
-describe('M-T38 (§3.7.3): capability 码表触发点', () => {
+describe('capability 码表触发点', () => {
   it('HOST_DISPOSED: dispose 后查询/注册', async () => {
     const host = createCapabilityHost<unknown>({})
     host.register({ name: 'a', activate: () => handleOf() })
@@ -80,7 +80,7 @@ describe('M-T38 (§3.7.3): capability 码表触发点', () => {
   })
 })
 
-describe('M-T41 (§3.7.5): capability 码表穷尽 + 单点声明', () => {
+describe('capability 码表穷尽 + 单点声明', () => {
   const srcFiles = collectSourceFiles(srcDir)
 
   it('scans a non-trivial number of source files', () => {
@@ -93,7 +93,7 @@ describe('M-T41 (§3.7.5): capability 码表穷尽 + 单点声明', () => {
     )
   })
 
-  it('code values are unique and the table has 9 entries (§3.7.3 + INVALID_OPTION)', () => {
+  it('code values are unique and the table has 9 entries (capability codes + INVALID_OPTION)', () => {
     const declared = Object.values(CapabilityErrorCode)
     expect(new Set(declared).size).toBe(declared.length)
     expect(declared).toHaveLength(9)

@@ -21,7 +21,7 @@ describe('ProviderAdmissionRegistry', () => {
 })
 
 /** Public possession delegates quota operations without revealing Core's preparation record. */
-it('[A44] exposes only constrain and clear on a caller-owned scope', () => {
+it('exposes only constrain and clear on a caller-owned scope', () => {
   /** A new handle must remain cold until the real Core framer attaches. */
   const scope = createProviderAdmissionScope()
   expect(Reflect.ownKeys(scope).sort(), 'A44_SCOPE_PUBLIC_DTO').toEqual(['clear', 'constrain'])

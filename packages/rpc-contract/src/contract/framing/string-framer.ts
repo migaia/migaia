@@ -6,7 +6,7 @@ import { messageFramerV1 } from './message-framer.js'
 import { bindRpcFrameIngress, registerRpcSingleFrameFacts } from './reassembler.js'
 import { RPC_STREAM_MAX_FRAME_BYTES } from './stream.js'
 
-/** BC7 keeps the native TypeError and original text while moving its identity to Contract. */
+/** Keeps the native TypeError and original text while moving its identity to Contract. */
 function asStringFrame(value: unknown): string {
   if (typeof value === 'string') return value
   /** Frame grammar keeps its RangeError; this string-domain failure remains a TypeError. */

@@ -165,12 +165,12 @@ ci-conformance:
 	fi; \
 	pnpm --filter ./packages/rpc-integration run test:conformance
 
-# Performance matrices and W3 guards are reference-machine ratios, need an
+# Performance matrices and throughput guards are reference-machine ratios, need an
 # exclusive calibrated measurement window, and take too long for ordinary CI.
 # Supply that window's noise receipt; budgets stay owned by the RPC benchmark.
 # Example: make perf-guard PERF_NOISE=raw/noise.json PERF_UNIT=node:stdio-framed:64 PERF_OUTPUT=raw/perf
 perf-guard:
-	@echo "==> manual RPC performance matrix / W3 guard ($(PERF_SCENARIO))"
+	@echo "==> manual RPC performance matrix / throughput guard ($(PERF_SCENARIO))"
 	@test -n "$(PERF_NOISE)" || { echo "Set PERF_NOISE to the current exclusive window calibration" >&2; exit 2; }
 	@pnpm --filter ./packages/rpc-integration run bench:ipc --scenario "$(PERF_SCENARIO)" \
 		$(if $(PERF_UNIT),--unit "$(PERF_UNIT)") --noise "$(PERF_NOISE)" \
@@ -184,7 +184,7 @@ long-test:
 	@echo "==> manual sustained RPC cell ($(LONG_MODE), $(LONG_RATE) RPS, $(LONG_SECONDS)s)"
 	@test -n "$(LONG_OUTPUT)" || { echo "Set LONG_OUTPUT to a fresh raw directory" >&2; exit 2; }
 	@test "$(LONG_SECONDS)" -ge 400 || { echo "LONG_SECONDS must be at least 400" >&2; exit 2; }
-	@node packages/rpc-browser/test/replay-window-r12/native-long.mjs \
+	@node packages/rpc-browser/test/replay-window/native-long.mjs \
 		"$(LONG_MODE)" "$(LONG_RATE)" "$(LONG_SECONDS)" "$(LONG_OUTPUT)"
 
 ship-preflight:

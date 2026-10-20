@@ -41,14 +41,14 @@ describe('error boundary helpers', () => {
     expect(RpcCoreErrorCode.middlewareMissing).toBe('MIDDLEWARE_MISSING')
   })
 
-  it('uses standard AbortError/TimeoutError names for cross-realm type checks (§5.5)', () => {
+  it('uses standard AbortError/TimeoutError names for cross-realm type checks', () => {
     expect(new RpcAbortError().name).toBe('AbortError')
     expect(new RpcTimeoutError().name).toBe('TimeoutError')
     expect(new RpcAbortError().code).toBe('CANCELLED')
     expect(new RpcTimeoutError().code).toBe('DEADLINE_EXCEEDED')
   })
 
-  it('keeps unique registered codes and a constant source (E-T1/E-T2)', () => {
+  it('keeps unique registered codes and a constant source', () => {
     const codes = Object.values(RpcCoreErrorCode)
     /** API audit adds CALLBACK_FAILED to the 32 Core semantic codes left after the guard removal. */
     expect(codes).toHaveLength(33)
@@ -69,7 +69,7 @@ describe('error boundary helpers', () => {
     }
   })
 
-  it('tagRpcError keeps the native runtime type while attaching (source, code) (§2.2)', () => {
+  it('tagRpcError keeps the native runtime type while attaching (source, code)', () => {
     const typeError = tagRpcError(new TypeError('bad option'), RpcCoreErrorCode.invalidConfig)
     const rangeError = tagRpcError(new RangeError('bad range'), RpcCoreErrorCode.invalidConfig)
     expect(typeError).toBeInstanceOf(TypeError)

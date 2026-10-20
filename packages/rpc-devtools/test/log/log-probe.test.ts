@@ -66,8 +66,8 @@ function logger(records: ILogRecord[]): IRpcLogSink {
   }
 }
 
-describe('A7 log probe', () => {
-  it('[closure A1] forwards stage capture and redaction through the real Core emitter', async () => {
+describe('log probe', () => {
+  it('forwards stage capture and redaction through the real Core emitter', async () => {
     /** Logger-visible fields are captured only after Core's synchronous redaction callback. */
     const records: ILogRecord[] = []
     /** The caller's redactor owns this replacement rather than changing business data. */
@@ -343,7 +343,7 @@ describe('A7 log probe', () => {
       {
         ...logger([]),
         warn: () => ({
-          // oxlint-disable-next-line unicorn/no-thenable -- R6 accepts logger thenables and preserves getter failures.
+          // oxlint-disable-next-line unicorn/no-thenable -- accepts logger thenables and preserves getter failures.
           get then() {
             throw failure
           }

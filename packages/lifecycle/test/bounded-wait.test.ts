@@ -16,7 +16,7 @@ const deferred = <T>(): {
   return { promise, resolve, reject }
 }
 
-describe('L-T16 boundedWait: task winning vs timeout winning', () => {
+describe('boundedWait: task winning vs timeout winning', () => {
   it('rejects invalid deadline before reading or scheduling injected time', async () => {
     const now = vi.fn(() => 0)
     const schedule = vi.fn(() => ({ cancel: vi.fn() }))
@@ -99,7 +99,7 @@ describe('L-T16 boundedWait: task winning vs timeout winning', () => {
     expect(won).toBe(false)
     reject(new Error('late failure, must be observed'))
     await new Promise((resolve) => setTimeout(resolve, 10))
-    // Reaching here without a process-level unhandledRejection proves LG-R5-3 held.
+    // Reaching here without a process-level unhandledRejection proves the wait stayed contained.
     expect(true).toBe(true)
   })
 

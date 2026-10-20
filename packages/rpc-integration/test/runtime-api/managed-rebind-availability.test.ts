@@ -22,7 +22,7 @@ for (const unavailable of [
   'connection-disabled',
   'connection-suspended'
 ] as const) {
-  it(`[A13][A17][C4-fix:M1] native rebind survives ${unavailable} and resumes real calls`, async () => {
+  it(`native rebind survives ${unavailable} and resumes real calls`, async () => {
     const host = runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
@@ -180,14 +180,14 @@ for (const unavailable of [
       assert.equal(
         businessReports.length,
         unavailable.startsWith('connection-') ? 0 : 1,
-        '[A13] the canonical hook reports exactly the actual inbound permission denial'
+        'the canonical hook reports exactly the actual inbound permission denial'
       )
       assert.equal(
         reports.length - businessReports.length,
         0,
-        '[A13] availability denial is per call, never a rebind failure'
+        'availability denial is per call, never a rebind failure'
       )
-      assert.equal(calls, 0, '[A13] unavailable exposed provider executes zero times')
+      assert.equal(calls, 0, 'unavailable exposed provider executes zero times')
       if (disabled) await disabled.token.enable()
       else await host.use(parent)
       await vi.waitFor(
@@ -198,12 +198,12 @@ for (const unavailable of [
           assert.equal(
             (current as { parent?: number }).parent,
             42,
-            '[C4-fix:M1] restored availability reaches the prepared successor'
+            'restored availability reaches the prepared successor'
           )
         },
         { timeout: 3000 }
       )
-      assert.equal(constructed, 2, '[C4-fix:M1] recovery never opens a third endpoint')
+      assert.equal(constructed, 2, 'recovery never opens a third endpoint')
     } finally {
       construction.mockRestore()
       await host.dispose()

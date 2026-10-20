@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { createRuntime } from '../src/index.js'
 import { createObserverBinding } from '../src/entry/extension.js'
 
-describe('RT24 effect terminal reentrancy', () => {
-  it('RT24-T01: cleanup self-disposal stops rerun, removes edges, and leaves queue empty', () => {
+describe('effect terminal reentrancy', () => {
+  it('cleanup self-disposal stops rerun, removes edges, and leaves queue empty', () => {
     const scheduled: Array<() => void> = []
     const runtime = createRuntime({
       schedulerStrategy: (flush) => {
@@ -43,7 +43,7 @@ describe('RT24 effect terminal reentrancy', () => {
     source.dispose()
   })
 
-  it('RT24-T02: cleanup-triggered binding retrack returns terminal no-observer', () => {
+  it('cleanup-triggered binding retrack returns terminal no-observer', () => {
     const runtime = createRuntime()
     const source = internalRuntimeOf(runtime).signal(0)
     const binding = createObserverBinding(runtime)
@@ -72,7 +72,7 @@ describe('RT24 effect terminal reentrancy', () => {
     source.dispose()
   })
 
-  it('RT24-T03: body self-disposal cannot commit its captured dependency edge', () => {
+  it('body self-disposal cannot commit its captured dependency edge', () => {
     const runtime = createRuntime()
     const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
@@ -102,7 +102,7 @@ describe('RT24 effect terminal reentrancy', () => {
     source.dispose()
   })
 
-  it('RT30-T01: switching A to B rolls back B when B onObserved disposes the effect', () => {
+  it('switching A to B rolls back B when B onObserved disposes the effect', () => {
     const runtime = createRuntime()
     const sourceA = internalRuntimeOf(runtime).signal(0)
     const sourceB = internalRuntimeOf(runtime).signal(0)

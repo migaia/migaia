@@ -51,7 +51,7 @@ export function attachLifecycleSecondaryErrors(
 /**
  * Rejects, at the creating factory, an error policy whose only observation channel is a reporter
  * that was not supplied. `report` hands every failure to the reporter and `firstError` hands every
- * failure after the first to it; without one those failures would vanish (X2=a, LC-B5). Throws an
+ * failure after the first to it; without one those failures would vanish. Throws an
  * `INVALID_OPTION` TypeError carrying `detail.field = 'report'`.
  */
 export function assertErrorPolicyReporter(

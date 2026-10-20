@@ -61,11 +61,7 @@ assert.equal(reported.length, 1)
 assert.ok(posted.length > 0)
 assert.ok(posted.every((transfer) => transfer === undefined))
 assert.equal(launcher.capabilities.termination, 'unsupported')
-assert.equal(
-  handle.sampleUsage,
-  undefined,
-  '[A45][A55] this native Worker has no local isolate sampler'
-)
+assert.equal(handle.sampleUsage, undefined, 'this native Worker has no local isolate sampler')
 handle.terminate()
 console.log(
   JSON.stringify({

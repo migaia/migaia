@@ -9,7 +9,7 @@ import { createNativeProcessOffer } from '../../src/process/offer.js'
 /** Verifier output is a stable principal rather than arbitrary truthy metadata. */
 describe('process socket principal admission', () => {
   it.each(['', { unexpected: true }] as const)(
-    '[D8] refuses a principal that is not a nonempty string',
+    'refuses a principal that is not a nonempty string',
     async (principal) => {
       let settle: (error: unknown) => void = () => undefined
       const rejected = new Promise<unknown>((resolve) => {

@@ -1155,7 +1155,7 @@ Leaf entry 提供更小的按需边界。只有五个名称不在根入口：`@m
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
 
-验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。
+验收用例位于 `test/` 目录。
 
 ## 可中止的相对延时
 

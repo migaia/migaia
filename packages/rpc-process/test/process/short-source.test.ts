@@ -19,7 +19,7 @@ const serviceEntry = new URL('./fixtures/short-service.ts', import.meta.url)
 const parentEntry = fileURLToPath(new URL('./fixtures/short-parent.mjs', import.meta.url))
 
 describe('short Process sources', () => {
-  it('[DX-P1-P01] runs a TS child through the original launcher, handshake and typed request', async () => {
+  it('runs a TS child through the original launcher, handshake and typed request', async () => {
     const peer = await createProcessPeer<IMathApi>({ spawn: serviceEntry })
     try {
       expect(await peer.request('math.double', 21)).toBe(42)
@@ -29,7 +29,7 @@ describe('short Process sources', () => {
     }
   })
 
-  it('[DX-P1-P02] self-spawn guard prevents recursive launch and preserves runtime flags', async () => {
+  it('self-spawn guard prevents recursive launch and preserves runtime flags', async () => {
     const result = await execute(process.execPath, ['--no-warnings', parentEntry], {
       timeout: 10_000
     })
@@ -40,7 +40,7 @@ describe('short Process sources', () => {
     })
   })
 
-  it('[DX-P1-P03] resolves a relative TS string against the main entry instead of cwd', async () => {
+  it('resolves a relative TS string against the main entry instead of cwd', async () => {
     const result = await execute(process.execPath, ['--no-warnings', parentEntry, 'relative'], {
       cwd: tmpdir(),
       timeout: 10_000
@@ -49,7 +49,7 @@ describe('short Process sources', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    '[DX-P1-P10] launches an exact absolute path from eval without replaying eval flags',
+    'launches an exact absolute path from eval without replaying eval flags',
     async () => {
       /** Literal ?/# are legal Unix filename bytes, independent of URL query/fragment syntax. */
       const directory = await mkdtemp(join(tmpdir(), 'dx-absolute-'))
@@ -81,14 +81,14 @@ describe('short Process sources', () => {
     }
   )
 
-  it('[DX-P1-P04] rejects self-spawn from a test-runner main entry before launching', async () => {
+  it('rejects self-spawn from a test-runner main entry before launching', async () => {
     await expect(createProcessPeer({ spawn: true })).rejects.toMatchObject({
       source: '@migaia/rpc/core',
       code: 'INVALID_CONFIG'
     })
   })
 
-  it('[DX-P1-P09] documents Node type stripping by preserving its original .js module-resolution diagnostic', async () => {
+  it('documents Node type stripping by preserving its original .js module-resolution diagnostic', async () => {
     /**
      * The raw runtime diagnostic is evidence for the documented loader requirement, not a
      * fabricated parent cause.
@@ -101,7 +101,7 @@ describe('short Process sources', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    '[DX-P1-P05] waits for a named server and enforces owner-only socket permissions',
+    'waits for a named server and enforces owner-only socket permissions',
     async () => {
       const name = `dx-short-${randomUUID()}`
       const clientPromise = createProcessPeer<IMathApi>({ connect: name, connectTimeoutMs: 1000 })
@@ -126,7 +126,7 @@ describe('short Process sources', () => {
     }
   )
 
-  it('[DX-P1-P06] never treats a TCP address as an unauthenticated named endpoint', async () => {
+  it('never treats a TCP address as an unauthenticated named endpoint', async () => {
     await expect(createProcessPeer({ connect: 'tcp://127.0.0.1:1' })).rejects.toMatchObject({
       source: '@migaia/rpc/process',
       code: 'PROCESS_PLUGIN_INVALID_OPTION',
@@ -140,7 +140,7 @@ describe('short Process sources', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    '[DX-P1-P07] can require a token between processes of the same OS user',
+    'can require a token between processes of the same OS user',
     async () => {
       const name = `dx-token-${randomUUID()}`
       const notices: unknown[] = []
@@ -178,7 +178,7 @@ describe('short Process sources', () => {
   )
 
   it.skipIf(process.platform === 'win32')(
-    '[DX-P1-P08] stops waiting for a missing named server at its bounded deadline',
+    'stops waiting for a missing named server at its bounded deadline',
     async () => {
       await expect(
         createProcessPeer({
@@ -191,7 +191,7 @@ describe('short Process sources', () => {
   )
 })
 
-it('RPC-B3 gives an explicit default reporter and its wrapper identical per-launch notices', async () => {
+it('gives an explicit default reporter and its wrapper identical per-launch notices', async () => {
   const notices: unknown[] = []
   const capture = vi.spyOn(console, 'error').mockImplementation((error) => {
     notices.push(error)

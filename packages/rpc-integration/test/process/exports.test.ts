@@ -22,7 +22,7 @@ function sources(directory: string): string[] {
 }
 
 describe('process package layering and exports', () => {
-  it('[A12] publishes the runtime-neutral process and byte-framing entries', async () => {
+  it('publishes the runtime-neutral process and byte-framing entries', async () => {
     const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       exports: Record<string, { default: string; types: string }>
     }
@@ -54,21 +54,19 @@ describe('process package layering and exports', () => {
     expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
   })
 
-  it('[A1][A25] ships four symmetric factories without any retired factory alias', async () => {
+  it('ships four symmetric factories without any retired factory alias', async () => {
     /** Built subpaths are the consumer boundary; internal imports cannot hide a leaked alias. */
     const process = await import('@migaia/rpc-process')
     const thread = await import('@migaia/rpc-threads')
     for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeProcessPlugin'])
-      expect(Object.hasOwn(process, name), '[A25] retired process factory must be absent').toBe(
-        false
-      )
+      expect(Object.hasOwn(process, name), 'retired process factory must be absent').toBe(false)
     for (const name of ['createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
-      expect(Object.hasOwn(thread, name), '[A25] retired thread factory must be absent').toBe(false)
+      expect(Object.hasOwn(thread, name), 'retired thread factory must be absent').toBe(false)
     expect(thread.createThreadPeer).toBeTypeOf('function')
     expect(thread.createThreadPlugin).toBeTypeOf('function')
   })
 
-  it('[A12] keeps platform peers optional and physical IPC construction singular', () => {
+  it('keeps platform peers optional and physical IPC construction singular', () => {
     const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       version: string
       dependencies: Record<string, string>

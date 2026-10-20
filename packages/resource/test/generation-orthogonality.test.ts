@@ -4,17 +4,17 @@ import { Resource } from '../src'
 import { deferred, flushAsync } from './helpers'
 
 /**
- * M-T7（`docs/lifecycle/migration.sdd.md` §8.5，批次 2 的核心验收项）。
+ * （，批次 2 的核心验收项）。
  *
  * `Resource` 有两条**互相正交**的代数，迁移到 `@migaia/lifecycle` 的 `GenerationController` 之后必须 保持不混：
  *
  * 1. **请求代数**（现由 `createGenerationController()` 承载）—— 判定「这次异步结果还该不该提交」。
  * 2. **观察/挂起代数**（仍是本地的 `#suspensionGeneration`）—— 判定「这次延迟挂起还该不该真的断上游边」。
  *
- * §7 批次 2 明文要求「保留 request generation 与 observation/suspension generation 两条正交代数」；
+ * 批次 2 明文要求「保留 request generation 与 observation/suspension generation 两条正交代数」；
  * 一旦合并成一条，观察者的来去会误作废在途请求，或者一次陈旧的挂起会把已被重新观察的资源断边。
  */
-describe('M-T7 (§7 批次 2): request generation and suspension generation stay orthogonal', () => {
+describe('request generation and suspension generation stay orthogonal', () => {
   it('an in-flight request still commits even though observers attached and detached while it ran', async () => {
     const runtime = createRuntime()
     const blocking = deferred<number>()
@@ -125,7 +125,7 @@ describe('M-T7 (§7 批次 2): request generation and suspension generation stay
   })
 })
 
-describe('ARC-T01 canonical adapter capabilities', () => {
+describe('canonical adapter capabilities', () => {
   it('inspects idle without starting or tracking, resets cancellation and reuses monotonic generations', async () => {
     const runtime = createRuntime()
     const first = deferred<number>()

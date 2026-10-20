@@ -5,7 +5,7 @@ import { color } from '../src/plugins/color.js'
 import { uuid } from '../src/plugins/uuid.js'
 import { file } from '../src/plugins/file.browser.js'
 
-describe('LG-C4/C5 instance host ownership', () => {
+describe('instance host ownership', () => {
   it('keeps writes, console, UUID, HTTP and file capabilities on the instance after default replacement', async () => {
     /** Records actual adapter use, including the receiver-sensitive factory. */
     const calls: string[] = []

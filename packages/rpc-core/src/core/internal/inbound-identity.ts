@@ -34,7 +34,7 @@ export type IInboundIdentityRequest = {
   readonly inbound?: IRpcInboundMessage
 }
 
-/** Narrow lifecycle-neutral identity surface shared with chunk and D95 consumers. */
+/** Narrow lifecycle-neutral identity surface shared with chunk and provider consumers. */
 export type IInboundIdentityPort = {
   readonly admit: (
     request: IInboundIdentityRequest

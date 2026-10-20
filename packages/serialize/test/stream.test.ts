@@ -576,7 +576,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
     ).rejects.toThrow('maxItems must be at least minItems')
   })
 
-  it('rejects a missing scheduler (R-4: core 无默认 timer)', async () => {
+  it('rejects a missing scheduler (core 无默认 timer)', async () => {
     await expect(sliceByFrameBudget(rows(1), {} as never).next()).rejects.toThrow(
       'serialize scheduler must be { now, schedule }'
     )
@@ -922,7 +922,7 @@ describe('decodeStream 与 collectStream', () => {
     expect(await collectStream(empty())).toEqual(['text', ''])
   })
 
-  it('MRC-SOL-F03 captures one encoder accessor and preserves its receiver', async () => {
+  it('captures one encoder accessor and preserves its receiver', async () => {
     let getterReads = 0
     let receiver: unknown
     const encoder = {
@@ -945,7 +945,7 @@ describe('decodeStream 与 collectStream', () => {
     expect(receiver).toBe(encoder)
   })
 
-  it('MRC-C-T02 keeps Option A as one documented stream receiver boundary', () => {
+  it('keeps Option A as one documented stream receiver boundary', () => {
     const source = readFileSync(new URL('../src/stream.ts', import.meta.url), 'utf8')
     expect(source).toContain('MRC-C-R02-only receiver boundary')
     expect(source).toContain('invokeCollectEncoderWithReceiver')

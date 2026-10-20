@@ -19,7 +19,7 @@ import {
 /** A logical clock proves default none and explicit custom health without elapsed-time guesses. */
 describe('JSON-RPC real process health', () => {
   it.each([false, true])(
-    '[I16 A5/M2] busy child obeys health none/custom and generation retest (custom=%s)',
+    'busy child obeys health none/custom and generation retest (custom=%s)',
     async (custom) => {
       /** Shared scheduler owns supervision checks, request deadlines and restart delay. */
       /** Policy timers are virtual; original native generation jobs retain host ordering. */

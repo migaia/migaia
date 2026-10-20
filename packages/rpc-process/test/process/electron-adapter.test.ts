@@ -68,7 +68,7 @@ afterEach(() => {
 })
 
 describe('Electron utility process boundary without a platform fixture', () => {
-  it('[A9] routes message and output events while keeping tree termination unsupported', async () => {
+  it('routes message and output events while keeping tree termination unsupported', async () => {
     const fake = child()
     /** Observes only the explicit allowlisted fork inputs. */
     const forks: unknown[][] = []
@@ -114,7 +114,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
     )
   })
 
-  it('[A9] rejects unsupported bootstrap and an unready app before fork', async () => {
+  it('rejects unsupported bootstrap and an unready app before fork', async () => {
     const launcher = createElectronUtilityProcessLauncher()
     const context = { signal: new AbortController().signal, output: () => undefined }
     runtime.fork = () => {
@@ -131,7 +131,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
     runtime.ready = true
   })
 
-  it('[A9] keeps a native fork failure reachable through PROCESS_CHANNEL_CONNECT_FAILED', async () => {
+  it('keeps a native fork failure reachable through PROCESS_CHANNEL_CONNECT_FAILED', async () => {
     const failure = new Error('fork failed')
     runtime.ready = true
     runtime.fork = () => {
@@ -145,7 +145,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
     ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CONNECT_FAILED', cause: failure })
   })
 
-  it('[A9][A51] preserves a native message error after launch ownership is handed off', async () => {
+  it('preserves a native message error after launch ownership is handed off', async () => {
     const fake = child()
     const failure = new Error('post failed')
     fake.process.postMessage = () => {
@@ -174,7 +174,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
     expect(fake.killed).toBe(1)
   })
 
-  it('[A9] closes a child that exits or errors before spawn', async () => {
+  it('closes a child that exits or errors before spawn', async () => {
     const launcher = createElectronUtilityProcessLauncher()
     const context = { signal: new AbortController().signal, output: () => undefined }
     const earlyExit = child()
@@ -200,7 +200,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
   })
 
   /** Ignored streams and an unsubscribed observer must have no output or late close effects. */
-  it('[A9] preserves ignored streams, environment selection, and close-observer ownership', async () => {
+  it('preserves ignored streams, environment selection, and close-observer ownership', async () => {
     /** Only explicit inherited keys may enter the native constructor. */
     vi.stubEnv('MIGAIA_FIXTURE_PRESENT', 'ambient')
     vi.stubEnv('MIGAIA_FIXTURE_MISSING', undefined)
@@ -258,7 +258,7 @@ describe('Electron utility process boundary without a platform fixture', () => {
   })
 
   /** Unsupported stdin policy rejects before the optional native fork boundary is invoked. */
-  it('[A9] rejects unsupported channel stdin before optional runtime acquisition', async () => {
+  it('rejects unsupported channel stdin before optional runtime acquisition', async () => {
     /** Native fork is unreachable when this adapter's declared stdin capability is violated. */
     const fork = vi.fn()
     runtime.fork = fork

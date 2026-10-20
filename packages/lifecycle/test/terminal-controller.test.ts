@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createTerminalController } from '../src/terminal-controller'
 
-describe('L-T1 TerminalController: open -> close -> terminal', () => {
+describe('TerminalController: open -> close -> terminal', () => {
   it('starts open, moves to closing on close(), and to terminal on forceTerminal()', () => {
     const controller = createTerminalController()
     expect(controller.lifecycle).toBe('open')

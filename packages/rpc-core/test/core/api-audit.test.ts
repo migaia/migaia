@@ -14,11 +14,11 @@ import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { createRuntimePeer } from '../../dist/remote/index.js'
 import * as root from '../../dist/core/index.js'
 
-it('[RC-C01] keeps the authentication nonce helper outside the public root', () => {
+it('keeps the authentication nonce helper outside the public root', () => {
   expect(root).not.toHaveProperty('createAuthenticationNonce')
 })
 
-it('[RC-D16] releases the operation parent listener when the UUID callback throws synchronously', async () => {
+it('releases the operation parent listener when the UUID callback throws synchronously', async () => {
   /** Count only listeners installed after endpoint construction. */
   const [left, right] = createMemoryTransportPair()
   /** The supported UUID middleware can fail while allocating a task identifier. */
@@ -77,7 +77,7 @@ it('[RC-D16] releases the operation parent listener when the UUID callback throw
   }
 })
 
-it('[RC-D01] retains independent cleanup failures beside a public lifecycle diagnostic', async () => {
+it('retains independent cleanup failures beside a public lifecycle diagnostic', async () => {
   /** A diagnostic is application data, not proof that it contains the whole cleanup transaction. */
   const diagnostic = new RpcLifecycleError('application resource closed')
   /** The other resource has an independent original failure that must remain reachable. */
@@ -123,7 +123,7 @@ it('[RC-D01] retains independent cleanup failures beside a public lifecycle diag
   }
 })
 
-it('[RC-D02] closes an acquired source when native entropy fails before endpoint construction', async () => {
+it('closes an acquired source when native entropy fails before endpoint construction', async () => {
   /** Both physical ends are closed independently of whether rollback works. */
   const [left, right] = createMemoryTransportPair()
   /** Native entropy failure must remain the INVALID_CONFIG diagnostic's original cause. */

@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { defineFeature, definePlugin, PluginHost, PluginHostError } from '../src/index.js'
 
-/**
- * A4, A5, A6, A7 and A14 cover suspended access, recovery, failure containment, teardown and
- * stale-generation restarts.
- */
+/** Covers suspended access, recovery, failure containment, teardown and stale-generation restarts. */
 type IRecoveryDiagnostic = { code?: string; error?: unknown }
 
 /** Sync pipeline host used to observe suspended-stage exclusion. */
@@ -552,7 +549,7 @@ describe('dependency suspension and recovery', () => {
     await host.dispose()
   })
 
-  it('A16 keeps a disabled rebindable middle node disabled while its provider returns', async () => {
+  it('keeps a disabled rebindable middle node disabled while its provider returns', async () => {
     for (const newDefinition of [false, true]) {
       const host = new PluginHost<Record<string, never>>({ execution })
       const p = definePlugin({
@@ -622,7 +619,7 @@ describe('dependency suspension and recovery', () => {
     }
   })
 
-  it('A17 restarts a disabled dependent without a hook and rebinds one with a hook', async () => {
+  it('restarts a disabled dependent without a hook and rebinds one with a hook', async () => {
     for (const withHook of [false, true]) {
       const host = new PluginHost<Record<string, never>>({ execution })
       const p = definePlugin({

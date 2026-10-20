@@ -3,9 +3,9 @@ export const ERROR_SOURCE = '@migaia/rpc/process'
 
 /** Process boundary failures; callers close or recreate the affected connection. */
 export const RpcProcessErrorCode = {
-  /** D23: native PID sampling failed; report its cause and display unavailable without retrying. */
+  /** Native PID sampling failed; report its cause and display unavailable without retrying. */
   usageSampleFailed: 'PROCESS_USAGE_SAMPLE_FAILED',
-  /** Host options violate R1/R2 before launch; callers must correct the named field. */
+  /** Host options are invalid before launch; callers must correct the named field. */
   hostInvalidOption: 'PROCESS_HOST_INVALID_OPTION',
   /** Facade release has begun; callers must create a new facade instead of enqueueing work. */
   hostClosed: 'PROCESS_HOST_CLOSED',
@@ -22,10 +22,7 @@ export const RpcProcessErrorCode = {
   connectFailed: 'PROCESS_CHANNEL_CONNECT_FAILED',
   /** The requested local listener could not bind; caller must choose an available address. */
   listenFailed: 'PROCESS_CHANNEL_LISTEN_FAILED',
-  /**
-   * Invalid process-plugin options violate R1/R2/R8 before launch; caller must correct the named
-   * field.
-   */
+  /** Invalid process-plugin options are rejected before launch; caller must correct the named field. */
   pluginInvalidOption: 'PROCESS_PLUGIN_INVALID_OPTION',
   /**
    * Invalid resilience limits, ownership, or health configuration; correct the named field before

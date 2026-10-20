@@ -102,7 +102,7 @@ async function assertSelectedRootProjection(): Promise<void> {
 void assertSelectedRootProjection
 
 /** Proves the runtime guard rejects an untyped legacy tuple before endpoint construction. */
-it('YS19 rejects an untyped legacy tuple before native composition', async () => {
+it('rejects an untyped legacy tuple before native composition', async () => {
   /** The tuple models a JavaScript caller bypassing the root-record TypeScript signature. */
   const forgedRoots = [{}] as unknown as Readonly<
     Record<string, import('@migaia/rpc-core').IRpcFeature>
@@ -115,7 +115,7 @@ it('YS19 rejects an untyped legacy tuple before native composition', async () =>
   ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
 })
 
-/** W1 proves the public async factory preserves each adjacent pipeline edge. */
+/** Proves the public async factory preserves each adjacent pipeline edge. */
 const validPipeline: IRpcFactoryConfig<
   string,
   readonly [],
@@ -213,7 +213,7 @@ async function assertInferredPipelineEdges(): Promise<void> {
 }
 void assertInferredPipelineEdges
 
-/** F0 keeps every public factory on one directed, concrete pipeline contract. */
+/** Keeps every public factory on one directed, concrete pipeline contract. */
 async function assertPublicFactoryPipelineMatrix(): Promise<void> {
   const identityLiteral: { readonly x: 1 } = identityCodec.encode({ x: 1 } as const)
   const preservedLegacy: IRpcFramer<string, string, 'custom', 1> = legacyCustom

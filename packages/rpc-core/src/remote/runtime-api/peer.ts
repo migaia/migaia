@@ -425,7 +425,10 @@ export async function createRuntimePeer(
     const supportsStream = channel.agreement.capabilities.includes(RpcCapability.stream)
     /** Core owns provider dispatch and all admission/replay/cancellation leases. */
     const providers: Record<string, IRpcProvider> = Object.create(null)
-    /** One cold completion adapter keeps D47 normalization outside handler and context failures. */
+    /**
+     * One cold completion adapter keeps completion normalization outside handler and context
+     * failures.
+     */
     const completeScalar = (
       result: unknown,
       context: Parameters<IRpcProvider>[0]

@@ -11,7 +11,7 @@ import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime
 import { peers } from '../process/peers/runtime-interop-fixture.js'
 
 for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) {
-  it(`U41 production TS Runtime Peer bridge → ${fixture.language}`, async () => {
+  it(`production TS Runtime Peer bridge → ${fixture.language}`, async () => {
     const launcher = createNodeProcessLauncher()
     const token = randomUUID()
     let handle: Awaited<ReturnType<typeof launcher.launch>> | undefined
@@ -32,7 +32,7 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
     })
     try {
       active = await createRuntimePeer({
-        self: { name: 'production-ts', instanceId: 'u41-production-ts' },
+        self: { name: 'production-ts', instanceId: 'production-ts-2' },
         connect: async (context) => {
           handle = await launcher.launch(
             {
@@ -79,8 +79,8 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
             scheduler: systemScheduler,
             wallClock: systemWallClock,
             ipc: {
-              connectionId: `u41-bridge-${fixture.language}`,
-              sessionId: `u41-bridge-${fixture.language}`,
+              connectionId: `bridge-${fixture.language}`,
+              sessionId: `bridge-${fixture.language}`,
               log: () => undefined
             },
             report: (error) => {

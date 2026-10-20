@@ -31,7 +31,7 @@ class NumberHost extends PluginHost<Record<string, never>, number> {
   }
 }
 
-describe('A1 committed removal result', () => {
+describe('committed removal result', () => {
   it('returns the applied frozen plan rather than a dry-run result', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -140,7 +140,7 @@ describe('A1 committed removal result', () => {
   })
 })
 
-describe('A4 release hook definition capture', () => {
+describe('release hook definition capture', () => {
   it('rejects malformed function values at define, async use, and sync use admission', () => {
     const invalid = { name: 'bad', install: vi.fn(() => ({})), beforeRelease: 1 }
     expect(() => definePlugin(invalid as never)).toThrow(
@@ -197,7 +197,7 @@ describe('A4 release hook definition capture', () => {
   })
 })
 
-describe('A2/A5 pre-release transaction', () => {
+describe('pre-release transaction', () => {
   it('leaves optional dependents and owned pipeline stages callable during the hook', async () => {
     const events: string[] = []
     /** Keeps the hook open while callers exercise the still-published registration. */

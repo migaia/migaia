@@ -69,9 +69,9 @@ const messagePackByteVectors: readonly IByteVector[] = [
 /** Convert a binary result into the stable lowercase spelling used by vector fixtures. */
 const toHex = (value: Uint8Array): string => Buffer.from(value).toString('hex')
 
-/** A5 keeps the three binary codec interoperability checks passing across the peer move. */
+/** Keeps the three binary codec interoperability checks passing across the peer move. */
 describe('independent codec interoperability', () => {
-  it('T10 matches native JSON for every canonical vector', () => {
+  it('matches native JSON for every canonical vector', () => {
     const codec = defineJsonCodec({ version: canonicalDocument.version })
     for (const vector of canonicalDocument.cases) {
       const encoded = codec.encode(vector.value)
@@ -80,7 +80,7 @@ describe('independent codec interoperability', () => {
     }
   })
 
-  it('T11 matches msgpackr bytes and independent decode for every canonical vector', () => {
+  it('matches msgpackr bytes and independent decode for every canonical vector', () => {
     const codec = defineMessagePackCodec({ version: canonicalDocument.version })
     for (const vector of canonicalDocument.cases) {
       const encoded = codec.encode(vector.value)
@@ -92,7 +92,7 @@ describe('independent codec interoperability', () => {
       expect(toHex(codec.encode(vector.value))).toBe(vector.hex)
   })
 
-  it('T12 matches cborg bytes and independent decode for every canonical vector', () => {
+  it('matches cborg bytes and independent decode for every canonical vector', () => {
     const codec = defineCBORCodec({ version: canonicalDocument.version })
     for (const vector of canonicalDocument.cases) {
       const encoded = codec.encode(vector.value)
@@ -103,7 +103,7 @@ describe('independent codec interoperability', () => {
     }
   })
 
-  it('T12 projects independently encoded signed safe integers through nested portable values', () => {
+  it('projects independently encoded signed safe integers through nested portable values', () => {
     const codec = defineCBORCodec({ version: canonicalDocument.version })
     /** Realistic timestamp and signed boundaries encoded by an independent CBOR implementation. */
     const value = {
@@ -124,7 +124,7 @@ describe('independent codec interoperability', () => {
     )
   })
 
-  it('T13 round-trips normative rpc-v1 bytes through an independent protobufjs binding', () => {
+  it('round-trips normative rpc-v1 bytes through an independent protobufjs binding', () => {
     const codec = defineProtobufCodec({
       version: 1,
       schema: { id: 'migaia.rpc', version: 1 },
@@ -153,7 +153,7 @@ describe('independent codec interoperability', () => {
     expect(codec.decode(independentBytes)).toMatchObject(value)
   })
 
-  it('F3 regenerates the canonical Buf descriptor from rpc-v1.proto', () => {
+  it('regenerates the canonical Buf descriptor from rpc-v1.proto', () => {
     const regenerated = (
       protobuf.parse(protobufSchema).root as unknown as IDescriptorRoot
     ).toDescriptor('proto3').file[0]!
@@ -171,7 +171,7 @@ describe('independent codec interoperability', () => {
     expect(RpcEnvelopeSchema.fields.map((field) => field.number)).toEqual([1, 2, 3])
   })
 
-  it('F3 keeps request and failure-response body fields across Buf and independent protobufjs', () => {
+  it('keeps request and failure-response body fields across Buf and independent protobufjs', () => {
     const protobufCodec = defineProtobufCodec({
       version: 1,
       schema: { id: 'migaia.rpc', version: 1 },
@@ -248,7 +248,7 @@ describe('independent codec interoperability', () => {
     })
   })
 
-  it('F3 rejects invalid outer identity and payload identity collisions with the original cause', () => {
+  it('rejects invalid outer identity and payload identity collisions with the original cause', () => {
     const protobufCodec = defineProtobufCodec({
       version: 1,
       schema: { id: 'migaia.rpc', version: 1 },

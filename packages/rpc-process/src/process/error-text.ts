@@ -20,7 +20,7 @@ export const RpcProcessErrorText = {
   connectFailed: 'process channel connection failed',
   /** Listener could not bind to the requested local address. */
   listenFailed: 'process channel listener failed',
-  /** Core's actual process codec admission preserves BC7's original private diagnostic. */
+  /** Core's actual process codec admission preserves the original private diagnostic. */
   expectedString: 'process channel requires a string encoded value',
   /** A channel is already owned by another transport adapter. */
   duplicateBinding: 'process channel is already bound',

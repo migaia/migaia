@@ -239,7 +239,7 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
     if bridge:
         if bare:
             while (body := bridge_body(reader)) is not None:
-                # A10 includes one payload parse and serialization without RPC envelope work.
+                # The reference baseline includes one payload parse and serialization without RPC envelope work.
                 payload = json.loads(body)
                 if isinstance(payload,dict) and payload.get("xrtReverse") is True:
                     bridge_write(writer,xrt_reverse(reader,writer,payload,True))
@@ -352,7 +352,7 @@ def bridge_write(writer: BinaryIO, message: Any) -> None:
     bridge_write_body(writer, body)
 
 
-# The bridge keeps the installed request/notification profile and the required U36 baseline.
+# The bridge keeps the installed request/notification profile and the required runtime baseline.
 BRIDGE_METHODS = ["migaia.hello", "migaia.describe", "migaia.invoke", "migaia.cancel"]
 BRIDGE_CAPABILITIES = ["runtime-api@1", "batch@1", "abort@1", "jsonrpc-bridge@1",
                        "wire-error@1", "deadline@1", "trace@1", "idempotency@1"]

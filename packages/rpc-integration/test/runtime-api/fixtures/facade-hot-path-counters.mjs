@@ -52,7 +52,7 @@ registerHooks({
           'managed request must load the original cold dispatcher'
         )
     if (url.endsWith('/rpc-contract/dist/contract/runtime-api/normalize-envelope.js')) {
-      /** Strict and decoded inbound admission share this canonical union owner after H1. */
+      /** Strict and decoded inbound admission share this canonical union owner. */
       const pattern =
         /export function normalizeRuntimeEnvelope\(value, portable, normalizeStreamPayload, readRecord = readStrictRecord\) \{/
       assert.ok(pattern.test(source), 'shared runtime normalization declaration required')

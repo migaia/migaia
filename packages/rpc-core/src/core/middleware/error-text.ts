@@ -1,9 +1,9 @@
 /** Stable middleware error text stays with its owner outside the root endpoint graph. */
 export const RpcMiddlewareErrorText = {
-  /** R12 requires a signed replay binding inside encryption; encrypt-only callers must add signing. */
+  /** Requires a signed replay binding inside encryption; encrypt-only callers must add signing. */
   authenticationEncryptionRequiresSigning:
     'authentication encryption requires sign/verify replay binding',
-  /** Binding parse/session failure is sanitized before provider admission (r12 A25/A29). */
+  /** Binding parse/session failure is sanitized before provider admission. */
   authenticationReplayBindingInvalid: 'Authentication replay binding is invalid',
   /** A verified counter already seen or outside the fixed 64-slot window cannot execute again. */
   authenticationFrameReplayed: 'Authentication frame was replayed',

@@ -62,7 +62,7 @@ async function settle(): Promise<void> {
 }
 
 describe('process resilience platform health', () => {
-  it('[A5] restarts real busy-loop children through native RPC ping in later generations', async () => {
+  it('restarts real busy-loop children through native RPC ping in later generations', async () => {
     /** Policy timers are virtual; original native generation jobs retain host ordering. */
     const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
     const handles: IProcessHandle[] = []

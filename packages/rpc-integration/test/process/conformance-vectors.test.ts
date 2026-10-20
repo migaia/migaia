@@ -8,7 +8,7 @@ import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-pr
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
 import { endpointFor } from './peers/ts/runtime.js'
 
-/** [A119] Independent scope is frozen here, so editing the baseline artifact cannot shrink it. */
+/** Independent scope is frozen here, so editing the baseline artifact cannot shrink it. */
 const vectorFiles = [
   'handshake.json',
   'control.json',
@@ -27,7 +27,7 @@ const requiredIds = [
       const vector = JSON.parse(
         readFileSync(new URL(`../../schema/vectors/${file}`, import.meta.url), 'utf8')
       )
-      /** U36 retires only v1 catalogs and describeHost; use/unUse/inspect stay live wire methods. */
+      /** Retires only v1 catalogs and describeHost; use/unUse/inspect stay live wire methods. */
       const sections =
         file === 'remote-host-control.json'
           ? [
@@ -68,7 +68,7 @@ beforeAll(async () => {
   if (!receipt.accepted) throw new Error(JSON.stringify(receipt))
 })
 
-describe('[A2][A119] published vectors evaluated by independent language owners', () => {
+describe('published vectors evaluated by independent language owners', () => {
   for (const peer of peers.slice(0, 4))
     it(`${peer.language} missing negotiated stream capability rejects before its first physical write`, async () => {
       /** The public proposal deliberately omits stream while preserving native mandatory controls. */

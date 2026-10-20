@@ -6,7 +6,7 @@ import { connect } from '../../dist/core/middleware/connect.js'
 import type { IRpcContext } from '../../dist/core/typing.js'
 import { streamRoots } from './fixture.js'
 
-describe('streaming K185 provider context', () => {
+describe('streaming provider context', () => {
   it('passes the core-created stream context by identity and isolates ordinary requests', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const contextCreation = vi.spyOn(ProviderExecutor.prototype, 'createContext')

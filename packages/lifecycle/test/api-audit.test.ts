@@ -3,7 +3,7 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { boundedWait, createSyncLifecycleScope, executeReleaseDescriptor } from '../src/index.js'
 
 describe('lifecycle audited release contracts', () => {
-  it('D-01 retains the task primary when timer cancellation also fails', async () => {
+  it('retains the task primary when timer cancellation also fails', async () => {
     /** These independent errors must remain reachable through the returned failure. */
     const primary = new Error('task primary')
     /** Cleanup is secondary to the task that won the wait. */
@@ -27,7 +27,7 @@ describe('lifecycle audited release contracts', () => {
     expect.unreachable('the failed task must reject')
   })
 
-  it('D-02 waits for a synchronous timer registration before finalizing cleanup', async () => {
+  it('waits for a synchronous timer registration before finalizing cleanup', async () => {
     /** A synchronous callback still owns the handle returned after it fires. */
     const cleanup = new Error('timer cleanup')
     /** Cancellation must happen exactly once, including the failure path. */
@@ -48,7 +48,7 @@ describe('lifecycle audited release contracts', () => {
     expect(cancel).toHaveBeenCalledTimes(1)
   })
 
-  it('D-07 reports a syncSafe thenable rejection while keeping synchronous disposal', async () => {
+  it('reports a syncSafe thenable rejection while keeping synchronous disposal', async () => {
     /** Observe the original late failure without waiting for it in synchronous disposal. */
     const failure = new Error('sync callback rejected')
     /** Report is the existing asynchronous observation channel for a contract-violating callback. */
@@ -78,7 +78,7 @@ describe('lifecycle audited release contracts', () => {
     expect(walkErrorCauses(reports[0])).toContain(failure)
   })
 
-  it('D-08 observes a graceful rejection even when its shared deadline has passed', async () => {
+  it('observes a graceful rejection even when its shared deadline has passed', async () => {
     /** Graceful work was already called, so force fallback cannot erase its later rejection. */
     const failure = new Error('late graceful rejected')
     /** The original promise is rejected only after the release selected its force fallback. */

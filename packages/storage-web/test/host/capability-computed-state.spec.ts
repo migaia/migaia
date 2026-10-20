@@ -7,8 +7,8 @@ import { createStorageReactiveService } from '../../src/host/reactive.js'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 
-/** R12 proves the public Host capability projection and runtime guard remain exact. */
-describe('SWV4-B05 R12 Host capability and computed state', () => {
+/** Proves the public Host capability projection and runtime guard remain exact. */
+describe('Host capability and computed state', () => {
   it('fixes the liveQuery slot at construction and fails closed without the service', async () => {
     const host = await createStorageHost()
     const descriptor = Object.getOwnPropertyDescriptor(host, 'liveQuery')
@@ -39,11 +39,11 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
   it('supports dynamic use after the facade is made non-extensible', async () => {
     const host = await createStorageHost()
     Object.preventExtensions(host)
-    const plugins = [memoryBackendPlugin({ id: 'r12-dynamic-use' })] as const
+    const plugins = [memoryBackendPlugin({ id: 'dynamic-use' })] as const
     const installed = await host.use(...plugins)
     const installedBackends = installed.backends() as ReadonlyMap<string, unknown>
     const originalBackends = host.backends() as ReadonlyMap<string, unknown>
-    expect(installedBackends.get('r12-dynamic-use')).toBe(originalBackends.get('r12-dynamic-use'))
+    expect(installedBackends.get('dynamic-use')).toBe(originalBackends.get('dynamic-use'))
     await host.dispose()
   })
 
@@ -54,7 +54,7 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
     expect(controller).toBeDefined()
     expect(() =>
       service.registerAdapter({
-        backendId: 'r12-forged-consistency',
+        backendId: 'forged-consistency',
         store,
         controller: controller!,
         consistency: { mode: 'push', visibility: 'forged' as never },
@@ -68,14 +68,14 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
 
   it('returns a frozen computed state bound to the exact reactive adapter store', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r12-reactive' })] as const
+      plugins: [memoryReactive({ id: 'fixture-reactive' })] as const
     })
-    const store = host.backend('r12-reactive')
-    const adapter = host.reactiveBackend('r12-reactive')
+    const store = host.backend('fixture-reactive')
+    const adapter = host.reactiveBackend('fixture-reactive')
     expect(adapter?.store).toBe(store)
     const runtime = createRuntime()
     const query = host.liveQuery({
-      backendId: 'r12-reactive',
+      backendId: 'fixture-reactive',
       runtime,
       query: () => 'computed'
     })
@@ -99,12 +99,12 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
 
   it('projects the exact Resource failure into the computed error state', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r12-error' })] as const
+      plugins: [memoryReactive({ id: 'error-1' })] as const
     })
     const runtime = createRuntime()
     const cause = new Error('r12 query failure')
     const query = host.liveQuery({
-      backendId: 'r12-error',
+      backendId: 'error-1',
       runtime,
       query: () => Promise.reject(cause)
     })
@@ -122,7 +122,7 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
 
   it('exposes refreshing and ready projections while Resource keeps request ownership', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r12-refresh' })] as const
+      plugins: [memoryReactive({ id: 'fixture-refresh' })] as const
     })
     const runtime = createRuntime()
     let reads = 0
@@ -131,7 +131,7 @@ describe('SWV4-B05 R12 Host capability and computed state', () => {
       resolveRefresh = resolve
     })
     const query = host.liveQuery({
-      backendId: 'r12-refresh',
+      backendId: 'fixture-refresh',
       runtime,
       query: () => (reads++ === 0 ? 'initial' : pendingRefresh)
     })

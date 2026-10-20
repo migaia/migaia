@@ -135,7 +135,7 @@ function randomDependencies(
 }
 
 describe('incremental topology index', () => {
-  it('A1 maintains dependents, missing edges, and required closure', () => {
+  it('maintains dependents, missing edges, and required closure', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
@@ -161,7 +161,7 @@ describe('incremental topology index', () => {
     )
   })
 
-  it('CAP-P2 retains ordinal edge order and kind across rewiring and transactions', () => {
+  it('retains ordinal edge order and kind across rewiring and transactions', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'older', dependencies: [{ provider: 'p', required: true }] })
@@ -180,7 +180,7 @@ describe('incremental topology index', () => {
     expect(index.dependents('p')).toEqual({ required: [], optional: ['older'] })
   })
 
-  it('A2 matches independent and static canonical order across 200 operation sequences', () => {
+  it('matches independent and static canonical order across 200 operation sequences', () => {
     for (let sequence = 0; sequence < 200; sequence += 1) {
       const random = createRandom(0x9e3779b9 ^ sequence)
       const index = createTestIndex()
@@ -214,7 +214,7 @@ describe('incremental topology index', () => {
     }
   })
 
-  it('A3 preserves leaf mutation and closure across graph sizes', () => {
+  it('preserves leaf mutation and closure across graph sizes', () => {
     for (const size of [2, 1002, 4002, 8002]) {
       const index = createTestIndex()
       index.add({ id: 'n0', dependencies: [] })
@@ -231,7 +231,7 @@ describe('incremental topology index', () => {
     }
   })
 
-  it('A4 isolates, rolls back, commits, and closes transactions', () => {
+  it('isolates, rolls back, commits, and closes transactions', () => {
     const index = createTestIndex()
     const control = createTestIndex()
     seedTransactionIndex(index)
@@ -276,7 +276,7 @@ describe('incremental topology index', () => {
     expect(committed.dependencies('q')).toEqual([{ provider: 'x', required: true }])
   })
 
-  it('A5 rejects cycle-closing add and dependency replacement atomically', () => {
+  it('rejects cycle-closing add and dependency replacement atomically', () => {
     const dangling = createTestIndex()
     dangling.add({ id: 'b', dependencies: [{ provider: 'a', required: false }] })
     const beforeAdd = projectTopology(dangling.snapshot())
@@ -295,7 +295,7 @@ describe('incremental topology index', () => {
     expect(existing.dependencies('p')).toEqual([])
   })
 
-  it('A4 keeps base buckets untouched while a transaction rewires a shared provider', () => {
+  it('keeps base buckets untouched while a transaction rewires a shared provider', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
@@ -314,7 +314,7 @@ describe('incremental topology index', () => {
     expect(index.order()).toEqual(['p', 'a', 'b'])
   })
 
-  it('A4 retains base reads and commits the isolated transaction', () => {
+  it('retains base reads and commits the isolated transaction', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     const transaction = index.begin()
@@ -325,7 +325,7 @@ describe('incremental topology index', () => {
     expect(index.order()).toEqual(['p', 'a'])
   })
 
-  it('A19 drops rolled-back writes after transaction reads', () => {
+  it('drops rolled-back writes after transaction reads', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     const transaction = index.begin()
@@ -336,7 +336,7 @@ describe('incremental topology index', () => {
     expect(index.order()).toEqual(['p'])
   })
 
-  it('A4 opens and rolls back a transaction without copying the index', () => {
+  it('opens and rolls back a transaction without copying the index', () => {
     /** Median wall time of begin() plus one add and rollback() for one index size. */
     const measure = (size: number): number => {
       const index = createTestIndex()

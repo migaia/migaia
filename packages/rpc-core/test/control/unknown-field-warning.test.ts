@@ -7,7 +7,7 @@ import { createProviderEndpoint } from '../../dist/core/provider.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 
-describe('endpoint unknown-field report (A4)', () => {
+describe('endpoint unknown-field report', () => {
   it('keeps processing additive route fields and warns once per admitted connection', async () => {
     const [clientWire, providerWire] = createMemoryTransportPair()
     let request: unknown

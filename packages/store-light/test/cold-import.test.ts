@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-describe('ST-C6 cold package import', () => {
+describe('cold package import', () => {
   it('creates no runtime on import and shares the canonical default only on first store creation', () => {
     /** A fresh native module graph observes the existing read-only copy registration boundary. */
     const script = `

@@ -46,7 +46,7 @@ const importFromConsumer = (
 }
 
 describe('serialize optional peer packed consumer', () => {
-  it('A3 installs only three local tarballs and resolves codec peers only when supplied', () => {
+  it('installs only three local tarballs and resolves codec peers only when supplied', () => {
     const temporary = mkdtempSync(join(tmpdir(), 'migaia-serialize-optional-peers-'))
     try {
       const archives = Object.fromEntries(

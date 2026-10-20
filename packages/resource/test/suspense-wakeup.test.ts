@@ -6,7 +6,7 @@ import { Resource } from '../src/index.js'
 import { deferred, flushAsync } from './helpers.js'
 
 describe('Suspense request wakeups', () => {
-  it('RSB-T3 observes a thrown dependency when its then getter cancels the request', async () => {
+  it('observes a thrown dependency when its then getter cancels the request', async () => {
     /** Rejection is released after cancellation to detect an abandoned thrown dependency. */
     const dependency = deferred()
     /** Getter cancellation occurs during supported thenable admission. */
@@ -32,7 +32,7 @@ describe('Suspense request wakeups', () => {
     resource.dispose()
   })
 
-  it('RSB-T1 shares one pending Promise and admits cancellation between immediate wakeups', async () => {
+  it('shares one pending Promise and admits cancellation between immediate wakeups', async () => {
     /** Manual deadlines prove Suspense cannot consume an unbounded microtask queue. */
     const scheduler = createManualScheduler()
     /** Every attempt throws a new already-fulfilled Promise, the reported starvation case. */
@@ -62,7 +62,7 @@ describe('Suspense request wakeups', () => {
     resource.dispose()
   })
 
-  it('RSB-T2 permits multiple Suspense stages without consuming the ordinary retry budget', async () => {
+  it('permits multiple Suspense stages without consuming the ordinary retry budget', async () => {
     /** Each settled dependency explicitly admits one next attempt. */
     const scheduler = createManualScheduler()
     /** This policy must never see a Suspense dependency as a fetch failure. */

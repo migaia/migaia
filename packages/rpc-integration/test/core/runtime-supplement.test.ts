@@ -11,7 +11,7 @@ const execute = promisify(execFile)
 const entry = fileURLToPath(new URL('./fixtures/runtime-bench-proof.mjs', import.meta.url))
 
 for (const topology of ['managed', 'one-hop'] as const) {
-  it(`[A37][A116] runtime measurement uses real ${topology} ownership`, async () => {
+  it(`runtime measurement uses real ${topology} ownership`, async () => {
     const result = await execute(
       process.execPath,
       [
@@ -32,12 +32,12 @@ for (const topology of ['managed', 'one-hop'] as const) {
     assert.equal(
       topology === 'managed' ? receipt.managed : receipt.forwardedVia === 'leaf',
       true,
-      '[A37][A116] requested topology must be the actual committed runtime route'
+      'requested topology must be the actual committed runtime route'
     )
   })
 }
 
-it('[A37][A38] reverse measurement originates in the actual Worker isolate', async () => {
+it('reverse measurement originates in the actual Worker isolate', async () => {
   const result = await execute(
     process.execPath,
     [entry, JSON.stringify({ carrier: 'worker', direction: 'reverse' })],
@@ -45,5 +45,5 @@ it('[A37][A38] reverse measurement originates in the actual Worker isolate', asy
   )
   const receipt = JSON.parse(result.stdout) as { echoes: number; initiatorThreadId: number }
   assert.equal(receipt.echoes, 3)
-  assert.ok(receipt.initiatorThreadId > 0, '[A38] initiating Worker owns the reverse timing clock')
+  assert.ok(receipt.initiatorThreadId > 0, 'initiating Worker owns the reverse timing clock')
 })

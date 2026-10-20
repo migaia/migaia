@@ -7,7 +7,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from './fixture.js'
 
-it('[RC-D15] releases an owned supervisor resource after its endpoint close fails', async () => {
+it('releases an owned supervisor resource after its endpoint close fails', async () => {
   /** The external supervisor owns a real physical resource behind its opaque unit handle. */
   const physical = new MessageChannel()
   /** Native close observation proves release, independently of a mocked invocation count. */
@@ -66,7 +66,7 @@ it('[RC-D15] releases an owned supervisor resource after its endpoint close fail
   }
 })
 
-it('[RC-D11] sends a late reporter throw to the shared host queue without an unhandled reaction Promise', async () => {
+it('sends a late reporter throw to the shared host queue without an unhandled reaction Promise', async () => {
   /** The real physical send rejects only after the logical generation has departed. */
   const sending = deferred<never>()
   /** The late send failure and the reporter's secondary failure have separate identities. */
@@ -124,7 +124,7 @@ it('[RC-D11] sends a late reporter throw to the shared host queue without an unh
   }
 })
 
-it('[RC-D15] closes a departed generation channel even when its endpoint close rejects', async () => {
+it('closes a departed generation channel even when its endpoint close rejects', async () => {
   /** Public complete binding ports supply actual generation exit and release operations. */
   const fixture = remoteHarness()
   /** The application endpoint's failure remains the original reported object. */

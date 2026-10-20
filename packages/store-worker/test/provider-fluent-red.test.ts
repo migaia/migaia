@@ -50,8 +50,8 @@ function createLinkedWorkerPort(): ILinkedWorkerPort {
   }
 }
 
-describe('Cycle H B12c02 Store Worker provider consumer RED matrix', () => {
-  it('T120 constructs the real handler seam and preserves request/result/repeated disposal', async () => {
+describe('Store Worker provider consumer RED matrix', () => {
+  it('constructs the real handler seam and preserves request/result/repeated disposal', async () => {
     const { WorkerAdapter, createWorkerHandler } = await import('../src/index.js')
     const listeners = new Map<
       'message' | 'error' | 'messageerror',
@@ -96,7 +96,7 @@ describe('Cycle H B12c02 Store Worker provider consumer RED matrix', () => {
     await firstDispose
   })
 
-  it('T138 owning handler consumes WebRPC fluent provider seam without a Store export', async () => {
+  it('owning handler consumes WebRPC fluent provider seam without a Store export', async () => {
     type IStoreWorkerModule = typeof import('../src/worker.js')
     expectTypeOf<IStoreWorkerModule>().not.toHaveProperty('createProviderEndpoint')
 

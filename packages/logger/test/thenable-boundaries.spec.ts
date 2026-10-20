@@ -45,7 +45,7 @@ function createHostileThenable(mode: IFailureMode | 'success', label: string): I
   }
 
   thenable = {}
-  // oxlint-disable-next-line unicorn/no-thenable -- LG-T12 requires a real hostile thenable.
+  // oxlint-disable-next-line unicorn/no-thenable -- requires a real hostile thenable.
   Object.defineProperty(thenable, 'then', {
     configurable: true,
     get: () => {
@@ -94,7 +94,7 @@ function createBoundaryLogger(boundary: IBoundary, thenable: unknown): ITestLogg
 const boundaries: readonly IBoundary[] = ['hook', 'sink', 'pipeline', 'flush']
 const failureModes: readonly IFailureMode[] = ['getter', 'invoke', 'reject']
 
-describe('LG-T12 hostile thenable boundaries', () => {
+describe('hostile thenable boundaries', () => {
   it.each(boundaries)(
     '%s reads then once, preserves receiver, and flush drains successful work',
     async (boundary) => {

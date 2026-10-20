@@ -44,7 +44,7 @@ export function createStoreLightTypeError(
   )
 }
 
-/** Builds a `(source, code)`-tagged `AggregateError`; `errors[]` stays reachable (E-T13). */
+/** Builds a `(source, code)`-tagged `AggregateError`; `errors[]` stays reachable. */
 export function createStoreLightAggregateError(
   code: IStoreLightErrorCode,
   errors: unknown[],

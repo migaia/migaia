@@ -19,7 +19,7 @@ function expectTransportIdentity(value: unknown, message: string): void {
   expect(error.code).toBe('TRANSPORT')
 }
 
-describe('control A13 message-port transport error identity', () => {
+describe('control message-port transport error identity', () => {
   it('tags browser message errors without changing the native error', () => {
     /** The structural browser port exposes its registered event callbacks. */
     const listeners = new Map<string, (event: unknown) => void>()

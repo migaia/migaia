@@ -13,7 +13,7 @@ function pending<T>(resource: IStoreResource<T>): Promise<T> {
   throw new Error('expected pending resource')
 }
 
-describe('ARC-T02 canonical request with version ownership', () => {
+describe('canonical request with version ownership', () => {
   it('shares the native Promise, aborts superseded work immediately and releases late values once', async () => {
     let firstResolve!: (value: object) => void
     let secondResolve!: (value: object) => void
@@ -100,7 +100,7 @@ describe('ARC-T02 canonical request with version ownership', () => {
   })
 })
 
-it('ARC-T02 releases a loaded value if canonical clock settlement fails', async () => {
+it('releases a loaded value if canonical clock settlement fails', async () => {
   const value = {}
   const failure = new Error('clock failed')
   const released: object[] = []
@@ -136,7 +136,7 @@ it('ARC-T02 releases a loaded value if canonical clock settlement fails', async 
   expect(released).toEqual([value])
 })
 
-it('ARC-T02 reports capture timer failure without losing a valid value or retaining its capture forever', async () => {
+it('reports capture timer failure without losing a valid value or retaining its capture forever', async () => {
   const value = {}
   const failure = new Error('capture timer failed')
   const released: object[] = []
@@ -173,7 +173,7 @@ it('ARC-T02 reports capture timer failure without losing a valid value or retain
 })
 
 it.each([false, true])(
-  'ARC-T02 closes a resource-leased pending load without aborting it, failing=%s',
+  'closes a resource-leased pending load without aborting it, failing=%s',
   async (failing) => {
     let resolve!: (value: object) => void
     let reject!: (error: unknown) => void

@@ -3,7 +3,7 @@ import { promisify } from 'node:util'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
-/** Focused startup receipts use three echoes; they never execute an A10 performance window. */
+/** Focused startup receipts use three echoes; they never execute a reference performance window. */
 const execute = promisify(execFile)
 /** Dynamic module loading keeps MJS helpers outside the package's TypeScript source graph. */
 const driverUrl = new URL('../../bench/ipc.mjs', import.meta.url).href
@@ -54,8 +54,8 @@ function receipt(unit: object, factor = 1) {
   }
 }
 
-describe('[A10] IPC pairing contract', () => {
-  it('[I21 A9] rejects either high-load boundary as environment ERROR and preserves exact admission', async () => {
+describe('IPC pairing contract', () => {
+  it('rejects either high-load boundary as environment ERROR and preserves exact admission', async () => {
     /** Run the actual guard in a process so its ERROR exit cannot masquerade as ratio FAIL. */
     const source = `import { judgeWindowLoad } from ${JSON.stringify(driverUrl)};
       const verdict = judgeWindowLoad(...JSON.parse(process.argv[1]));

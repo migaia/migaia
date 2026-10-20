@@ -6,7 +6,7 @@ import {
   createStoreWorkerError
 } from '../src/errors'
 
-describe('store-worker error-code contract (E-T9)', () => {
+describe('store-worker error-code contract', () => {
   it('declares 6 unique codes under the package source', () => {
     const codes = Object.values(StoreWorkerErrorCode)
     expect(codes).toHaveLength(6)

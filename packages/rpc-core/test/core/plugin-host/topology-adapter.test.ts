@@ -25,7 +25,7 @@ function createConfig(onSubscribe: () => void): IRpcCoreConfig {
 }
 
 describe('capability topology adapter', () => {
-  it('WRC-C-T71 preserves transitive order while keeping one installer path', async () => {
+  it('preserves transitive order while keeping one installer path', async () => {
     const installs: string[] = []
     const provider = defineFeature(() => {
       installs.push('provider')
@@ -48,7 +48,7 @@ describe('capability topology adapter', () => {
     await endpoint.dispose()
   })
 
-  it('WRC-C-T71 rejects undefined native dependencies and retired arrays before installation', async () => {
+  it('rejects undefined native dependencies and retired arrays before installation', async () => {
     let subscriptions = 0
     let installs = 0
     expect(() =>

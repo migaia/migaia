@@ -11,7 +11,7 @@ import {
   normalizeRetainedModules
 } from '../storage-v2-retained-ledger.mjs'
 
-describe('SWV2-T58 root-owned package-tree and retained-ledger tools', () => {
+describe('root-owned package-tree and retained-ledger tools', () => {
   it('hashes file and symlink identity deterministically and detects byte drift', () => {
     const root = mkdtempSync(join(tmpdir(), 'storage-v2-tree-tool-'))
     mkdirSync(join(root, 'dist'))

@@ -11,7 +11,7 @@ import {
   type IRpcDevtoolsRecordEvent
 } from '@migaia/rpc-devtools/contract'
 
-/** A4 uses native coded errors so stack/cause preservation is checked independently of the codec. */
+/** Uses native coded errors so stack/cause preservation is checked independently of the codec. */
 function codedError(error: Error, code: string): Error {
   Object.defineProperties(error, {
     source: { value: '@fixture/service', enumerable: true },
@@ -34,7 +34,7 @@ function event(error?: Error): IRpcDevtoolsRecordEvent {
   }
 }
 
-describe('A4 record codec', () => {
+describe('record codec', () => {
   it.each([false, true])('preserves Node byte payloads before toJSON (nested=%s)', (nested) => {
     /** Node carrier chunks are byte views whose JSON conversion must not replace their bytes. */
     const bytes = Buffer.from([0, 127, 255])

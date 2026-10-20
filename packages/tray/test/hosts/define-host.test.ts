@@ -7,7 +7,7 @@ import { toWire } from '../../src/hosts/portable.js'
 /** Empty business installation keeps definition tests independent of runtime startup. */
 const plugins = () => [] as const
 
-describe('instances A1 definitions', () => {
+describe('instance definitions', () => {
   it('accepts and freezes the three runtime definitions without running plugins', () => {
     for (const definition of [
       { name: 'co', plugins, exposes: [] },

@@ -10,7 +10,7 @@ import { RpcCoreErrorText } from '../error-text.js'
 export type IResourceReleaseError = { readonly resource: string; readonly error: unknown }
 export type IResourceReleasePhase = 'critical' | 'application'
 
-/** Higher `order` runs first (§3.1: critical transport resources release before application ones). */
+/** Higher `order` runs first (: critical transport resources release before application ones). */
 const ORDER_BY_PHASE: Record<IResourceReleasePhase, number> = { critical: 1, application: 0 }
 
 /** Keep resource labels on a coded native error so Lifecycle need not wrap an unclassified record. */
@@ -29,8 +29,8 @@ const releaseFailure = (
  * Synchronous resources (transport listener unsubscribes, which are plain `() => void`) live in a
  * `SyncLifecycleScope` so that construction rollback can release them in the same tick — the
  * endpoint constructor registers `subscribe`/`onTransportError`/`onListenerError` and, when a later
- * registration throws, must have already detached every earlier listener synchronously (D-6: the
- * general `LifecycleScope.dispose()` is always asynchronous and cannot provide that). Asynchronous
+ * registration throws, must have already detached every earlier listener synchronously (the general
+ * `LifecycleScope.dispose()` is always asynchronous and cannot provide that). Asynchronous
  * resources (transport close, middleware disposers) live in a `LifecycleScope` and drain after the
  * synchronous ones, preserving the existing "unsubscribe listeners, then close the transport, then
  * dispose middleware" order.

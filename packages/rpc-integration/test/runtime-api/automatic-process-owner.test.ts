@@ -10,7 +10,7 @@ import { createNativeProcessOffer } from '@migaia/rpc-process'
 import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-process/dist/process/constants.js'
 import { createRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 
-it('[A1][A3][A17] automatic process authenticates its bootstrap parent and retains bidirectional business', async () => {
+it('automatic process authenticates its bootstrap parent and retains bidirectional business', async () => {
   /**
    * Canonical Node byte adapters own real stream backpressure and subscriptions, without a fake
    * dispatcher.

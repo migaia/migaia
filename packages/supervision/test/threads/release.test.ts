@@ -9,7 +9,7 @@ import {
 } from '../../src/threads/index.js'
 import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
 
-describe('A8 thread resource release', () => {
+describe('thread resource release', () => {
   it.each(['clean', 'crash', 'launch', 'ready', 'heap', 'stop'] as const)(
     'releases all leases after %s',
     async (mode) => {

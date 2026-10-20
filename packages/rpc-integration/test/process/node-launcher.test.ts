@@ -18,7 +18,7 @@ const fixture = fileURLToPath(new URL('./fixtures/node-child.mjs', import.meta.u
 
 describe('Node process launcher', () => {
   it.skipIf(process.platform === 'win32')(
-    '[N3] force termination reaches a child process group',
+    'force termination reaches a child process group',
     async () => {
       /** The grandchild inherits the launched child's POSIX process group. */
       const childCode =
@@ -79,7 +79,7 @@ describe('Node process launcher', () => {
     }
   )
 
-  it('[A7] drains stderr before bootstrap and keeps secrets out of IPC records', async () => {
+  it('drains stderr before bootstrap and keeps secrets out of IPC records', async () => {
     const launcher = createNodeProcessLauncher()
     expect(launcher.capabilities[ProcessCapability.bootstrapStdin]).toBe('enforced')
     expect(launcher.capabilities[ProcessCapability.bootstrapFd]).toBe('unsupported')
@@ -170,7 +170,7 @@ describe('Node process launcher', () => {
     expect(stderrListeners.size).toBe(0)
   })
 
-  it('[A7] hands a coalesced bootstrap and hello to the same child decoder', async () => {
+  it('hands a coalesced bootstrap and hello to the same child decoder', async () => {
     const token = 'coalesced-token'
     const endpointFixture = fileURLToPath(
       new URL('./fixtures/node-endpoint-child.mjs', import.meta.url)
@@ -217,7 +217,7 @@ describe('Node process launcher', () => {
     }
   })
 
-  it('[A7][D1] contains EPIPE when a child closes stdin before a large bootstrap', async () => {
+  it('contains EPIPE when a child closes stdin before a large bootstrap', async () => {
     /** The payload exceeds a pipe buffer so the child can close stdin before drain. */
     const bootstrap = new Uint8Array(1024 * 1024)
     /** A live child with closed fd 0 makes the write fail without a spawn failure. */

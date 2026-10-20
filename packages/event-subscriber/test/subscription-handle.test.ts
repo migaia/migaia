@@ -8,7 +8,7 @@ import {
 } from '../src/index.js'
 
 describe('callable subscription handles', () => {
-  it('ES-T186 removes the strict abort observer before surfacing second-site ABORTED', () => {
+  it('removes the strict abort observer before surfacing second-site ABORTED', () => {
     let reads = 0
     const lifecycle: string[] = []
     const signal = {
@@ -28,7 +28,7 @@ describe('callable subscription handles', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T100 keeps callable self-alias and chain identity', () => {
+  it('keeps callable self-alias and chain identity', () => {
     const channel = createEventChannel<number>()
     const handle = channel.subscribe(() => undefined)
     expect(handle.subscribe(() => undefined)).toBe(handle)
@@ -43,7 +43,7 @@ describe('callable subscription handles', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T107 rejects both closed entry points before hostile validation and mutates nothing', () => {
+  it('rejects both closed entry points before hostile validation and mutates nothing', () => {
     for (const close of ['handle', 'unsubscribe'] as const) {
       const channel = createEventChannel<number>()
       const handle = channel.subscribe(() => undefined)
@@ -97,7 +97,7 @@ describe('callable subscription handles', () => {
     }
   })
 
-  it('ES-T103 keeps hub duplicate keys chain-local', () => {
+  it('keeps hub duplicate keys chain-local', () => {
     const hub = createEventHub<{ ready: number }>()
     const handle = hub.subscribe('ready', () => undefined)
     expect((handle as any).subscribe('ready', () => undefined)).toBe(handle)
@@ -109,7 +109,7 @@ describe('callable subscription handles', () => {
     expect(hub.size('ready')).toBe(0)
   })
 
-  it('ES-T104 keeps independent hub chains isolated', () => {
+  it('keeps independent hub chains isolated', () => {
     const hub = createEventHub<{ ready: number }>()
     const first = vi.fn()
     const second = vi.fn()
@@ -124,7 +124,7 @@ describe('callable subscription handles', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T108 makes stale clear handles harmless after recreation', () => {
+  it('makes stale clear handles harmless after recreation', () => {
     const channel = createEventChannel<number>()
     const staleChannel = channel.subscribe(() => undefined)
     channel.clear()
@@ -147,7 +147,7 @@ describe('callable subscription handles', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T119 preserves mixed-key chain state across clear and stale release races', () => {
+  it('preserves mixed-key chain state across clear and stale release races', () => {
     const hub = createEventHub<{ alpha: number; beta: number }>()
     const stale = hub.subscribe('alpha', () => undefined).subscribe('beta', () => undefined)
     const currentAlpha = hub.subscribe('alpha', () => undefined)
@@ -161,7 +161,7 @@ describe('callable subscription handles', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T120 rejects real Channel and Hub hostile admission without partial mutation', () => {
+  it('rejects real Channel and Hub hostile admission without partial mutation', () => {
     const channel = createEventChannel<number>()
     const listener = vi.fn()
     const handle = channel.subscribe(listener)
@@ -262,7 +262,7 @@ describe('callable subscription handles', () => {
     handle()
   })
 
-  it('ES-T121 table-driven hostile Hub admission preserves error chain and zero mutation', () => {
+  it('table-driven hostile Hub admission preserves error chain and zero mutation', () => {
     const hub = createEventHub<{ ready: number }>()
     const delivered = vi.fn()
     const handle = hub.subscribe('ready', delivered)
@@ -346,7 +346,7 @@ describe('callable subscription handles', () => {
     }
   })
 
-  it('ES-T101 gives both owners exact self identity and reverse exact-once release', () => {
+  it('gives both owners exact self identity and reverse exact-once release', () => {
     const channel = createEventChannel<number>()
     const order: number[] = []
     const handle = channel
@@ -363,7 +363,7 @@ describe('callable subscription handles', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T102 preserves duplicate channel listener registrations in one chain', () => {
+  it('preserves duplicate channel listener registrations in one chain', () => {
     const channel = createEventChannel<number>()
     const listener = vi.fn()
     const handle = channel
@@ -378,7 +378,7 @@ describe('callable subscription handles', () => {
     handle()
   })
 
-  it('ES-T105 keeps widened finite keys and index signatures dynamically repeatable', () => {
+  it('keeps widened finite keys and index signatures dynamically repeatable', () => {
     const hub = createEventHub<{ alpha: number; beta: number }>()
     const key: keyof { alpha: number; beta: number } = 'alpha'
     const listener = vi.fn()
@@ -388,7 +388,7 @@ describe('callable subscription handles', () => {
     handle()
   })
 
-  it('ES-T106 releases whole chain exactly once in reverse completion order', () => {
+  it('releases whole chain exactly once in reverse completion order', () => {
     const releases: number[] = []
     const hub = createEventHub<{ alpha: number; beta: number; gamma: number }>()
     const hubHandle = hub
@@ -423,7 +423,7 @@ describe('callable subscription handles', () => {
     expect(completed).toEqual([])
   })
 
-  it('ES-T109 preserves earlier ownership when listener, key, or options admission fails', () => {
+  it('preserves earlier ownership when listener, key, or options admission fails', () => {
     const channel = createEventChannel<number>()
     const listener = vi.fn()
     const handle = channel.subscribe(listener)

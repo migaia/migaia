@@ -2,7 +2,7 @@
 export const IpcBenchErrorText = Object.freeze({
   /** Missing equivalent PID roles invalidate the paired denominator. */
   endpoint: 'Incomplete endpoint attribution',
-  /** Both sides must retain complete observations before DA1 can judge a ratio. */
+  /** Both sides must retain complete observations before the budget can judge a ratio. */
   paired: 'Incomplete paired measurement',
   /** Native latencies are positive; browser quantized zero samples require explicit opt-in. */
   latency: 'Invalid measured latency samples',
@@ -54,14 +54,14 @@ export const IpcBenchErrorText = Object.freeze({
   workerObservation: 'Worker observation readiness invalid',
   /** A genuine Worker exit during cold observation setup invalidates preparation. */
   workerObservationExit: 'Worker exited before observation readiness',
-  /** P3 is a Node diagnostic over the two requested physical carriers, never a fallback lane. */
-  diagnosticMode: 'Invalid or unsupported P3 diagnostic mode/carrier',
+  /** Is a Node diagnostic over the two requested physical carriers, never a fallback lane. */
+  diagnosticMode: 'Invalid or unsupported diagnostic mode/carrier',
   /** One isolate owns exactly one separate CPU or guard capture at a time. */
-  diagnosticState: 'P3 diagnostic boundary does not match its active capture',
+  diagnosticState: 'Diagnostic boundary does not match its active capture',
   /** Peer diagnostic errors retain their full serialized causal classification as the cause. */
-  diagnosticPeer: 'Peer P3 diagnostic capture failed',
+  diagnosticPeer: 'Peer diagnostic capture failed',
   /** A failed local capture retains its serialized native cause instead of producing a guard zero. */
-  diagnosticCapture: 'P3 diagnostic capture failed',
+  diagnosticCapture: 'Diagnostic capture failed',
   /** A non-sampling guard must retain the native allocation trace schema, not substitute heapUsed. */
   diagnosticTrace: 'V8 allocation trace metadata unavailable',
   /**

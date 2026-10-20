@@ -212,7 +212,7 @@ describe('remote Host trusted control', () => {
     }
   })
 
-  it('[D5] shares an in-flight Host use across two remote connections', async () => {
+  it('shares an in-flight Host use across two remote connections', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -650,7 +650,7 @@ describe('remote Host trusted control', () => {
   })
 })
 
-describe('K203 remote Host removal adoption', () => {
+describe('remote Host removal adoption', () => {
   it('rejects unadopted and local installations, permits live adopters, and expires other adopters', async () => {
     /** Real Host identity distinguishes local installation from successful remote admission. */
     const host = new PluginHost<Record<string, never>>({
@@ -728,7 +728,7 @@ describe('K203 remote Host removal adoption', () => {
   })
 })
 
-describe('K203 exact remote installation lifetime', () => {
+describe('exact remote installation lifetime', () => {
   it.each([false, true])(
     'rejects local replacement with reused Feature output (disabled=%s)',
     async (disabled) => {

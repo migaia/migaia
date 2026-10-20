@@ -19,7 +19,7 @@ import {
   subscribeProbeStages
 } from '../../dist/core/probe/index.js'
 
-it('[RC-D03] publishes the binding disposal settlement before one synchronous reentry', async () => {
+it('publishes the binding disposal settlement before one synchronous reentry', async () => {
   /** The bound operation is allowed to synchronously join disposal before returning its Promise. */
   let calls = 0
   /** A reentrant observer must receive the same facade-owned settlement. */
@@ -46,7 +46,7 @@ it('[RC-D03] publishes the binding disposal settlement before one synchronous re
   expect(endpoint.dispose()).toBe(closing)
 })
 
-it('[RC-D04] rebuilds installed probe stages even when an earlier cold listener throws', async () => {
+it('rebuilds installed probe stages even when an earlier cold listener throws', async () => {
   /** Record only ordinary events actually emitted by the installed probe. */
   let events = 0
   /** The callback's native failure keeps its original identity and receives package classification. */
@@ -101,7 +101,7 @@ it.each([
   createNodeMessagePortTransport,
   createWebWorkerTransport
 ])(
-  '[RC-D05] codes the native clone rejection from %s without changing its DOMException family',
+  'codes the native clone rejection from %s without changing its DOMException family',
   async (factory) => {
     /** A genuine native port rejects the unsupported function payload itself. */
     const pair = new MessageChannel()
@@ -130,7 +130,7 @@ it.each([
   }
 )
 
-it('[RC-D06] classifies the original middleware installation failure at the endpoint boundary', async () => {
+it('classifies the original middleware installation failure at the endpoint boundary', async () => {
   /** The application callback's original native instance and stack remain intact. */
   const original = new Error('audit installation failed')
   /** This middleware is admitted through its ordinary native descriptor. */
@@ -156,7 +156,7 @@ it('[RC-D06] classifies the original middleware installation failure at the endp
   }
 })
 
-it('[RC-D07] retains the original native error event cause in the worker transport diagnostic', async () => {
+it('retains the original native error event cause in the worker transport diagnostic', async () => {
   /** Native event dispatch supplies the supported Worker-like callback surface. */
   const events = new EventTarget()
   /** The actual event cause is distinct from its presentation message. */
@@ -196,7 +196,7 @@ it('[RC-D07] retains the original native error event cause in the worker transpo
 })
 
 it.each([true, false])(
-  '[RC-D12] keeps native AbortError and the exact reason (pre-aborted=%s)',
+  'keeps native AbortError and the exact reason (pre-aborted=%s)',
   async (preAborted) => {
     /** A normal manual endpoint exposes the public query operation without private state access. */
     const [left, right] = createMemoryTransportPair()

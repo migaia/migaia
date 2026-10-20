@@ -153,7 +153,7 @@ function providers() {
 
 describe('browser Runtime Peer', () => {
   it.each(['window', 'shared-worker'] as const)(
-    '[BP-T1] provides typed request, notify, stream, directory, group and outcome over %s',
+    'provides typed request, notify, stream, directory, group and outcome over %s',
     async (carrier) => {
       /** The selected pair supplies native messages; Core owns every protocol and method operation. */
       const pair = carrier === 'window' ? windowPair() : portPair()
@@ -233,7 +233,7 @@ describe('browser Runtime Peer', () => {
     }
   )
 
-  it('[BP-T2] ignores real request frames from wrong origin and another Window', async () => {
+  it('ignores real request frames from wrong origin and another Window', async () => {
     /** Two concrete Window identities establish a genuine source-bound handshake. */
     const pair = windowPair()
     /** Accepted provider invocation remains independent from copied wire identities. */
@@ -279,7 +279,7 @@ describe('browser Runtime Peer', () => {
     }
   })
 
-  it('[BP-T3] requires explicit Window origin and preserves the existing wildcard escape', async () => {
+  it('requires explicit Window origin and preserves the existing wildcard escape', async () => {
     /** Invalid configuration must fail before allocating any inbound listener. */
     const fixture = messageTarget()
     await expect(
@@ -293,7 +293,7 @@ describe('browser Runtime Peer', () => {
     expect(fixture.listeners.get('message')?.size ?? 0).toBe(0)
   })
 
-  it('[BP-T2A] ignores hostile origin and sibling source before the real capability ACK is accepted', async () => {
+  it('ignores hostile origin and sibling source before the real capability ACK is accepted', async () => {
     /** Initial/ready frames continue normally while both actual capability ACKs are held. */
     const pair = windowPair()
     /** Each held ACK comes from its own live Core resource's ordinary physical send operation. */
@@ -374,17 +374,14 @@ describe('browser Runtime Peer', () => {
     { connect: { window: null, origin: 'https://peer.test' } },
     { connect: { sharedWorker: null } },
     { connect: { sharedWorker: {} } }
-  ])(
-    '[BP-T3I] classifies missing supported carrier resources as INVALID_PEER_SOURCE',
-    async (options) => {
-      await expect(createBrowserPeer(options as never)).rejects.toMatchObject({
-        source: RPC_BROWSER_ERROR_SOURCE,
-        code: 'INVALID_PEER_SOURCE'
-      })
-    }
-  )
+  ])('classifies missing supported carrier resources as INVALID_PEER_SOURCE', async (options) => {
+    await expect(createBrowserPeer(options as never)).rejects.toMatchObject({
+      source: RPC_BROWSER_ERROR_SOURCE,
+      code: 'INVALID_PEER_SOURCE'
+    })
+  })
 
-  it('[BP-T4] cancels an unfinished handshake and removes listeners without closing the borrowed Window', async () => {
+  it('cancels an unfinished handshake and removes listeners without closing the borrowed Window', async () => {
     /** A silent native target keeps the real Core message handshake unfinished. */
     const fixture = messageTarget()
     /** Caller cancellation is the factory's only pre-ready cleanup control. */
@@ -402,7 +399,7 @@ describe('browser Runtime Peer', () => {
     expect(fixture.closeCalls).toBe(0)
   })
 
-  it('[BP-T6] listens once, isolates two accepted ports and keeps Core zero/one/many targeting', async () => {
+  it('listens once, isolates two accepted ports and keeps Core zero/one/many targeting', async () => {
     /** The SharedWorker scope owns native connect events; it carries no trusted Peer state. */
     const scope = messageTarget()
     /** Two pages own independent physical ports into the same SharedWorker listener. */
@@ -475,24 +472,21 @@ describe('browser Runtime Peer', () => {
     { ordered: false, maxRetransmits: null, maxPacketLifeTime: null },
     { ordered: true, maxRetransmits: 1, maxPacketLifeTime: null },
     { ordered: true, maxRetransmits: null, maxPacketLifeTime: 1 }
-  ])(
-    '[BP-T5] rejects RTC channels outside ordered reliable delivery: %j',
-    async (configuration) => {
-      /** Native RTC ordering and reliability settings are physical carrier contract inputs. */
-      const fixture = messageTarget()
-      await expect(
-        createBrowserPeer({
-          connect: {
-            rtcDataChannel: { ...fixture.target, ...configuration, readyState: 'open', send() {} }
-          }
-        })
-      ).rejects.toMatchObject({ source: RPC_BROWSER_ERROR_SOURCE, code: 'RTC_CHANNEL_UNRELIABLE' })
-      expect(fixture.closeCalls).toBe(0)
-      expect(fixture.listeners.size).toBe(0)
-    }
-  )
+  ])('rejects RTC channels outside ordered reliable delivery: %j', async (configuration) => {
+    /** Native RTC ordering and reliability settings are physical carrier contract inputs. */
+    const fixture = messageTarget()
+    await expect(
+      createBrowserPeer({
+        connect: {
+          rtcDataChannel: { ...fixture.target, ...configuration, readyState: 'open', send() {} }
+        }
+      })
+    ).rejects.toMatchObject({ source: RPC_BROWSER_ERROR_SOURCE, code: 'RTC_CHANNEL_UNRELIABLE' })
+    expect(fixture.closeCalls).toBe(0)
+    expect(fixture.listeners.size).toBe(0)
+  })
 
-  it('[BP-T5R] carries request and stream over reliable RTC and retains malformed JSON as the original decoder cause', async () => {
+  it('carries request and stream over reliable RTC and retains malformed JSON as the original decoder cause', async () => {
     /** String encoding stays in the existing RTC transport; the double forwards only native data. */
     const pair = portPair()
     /** Carrier failures remain observable through Core's ordinary reporter and pending call failure. */

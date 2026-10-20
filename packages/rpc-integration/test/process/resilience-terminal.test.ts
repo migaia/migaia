@@ -60,7 +60,7 @@ function supervisorFixture(report: (error: unknown) => void) {
 
 describe('process resilience terminal registration', () => {
   it.each(['spawn', 'connect'] as const)(
-    '[A6] gates actual proxy modes and liquidates once through its real local Host for %s',
+    'gates actual proxy modes and liquidates once through its real local Host for %s',
     async (deploymentKind) => {
       /** Existing neutral endpoint records the frame count independently of the real supervisor. */
       const fixture = remoteHarness()
@@ -167,7 +167,7 @@ describe('process resilience terminal registration', () => {
             () => undefined,
             (error) => error
           )
-          expect(failure, 'SDD_BASE_RED_CONTRACT:A6 default process call guard').toMatchObject({
+          expect(failure, 'default process call guard').toMatchObject({
             code: 'PROCESS_TERMINAL_CALL'
           })
         }
@@ -195,7 +195,7 @@ describe('process resilience terminal registration', () => {
     }
   )
 
-  it('[A6] reports at 0/1/5/15 minutes and liquidates after four unhandled entries', async () => {
+  it('reports at 0/1/5/15 minutes and liquidates after four unhandled entries', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const supervisor = supervisorFixture((error) => reports.push(error))
@@ -237,7 +237,7 @@ describe('process resilience terminal registration', () => {
     await resilience.close()
   })
 
-  it('[A6] accepts one successful subscriber without a second diagnostic report', async () => {
+  it('accepts one successful subscriber without a second diagnostic report', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const supervisor = supervisorFixture((error) => reports.push(error))
@@ -261,7 +261,7 @@ describe('process resilience terminal registration', () => {
     await resilience.close()
   })
 
-  it('[A6] preserves unhandled count across cooldown and clears it on explicit restart', async () => {
+  it('preserves unhandled count across cooldown and clears it on explicit restart', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const supervisor = supervisorFixture((error) => reports.push(error))
@@ -290,7 +290,7 @@ describe('process resilience terminal registration', () => {
     await resilience.close()
   })
 
-  it('[A6] normal close removes its guard and never disposes the caller supervisor', async () => {
+  it('normal close removes its guard and never disposes the caller supervisor', async () => {
     const scheduler = createManualScheduler()
     const supervisor = supervisorFixture(() => undefined)
     const resilience = createProcessResilience({ scheduler, report: () => undefined })
@@ -314,7 +314,7 @@ describe('process resilience terminal registration', () => {
     await resilience.close()
   })
 
-  it('[A6] extends the last diagnostic interval until a custom unhandled limit', async () => {
+  it('extends the last diagnostic interval until a custom unhandled limit', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const supervisor = supervisorFixture((error) => reports.push(error))
@@ -341,7 +341,7 @@ describe('process resilience terminal registration', () => {
     await resilience.close()
   })
 
-  it('[A6] reports a failing subscriber once while leaving the entry unhandled', async () => {
+  it('reports a failing subscriber once while leaving the entry unhandled', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const supervisor = supervisorFixture((error) => reports.push(error))
@@ -367,7 +367,7 @@ describe('process resilience terminal registration', () => {
   })
 })
 
-it('[A52][A53] passive liquidation notifications follow successful cleanup and cannot handle terminal state', async () => {
+it('passive liquidation notifications follow successful cleanup and cannot handle terminal state', async () => {
   /** The canonical governor schedules terminal handling independently from passive observers. */
   const scheduler = createManualScheduler()
   const reports: unknown[] = []
@@ -393,7 +393,7 @@ it('[A52][A53] passive liquidation notifications follow successful cleanup and c
     const listen = Reflect.get(resilienceOwner, 'listenProcessLiquidated')
     expect(
       typeof listen,
-      '[A52] the original governor exposes passive successful-liquidation facts'
+      'the original governor exposes passive successful-liquidation facts'
     ).toBe('function')
     const notifications: unknown[] = []
     const unsubscribe = listen(resilience, (snapshot: unknown) => {

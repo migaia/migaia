@@ -50,7 +50,7 @@ const vectors = JSON.parse(
 async function business(channel: IRemoteChannel, hostProfile: boolean): Promise<void> {
   /** Core performs discovery and supplies receiverId before admitting each business call. */
   const runtime = await endpointFor(channel, 'caller')
-  /** Caller providers are ready; release the U36 channel's existing deferred receive owner. */
+  /** Caller providers are ready; release the baseline channel's existing deferred receive owner. */
   ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
   try {
     /** Describe is a real reserved RPC method rather than a local fixture read. */

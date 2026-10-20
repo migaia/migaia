@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 
-# The A10 peer baseline uses the production release optimization level explicitly.
+# The reference peer baseline uses the production release optimization level explicitly.
 [profile.release]
 opt-level = 3

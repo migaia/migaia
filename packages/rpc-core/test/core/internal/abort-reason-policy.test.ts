@@ -55,7 +55,7 @@ function throwingSignal(
 }
 
 describe('guarded abort reason policy', () => {
-  it('[A5] rejects a pre-aborted caller with CANCELLED and the getter failure as cause', async () => {
+  it('rejects a pre-aborted caller with CANCELLED and the getter failure as cause', async () => {
     const [transport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
       id: 'reason-client',
@@ -79,7 +79,7 @@ describe('guarded abort reason policy', () => {
     }
   })
 
-  it('[A5] settles event abort once and sends one remote cancellation', async () => {
+  it('settles event abort once and sends one remote cancellation', async () => {
     const [clientWire, providerWire] = createMemoryTransportPair()
     const sent: unknown[] = []
     const capture: IRpcTransport = {
@@ -149,7 +149,7 @@ describe('guarded abort reason policy', () => {
     }
   })
 
-  it('[A6] preserves a throwing construction reason as an aborted signal value', () => {
+  it('preserves a throwing construction reason as an aborted signal value', () => {
     const failure = new Error('construction reason')
     const source = throwingSignal(failure, true)
     let control: ReturnType<typeof createConstructionControl> | undefined
@@ -165,7 +165,7 @@ describe('guarded abort reason policy', () => {
     control?.close()
   })
 
-  it('[A6] rejects endpoint construction through the coded cancellation chain', async () => {
+  it('rejects endpoint construction through the coded cancellation chain', async () => {
     const [transport] = createMemoryTransportPair()
     const failure = new Error('construction getter')
     const source = throwingSignal(failure, true)
@@ -188,7 +188,7 @@ describe('guarded abort reason policy', () => {
     expect(source.reads()).toBe(1)
   })
 
-  it('[A6] aborts a pending install and releases its owned resource', async () => {
+  it('aborts a pending install and releases its owned resource', async () => {
     const [transport] = createMemoryTransportPair()
     const failure = new Error('mid-install reason')
     const source = throwingSignal(failure, false)
@@ -239,7 +239,7 @@ describe('guarded abort reason policy', () => {
     expect(source.reads()).toBe(1)
   })
 
-  it('[A7] reports a throwing race reason once and passes it to the abort factory', async () => {
+  it('reports a throwing race reason once and passes it to the abort factory', async () => {
     const failure = new Error('race reason')
     const source = throwingSignal(failure, true)
     const diagnostics: unknown[] = []
@@ -269,7 +269,7 @@ describe('guarded abort reason policy', () => {
     expect(source.reads()).toBe(1)
   })
 
-  it('[A8] exposes one helper that converts a throwing getter into reason data', async () => {
+  it('exposes one helper that converts a throwing getter into reason data', async () => {
     const failure = new Error('reason')
     const source = throwingSignal(failure, true)
     const { resolveAbortReason } = await import('../../../dist/core/internal/async-control.js')

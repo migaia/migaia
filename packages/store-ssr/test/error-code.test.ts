@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { StoreSsrErrorCode, STORE_SSR_SOURCE } from '../src/errors'
 
-describe('store-ssr error-code contract (E-T9)', () => {
+describe('store-ssr error-code contract', () => {
   it('declares 12 unique codes under the package source', () => {
     const codes = Object.values(StoreSsrErrorCode)
     expect(codes).toHaveLength(12)

@@ -63,7 +63,7 @@ function createBrowserPort() {
 }
 
 describe('core listener admission', () => {
-  it('RLF A5 removes the HookRegistry identity map while preserving Set behavior', () => {
+  it('removes the HookRegistry identity map while preserving Set behavior', () => {
     const registry = new HookRegistry()
     const hook = vi.fn()
     const first = registry.add(hook)
@@ -91,7 +91,7 @@ describe('core listener admission', () => {
     expect(source).not.toContain('new Map<IRpcHook')
   })
 
-  it('RLF A6 keeps stale transport disposers from removing a new admission', () => {
+  it('keeps stale transport disposers from removing a new admission', () => {
     /** Node transport errors must keep both native error hooks after stale disposal. */
     const node = createNodePort()
     const nodeTransport = createNodeMessagePortTransport(node.port)
@@ -147,7 +147,7 @@ describe('core listener admission', () => {
     expect(duplicate()).toBe(false)
   })
 
-  it('RLF A7 preserves ordered isolation, delayed failure drain, and terminal replay', () => {
+  it('preserves ordered isolation, delayed failure drain, and terminal replay', () => {
     /** A duplicate reporter is delivered once and cannot interrupt later reporters. */
     for (const kind of ['node', 'browser'] as const) {
       const fixture = kind === 'node' ? createNodePort() : createBrowserPort()
@@ -190,7 +190,7 @@ describe('core listener admission', () => {
     expect(late.mock.calls[0]?.[0]).toMatchObject({ message: '[rpc] message port closed' })
   })
 
-  it('RLF A8 owns every MessagePort error text without changing messages', () => {
+  it('owns every MessagePort error text without changing messages', () => {
     /** Source scanning distinguishes a canonical text reference from an inline message. */
     const source = readFileSync(
       resolve(import.meta.dirname, '../../src/core/adapters/message-port.ts'),

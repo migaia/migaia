@@ -1,8 +1,8 @@
 import type { IRpcProbeEventView } from './types.js'
 
 /**
- * SC9(c): the public snapshot API explicitly requests a field copy. Detail, error and content keep
- * their existing ownership and reference identity; no nested value is cloned.
+ * The public snapshot API explicitly requests a field copy. Detail, error and content keep their
+ * existing ownership and reference identity; no nested value is cloned.
  */
 export function snapshotProbeEvent(view: IRpcProbeEventView): Readonly<IRpcProbeEventView> {
   return Object.freeze({

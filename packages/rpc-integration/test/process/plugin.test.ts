@@ -45,9 +45,9 @@ class SyncProbeHost extends PluginHost<Record<string, never>> {
   }
 }
 
-/** S2 verifies binding handoff without substituting a second RPC implementation. */
+/** Verifies binding handoff without substituting a second RPC implementation. */
 describe('process plugin spawn binding', () => {
-  it('[A1/A3] completes remote preparation before a dependent first calls its feature', async () => {
+  it('completes remote preparation before a dependent first calls its feature', async () => {
     const fixture = remoteHarness()
     const host = new SyncProbeHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -171,7 +171,7 @@ describe('process plugin spawn binding', () => {
       await host.dispose()
     }
   })
-  it('[A1] forwards one session, scheduler, and post-subscription stderr to the channel adapter', async () => {
+  it('forwards one session, scheduler, and post-subscription stderr to the channel adapter', async () => {
     const token = 'only-private-bootstrap'
     const scheduler = createManualScheduler()
     const spec = processSpec(token)
@@ -256,7 +256,7 @@ describe('process plugin spawn binding', () => {
     expect(logged.map((chunk) => new TextDecoder().decode(chunk))).toEqual(['after-subscribe'])
   })
 
-  it('[A3] rejects a mismatched bootstrap without launch or exposing token', () => {
+  it('rejects a mismatched bootstrap without launch or exposing token', () => {
     const token = 'secret-do-not-report'
     const scheduler = createManualScheduler()
     const spec = processSpec('wrong-secret')

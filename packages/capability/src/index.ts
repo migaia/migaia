@@ -34,7 +34,7 @@ export {
   type IGraphReadinessSnapshot
 } from './graph-readiness.js'
 
-// Error codes are public API (`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1).
+// Error codes are public API.
 // Export constants and types from the main entry so callers can branch on `(source, code)`.
 export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js'
 export { CAPABILITY_SOURCE } from './errors.js'
@@ -48,8 +48,7 @@ export type ICapabilityHandle = {
  *
  * `off` means the gate allows activation but the capability is not enabled. `gated` means a flag
  * denies activation, distinct from an activation that has not been attempted. This differs from
- * tray graph availability `blocked`, which has different recovery semantics. See `migration.sdd.md`
- * §5.5.
+ * tray graph availability `blocked`, which has different recovery semantics.
  */
 export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState]
 
@@ -145,7 +144,7 @@ type IEntry<Context> = {
   /** 在途激活。用于幂等：并发 enable 共享它。结果在激活闭包内一次性产生，共享者看到同一个分类， 不再各自事后读取可变的 `state`。 */
   pending?: Promise<ICapabilityEnableResult>
   /**
-   * 激活代数，换成 `@migaia/lifecycle` 的 `GenerationController`（`migration.sdd.md` §3.2）。
+   * 激活代数，换成 `@migaia/lifecycle` 的 `GenerationController`。
    *
    * 异步激活期间可能被 `disable()` 或 `dispose()`，此时 activate 的结果**不能** 被采纳——否则关掉的能力会在几毫秒后自己回来（而调用方以为已经回退了）。
    * `adopt()` 在代数不匹配时会把刚拿到的 handle 直接释放。
@@ -207,7 +206,7 @@ export function createCapabilityHost<Context>(
       descriptors = Object.getOwnPropertyDescriptors(source)
     } catch (error) {
       // hostile Proxy ownKeys/getOwnPropertyDescriptor trap — surface with (source, code), cause
-      // keeps the original Proxy exception === reachable (AF-09).
+      // keeps the original Proxy exception === reachable.
       throw createCapabilityError(
         CapabilityErrorCode.invalidOption,
         CapabilityErrorText.flagsSnapshotFailed,
@@ -225,9 +224,9 @@ export function createCapabilityHost<Context>(
   let flagValues = copyFlags(flags)
   const entries = new Map<string, IEntry<Context>>()
   /**
-   * 排空的双视图（`migration.sdd.md` §3.3）：`ALL_KEY` 给 `dispose()` 的全局排空， `entry` 对象自身给 `disable()`
-   * 的逐单元排空——同一个 `QuiescenceTracker` 承担两种 key，靠它自带的 `retain()`/`whenZeroOnce()`
-   * 保证「排空过程中冒出的新待排空项不会被提前放行」，不用自己再手写 Set 快照。 激活与释放两类在途 Promise 合并计一个维度：原实现分开算但求和判零，观察语义等价。
+   * 排空的双视图：`ALL_KEY` 给 `dispose()` 的全局排空， `entry` 对象自身给 `disable()` 的逐单元排空——同一个 `QuiescenceTracker`
+   * 承担两种 key，靠它自带的 `retain()`/`whenZeroOnce()` 保证「排空过程中冒出的新待排空项不会被提前放行」，不用自己再手写 Set 快照。 激活与释放两类在途
+   * Promise 合并计一个维度：原实现分开算但求和判零，观察语义等价。
    */
   const pendingTracker = createQuiescenceTracker<object>()
   const ALL_KEY = {}
@@ -567,7 +566,7 @@ export function createCapabilityHost<Context>(
   const drainPending = async (): Promise<void> => {
     // `whenZeroOnce()` loops until the count is actually zero the instant it resolves — draining a
     // still-in-flight activation can itself enqueue a new release promise under the same key, and
-    // this must not resolve until that settles too (§8.2 "排空循环在冒出新待排空项时不提前返回").
+    // this must not resolve until that settles too ("排空循环在冒出新待排空项时不提前返回").
     while (pendingTracker.count(ALL_KEY) > 0) {
       await pendingTracker.whenZeroOnce(ALL_KEY)
     }
@@ -632,7 +631,7 @@ export function createCapabilityHost<Context>(
           name = definition?.name
           activate = definition?.activate
         } catch (error) {
-          // hostile Proxy getter on definition — surface with (source, code) + cause reachable (AF-09).
+          // hostile Proxy getter on definition — surface with (source, code) + cause reachable.
           throw createCapabilityError(
             CapabilityErrorCode.invalidOption,
             CapabilityErrorText.definitionSnapshotFailed,
@@ -718,7 +717,7 @@ export function createCapabilityHost<Context>(
     enable: enableStructured,
 
     async disable(name) {
-      // disposed 优先级高于 NOT_REGISTERED（AF-20）：先断言 host 可用，再做 name lookup。
+      // disposed 优先级高于 NOT_REGISTERED：先断言 host 可用，再做 name lookup。
       assertUsable()
       const entry = entryOf(name)
       const changed = disableSync(name)

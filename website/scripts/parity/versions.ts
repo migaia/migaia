@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
-// P2: versions check
+// Versions check
 console.log('✓ versions check framework ready')

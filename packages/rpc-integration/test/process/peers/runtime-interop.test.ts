@@ -8,7 +8,7 @@ import { createRuntimePeer, type IRuntimePeer } from '@migaia/rpc-core/remote'
 import { readRuntimePeerConnection } from '../../../../rpc-core/dist/remote/runtime-api/peer.js'
 
 for (const fixture of peers) {
-  it(`U36 production TS standard request → ${fixture.language}`, async () => {
+  it(`production TS standard request → ${fixture.language}`, async () => {
     /** The existing launcher owns the child while Runtime Peer borrows its byte endpoint. */
     const launcher = createNodeProcessLauncher()
     /** A failed preparation still leaves child termination with this test. */
@@ -21,7 +21,7 @@ for (const fixture of peers) {
     let reverseCalls = 0
     try {
       active = await createRuntimePeer({
-        self: { name: 'production-ts', instanceId: 'u36-production-ts' },
+        self: { name: 'production-ts', instanceId: 'production-ts-1' },
         provide: {
           parentEcho: (payload: unknown) => {
             reverseCalls += 1

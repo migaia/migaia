@@ -1,7 +1,7 @@
 /**
  * RPC source file set extracted verbatim from coverage-baseline.json at merge delivery
- * 0d7805d3fdb09716f3792704bfdb269b1f7b35c3 (2026-09-26). K217 keeps A10 tied to this historical
- * code, while custody and package Vitest govern later modules.
+ * 0d7805d3fdb09716f3792704bfdb269b1f7b35c3 (2026-09-26). This keeps the reference coverage tied to
+ * this historical code, while custody and package Vitest govern later modules.
  */
 export const frozenMergeCoverageFiles = Object.freeze([
   'packages/rpc/src/browser/adapters/broadcast-channel.ts',
@@ -133,7 +133,7 @@ export const retiredMergeCoverageFiles = Object.freeze({
   'packages/rpc/src/core/internal/control-task-registry.ts':
     'e40421e: duplicate lifecycle state removed by rpc-layering; canonical operation-scope/control-attachment retained',
   'packages/rpc/src/core/error-serialization.ts':
-    '76f08a9: rpc-error-format BC1 retired serializer; contract/error.ts is the canonical owner',
+    '76f08a9: rpc-error-format retired serializer; contract/error.ts is the canonical owner',
   'packages/rpc/src/core/internal/routing-data.ts':
-    'f55977f: rpc-error-format S8 removed legacy route validation; canonical contract/v1/route.ts owns normalization'
+    'f55977f: rpc-error-format removed legacy route validation; canonical contract/v1/route.ts owns normalization'
 })

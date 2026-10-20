@@ -5,7 +5,7 @@ import type { IDisposable } from '@migaia/reactive'
 import { createStore, createAsyncStore, FIELD_BUILDER, type IFieldBuilder } from '../src'
 import { createStoreLightRangeError, StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors'
 
-describe('store-light error-code contract (E-T9)', () => {
+describe('store-light error-code contract', () => {
   it('declares 14 unique codes under the package source', () => {
     const codes = Object.values(StoreLightErrorCode)
     expect(codes).toHaveLength(14)
@@ -21,7 +21,7 @@ describe('store-light error-code contract (E-T9)', () => {
   })
 })
 
-describe('store-light double-failure cause reachability (E-T13)', () => {
+describe('store-light double-failure cause reachability', () => {
   it('INIT_AND_CLEANUP_FAILED keeps both the init cause and the cleanup error reachable', async () => {
     const runtime = createRuntime()
     // Resolves first (one microtask) so its field is adopted before the failing sibling rejects;

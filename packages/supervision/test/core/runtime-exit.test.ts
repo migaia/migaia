@@ -9,7 +9,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 60; index++) await Promise.resolve()
 }
 
-it('[A52/A58] abandonment is not native exit; late actual exit preserves its status once', async () => {
+it('abandonment is not native exit; late actual exit preserves its status once', async () => {
   /** The native exit promise remains pending past the bounded reap deadline. */
   const launcher = memoryProcessLauncher(undefined, false)
   /** No wall-clock sleeps are necessary to distinguish termination from actual exit. */
@@ -41,7 +41,7 @@ it('[A52/A58] abandonment is not native exit; late actual exit preserves its sta
     scheduler.advance(5)
     await killing
     expect(supervisor.inspect().lastExit?.reason).toBe('abandoned')
-    expect(exits, '[A58] timeout cannot manufacture native exit').toEqual([])
+    expect(exits, 'timeout cannot manufacture native exit').toEqual([])
     expect(budget.inUse).toBe(1)
     launcher.handles[0]!.complete({ code: null, signal: 'SIGKILL' })
     await settle()
@@ -67,7 +67,7 @@ it('[A52/A58] abandonment is not native exit; late actual exit preserves its sta
   }
 })
 
-it('[A58] late abandoned exit cannot overwrite the next generation exit', async () => {
+it('late abandoned exit cannot overwrite the next generation exit', async () => {
   /** Two leases allow a new unit while the abandoned unit remains alive. */
   const scheduler = createManualScheduler()
   /** Each actual handle keeps its own exit promise and native status. */

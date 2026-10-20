@@ -14,8 +14,8 @@ export const RpcContractErrorCode = {
   /** Invalid semantic envelope; caller must reject the untrusted message. */
   invalidEnvelope: 'INVALID_ENVELOPE',
   /**
-   * Invalid stream event, field, sequence, or value budget under streaming R3/R6/R8; reject this
-   * frame and terminate only its stream.
+   * Invalid stream event, field, sequence, or value budget under the streaming contract; reject
+   * this frame and terminate only its stream.
    */
   invalidStream: 'INVALID_STREAM',
   /** Invalid frame grammar or empty/malformed physical batch; discard the physical frame. */
@@ -24,7 +24,7 @@ export const RpcContractErrorCode = {
   frameLimitExceeded: 'FRAME_LIMIT_EXCEEDED',
   /** Reassembly expired before all fragments arrived. */
   frameAssemblyExpired: 'FRAME_ASSEMBLY_EXPIRED',
-  /** Invalid wire error payload; the caller must reject the received value under R4. */
+  /** Invalid wire error payload; the caller must reject the received value. */
   invalidWireError: 'INVALID_WIRE_ERROR',
   /** Malformed UTF-8, JSON, shape, or negotiation fields in a handshake; close this channel. */
   handshakeInvalid: 'HANDSHAKE_INVALID',

@@ -947,7 +947,7 @@ describe('debugName / $runtime / $async on plain stores', () => {
   })
 })
 
-describe('ST-B3 hydration option capture', () => {
+describe('hydration option capture', () => {
   it('reads changing getters once and preserves the unknown callback receiver', async () => {
     /** Local runtime keeps this store independent of the ambient graph. */
     const runtime = createRuntime()
@@ -1013,7 +1013,7 @@ describe('ST-B3 hydration option capture', () => {
   })
 })
 
-describe('ST-C5 async action diagnostics', () => {
+describe('async action diagnostics', () => {
   it('batches the synchronous prefix and returns the Promise until explicit continuation batching', async () => {
     const runtime = createRuntime({ schedulerStrategy: (run) => run() })
     let resume!: () => void

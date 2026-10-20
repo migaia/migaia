@@ -9,10 +9,7 @@ import {
 } from '@migaia/utils/error'
 
 export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
-  /**
-   * The `source` component of `(source, code)`, always `'@migaia/plugin-host'`
-   * (`docs/contracts/error-codes.md` §2).
-   */
+  /** The `source` component of `(source, code)`, always `'@migaia/plugin-host'`. */
   readonly source: string
   readonly code: IPluginHostErrorCode
   /**
@@ -70,7 +67,7 @@ export function formatPluginHostDiagnostic(target: object, message: string): str
  * Attaches `(source, code)` to an existing error without changing `message`, `name`, `stack`, or
  * other fields. Use this for input validation that retains a native type for checks such as
  * `instanceof TypeError`. The return type exposes `source` and `code` while preserving the original
- * error type. See `docs/contracts/error-codes.md` §2.
+ * error type. See `docs/contracts/error-codes.md`.
  */
 export function tagPluginHostError<E extends Error>(
   error: E,
@@ -118,10 +115,7 @@ export function identifyPluginHostCallbackFailure(error: unknown): Error {
   })
 }
 
-/**
- * Creates a native input-validation `TypeError` tagged with `INVALID_OPTION`
- * (`docs/contracts/error-codes.md` §7).
- */
+/** Creates a native input-validation `TypeError` tagged with `INVALID_OPTION`. */
 export function createPluginHostTypeError(
   message: string,
   options?: { readonly cause?: unknown }

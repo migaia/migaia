@@ -4,7 +4,7 @@ import { createSupervisor, createUnitBudget, type IUnitBudget } from '../../src/
 import { createMemoryLauncher } from '../support/memory-launcher.js'
 import { createMemoryProfile } from '../support/memory-profile.js'
 
-describe('A6 inverse scope release', () => {
+describe('inverse scope release', () => {
   it('cancels monitors, then stops the unit, then releases attachments and lease', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()

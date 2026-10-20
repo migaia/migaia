@@ -13,7 +13,7 @@ import { createThreadPeer } from '@migaia/rpc-threads'
 /** A native Worker runs independently from Vitest and loads the built package. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-worker.mjs', import.meta.url))
 
-it('[A2][A17] the genuine launcher supplies trusted child name and parent route without a child source', async () => {
+it('the genuine launcher supplies trusted child name and parent route without a child source', async () => {
   /** Both old and new launcher paths use the same actual Worker and borrowed channel owner. */
   let handle: Awaited<ReturnType<ReturnType<typeof createNodeThreadLauncher>['launch']>> | undefined
   /** Existing channel assembly consumes the same scheduler and independent child ACK when present. */
@@ -54,28 +54,24 @@ it('[A2][A17] the genuine launcher supplies trusted child name and parent route 
     assert.equal(
       result.value,
       'ready',
-      '[A2] ordinary child business succeeds before automatic-source assertion'
+      'ordinary child business succeeds before automatic-source assertion'
     )
     assert.equal(
       result.self?.name,
       'named-child',
-      '[A17] automatic self.name comes from the trusted launcher'
+      'automatic self.name comes from the trusted launcher'
     )
     assert.equal(
       result.self?.instanceId,
       handle!.identity.fingerprint,
-      '[A17] route ID is the original canonical fingerprint'
+      'route ID is the original canonical fingerprint'
     )
     assert.equal(
       result.parent,
       'automatic-parent',
-      '[A2] the genuine child reverse request reaches the authenticated parent route'
+      'the genuine child reverse request reaches the authenticated parent route'
     )
-    assert.equal(
-      reverseCalls,
-      1,
-      '[A2] parent business actually executed through the reverse route'
-    )
+    assert.equal(reverseCalls, 1, 'parent business actually executed through the reverse route')
   } finally {
     try {
       await parent?.close()

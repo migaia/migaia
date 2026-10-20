@@ -138,7 +138,7 @@ const controlUtilsApiGuides: Readonly<
   'utils:value:isPrimitive': utilsGuide({ purposeEn: 'Narrows JavaScript primitive values, including symbol and bigint, while excluding objects and functions.', purposeZh: '窄化 JavaScript primitive value，包括 symbol 与 bigint，同时排除 object 与 function。', quickStart: "import { isPrimitive } from '@migaia/utils'\n\nconst value: unknown = 42\nif (isPrimitive(value)) console.log(value) // scalar 通过 guard 后可按 primitive 处理", useEn: 'A codec, snapshot, or branch handles scalar identity separately from object graphs.', useZh: 'codec、snapshot 或 branch 需要把 scalar identity 与 object graph 分开处理。', avoidEn: 'Only JSON scalar values are accepted, because symbol, bigint, and undefined require separate policy.', avoidZh: '只接受 JSON scalar value；symbol、bigint 与 undefined 需要独立 policy。' })
 }
 
-/** Builds the four K290 guides from their concrete semantic cases without fallback content. */
+/** Builds the four safe-value guides from their concrete semantic cases without fallback content. */
 function safeValueGuide(input: {
   readonly purposeEn: string
   readonly purposeZh: string

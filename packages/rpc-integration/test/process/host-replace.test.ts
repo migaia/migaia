@@ -29,7 +29,7 @@ async function settle(): Promise<void> {
 }
 
 describe('process Host replacement publication', () => {
-  it('[A4] rejects a candidate released between ready and publication', async () => {
+  it('rejects a candidate released between ready and publication', async () => {
     /** The neutral native ports retain their actual supervisor and true Host install owner. */
     const fixture = runtimeHostFixture()
     /** Retain the genuine factory before observing the second prepared candidate only. */
@@ -71,7 +71,7 @@ describe('process Host replacement publication', () => {
     }
   })
 
-  it('[A3] never resends an old sent idempotent request into the new real child', async () => {
+  it('never resends an old sent idempotent request into the new real child', async () => {
     /** Real I/O retains production deadlines while the injected monotonic clock advances drain. */
     const fixture = nativeHostFixture('old')
     const scheduler = createManualScheduler()
@@ -136,7 +136,7 @@ describe('process Host replacement publication', () => {
     }
   })
   it.each(['stop-then-start', 'start-then-switch'] as const)(
-    '[A3/A4] reclaims a real failed description and permits a fresh replacement (%s)',
+    'reclaims a real failed description and permits a fresh replacement (%s)',
     async (strategy) => {
       /** Real child exits prove the failed candidate cannot retain a process or budget lease. */
       const fixture = nativeHostFixture('old')
@@ -233,7 +233,7 @@ describe('process Host replacement publication', () => {
       }
     }
   )
-  it('[A3] invalidates a real size-one pool after old exit without taking it for replacement', async () => {
+  it('invalidates a real size-one pool after old exit without taking it for replacement', async () => {
     const fixture = runtimeHostFixture()
     const deployment = fixture.options.spawn
     const budget = createUnitBudget({ kind: 'process', maxUnits: 3, scheduler: fixture.scheduler })
@@ -281,7 +281,7 @@ describe('process Host replacement publication', () => {
     expect(budget.inUse).toBe(0)
   })
 
-  it('[A4] consumes a parsed Host descriptor and preserves its default switch strategy', async () => {
+  it('consumes a parsed Host descriptor and preserves its default switch strategy', async () => {
     const fixture = runtimeHostFixture()
     const vectors = JSON.parse(
       readFileSync(
@@ -325,7 +325,7 @@ describe('process Host replacement publication', () => {
     }
   })
   it.each([true, false])(
-    '[A3] guards actual Host terminal commands and retains liquidation diagnostics (restart=%s)',
+    'guards actual Host terminal commands and retains liquidation diagnostics (restart=%s)',
     async (recover) => {
       const fixture = hostFixture()
       if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
@@ -345,7 +345,7 @@ describe('process Host replacement publication', () => {
         scheduler: fixture.scheduler,
         report: fixture.report
       })
-      /** Public lower remote control remains supported by D1/M6 after high factories are retired. */
+      /** Public lower remote control remains supported after high factories are retired. */
       const host = createRemoteHost({
         catalog: fixture.options.catalog,
         binding,
@@ -429,7 +429,7 @@ describe('process Host replacement publication', () => {
     }
   )
   it.each(['stop-then-start', 'start-then-switch'] as const)(
-    '[A3/A4] gates real Node replacement on describe and never replays installed plugins (%s)',
+    'gates real Node replacement on describe and never replays installed plugins (%s)',
     async (strategy) => {
       /** A real endpoint is held only at its outbound describe boundary. */
       const fixture = nativeHostFixture('old')
@@ -537,7 +537,7 @@ describe('process Host replacement publication', () => {
     }
   )
 
-  it('[A4] rejects a real overlapping candidate at a one-unit budget and preserves the old PID', async () => {
+  it('rejects a real overlapping candidate at a one-unit budget and preserves the old PID', async () => {
     const fixture = nativeHostFixture()
     const budget = createUnitBudget({
       kind: 'process',
@@ -576,7 +576,7 @@ describe('process Host replacement publication', () => {
     expect(budget.inUse).toBe(0)
   })
 
-  it('[A3] stops the old owned unit before launching and retains the same facade', async () => {
+  it('stops the old owned unit before launching and retains the same facade', async () => {
     const fixture = runtimeHostFixture()
     await fixture.host.use(fixture.plugin)
     const outlet = fixture.host.process!
@@ -605,7 +605,7 @@ describe('process Host replacement publication', () => {
     }
   })
 
-  it('[A4] holds old service until description, publishes once and queues every spec', async () => {
+  it('holds old service until description, publishes once and queues every spec', async () => {
     const fixture = runtimeHostFixture()
     let complete!: () => void
     const described = new Promise<void>((resolve) => {
@@ -668,7 +668,7 @@ describe('process Host replacement publication', () => {
     }
   })
 
-  it('[A3/A4] cancels a delayed candidate and refuses queued replacement without another launch', async () => {
+  it('cancels a delayed candidate and refuses queued replacement without another launch', async () => {
     const fixture = runtimeHostFixture()
     const send = fixture.send.getMockImplementation()!
     /** The actual core endpoint honors cancellation; this neutral held-send fixture must too. */

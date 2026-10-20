@@ -1,7 +1,7 @@
 /**
  * Core owns synchronous reporting, terminal draining across dispatches, and LIFO cleanup with
  * primary-first failures. Event Subscriber's settled helpers await one dispatch Promise, so they
- * cannot replace this resource boundary without changing reporting or cleanup semantics (K291).
+ * cannot replace this resource boundary without changing reporting or cleanup semantics.
  */
 import { RpcAuxiliaryErrorText } from './auxiliary-error-text.js'
 import {

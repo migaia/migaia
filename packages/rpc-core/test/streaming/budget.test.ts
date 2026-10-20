@@ -5,8 +5,8 @@ import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'
 
-/** A6 compares the portable value budget with producer-side rejection before sending. */
-describe('streaming A6 portable value budget', () => {
+/** Compares the portable value budget with producer-side rejection before sending. */
+describe('streaming portable value budget', () => {
   it('accepts exactly 16 KiB and rejects the next byte and undefined yields', async () => {
     expect(measurePortableStreamValue('x'.repeat(16382))).toBe(RpcStreamLimit.maxItemValueBytes)
     expect(measurePortableStreamValue('x'.repeat(16383))).toBe(RpcStreamLimit.maxItemValueBytes + 1)

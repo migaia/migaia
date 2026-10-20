@@ -25,7 +25,7 @@ export type ICollectorServiceOwner = Pick<
   excludeEndpoint(endpointId: string): void
 }
 
-/** SC9(b): service results become plain portable wire data only at the remote boundary. */
+/** Service results become plain portable wire data only at the remote boundary. */
 function portableResult<T>(value: T): T {
   try {
     /** JSON's representation removes undefined/functions and class prototypes without hot-path work. */
@@ -40,7 +40,7 @@ function portableResult<T>(value: T): T {
           }
         })
       if (original instanceof Uint8Array) return normalizePortable(original)
-      // SC9(b): a wire byte view changes representation while sharing the original backing.
+      // A wire byte view changes representation while sharing the original backing.
       if (original instanceof ArrayBuffer) return normalizePortable(new Uint8Array(original))
       if (typeof field === 'bigint') return field.toString()
       return field

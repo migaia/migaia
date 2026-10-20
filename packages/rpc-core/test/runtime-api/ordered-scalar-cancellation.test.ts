@@ -29,7 +29,7 @@ it.each([
   ['group', 'signal'],
   ['group', 'deadline']
 ] as const)(
-  '[A56][A59] started ordered %s retains its lease after %s until real business completion',
+  'started ordered %s retains its lease after %s until real business completion',
   async (mode, control) => {
     /** The actual asynchronous handler ignores cancellation until its business barrier opens. */
     let release!: () => void
@@ -102,11 +102,11 @@ it.each([
             Reflect.get(terminal.error as object, 'code'),
             RpcCoreErrorCode.deadlineExceeded
           )
-      } else assert.ok('value' in terminal, '[A56] notify still settles at physical completion')
+      } else assert.ok('value' in terminal, 'notify still settles at physical completion')
       assert.equal(
         providers.size,
         mode === 'group' ? 2 : 1,
-        '[A59] cancellation cannot release running business capacity'
+        'cancellation cannot release running business capacity'
       )
       follower = fixture.peers[0].request('after', undefined, { orderKey: 'held-business' })
       void follower.catch(() => undefined)
@@ -114,18 +114,14 @@ it.each([
         await fixture.peers[0].request('barrier', undefined, { orderKey: 'other-key' }),
         9
       )
-      assert.deepEqual(
-        effects,
-        ['started'],
-        '[A59] a cancelled handler still owns its same-key FIFO'
-      )
+      assert.deepEqual(effects, ['started'], 'a cancelled handler still owns its same-key FIFO')
       /** Caller receipt can precede the barrier's own post-response lease release. */
       await vi.waitFor(
         () =>
           assert.equal(
             providers.size,
             mode === 'group' ? 3 : 2,
-            '[A59] waiting and running retain their original leases'
+            'waiting and running retain their original leases'
           ),
         { interval: 5 }
       )

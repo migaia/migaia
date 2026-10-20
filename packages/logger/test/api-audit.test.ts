@@ -21,7 +21,7 @@ function memoryRuntime(): ILoggerRuntimeManager {
 }
 
 describe('audited logger contracts', () => {
-  it('LOGGER-D01 drains buffered HTTP logs before aborting the transport owner', async () => {
+  it('drains buffered HTTP logs before aborting the transport owner', async () => {
     /** Only memory transport is used; no request leaves this process. */
     const bodies: string[] = []
     const runtime = memoryRuntime()
@@ -41,7 +41,7 @@ describe('audited logger contracts', () => {
   })
 
   it.each([false, true])(
-    'LOGGER-D02 settles the shared shutdown and disposes after clock failure (cleanup failure: %s)',
+    'settles the shared shutdown and disposes after clock failure (cleanup failure: %s)',
     async (cleanupFails) => {
       /** Clock failure begins only after construction and plugin admission finish. */
       let failClock = false
@@ -88,7 +88,7 @@ describe('audited logger contracts', () => {
     }
   )
 
-  it('LOGGER-D03 removes only the hook registration whose handle is released', async () => {
+  it('removes only the hook registration whose handle is released', async () => {
     /** Duplicate functions still have independent subscription ownership. */
     let calls = 0
     const listener = () => {
@@ -105,7 +105,7 @@ describe('audited logger contracts', () => {
     await log.shutdown('manual')
   })
 
-  it('LOGGER-D04 renders forwarded topic chains without exposing cycle bookkeeping', async () => {
+  it('renders forwarded topic chains without exposing cycle bookkeeping', async () => {
     /** JSON output is the documented consumer of the display-only topic chain. */
     const lines: string[] = []
     const runtime = {
@@ -133,7 +133,7 @@ describe('audited logger contracts', () => {
     await target.shutdown('manual')
   })
 
-  it('LOGGER-D05 ignores raw after shutdown starts while allowing final structured logs', async () => {
+  it('ignores raw after shutdown starts while allowing final structured logs', async () => {
     /** Shutdown handlers retain the explicit final structured dispatch allowance. */
     const writes: string[] = []
     const entries: string[] = []
@@ -158,7 +158,7 @@ describe('audited logger contracts', () => {
     expect(entries).toEqual(['final structured'])
   })
 
-  it('LOGGER-D06 transfers the existing error chain through HTTP without rebuilding stacks', async () => {
+  it('transfers the existing error chain through HTTP without rebuilding stacks', async () => {
     /** Both cause and aggregate branches carry independently classified upstream errors. */
     const cause = Object.assign(new Error('cause'), { source: 'upstream', code: 'CAUSE' })
     const secondary = Object.assign(new TypeError('secondary'), {
@@ -196,7 +196,7 @@ describe('audited logger contracts', () => {
   })
 
   it.each(['sync', 'async'] as const)(
-    'LOGGER-D08 surfaces %s terminal reporter failure on the shared host queue',
+    'surfaces %s terminal reporter failure on the shared host queue',
     async (kind) => {
       /**
        * Host delivery stays separate from business dispatch, without recursively calling the failed
@@ -228,7 +228,7 @@ describe('audited logger contracts', () => {
     }
   )
 
-  it('LOGGER-D07 restores the same original default runtime manager object', () => {
+  it('restores the same original default runtime manager object', () => {
     /** An outer override must not manufacture a new host capability owner when restored. */
     const previous = getLoggerRuntimeManager()
     const restore = setLoggerRuntimeManager(memoryRuntime())

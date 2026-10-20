@@ -27,12 +27,12 @@ type IThreadApi = {
 /** The second real source demonstrates the Process public factory/stdio business path. */
 type IProcessApi = { math: { double(value: number): number }; identity(): number }
 
-it('[POOL-T02] preserves failed work once while the same real Peer restarts and serves future calls', async () => {
+it('preserves failed work once while the same real Peer restarts and serves future calls', async () => {
   /** Native fixture data stays inside this owning package's test directory. */
   const directory = await mkdtemp(join(import.meta.dirname, 'native-journal-'))
   /** Every line is written by the actual crashing business method before its native exit. */
   const journal = join(directory, 'executions.txt')
-  /** An exact entry URL uses the P1 short source through the existing Thread launcher. */
+  /** An exact entry URL uses the short source through the existing Thread launcher. */
   const spawn = new URL('./fixtures/thread-child.mjs', import.meta.url)
   /** The public factory spy observes only construction; it never substitutes restart behavior. */
   const threadFactory = vi.mocked(createThreadPeer)

@@ -48,7 +48,7 @@ function recordedSend(sender: RpcOutboundSender, message: IRpcEnvelope) {
   try {
     /** The synchronous physical invocation must register a real pair before observation succeeds. */
     const pending = sender.send(message)
-    assert.ok(reactions.length > 0, '[A25/IDLE1] native reaction positive control')
+    assert.ok(reactions.length > 0, 'native reaction positive control')
     return { pending, completion: reactions.at(-1)! }
   } finally {
     // eslint-disable-next-line unicorn/no-thenable -- Restore the original native descriptor before awaiting.
@@ -56,7 +56,7 @@ function recordedSend(sender: RpcOutboundSender, message: IRpcEnvelope) {
   }
 }
 
-it('[A25/IDLE1] idle completions reuse owner callbacks and preserve failure recovery', async () => {
+it('idle completions reuse owner callbacks and preserve failure recovery', async () => {
   /** Canonical components keep the original identity payload and whole-frame path. */
   const components: IRpcSelectedComponents = {
     protocol: rpcProtocolV1,
@@ -95,12 +95,12 @@ it('[A25/IDLE1] idle completions reuse owner callbacks and preserve failure reco
   const pairs: (readonly [unknown, unknown])[] = []
   for (const id of ['first', 'second', 'third']) {
     const observed = recordedSend(sender, request(id))
-    assert.equal(written.at(-1), id, '[A25/IDLE1] idle physical send remains synchronous')
+    assert.equal(written.at(-1), id, 'idle physical send remains synchronous')
     pairs.push(observed.completion)
     await observed.pending
   }
-  assert.equal(new Set(pairs.map((pair) => pair[0])).size, 1, '[A25/IDLE1] reuse success callback')
-  assert.equal(new Set(pairs.map((pair) => pair[1])).size, 1, '[A25/IDLE1] reuse failure callback')
+  assert.equal(new Set(pairs.map((pair) => pair[0])).size, 1, 'reuse success callback')
+  assert.equal(new Set(pairs.map((pair) => pair[1])).size, 1, 'reuse failure callback')
   /** A rejected physical write retains its native cause and releases busy before the next call. */
   const reason = new Error('fixture physical write failure')
   nextFailure = reason
@@ -113,7 +113,7 @@ it('[A25/IDLE1] idle completions reuse owner callbacks and preserve failure reco
     return true
   })
   const recovered = recordedSend(sender, request('recovered'))
-  assert.equal(written.at(-1), 'recovered', '[A25/IDLE1] failure releases busy before continuation')
+  assert.equal(written.at(-1), 'recovered', 'failure releases busy before continuation')
   assert.equal(recovered.completion[0], pairs[0]![0])
   assert.equal(recovered.completion[1], pairs[0]![1])
   await recovered.pending

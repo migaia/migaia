@@ -12,9 +12,9 @@ import { ReactiveErrorCode } from '../src/error-code.js'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 
-// M-T：docs/lifecycle/migration.sdd.md §4.1 —— Scope/createScope()/IScope 从公开 API 移除，
+// Scope/createScope()/IScope 从公开 API 移除，
 // lifecycle-primitives.ts / generation-controller.ts 整体移入 @migaia/lifecycle，reactive 内不留副本。
-describe('M-T1/M-T14 (§5.1/§5.2): Scope leaves @migaia/reactive entirely', () => {
+describe('Scope leaves @migaia/reactive entirely', () => {
   it('the public entry point does not export Scope or createScope as runtime values', () => {
     const exported = reactivePublicApi as Record<string, unknown>
     expect(exported.Scope).toBeUndefined()
@@ -38,9 +38,9 @@ describe('M-T1/M-T14 (§5.1/§5.2): Scope leaves @migaia/reactive entirely', () 
   })
 })
 
-// M-T14：reactive runtime 多实例——SSR request / 测试 / Worker 之间无节点、scope、lease 串线。
+// Reactive runtime 多实例——SSR request / 测试 / Worker 之间无节点、scope、lease 串线。
 // `createScope()` 被移除后，「隔离」不再有一个 scope 对象作为载体，必须由 Runtime 自身的所有权表保证。
-describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createScope() removal', () => {
+describe('multiple Runtime instances stay isolated after createScope() removal', () => {
   it('a node created by one Runtime is rejected by another Runtime’s tracking context', () => {
     const runtimeA = createRuntime()
     const runtimeB = createRuntime()
@@ -110,7 +110,7 @@ describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createSc
   })
 })
 
-describe('ST-C6 pure default provider', () => {
+describe('pure default provider', () => {
   it('returns the same authority as the root convenience binding', () => {
     /** The provider must not create a second default graph for extension consumers. */
     const runtime = getDefaultRuntime()
@@ -123,7 +123,7 @@ describe('ST-C6 pure default provider', () => {
   })
 })
 
-describe('ST-C5 adapter cleanup capability', () => {
+describe('adapter cleanup capability', () => {
   it('uses the bound Runtime idle channel and reports cleanup failure there', () => {
     const pending: Array<() => void> = []
     const reported: unknown[] = []

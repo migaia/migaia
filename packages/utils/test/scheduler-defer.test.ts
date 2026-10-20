@@ -4,7 +4,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('SD-T02 keeps native microtask order independently of zero-delay timers', async () => {
+it('keeps native microtask order independently of zero-delay timers', async () => {
   /** Observed callback order distinguishes microtasks, clock jobs and timer callbacks. */
   const trace: string[] = []
   deferTask(systemScheduler, () => {
@@ -21,7 +21,7 @@ it('SD-T02 keeps native microtask order independently of zero-delay timers', asy
   timer.cancel()
 })
 
-it('SD-T02 controls manual and legacy two-method jobs without host microtasks', () => {
+it('controls manual and legacy two-method jobs without host microtasks', () => {
   vi.stubGlobal('queueMicrotask', undefined)
   /** One deterministic clock owns both modern and legacy deferred registrations. */
   const manual = createManualScheduler()
@@ -41,7 +41,7 @@ it('SD-T02 controls manual and legacy two-method jobs without host microtasks', 
   expect(trace).toEqual(['manual', 'legacy'])
 })
 
-it('SD-T02 rejects invalid callback/capability arguments with native coded TypeError', () => {
+it('rejects invalid callback/capability arguments with native coded TypeError', () => {
   /** Invalid JavaScript inputs must fail before any registration starts. */
   const invalid = [
     () => deferTask(systemScheduler, undefined as never),
@@ -56,7 +56,7 @@ it('SD-T02 rejects invalid callback/capability arguments with native coded TypeE
   }
 })
 
-it('SD-T02 preserves the exact failed scheduler getter on cause', () => {
+it('preserves the exact failed scheduler getter on cause', () => {
   /** The exact caller-owned failure must remain reachable without replacement. */
   const cause = new Error('defer getter failed')
   /** This scheduler exercises only the external method/error contract under test. */
@@ -76,7 +76,7 @@ it('SD-T02 preserves the exact failed scheduler getter on cause', () => {
   )
 })
 
-it('SD-T02 reports absent default host capability without affecting custom schedulers', () => {
+it('reports absent default host capability without affecting custom schedulers', () => {
   vi.stubGlobal('queueMicrotask', undefined)
   expect(() => deferTask(systemScheduler, () => undefined)).toThrow(
     expect.objectContaining({
@@ -86,7 +86,7 @@ it('SD-T02 reports absent default host capability without affecting custom sched
   )
 })
 
-it('SD-T02 preserves a caller-owned registration failure by identity', () => {
+it('preserves a caller-owned registration failure by identity', () => {
   /** The exact caller-owned failure must remain reachable without replacement. */
   const cause = new Error('custom deferred registration failed')
   /** This scheduler exercises only the external method/error contract under test. */

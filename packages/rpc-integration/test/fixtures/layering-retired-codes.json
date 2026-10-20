@@ -1,5 +1,5 @@
 {
-  "description": "Core error codes removed by rpc-layering BC1/R2 because no supported throw site emits them; shared by the layering A2 oracle and the merge A5 registry oracle.",
+  "description": "Core error codes removed by rpc-layering because no supported throw site emits them; shared by the layering oracle and the merge registry oracle.",
   "codes": [
     "UUID_UNAVAILABLE",
     "UUID_INVALID",

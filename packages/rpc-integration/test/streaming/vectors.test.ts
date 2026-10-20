@@ -43,7 +43,7 @@ function frameEvent(value: unknown): string | undefined {
       : undefined
 }
 
-/** A13 consumer vectors supply one peer response for each on-wire pull. */
+/** Consumer vectors supply one peer response for each on-wire pull. */
 async function runConsumerVector(vector: ISequenceVector): Promise<void> {
   const [clientTransport, peer] = createMemoryTransportPair()
   const clientFrames: string[] = []
@@ -103,7 +103,7 @@ async function runConsumerVector(vector: ISequenceVector): Promise<void> {
   }
 }
 
-/** A13 producer vector verifies cancellation frames and one iterator cleanup. */
+/** Producer vector verifies cancellation frames and one iterator cleanup. */
 async function runProducerVector(vector: ISequenceVector): Promise<void> {
   const [clientTransport, serverTransport] = createMemoryTransportPair()
   const clientFrames: string[] = []
@@ -158,7 +158,7 @@ async function runProducerVector(vector: ISequenceVector): Promise<void> {
 }
 
 /** Current vectors retain exact malformed stream-route classification on the new baseline. */
-describe('streaming A13 1.1 vectors', () => {
+describe('streaming 1.1 vectors', () => {
   it('rejects a stream envelope with a request route using the current vector', () => {
     const vectors = JSON.parse(
       readFileSync(new URL('../../schema/vectors/stream.json', import.meta.url), 'utf8')

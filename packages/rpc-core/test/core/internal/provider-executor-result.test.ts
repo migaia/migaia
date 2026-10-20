@@ -465,7 +465,7 @@ describe('ProviderExecutor result normalization', () => {
 
 describe('local provider refusal identity', () => {
   it.each(['concurrency', 'replayLedgerFull', 'bindingExpired'] as const)(
-    '[K215] reports %s for request and dispatchOnly without payload',
+    'reports %s for request and dispatchOnly without payload',
     async (reason) => {
       for (const dispatchOnly of [false, true]) {
         /** Each row uses the original executor and its actual admission owner. */

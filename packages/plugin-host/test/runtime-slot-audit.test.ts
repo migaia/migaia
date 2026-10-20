@@ -89,7 +89,7 @@ it('[C4-fix:L2] a class slot is immutable while its canonical owner retires and 
   }
 })
 
-it('[C4-fix:M2] single-receipt find reads the canonical bucket without a Set iterator', async () => {
+it('single-receipt find reads the canonical bucket without a Set iterator', async () => {
   /** This genuine Host publishes one actual original integration receipt. */
   const host = defineHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -101,7 +101,7 @@ it('[C4-fix:M2] single-receipt find reads the canonical bucket without a Set ite
     const values = vi.spyOn(Set.prototype, 'values')
     try {
       assert.equal(facade.read(), 42)
-      assert.equal(values.mock.calls.length, 0, '[C4-fix:M2] hot find creates no Set iterator')
+      assert.equal(values.mock.calls.length, 0, 'hot find creates no Set iterator')
     } finally {
       values.mockRestore()
     }

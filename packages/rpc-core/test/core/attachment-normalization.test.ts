@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
-/** Proves the final B12c05 boundary has no legacy outbound bridge producer. */
+/** Proves the final attachment boundary has no legacy outbound bridge producer. */
 describe('canonical attachment boundary', () => {
   it('removes legacy bridge constructors from source and package internals', async () => {
     const source = await readFile(

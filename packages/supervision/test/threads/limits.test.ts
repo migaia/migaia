@@ -8,7 +8,7 @@ import {
 } from '../../src/threads/index.js'
 import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
 
-describe('A5 thread limits and A6 exit observation', () => {
+describe('thread limits and exit observation', () => {
   it('admits only capabilities the launcher can enforce', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryThreadLauncher({

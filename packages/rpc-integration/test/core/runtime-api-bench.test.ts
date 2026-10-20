@@ -26,7 +26,7 @@ const units = [
 ]
 
 it.each(units)(
-  '[A37][A38] DA1 $executable $carrier business belongs to the canonical public Peer',
+  '$executable $carrier business belongs to the canonical public Peer',
   async (unit) => {
     /** Existing physical preparation performs three actual echoes before the provenance assertion. */
     const result = await execute(unit.executable, [entry, JSON.stringify(unit)], {
@@ -40,10 +40,7 @@ it.each(units)(
       methods: string[]
     }
     assert.equal(receipt.echoes, 3)
-    assert.ok(
-      receipt.self,
-      '[A37] successful formal business must use the actual public Peer owner'
-    )
+    assert.ok(receipt.self, 'successful formal business must use the actual public Peer owner')
     assert.equal(receipt.self.instanceId, unit.carrier === 'browser-worker' ? 'page' : 'parent')
     if (unit.carrier === 'worker' || unit.carrier === 'browser-worker')
       assert.match(receipt.peerId!, /^rpc-thread-(?:web-)?[1-9]\d*$/)

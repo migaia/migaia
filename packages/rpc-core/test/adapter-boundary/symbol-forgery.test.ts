@@ -21,7 +21,7 @@ import {
 } from '../../dist/core/internal/provider.js'
 
 /** Ordinary fixture metadata remains copyable, so every forgery performs a nonempty Symbol copy. */
-const ordinaryMarker = Symbol('APS7 ordinary metadata')
+const ordinaryMarker = Symbol('ordinary metadata')
 
 /** Keep the owner's real object intact while adding unrelated metadata that callers may observe. */
 function withOrdinarySymbol<T extends object>(value: T): T {
@@ -62,9 +62,12 @@ const route: IRpcRouteHeader = {
   sentAt: 0
 }
 
-/** These owner-local cases join APS7 without exposing any private writer from a public entry. */
-describe('APS7 Symbol transplantation cannot copy private provider facts', () => {
-  it('[APS7-S1] keeps the real principal and scope value while a Symbol copy receives no principal', () => {
+/**
+ * These owner-local cases join the forgery suite without exposing any private writer from a public
+ * entry.
+ */
+describe('Symbol transplantation cannot copy private provider facts', () => {
+  it('keeps the real principal and scope value while a Symbol copy receives no principal', () => {
     /** The existing private owner mints the genuine callback used by the public scope resource. */
     const original = () => 'existing-scope-value'
     /** A real fact must retain the exact callback and its original business return. */
@@ -79,7 +82,7 @@ describe('APS7 Symbol transplantation cannot copy private provider facts', () =>
     expect(readRuntimeIdempotencyScope(genuine)).toBe('verified-parent')
   })
 
-  it('[APS7-S2] retains the real bulk registration while a Symbol copy has no admission or invoke fact', () => {
+  it('retains the real bulk registration while a Symbol copy has no admission or invoke fact', () => {
     /** Native reservation operations are retained by identity rather than serialized or rebuilt. */
     const reservation = { consume: vi.fn(), release: vi.fn() }
     /** The genuine provider retains the ordinary callback's return behavior. */
@@ -102,7 +105,7 @@ describe('APS7 Symbol transplantation cannot copy private provider facts', () =>
     expect(readProviderBulkAdmission(genuine)).toBe(registration)
   })
 
-  it('[APS7-S3] preserves genuine preflight and canonical retention while rejecting copied policy', () => {
+  it('preserves genuine preflight and canonical retention while rejecting copied policy', () => {
     /** The real synchronous checker is consumed by the unchanged provider executor. */
     const check = vi.fn((_value: IRpcRouteHeader) => undefined)
     /** Callback identity and business completion remain independent of the private policy. */
@@ -124,7 +127,7 @@ describe('APS7 Symbol transplantation cannot copy private provider facts', () =>
     expect(readProviderPreflight(genuine)).toBe(check)
   })
 
-  it('[APS7-S4] preserves the real stream lifetime and its retention while rejecting copied admission', () => {
+  it('preserves the real stream lifetime and its retention while rejecting copied admission', () => {
     /** Producer settlement remains the original resource operation with the same result input. */
     const release = vi.fn((_succeeded: boolean) => undefined)
     /** The existing admission owner starts this exact producer lifetime once. */
@@ -154,7 +157,7 @@ describe('APS7 Symbol transplantation cannot copy private provider facts', () =>
     expect(readProviderStreamAdmission(genuine)).toBe(admission)
   })
 
-  it('[APS7-S5] keeps admitted invocation authority on its exact context and rejects copied context Symbols', () => {
+  it('keeps admitted invocation authority on its exact context and rejects copied context Symbols', () => {
     /** Relay operations represent the original admitted resource and retain exact method identity. */
     const relay: IProviderRuntimeRelay = {
       execute: async () => undefined,

@@ -219,7 +219,7 @@ export function array(
             disposing = true
             disposed = true
             try {
-              // 逆序释放（migration.sdd.md §5.7）：子资源依赖 block 的 WASM 内存，必须先摘子资源边再 dealloc。
+              // 逆序释放：子资源依赖 block 的 WASM 内存，必须先摘子资源边再 dealloc。
               disposeWasmField(
                 block,
                 field,

@@ -11,7 +11,7 @@ const hostOptions = {
 const plugin = (name: string) => definePlugin({ name, install: () => ({}) })
 
 describe('defineHost', () => {
-  it('SM-D01 preserves live domain accessors on the canonical frozen fluent handle', async () => {
+  it('preserves live domain accessors on the canonical frozen fluent handle', async () => {
     /** Application state changes independently of the immutable public member descriptors. */
     let current = 1
     /** The domain surface must keep this accessor instead of copying its first value. */

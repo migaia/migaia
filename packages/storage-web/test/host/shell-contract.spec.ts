@@ -12,10 +12,10 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 
-/** Minimal valid store used only to exercise opaque type identity and R02 admission. */
+/** Minimal valid store used only to exercise opaque type identity and shell admission. */
 const store = memoryStorageHost() as IKeyValueStore
 
-describe('SWV4-B02 R02 shell', () => {
+describe('shell', () => {
   it('keeps names canonical and inspects native Feature closure without executing factories', () => {
     expect(pluginNameFromBackendId('a.b')).toBe('storage-backend:612E62')
     expect(reactiveAdapterNameFromBackendId('a-b')).toBe('storage-reactive-adapter:612D62')

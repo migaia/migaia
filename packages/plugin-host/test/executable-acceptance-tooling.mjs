@@ -45,7 +45,7 @@ export const runRuntimeFaultProducer = () => {
       /descriptorFactory: args\[1\] as \(core: object\) => IPluginDescriptor/,
       'descriptorFactory: undefined',
       'test/plugin-host.test.ts',
-      'YS23: keeps object extension members',
+      'keeps object extension members',
       /promise resolved/i
     ],
     [
@@ -55,7 +55,7 @@ export const runRuntimeFaultProducer = () => {
       null,
       null,
       'test/acceptance-contract.test.ts',
-      'YS24: rejects a forged Feature batch',
+      'rejects a forged Feature batch',
       /AssertionError: expected 1 to be \+0/
     ],
     [
@@ -65,7 +65,7 @@ export const runRuntimeFaultProducer = () => {
       null,
       null,
       'test/plugin-host.test.ts',
-      'YS25: rejects Feature-core reads',
+      'rejects Feature-core reads',
       /promise resolved/i
     ],
     [
@@ -75,7 +75,7 @@ export const runRuntimeFaultProducer = () => {
       null,
       null,
       'test/acceptance-contract.test.ts',
-      'YS26: rejects equal install and expose keys',
+      'rejects equal install and expose keys',
       /promise resolved/i
     ],
     [
@@ -85,7 +85,7 @@ export const runRuntimeFaultProducer = () => {
       null,
       null,
       'test/acceptance-contract.test.ts',
-      'YS27: injects only featureExpose',
+      'injects only featureExpose',
       /AssertionError: expected \[.*featureExpose.*getShared.*own.*\] to deeply equal \[.*featureExpose.*\]/s
     ]
   ]

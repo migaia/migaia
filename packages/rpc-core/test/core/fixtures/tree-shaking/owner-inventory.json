@@ -69,7 +69,7 @@
       "listener error disposer"
     ]
   },
-  "status": "reviewed pre-migration baseline; ownership requires B02-B06 reclassification",
+  "status": "reviewed pre-migration baseline; ownership requires later reclassification",
   "ownerRules": ["^#[A-Za-z0-9_]+$"],
   "unclassified": []
 }

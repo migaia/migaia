@@ -37,7 +37,7 @@ const users = defineEntity<IUser>()({
   onDiagnostic: () => {}
 })
 
-describe('SW-D06 authoritative fallback unique writes', () => {
+describe('authoritative fallback unique writes', () => {
   it.each(factories.slice(0, 2))(
     '$name classifies a failing unique projection without losing its original error',
     async ({ create }) => {

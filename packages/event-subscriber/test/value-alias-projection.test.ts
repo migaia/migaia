@@ -15,7 +15,7 @@ type IValue = {
 }
 
 describe('value alias projection', () => {
-  it('ES-T150 ESVA-T01/ESVA-T03/ESVA-T05 accepts static config and probes once for all listeners', () => {
+  it('accepts static config and probes once for all listeners', () => {
     const leaf = {}
     let reads = 0
     const value: IValue = {
@@ -52,7 +52,7 @@ describe('value alias projection', () => {
     expect(contexts[0]).toBe(contexts[1])
   })
 
-  it('ES-T151 ESVA-T02 applies config independently to Hub keys', () => {
+  it('applies config independently to Hub keys', () => {
     const hub = createEventHub<
       { ready: { data: { id: number } }; text: { data: { id: string } } },
       undefined,
@@ -72,7 +72,7 @@ describe('value alias projection', () => {
     expect(values).toEqual([1, 'one'])
   })
 
-  it('ES-T152 ESVA-T06/ESVA-T07 preserves original value and controls', () => {
+  it('preserves original value and controls', () => {
     const value = { data: { leaf: 4 } }
     const channel = createEventChannel<
       typeof value,
@@ -103,7 +103,7 @@ describe('value alias projection', () => {
     expect(observed && 'abort' in observed).toBe(true)
   })
 
-  it('ES-T153 ESVA-T08/ESVA-T10 distinguishes missing, blocked, and undefined leaves', async () => {
+  it('distinguishes missing, blocked, and undefined leaves', async () => {
     const report = vi.fn()
     const channel = createEventChannel<
       { data?: { leaf?: number } | null },
@@ -132,7 +132,7 @@ describe('value alias projection', () => {
     })
   })
 
-  it('ES-T154 ESVA-T09 preserves getter cause and reporter failure without suppressing delivery', async () => {
+  it('preserves getter cause and reporter failure without suppressing delivery', async () => {
     const getterFailure = new Error('leaf failed')
     const terminal = vi.fn()
     const report = vi.fn(() => {
@@ -170,7 +170,7 @@ describe('value alias projection', () => {
     expect((diagnostic.errors[0] as Error & { readonly cause?: unknown }).cause).toBe(getterFailure)
   })
 
-  it('ES-T155 ESVA-T11 disables projection before reading alias for blank paths', () => {
+  it('disables projection before reading alias for blank paths', () => {
     let aliasReads = 0
     const valueConfig = {
       readPath: '   ',
@@ -205,7 +205,7 @@ describe('value alias projection', () => {
     expect(aliasReads).toBe(0)
   })
 
-  it('ES-T156 ESVA-T12/ESVA-T13 rejects active alias collisions before Hub state', () => {
+  it('rejects active alias collisions before Hub state', () => {
     expect(() =>
       createEventChannel<{ data: { leaf: number } }>({
         valueConfig: { readPath: 'data.leaf', alias: 'value' } as never
@@ -218,7 +218,7 @@ describe('value alias projection', () => {
     ).toThrowError(expect.objectContaining({ code: EventSubscriberErrorCode.invalidOptions }))
   })
 
-  it('ES-T157 ESVA-T16/ESVA-T17 projects through async invoke helpers once', async () => {
+  it('projects through async invoke helpers once', async () => {
     let reads = 0
     const channel = createEventChannel<
       { data: { get leaf(): number } },
@@ -246,7 +246,7 @@ describe('value alias projection', () => {
     expect(reads).toBe(4)
   })
 
-  it('ES-T158 skips projection probing when serial invocation has no targets', async () => {
+  it('skips projection probing when serial invocation has no targets', async () => {
     let reads = 0
     const channel = createEventChannel<
       { readonly data: { readonly leaf: number } },
@@ -268,7 +268,7 @@ describe('value alias projection', () => {
     expect(reads).toBe(0)
   })
 
-  it('ES-T159 ESVA-T07/ESVA-T09 reports after all parallel listeners enter', async () => {
+  it('reports after all parallel listeners enter', async () => {
     const order: string[] = []
     const entries: Array<{ readonly taskId: string | undefined; readonly aborted: boolean }> = []
     const report = vi.fn(
@@ -320,7 +320,7 @@ describe('value alias projection', () => {
     expect(report).toHaveBeenCalledOnce()
   })
 
-  it('ES-T160 ESVA-T07/ESVA-T09 reports after all serial settlements', async () => {
+  it('reports after all serial settlements', async () => {
     const order: string[] = []
     const entries: Array<{ readonly taskId: string | undefined; readonly aborted: boolean }> = []
     const report = vi.fn(
@@ -374,7 +374,7 @@ describe('value alias projection', () => {
     expect(report).toHaveBeenCalledOnce()
   })
 
-  it('ES-T161 ESVA-T07/ESVA-T09 reports after the selected task listener enters', async () => {
+  it('reports after the selected task listener enters', async () => {
     const order: string[] = []
     const report = vi.fn(
       (failure: {

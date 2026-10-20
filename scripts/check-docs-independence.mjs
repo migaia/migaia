@@ -87,10 +87,10 @@ function checkArchitecture(target, output) {
     join(target, 'packages', 'event-subscriber', 'test', 'architecture.test.ts'),
     'utf8'
   )
-  assert.match(output, /ES-T113/)
-  assert.match(output, /ES-T114 uses explicit owner import graph/)
-  assert.doesNotMatch(output, /ES-T114 audits every active/)
-  for (const removed of ['assertSdd', 'ES-M11', 'const audit', 'sdd-validator'])
+  assert.match(output, /verifies the callable documentation contract/)
+  assert.match(output, /uses explicit owner import graph/)
+  assert.doesNotMatch(output, /audits every active/)
+  for (const removed of ['assertSdd', 'const audit', 'sdd-validator'])
     assert.equal(source.includes(removed), false, `obsolete ${removed} remains`)
   for (const retained of ['IEventChannelSubscription', 'IEventHubSubscription'])
     assert.equal(source.includes(retained), true, `retained ${retained} is missing`)

@@ -7,7 +7,7 @@ import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { streamRoots } from './fixture.js'
 
 /** A recognized stream kind without an installed route is a protocol failure. */
-describe('streaming A2 unclaimed route', () => {
+describe('streaming unclaimed route', () => {
   it('rejects a peer without stream@1 before sending an initial request', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let sent = 0

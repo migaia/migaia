@@ -125,7 +125,7 @@ async function receiver(
   }
 }
 
-it('[A59][A60] real ingress captures before async protection, submits the ready prefix, and lets authenticated controls bypass it', async () => {
+it('real ingress captures before async protection, submits the ready prefix, and lets authenticated controls bypass it', async () => {
   const harness = await receiver()
   try {
     for (const id of ['first', 'second', 'cancel'])
@@ -134,23 +134,19 @@ it('[A59][A60] real ingress captures before async protection, submits the ready 
     harness.waiting.get('second')!.resolve(frame('second'))
     await Promise.resolve()
     await Promise.resolve()
-    assert.deepEqual(
-      harness.delivered,
-      [],
-      '[A59] later authentication cannot overtake physical arrival'
-    )
+    assert.deepEqual(harness.delivered, [], 'later authentication cannot overtake physical arrival')
     harness.waiting.get('cancel')!.resolve(frame('cancel', true))
     await vi.waitFor(() =>
       assert.deepEqual(
         harness.delivered,
         ['cancel'],
-        '[A60] original control route bypasses incomplete business verification'
+        'original control route bypasses incomplete business verification'
       )
     )
     assert.equal(
       harness.admission.size,
       0,
-      '[A60] physical candidates never borrow maxGlobal=1 business capacity'
+      'physical candidates never borrow maxGlobal=1 business capacity'
     )
     harness.waiting.get('first')!.resolve(frame('first'))
     await vi.waitFor(() => assert.deepEqual(harness.delivered, ['cancel', 'first', 'second']))
@@ -159,7 +155,7 @@ it('[A59][A60] real ingress captures before async protection, submits the ready 
   }
 })
 
-it('[A59][A75] rejecting the head releases its exact receipt; close prevents late verification from dispatching', async () => {
+it('rejecting the head releases its exact receipt; close prevents late verification from dispatching', async () => {
   const harness = await receiver()
   try {
     for (const id of ['rejected', 'ready', 'late'])

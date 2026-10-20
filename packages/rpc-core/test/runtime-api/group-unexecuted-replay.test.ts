@@ -13,7 +13,7 @@ import {
 } from './fixture.js'
 
 it.each([0, 1, 2] as const)(
-  '[A62] failed group member %i retains only the invoked prefix in the original non-L replay owner',
+  'failed group member %i retains only the invoked prefix in the original non-L replay owner',
   async (failureIndex) => {
     /** Actual provider invocation, including the failure, determines retained replay ownership. */
     const effects: string[] = []
@@ -70,7 +70,7 @@ it.each([0, 1, 2] as const)(
       assert.equal(
         replay.size,
         initial + failureIndex + 1,
-        '[A62] never-invoked members release retained replay capacity'
+        'never-invoked members release retained replay capacity'
       )
       /** A subsequent complete group preserves replay history for every executed member. */
       await fixture.peers[0].group([{ method: 'value' }, { method: 'value' }])
@@ -84,7 +84,7 @@ it.each([0, 1, 2] as const)(
 )
 
 it.each(['done', 'pending'] as const)(
-  '[A62][A68] cached %s group completion releases its proven unexecuted replay suffix',
+  'cached %s group completion releases its proven unexecuted replay suffix',
   async (cached) => {
     /** Only the first genuine keyed task may invoke the failing business method. */
     let effects = 0
@@ -159,12 +159,12 @@ it.each(['done', 'pending'] as const)(
           ['failure', 'not-executed', 'not-executed']
         )
       await vi.waitFor(() => assert.equal(admission.size, 0))
-      assert.equal(effects, 1, '[A68] cached group completion never repeats business')
+      assert.equal(effects, 1, 'cached group completion never repeats business')
       assert.equal(replay.activeSize, 0)
       assert.equal(
         replay.size,
         initial + 2,
-        '[A62] each cached task retains only the proven executed prefix'
+        'each cached task retains only the proven executed prefix'
       )
     } finally {
       releaseBusiness()

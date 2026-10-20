@@ -19,7 +19,7 @@ function sources(directory: string): string[] {
   })
 }
 
-describe('A1 thread boundary', () => {
+describe('thread boundary', () => {
   it('publishes a separate runtime-neutral subentry', () => {
     const root = join(import.meta.dirname, '../..')
     const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {

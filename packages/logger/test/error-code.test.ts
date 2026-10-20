@@ -6,7 +6,7 @@ import { http } from '../src/plugins/http.js'
 import { process as processPlugin } from '../src/plugins/process.js'
 import { LoggerErrorText } from '../src/error-text.js'
 
-describe('logger error-code contract (E-T9)', () => {
+describe('logger error-code contract', () => {
   it('declares 17 unique codes under the package source', () => {
     const codes = Object.values(LoggerErrorCode)
     expect(codes).toHaveLength(17)

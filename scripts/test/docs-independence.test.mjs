@@ -41,7 +41,7 @@ function workspacePaths() {
   return [...new Set(result.stdout.split('\0').filter(Boolean))].sort()
 }
 
-/** Selects only the R1 source paths from a Git path inventory. */
+/** Selects only the guarded source paths from a Git path inventory. */
 function isGuardedSource(path) {
   if (!SOURCE_SUFFIX.test(path)) return false
   if (path.startsWith(SCAN_PREFIXES[1]) || path.startsWith(SCAN_PREFIXES[2])) return true
@@ -87,7 +87,7 @@ export function findDocsScripts(manifest) {
   )
 }
 
-test('TDI A2 recognizes real path literals without treating comments or names as reads', () => {
+test('recognizes real path literals without treating comments or names as reads', () => {
   /** Build the fixture path at runtime so the guard does not flag its own test data. */
   const docs = 'do' + 'cs'
   const source = [
@@ -117,7 +117,7 @@ test('TDI A2 recognizes real path literals without treating comments or names as
   )
 })
 
-test('TDI A1 scans tracked test and script sources', () => {
+test('scans tracked test and script sources', () => {
   const paths = workspacePaths()
   const sources = paths.filter(isGuardedSource)
   assert.ok(sources.length > 0, 'source inventory must not be empty')
@@ -138,11 +138,11 @@ test('TDI A1 scans tracked test and script sources', () => {
   assert.ok(!paths.includes('packages/storage-web/test/reconcile-error-registry.mjs'))
 })
 
-/** Explicit refs keep unrelated earlier production changes out of this SDD's preserve check. */
+/** Explicit refs keep unrelated earlier production changes out of this preserve check. */
 const base = process.env.TDI_BASE
 const change = process.env.TDI_CHANGE
 test(
-  'TDI A6 leaves production source untouched',
+  'leaves production source untouched',
   {
     skip: base && change ? false : 'set TDI_BASE and TDI_CHANGE to audit source preservation'
   },

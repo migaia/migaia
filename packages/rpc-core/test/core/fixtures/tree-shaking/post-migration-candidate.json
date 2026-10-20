@@ -782,7 +782,6 @@
     {
       "module": "packages/rpc/src/core/internal/composed-disposal-observer.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R07"],
       "rationale": "Endpoint projection retains the once-only disposal observer that reports Host-owned terminal effects without creating a second disposal owner.",
       "byteAttribution": {
         "originalBytes": 877,
@@ -823,7 +822,6 @@
     {
       "module": "packages/rpc/src/core/internal/construction-install.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R13"],
       "rationale": "Core construction and plugin translation retain the bounded install-settlement helper that coordinates abort, rollback, and late failure reporting.",
       "byteAttribution": {
         "originalBytes": 7051,
@@ -889,7 +887,6 @@
     {
       "module": "packages/rpc/src/core/internal/disposal-translation.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R36"],
       "rationale": "Core retains the WebRPC error translation boundary that preserves Host disposal ownership while exposing the package error contract.",
       "byteAttribution": {
         "originalBytes": 5766,
@@ -930,7 +927,6 @@
     {
       "module": "packages/rpc/src/core/internal/endpoint-projection.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R34"],
       "rationale": "Core retains the endpoint projection that exposes only admitted feature members and delegates disposal to the single Host promise.",
       "byteAttribution": {
         "originalBytes": 4831,
@@ -971,7 +967,6 @@
     {
       "module": "packages/rpc/src/core/internal/outbound-sender.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-D63", "WRC-C-T46"],
       "rationale": "WebRPC owns the fixed encode, authentication, chunk, and transport-send sequence; only consumers selecting outbound retain this domain sender.",
       "byteAttribution": {
         "originalBytes": 16075,
@@ -1007,7 +1002,6 @@
     {
       "module": "packages/rpc/src/core/internal/plugin-contract.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R29"],
       "rationale": "Plugin translation retains the package-internal feature contract that maps endpoint modules onto canonical PluginHost lifecycle semantics.",
       "byteAttribution": {
         "originalBytes": 9432,
@@ -1048,7 +1042,6 @@
     {
       "module": "packages/rpc/src/core/internal/plugin-descriptor.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R18"],
       "rationale": "Plugin inventory retains normalized immutable descriptors so one construction transaction owns ordering, claims, and install inputs.",
       "byteAttribution": {
         "originalBytes": 1895,
@@ -1089,7 +1082,6 @@
     {
       "module": "packages/rpc/src/core/internal/plugin-inventory.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R18"],
       "rationale": "Core retains the complete plugin inventory that validates and orders the one Host construction batch before side effects.",
       "byteAttribution": {
         "originalBytes": 19740,
@@ -1130,7 +1122,6 @@
     {
       "module": "packages/rpc/src/core/internal/plugin-shared-keys.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R15"],
       "rationale": "Selected features and bootstrap retain canonical internal shared keys for typed Host-owned ports without public surface leakage.",
       "byteAttribution": {
         "originalBytes": 8999,
@@ -1311,7 +1302,6 @@
     {
       "module": "packages/rpc/src/core/internal/plugin-translator.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R29"],
       "rationale": "Core and WebRpcPluginHost retain the sole translator from WebRPC feature definitions to the canonical PluginHost install batch.",
       "byteAttribution": {
         "originalBytes": 26618,
@@ -1377,7 +1367,6 @@
     {
       "module": "packages/rpc/src/core/internal/provider-claim-authority.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R50"],
       "rationale": "Provider inventory and admission retain the WeakSet-backed package-native identity authority that mints and checks first-party provider modules and claims without owning duplicate detection.",
       "byteAttribution": {
         "originalBytes": 1343,
@@ -1458,7 +1447,6 @@
     {
       "module": "packages/rpc/src/core/internal/transport-activation.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R38"],
       "rationale": "Outbound attachment retains the post-commit transport activation boundary only for consumers selecting outbound behavior.",
       "byteAttribution": {
         "originalBytes": 1516,
@@ -1494,7 +1482,6 @@
     {
       "module": "packages/rpc/src/core/internal/web-rpc-plugin-host.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R28"],
       "rationale": "Core retains the sole WebRPC PluginHost specialization that applies package-specific disposal error translation without a second lifecycle owner.",
       "byteAttribution": {
         "originalBytes": 4625,
@@ -1535,7 +1522,6 @@
     {
       "module": "workspace:packages/capability/dist/graph/topology.js",
       "owner": "@migaia/capability/graph",
-      "requirements": ["WRC-C-R30"],
       "rationale": "Canonical pure topology admission retained by selected endpoint consumers; no WebRPC-local DAG owner.",
       "byteAttribution": {
         "originalBytes": 9220,
@@ -1576,7 +1562,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/abort-factory.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 1226,
@@ -1598,7 +1583,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/abort.js",
       "owner": "@migaia/rpc",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 264,
@@ -1620,7 +1604,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/bounded-wait.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 583,
@@ -1642,7 +1625,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/dispose-transaction.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 5088,
@@ -1664,7 +1646,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/disposer-context.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 342,
@@ -1686,7 +1667,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/error-code.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 910,
@@ -1708,7 +1688,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/error-text.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 1496,
@@ -1730,7 +1709,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/errors.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 2827,
@@ -1752,7 +1730,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/generation-controller.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 3586,
@@ -1774,7 +1751,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/lifecycle-scope.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 2796,
@@ -1796,7 +1772,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/mutation-queue.js",
       "owner": "@migaia/rpc",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 3406,
@@ -1818,7 +1793,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/observed-subscription.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 1179,
@@ -1840,7 +1814,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/provisional-scope.js",
       "owner": "@migaia/rpc",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2708,
@@ -1862,7 +1835,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/quiescence-tracker.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 1696,
@@ -1884,7 +1856,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/scheduler.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 3221,
@@ -1906,7 +1877,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/state-constants.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 583,
@@ -1928,7 +1898,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 2871,
@@ -1950,7 +1919,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/terminal-controller.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 338,
@@ -1972,7 +1940,6 @@
     {
       "module": "workspace:packages/lifecycle/dist/types.js",
       "owner": "@migaia/lifecycle",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 111,
@@ -1994,7 +1961,6 @@
     {
       "module": "workspace:packages/middleware-pipeline/dist/index.js",
       "owner": "@migaia/rpc",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 8495,
@@ -2016,7 +1982,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 289,
@@ -2036,7 +2001,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 239,
@@ -2056,7 +2020,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 200,
@@ -2076,7 +2039,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 215,
@@ -2096,7 +2058,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 209,
@@ -2116,7 +2077,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 210,
@@ -2136,7 +2096,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 309,
@@ -2156,7 +2115,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 436,
@@ -2176,7 +2134,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 253,
@@ -2196,7 +2153,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 408,
@@ -2216,7 +2172,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/admission-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2009,
@@ -2238,7 +2193,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/cleanup-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2098,
@@ -2260,7 +2214,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/composition-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 6262,
@@ -2282,7 +2235,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/composition.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2379,
@@ -2304,7 +2256,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/config-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2319,
@@ -2326,7 +2277,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/config.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 21362,
@@ -2348,7 +2298,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/core-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2525,
@@ -2370,7 +2319,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/core.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2213,
@@ -2392,7 +2340,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/define-plugin.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 3480,
@@ -2414,7 +2361,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/disposal.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 982,
@@ -2436,7 +2382,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/error-code.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 1633,
@@ -2458,7 +2403,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/error-text.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 7776,
@@ -2480,7 +2424,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/extension.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 1824,
@@ -2502,7 +2445,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/host-disposal-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2647,
@@ -2524,7 +2466,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/host-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 19292,
@@ -2546,7 +2487,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/index.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 1714,
@@ -2612,7 +2552,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/install-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 6833,
@@ -2634,7 +2573,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/invocation.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 157,
@@ -2656,7 +2594,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/operation-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2180,
@@ -2678,7 +2615,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/pipeline-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 3002,
@@ -2700,7 +2636,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/pipeline.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 1919,
@@ -2722,7 +2657,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/publication.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 1349,
@@ -2744,7 +2678,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/removal-runtime.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted managed-composition publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 3642,
@@ -2766,7 +2699,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/state-constants.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 514,
@@ -2788,7 +2720,6 @@
     {
       "module": "workspace:packages/plugin-host/dist/symbols.js",
       "owner": "@migaia/plugin-host",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 392,
@@ -2810,7 +2741,6 @@
     {
       "module": "workspace:packages/utils/dist/config.js",
       "owner": "@migaia/rpc",
-      "requirements": ["TSR-R03", "TSR-R07"],
       "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 20769,
@@ -2832,7 +2762,6 @@
     {
       "module": "workspace:packages/utils/dist/error-text-[chunk].js",
       "owner": "@migaia/utils",
-      "requirements": ["WRC-C-R07"],
       "rationale": "The canonical retained graph attributes this selected runtime module to @migaia/utils.",
       "byteAttribution": {
         "originalBytes": 2380,
@@ -2854,7 +2783,6 @@
     {
       "module": "workspace:packages/utils/dist/function.js",
       "owner": "@migaia/utils",
-      "requirements": ["PDLC-R06"],
       "rationale": "The admitted PDLC r5 publication retains this package-owned module in the selected WebRPC consumer closure.",
       "byteAttribution": {
         "originalBytes": 2820,
@@ -2876,7 +2804,6 @@
     {
       "module": "workspace:packages/utils/dist/object-path.js",
       "owner": "@migaia/utils",
-      "requirements": ["AUTH-WEBRPC-RETAINED"],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 4552,
@@ -2900,7 +2827,6 @@
     {
       "module": "packages/rpc/src/core/internal/capability-registry.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-R30", "WRC-C-R32"],
       "retainedConsumers": [],
       "rationale": "Removed obsolete WebRPC-local capability registry so static topology has one canonical owner.",
       "byteAttribution": null,
@@ -2909,7 +2835,6 @@
     {
       "module": "packages/rpc/src/core/internal/pipeline.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["WRC-C-D63", "WRC-C-T46"],
       "retainedConsumers": [],
       "rationale": "Removed the obsolete generic-pipeline filename after the unchanged domain sender moved to its canonical outbound-sender owner path.",
       "byteAttribution": null,
@@ -2918,9 +2843,8 @@
     {
       "module": "packages/rpc/src/core/internal/retry.ts",
       "owner": "@migaia/rpc",
-      "requirements": ["DEC-WEBRPC-RETRY", "REQ-PK-07"],
       "retainedConsumers": [],
-      "rationale": "WEBRPC-RETRY-B deletes the response-timeout retry owner without an alias or at-least-once wire replacement.",
+      "rationale": "The retry removal deletes the response-timeout retry owner without an alias or at-least-once wire replacement.",
       "byteAttribution": null,
       "incomingEdges": []
     },

@@ -81,19 +81,15 @@ try {
   assert.notEqual(units[0].handle.identity.pid, units[1].handle.identity.pid)
   for (const unit of units) {
     const sample = await unit.handle.sampleUsage()
-    assert.ok(sample.rssBytes > 0, '[A44] RSS belongs to the selected actual PID')
+    assert.ok(sample.rssBytes > 0, 'RSS belongs to the selected actual PID')
     assert.ok(sample.cpuUserMicros >= 0 && sample.cpuSystemMicros >= 0)
     assert.equal(sample.cpuTimeMs, (sample.cpuUserMicros + sample.cpuSystemMicros) / 1000)
   }
   await units[0].supervisor.stop({ graceMs: 0 })
-  assert.deepEqual(
-    units[0].calls,
-    ['graceful', 'force'],
-    '[A46] stop(0) retains SIGTERM then SIGKILL'
-  )
+  assert.deepEqual(units[0].calls, ['graceful', 'force'], 'stop(0) retains SIGTERM then SIGKILL')
   assert.equal(units[0].supervisor.inspect().lastExit.status.signal, 'SIGKILL')
   await units[1].supervisor.kill()
-  assert.deepEqual(units[1].calls, ['force'], '[A46] kill skips graceful termination')
+  assert.deepEqual(units[1].calls, ['force'], 'kill skips graceful termination')
   for (const unit of units) assert.equal(unit.budget.inUse, 0)
 } finally {
   await Promise.all(units.map((unit) => unit.supervisor.dispose()))
@@ -111,7 +107,7 @@ const held = await started(8, true, () => {
 try {
   const stop = held.supervisor.stop({ graceMs: 1000 })
   await draining
-  assert.equal(held.supervisor.kill(), stop, '[A46] force joins the exact pending stop Promise')
+  assert.equal(held.supervisor.kill(), stop, 'force joins the exact pending stop Promise')
   await stop
   assert.deepEqual(held.calls, ['force'])
   assert.equal(held.budget.inUse, 0)

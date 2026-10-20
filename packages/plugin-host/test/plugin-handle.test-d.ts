@@ -9,7 +9,7 @@ handles[0].extensions.a()
 handles[1].extensions.b()
 // @ts-expect-error Handles expose plugin capabilities, not Host mutations.
 handles[0].use(b)
-// @ts-expect-error Handles never carry the retired `view.host` back-reference (probe P1).
+// @ts-expect-error Handles never carry the retired `view.host` back-reference.
 void handles[0].host
 // @ts-expect-error Handles never expose Host-level unUse (retired `view.unUse`).
 void handles[0].unUse

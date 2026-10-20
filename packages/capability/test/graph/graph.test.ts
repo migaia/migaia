@@ -35,7 +35,7 @@ const deferred = <T>() => {
 }
 
 describe('capability graph core', () => {
-  it('CPL-T1 starts a whole level before awaiting it and preserves reverse release', async () => {
+  it('starts a whole level before awaiting it and preserves reverse release', async () => {
     /** Independent startup gates expose concurrency without a wall-clock assertion. */
     const first = deferred<ReturnType<typeof instance<string>>>()
     /** The later registration settles first to separate invocation order from completion order. */
@@ -99,7 +99,7 @@ describe('capability graph core', () => {
     }
   })
 
-  it('CPL-T2 settles a failed level and preserves ordinal primary plus secondary failures', async () => {
+  it('settles a failed level and preserves ordinal primary plus secondary failures', async () => {
     /** Two independently failing starts deliberately reject in reverse registration order. */
     const first = deferred<ReturnType<typeof instance<number>>>()
     /** A separate rejection lets the later node fail before the canonical primary. */
@@ -181,7 +181,7 @@ describe('capability graph core', () => {
     }
   })
 
-  it('CPL-T3 disposes while two same-level starts are pending and releases both late results', async () => {
+  it('disposes while two same-level starts are pending and releases both late results', async () => {
     /** Starts and releases have separate gates so disposal never waits for uncooperative work. */
     const starts = [
       deferred<ReturnType<typeof instance<number>>>(),
@@ -234,7 +234,7 @@ describe('capability graph core', () => {
     }
   })
 
-  it('CAP-P3 preserves strict-equality treatment of a NaN auxiliary value', async () => {
+  it('preserves strict-equality treatment of a NaN auxiliary value', async () => {
     /** Owning a primitive is supported; NaN was never equal to itself in the old collision scan. */
     const released = vi.fn()
     /** The public graph must adopt the primary NaN while still releasing its auxiliary entry. */
@@ -254,7 +254,7 @@ describe('capability graph core', () => {
     expect(released).toHaveBeenCalledTimes(1)
   })
 
-  it('CAP-B6 rejects missing force at own admission and preserves the coded cause', async () => {
+  it('rejects missing force at own admission and preserves the coded cause', async () => {
     /** A valid sibling proves malformed ownership does not poison later cleanup. */
     const released = vi.fn()
     /** The public graph owns both descriptor admission and eventual release. */
@@ -279,7 +279,7 @@ describe('capability graph core', () => {
     expect(released).toHaveBeenCalledTimes(1)
   })
 
-  it('CAP-B7 contains asynchronous diagnostic rejection without changing removal', async () => {
+  it('contains asynchronous diagnostic rejection without changing removal', async () => {
     /** Terminal reporter rejection stays observable outside removal's business Promise. */
     const callbacks: (() => void)[] = []
     /** Inspect the existing utils host channel without crashing the test process. */
@@ -318,7 +318,7 @@ describe('capability graph core', () => {
     queue.mockRestore()
   })
 
-  it('CG-T01 exposes the graph subpath contract and stable public nodes', () => {
+  it('exposes the graph subpath contract and stable public nodes', () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('provider'),
@@ -330,7 +330,7 @@ describe('capability graph core', () => {
     expect(graph.state).toBe('open')
   })
 
-  it('CG-T02 freezes registration at ready and rejects terminal mutation', async () => {
+  it('freezes registration at ready and rejects terminal mutation', async () => {
     const graph = createCapabilityGraph()
     await graph.ready()
     expect(() =>
@@ -342,7 +342,7 @@ describe('capability graph core', () => {
     ).toThrow(expect.objectContaining({ code: CapabilityGraphErrorCode.graphDisposed }))
   })
 
-  it('CG-T02 rejects ready and registration during quiescing admission', async () => {
+  it('rejects ready and registration during quiescing admission', async () => {
     const graph = createCapabilityGraph()
     const releaseGate = deferred<void>()
     graph.register({
@@ -361,7 +361,7 @@ describe('capability graph core', () => {
     await disposal
   })
 
-  it('CG-T04 rejects duplicate nodes without polluting the registry', async () => {
+  it('rejects duplicate nodes without polluting the registry', async () => {
     const graph = createCapabilityGraph()
     const start = vi.fn(() => instance(1))
     graph.register({ id: id('a'), kind: 'test', dependencies: [], start })
@@ -393,7 +393,7 @@ describe('capability graph core', () => {
     ).toThrow(expect.objectContaining({ code: CapabilityGraphErrorCode.duplicateEdge }))
   })
 
-  it('CG-T05 rejects an unknown provider before any start callback', async () => {
+  it('rejects an unknown provider before any start callback', async () => {
     const graph = createCapabilityGraph()
     const start = vi.fn(() => instance(1))
     graph.register({
@@ -408,7 +408,7 @@ describe('capability graph core', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
-  it('CG-T06 rejects a duplicate dependency edge at registration', () => {
+  it('rejects a duplicate dependency edge at registration', () => {
     const graph = createCapabilityGraph()
     expect(() =>
       graph.register({
@@ -423,7 +423,7 @@ describe('capability graph core', () => {
     ).toThrow(expect.objectContaining({ code: CapabilityGraphErrorCode.duplicateEdge }))
   })
 
-  it('CG-T03 reads node admission getters once and tags getter failure', () => {
+  it('reads node admission getters once and tags getter failure', () => {
     let reads = 0
     const admissionError = new Error('id getter failed')
     const node = {
@@ -444,7 +444,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T09 exposes only a ready direct provider through start context', async () => {
+  it('exposes only a ready direct provider through start context', async () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('provider'),
@@ -462,7 +462,7 @@ describe('capability graph core', () => {
     expect(graph.get(id('consumer'), id('provider'))).toBe(7)
   })
 
-  it('CG-T11 blocks required dependents when their provider fails', async () => {
+  it('blocks required dependents when their provider fails', async () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('failed'),
@@ -485,7 +485,7 @@ describe('capability graph core', () => {
     expect(graph.nodeState(id('dependent')).state).toBe(CapabilityGraphNodeState.blocked)
   })
 
-  it('CG-T12 rolls back prior nodes while retaining consumer primary failure', async () => {
+  it('rolls back prior nodes while retaining consumer primary failure', async () => {
     const released = vi.fn()
     const primary = new Error('consumer failed')
     const graph = createCapabilityGraph()
@@ -508,7 +508,7 @@ describe('capability graph core', () => {
     expect(graph.nodeState(id('provider')).state).toBe(CapabilityGraphNodeState.rolledBack)
   })
 
-  it('CG-T13 reports rollback cleanup failure without replacing startup primary', async () => {
+  it('reports rollback cleanup failure without replacing startup primary', async () => {
     const primary = new Error('startup primary')
     const cleanup = new Error('cleanup secondary')
     const reported: unknown[] = []
@@ -541,7 +541,7 @@ describe('capability graph core', () => {
     expect(reported).toContain(cleanup)
   })
 
-  it('CG-T16 rejects ready immediately during a non-cooperative start', async () => {
+  it('rejects ready immediately during a non-cooperative start', async () => {
     const pending = deferred<ReturnType<typeof instance>>()
     const graph = createCapabilityGraph()
     graph.register({
@@ -558,7 +558,7 @@ describe('capability graph core', () => {
     pending.resolve(instance(1))
   })
 
-  it('CG-T17 keeps Graph source free of reactive graph dependencies', () => {
+  it('keeps Graph source free of reactive graph dependencies', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../../src/graph/index.ts', import.meta.url)),
       'utf8'
@@ -566,7 +566,7 @@ describe('capability graph core', () => {
     expect(source).not.toMatch(/@migaia\/(reactive|resource|plugin-host|tray)/)
   })
 
-  it('CG-T21 keeps optional, dynamic, replacement, and notification paths out of core API', () => {
+  it('keeps optional, dynamic, replacement, and notification paths out of core API', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../../src/graph/index.ts', import.meta.url)),
       'utf8'
@@ -574,7 +574,7 @@ describe('capability graph core', () => {
     expect(source).not.toMatch(/create(?:Optional|Notification|Replacement|Dynamic)/)
   })
 
-  it('CG-T22 keeps unknown-node diagnostics stable after terminal', async () => {
+  it('keeps unknown-node diagnostics stable after terminal', async () => {
     const graph = createCapabilityGraph()
     await graph.dispose()
     expect(() => graph.nodeState(id('missing'))).toThrow(
@@ -582,7 +582,7 @@ describe('capability graph core', () => {
     )
   })
 
-  it('CG-T23 uses dependency topology before registration ordinal', async () => {
+  it('uses dependency topology before registration ordinal', async () => {
     const order: string[] = []
     const graph = createCapabilityGraph()
     graph.register({
@@ -607,7 +607,7 @@ describe('capability graph core', () => {
     expect(order).toEqual(['provider', 'consumer'])
   })
 
-  it('CG-T25 preserves failed graph state without implicit retry', async () => {
+  it('preserves failed graph state without implicit retry', async () => {
     const start = vi.fn(() => {
       throw new Error('failed')
     })
@@ -621,7 +621,7 @@ describe('capability graph core', () => {
     expect(graph.state).toBe('failed')
   })
 
-  it('CG-T26 wraps non-Error startup throws with reachable cause', async () => {
+  it('wraps non-Error startup throws with reachable cause', async () => {
     const thrown = { reason: 'foreign' }
     const graph = createCapabilityGraph()
     graph.register({
@@ -639,7 +639,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T29 continues all releases and preserves tagged aggregate failures', async () => {
+  it('continues all releases and preserves tagged aggregate failures', async () => {
     const first = new Error('first release')
     const second = new Error('second release')
     const released: string[] = []
@@ -672,7 +672,7 @@ describe('capability graph core', () => {
     expect(released).toEqual(['second', 'first'])
   })
 
-  it('CG-T30 rejects synchronous release reentry with Graph-owned code', async () => {
+  it('rejects synchronous release reentry with Graph-owned code', async () => {
     let graph!: ReturnType<typeof createCapabilityGraph>
     graph = createCapabilityGraph()
     graph.register({
@@ -687,7 +687,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T31 assimilates a hostile start thenable once and tags getter failure', async () => {
+  it('assimilates a hostile start thenable once and tags getter failure', async () => {
     const thenError = new Error('then getter failed')
     const graph = createCapabilityGraph()
     const thenKey = ['t', 'h', 'e', 'n'].join('')
@@ -708,7 +708,7 @@ describe('capability graph core', () => {
     expect(thenError).toMatchObject({ source: '@migaia/capability/graph' })
   })
 
-  it('CG-T32 snapshots onError once before lifecycle construction', () => {
+  it('snapshots onError once before lifecycle construction', () => {
     let reads = 0
     const optionError = new Error('option getter failed')
     const options = {
@@ -726,7 +726,7 @@ describe('capability graph core', () => {
     expect(reads).toBe(1)
   })
 
-  it('CG-T08 starts disconnected nodes by stable registration ordinal', async () => {
+  it('starts disconnected nodes by stable registration ordinal', async () => {
     const order: string[] = []
     const graph = createCapabilityGraph()
     graph.register({
@@ -751,7 +751,7 @@ describe('capability graph core', () => {
     expect(order).toEqual(['a', 'b'])
   })
 
-  it('CG-T07 rejects cycles before user code and reports a stable path', async () => {
+  it('rejects cycles before user code and reports a stable path', async () => {
     const order: string[] = []
     const graph = createCapabilityGraph()
     graph.register({
@@ -803,7 +803,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T10 releases primary before auxiliary and in inverse topology', async () => {
+  it('releases primary before auxiliary and in inverse topology', async () => {
     const events: string[] = []
     const graph = createCapabilityGraph()
     graph.register({
@@ -847,7 +847,7 @@ describe('capability graph core', () => {
     expect(events).toEqual(['consumer-primary', 'consumer-aux', 'provider-primary', 'provider-aux'])
   })
 
-  it('CG-T15 preserves dispose Promise identity after ready', async () => {
+  it('preserves dispose Promise identity after ready', async () => {
     const graph = createCapabilityGraph()
     await graph.ready()
     const first = graph.dispose()
@@ -855,7 +855,7 @@ describe('capability graph core', () => {
     await first
   })
 
-  it('CG-T14 preserves ready and dispose Promise identity', async () => {
+  it('preserves ready and dispose Promise identity', async () => {
     const graph = createCapabilityGraph()
     const ready = graph.ready()
     expect(graph.ready()).toBe(ready)
@@ -866,7 +866,7 @@ describe('capability graph core', () => {
     expect(graph.state).toBe('terminal')
   })
 
-  it('CG-T20 keeps start errors traceable and records failed node diagnostics', async () => {
+  it('keeps start errors traceable and records failed node diagnostics', async () => {
     const startError = new Error('boom')
     const graph = createCapabilityGraph()
     graph.register({
@@ -885,7 +885,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T27 rejects undeclared get without creating a lease', () => {
+  it('rejects undeclared get without creating a lease', () => {
     const graph = createCapabilityGraph()
     graph.register({ id: id('a'), kind: 'test', dependencies: [], start: () => instance(1) })
     graph.register({ id: id('b'), kind: 'test', dependencies: [], start: () => instance(2) })
@@ -894,7 +894,7 @@ describe('capability graph core', () => {
     )
   })
 
-  it('CG-T28 releases a late start result after dispose without an unhandled rejection', async () => {
+  it('releases a late start result after dispose without an unhandled rejection', async () => {
     let resolve!: (value: ReturnType<typeof instance>) => void
     const lateRelease = vi.fn()
     const pending = new Promise<ReturnType<typeof instance>>((done) => {
@@ -910,7 +910,7 @@ describe('capability graph core', () => {
     expect(lateRelease).toHaveBeenCalledOnce()
   })
 
-  it('CG-T33 keeps every node signal alive until graph disposal', async () => {
+  it('keeps every node signal alive until graph disposal', async () => {
     const signals: AbortSignal[] = []
     const graph = createCapabilityGraph()
     graph.register({
@@ -937,7 +937,7 @@ describe('capability graph core', () => {
     expect(signals.map((signal) => signal.aborted)).toEqual([true, true])
   })
 
-  it('CG-T34 keeps terminal state after a late resolve', async () => {
+  it('keeps terminal state after a late resolve', async () => {
     const pending = deferred<ReturnType<typeof instance>>()
     const lateRelease = vi.fn()
     const reported: unknown[] = []
@@ -960,7 +960,7 @@ describe('capability graph core', () => {
     expect(reported).toEqual([])
   })
 
-  it('CG-T35 keeps the admission-closed primary when a late start rejects', async () => {
+  it('keeps the admission-closed primary when a late start rejects', async () => {
     const pending = deferred<ReturnType<typeof instance>>()
     const lateError = new Error('late rejection')
     const reported: unknown[] = []
@@ -981,7 +981,7 @@ describe('capability graph core', () => {
     expect(reported).toContain(lateError)
   })
 
-  it('CG-T36 requires consumer-aware public direct-edge reads', async () => {
+  it('requires consumer-aware public direct-edge reads', async () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('provider'),
@@ -995,7 +995,7 @@ describe('capability graph core', () => {
     ).toThrow(expect.objectContaining({ code: CapabilityGraphErrorCode.providerUnavailable }))
   })
 
-  it('CG-T24 rejects auxiliary-primary identity collision before commit', async () => {
+  it('rejects auxiliary-primary identity collision before commit', async () => {
     const resource = {}
     const graph = createCapabilityGraph()
     graph.register({
@@ -1012,7 +1012,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T37 rejects auxiliary-primary identity collision and releases auxiliary once', async () => {
+  it('rejects auxiliary-primary identity collision and releases auxiliary once', async () => {
     const released = vi.fn()
     const resource = {}
     const graph = createCapabilityGraph()
@@ -1032,7 +1032,7 @@ describe('capability graph core', () => {
     expect(released).toHaveBeenCalledOnce()
   })
 
-  it('CG-T38/CG-T43 rejects non-array dependencies and snapshots array fields once', () => {
+  it('rejects non-array dependencies and snapshots array fields once', () => {
     const graph = createCapabilityGraph()
     expect(() =>
       graph.register({
@@ -1057,7 +1057,7 @@ describe('capability graph core', () => {
     expect(indexReads).toBe(1)
   })
 
-  it('CG-T39 exposes released diagnostics and converts release reentrancy', async () => {
+  it('exposes released diagnostics and converts release reentrancy', async () => {
     let graph!: ReturnType<typeof createCapabilityGraph>
     graph = createCapabilityGraph()
     graph.register({
@@ -1084,7 +1084,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T40 builds sparse topology through reverse adjacency without a full consumer scan', async () => {
+  it('builds sparse topology through reverse adjacency without a full consumer scan', async () => {
     const source = readFileSync(
       fileURLToPath(new URL('../../src/graph/index.ts', import.meta.url)),
       'utf8'
@@ -1129,7 +1129,7 @@ describe('capability graph core', () => {
     expect(large).toBeLessThan(medium * 12 + 25)
   })
 
-  it('CG-T41 closes value reads as soon as disposal enters quiescing', async () => {
+  it('closes value reads as soon as disposal enters quiescing', async () => {
     let release!: () => void
     const pending = new Promise<void>((resolve) => {
       release = resolve
@@ -1159,7 +1159,7 @@ describe('capability graph core', () => {
     )
   })
 
-  it('CG-T42 reports a closed stable path for mixed resolved and residual edges', async () => {
+  it('reports a closed stable path for mixed resolved and residual edges', async () => {
     const graph = createCapabilityGraph()
     graph.register({ id: id('root'), kind: 'test', dependencies: [], start: () => instance(0) })
     graph.register({
@@ -1185,7 +1185,7 @@ describe('capability graph core', () => {
     expect(path[0]).toBe(path[path.length - 1])
   })
 
-  it('CG-T44 records primary release failure on the node diagnostic', async () => {
+  it('records primary release failure on the node diagnostic', async () => {
     const releaseError = new Error('release failed')
     const graph = createCapabilityGraph()
     graph.register({
@@ -1209,7 +1209,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T46/CG-T47/CG-T48 uses level then ordinal startup and strict reverse release', async () => {
+  it('uses level then ordinal startup and strict reverse release', async () => {
     const started: string[] = []
     const released: string[] = []
     const graph = createCapabilityGraph()
@@ -1242,7 +1242,7 @@ describe('capability graph core', () => {
     expect(released).toEqual(['c', 'b', 'p', 'a'])
   })
 
-  it('CG-T20 verifies every Graph error code as a native traceable boundary error', async () => {
+  it('verifies every Graph error code as a native traceable boundary error', async () => {
     const seenCodes = new Set<string>()
     const assertCode = (error: unknown, code: string): void => {
       expect(error).toBeInstanceOf(Error)
@@ -1475,7 +1475,7 @@ describe('capability graph core', () => {
     expect([...seenCodes].sort()).toEqual(Object.values(CapabilityGraphErrorCode).sort())
   })
 
-  it('CG-T49 blocks external reads until whole graph is ready', async () => {
+  it('blocks external reads until whole graph is ready', async () => {
     const gate = deferred<ReturnType<typeof instance>>()
     const graph = createCapabilityGraph()
     graph.register({
@@ -1498,7 +1498,7 @@ describe('capability graph core', () => {
     await ready
   })
 
-  it('CG-T50/CG-T51 revokes retained context after node settlement', async () => {
+  it('revokes retained context after node settlement', async () => {
     let retained!: IGraphStartContext
     const graph = createCapabilityGraph()
     graph.register({
@@ -1525,7 +1525,7 @@ describe('capability graph core', () => {
     )
   })
 
-  it('CG-T52 clears terminal diagnostic values and CG-T53 reuses cold-terminal ready identity', async () => {
+  it('clears terminal diagnostic values and reuses cold-terminal ready identity', async () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('value'),
@@ -1543,7 +1543,7 @@ describe('capability graph core', () => {
     await expect(first).rejects.toMatchObject({ code: CapabilityGraphErrorCode.graphDisposed })
   })
 
-  it('CG-T54 freezes cycle diagnostic snapshots and preserves release cleanup primary', async () => {
+  it('freezes cycle diagnostic snapshots and preserves release cleanup primary', async () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('a'),
@@ -1595,7 +1595,7 @@ describe('capability graph core', () => {
     })
   })
 
-  it('CG-T55 exposes one reusable topology builder with stable derived levels', () => {
+  it('exposes one reusable topology builder with stable derived levels', () => {
     const nodes: ITopologyNode[] = [
       {
         id: id('consumer'),
@@ -1643,7 +1643,7 @@ describe('capability graph core', () => {
     expect(graphSource).toContain('Canonical readiness promise shared by every caller.')
   })
 
-  it('CG-T45 exercises auxiliary descriptor adapters and async primary release branches', async () => {
+  it('exercises auxiliary descriptor adapters and async primary release branches', async () => {
     const events: string[] = []
     const graph = createCapabilityGraph()
     graph.register({
@@ -1680,7 +1680,7 @@ describe('capability graph core', () => {
     expect(events).toContain('primary')
   })
 
-  it('CG-T45 covers provider admission, result validation, and async teardown rejection', async () => {
+  it('covers provider admission, result validation, and async teardown rejection', async () => {
     const contextFailure = createCapabilityGraph()
     contextFailure.register({
       id: id('context'),
@@ -1753,7 +1753,7 @@ describe('capability graph core', () => {
     ).toThrowError(expect.objectContaining({ code: CapabilityGraphErrorCode.invalidNode }))
   })
 
-  it('CG-T45 covers failed/quiescing ready branches and late rejection reporting', async () => {
+  it('covers failed/quiescing ready branches and late rejection reporting', async () => {
     const reported: unknown[] = []
     let resolve!: (value: ReturnType<typeof instance>) => void
     const pending = new Promise<ReturnType<typeof instance>>((done) => {

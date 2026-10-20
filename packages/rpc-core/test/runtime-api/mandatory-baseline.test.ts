@@ -7,7 +7,7 @@ import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js
 import { runtimeSources } from './fixture.js'
 
 for (const missing of [RpcCapability.runtimeApi, RpcCapability.batch]) {
-  it(`[A31][U36] missing ${missing} rejects the actual bilateral preparation before frames or providers`, async () => {
+  it(`missing ${missing} rejects the actual bilateral preparation before frames or providers`, async () => {
     /** Both independently configured offers omit exactly one mandatory baseline capability. */
     const offered = [RpcCapability.runtimeApi, RpcCapability.batch].filter(
       (value) => value !== missing
@@ -29,11 +29,7 @@ for (const missing of [RpcCapability.runtimeApi, RpcCapability.batch]) {
     )
     try {
       for (const result of settled) {
-        assert.equal(
-          result.status,
-          'rejected',
-          '[A31] baseline absence cannot select legacy business'
-        )
+        assert.equal(result.status, 'rejected', 'baseline absence cannot select legacy business')
         if (result.status === 'rejected')
           assert.equal(result.reason.code, RpcCoreErrorCode.capabilityUnsupported)
       }
@@ -52,7 +48,7 @@ for (const missing of [RpcCapability.runtimeApi, RpcCapability.batch]) {
   })
 }
 
-it('[A31][A32][U36] v2/batch baseline exchanges real directories and preserves optional capability rejection', async () => {
+it('v2/batch baseline exchanges real directories and preserves optional capability rejection', async () => {
   const offered = [RpcCapability.runtimeApi, RpcCapability.batch]
   const channel = runtimeSources(offered, offered)
   const peers = await Promise.all(

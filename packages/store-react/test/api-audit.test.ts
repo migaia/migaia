@@ -13,7 +13,7 @@ import {
 } from '../src/index.js'
 
 describe('store-react audit regressions', () => {
-  it('SR-D01 closes admission before owned callbacks and shares reentrant completion', async () => {
+  it('closes admission before owned callbacks and shares reentrant completion', async () => {
     /** Observe the actual registry owner with lifecycle-owned asynchronous completion. */
     const registry = createStoreRegistry(createRuntime({ onError: () => {} }))
     /** The callback must not transfer ownership of a value to an already closing owner. */
@@ -47,7 +47,7 @@ describe('store-react audit regressions', () => {
     expect(disposed).toBe(1)
   })
 
-  it('SR-D02 contains a nested defaults getter before invoking readiness factories', () => {
+  it('contains a nested defaults getter before invoking readiness factories', () => {
     /** This actual accessor failure must remain reachable through the configuration boundary. */
     const original = new TypeError('defaults getter failed')
     /** Invalid configuration must not start the readiness side effect first. */
@@ -76,7 +76,7 @@ describe('store-react audit regressions', () => {
     expect(factoryCalls).toBe(0)
   })
 
-  it('SR-D03/D04 renders a store registered before the first child read using the same Runtime', async () => {
+  it('renders a store registered before the first child read using the same Runtime', async () => {
     /** Application assembly owns one registry and uses its actual Runtime for every injected Store. */
     const registry = createStoreRegistry(createRuntime({ onError: () => {} }))
     /** This matches the corrected complete example; registration precedes React rendering. */
@@ -107,7 +107,7 @@ describe('store-react audit regressions', () => {
   })
 
   it.each(['native', 'frozen', 'foreign'] as const)(
-    'SR-D05 classifies %s single cleanup failures without losing the original error',
+    'classifies %s single cleanup failures without losing the original error',
     async (kind) => {
       /**
        * Supported native, frozen-native and real foreign-owner errors exercise one cleanup

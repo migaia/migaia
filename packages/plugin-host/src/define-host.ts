@@ -52,9 +52,9 @@ export type IHostDomainCoreRequest = Readonly<{
 }>
 
 /**
- * `TValue` is deliberately absent: no member of this shape mentions the pipeline value. The SDD's
- * API section declares it as `IDefineHostOptions<TDomainCore, TValue>`, which would be an unused
- * type parameter — `defineHost` still takes both, because the handle it returns does use `TValue`.
+ * `TValue` is deliberately absent: no member of this shape mentions the pipeline value. The design
+ * declares it as `IDefineHostOptions<TDomainCore, TValue>`, which would be an unused type parameter
+ * — `defineHost` still takes both, because the handle it returns does use `TValue`.
  */
 export type IDefineHostOptions<
   TDomainCore extends object,

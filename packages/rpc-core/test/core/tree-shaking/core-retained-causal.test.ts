@@ -113,7 +113,7 @@ function expectedModuleDiff(): {
   }
 }
 
-describe('WRC-C-B11f five-consumer causal graph', () => {
+describe('five-consumer causal graph', () => {
   it('derives exact added/removed sets and non-empty causal attribution', () => {
     const report = readCausalReport()
     const retainedProbe = readRetainedProbe()

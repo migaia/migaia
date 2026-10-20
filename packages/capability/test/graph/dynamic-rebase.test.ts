@@ -34,7 +34,7 @@ function node(
 }
 
 describe('dynamic topology-index rebase', () => {
-  it('A12 uses canonical frontiers while preserving dependency policies', async () => {
+  it('uses canonical frontiers while preserving dependency policies', async () => {
     /** Observable startup and release sequence across the rebase boundary. */
     const events: string[] = []
     let startEnabled = false

@@ -76,7 +76,7 @@ export function prepareJsonRpcOffer(options: IAdapterJsonRpcChannelOptions): IRp
       : !Object.hasOwn(target, 'catalog') || Object.hasOwn(target, 'contract'))
   )
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
-  /** Local legacy facade declarations remain configuration until their C7 API removal. */
+  /** Local legacy facade declarations remain configuration until their API removal. */
   const contracts =
     target.kind === 'plugin'
       ? [normalizeRemoteContract(target.contract)]

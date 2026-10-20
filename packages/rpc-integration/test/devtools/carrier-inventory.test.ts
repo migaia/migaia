@@ -58,7 +58,7 @@ type IInventoryInstance = Readonly<{
   transports: readonly Pick<IRpcTransport, 'observe' | 'send' | 'encodedType'>[]
   close(): void | Promise<void>
 }>
-/** The four carrier owners have no explicit exclusions in carriers R2. */
+/** The four carrier owners have no explicit carrier exclusions. */
 const packages = ['rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'] as const
 /** Repository root resolves package export metadata independently of the process working directory. */
 const root = fileURLToPath(new URL('../../../../', import.meta.url))
@@ -498,7 +498,7 @@ function exportedTransportFactories(): readonly string[] {
   }
 }
 
-describe('carriers A2: complete public transport inventory', () => {
+describe('carriers: complete public transport inventory', () => {
   it('lists every public transport, pair, and channel constructor with no exclusions', () => {
     expect(inventory.map((entry) => `${entry.entry}#${entry.symbol}`).sort()).toEqual(
       exportedTransportFactories()

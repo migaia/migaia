@@ -19,7 +19,7 @@ const coreCodes = {
   heartbeatMissed: 'HEARTBEAT_MISSED'
 } as const
 
-describe('A11 public entries and core codes', () => {
+describe('public entries and core codes', () => {
   it('exports exactly the core and coroutine runtime surfaces', async () => {
     const core = await import('../../dist/index.js')
     const coroutine = await import('../../dist/coroutine/index.js')

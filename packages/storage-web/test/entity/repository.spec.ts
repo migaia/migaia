@@ -40,7 +40,7 @@ it('stream direction reverses the explicit comparator order', async () => {
   expect(values.map((value) => value.id)).toEqual(['b', 'a'])
 })
 
-it('SWV4-R05 projects explicit selectors and indexed list through the shared query route', async () => {
+it('projects explicit selectors and indexed list through the shared query route', async () => {
   type IIndexedUser = { id: string; email: string; tags: string[] }
   let selectorCalls = 0
   let keyReads = 0
@@ -123,7 +123,7 @@ it('SWV4-R05 projects explicit selectors and indexed list through the shared que
   expect(keyReads).toBe(4)
 })
 
-it('SWV2-T39 routes complete indexed entity put/remove through planner', async () => {
+it('routes complete indexed entity put/remove through planner', async () => {
   const base = memoryStorageHost()
   const calls: string[] = []
   const projections: unknown[] = []
@@ -161,7 +161,7 @@ it('SWV2-T39 routes complete indexed entity put/remove through planner', async (
   expect(projections[0]).toEqual({ email: { kind: 'single', key: 'ada@example.com' } })
 })
 
-it('SWV2-T39 fallback batch does not execute secondary-index selectors', async () => {
+it('fallback batch does not execute secondary-index selectors', async () => {
   let selectorCalls = 0
   const entity = defineEntity<IUser>()({
     name: 'fallback-batch-users',
@@ -182,7 +182,7 @@ it('SWV2-T39 fallback batch does not execute secondary-index selectors', async (
   expect(selectorCalls).toBe(0)
 })
 
-it('SWV2-T39 routes complete indexed migration through planner projections', async () => {
+it('routes complete indexed migration through planner projections', async () => {
   const base = memoryStorageHost()
   const projections: unknown[] = []
   const indexedTransactions: number[] = []
@@ -229,7 +229,7 @@ it('SWV2-T39 routes complete indexed migration through planner projections', asy
   expect(projections).toHaveLength(2)
 })
 
-it('SWV2-T39 keeps indexed migration conflict retries projected and atomic', async () => {
+it('keeps indexed migration conflict retries projected and atomic', async () => {
   const base = memoryStorageHost()
   const projections: unknown[] = []
   let indexedTransactions = 0
@@ -285,7 +285,7 @@ it('SWV2-T39 keeps indexed migration conflict retries projected and atomic', asy
   ])
 })
 
-it('SWV2-T34 exposes projection and failed-readiness persistence errors in stable order', async () => {
+it('exposes projection and failed-readiness persistence errors in stable order', async () => {
   const store = memoryStorageHost()
   const projectionFailure = new RangeError('projection failed')
   const persistenceFailure = new Error('failed readiness persistence failed')
@@ -338,7 +338,7 @@ it('SWV2-T34 exposes projection and failed-readiness persistence errors in stabl
   expect(reportedPrimary).toBe(projectionFailure)
 })
 
-it('SWV2-T16 find APIs share fallback range, ordering, direction, and limit semantics', async () => {
+it('find APIs share fallback range, ordering, direction, and limit semantics', async () => {
   const repository = defineEntity<IUser>()({
     name: 'indexed-fallback-users',
     key: 'id',
@@ -367,7 +367,7 @@ it('SWV2-T16 find APIs share fallback range, ordering, direction, and limit sema
   expect(streamed.map((value) => value.id)).toEqual(['u1', 'u2'])
 })
 
-it('SWV4-T43 indexed comparator ordering ties by index and id before direction and limit', async () => {
+it('indexed comparator ordering ties by index and id before direction and limit', async () => {
   const entity = defineEntity<IUser>()({
     name: 'indexed-comparator-users',
     key: 'id',

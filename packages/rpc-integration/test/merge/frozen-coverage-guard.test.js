@@ -16,7 +16,7 @@ const legacy = JSON.parse(
   readFileSync(new URL('../fixtures/legacy-coverage.json', import.meta.url), 'utf8')
 )
 
-describe('K217 frozen merge coverage guard', () => {
+describe('frozen merge coverage guard', () => {
   it('rejects a frozen file decline that pulls its aggregate below the original threshold', () => {
     /** A single frozen source retains its counts but gains uncovered executable statements. */
     const files = structuredClone(baseline.files)

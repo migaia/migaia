@@ -9,7 +9,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 20; index++) await Promise.resolve()
 }
 
-describe('A6 core process profile', () => {
+describe('core process profile', () => {
   it('classifies clean exit and reports terminal entry only once', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher()

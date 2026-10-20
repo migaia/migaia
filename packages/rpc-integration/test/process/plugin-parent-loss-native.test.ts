@@ -2,9 +2,9 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { matrixFixture, type IMatrixFeature } from './matrix-fixture.js'
 
-describe('I15 real Node parent-loss ownership', () => {
+describe('real Node parent-loss ownership', () => {
   it.each(['graceful', 'hung', 'explicit'] as const)(
-    '[A6] [K242] real Node parent-loss %s uses original manual grace deadline',
+    'real Node parent-loss %s uses original manual grace deadline',
     async (mode) => {
       const test = await matrixFixture()
       if (test.options.deployment.kind !== 'spawn') throw new Error('spawn required')
@@ -36,7 +36,7 @@ describe('I15 real Node parent-loss ownership', () => {
         if (mode === 'explicit') {
           await proxy.request(['explicit-close'])
           await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:explicit-closed'))
-          expect(test.chunks.join(''), 'SDD_BASE_RED_CONTRACT:A6').not.toContain('matrix:exit:')
+          expect(test.chunks.join(''), 'parent loss contract').not.toContain('matrix:exit:')
           expect(test.chunks.join('')).not.toContain('matrix:parent-lost')
         } else {
           await test.rawChannels[0]!.close()
@@ -44,12 +44,10 @@ describe('I15 real Node parent-loss ownership', () => {
           if (mode === 'graceful') {
             await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:exit:0'))
           } else {
-            expect(test.chunks.join(''), 'SDD_BASE_RED_CONTRACT:A6').toContain(
-              'matrix:grace-scheduled'
-            )
+            expect(test.chunks.join(''), 'parent loss contract').toContain('matrix:grace-scheduled')
             await test.gate('clock99')
             await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:clock:99'))
-            expect(test.chunks.join(''), 'SDD_BASE_RED_CONTRACT:A6').not.toContain('matrix:exit:')
+            expect(test.chunks.join(''), 'parent loss contract').not.toContain('matrix:exit:')
             await test.gate('clock100')
             await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:clock:100'))
             expect(test.chunks.join('')).toContain('matrix:exit:1')

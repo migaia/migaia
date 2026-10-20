@@ -26,7 +26,7 @@ class Host extends PluginHost<Record<string, never>, string> {
 }
 
 describe('native Feature synchronous installation', () => {
-  it('YS11 cause chain: reports each rejected Feature and install attachment failure without replacing its primary error', async () => {
+  it('cause chain: reports each rejected Feature and install attachment failure without replacing its primary error', async () => {
     const attachmentFailure = new Error('feature-install-cause-attach-failed')
     const originalDefineProperty = Object.defineProperty
     const defineProperty = vi.spyOn(Object, 'defineProperty').mockImplementation(((
@@ -94,7 +94,7 @@ describe('native Feature synchronous installation', () => {
     }
   })
 
-  it('YS11 cause chain: timeout error attachment failure is diagnostic-only when supersession also fails', async () => {
+  it('cause chain: timeout error attachment failure is diagnostic-only when supersession also fails', async () => {
     const scheduler = createManualScheduler()
     const diagnostics: string[] = []
     const runtime = new PluginHostOperationRuntime({
@@ -280,7 +280,7 @@ describe('native Feature synchronous installation', () => {
 
 /** Set subclass overrides every reader family to prove custom calls receive only the proxy. */
 
-describe('PH-AF-63：resource disposer admission snapshot', () => {
+describe('resource disposer admission snapshot', () => {
   it('rejects native cleanup methods published as extension capabilities', async () => {
     /** Cleanup symbols belong to resource admission, so a view cannot publish them as methods. */
     const host = new Host()
@@ -341,8 +341,8 @@ describe('PH-AF-63：resource disposer admission snapshot', () => {
   })
 })
 
-describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
-  it('PH-T16a：每个 plugin getter 只读取一次，mutation 后仍执行已捕获 hook 与 receiver', async () => {
+describe('plugin admission snapshot and disposer boundary', () => {
+  it('每个 plugin getter 只读取一次，mutation 后仍执行已捕获 hook 与 receiver', async () => {
     const host = new Host()
     const plugin = {} as Record<PropertyKey, unknown>
     const reads = new Map<PropertyKey, number>()
@@ -441,7 +441,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     expect(receivers).toEqual({ install: true, update: true, dispose: true })
   })
 
-  it('PH-T16b：symbol disposer admission 保持 async precedence、receiver 与 captured identity', async () => {
+  it('symbol disposer admission 保持 async precedence、receiver 与 captured identity', async () => {
     const host = new Host()
     const plugin = {} as Record<PropertyKey, unknown>
     let asyncReads = 0
@@ -516,7 +516,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     })
   })
 
-  it('PH-T16d：hostile resource disposer getter remains tagged inside install failure cause chain', async () => {
+  it('hostile resource disposer getter remains tagged inside install failure cause chain', async () => {
     const host = new Host()
     const cause = new Error('resource disposer getter boom')
     const resource = {} as Record<PropertyKey, unknown>
@@ -625,7 +625,7 @@ describe('#5 扩展属性被外部覆写后，unUse 静默放弃卸载', () => {
   })
 })
 
-describe('#6（重新裁定，见 SDD §5.6/M-T15）useSync 回滚改为两阶段：close 同步 + dispose 异步', () => {
+describe('#6 useSync 回滚改为两阶段：close 同步 + dispose 异步', () => {
   it('keeps Feature expose through late useSync rollback cleanup only', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
@@ -666,10 +666,10 @@ describe('#6（重新裁定，见 SDD §5.6/M-T15）useSync 回滚改为两阶�
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(() => expose.read()).toThrow()
   })
-  // §5.6：useSync 的同步性只覆盖 close（撤销 extensions/registrations/shared 等 host 可见状态），
+  // useSync 的同步性只覆盖 close（撤销 extensions/registrations/shared 等 host 可见状态），
   // 不再覆盖实际跑 disposer——那部分和普通异步 dispose 走同一条路径，fire-and-forget，失败通过
   // diagnostic 通道上报，不再折进 useSync 同步抛出的错误链。原始构造错误（install-boom）保持为
-  // useSync 抛出错误的唯一原因（primary），不会被 rollback 结果改写（对齐 M-T44 的 L-T39 口径）。
+  // useSync 抛出错误的唯一原因（primary），不会被 rollback 结果改写。
   it('同步 disposer 抛出的错误不再折进同步抛出链，而是通过 diagnostic 异步上报', async () => {
     const diagnostics: string[] = []
     const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) } as any)
@@ -711,7 +711,7 @@ describe('#6（重新裁定，见 SDD §5.6/M-T15）useSync 回滚改为两阶�
     expect(diagnostics.join('|')).toContain('rollback-boom')
   })
 
-  it('异步 disposer 在 useSync 里注册时不再被拒绝，回滚仍然正确执行（M-T15）', async () => {
+  it('异步 disposer 在 useSync 里注册时不再被拒绝，回滚仍然正确执行', async () => {
     const host = new Host()
     let asyncDisposerRan = false
 
@@ -791,8 +791,8 @@ describe('#8（批次0）非枚举扩展键被静默跳过', () => {
   })
 })
 
-describe('second adversarial pass (R3, fixed)', () => {
-  it('R4-1: concurrent dispose is terminal and is not evicted by ordinary mutation SLA', async () => {
+describe('second adversarial pass (fixed)', () => {
+  it('concurrent dispose is terminal and is not evicted by ordinary mutation SLA', async () => {
     vi.useFakeTimers()
     try {
       const host = new Host({
@@ -816,7 +816,7 @@ describe('second adversarial pass (R3, fixed)', () => {
     }
   })
 
-  it('PH-R3-1 (redesigned per SDD §10.1): a legitimate external mutation behind a slow install waits out the 5s SLA and is rejected with MUTATION_QUEUE_TIMEOUT, not silently diagnosed', async () => {
+  it('redesigned: a legitimate external mutation behind a slow install waits out the 5s SLA and is rejected with MUTATION_QUEUE_TIMEOUT, not silently diagnosed', async () => {
     vi.useFakeTimers()
     try {
       const diagnostics: string[] = []
@@ -843,7 +843,7 @@ describe('second adversarial pass (R3, fixed)', () => {
     }
   })
 
-  it('PH-R3-2 superseded by §5.6/M-T15: an async disposer registered during useSync is no longer rejected at all', () => {
+  it('superseded: an async disposer registered during useSync is no longer rejected at all', () => {
     const host = new Host()
     let started = false
 
@@ -864,7 +864,7 @@ describe('second adversarial pass (R3, fixed)', () => {
     expect(started).toBe(false) // the disposer itself hasn't run — the plugin was never disposed
   })
 
-  it('PH-R3-3 fixed: non-enumerable extension omission is reported through the diagnostic channel', async () => {
+  it('fixed: non-enumerable extension omission is reported through the diagnostic channel', async () => {
     const diagnostics: string[] = []
     const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) })
     const extension = {}
@@ -875,7 +875,7 @@ describe('second adversarial pass (R3, fixed)', () => {
     expect((host as any).hidden).toBeUndefined()
   })
 
-  it('PH-R3-4 fixed: a queued mutation that settles before the watchdog fires clears its timer immediately', async () => {
+  it('fixed: a queued mutation that settles before the watchdog fires clears its timer immediately', async () => {
     vi.useFakeTimers()
     try {
       const host = new Host()
@@ -929,15 +929,15 @@ describe('second adversarial pass (R3, fixed)', () => {
   })
 })
 
-describe('fifth adversarial pass (R5)', () => {
-  it('PH-R5-1: a plugin dispose hook that awaits host.dispose() again must not deadlock the host forever', async () => {
+describe('fifth adversarial pass', () => {
+  it('a plugin dispose hook that awaits host.dispose() again must not deadlock the host forever', async () => {
     vi.useFakeTimers()
     try {
       const host = new Host()
       await host.use({
         name: 'self-disposer',
         install: () => ({}),
-        // #hookRegistration is cleared before the first await (same timing PH4 exploited for
+        // #hookRegistration is cleared before the first await (same timing an earlier regression exploited for
         // use()); the reentrant dispose() call below returns the very #disposePromise this
         // hook is blocking on, so nothing outside a bounded wait can ever unblock it.
         dispose: async () => {
@@ -974,7 +974,7 @@ describe('fifth adversarial pass (R5)', () => {
     }
   })
 
-  it('PH-R5-1: the same reentrant call via a resource disposer (no #hookRegistration guard at all) also converges', async () => {
+  it('the same reentrant call via a resource disposer (no #hookRegistration guard at all) also converges', async () => {
     vi.useFakeTimers()
     try {
       const host = new Host()
@@ -1012,7 +1012,7 @@ describe('fifth adversarial pass (R5)', () => {
     }
   })
 
-  it('PH-R5-2: ERROR_TEXT carries no dead diagnostic text left over from the superseded diagnostic-only watchdog', async () => {
+  it('ERROR_TEXT carries no dead diagnostic text left over from the superseded diagnostic-only watchdog', async () => {
     const errorTextModule = await import('../src/error-text')
     expect(Object.hasOwn(errorTextModule.default, 'QUEUE_WATCHDOG_TIMEOUT')).toBe(false)
   })

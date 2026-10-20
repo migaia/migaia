@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createStoreResource } from '../src/store-resource.js'
 
 describe('event-subscriber compatibility', () => {
-  it('ES-T115 preserves exact revision progression and notification call order', async () => {
+  it('preserves exact revision progression and notification call order', async () => {
     const calls: string[] = []
     const resource = createStoreResource(() => ({ value: 1 }))
     const first = resource.subscribe(() => calls.push('first'))
@@ -22,7 +22,7 @@ describe('event-subscriber compatibility', () => {
     expect(resource.getSnapshot()).toBe(disposed)
   })
 
-  it('ES-T116 preserves Set dedupe and repeated disposer idempotency', async () => {
+  it('preserves Set dedupe and repeated disposer idempotency', async () => {
     const listener = vi.fn()
     const resource = createStoreResource(() => ({ value: 1 }))
     const first = resource.subscribe(listener)

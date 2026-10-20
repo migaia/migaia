@@ -28,7 +28,7 @@ const responder: IRpcHandshakeOffer = {
   peer: { id: 'provider', runtime: 'node' }
 }
 
-describe('handshake 1.0 (A5)', () => {
+describe('handshake 1.0', () => {
   it('chooses the greatest shared major and the initiator-preferred codec', () => {
     const answer = acceptRpcHandshake(responder, createRpcHello(initiator))
     expect(answer.ok).toBe(true)

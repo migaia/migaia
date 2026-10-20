@@ -10,7 +10,7 @@ import {
 } from '../src/config.js'
 
 describe('config primitives', () => {
-  it('U-D02 rejects setMilliseconds through every readonly Date entry', () => {
+  it('rejects setMilliseconds through every readonly Date entry', () => {
     /** Both accessors must protect the same owned Date from supported native mutators. */
     const owned = ownConfig({ when: new Date(0) })
     /** Direct readonly view retains native Date reads while denying writes. */
@@ -28,7 +28,7 @@ describe('config primitives', () => {
     expect(owned.when.getTime()).toBe(0)
   })
 
-  it('U-D03 reads frozen nested descriptors through stable recursive readonly views', () => {
+  it('reads frozen nested descriptors through stable recursive readonly views', () => {
     /** Frozen arrays and records are valid owned data, including shared nested identities. */
     const nested = Object.freeze({ value: 1 })
     /** Ownership keeps source descriptors; the readonly facade must not violate Proxy invariants. */

@@ -17,13 +17,13 @@ vi.mock('@migaia/lifecycle', async (loadOriginal) => {
   }
 })
 
-it('[C4-fix:M2] successful unreplayed retry dispatch creates no readiness AbortController', async () => {
+it('successful unreplayed retry dispatch creates no readiness AbortController', async () => {
   /** This actual event contract never retires its observed original generation. */
   const events: IRemoteGenerationEvents = {
     current: () => ({ generation: 1, active: true }),
     onLeave: () => () => undefined,
     whenReady: () => {
-      assert.fail('[C4-fix:M2] an unreplayed call never waits for a successor')
+      assert.fail('an unreplayed call never waits for a successor')
     }
   }
   const scheduler = createManualScheduler()
@@ -46,10 +46,6 @@ it('[C4-fix:M2] successful unreplayed retry dispatch creates no readiness AbortC
     })
     assert.equal(result, 42)
   }
-  assert.equal(
-    allocations.controllers,
-    0,
-    '[C4-fix:M2] only real replay allocates a readiness controller'
-  )
+  assert.equal(allocations.controllers, 0, 'only real replay allocates a readiness controller')
   assert.equal(scheduler.pendingCount, 0)
 })

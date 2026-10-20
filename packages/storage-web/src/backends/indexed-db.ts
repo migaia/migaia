@@ -47,11 +47,10 @@ import {
 } from '../core/key-domain.js'
 import { planChannelWrite } from '../core/channel-write.js'
 /**
- * SWV2-D27's raw-record firewall must distinguish a "canonical entity key" from an
- * unclassifiable/legacy one by physical key shape. `REPOSITORY_KEY_PREFIX` is the one constant that
- * shape depends on; it is a leaf-level string with no dependency back onto this backend module, so
- * importing it here does not create a cycle with `entity/repository.ts` (which does depend on this
- * file).
+ * 's raw-record firewall must distinguish a "canonical entity key" from an unclassifiable/legacy
+ * one by physical key shape. `REPOSITORY_KEY_PREFIX` is the one constant that shape depends on; it
+ * is a leaf-level string with no dependency back onto this backend module, so importing it here
+ * does not create a cycle with `entity/repository.ts` (which does depend on this file).
  */
 import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '../entity/key.js'
 import { isArrayBuffer, isUint8Array } from '../core/bytes.js'
@@ -116,7 +115,7 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   records: true,
   transactions: true,
   iteration: true,
-  // R07 closes the full planner/readiness/native-query/unique inventory. The immutable
+  // Closes the full planner/readiness/native-query/unique inventory. The immutable
   // capability is now honest: complete handles use the sidecar route, while pending/failed
   // handles still remain on the authoritative fallback path.
   secondaryIndexes: true,
@@ -210,7 +209,7 @@ const RECORD_EPOCH_KEY = '__storage_web_record_epoch__'
 /** Historical migration mirror is never read to authorize a current migration. */
 const LEGACY_RECORDS_MIGRATION_MIRROR_KEY = 'migration:records-v1-to-v2'
 const LEGACY_MIGRATION_BATCH_SIZE = 128
-/** Bounds `iterateRecordIndex` candidates per short readonly page transaction (SWV2-D26). */
+/** Bounds `iterateRecordIndex` candidates per short readonly page transaction. */
 const INDEX_QUERY_PAGE_SIZE = 64
 /** Soft decoded-value cap for one backfill page. */
 const INDEX_BACKFILL_SOFT_CAP_BYTES = 1024 * 1024
@@ -220,13 +219,13 @@ const INDEX_BACKFILL_PROJECTION_ROW_CAP = 4096
 const INDEX_BACKFILL_PROJECTION_BYTE_CAP = 2 * 1024 * 1024
 /** Hard row cap for one prepared record, matching the entity projection contract. */
 const INDEX_BACKFILL_RECORD_ROW_CAP = 1024
-/** Fixed private backfill batch lower bound required by SWV2-D25/T40. */
+/** Fixed private backfill batch lower bound. */
 const INDEX_BACKFILL_MIN_BATCH_SIZE = 1
-/** Fixed private backfill batch upper bound required by SWV2-D25/T40. */
+/** Fixed private backfill batch upper bound. */
 const INDEX_BACKFILL_MAX_BATCH_SIZE = 512
-/** Fixed private lease lower bound in milliseconds required by SWV2-D25/T40. */
+/** Fixed private lease lower bound in milliseconds. */
 const INDEX_BACKFILL_MIN_LEASE_MS = 5_000
-/** Fixed private lease upper bound in milliseconds required by SWV2-D25/T40. */
+/** Fixed private lease upper bound in milliseconds. */
 const INDEX_BACKFILL_MAX_LEASE_MS = 120_000
 /** Default lease duration in milliseconds. */
 const INDEX_BACKFILL_DEFAULT_LEASE_MS = 30_000
@@ -602,10 +601,10 @@ export const indexedDbHost = <TValue = unknown>(
     )
 
   /**
-   * Scope component of the `{global, scope}` mutation-epoch vector required by SWV2-D26/E19. Bumped
-   * atomically with every `runIndexedTransaction` commit that mutates this scope's sidecar rows, so
-   * a paginated `iterateRecordIndex` can detect an in-flight write between pages without
-   * re-scanning the whole index.
+   * Scope component of the `{global, scope}` mutation-epoch vector. Bumped atomically with every
+   * `runIndexedTransaction` commit that mutates this scope's sidecar rows, so a paginated
+   * `iterateRecordIndex` can detect an in-flight write between pages without re-scanning the whole
+   * index.
    */
   const indexScopeEpochKey = (scope: string): IDBValidKey => ['__storage_web_index_epoch__', scope]
 
@@ -613,14 +612,14 @@ export const indexedDbHost = <TValue = unknown>(
   const indexRawEpochKey = (scope: string): IDBValidKey => ['__storage_web_raw_epoch__', scope]
 
   /**
-   * Scoped `META_STORE_NAME` cleanup for a raw `clearRecords`/`clearAll` (SWV2-D27/§4.4): deletes
-   * only the index-handle/readiness (`index:<scope>`) and repository migration-checkpoint
+   * Scoped `META_STORE_NAME` cleanup for a raw `clearRecords`/`clearAll`: deletes only the
+   * index-handle/readiness (`index:<scope>`) and repository migration-checkpoint
    * (`repository:<name>:migration`) keys this backend owns, inside the caller's existing
    * transaction. Never touches the backend's own legacy v1-to-v2 migration checkpoint
    * (`LEGACY_RECORDS_MIGRATION_KEY`) — deleting it would make `migrateLegacyRecords` silently
-   * re-copy already-cleared legacy `documents` rows back into `records` on the next open
-   * (SOL-SWV2-035) — and never touches arbitrary public `metadata` entries, which share this store
-   * but are not backend-owned (SOL-SWV2-036).
+   * re-copy already-cleared legacy `documents` rows back into `records` on the next open — and
+   * never touches arbitrary public `metadata` entries, which share this store but are not
+   * backend-owned.
    */
   const deleteOwnedMetaKeys = async (
     metaStore: IDBObjectStore,
@@ -645,9 +644,9 @@ export const indexedDbHost = <TValue = unknown>(
   }
 
   /**
-   * Scoped `REVISIONS_STORE_NAME` cleanup for a raw `clearRecords`/`clearAll` (§4.4): clears every
+   * Scoped `REVISIONS_STORE_NAME` cleanup for a raw `clearRecords`/`clearAll`: clears every
    * per-record and per-scope revision/epoch entry, but leaves the global `RECORD_EPOCH_KEY` counter
-   * for the caller to read-and-bump atomically in the same transaction (SOL-SWV2-037).
+   * for the caller to read-and-bump atomically in the same transaction.
    */
   const deleteOwnedRevisionKeys = async (
     revisionStore: IDBObjectStore,
@@ -716,7 +715,7 @@ export const indexedDbHost = <TValue = unknown>(
   }
 
   /**
-   * SWV2-D27 raw-record firewall for `putRecord`/`deleteRecord`: a raw mutation bypasses the entity
+   * Raw-record firewall for `putRecord`/`deleteRecord`: a raw mutation bypasses the entity
    * repository's projection-aware planner, so any index built over the affected data may now be
    * wrong. Called inside the caller's existing readwrite transaction after the record write/delete
    * itself has been staged but before commit. Canonical entity keys affect only their own scope;
@@ -1014,10 +1013,10 @@ export const indexedDbHost = <TValue = unknown>(
         lease = { ownerToken, heartbeatRevision: 0, leaseMs }
       }
       /**
-       * SOL-SWV2-040/042: only a genuinely fresh scan (starting from the range's beginning, i.e. no
-       * checkpoint yet) takes a new raw-firewall epoch snapshot; a resumed session preserves the
-       * one from when this scan actually began, so a raw write from an earlier resumed batch is
-       * still caught at completion in `commitBatch`.
+       * /042: only a genuinely fresh scan (starting from the range's beginning, i.e. no checkpoint
+       * yet) takes a new raw-firewall epoch snapshot; a resumed session preserves the one from when
+       * this scan actually began, so a raw write from an earlier resumed batch is still caught at
+       * completion in `commitBatch`.
        */
       const scanStartRawEpoch =
         current.scanStartRawEpoch === undefined
@@ -1498,16 +1497,16 @@ export const indexedDbHost = <TValue = unknown>(
               )
               const previous = state.readiness ?? { status: 'running', scanned: 0, indexed: 0 }
               /**
-               * SOL-SWV2-040/042: a scan can only be trusted `complete` if the raw-firewall epoch
-               * (bumped by every canonical or legacy-shaped raw write in
-               * `applyRawMutationFirewall`, at _any_ readiness state, not only `complete`) still
-               * matches the snapshot taken when this scan genuinely restarted from the range's
-               * beginning. This catches an interleaved raw write regardless of whether it landed
-               * inside this batch or between two commits, and regardless of its position relative
-               * to the checkpoint — the batch-local flag this replaced could only see the former.
-               * It is also recoverable: a later fresh full re-scan takes a new snapshot, and if
-               * nothing else mutates the scope during that new scan, the epochs match again and
-               * `complete` is reachable — unlike a sticky boolean with no legitimate reset path.
+               * /042: a scan can only be trusted `complete` if the raw-firewall epoch (bumped by
+               * every canonical or legacy-shaped raw write in `applyRawMutationFirewall`, at _any_
+               * readiness state, not only `complete`) still matches the snapshot taken when this
+               * scan genuinely restarted from the range's beginning. This catches an interleaved
+               * raw write regardless of whether it landed inside this batch or between two commits,
+               * and regardless of its position relative to the checkpoint — the batch-local flag
+               * this replaced could only see the former. It is also recoverable: a later fresh full
+               * re-scan takes a new snapshot, and if nothing else mutates the scope during that new
+               * scan, the epochs match again and `complete` is reachable — unlike a sticky boolean
+               * with no legitimate reset path.
                */
               const currentRawEpoch =
                 ((await fromIdbRequest(
@@ -1532,10 +1531,10 @@ export const indexedDbHost = <TValue = unknown>(
                 indexed: previous.indexed + indexed
               }
               /**
-               * SOL-SWV2-042: the scan reached its natural end (nothing left to scan) but could not
-               * be trusted `complete` only because the epoch moved underneath it. Holding onto a
-               * checkpoint at the very end of the range with no way to advance further would wedge
-               * this generation permanently `running` — the next `openBackfillSession` would see a
+               * The scan reached its natural end (nothing left to scan) but could not be trusted
+               * `complete` only because the epoch moved underneath it. Holding onto a checkpoint at
+               * the very end of the range with no way to advance further would wedge this
+               * generation permanently `running` — the next `openBackfillSession` would see a
                * defined checkpoint and treat it as a resume, never re-snapshotting the raw-firewall
                * epoch. Clearing the checkpoint here instead makes the _next_ session a genuinely
                * fresh start (per the raw-firewall epoch logic in `openBackfillSession`), so a later
@@ -1746,10 +1745,9 @@ export const indexedDbHost = <TValue = unknown>(
   }
 
   /**
-   * SWV2-B05/§4.6/§5.3 change feed: local commit publication plus metadata-only coordination hints.
-   * Every publish here happens only after the owning `IDBTransaction` has actually committed
-   * (`await committed`), never before, so an aborted/rolled-back IndexedDB transaction fires
-   * nothing.
+   * / change feed: local commit publication plus metadata-only coordination hints. Every publish
+   * here happens only after the owning `IDBTransaction` has actually committed (`await committed`),
+   * never before, so an aborted/rolled-back IndexedDB transaction fires nothing.
    */
   /** Route existing post-commit events through the one private controller owner. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
@@ -1976,7 +1974,7 @@ export const indexedDbHost = <TValue = unknown>(
         const meta = transaction.objectStore(META_STORE_NAME)
         const sidecar = transaction.objectStore(INDEX_RECORDS_STORE_NAME)
         /**
-         * SOL-SWV2-053: only the entries this batch actually copies (not skipped as pre-existing or
+         * Only the entries this batch actually copies (not skipped as pre-existing or
          * already-removed from the legacy store), so a batch that copies nothing publishes
          * nothing.
          */
@@ -2028,7 +2026,7 @@ export const indexedDbHost = <TValue = unknown>(
             LEGACY_RECORDS_MIGRATION_KEY
           )
           await committed
-          // SOL-SWV2-053: this backend's own record-mutating route, previously entirely silent —
+          // This backend's own record-mutating route, previously entirely silent —
           // a subscriber must learn that records materialized in the store it is watching, exactly
           // as any other route that commits records does.
           if (migratedKeys.length > 0)
@@ -2114,7 +2112,7 @@ export const indexedDbHost = <TValue = unknown>(
         /**
          * Preserve the host failure while assigning this cursor boundary's operation metadata. Only
          * a web `StorageError` bridge wrapper is unwrapped; a contract error stays whole so
-         * `normalizeError` lets it penetrate (rule §4.4).
+         * `normalizeError` lets it penetrate (rule).
          */
         const rootCause = cause instanceof StorageError ? (cause.cause ?? cause) : cause
         reject(
@@ -2206,7 +2204,7 @@ export const indexedDbHost = <TValue = unknown>(
         settled = true
         /**
          * Remove an intermediate web bridge wrapper before assigning open semantics; a contract
-         * error is never unwrapped so `normalizeError` lets it penetrate (rule §4.4).
+         * error is never unwrapped so `normalizeError` lets it penetrate (rule).
          */
         const rootCause = cause instanceof StorageError ? (cause.cause ?? cause) : cause
         reject(
@@ -2619,7 +2617,7 @@ export const indexedDbHost = <TValue = unknown>(
           runtime
         )
         revisionStore.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
-        // SWV2-D27 raw-record firewall: this write staged, replaced, or removed a `record` entry
+        // Raw-record firewall: this write staged, replaced, or removed a `record` entry
         // outside the entity repository's planner, so any index built over it may now be wrong.
         await applyRawMutationFirewall(
           transaction.objectStore(META_STORE_NAME),
@@ -2631,10 +2629,10 @@ export const indexedDbHost = <TValue = unknown>(
         )
       }
       await committed
-      // SWV2-B05: only after the IDBTransaction has actually committed — an aborted/rolled-back
+      // Only after the IDBTransaction has actually committed — an aborted/rolled-back
       // transaction (the `catch` below) must fire nothing.
       publishChange({ channel, kind: 'put', keys: [key] })
-      // SOL-SWV2-050/055: a `conflictPolicy:'replace'` write can silently evict whatever other
+      // /055: a `conflictPolicy:'replace'` write can silently evict whatever other
       // channel already held this key — that eviction is itself a real mutation on its own
       // channel and must publish its own `remove`, mirroring the memory backend's
       // `checkCrossChannel`. Only the evicted channel's own event fires here; the attempted
@@ -2877,7 +2875,7 @@ export const indexedDbHost = <TValue = unknown>(
       revisionStore.put(currentEpoch + 1, RECORD_EPOCH_KEY)
     }
     await committed
-    // SOL-SWV2-050: mirrors the memory backend's `runTransaction` — the whole batch fanouts as
+    // Mirrors the memory backend's `runTransaction` — the whole batch fanouts as
     // one `kind:'batch'` event after every entry above committed, never per key, and only when
     // reached at all (rollback via any `throw` above ⇒ no event; a read-only transaction with
     // `recordMutation` still `false` has nothing to report).
@@ -3096,7 +3094,7 @@ export const indexedDbHost = <TValue = unknown>(
         revisions.put(scopeEpoch + 1, indexScopeEpochKey(handle.scope))
       }
       await committed
-      // SOL-SWV2-050 (planner half): the last unwired record-mutating route. Same "batch
+      // (planner half): the last unwired record-mutating route. Same "batch
       // one-event, only for what actually committed" contract as `transaction()` and the memory
       // backend — one `record:batch` for every record this call put/deleted, published only
       // after the owning `IDBTransaction` has actually committed, never on the `catch` below.
@@ -3173,7 +3171,7 @@ export const indexedDbHost = <TValue = unknown>(
         const range = snapshotKeyRange(query.range, StorageBackend.indexedDb)
         const direction: IDBCursorDirection = query.direction === 'prev' ? 'prev' : 'next'
         const prefix: IDBValidKey[] = [query.handle.scope, query.index, query.handle.generation]
-        /** Bounded per short readonly transaction; keeps SWV2-D26 pages small and predictable. */
+        /** Bounded per short readonly transaction; keeps pages small and predictable. */
         const pageSize = INDEX_QUERY_PAGE_SIZE
         /**
          * `{global, scope}` mutation-epoch vector observed on the first page; every later page must
@@ -3287,8 +3285,8 @@ export const indexedDbHost = <TValue = unknown>(
                * the same index-key group), `continuePrimaryKey` jumps straight past it in one
                * engine-side seek. Either branch is O(1) regardless of tie-group size, unlike a JS
                * walk over every already-emitted tied entry, which would be `Θ(G)` per page and
-               * quadratic across a group spanning multiple pages (SWV2-D26/§4.8 require
-               * `O(pageSize)` per page; SWV2-SEC06 resource exhaustion).
+               * quadratic across a group spanning multiple pages (paging requires `O(pageSize)` per
+               * page to avoid resource exhaustion).
                */
               const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
               const comparison = compareStorageKeys(
@@ -3472,7 +3470,7 @@ export const indexedDbHost = <TValue = unknown>(
             const existingKey = await fromIdbRequest(store.getKey(key), { signal }, runtime)
             store.delete(key)
             await committed
-            // SOL-SWV2-047: removing an absent key changed nothing, so it must not publish.
+            // Removing an absent key changed nothing, so it must not publish.
             if (existingKey !== undefined)
               publishChange({ channel: 'value', kind: 'remove', keys: [key] })
           } catch (cause) {
@@ -3521,7 +3519,7 @@ export const indexedDbHost = <TValue = unknown>(
             const count = await fromIdbRequest(store.count(), { signal }, runtime)
             store.clear()
             await committed
-            // SOL-SWV2-047: clearing an already-empty store changed nothing.
+            // Clearing an already-empty store changed nothing.
             if ((count ?? 0) > 0) publishChange({ channel: 'value', kind: 'clear' })
           } catch (cause) {
             try {
@@ -3571,7 +3569,7 @@ export const indexedDbHost = <TValue = unknown>(
             transaction.objectStore(kvStoreName).clear()
             transaction.objectStore(bytesStoreName).clear()
             transaction.objectStore(recordsStoreName).clear()
-            // SWV2-D27 raw-record firewall: see `clearRecords` for why the sidecar must be wiped
+            // Raw-record firewall: see `clearRecords` for why the sidecar must be wiped
             // atomically with the record store, and why the meta/revisions cleanup is scoped
             // (`deleteOwnedMetaKeys`/`deleteOwnedRevisionKeys`) rather than a wholesale `.clear()`.
             transaction.objectStore(INDEX_RECORDS_STORE_NAME).clear()
@@ -3593,20 +3591,20 @@ export const indexedDbHost = <TValue = unknown>(
         })
       ),
     /**
-     * SWV2-B05: every mutation route is wired — `record` (`putRecord`/`deleteRecord`/
+     * Every mutation route is wired — `record` (`putRecord`/`deleteRecord`/
      * `clearRecords`/`transaction`/`transactionIndexed`/`migrateLegacyRecords`), `value`/`bytes`
      * (`set`/`remove`/`clearValues`/`setBytes`/`clearBytes`, including `writeWithConflict`'s
      * cross-channel eviction deletes), and `all` (`clearAll`) — each proven post-commit-only
      * against a real `IDBTransaction` (fires after `await committed`, never before, so an
-     * aborted/rolled-back transaction is silent) and no-op-suppressed (SOL-SWV2-047: a delete of an
-     * absent key or a clear of an empty store publishes nothing). One deliberate exception,
-     * matching the memory backend's own `checkCrossChannel(..., emitEvent: false)`: `transaction()`
-     * evicting a `value`/`bytes` entry as a side effect of a `replace`-policy record write does not
-     * publish its own event, on both backends, because that eviction is folded into the
-     * transaction's single `record:batch` event rather than firing a standalone one mid-batch. That
-     * local matrix is complete; admitted R09 coordination additionally delivers a bounded
-     * metadata-only hint to same-page handles and the realm transport, while non-admitted factories
-     * remain fail-closed through the immutable capability snapshot.
+     * aborted/rolled-back transaction is silent) and no-op-suppressed (a delete of an absent key or
+     * a clear of an empty store publishes nothing). One deliberate exception, matching the memory
+     * backend's own `checkCrossChannel(..., emitEvent: false)`: `transaction()` evicting a
+     * `value`/`bytes` entry as a side effect of a `replace`-policy record write does not publish
+     * its own event, on both backends, because that eviction is folded into the transaction's
+     * single `record:batch` event rather than firing a standalone one mid-batch. That local matrix
+     * is complete; admitted cross-page coordination additionally delivers a bounded metadata-only
+     * hint to same-page handles and the realm transport, while non-admitted factories remain
+     * fail-closed through the immutable capability snapshot.
      */
     subscribeChanges: (listener) => {
       assertLive()
@@ -3689,7 +3687,7 @@ export const indexedDbHost = <TValue = unknown>(
             const count = await fromIdbRequest(store.count(), { signal }, runtime)
             store.clear()
             await committed
-            // SOL-SWV2-047: clearing an already-empty store changed nothing.
+            // Clearing an already-empty store changed nothing.
             if ((count ?? 0) > 0) publishChange({ channel: 'bytes', kind: 'clear' })
           } catch (cause) {
             try {
@@ -3766,7 +3764,7 @@ export const indexedDbHost = <TValue = unknown>(
               runtime
             )) as number | undefined
             revisionStore.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
-            // SWV2-D27 raw-record firewall: see `writeWithConflict` for why any record-affecting
+            // Raw-record firewall: see `writeWithConflict` for why any record-affecting
             // raw mutation must run this before commit.
             await applyRawMutationFirewall(
               transaction.objectStore(META_STORE_NAME),
@@ -3777,7 +3775,7 @@ export const indexedDbHost = <TValue = unknown>(
               runtime
             )
             await committed
-            // SWV2-B05/SOL-SWV2-047: only when the key actually existed (a no-op delete must not
+            // Only when the key actually existed (a no-op delete must not
             // publish) and only after real commit.
             if (existingKey !== undefined)
               publishChange({ channel: 'record', kind: 'remove', keys: [keySnapshot] })
@@ -3820,7 +3818,7 @@ export const indexedDbHost = <TValue = unknown>(
             )) as number
             transaction.objectStore(recordsStoreName).clear()
             /**
-             * SWV2-D27 raw-record firewall: a raw `clearRecords()` bypasses the entity
+             * Raw-record firewall: a raw `clearRecords()` bypasses the entity
              * put/remove/batch/migrate planner, so every existing sidecar projection row and every
              * scope's index generation/readiness handle becomes stale in the same atomic step as
              * the record wipe. Any handle a caller already holds stops matching stored state, so
@@ -3829,7 +3827,7 @@ export const indexedDbHost = <TValue = unknown>(
              * queries against data that no longer exists. `deleteOwnedMetaKeys`/
              * `deleteOwnedRevisionKeys` scope this to only backend-owned bookkeeping (never the
              * legacy migration checkpoint or public `metadata`/other revisions) — see their doc
-             * comments for SOL-SWV2-035/036/037.
+             * comments.
              */
             transaction.objectStore(INDEX_RECORDS_STORE_NAME).clear()
             await deleteOwnedMetaKeys(metaStore, signal, runtime)
@@ -3891,8 +3889,8 @@ export const indexedDbHost = <TValue = unknown>(
             }
             /**
              * Normalize every non-cancellation cursor failure at its owning operation boundary. A
-             * contract error penetrates whole (rule §4.4); only a web `StorageError` bridge wrapper
-             * is unwrapped before the cursor boundary assigns its own metadata.
+             * contract error penetrates whole (rule); only a web `StorageError` bridge wrapper is
+             * unwrapped before the cursor boundary assigns its own metadata.
              */
             const cursorFailure = (cause: unknown): StorageError | StorageContractError =>
               isStorageContractError(cause)

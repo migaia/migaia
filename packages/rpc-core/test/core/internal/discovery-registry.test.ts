@@ -16,7 +16,7 @@ function activeReceiver(
 }
 
 describe('DiscoveryRegistry', () => {
-  it('[C8-H5-P1] reads only the exact installed canonical port and preserves its local Promise miss', () => {
+  it('reads only the exact installed canonical port and preserves its local Promise miss', () => {
     /** This receiver is ordinary route data; no declaration or identifier registers a reader. */
     const receiver = { receiverId: 'receiver', verifiedPeerKey: 'held-binding' }
     /** Public resolve remains an asynchronous operation with its original receiver shape. */
@@ -38,7 +38,7 @@ describe('DiscoveryRegistry', () => {
     expect(port.resolve()).toBeInstanceOf(Promise)
   })
 
-  it('[C8-H5-P2] ignores custom port claims without reading its resolver or returned Promise', () => {
+  it('ignores custom port claims without reading its resolver or returned Promise', () => {
     /** The getter makes retrieving an unknown extension's Promise independently observable. */
     let resolveReads = 0
     /** The public resolver will retain its original Promise if its actual caller invokes it. */
@@ -58,7 +58,7 @@ describe('DiscoveryRegistry', () => {
     expect(resolveReads).toBe(1)
   })
 
-  it('[C8-H5-R1] indexes active target receivers in original insertion order without a snapshot scan', () => {
+  it('indexes active target receivers in original insertion order without a snapshot scan', () => {
     /** Stored snapshots remain the original objects; target membership is ordinary routing data. */
     const first = { targetId: 'target', receiverId: 'first', status: 'active' }
     /** A second receiver distinguishes insertion order from a most-recent refresh policy. */
@@ -86,7 +86,7 @@ describe('DiscoveryRegistry', () => {
     expect(snapshot).not.toHaveBeenCalled()
   })
 
-  it('[C8-H5-R2] updates target selection with binding refusal, committed replacement, delete and close', () => {
+  it('updates target selection with binding refusal, committed replacement, delete and close', () => {
     /** The original identity lease can reject a new token or fail after a replacement commits. */
     const released: string[] = []
     /** Cleanup failure must leave the replacement snapshot and index in the same committed state. */
@@ -119,7 +119,7 @@ describe('DiscoveryRegistry', () => {
     expect(released).toEqual(['old', 'new'])
   })
 
-  it('[C8-H5-R3] restores the prior target index when the original binding commit fails', () => {
+  it('restores the prior target index when the original binding commit fails', () => {
     /** The actual replacement operation fails between snapshot and binding Map commits. */
     const primary = new Error('indexed binding commit failed')
     /** The original release callback records rollback of the newly retained lease. */
@@ -158,7 +158,7 @@ describe('DiscoveryRegistry', () => {
     expect(released).toEqual(['new'])
   })
 
-  it('[C8-H5-R4] records target routing data without reading an opaque snapshot getter', () => {
+  it('records target routing data without reading an opaque snapshot getter', () => {
     /** Generic remote values keep their original opacity at the commit boundary. */
     const value = { receiverId: 'receiver', status: 'active' }
     Object.defineProperty(value, 'targetId', {

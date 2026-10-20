@@ -4,7 +4,7 @@ import { assembled, fixture, liveThreads, processAlive, until } from './helper.j
 
 describe('Tray child topology', () => {
   it.each([0, 1, 2])(
-    '[A2] runtime %i rejects foreign first init before any business or outlet access',
+    'runtime %i rejects foreign first init before any business or outlet access',
     async (index) => {
       /** This dispatcher owner is the same implementation used by the real native cases below. */
       const dispatcherUrl = new URL('../../dist/hosts/child/dispatch.js', import.meta.url).href
@@ -36,7 +36,7 @@ describe('Tray child topology', () => {
     }
   )
   it.each([0, 1, 2])(
-    '[A2] runtime %i connects once, validates init and guards double/foreign init and exposure',
+    'runtime %i connects once, validates init and guards double/foreign init and exposure',
     async (index) => {
       /** Fixture declarations and parent assembly share the built host brand. */
       const api = await fixture()

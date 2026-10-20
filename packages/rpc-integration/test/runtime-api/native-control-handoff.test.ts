@@ -8,7 +8,7 @@ import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
 import { prepareRuntimePeerSourceContext } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
 
-it('[A46] ready process stop drains then SIGTERM without launcher abort issuing SIGKILL', async () => {
+it('ready process stop drains then SIGTERM without launcher abort issuing SIGKILL', async () => {
   /** Actual child readiness precedes stop, avoiding a race with native handler installation. */
   let ready!: () => void
   /** Native stderr is already owned by the launcher's original output drain. */
@@ -45,10 +45,7 @@ it('[A46] ready process stop drains then SIGTERM without launcher abort issuing 
     const stopping = supervisor.stop()
     release()
     await stopping
-    expect(
-      supervisor.inspect().lastExit?.status,
-      '[A46] launch-to-active ownership handoff'
-    ).toEqual({
+    expect(supervisor.inspect().lastExit?.status, 'launch-to-active ownership handoff').toEqual({
       code: null,
       signal: 'SIGTERM'
     })
@@ -58,7 +55,7 @@ it('[A46] ready process stop drains then SIGTERM without launcher abort issuing 
   }
 })
 
-it('[A47] an acknowledged Worker no longer belongs to the launcher cancellation listener', async () => {
+it('an acknowledged Worker no longer belongs to the launcher cancellation listener', async () => {
   /** This genuine Worker emits the private ACK through its original runtime bootstrap. */
   const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
   /** Cancelling a handed-off attempt cannot bypass the supervisor's application drain. */
@@ -81,7 +78,7 @@ it('[A47] an acknowledged Worker no longer belongs to the launcher cancellation 
     controller.abort()
     expect(
       terminate,
-      '[A47] active unit is not force-killed by launch cancellation'
+      'active unit is not force-killed by launch cancellation'
     ).not.toHaveBeenCalled()
     handle.terminate()
     await handle.exited

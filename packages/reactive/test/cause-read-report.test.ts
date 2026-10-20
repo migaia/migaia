@@ -46,7 +46,7 @@ function runRuntimeFailure(
 }
 
 describe('batch cause-read reporting', () => {
-  it('A1 reports the original getter failure and keeps all three errors in order', () => {
+  it('reports the original getter failure and keeps all three errors in order', () => {
     const getterFailure = new Error('cause getter failed')
     const getterStack = getterFailure.stack
     const reports: Array<{ error: unknown; context: unknown }> = []
@@ -73,7 +73,7 @@ describe('batch cause-read reporting', () => {
     ])
   })
 
-  it('A2 contains reporter failures without replacing the original error chain', async () => {
+  it('contains reporter failures without replacing the original error chain', async () => {
     /** Business aggregation and terminal reporter observation are independent results. */
     const callbacks: (() => void)[] = []
     /** Capture only this test's queued host work and inspect it before restoring. */
@@ -149,7 +149,7 @@ describe('batch cause-read reporting', () => {
     ])
   })
 
-  it('A3 preserves normal, existing-cause, and frozen-error outcomes', () => {
+  it('preserves normal, existing-cause, and frozen-error outcomes', () => {
     for (const withCause of [false, true]) {
       const reports: unknown[] = []
       const runtime = createRuntime({ onError: (error) => reports.push(error) })

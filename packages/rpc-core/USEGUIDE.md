@@ -910,7 +910,7 @@ const probe = defineProbe({
     return '<redacted>'
   },
   emit(view) {
-    // SC9(c)：调用方显式请求顶层事件快照。
+    // 调用方显式请求顶层事件快照。
     saved.push(snapshotProbeEvent(view))
   }
 })
@@ -919,7 +919,7 @@ probe.setStages([]) // 暂停，captureMask 保持原值。
 probe.setStages(['frame', 'protected']) // 恢复选定阶段。
 ```
 
-`snapshotProbeEvent` 是显式复制请求（SC9c）：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。按照 SC9，普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界（SC9b），或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。
+`snapshotProbeEvent` 是显式复制请求：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界，或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。
 
 `protected` 仅在认证保护路径存在时产生；没有该能力的路径不会伪造该阶段。内容捕获包括 protected 内容都必须显式启用。Descriptor 的 `stageMask` 描述 endpoint 能产生且当前已订阅的阶段，不证明所有路径都会经历每个阶段。
 
@@ -981,7 +981,7 @@ Byte 业务 receive 的 carrier 事件在实际交付 Core 前发出。启动时
 
 采样在解密前没有 sender/message identity；不能保证与后续逻辑阶段采用相同 key。Native Peer 调用选项不携带 trace，应用在自己的 Endpoint.send 边界显式传递已有 trace。多块消息完成解码前的匿名 carrier/protected/frame 当前不能全部归入 hub interaction；完成解码的最后一块可通过 carrierSeq 关联，前序原始记录保留，不猜测身份。
 
-捕获容器中的 nested transferable 保留原引用，不遍历 getter、不深扫描或复制；其成员可能在实际 transfer 后分离。只有直接捕获且确会分离的 backing/view 按 SC9(a) 保存字节。
+捕获容器中的 nested transferable 保留原引用，不遍历 getter、不深扫描或复制；其成员可能在实际 transfer 后分离。只有直接捕获且确会分离的 backing/view 才保存字节。
 
 ```ts doc-test=check
 import { defineProbe, readProbeStages, subscribeProbeStages } from '@migaia/rpc-core/probe'

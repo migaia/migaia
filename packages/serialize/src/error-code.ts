@@ -5,8 +5,7 @@
  * `source` is always `'@migaia/serialize'`. Throw sites use these constants instead of inline
  * values.
  *
- * Code values are public API. Renaming a code is a breaking change. See
- * `docs/contracts/error-code-rollout.sdd.md` §1.2.
+ * Code values are public API. Renaming a code is a breaking change.
  */
 export const SerializeErrorCode = {
   /**

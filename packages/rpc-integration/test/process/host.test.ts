@@ -12,7 +12,7 @@ import type { IRemoteRetryPort } from '@migaia/rpc-core/remote'
 import { createLifecycleScope } from '@migaia/lifecycle'
 
 describe('process Host facade admission and ownership', () => {
-  it('[K221/A1] drains an external retry port without changing its call count or Promise', async () => {
+  it('drains an external retry port without changing its call count or Promise', async () => {
     /** No endpoint send owns this logical operation; the caller-supplied retry port does. */
     const fixture = nativeHostFixture()
     /** Preserve the original drain-timer oracle on the actual native binding's clock. */
@@ -102,7 +102,7 @@ describe('process Host facade admission and ownership', () => {
     }
   })
 
-  it('[A1] forwards the process call wall cap through the existing remote dispatcher', async () => {
+  it('forwards the process call wall cap through the existing remote dispatcher', async () => {
     /** A real native endpoint records the effective deadline selected by its canonical dispatcher. */
     const fixture = nativeHostFixture()
     /** The unchanged exact 60ms oracle uses the original unadvanced manual dispatch clock. */
@@ -145,7 +145,7 @@ describe('process Host facade admission and ownership', () => {
       await fixture.close()
     }
   })
-  it('[A1] announces one close and waits for the real in-flight request before child exit', async () => {
+  it('announces one close and waits for the real in-flight request before child exit', async () => {
     const fixture = nativeHostFixture()
     const original = fixture.options.endpointFactory
     const close = vi.fn()
@@ -206,7 +206,7 @@ describe('process Host facade admission and ownership', () => {
       await fixture.close()
     }
   })
-  it('[A1] controls a real initially empty Node Host through the local catalog resolver', async () => {
+  it('controls a real initially empty Node Host through the local catalog resolver', async () => {
     const fixture = nativeHostFixture()
     try {
       expect(fixture.handles).toHaveLength(0)
@@ -238,7 +238,7 @@ describe('process Host facade admission and ownership', () => {
       await fixture.close()
     }
   })
-  it('[A1] stays lazy, delegates catalog control and gates release synchronously', async () => {
+  it('stays lazy, delegates catalog control and gates release synchronously', async () => {
     const fixture = runtimeHostFixture()
     /** The observer calls the original binding constructor and exposes its actual health policy. */
     const binding = vi.spyOn(bindingModule, 'createSpawnProcessBinding')
@@ -281,7 +281,7 @@ describe('process Host facade admission and ownership', () => {
     }
   })
 
-  it('[A2/A4] rejects borrowed strategy and scheduler mismatch before dial or launch', async () => {
+  it('rejects borrowed strategy and scheduler mismatch before dial or launch', async () => {
     const fixture = hostFixture()
     const dial = vi.fn()
     /** Canonical remote clock admission observes the original supervisor without native acquisition. */
@@ -331,7 +331,7 @@ describe('process Host facade admission and ownership', () => {
     }
   })
 
-  it('[A1] escalates a second signal once while awaiting the owned exit and unsubscribes', async () => {
+  it('escalates a second signal once while awaiting the owned exit and unsubscribes', async () => {
     const fixture = runtimeHostFixture()
     let settleExit!: (value: { code: number; signal: null }) => void
     let notify: (() => void) | undefined

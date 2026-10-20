@@ -8,7 +8,7 @@ import { ResourceErrorCode } from '../src/error-code.js'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
-describe('AF-T6 resource scheduler injection', () => {
+describe('resource scheduler injection', () => {
   it('retry delay is driven by the injected manual scheduler, not a host timer or microtask', async () => {
     const manual = createManualScheduler()
     const runtime = createRuntime()
@@ -65,7 +65,7 @@ describe('AF-T6 resource scheduler injection', () => {
   })
 })
 
-describe('Round21 resource TTL finite-domain admission', () => {
+describe('resource TTL finite-domain admission', () => {
   it('rejects ageMs plus finite ttl overflow before success or dehydration', async () => {
     const runtime = createRuntime()
     const resource = new Resource(async () => 'value', runtime, {
@@ -138,7 +138,7 @@ describe('Round21 resource TTL finite-domain admission', () => {
   })
 })
 
-describe('AF-T7 SWR cancel state consistency', () => {
+describe('SWR cancel state consistency', () => {
   it('cancel during a SWR refresh keeps stale data and clears refreshing', async () => {
     const runtime = createRuntime()
     const fetcher = vi
@@ -161,7 +161,7 @@ describe('AF-T7 SWR cancel state consistency', () => {
   })
 })
 
-describe('AF-T8 Suspense throw then-getter probe', () => {
+describe('Suspense throw then-getter probe', () => {
   it('surfaces the getter error and keeps the thrown value reachable', async () => {
     const runtime = createRuntime()
     const getterError = new Error('then getter boom')
@@ -187,7 +187,7 @@ describe('AF-T8 Suspense throw then-getter probe', () => {
   })
 })
 
-describe('AF-T21 resource scheduler entry validation', () => {
+describe('resource scheduler entry validation', () => {
   it('hydrates from one snapshot read, preventing accessor TOCTOU', () => {
     const runtime = createRuntime()
     let reads = 0
@@ -242,7 +242,7 @@ describe('AF-T21 resource scheduler entry validation', () => {
     )
   })
 
-  it('AF-T28: hostile scheduler getter is wrapped as INVALID_OPTION with the original as cause', () => {
+  it('hostile scheduler getter is wrapped as INVALID_OPTION with the original as cause', () => {
     const runtime = createRuntime()
     const getterError = new Error('scheduler getter boom')
     const scheduler = new Proxy(
@@ -263,7 +263,7 @@ describe('AF-T21 resource scheduler entry validation', () => {
     expect((caught as { cause?: unknown }).cause).toBe(getterError)
   })
 
-  it('AF-T31: scheduler is read exactly once and the validated snapshot is used', () => {
+  it('scheduler is read exactly once and the validated snapshot is used', () => {
     const runtime = createRuntime()
     let reads = 0
     const scheduler = { now: () => 0, schedule: () => ({ cancel: () => {} }) }
@@ -278,7 +278,7 @@ describe('AF-T21 resource scheduler entry validation', () => {
   })
 })
 
-describe('AF-T65 resource initialSnapshot construction admission', () => {
+describe('resource initialSnapshot construction admission', () => {
   it('reads initialSnapshot once and uses the first value for hydration and autostart', async () => {
     const runtime = createRuntime()
     const first = { version: 2 as const, data: 'first', ageMs: 1, remainingTtlMs: null }
@@ -388,7 +388,7 @@ describe('AF-T65 resource initialSnapshot construction admission', () => {
   })
 })
 
-describe('AF-T64 retry timer cleanup failure', () => {
+describe('retry timer cleanup failure', () => {
   it('rejects an invalid retry task without leaving the resource fetching forever', async () => {
     const runtime = createRuntime()
     const resource = new Resource(
@@ -420,7 +420,7 @@ describe('AF-T64 retry timer cleanup failure', () => {
     resource.dispose()
   })
 
-  it('AF-T64: cancel converges state while reporting cleanup error through the runtime sink', async () => {
+  it('cancel converges state while reporting cleanup error through the runtime sink', async () => {
     const reported: unknown[] = []
     const runtime = createRuntime({ onError: (error) => reported.push(error) })
     const cleanupError = new Error('retry timer cleanup failed')
@@ -482,7 +482,7 @@ describe('AF-T64 retry timer cleanup failure', () => {
   })
 })
 
-describe('AF-T75 retry admission abort race', () => {
+describe('retry admission abort race', () => {
   it('removes a retry listener stored after its synchronous abort callback returns', async () => {
     const runtime = createRuntime()
     const storedListeners = new Set<() => void>()
@@ -643,7 +643,7 @@ describe('AF-T75 retry admission abort race', () => {
   })
 })
 
-describe('AF-T85 withAbort signal registration race', () => {
+describe('withAbort signal registration race', () => {
   it('rejects when abort happens during add without replaying the callback, then removes once', async () => {
     const runtime = createRuntime()
     const storedListeners = new Set<() => void>()
@@ -829,7 +829,7 @@ describe('AF-T85 withAbort signal registration race', () => {
   })
 })
 
-describe('AF-T86 Resource dispose teardown convergence', () => {
+describe('Resource dispose teardown convergence', () => {
   it('completes teardown when an active fetch signal listener is notified', () => {
     const runtime = createRuntime()
     const dependency = runtime.signal(1)
@@ -870,8 +870,8 @@ describe('AF-T86 Resource dispose teardown convergence', () => {
   })
 })
 
-describe('Round29 Resource scheduler.now boundary', () => {
-  it('R-T29-01 wraps a scheduler.now throw during successful settlement and publishes no success/cache', async () => {
+describe('Resource scheduler.now boundary', () => {
+  it('wraps a scheduler.now throw during successful settlement and publishes no success/cache', async () => {
     const runtime = createRuntime()
     const clockError = new Error('settlement clock failed')
     const scheduler = {
@@ -896,7 +896,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
   })
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY])(
-    'R-T29-02 wraps scheduler.now()=%s validation with Resource ownership and preserves native cause',
+    'wraps scheduler.now()=%s validation with Resource ownership and preserves native cause',
     async (invalidNow) => {
       const runtime = createRuntime()
       const scheduler = {
@@ -924,7 +924,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
     }
   )
 
-  it('R-T29-03 makes repeated passive freshness reads fail closed with one wrapper, stable promise, atomic cache metadata, and reporter identity', async () => {
+  it('makes repeated passive freshness reads fail closed with one wrapper, stable promise, atomic cache metadata, and reporter identity', async () => {
     const reported: unknown[] = []
     const runtime = createRuntime({ onError: (error) => reported.push(error) })
     /** Enable the passive clock failure only after v2 admission/dehydration clock samples. */
@@ -971,7 +971,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
     resource.dispose()
   })
 
-  it('R-T29-04 preserves the retry boundary when the retried success settlement clock fails', async () => {
+  it('preserves the retry boundary when the retried success settlement clock fails', async () => {
     const runtime = createRuntime()
     const clockError = new Error('retry settlement clock failed')
     let attempts = 0
@@ -1010,7 +1010,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
     resource.dispose()
   })
 
-  it('R-T29-05 SWR/keepAlive success settlement clock failure keeps refresh atomic and does not suspend dependencies', async () => {
+  it('SWR/keepAlive success settlement clock failure keeps refresh atomic and does not suspend dependencies', async () => {
     const runtime = createRuntime()
     const dependency = runtime.signal(1)
     let nowCalls = 0
@@ -1050,7 +1050,7 @@ describe('Round29 Resource scheduler.now boundary', () => {
     resource.dispose()
   })
 
-  it('R-T29-06 keeps a fresh passive cache and revalidates one stale passive read', async () => {
+  it('keeps a fresh passive cache and revalidates one stale passive read', async () => {
     const runtime = createRuntime()
     let now = 5
     let fetches = 0

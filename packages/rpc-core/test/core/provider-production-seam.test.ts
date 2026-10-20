@@ -528,8 +528,8 @@ async function createActualAdmissionFixture(
   }
 }
 
-/** Rejects the removed D95 key in every surviving package-owned key collection. */
-function assertNoRemovedD95Key(keys: readonly PropertyKey[]): void {
+/** Rejects the removed provider-bridge key in every surviving package-owned key collection. */
+function assertNoRemovedBridgeKey(keys: readonly PropertyKey[]): void {
   expect(keys).not.toContain('outboundCompatibility')
   expect(
     keys.some(
@@ -538,8 +538,8 @@ function assertNoRemovedD95Key(keys: readonly PropertyKey[]): void {
   ).toBe(false)
 }
 
-/** Reads the source and built artifacts that formerly implemented D95 normalization. */
-async function readFinalD95BoundaryTexts(): Promise<readonly string[]> {
+/** Reads the source and built artifacts that formerly implemented provider-bridge normalization. */
+async function readFinalBridgeBoundaryTexts(): Promise<readonly string[]> {
   const paths = [
     '../../src/core/internal/plugin-descriptor.ts',
     '../../src/core/internal/plugin-shared-keys.ts',
@@ -552,8 +552,8 @@ async function readFinalD95BoundaryTexts(): Promise<readonly string[]> {
   return Promise.all(paths.map((path) => readFile(new URL(path, import.meta.url), 'utf8')))
 }
 
-/** Projects the observable terminal state required by the D95 disposal contract. */
-function projectD95TerminalSnapshot(snapshot: ReturnType<IActualAdmissionFixture['snapshot']>) {
+/** Projects the observable terminal state required by the provider-bridge disposal contract. */
+function projectBridgeTerminalSnapshot(snapshot: ReturnType<IActualAdmissionFixture['snapshot']>) {
   return {
     hostKeys: snapshot.hostKeys,
     sharedEmpty: snapshot.ports.every((value) => value === undefined),
@@ -569,8 +569,8 @@ function projectD95TerminalSnapshot(snapshot: ReturnType<IActualAdmissionFixture
   }
 }
 
-/** Proves migrated control behavior is independent of a hostile legacy D95 publication. */
-async function assertMigratedControlIgnoresD95(fixture: IActualAdmissionFixture): Promise<void> {
+/** Proves migrated control behavior is independent of a hostile legacy provider-bridge publication. */
+async function assertMigratedControlIgnoresBridge(fixture: IActualAdmissionFixture): Promise<void> {
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
   await fixture.install()
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
@@ -579,7 +579,7 @@ async function assertMigratedControlIgnoresD95(fixture: IActualAdmissionFixture)
   expect(fixture.host.dispose()).toBe(hostDispose)
   await hostDispose
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
-  expect(projectD95TerminalSnapshot(fixture.snapshot())).toMatchObject({
+  expect(projectBridgeTerminalSnapshot(fixture.snapshot())).toMatchObject({
     hostKeys: [...HOST_SURFACE].sort(),
     sharedEmpty: true,
     extensionsEmpty: true,
@@ -638,8 +638,8 @@ const HOST_SURFACE = Object.freeze([
   'installBatch'
 ])
 
-describe('Cycle H B12c02 provider production-seam RED matrix', () => {
-  it('T110 real transaction baseline: provider RPC and public boundary execute before projection RED', async () => {
+describe('provider production-seam matrix', () => {
+  it('real transaction baseline: provider RPC and public boundary execute before projection checks', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createRealProvider('provider-exposure-host', serverTransport, {
       echo: (context) => context.success(context.data)
@@ -672,7 +672,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T111 real transaction: provider success and endpoint-local disposal remain stable', async () => {
+  it('real transaction: provider success and endpoint-local disposal remain stable', async () => {
     const [firstClientTransport, firstServerTransport] = createMemoryTransportPair()
     const [secondClientTransport, secondServerTransport] = createMemoryTransportPair()
     const first = await createRealProvider('provider-first', firstServerTransport, {
@@ -708,7 +708,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T112 real provider security baseline rejects a forged receiver without execution', async () => {
+  it('real provider security baseline rejects a forged receiver without execution', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let executions = 0
     const server = await createRealProvider('provider-security-host', serverTransport, {
@@ -736,7 +736,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T113 real provider response baseline preserves native provider error code and residue', async () => {
+  it('real provider response baseline preserves native provider error code and residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const cause = new TypeError('provider failure cause')
     const primary = new Error('provider failure', { cause })
@@ -772,7 +772,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T114 real provider abort baseline preserves caller terminal reason and releases controller', async () => {
+  it('real provider abort baseline preserves caller terminal reason and releases controller', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let started!: () => void
     let release!: () => void
@@ -819,7 +819,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T115 config snapshot baseline reads the provider object once before installation', async () => {
+  it('config snapshot baseline reads the provider object once before installation', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     let reads = 0
     const providerMap = {
@@ -844,7 +844,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T116 hostile provider getter fails before transport subscription with original cause', async () => {
+  it('hostile provider getter fails before transport subscription with original cause', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const cause = new Error('provider getter hostile')
     await expect(
@@ -855,7 +855,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
   })
 
-  it('T117 later invalid provider entry preserves primary failure and terminal residue', async () => {
+  it('later invalid provider entry preserves primary failure and terminal residue', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const invalidProvider = {
       valid: (context: Parameters<IRpcProvider>[0]) => context.success('valid'),
@@ -979,7 +979,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(readProviderRegistrationObservation(fixture.kernel)).toBeUndefined()
   })
 
-  it('T121 source ownership scan rejects provider attachment broad-bridge imports', async () => {
+  it('source ownership scan rejects provider attachment broad-bridge imports', async () => {
     const providerSource = await readFile(
       new URL('../../src/core/features/provider.ts', import.meta.url),
       'utf8'
@@ -992,7 +992,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(attachmentSource).not.toContain('IOutboundAttachmentHost')
   })
 
-  it('T122 contract: provider schema and cancellation metadata are frozen and candidate-independent', () => {
+  it('contract: provider schema and cancellation metadata are frozen and candidate-independent', () => {
     const schema = RpcProviderRoleSchema.provider
     expect(schema).toEqual({
       sharedProvides: [RpcPortName.providerCancellation],
@@ -1107,7 +1107,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(RpcProviderCancellationPortMetadata).not.toHaveProperty('abort')
   })
 
-  it('T124 real provider snapshot reads outer config and every provider entry once', async () => {
+  it('real provider snapshot reads outer config and every provider entry once', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const reads: string[] = []
     const providerMap = {} as Record<string, IRpcProvider>
@@ -1144,7 +1144,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('P2-026 production seam preserves canonical owner timing and identities', async () => {
+  it('production seam preserves canonical owner timing and identities', async () => {
     const reporterInput = new Error('report input')
     const reporterCalls: unknown[] = []
     const validateCause = new Error('schema rejected')
@@ -1326,7 +1326,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T148 composed disposal observer fails closed for forged and separate endpoint instances', async () => {
+  it('composed disposal observer fails closed for forged and separate endpoint instances', async () => {
     const transport: IRpcTransport = {
       platform: 'Memory',
       ownership: 'borrowed',
@@ -1373,7 +1373,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     await secondDispose
   })
 
-  it('T129 actual provider endpoint isolation and terminal removal preserve independent identity', async () => {
+  it('actual provider endpoint isolation and terminal removal preserve independent identity', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
     const first = await createRealProvider('provider-isolation-first', firstTransport, {
@@ -1393,7 +1393,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(readEndpointDebugSnapshot(second)?.providers).toBe(0)
   })
 
-  it('T130 provider source boundary excludes D95 from all migrated feature consumers', async () => {
+  it('provider source boundary excludes the provider bridge from all migrated feature consumers', async () => {
     const sources = await Promise.all(
       ['discovery.ts', 'control.ts', 'provider.ts', 'canonical-chunk.ts'].map((name) =>
         readFile(new URL(`../../src/core/features/${name}`, import.meta.url), 'utf8')
@@ -1405,7 +1405,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(sources[3]).not.toContain('outboundCompatibility')
   })
 
-  it('T250 discovery ownership scan finds only the canonical attachment state owner', async () => {
+  it('discovery ownership scan finds only the canonical attachment state owner', async () => {
     await expect(
       readFile(new URL('../../src/core/endpoint.ts', import.meta.url), 'utf8')
     ).rejects.toThrow()
@@ -1420,7 +1420,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(attachmentSource).not.toContain('kernel.registerRoute(WebRpcMessageKind.discovery')
   })
 
-  it('T246 real composed discovery consumes narrow ports and publishes only its resolver', async () => {
+  it('real composed discovery consumes narrow ports and publishes only its resolver', async () => {
     const discoveryFixture = await createActualAdmissionFixture({
       endpointId: 'cycle-m-discovery-contract',
       rootNames: ['first-party-discovery']
@@ -1503,7 +1503,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T247 composed discovery schedules and clears its exact timer through the endpoint time port', async () => {
+  it('composed discovery schedules and clears its exact timer through the endpoint time port', async () => {
     vi.useFakeTimers()
     const [baseTransport] = createMemoryTransportPair()
     const transport = { ...baseTransport, topology: 'multiplexed' as const }
@@ -1573,7 +1573,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T252 control inventory exposes only its planned narrow shared ports', async () => {
+  it('control inventory exposes only its planned narrow shared ports', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-inventory',
       rootNames: ['first-party-control']
@@ -1592,7 +1592,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T253 actual control candidate matches the narrow contract through real inventory', async () => {
+  it('actual control candidate matches the narrow contract through real inventory', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-candidate',
       rootNames: ['first-party-control']
@@ -1608,7 +1608,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T261 admitted-unpublished control publication fails with the same Host transaction evidence', async () => {
+  it('admitted-unpublished control publication fails with the same Host transaction evidence', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-unpublished',
       rootNames: ['first-party-outbound', 'first-party-control'],
@@ -1627,7 +1627,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const hostDispose = fixture.host.dispose()
     expect(fixture.host.dispose()).toBe(hostDispose)
     await hostDispose
-    const terminal = projectD95TerminalSnapshot(fixture.snapshot())
+    const terminal = projectBridgeTerminalSnapshot(fixture.snapshot())
     try {
       expect({
         name: (failure as { readonly name?: unknown } | undefined)?.name,
@@ -1666,7 +1666,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T262 control narrow publication is endpoint-local across two real Host transactions', async () => {
+  it('control narrow publication is endpoint-local across two real Host transactions', async () => {
     const first = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-isolation-a'
     })
@@ -1687,7 +1687,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T263 terminal control disposal removes narrow shared state exactly once', async () => {
+  it('terminal control disposal removes narrow shared state exactly once', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-terminal-removal'
     })
@@ -1701,7 +1701,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     await fixture.dispose()
   })
 
-  it('T264 successful control transaction preserves canonical cleanup and repeated Host Promise identity', async () => {
+  it('successful control transaction preserves canonical cleanup and repeated Host Promise identity', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'b12c04-control-success-lifecycle'
     })
@@ -1719,7 +1719,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     await fixture.dispose()
   })
 
-  it('T266 superseded intermediate deletion leaves both migrated consumers free of D95', async () => {
+  it('superseded intermediate deletion leaves both migrated consumers free of the provider bridge', async () => {
     const [controlSource, chunkSource] = await Promise.all([
       readFile(new URL('../../src/core/features/control.ts', import.meta.url), 'utf8'),
       readFile(new URL('../../src/core/features/canonical-chunk.ts', import.meta.url), 'utf8')
@@ -1728,7 +1728,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(chunkSource).not.toContain('outboundCompatibility')
   })
 
-  it('T267 final deletion boundary removes D95 from control and chunk after both narrow migrations', async () => {
+  it('final deletion boundary removes the provider bridge from control and chunk after both narrow migrations', async () => {
     const [controlSource, chunkSource] = await Promise.all([
       readFile(new URL('../../src/core/features/control.ts', import.meta.url), 'utf8'),
       readFile(new URL('../../src/core/features/canonical-chunk.ts', import.meta.url), 'utf8')
@@ -1737,7 +1737,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(chunkSource).not.toContain('outboundCompatibility')
   })
 
-  it('T268 control role authority is deeply frozen with the exact contract shape', () => {
+  it('control role authority is deeply frozen with the exact contract shape', () => {
     const role = RpcControlRoleSchema[RpcControlRole.control]
     expect(Object.isFrozen(RpcControlRole)).toBe(true)
     expect(Object.keys(RpcControlRole)).toEqual(['control'])
@@ -1782,7 +1782,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(Object.getOwnPropertyDescriptors(role.exposedKeys)).toEqual(exposedDescriptors)
   })
 
-  it('T271 canonical control endpoint disposal exposes the same stable Host and endpoint Promises', async () => {
+  it('canonical control endpoint disposal exposes the same stable Host and endpoint Promises', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const endpoint = await createFullEndpoint({
       id: 'b12c04-control-endpoint-disposal',
@@ -1803,7 +1803,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T272 selected control roots keep dependencies private and disposal endpoint-local', async () => {
+  it('selected control roots keep dependencies private and disposal endpoint-local', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
     const first = await createComposedEndpoint(
@@ -1863,7 +1863,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T273 canonical control ping abort and timeout preserve peer and terminal isolation', async () => {
+  it('canonical control ping abort and timeout preserve peer and terminal isolation', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createFullEndpoint({
       id: 'round-seventeen-control-peer',
@@ -1905,7 +1905,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T274 canonical control endpoint translates two cleanup leaves on one transaction', async () => {
+  it('canonical control endpoint translates two cleanup leaves on one transaction', async () => {
     const cleanupOrder: string[] = []
     const firstCleanup = new Error('round-seventeen-first-control-cleanup')
     const secondCleanup = new Error('round-seventeen-second-control-cleanup')
@@ -1995,7 +1995,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(endpoint.dispose()).toBe(endpointDispose)
   })
 
-  it('T275 final source boundary excludes D95 from control and chunk', async () => {
+  it('final source boundary excludes the provider bridge from control and chunk', async () => {
     const [controlSource, chunkSource] = await Promise.all([
       readFile(new URL('../../src/core/features/control.ts', import.meta.url), 'utf8'),
       readFile(new URL('../../src/core/features/canonical-chunk.ts', import.meta.url), 'utf8')
@@ -2016,7 +2016,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(chunkSource).not.toContain('WebRpcPortName.time')
   })
 
-  it('T276 concurrent reused control modules preserve independent endpoint snapshots', async () => {
+  it('concurrent reused control modules preserve independent endpoint snapshots', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
     const reusedPing = ping()
@@ -2057,7 +2057,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T277 real control fanout keeps tagged peer results endpoint-local', async () => {
+  it('real control fanout keeps tagged peer results endpoint-local', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createFullEndpoint({
       id: 'round-eighteen-control-fanout-server',
@@ -2084,7 +2084,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T278 disposed control endpoint rejects a later operation without reviving state', async () => {
+  it('disposed control endpoint rejects a later operation without reviving state', async () => {
     const [transport] = createMemoryTransportPair()
     const endpoint = await createFullEndpoint({
       id: 'round-eighteen-control-terminal-removal',
@@ -2110,7 +2110,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(endpoint.dispose()).toBe(disposePromise)
   })
 
-  it('T279 control abort and disposal race leaves no late pending state', async () => {
+  it('control abort and disposal race leaves no late pending state', async () => {
     const [baseTransport] = createMemoryTransportPair()
     let transportErrorCount = 0
     const transport: IRpcTransport = {
@@ -2152,7 +2152,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(endpoint.dispose()).toBe(disposePromise)
   })
 
-  it('T280 runtime and declaration control D95 boundary remains fail-closed before artifact migration', async () => {
+  it('runtime and declaration control provider-bridge boundary remains fail-closed before artifact migration', async () => {
     const runtimeUrl = new URL('../../dist/core/features/control.js', import.meta.url)
     const declarationUrl = new URL('../../dist/core/features/control.d.ts', import.meta.url)
     const [runtimeSource, declarationSource] = await Promise.all([
@@ -2165,7 +2165,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(declarationSource).not.toContain('outboundCompatibility')
   })
 
-  it('T282 control construction snapshots config getters once before later source mutation', async () => {
+  it('control construction snapshots config getters once before later source mutation', async () => {
     const [transport] = createMemoryTransportPair()
     const reads: string[] = []
     const targetIds = ['round-twenty-snapshot-target']
@@ -2230,7 +2230,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T286 late control delivery after timeout cannot resettle or revive terminal state', async () => {
+  it('late control delivery after timeout cannot resettle or revive terminal state', async () => {
     vi.useFakeTimers()
     const [baseClientTransport, serverTransport] = createMemoryTransportPair()
     const delayedFrames: unknown[] = []
@@ -2288,7 +2288,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T290 concurrent reused control tokens preserve independent post-snapshot target state', async () => {
+  it('concurrent reused control tokens preserve independent post-snapshot target state', async () => {
     const reusedRoots = createNativeRoots('first-party-outbound', 'first-party-control')
     const firstTargets = ['cycle-m-concurrent-first-target']
     const secondTargets = ['cycle-m-concurrent-second-target']
@@ -2360,7 +2360,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T291 duplicate control delivery is rejected by canonical replay admission', async () => {
+  it('duplicate control delivery is rejected by canonical replay admission', async () => {
     const [baseClientTransport, baseServerTransport] = createMemoryTransportPair()
     const pingFrames: unknown[] = []
     const pongFrames: unknown[] = []
@@ -2429,7 +2429,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T292 forged cross-peer control delivery cannot settle a trusted pending ping', async () => {
+  it('forged cross-peer control delivery cannot settle a trusted pending ping', async () => {
     const [baseClientTransport, baseServerTransport] = createMemoryTransportPair()
     const trustedSource = {}
     let inboundSource: unknown = trustedSource
@@ -2487,7 +2487,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T293 late control send rejection reports once after timeout', async () => {
+  it('late control send rejection reports once after timeout', async () => {
     vi.useFakeTimers()
     const [baseClientTransport] = createMemoryTransportPair()
     let rejectSend!: (error: unknown) => void
@@ -2533,7 +2533,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T294 endpoint time owner advances control timeout and clears its exact timer', async () => {
+  it('endpoint time owner advances control timeout and clears its exact timer', async () => {
     vi.useFakeTimers()
     const [transport] = createMemoryTransportPair()
     const endpoint = await createFullEndpoint({
@@ -2584,7 +2584,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T219 unchanged discovery/control consumers run through the ordered D95 bridge transaction', async () => {
+  it('unchanged discovery/control consumers run through the ordered provider bridge transaction', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
     const first = await createFullEndpoint({
@@ -2618,7 +2618,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T220 final D95 deletion removes bridge producers from source and dist', async () => {
+  it('final provider-bridge deletion removes bridge producers from source and dist', async () => {
     const source = await readFile(
       new URL('../../src/core/internal/outbound-attachment.ts', import.meta.url),
       'utf8'
@@ -2634,7 +2634,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T221 provider and adjacent-consumer artifacts expose the final removed D95 boundary', async () => {
+  it('provider and adjacent-consumer artifacts expose the final removed provider-bridge boundary', async () => {
     const featureNames = ['provider', 'discovery', 'control', 'canonical-chunk'] as const
     const sourceTexts = await Promise.all(
       featureNames.map((name) =>
@@ -2666,7 +2666,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(packageJson.exports['./core/internal/plugin-shared-keys']).toBeUndefined()
   })
 
-  it('T223 chunk is an explicitly inventoried D95 consumer with canonical assembly ownership', async () => {
+  it('chunk is an explicitly inventoried provider-bridge consumer with canonical assembly ownership', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createFullEndpoint({
       id: 'r73-chunk-server',
@@ -2714,29 +2714,29 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T224 superseded copied bridge injection has no surviving shared-key seam', () => {
-    assertNoRemovedD95Key(Reflect.ownKeys(RpcPortName))
+  it('superseded copied bridge injection has no surviving shared-key seam', () => {
+    assertNoRemovedBridgeKey(Reflect.ownKeys(RpcPortName))
   })
 
-  it('T225 superseded hostile bridge injection has no surviving publisher descriptor seam', async () => {
+  it('superseded hostile bridge injection has no surviving publisher descriptor seam', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r73-final-publisher'
     })
     try {
       for (const descriptor of fixture.descriptors) {
-        assertNoRemovedD95Key([
+        assertNoRemovedBridgeKey([
           ...(descriptor.sharedProvides ?? []),
           ...(descriptor.sharedConsumes ?? []),
           ...(descriptor.sharedOptionalConsumes ?? [])
         ])
-        assertNoRemovedD95Key(Reflect.ownKeys(descriptor.claims))
+        assertNoRemovedBridgeKey(Reflect.ownKeys(descriptor.claims))
       }
     } finally {
       await fixture.dispose().catch(() => undefined)
     }
   })
 
-  it('T226 terminal disposal leaves no D95 compatibility installation', async () => {
+  it('terminal disposal leaves no provider-bridge compatibility installation', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r73-final-terminal'
     })
@@ -2752,7 +2752,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T232 Host disposal removes all final outbound compatibility residue', async () => {
+  it('Host disposal removes all final outbound compatibility residue', async () => {
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r73-result-disposal'
     })
@@ -2787,8 +2787,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T227 superseded replacement injection has no translator normalization seam', async () => {
-    const texts = await readFinalD95BoundaryTexts()
+  it('superseded replacement injection has no translator normalization seam', async () => {
+    const texts = await readFinalBridgeBoundaryTexts()
     for (const text of texts) {
       expect(text).not.toContain('createOutboundCompatibilityPort')
       expect(text).not.toContain('normalizeOutboundCompatibilityPort')
@@ -2796,7 +2796,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T228 superseded missing-member injection has no internal export seam', async () => {
+  it('superseded missing-member injection has no internal export seam', async () => {
     const packageJson = JSON.parse(
       await readFile(new URL('../../package.json', import.meta.url), 'utf8')
     ) as { readonly exports: Readonly<Record<string, unknown>> }
@@ -2805,14 +2805,14 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     ).toEqual([])
   })
 
-  it('T229 superseded reordered injection has no runtime or declaration seam', async () => {
-    const texts = await readFinalD95BoundaryTexts()
+  it('superseded reordered injection has no runtime or declaration seam', async () => {
+    const texts = await readFinalBridgeBoundaryTexts()
     for (const text of texts) {
       expect(text).not.toContain('outboundCompatibility')
     }
   })
 
-  it('T230 superseded prototype injection has no packed deep-import seam', async () => {
+  it('superseded prototype injection has no packed deep-import seam', async () => {
     const packageJson = JSON.parse(
       await readFile(new URL('../../package.json', import.meta.url), 'utf8')
     ) as { readonly exports: Readonly<Record<string, unknown>> }
@@ -2820,7 +2820,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(Object.keys(packageJson.exports)).not.toContain('./core/internal/plugin-shared-keys')
   })
 
-  it('T231 cross-endpoint final composition has no compatibility publication', async () => {
+  it('cross-endpoint final composition has no compatibility publication', async () => {
     const owner = await createActualAdmissionFixture({
       endpointId: 'r73-cross-owner'
     })
@@ -2831,7 +2831,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       fixture = await createActualAdmissionFixture({
         endpointId: 'r73-cross-consumer'
       })
-      await assertMigratedControlIgnoresD95(fixture)
+      await assertMigratedControlIgnoresBridge(fixture)
       const ownerDispose = owner.host.dispose()
       const repeatedOwnerDispose = owner.host.dispose()
       let ownerDisposalFailure: unknown
@@ -2843,7 +2843,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect({
         ownerDisposeStable: repeatedOwnerDispose === ownerDispose,
         ownerDisposalFailure,
-        ownerTerminal: projectD95TerminalSnapshot(owner.snapshot())
+        ownerTerminal: projectBridgeTerminalSnapshot(owner.snapshot())
       }).toEqual({
         ownerDisposeStable: true,
         ownerDisposalFailure: undefined,
@@ -2867,7 +2867,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T131 provider cancellation reuses the existing verified abort path and releases terminal state', async () => {
+  it('provider cancellation reuses the existing verified abort path and releases terminal state', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let started!: () => void
     let release!: () => void
@@ -2916,7 +2916,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T195 providerCancellation publishes one frozen endpoint-local abort port', async () => {
+  it('providerCancellation publishes one frozen endpoint-local abort port', async () => {
     const first = await createActualAdmissionFixture({ endpointId: 'r71-port-first' })
     const second = await createActualAdmissionFixture({ endpointId: 'r71-port-second' })
     try {
@@ -2955,7 +2955,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T196 providerCancellation aborts an active Host-installed task by task id', async () => {
+  it('providerCancellation aborts an active Host-installed task by task id', async () => {
     let started!: () => void
     let observedAbort!: () => void
     let observedAborts = 0
@@ -3036,7 +3036,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T197 providerCancellation rejects cross-endpoint task control and isolates release', async () => {
+  it('providerCancellation rejects cross-endpoint task control and isolates release', async () => {
     const makeFixture = async (endpointId: string, started: () => void, aborted: () => void) =>
       createActualAdmissionFixture({
         endpointId,
@@ -3116,7 +3116,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T199 providerCancellation before registration is a no-op with no owner-state allocation', async () => {
+  it('providerCancellation before registration is a no-op with no owner-state allocation', async () => {
     let executions = 0
     const fixture = await createActualAdmissionFixture({
       endpointId: 'r71-before-registration',
@@ -3151,7 +3151,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T200 providerCancellation after completion is idempotent and preserves Host disposal identity', async () => {
+  it('providerCancellation after completion is idempotent and preserves Host disposal identity', async () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-after-completion' })
     try {
       await fixture.install()
@@ -3198,7 +3198,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T201 repeated same-tick providerCancellation aborts one controller exactly once', async () => {
+  it('repeated same-tick providerCancellation aborts one controller exactly once', async () => {
     let started!: () => void
     let notifyAbort!: () => void
     let observedAborts = 0
@@ -3279,7 +3279,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T202 providerCancellation late resolve emits no response and releases canonical state', async () => {
+  it('providerCancellation late resolve emits no response and releases canonical state', async () => {
     let started!: () => void
     let release!: () => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -3362,7 +3362,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T203 providerCancellation late reject reports the raw error without a second response', async () => {
+  it('providerCancellation late reject reports the raw error without a second response', async () => {
     const latePrimary = new Error('r71 late rejection')
     let started!: () => void
     let rejectLate!: (error: unknown) => void
@@ -3452,7 +3452,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T204 caller primitive abort reason remains exact on the endpoint-owned path', async () => {
+  it('caller primitive abort reason remains exact on the endpoint-owned path', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let started!: () => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -3500,7 +3500,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T205 forged non-string providerCancellation ids are fail-closed', async () => {
+  it('forged non-string providerCancellation ids are fail-closed', async () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-forged-id' })
     try {
       await fixture.install()
@@ -3517,7 +3517,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T206 real provider completion releases one identity admission lease before terminal disposal', async () => {
+  it('real provider completion releases one identity admission lease before terminal disposal', async () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-identity-complete' })
     try {
       await fixture.install()
@@ -3568,7 +3568,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T207 repeated shared-port cancellation and late settlement release one identity lease', async () => {
+  it('repeated shared-port cancellation and late settlement release one identity lease', async () => {
     let started!: () => void
     let release!: () => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -3647,7 +3647,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T208 provider failure releases one identity admission lease and preserves the raw report', async () => {
+  it('provider failure releases one identity admission lease and preserves the raw report', async () => {
     const failure = new Error('r71 identity failure')
     const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
@@ -3714,7 +3714,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T209 identity-release observation is isolated, non-forgeable, and non-interfering', async () => {
+  it('identity-release observation is isolated, non-forgeable, and non-interfering', async () => {
     const [first, second] = await Promise.all([
       createActualAdmissionFixture({ endpointId: 'r71-identity-first' }),
       createActualAdmissionFixture({ endpointId: 'r71-identity-second' })
@@ -3748,7 +3748,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T210 duplicate identity observation registration uses tokens and unregisters fail-closed', async () => {
+  it('duplicate identity observation registration uses tokens and unregisters fail-closed', async () => {
     const fixture = await createActualAdmissionFixture({ endpointId: 'r71-identity-token' })
     try {
       await fixture.install()
@@ -3780,7 +3780,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T211 built declarations and package exports hide the identity observer callables', async () => {
+  it('built declarations and package exports hide the identity observer callables', async () => {
     const declaration = await readFile(
       new URL('../../dist/core/internal/test-observer.d.ts', import.meta.url),
       'utf8'
@@ -3804,7 +3804,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(packageJson.exports['./core/internal/test-observer']).toBeUndefined()
   })
 
-  it('T132 source scan keeps provider ownership on registry/executor/replay and forbids a second lifecycle owner', async () => {
+  it('source scan keeps provider ownership on registry/executor/replay and forbids a second lifecycle owner', async () => {
     const source = await readFile(
       new URL('../../src/core/internal/provider-attachment.ts', import.meta.url),
       'utf8'
@@ -3817,7 +3817,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(source).not.toContain('new PluginHost')
   })
 
-  it('T133 failed provider installation can retry with a fresh candidate snapshot', async () => {
+  it('failed provider installation can retry with a fresh candidate snapshot', async () => {
     const [, failedTransport] = createMemoryTransportPair()
     const failedCause = new Error('failed provider candidate')
     const failedProvider = {} as Record<string, IRpcProvider>
@@ -3852,7 +3852,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T134 hostile provider-map getter at first position preserves failedName and original cause', async () => {
+  it('hostile provider-map getter at first position preserves failedName and original cause', async () => {
     const cause = new Error('hostile alpha getter')
     const reads: string[] = []
     const providerMap = {} as Record<string, IRpcProvider>
@@ -3915,7 +3915,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T135 hostile provider-map getter at middle position preserves failedName and original cause', async () => {
+  it('hostile provider-map getter at middle position preserves failedName and original cause', async () => {
     const cause = new Error('hostile beta getter')
     const reads: string[] = []
     const providerMap = {} as Record<string, IRpcProvider>
@@ -3985,7 +3985,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T136 hostile provider-map getter at last position preserves failedName and original cause', async () => {
+  it('hostile provider-map getter at last position preserves failedName and original cause', async () => {
     const cause = new Error('hostile gamma getter')
     const reads: string[] = []
     const providerMap = {} as Record<string, IRpcProvider>
@@ -4062,7 +4062,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T137 concurrent same-map transactions isolate passive observation cleanup', async () => {
+  it('concurrent same-map transactions isolate passive observation cleanup', async () => {
     const providerMap = {
       echo: (context: Parameters<IRpcProvider>[0]) => context.success('shared-candidate')
     }
@@ -4095,7 +4095,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T167 Host-installed provider verifies receiver admission before execution', async () => {
+  it('Host-installed provider verifies receiver admission before execution', async () => {
     let executions = 0
     const fixture = await createActualAdmissionFixture({
       providerMap: {
@@ -4134,7 +4134,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T168 Host-installed replay ledger suppresses duplicate task execution', async () => {
+  it('Host-installed replay ledger suppresses duplicate task execution', async () => {
     let executions = 0
     const fixture = await createActualAdmissionFixture({
       providerMap: {
@@ -4157,7 +4157,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T169 Host-installed dispatch-only execution sends no response', async () => {
+  it('Host-installed dispatch-only execution sends no response', async () => {
     let executions = 0
     const fixture = await createActualAdmissionFixture({
       providerMap: {
@@ -4183,7 +4183,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T170 Host-installed missing provider returns the canonical not-found response', async () => {
+  it('Host-installed missing provider returns the canonical not-found response', async () => {
     const fixture = await createActualAdmissionFixture({
       providerMap: {
         echo: (context) => context.success('present')
@@ -4209,7 +4209,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T171 Host-installed unbranded provider result reports not-settled', async () => {
+  it('Host-installed unbranded provider result reports not-settled', async () => {
     const fixture = await createActualAdmissionFixture({
       providerMap: {
         echo: () => ({ ok: true, data: 'unbranded' }) as never
@@ -4235,7 +4235,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T172 Host-installed reentrant duplicate request remains idempotent', async () => {
+  it('Host-installed reentrant duplicate request remains idempotent', async () => {
     let executions = 0
     let clientTransport: IRpcTransport | undefined
     const request = createProviderRequest('reentrant')
@@ -4260,7 +4260,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T173 concurrent Host endpoints preserve endpoint-local provider identity', async () => {
+  it('concurrent Host endpoints preserve endpoint-local provider identity', async () => {
     const firstExecutions: string[] = []
     const secondExecutions: string[] = []
     const [first, second] = await Promise.all([
@@ -4293,7 +4293,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T174 Host-installed async provider rejection preserves terminal controller residue', async () => {
+  it('Host-installed async provider rejection preserves terminal controller residue', async () => {
     const fixture = await createActualAdmissionFixture({
       providerMap: {
         echo: async () => {
@@ -4323,7 +4323,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T175 Host-installed transfer overflow preserves the native provider failure code', async () => {
+  it('Host-installed transfer overflow preserves the native provider failure code', async () => {
     const fixture = await createActualAdmissionFixture({
       providerMap: {
         echo: (context) =>
@@ -4352,7 +4352,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T176 real Host admission rejects forged source, sender, receiver, and cross-endpoint frames', async () => {
+  it('real Host admission rejects forged source, sender, receiver, and cross-endpoint frames', async () => {
     const acceptedPeerId = 'r70-peer'
     let executions = 0
     const fixture = await createActualAdmissionFixture({
@@ -4415,7 +4415,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T177 concurrent duplicate requests preserve replay response uniqueness and controller release', async () => {
+  it('concurrent duplicate requests preserve replay response uniqueness and controller release', async () => {
     let executions = 0
     let started!: () => void
     let release!: () => void
@@ -4472,7 +4472,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T178 real Host admission capacity rejects one of 65 concurrent unique tasks and releases all', async () => {
+  it('real Host admission capacity rejects one of 65 concurrent unique tasks and releases all', async () => {
     let active = 0
     let maximumActive = 0
     let reachedCapacity!: () => void
@@ -4527,8 +4527,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T179 real Host schema failure preserves serialized native identity and residue', async () => {
-    const schemaCause = new Error('R70 schema cause')
+  it('real Host schema failure preserves serialized native identity and residue', async () => {
+    const schemaCause = new Error('schema cause')
     let executions = 0
     const fixture = await createActualAdmissionFixture({
       contractConfig: {
@@ -4581,8 +4581,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T180 late provider rejection reports the original error and releases operation state', async () => {
-    const latePrimary = new Error('R70 late provider rejection')
+  it('late provider rejection reports the original error and releases operation state', async () => {
+    const latePrimary = new Error('late provider rejection')
     let started!: () => void
     let rejectLate!: (error: unknown) => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -4632,7 +4632,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T182 two real Host transactions isolate cross-endpoint and post-removal requests', async () => {
+  it('two real Host transactions isolate cross-endpoint and post-removal requests', async () => {
     let firstExecutions = 0
     let secondExecutions = 0
     const firstPeer = 'r70-peer-first'
@@ -4733,8 +4733,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T183 synchronous provider failure preserves raw report identity and terminal release', async () => {
-    const primary = new Error('R70 synchronous provider failure')
+  it('synchronous provider failure preserves raw report identity and terminal release', async () => {
+    const primary = new Error('synchronous provider failure')
     const reports: unknown[] = []
     const fixture = await createActualAdmissionFixture({
       hookErrorReporter: (error) => reports.push(error),
@@ -4780,7 +4780,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T184 post-terminal late resolve has no response and leaves no provider state', async () => {
+  it('post-terminal late resolve has no response and leaves no provider state', async () => {
     let started!: () => void
     let resolveLate!: () => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -4825,8 +4825,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T185 post-terminal late reject reports the distinct raw primary without a response', async () => {
-    const latePrimary = new Error('R70 post-terminal late rejection')
+  it('post-terminal late reject reports the distinct raw primary without a response', async () => {
+    const latePrimary = new Error('post-terminal late rejection')
     let started!: () => void
     let rejectLate!: (error: unknown) => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -4874,8 +4874,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T186 result schema failure retains raw cause in serialized error graph', async () => {
-    const resultCause = new Error('R70 result schema cause')
+  it('result schema failure retains raw cause in serialized error graph', async () => {
+    const resultCause = new Error('result schema cause')
     const fixture = await createActualAdmissionFixture({
       contractConfig: {
         schemas: {
@@ -4928,9 +4928,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T187 synchronous provider WebRPC error serializes primary and cause across the real seam', async () => {
-    const cause = new Error('R70 serialized sync cause')
-    const primary = new RpcError(RpcCoreErrorCode.internal, 'R70 serialized sync primary', cause)
+  it('synchronous provider WebRPC error serializes primary and cause across the real seam', async () => {
+    const cause = new Error('serialized sync cause')
+    const primary = new RpcError(RpcCoreErrorCode.internal, 'serialized sync primary', cause)
     const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -4994,9 +4994,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T188 asynchronous provider WebRPC error serializes primary and cause across the real seam', async () => {
-    const cause = new Error('R70 serialized async cause')
-    const primary = new RpcError(RpcCoreErrorCode.internal, 'R70 serialized async primary', cause)
+  it('asynchronous provider WebRPC error serializes primary and cause across the real seam', async () => {
+    const cause = new Error('serialized async cause')
+    const primary = new RpcError(RpcCoreErrorCode.internal, 'serialized async primary', cause)
     const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -5059,9 +5059,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T189 post-terminal late WebRPC rejection reports native cause identity without response', async () => {
-    const cause = new Error('R70 late native cause')
-    const primary = new RpcError(RpcCoreErrorCode.internal, 'R70 late native primary', cause)
+  it('post-terminal late WebRPC rejection reports native cause identity without response', async () => {
+    const cause = new Error('late native cause')
+    const primary = new RpcError(RpcCoreErrorCode.internal, 'late native primary', cause)
     let started!: () => void
     let rejectLate!: (error: unknown) => void
     const startedPromise = new Promise<void>((resolve) => {
@@ -5112,7 +5112,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T190 invalid provider transfer shape preserves native contract failure and release', async () => {
+  it('invalid provider transfer shape preserves native contract failure and release', async () => {
     const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -5192,8 +5192,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T191 params schema failure preserves exact parser cause in serialized graph', async () => {
-    const paramsCause = new Error('R70 params schema cause')
+  it('params schema failure preserves exact parser cause in serialized graph', async () => {
+    const paramsCause = new Error('params schema cause')
     const fixture = await createActualAdmissionFixture({
       contractConfig: {
         schemas: {
@@ -5239,7 +5239,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T194 transfer overflow preserves native failure identity and requires serialized error graph', async () => {
+  it('transfer overflow preserves native failure identity and requires serialized error graph', async () => {
     const observations: IRpcOutboundCommandObservation[] = []
     const fixture = await createActualAdmissionFixture({
       observeOutboundCommand: (observation) => observations.push(observation),
@@ -5319,9 +5319,9 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T181 canonical endpoint disposal preserves Promise identity and terminal provider residue', async () => {
+  it('canonical endpoint disposal preserves Promise identity and terminal provider residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const primary = new Error('R70 canonical provider failure')
+    const primary = new Error('canonical provider failure')
     const server = await createProviderEndpoint({
       id: 'r70-canonical-provider',
       transport: serverTransport,
@@ -5363,7 +5363,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     }
   })
 
-  it('T214 owned provider transport closes once after successful canonical disposal', async () => {
+  it('owned provider transport closes once after successful canonical disposal', async () => {
     const [, baseTransport] = createMemoryTransportPair()
     let closeCalls = 0
     const transport: IRpcTransport = {
@@ -5418,7 +5418,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(readEndpointDebugSnapshot(endpoint)).toEqual(terminal)
   })
 
-  it('T215 borrowed provider transport remains open after repeated canonical disposal', async () => {
+  it('borrowed provider transport remains open after repeated canonical disposal', async () => {
     const [, baseTransport] = createMemoryTransportPair()
     let closeCalls = 0
     const transport: IRpcTransport = {

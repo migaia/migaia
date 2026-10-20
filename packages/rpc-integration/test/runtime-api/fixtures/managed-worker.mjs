@@ -48,7 +48,7 @@ prepared = createThreadPeer({
         }
       : {}),
   provide: {
-    /** D40 observes the real Worker timer, never a parent-side synthetic deadline. */
+    /** Observes the real Worker timer, never a parent-side synthetic deadline. */
     delay: async (duration) => {
       await new Promise((resolve) => setTimeout(resolve, duration))
       return 7
@@ -103,7 +103,7 @@ prepared = createThreadPeer({
           if (
             data.crash &&
             data.sequence === 1 &&
-            (value === 'retry' || value?.marker === 'r14-retry')
+            (value === 'retry' || value?.marker === 'fixture-retry')
           ) {
             const peer = await prepared
             await peer.request('parent.started')

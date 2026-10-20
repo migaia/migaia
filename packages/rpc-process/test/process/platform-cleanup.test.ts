@@ -3,7 +3,7 @@ import { createWindowsJobProcessLauncher } from '../../src/process/adapters/wind
 import { RpcProcessErrorCode } from '@migaia/rpc-process'
 
 describe('platform cleanup evidence boundary', () => {
-  it('[A11] unsupported Windows launcher never starts user code', async () => {
+  it('unsupported Windows launcher never starts user code', async () => {
     const launcher = createWindowsJobProcessLauncher()
     const launched = launcher.launch(
       {

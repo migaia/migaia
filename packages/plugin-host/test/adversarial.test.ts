@@ -12,7 +12,7 @@ class Host extends PluginHost<Record<string, never>, string> {
   }
 }
 
-describe('AF-T10 plugin-host scheduler/policy options', () => {
+describe('plugin-host scheduler/policy options', () => {
   it('rejects NaN/Infinity/negative timeout options with INVALID_OPTION', () => {
     for (const value of [NaN, Infinity, -Infinity, -1]) {
       expect(() => new Host({ queueAdmissionTimeoutMs: value } as any)).toThrow(TypeError)
@@ -115,14 +115,14 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
     }
   })
 
-  it('AF-T19: a scheduler missing now/schedule is rejected with INVALID_OPTION', () => {
+  it('a scheduler missing now/schedule is rejected with INVALID_OPTION', () => {
     expect(() => new Host({ scheduler: {} } as any)).toThrow(TypeError)
     expect(() => new Host({ scheduler: { now: 'x', schedule: () => undefined } } as any)).toThrow(
       TypeError
     )
   })
 
-  it('AF-T18: dispose step timeout is driven by the injected manual scheduler (no host timer)', async () => {
+  it('dispose step timeout is driven by the injected manual scheduler (no host timer)', async () => {
     const scheduler = createManualScheduler()
     const host = new Host({ scheduler, disposeStepTimeoutMs: 100 } as any)
     await host.use({
@@ -141,7 +141,7 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
     expect((outcome as any).cleanupErrors.length).toBeGreaterThan(0)
   })
 
-  it('AF-T28: hostile scheduler getter is wrapped as INVALID_OPTION with the original as cause', () => {
+  it('hostile scheduler getter is wrapped as INVALID_OPTION with the original as cause', () => {
     const getterError = new Error('scheduler getter boom')
     const scheduler = new Proxy(
       {},
@@ -161,7 +161,7 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
     expect((caught as { cause?: unknown }).cause).toBe(getterError)
   })
 
-  it('AF-T31: scheduler is read exactly once and the validated snapshot is used', () => {
+  it('scheduler is read exactly once and the validated snapshot is used', () => {
     let reads = 0
     const scheduler = { now: () => 0, schedule: () => ({ cancel: () => {} }) }
     const options = {

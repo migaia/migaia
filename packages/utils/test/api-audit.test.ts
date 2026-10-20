@@ -15,7 +15,7 @@ import {
 } from '../src/promise.js'
 
 describe('utils audited public contracts', () => {
-  it('U-B14 accepts PromiseLike callbacks and preserves the one native Promise identity', async () => {
+  it('accepts PromiseLike callbacks and preserves the one native Promise identity', async () => {
     /** The public signature must match the existing captured-then assimilation contract. */
     const load = onceAsync((): PromiseLike<number> => Promise.resolve(7))
     /** All consumers share one native Promise even when the callback only promises PromiseLike. */
@@ -25,7 +25,7 @@ describe('utils audited public contracts', () => {
     expect(first).toBeInstanceOf(Promise)
   })
 
-  it('U-D04 retains the conflict cause and attaches its registered native identity', () => {
+  it('retains the conflict cause and attaches its registered native identity', () => {
     /** Conflicting public identities must not erase the first error. */
     const original = attachErrorIdentity(new Error('original'), { source: 'first', code: 'FIRST' })
     expect(() => attachErrorIdentity(original, { source: 'second', code: 'SECOND' })).toThrowError(
@@ -37,7 +37,7 @@ describe('utils audited public contracts', () => {
     )
   })
 
-  it('U-D05 attaches INVALID_ARGUMENT while retaining native validation error families', async () => {
+  it('attaches INVALID_ARGUMENT while retaining native validation error families', async () => {
     /** Every documented public argument rejection uses the existing code, never a new error family. */
     const operations: readonly (() => unknown)[] = [
       () => [...streamBase64Chunks(new Uint8Array([1]), 2)],
@@ -60,7 +60,7 @@ describe('utils audited public contracts', () => {
     }
   })
 
-  it('U-D06 names UTF-8 in fatal decoding diagnostics', () => {
+  it('names UTF-8 in fatal decoding diagnostics', () => {
     expect(() => decodeUtf8(new Uint8Array([255]), { fatal: true })).toThrowError(
       expect.objectContaining({
         code: 'INVALID_ENCODING',
@@ -69,7 +69,7 @@ describe('utils audited public contracts', () => {
     )
   })
 
-  it('U-D07 contains has trap failures in the property probe result', () => {
+  it('contains has trap failures in the property probe result', () => {
     /** A failed existence probe is observable data, just like a failed getter. */
     const cause = new Error('has trap failed')
     expect(
@@ -87,7 +87,7 @@ describe('utils audited public contracts', () => {
     ).toEqual({ kind: 'failed', error: cause })
   })
 
-  it('U-D08 accepts parsed tuples and rejects string paths at the type boundary', () => {
+  it('accepts parsed tuples and rejects string paths at the type boundary', () => {
     expect(probeObjectPathSegments({ name: 'value' }, ['name'] as const)).toMatchObject({
       kind: 'value',
       value: 'value'
@@ -96,7 +96,7 @@ describe('utils audited public contracts', () => {
     expectTypeOf(probeObjectPathSegments<{ name: string }, 'name'>).toBeFunction()
   })
 
-  it('U-D09 rejects exclusive signal options before total timeout can start work', async () => {
+  it('rejects exclusive signal options before total timeout can start work', async () => {
     /** The total deadline must not remove an invalid public option before admission checks. */
     const operation = vi.fn(() => 42)
     await expect(
@@ -113,7 +113,7 @@ describe('utils audited public contracts', () => {
     expect(operation).not.toHaveBeenCalled()
   })
 
-  it('U-D10 exposes attempt scope on both the rejection and operation cancellation reason', async () => {
+  it('exposes attempt scope on both the rejection and operation cancellation reason', async () => {
     /** The same attempt deadline must identify both cancellation and the rejected result. */
     const scheduler = createManualScheduler()
     /** Captured native signal proves the actual operation observes the promised reason. */
@@ -141,7 +141,7 @@ describe('utils audited public contracts', () => {
     expect(signal?.reason).toMatchObject({ code: 'DEADLINE_EXCEEDED', scope: 'attempt' })
   })
 
-  it('U-D11 reports secondary reporter failures without an unhandled rejected Promise', async () => {
+  it('reports secondary reporter failures without an unhandled rejected Promise', async () => {
     /**
      * Captured host callbacks prove reporting while preventing intentional host throws during
      * tests.
@@ -171,7 +171,7 @@ describe('utils audited public contracts', () => {
     }
   })
 
-  it('U-D12 only narrows errors with a registered utils code', () => {
+  it('only narrows errors with a registered utils code', () => {
     expect(isUtilsError(Object.assign(new Error('missing'), { source: '@migaia/utils' }))).toBe(
       false
     )

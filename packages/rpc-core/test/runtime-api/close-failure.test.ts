@@ -5,7 +5,7 @@ import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { tagRpcError } from '../../dist/core/errors.js'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 
-it('[A34][L2] a failed physical close keeps the original error and repeated close Promise', async () => {
+it('[L2] a failed physical close keeps the original error and repeated close Promise', async () => {
   /** Both callable owners complete genuine agreement and business before cleanup failure. */
   const channel = runtimeSources()
   /** The external physical owner supplies one coded native failure without rebuilding its identity. */
@@ -39,7 +39,7 @@ it('[A34][L2] a failed physical close keeps the original error and repeated clos
     const first = peers[0].close()
     assert.equal(peers[0].close(), first)
     await assert.rejects(first, (error) => error === original)
-    assert.equal(closes, 1, '[A34] failed close cannot repeat physical ownership release')
+    assert.equal(closes, 1, 'failed close cannot repeat physical ownership release')
     await assert.rejects(async () => peers[0].request('echo', 43), { code: 'ENDPOINT_DISPOSED' })
   } finally {
     await peers[1].close()

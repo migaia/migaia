@@ -4,7 +4,7 @@ import { createThreadPlugin } from '@migaia/rpc-threads'
 import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 
-it('[A41][A42] target queries return safe promises and apply source/name/direction filters before business dispatch', async () => {
+it('target queries return safe promises and apply source/name/direction filters before business dispatch', async () => {
   /** Genuine Hosts retain the original committed registration and ready indexes. */
   const hosts = [
     runtimeTestHost({
@@ -45,7 +45,7 @@ it('[A41][A42] target queries return safe promises and apply source/name/directi
     assert.ok(connection)
     const before = frames
     const pending = outlet.get('remote')
-    assert.ok(pending instanceof Promise, '[A41] get is an asynchronous safe query')
+    assert.ok(pending instanceof Promise, 'get is an asynchronous safe query')
     const detail = await pending
     /** Different cold reads have distinct observation times but the same owner fields and values. */
     const comparable = (value: unknown) =>
@@ -83,11 +83,7 @@ it('[A41][A42] target queries return safe promises and apply source/name/directi
     ])
       await assert.rejects(outlet.list({ filter } as never), { code: 'INVALID_CONFIG' })
     await assert.rejects(outlet.get('missing'), { code: 'TARGET_UNKNOWN' })
-    assert.equal(
-      frames,
-      before,
-      '[A41] all query formats and filters send zero hidden management frames'
-    )
+    assert.equal(frames, before, 'all query formats and filters send zero hidden management frames')
     assert.equal(await outlet.request('remote', 'echo', 42), 42)
   } finally {
     for (const host of hosts) await host.dispose()

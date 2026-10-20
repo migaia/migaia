@@ -9,7 +9,7 @@ import { assertEnvelope, type IPersistHandle } from '../src/index.js'
 import { defaultJsonCodec, PersistState } from '../src/index.js'
 
 describe('store-persist audit regressions', () => {
-  it('SP-D01 delivers the same real backend failure to concurrent strict flush calls', async () => {
+  it('delivers the same real backend failure to concurrent strict flush calls', async () => {
     /** Public Store and backend own the actual state and write failure. */
     const runtime = createRuntime({ onError: () => {} })
     /** No pending state change introduces a debounced write before the explicit flush calls. */
@@ -39,7 +39,7 @@ describe('store-persist audit regressions', () => {
     }
   })
 
-  it('SP-D02 round-trips mixed legacy lookalikes and current Map/Set values without dropping fields', async () => {
+  it('round-trips mixed legacy lookalikes and current Map/Set values without dropping fields', async () => {
     /** Extra user fields make these ordinary data records, not exact legacy collection markers. */
     const value = {
       version: 0,
@@ -62,7 +62,7 @@ describe('store-persist audit regressions', () => {
     expect(decoded.state.currentSet).toEqual(value.state.currentSet)
   })
 
-  it('SP-D02 continues reading exact one-key legacy collection archives', async () => {
+  it('continues reading exact one-key legacy collection archives', async () => {
     /** Exact one-key old markers remain the supported archive migration grammar. */
     const raw = JSON.stringify({
       version: 0,
@@ -78,7 +78,7 @@ describe('store-persist audit regressions', () => {
     expect(decoded.state.map).toEqual(new Map([['old', 1]]))
     expect(decoded.state.set).toEqual(new Set(['old']))
   })
-  it('SP-D03 invokes a facade option getter with the original receiver once', async () => {
+  it('invokes a facade option getter with the original receiver once', async () => {
     /** Both value source and storage are complete actual public implementations. */
     const runtime = createRuntime({ onError: () => {} })
     /** An extra option property is legitimately read by the key getter through this. */
@@ -109,7 +109,7 @@ describe('store-persist audit regressions', () => {
     }
   })
 
-  it('SP-D04 preserves the live keyed handle getter while value remains the initial snapshot', async () => {
+  it('preserves the live keyed handle getter while value remains the initial snapshot', async () => {
     /** AtomStore owns the business value independently of persistence. */
     const atoms = createAtomStore(createRuntime())
     /** The initial snapshot differs from the restored archive. */
@@ -136,7 +136,7 @@ describe('store-persist audit regressions', () => {
     }
   })
 
-  it('SP-D05 rejects ready when disposal cancels the still-pending hydration', async () => {
+  it('rejects ready when disposal cancels the still-pending hydration', async () => {
     /** Gate the real backend read without replacing its cancellation or capability semantics. */
     const backend = memoryStorageHost()
     /** The original backend get remains the sole actual storage operation. */
@@ -185,7 +185,7 @@ describe('store-persist audit regressions', () => {
     }
   })
 
-  it('SP-D06 keeps a failed envelope getter reachable through a coded validation error', () => {
+  it('keeps a failed envelope getter reachable through a coded validation error', () => {
     /** The accessor owns this real native failure and its stack. */
     const primary = new Error('envelope getter failed')
     /** The public unknown boundary must expose its semantic validation identity. */
@@ -211,11 +211,11 @@ describe('store-persist audit regressions', () => {
     expect((failure as Error).cause).toBe(primary)
     expect(primary.stack).toBeTruthy()
   })
-  it('SP-C02 keeps the private active projection out of the public runtime vocabulary', () => {
+  it('keeps the private active projection out of the public runtime vocabulary', () => {
     expect(PersistState).not.toHaveProperty('active')
     expect(PersistState.disposed).toBe('disposed')
   })
-  it('SP-D02 preserves ordinary tuple-shaped arrays inside a valid legacy archive', async () => {
+  it('preserves ordinary tuple-shaped arrays inside a valid legacy archive', async () => {
     /** The old format did not assign new-format meaning to an application array in a Map value. */
     const literal = ['migaia-collections-json-v1', 'map', [['application', 1]]]
     /** An exact old marker identifies the existing legacy archive grammar. */

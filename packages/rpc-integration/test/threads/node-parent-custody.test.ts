@@ -3,7 +3,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 
 describe('Node child-port lazy replay ownership', () => {
-  it('[A6/A7/A21] observes the exact parent port only when its canonical channel opens', async () => {
+  it('observes the exact parent port only when its canonical channel opens', async () => {
     /**
      * A real Node port supplies message and close events; only the child-module binding is
      * injected.

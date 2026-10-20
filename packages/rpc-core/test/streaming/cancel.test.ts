@@ -17,8 +17,8 @@ function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void
   }
 }
 
-/** A4 return keeps its local value and releases the remote generator once. */
-describe('streaming A4 cancellation', () => {
+/** Return keeps its local value and releases the remote generator once. */
+describe('streaming cancellation', () => {
   it('sends one cancel and receives the producer cleanup acknowledgement', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     /** Independent virtual deadline clocks let the provider expire before the caller. */

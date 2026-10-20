@@ -280,23 +280,23 @@ Tray core 不增加 timeout、scheduler 或强制终止策略。可能永久 pen
 | `runtimeAborted`         | `RUNTIME_ABORTED`          | caller/runtime/deadline cooperative abort                      | 按 cancellation 处理并等待 settlement                              |
 | `artifactCleanupFailed`  | `ARTIFACT_CLEANUP_FAILED`  | artifact secondary cleanup failure                             | 检查 cleanupErrors，不替换 mutation primary                        |
 
-| `topicInvalid` | `TRAY_TOPIC_INVALID` | Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `hostInvalid` | `TRAY_HOST_INVALID` | Host definition violates instances R1; provide an admitted host DSL. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `hostUnknown` | `TRAY_HOST_UNKNOWN` | Spawn names an unregistered host in R3; register the host before spawning. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `hostMismatch` | `TRAY_HOST_MISMATCH` | Remote host differs from the admission in R6; select the record's host. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `reservedName` | `TRAY_RESERVED_NAME` | Expose uses a reserved internal plugin in R1; rename the business plugin. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `valueNotPortable` | `TRAY_VALUE_NOT_PORTABLE` | Config or payload violates R3/R6 portable data; remove unsupported values. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `instanceDuplicate` | `TRAY_INSTANCE_DUPLICATE` | Spawn reuses an admitted id in R3; choose a free id or remove the admission. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `instanceStartFailed` | `TRAY_INSTANCE_START_FAILED` | Install or generation init fails in R3/R5; inspect the preserved cause. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `pathNotExposed` | `TRAY_PATH_NOT_EXPOSED` | Dispatcher receives a path outside R2 exposure; use an exposed Feature method. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `childStateInvalid` | `TRAY_CHILD_STATE_INVALID` | Child init repeats or names another host in R2; init once per generation. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `disposed` | `TRAY_DISPOSED` | Operation enters a closing registry in R3; create a new Tray. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `topicInvalid` | `TRAY_TOPIC_INVALID` | The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostInvalid` | `TRAY_HOST_INVALID` | Host definition is invalid; provide an admitted host DSL. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostUnknown` | `TRAY_HOST_UNKNOWN` | Spawn names an unregistered host; register the host before spawning. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostMismatch` | `TRAY_HOST_MISMATCH` | Remote host differs from the admission; select the record's host. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `reservedName` | `TRAY_RESERVED_NAME` | Expose uses a reserved internal plugin; rename the business plugin. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `valueNotPortable` | `TRAY_VALUE_NOT_PORTABLE` | Config or payload is not portable data; remove unsupported values. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceDuplicate` | `TRAY_INSTANCE_DUPLICATE` | Spawn reuses an admitted id; choose a free id or remove the admission. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceStartFailed` | `TRAY_INSTANCE_START_FAILED` | Install or generation init fails; inspect the preserved cause. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `pathNotExposed` | `TRAY_PATH_NOT_EXPOSED` | Dispatcher receives a path outside the exposure; use an exposed Feature method. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `childStateInvalid` | `TRAY_CHILD_STATE_INVALID` | Child init repeats or names another host; init once per generation. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `disposed` | `TRAY_DISPOSED` | Operation enters a closing registry; create a new Tray. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
 
-| `hostUnavailable` | `TRAY_HOST_UNAVAILABLE` | Mesh R1 has no ready host candidate; await a ready instance before calling again. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `routingUnknown` | `TRAY_ROUTING_UNKNOWN` | Mesh R1 policy is absent from registration or declaration; register its branded definition. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `routingInvalid` | `TRAY_ROUTING_INVALID` | Routing policy name or pick violates instances R1; provide a named synchronous policy. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `instanceUnknown` | `TRAY_INSTANCE_UNKNOWN` | Lookup or remote uses an ended admission in R6; obtain a fresh remote. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
-| `instanceNotReady` | `TRAY_INSTANCE_NOT_READY` | Call targets a non-ready instance in R6; await its ready transition. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `hostUnavailable` | `TRAY_HOST_UNAVAILABLE` | The mesh has no ready host candidate; await a ready instance before calling again. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `routingUnknown` | `TRAY_ROUTING_UNKNOWN` | The routing policy is absent from registration or declaration; register its branded definition. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `routingInvalid` | `TRAY_ROUTING_INVALID` | Routing policy name or pick is invalid; provide a named synchronous policy. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceUnknown` | `TRAY_INSTANCE_UNKNOWN` | Lookup or remote uses an ended admission; obtain a fresh remote. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
+| `instanceNotReady` | `TRAY_INSTANCE_NOT_READY` | Call targets a non-ready instance; await its ready transition. | 修正输入或先满足对应接纳/生命周期条件，再按 cause 排查 |
 
 Graph 启动、节点或释放错误仍保留 `@migaia/capability` 的 source/code，不会被 Tray 强行改写。
 

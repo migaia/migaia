@@ -11,7 +11,7 @@ import {
 } from '@migaia/rpc-process'
 import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 
-it('[A2][A3] Deno explicit source does not require or prompt for discovery env permission', () => {
+it('Deno explicit source does not require or prompt for discovery env permission', () => {
   /** Actual Deno executes without allow-env; imported modules and local Feature business run first. */
   const entry = fileURLToPath(new URL('./fixtures/deno-source-permission.mjs', import.meta.url))
   /** The fixture emits only safe preparation counters and error identity, never environment values. */
@@ -19,15 +19,11 @@ it('[A2][A3] Deno explicit source does not require or prompt for discovery env p
     execFileSync('deno', ['run', '--no-prompt', entry], { encoding: 'utf8', timeout: 15000 })
   )
   assert.equal(receipt.ordinary, 42)
-  assert.equal(
-    receipt.prepared,
-    1,
-    '[A2] explicit source prepares with denied discovery permission'
-  )
+  assert.equal(receipt.prepared, 1, 'explicit source prepares with denied discovery permission')
   assert.equal(receipt.sourceCalls, 1)
 })
 
-it('[A2][A3] consumed process discovery cannot redirect a genuine grandchild stdin', async () => {
+it('consumed process discovery cannot redirect a genuine grandchild stdin', async () => {
   /** The same actual automatic-child fixture already proves native forward and reverse business. */
   const entry = fileURLToPath(new URL('./fixtures/automatic-process.mjs', import.meta.url))
   /** Native execution stays with its original launcher and real exit observation. */
@@ -77,15 +73,11 @@ it('[A2][A3] consumed process discovery cannot redirect a genuine grandchild std
       consumed: boolean
       grandchild: { code: string; before: number; after: number }
     }
-    assert.equal(
-      receipt.consumed,
-      true,
-      '[A2] the automatic marker is consumed before nested spawn'
-    )
+    assert.equal(receipt.consumed, true, 'the automatic marker is consumed before nested spawn')
     assert.deepEqual(
       receipt.grandchild,
       Object.assign(Object.create(null), { code: 'INVALID_CONFIG', before: 0, after: 0 }),
-      '[A3] no arbitrary grandchild stdin reader is acquired'
+      'no arbitrary grandchild stdin reader is acquired'
     )
   } finally {
     await peer?.close()
@@ -94,7 +86,7 @@ it('[A2][A3] consumed process discovery cannot redirect a genuine grandchild std
   }
 }, 15000)
 
-it('[A2][A3] a genuine unlaunched Bun Worker rejects missing bootstrap within its cold bound', () => {
+it('a genuine unlaunched Bun Worker rejects missing bootstrap within its cold bound', () => {
   /** The parent uses a native Worker without the library launcher, so there is no trusted bootstrap. */
   const entry = fileURLToPath(new URL('./fixtures/unlaunched-worker-parent.mjs', import.meta.url))
   /**
@@ -106,6 +98,6 @@ it('[A2][A3] a genuine unlaunched Bun Worker rejects missing bootstrap within it
   assert.equal(
     receipt.code,
     'INVALID_CONFIG',
-    '[A3] a missing library bootstrap settles rather than hanging'
+    'a missing library bootstrap settles rather than hanging'
   )
 }, 20000)

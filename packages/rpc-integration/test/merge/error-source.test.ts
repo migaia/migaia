@@ -8,7 +8,7 @@ import {
 } from '@migaia/rpc-core'
 import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
-describe('A4 source continuity through merged layers', () => {
+describe('source continuity through merged layers', () => {
   it('tags contract descriptor failure with contract source and original native type', () => {
     let caught: unknown
     try {

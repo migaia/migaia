@@ -343,9 +343,9 @@ export class PluginHostState<TDomainCore extends object, TValue> {
    * Detaches one registration from every host-visible table, synchronously and without user code.
    *
    * It lives with the state rather than on the host because it is the state's own bookkeeping —
-   * `SM08` requires registration teardown to have one owner instead of the host and the removal
-   * runtime each deleting half. Idempotent: a second call finds nothing of its own left and removes
-   * nothing belonging to whoever claimed the key next.
+   * Registration teardown must have one owner instead of the host and the removal runtime each
+   * deleting half. Idempotent: a second call finds nothing of its own left and removes nothing
+   * belonging to whoever claimed the key next.
    */
   closeRegistration(registration: IRegistration<TDomainCore, TValue>): void {
     this.clearRegistrationPublication(registration)

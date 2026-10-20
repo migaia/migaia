@@ -43,7 +43,7 @@ const declareCodes = (root, directory, name, declaration, subdirectory = '') => 
   return relative(root, file)
 }
 
-test('A1 registry rows use code-unit order and render identically across locales', () => {
+test('registry rows use code-unit order and render identically across locales', () => {
   /** This fixture distinguishes locale collation from UTF-16 code-unit order. */
   const root = fixture()
   try {
@@ -96,7 +96,7 @@ test('A1 registry rows use code-unit order and render identically across locales
   }
 })
 
-test('A2 duplicate source and code fails before changing a registry document', () => {
+test('duplicate source and code fails before changing a registry document', () => {
   /** Two files under one package declare the same semantic code. */
   const root = fixture()
   try {
@@ -139,7 +139,7 @@ test('A2 duplicate source and code fails before changing a registry document', (
   }
 })
 
-test('A3 source-only validation reports counts without reading or writing docs', () => {
+test('source-only validation reports counts without reading or writing docs', () => {
   /** Stale docs distinguish source-only validation from a full registry check. */
   const root = fixture()
   try {
@@ -194,7 +194,7 @@ test('A3 source-only validation reports counts without reading or writing docs',
   assert.match(cli.stdout.trim().split('\n').at(-1) ?? '', /^sources ok: /)
 })
 
-test('A4 generated region includes a source count table before code rows', () => {
+test('generated region includes a source count table before code rows', () => {
   /** Minimal sorted rows make section order observable. */
   const rows = [
     { source: '@fixture/a', code: 'FIRST', scenario: 'First scenario.' },
@@ -251,7 +251,7 @@ const declareBaseline = (root, packages) => {
   return file
 }
 
-test('A5 export collection fails on missing targets and preserves upstream errors', async () => {
+test('export collection fails on missing targets and preserves upstream errors', async () => {
   /** An isolated module tree exercises manifest coverage without a full build. */
   const root = fixture()
   /** Shared global exposes one exact Error instance to the fixture ESM module. */
@@ -315,7 +315,7 @@ test('A5 export collection fails on missing targets and preserves upstream error
   }
 })
 
-test('A6 scoped checks report only admitted differences without writing the baseline', async () => {
+test('scoped checks report only admitted differences without writing the baseline', async () => {
   /** Two packages distinguish admitted from unadmitted export drift. */
   const root = fixture()
   try {
@@ -365,7 +365,7 @@ test('A6 scoped checks report only admitted differences without writing the base
   }
 })
 
-test('A8 merged source changes generate identical and idempotent registration bytes', async () => {
+test('merged source changes generate identical and idempotent registration bytes', async () => {
   /** Independent fixture copies model the two possible child integration orders. */
   const roots = [fixture(), fixture()]
   try {

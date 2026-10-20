@@ -9,7 +9,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 35; index++) await Promise.resolve()
 }
 
-describe('A5 bounded stop', () => {
+describe('bounded stop', () => {
   it('drains before graceful termination and classifies a clean stop', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()

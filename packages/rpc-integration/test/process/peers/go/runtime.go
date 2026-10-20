@@ -65,7 +65,7 @@ func validRuntimeDescription(value record, remoteID string) bool {
 	return true
 }
 
-// U36 uses one baseline directory and physical batch contract, independent of optional runtime profiles.
+// The runtime baseline uses one directory and physical batch contract, independent of optional runtime profiles.
 const (
 	runtimeCapability            = "runtime-api@1"
 	batchCapability              = "batch@1"
@@ -153,7 +153,7 @@ func baselineMembers(frame record) ([]record, bool, error) {
 
 // validateBaselineMember rejects malformed supported envelopes before a handler can inspect their payload.
 func validateBaselineMember(message record) error {
-	// New U25/binary profiles are not installed and cannot be silently treated as ordinary calls.
+	// New runtime-api/binary profiles are not installed and cannot be silently treated as ordinary calls.
 	kind, _ := message["kind"].(string)
 	if strings.HasPrefix(kind, "runtime-") || strings.HasPrefix(kind, "rpc.runtime-api.") || strings.HasPrefix(kind, "rpc.native-binary.") {
 		return errUnsupportedRuntimeProfile

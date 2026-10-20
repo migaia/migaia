@@ -44,7 +44,7 @@ export function captureTransferredContent(
   if (transfer === undefined) return message
   if (isArrayBuffer(message)) {
     if (!transfer.includes(message)) return message
-    // SC9(a): this directly captured backing would detach at the actual send boundary.
+    // This directly captured backing would detach at the actual send boundary.
     return new Uint8Array(message).slice().buffer
   }
   if (!ArrayBuffer.isView(message)) return message
@@ -57,12 +57,12 @@ export function captureTransferredContent(
   /** Only the directly captured backing is compared with the actual send's transfer list. */
   const backing = Reflect.get(prototype, 'buffer', message) as ArrayBuffer
   if (!transfer.includes(backing)) return message
-  // SC9(a): one native backing conversion preserves the directly captured view before detachment.
+  // One native backing conversion preserves the directly captured view before detachment.
   /** Captured views retain their original offsets and native element representation. */
   const copied = new Uint8Array(backing).slice().buffer
   /** Intrinsic offset reads never evaluate custom payload properties. */
   const offset = Reflect.get(prototype, 'byteOffset', message) as number
-  // SC9(a): the replacement native view is required to address the preserved backing.
+  // The replacement native view is required to address the preserved backing.
   return tag === undefined
     ? new DataView(copied, offset, Reflect.get(prototype, 'byteLength', message))
     : new NativeViewConstructor[tag](copied, offset, Reflect.get(prototype, 'length', message))

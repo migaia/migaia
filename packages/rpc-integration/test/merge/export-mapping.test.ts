@@ -29,10 +29,7 @@ function splitEntry(name: string) {
   const key = domain === 'remote' || domain === 'testing' ? `./${domain}` : tail ? `./${tail}` : '.'
   return { current, owner, root: join(packageRoot, owner), key }
 }
-/**
- * Explicit C3 ordinary toolkit and held-resource entries replace the three retired helper
- * namespaces.
- */
+/** Explicit ordinary toolkit and held-resource entries replace the three retired helper namespaces. */
 const ordinaryEntries: Record<string, Record<string, string[]>> = {
   'rpc-contract': {
     './wire': [
@@ -224,7 +221,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'hostRethrowReporter',
       'IpcReporterContext'
     ],
-    /** P5 SDK exposes only the two task-level factories to ordinary adapter authors. */
+    /** SDK exposes only the two task-level factories to ordinary adapter authors. */
     './adapter': ['defineByteAdapter', 'defineMessageAdapter'],
     /** Only real native owners retain the moved low-level runtime operations. */
     './adapter/internal-advanced': [
@@ -268,7 +265,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     '.': ['createBrowserPeer', 'RpcBrowserErrorCode', 'RPC_BROWSER_ERROR_SOURCE']
   }
 }
-/** C3 retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
+/** Retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
 const retiredSymbols: Record<string, readonly string[]> = {
   '@migaia/rpc/contract': ['invalidRpcStream'],
   '@migaia/rpc/contract/v1': ['invalidRpcStream', 'default'],
@@ -336,7 +333,7 @@ function compiledCoreFiles(directory: string): string[] {
   })
 }
 
-describe('A1 merged public exports', () => {
+describe('merged public exports', () => {
   it('preserves the merged runtime export sets and the layered transport kit', async () => {
     const manifests = Object.fromEntries(
       ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map((owner) => [
@@ -490,7 +487,7 @@ describe('A1 merged public exports', () => {
         ])
       ].sort()
     )
-    /** Every C3 ordinary entry retains an exact namespace, with no claimed preparation exports. */
+    /** Every ordinary entry retains an exact namespace, with no claimed preparation exports. */
     for (const [owner, entries] of Object.entries(ordinaryEntries)) {
       for (const [key, names] of Object.entries(entries)) {
         const entry = manifests[owner]!.exports[key]!
@@ -504,7 +501,7 @@ describe('A1 merged public exports', () => {
     }
     for (const [symbol, module] of Object.entries(formerProtocolOperations))
       expect(await import(module), symbol).toHaveProperty(symbol)
-    /** C3 exposes only scalar metadata from the existing owner, without its family tokens. */
+    /** Exposes only scalar metadata from the existing owner, without its family tokens. */
     const remoteNamespace = await import(pathToFileURL(join(coreRoot, remote.default)).href)
     /** Canonical identity prevents a copied table or wrapper from becoming another vocabulary owner. */
     const runtimeConstants = await import(
@@ -577,7 +574,7 @@ describe('A1 merged public exports', () => {
     expect(Object.keys(nodeSockets).sort()).toEqual(
       ['createAdapterSocketByteIO', 'dialProcessByteChannel', 'listenProcessByteChannel'].sort()
     )
-    /** C5 removes text/constructor/lazy aliases without weakening the exact ordinary namespaces. */
+    /** Removes text/constructor/lazy aliases without weakening the exact ordinary namespaces. */
     for (const [owner, entries] of Object.entries(manifests)) {
       for (const [key, entry] of Object.entries(entries.exports)) {
         if (owner === 'rpc-contract' && key === './schema/wire-error') continue
@@ -627,8 +624,8 @@ describe('A1 merged public exports', () => {
     expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
   })
 
-  it('A5 BC1 exports the runtime coroutine plugin and removes the legacy host', async () => {
-    /** BC1 keeps the public factory name while moving its owner to the runtime family. */
+  it('exports the runtime coroutine plugin and removes the legacy host', async () => {
+    /** Keeps the public factory name while moving its owner to the runtime family. */
     const coreRoot = join(packageRoot, 'rpc-core')
     /** The built public entry is the surface consumed by applications and website manifests. */
     const remoteNamespace = await import(pathToFileURL(join(coreRoot, 'dist/remote/index.js')).href)

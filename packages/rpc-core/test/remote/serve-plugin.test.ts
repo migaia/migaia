@@ -14,7 +14,7 @@ import { createRemoteRegistration } from '../../dist/remote/proxy.js'
 import { streamRoots } from '../streaming/fixture.js'
 import { remoteHarness } from './fixture.js'
 
-/** A3 proves request and stream hooks receive their own admitted core contexts. */
+/** Proves request and stream hooks receive their own admitted core contexts. */
 describe('remote service plugin', () => {
   it('stops forwarding after target removal suspends the service registration', async () => {
     const host = new PluginHost<Record<string, never>>({
@@ -216,7 +216,7 @@ describe('remote service plugin', () => {
       expect(streamHookContext).toBe(streamProviderContext)
       expect(requestHookContext).toBe(requestContext)
       expect(typeof streamContext?.dispatchTo).toBe('function')
-      /** K232 keeps the exact hook failure local; the requester receives only its code/message. */
+      /** Keeps the exact hook failure local; the requester receives only its code/message. */
       const rejected = await registration
         .invokeRequest('p.f.request', ['reject'])
         .catch((error: unknown) => error)

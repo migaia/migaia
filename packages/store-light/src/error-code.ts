@@ -5,8 +5,7 @@
  * `source` is always `'@migaia/store-light'`. Throw sites use these constants instead of inline
  * literals.
  *
- * Code values are public API. Renaming a code is a breaking change
- * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
+ * Code values are public API. Renaming a code is a breaking change.
  */
 export const StoreLightErrorCode = {
   /**
@@ -68,8 +67,8 @@ export const StoreLightErrorCode = {
    * Error. A coded `AggregateError` preserves both failures; mutable primaries keep their own
    * identity and receive cleanup through cause instead.
    *
-   * The initialization and cleanup errors remain reachable through `cause` or `errors` (E-T13).
-   * Treat this as initialization failure and inspect the cleanup failure.
+   * The initialization and cleanup errors remain reachable through `cause` or `errors`. Treat this
+   * as initialization failure and inspect the cleanup failure.
    */
   initAndCleanupFailed: 'INIT_AND_CLEANUP_FAILED',
 

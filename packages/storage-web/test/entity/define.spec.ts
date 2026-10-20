@@ -5,7 +5,7 @@ import { StorageErrorCode } from '../../src/types/errors'
 import { StorageContractErrorCode } from '@migaia/storage-contract'
 
 describe('defineEntity runtime contract', () => {
-  it('SWV2-T35 rejects direct indexed declarations at runtime', () => {
+  it('rejects direct indexed declarations at runtime', () => {
     expect(() =>
       defineEntity<{ id: string }>({
         name: 'direct-indexed',
@@ -15,7 +15,7 @@ describe('defineEntity runtime contract', () => {
     ).toThrow(StorageErrorCode.invalidConfig)
   })
 
-  it('SWV2-T15 snapshots indexes and rejects ambiguous or hostile declarations', () => {
+  it('snapshots indexes and rejects ambiguous or hostile declarations', () => {
     expect(() =>
       defineEntity<{ id: string; profile: { email: string } }>()({
         name: 'indexed-users',

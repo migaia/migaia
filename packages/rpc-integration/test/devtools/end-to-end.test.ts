@@ -54,10 +54,7 @@ function program(mode: 'baseline' | 'observed'): Promise<IProgramResult> {
       }
       try {
         if (stderr.trim()) console.info(stderr.trim())
-        /**
-         * SC9(b): JSON is the standalone parent result boundary, never a retained probe-event
-         * clone.
-         */
+        /** JSON is the standalone parent result boundary, never a retained probe-event clone. */
         resolve(JSON.parse(stdout) as IProgramResult)
       } catch (cause) {
         reject(cause)
@@ -66,7 +63,7 @@ function program(mode: 'baseline' | 'observed'): Promise<IProgramResult> {
   })
 }
 
-it('[A-total] actual T1 crosses signed/encrypted parent-child-worker hops with live services, both carrier directions and unchanged business results', async () => {
+it('actual traffic crosses signed/encrypted parent-child-worker hops with live services, both carrier directions and unchanged business results', async () => {
   /** The business baseline executes in three genuine hosts with no devtools instances. */
   const baseline = await program('baseline')
   /** Real-host collector close is separate from the directly supported Core observation scope. */
@@ -110,7 +107,7 @@ it('[A-total] actual T1 crosses signed/encrypted parent-child-worker hops with l
   expect(observed.trace?.selfFiltered).toBe(true)
   console.info(
     JSON.stringify({
-      acceptance: 'A-total',
+      acceptance: 'end-to-end',
       managedBusiness: baseline.result,
       afterCollectorClose: observed.afterCollectorClose,
       directCore: observed.core,

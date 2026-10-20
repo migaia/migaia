@@ -5,7 +5,7 @@ import { connect } from '../../dist/core/middleware/connect.js'
 import { createProviderEndpoint } from '../../dist/core/provider.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
-describe('opaque trace propagation (A8)', () => {
+describe('opaque trace propagation', () => {
   it('passes trace to the provider and rejects invalid values before sending', async () => {
     const [clientWire, providerWire] = createMemoryTransportPair()
     const sent: unknown[] = []

@@ -28,7 +28,7 @@ type IControlledFrame = {
 }
 
 for (const borrowed of [true, false]) {
-  it(`[R8-A2] two forced batched responses settle through process Peer (borrowed=${borrowed})`, async () => {
+  it(`two forced batched responses settle through process Peer (borrowed=${borrowed})`, async () => {
     /** The maintained TS peer uses production core; its implementation and scheduler are untouched. */
     const peer = peers.find((entry) => entry.language === 'node')!
     /** This test owns only its temporary listener process and private authentication file. */
@@ -73,7 +73,7 @@ for (const borrowed of [true, false]) {
             if (Buffer.concat(output).toString().includes('READY')) resolve()
           })
           child!.once('error', reject)
-          child!.once('exit', () => reject(new Error('R8 fixture exited before READY')))
+          child!.once('exit', () => reject(new Error('batch fixture exited before READY')))
         })
       }
       /** Use the same public source specification, byte carrier and establishment as conformance. */
@@ -194,7 +194,7 @@ for (const borrowed of [true, false]) {
       expect(batches[0]).toHaveLength(2)
       expect(new Set((batches[0] as IControlledFrame[]).map((frame) => frame.id)).size).toBe(2)
       await vi.waitFor(() =>
-        expect(Object.fromEntries(values), '[R8-A2] both native response IDs must settle').toEqual({
+        expect(Object.fromEntries(values), 'both native response IDs must settle').toEqual({
           'trace-one': 'trace-one',
           'trace-two': 'trace-two'
         })

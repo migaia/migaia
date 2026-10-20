@@ -5,7 +5,7 @@ import { RpcProbeStageName, type IRpcProbeStageName } from './constants.js'
 import { readProbeState, registerProbeState, type IRpcProbeState } from './internal.js'
 import type { IRpcProbe, IRpcProbeDefinition } from './types.js'
 
-/** D7 reserves exactly these own fields; unrelated host members, including emit, remain untouched. */
+/** Reserves exactly these own fields; unrelated host members, including emit, remain untouched. */
 const ProbeHostField = {
   stageMask: 'stageMask',
   captureMask: 'captureMask',
@@ -42,8 +42,9 @@ export function defineProbe<THost extends object>(
   host: THost
 ): THost & IRpcProbe
 /**
- * Validates definition and host before attachment. D7 stores references in private state; emitters
- * install them once into their own fixed-shape records and never read the host on hot paths.
+ * Validates definition and host before attachment. The probe stores references in private state;
+ * emitters install them once into their own fixed-shape records and never read the host on hot
+ * paths.
  */
 export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRpcProbe {
   if (typeof definition !== 'object' || definition === null)
@@ -71,7 +72,7 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
       definition.methods.some((method) => typeof method !== 'string'))
   )
     invalid(RpcCoreErrorText.probeMethodsInvalid)
-  /** D4 compiles the required membership Set representation; this is not a defensive payload copy. */
+  /** Compiles the required membership Set representation; this is not a defensive payload copy. */
   const methods = definition.methods === undefined ? undefined : new Set(definition.methods)
   /** The full-sampling sentinel preserves the frozen v1 compiled-field contract. */
   const sampleThreshold =
@@ -106,7 +107,7 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
     onError: definition.onError,
     listeners: new Set()
   }
-  /** Stage updates change private active state; a host's non-writable data mask stays initial (D7). */
+  /** Stage updates change private active state; a host's non-writable data mask stays initial. */
   const setStages = (stages: readonly IRpcProbeStageName[]): void => {
     /** Compile first so invalid input preserves the original mask and sends no notifications. */
     const nextMask = compileStages(stages, true)

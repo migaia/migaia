@@ -41,7 +41,7 @@ function hasInlineErrorText(file: string, method: string): boolean {
   )
 }
 
-describe('canonical control registration texts (A14–A15)', () => {
+describe('canonical control registration texts', () => {
   it('keeps duplicate variation registration native and moves its message to core text', () => {
     const coordinator = new RpcVariationCoordinator(
       () => 0,

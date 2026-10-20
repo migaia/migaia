@@ -57,7 +57,7 @@ async function echoed(command: string, args: string[], contentLength: boolean): 
   }
 }
 
-describe('[A10] release peer and JSON bare baseline', () => {
+describe('release peer and JSON bare baseline', () => {
   for (const language of ['python', 'rust', 'go']) {
     it(`${language} parses and serializes a bare JSON payload once before physical reply`, async () => {
       /** Launch wrappers select fixed optimized binaries before the measured request. */

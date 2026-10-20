@@ -23,7 +23,7 @@ const entry = fileURLToPath(new URL('./fixtures/automatic-plugin.mjs', import.me
 
 for (const kind of ['process', 'thread'] as const) {
   for (const source of ['callback', 'deployment'] as const) {
-    it(`[A1][A11][A17][A33] two true Hosts use the symmetric ${kind} Plugin over a genuine native carrier (${source})`, async () => {
+    it(`two true Hosts use the symmetric ${kind} Plugin over a genuine native carrier (${source})`, async () => {
       /** Actual local Feature dispatch proves the reverse result independently of child metadata. */
       let reverseCalls = 0
       /** Endpoint readiness precedes the child's separate original Host install commit. */
@@ -156,10 +156,7 @@ for (const kind of ['process', 'thread'] as const) {
           establish: async (raw, prepared) => {
             assert.equal(raw.kind, 'byte')
             assert.equal(prepared.role, 'initiator')
-            assert.ok(
-              prepared.offer,
-              '[A1] the original handshake receives the actual compiled offer'
-            )
+            assert.ok(prepared.offer, 'the original handshake receives the actual compiled offer')
             return createProcessTransport(
               raw as NonNullable<typeof processHandle>['channel'] & object,
               {
@@ -235,7 +232,7 @@ for (const kind of ['process', 'thread'] as const) {
         assert.equal(
           installed,
           undefined,
-          '[A1] full original deployment input must prepare after ordinary Feature business'
+          'full original deployment input must prepare after ordinary Feature business'
         )
         /** The route is the genuine same-family Host publication, not a structural demo outlet. */
         const outlet = host[kind]!
@@ -244,11 +241,7 @@ for (const kind of ['process', 'thread'] as const) {
           42,
           'native:parent'
         ])
-        assert.equal(
-          reverseCalls,
-          1,
-          '[A11] native child actually executed the reverse exposed Feature'
-        )
+        assert.equal(reverseCalls, 1, 'native child actually executed the reverse exposed Feature')
         /** Iteration keeps the original stream owner over the same physical channel. */
         const values: unknown[] = []
         for await (const value of outlet.stream('bridge', 'service.values')) values.push(value)

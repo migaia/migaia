@@ -41,7 +41,7 @@ function failure(operation: () => unknown): TypeError {
   assert.fail('invalid decoded fixture was accepted')
 }
 
-it('[H1-D1] codec-decoded data keeps the strict result, prototypes and frozen metadata', () => {
+it('codec-decoded data keeps the strict result, prototypes and frozen metadata', () => {
   /** Both parsers receive the same ordinary codec result, without an input trust flag. */
   const decoded = JSON.parse(JSON.stringify(wireInput())) as unknown
   /** Strict output is the existing contract oracle, rather than a copied expected grammar. */
@@ -55,7 +55,7 @@ it('[H1-D1] codec-decoded data keeps the strict result, prototypes and frozen me
 })
 
 it.each(['unknown', 'type', 'missing', 'ordered-errors'] as const)(
-  '[H1-D2] decoded %s rejection retains native identity and the original pointer text',
+  'decoded %s rejection retains native identity and the original pointer text',
   (shape) => {
     /** Mutations represent malformed decoded data, never a getter or proxy shortcut. */
     const input = wireInput()
@@ -83,7 +83,7 @@ it.each(['unknown', 'type', 'missing', 'ordered-errors'] as const)(
 )
 
 it.each([new Date(0), new Map()] as const)(
-  '[H1-D3] native clone built-in records retain the strict prototype rejection',
+  'native clone built-in records retain the strict prototype rejection',
   (route) => {
     /**
      * Structured clone preserves built-in prototypes; codec provenance cannot admit them as
@@ -99,7 +99,7 @@ it.each([new Date(0), new Map()] as const)(
   }
 )
 
-it('[H1-D4] live objects use strict admission and reject an accessor without invoking it', () => {
+it('live objects use strict admission and reject an accessor without invoking it', () => {
   /** The old public entry still owns all live in-process object validation. */
   const input = wireInput()
   /** Accessor execution would be an observable behaviour change at the strict boundary. */

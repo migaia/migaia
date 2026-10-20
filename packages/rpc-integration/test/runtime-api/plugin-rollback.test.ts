@@ -13,7 +13,7 @@ function reaches(value: unknown, expected: Error): boolean {
   return value instanceof Error && reaches(value.cause, expected)
 }
 
-it('[A33][A34] a real prepared shared-slot candidate rolls back without revoking committed siblings', async () => {
+it('a real prepared shared-slot candidate rolls back without revoking committed siblings', async () => {
   /** Original Host disposal reports retain the native failures from the failed batch. */
   const diagnostics: unknown[] = []
   /** Every registration belongs to a true managed Host and the original atomic batch owner. */
@@ -115,14 +115,14 @@ it('[A33][A34] a real prepared shared-slot candidate rolls back without revoking
     const rejection = await failed
     assert.equal((rejection as Error).cause, primary)
     assert.equal(closes, 1)
-    assert.equal(owner.thread, outlet, '[A34] candidate rollback cannot retire the existing slot')
-    assert.deepEqual(ready, [], '[A52] rollback publishes no candidate ready event')
+    assert.equal(owner.thread, outlet, 'candidate rollback cannot retire the existing slot')
+    assert.deepEqual(ready, [], 'rollback publishes no candidate ready event')
     await assert.rejects(outlet.get('candidate'), { code: 'TARGET_UNKNOWN' })
     assert.equal(await outlet.request('first', 'service.read'), 42)
     /** The original Host diagnostic contains cleanup through its existing aggregate/detail shape. */
     assert.ok(
       diagnostics.some((error) => reaches(error, cleanup)),
-      '[A33] original cleanup is reachable through the reported aggregate'
+      'original cleanup is reachable through the reported aggregate'
     )
   } finally {
     await owner.dispose()

@@ -9,21 +9,21 @@ import { createStorageReactiveService } from '../../src/host/reactive.js'
 import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
 import { memoryStorageHost } from '../../src/backends/memory.js'
 
-/** R11 proves Host query state is Resource-owned and backend changes trigger authoritative refresh. */
-describe('SWV4-B05 R11 Resource-backed queries', () => {
+/** Proves Host query state is Resource-owned and backend changes trigger authoritative refresh. */
+describe('Resource-backed queries', () => {
   it('uses caller runtime, refreshes after one backend invalidation, and disposes idempotently', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-memory' })] as const
+      plugins: [memoryReactive({ id: 'fixture-memory' })] as const
     })
     const runtime = createRuntime()
     let reads = 0
     const query = host.liveQuery({
-      backendId: 'r11-memory',
+      backendId: 'fixture-memory',
       runtime,
       query: async ({ store, signal }) => {
         expect(signal.aborted).toBe(false)
         reads += 1
-        return store.get('r11-value')
+        return store.get('value-1')
       }
     })
 
@@ -31,7 +31,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     expect(query.state.value.value).toBeNull()
     expect(reads).toBe(1)
 
-    await host.backend('r11-memory').set('r11-value', 'updated')
+    await host.backend('fixture-memory').set('value-1', 'updated')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     expect(query.state.value.value).toBe('updated')
@@ -45,7 +45,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
   it('snapshots every admitted option once and preserves equal settled identity', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-options' })] as const
+      plugins: [memoryReactive({ id: 'fixture-options' })] as const
     })
     const runtime = createRuntime()
     const reads: Record<string, number> = {}
@@ -56,7 +56,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     let queryReads = 0
     const query = host.liveQuery({
       get backendId() {
-        return read('backendId', 'r11-options' as const)
+        return read('backendId', 'fixture-options' as const)
       },
       get runtime() {
         return read('runtime', runtime)
@@ -65,7 +65,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
         return read('query', () => ({ value: ++queryReads }))
       },
       get scope() {
-        return read('scope', 'r11-options-scope')
+        return read('scope', 'options-scope')
       },
       get matches() {
         return read('matches', () => true)
@@ -88,7 +88,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     })
     await query.ready
     const first = query.state.value.value
-    await host.backend('r11-options').set('r11-options-key', 'changed')
+    await host.backend('fixture-options').set('options-key', 'changed')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     expect(query.state.value.value).toBe(first)
@@ -113,12 +113,12 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     const scheduler = createManualScheduler()
     const host = await createStorageHost({
       scheduler,
-      plugins: [memoryReactive({ id: 'r11-deadline' })] as const
+      plugins: [memoryReactive({ id: 'fixture-deadline' })] as const
     })
     const runtime = createRuntime()
     const pending = new Promise<string>(() => undefined)
     const query = host.liveQuery({
-      backendId: 'r11-deadline',
+      backendId: 'fixture-deadline',
       runtime,
       timeoutMs: 10,
       query: () => pending
@@ -131,11 +131,11 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     const controller = new AbortController()
     controller.abort('pre-aborted')
     const secondHost = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-pre-abort' })] as const
+      plugins: [memoryReactive({ id: 'fixture-pre-abort' })] as const
     })
     expect(() =>
       secondHost.liveQuery({
-        backendId: 'r11-pre-abort',
+        backendId: 'fixture-pre-abort',
         runtime,
         signal: controller.signal,
         query: () => 'never-started'
@@ -146,7 +146,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
   it('registers external abort before Resource allocation and rolls back on hostile registration', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-abort-admission' })] as const
+      plugins: [memoryReactive({ id: 'abort-admission' })] as const
     })
     const runtime = createRuntime()
     const computedFactory = vi.spyOn(runtime, 'computed')
@@ -161,7 +161,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
     expect(() =>
       host.liveQuery({
-        backendId: 'r11-abort-admission',
+        backendId: 'abort-admission',
         runtime,
         signal: registrationFailure,
         query: () => {
@@ -191,7 +191,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     }
     expect(() =>
       host.liveQuery({
-        backendId: 'r11-abort-admission',
+        backendId: 'abort-admission',
         runtime,
         signal: abortDuringQuery,
         query: () => {
@@ -212,7 +212,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
   it('rolls back the Resource when computed state construction fails', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-computed-rollback' })] as const
+      plugins: [memoryReactive({ id: 'computed-rollback' })] as const
     })
     const runtime = createRuntime()
     const primary = new Error('computed state construction failed')
@@ -223,7 +223,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     let thrown: unknown
     try {
       host.liveQuery({
-        backendId: 'r11-computed-rollback',
+        backendId: 'computed-rollback',
         runtime,
         query: () => 'never-started'
       })
@@ -260,13 +260,13 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       }
     }
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-construction-aggregate' })] as const
+      plugins: [memoryReactive({ id: 'construction-aggregate' })] as const
     })
     try {
       let thrown: unknown
       try {
         host.liveQuery({
-          backendId: 'r11-construction-aggregate',
+          backendId: 'construction-aggregate',
           runtime,
           signal,
           query: () => 'never-started'
@@ -315,7 +315,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       }
     }
     service.registerAdapter({
-      backendId: 'r11-direct-construction-aggregate',
+      backendId: 'direct-construction-aggregate',
       store,
       controller,
       consistency: { mode: 'push', visibility: 'instance' },
@@ -326,7 +326,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       let thrown: unknown
       try {
         service.createQuery({
-          backendId: 'r11-direct-construction-aggregate',
+          backendId: 'direct-construction-aggregate',
           runtime,
           signal,
           query: () => 'never-started'
@@ -347,7 +347,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
   it('follows the current Resource generation when invalidation supersedes the initial read', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-current-generation' })] as const
+      plugins: [memoryReactive({ id: 'fixture-current-generation' })] as const
     })
     const runtime = createRuntime()
     let reads = 0
@@ -360,11 +360,11 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       resolveSecond = resolve
     })
     const query = host.liveQuery({
-      backendId: 'r11-current-generation',
+      backendId: 'fixture-current-generation',
       runtime,
       query: () => (reads++ === 0 ? first : second)
     })
-    await host.backend('r11-current-generation').set('invalidate', 'true')
+    await host.backend('fixture-current-generation').set('invalidate', 'true')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     resolveFirst('stale-generation')
@@ -379,7 +379,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
   it('returns one derived Promise for overlapping refreshes of the same Resource generation', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-refresh-coalesce' })] as const
+      plugins: [memoryReactive({ id: 'refresh-coalesce' })] as const
     })
     const runtime = createRuntime()
     let reads = 0
@@ -388,7 +388,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       resolveRefresh = resolve
     })
     const query = host.liveQuery({
-      backendId: 'r11-refresh-coalesce',
+      backendId: 'refresh-coalesce',
       runtime,
       query: () => (reads++ === 0 ? 'initial' : refresh)
     })
@@ -406,12 +406,12 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
 
   it('guards every Resource access after dispose with one handled LIVE_QUERY_DISPOSED rejection', async () => {
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-terminal-guard' })] as const
+      plugins: [memoryReactive({ id: 'terminal-guard' })] as const
     })
     const runtime = createRuntime()
     let reads = 0
     const query = host.liveQuery({
-      backendId: 'r11-terminal-guard',
+      backendId: 'terminal-guard',
       runtime,
       query: () => {
         reads += 1
@@ -485,7 +485,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       removeEventListener: () => undefined
     }
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-terminal-abort-ready' })] as const
+      plugins: [memoryReactive({ id: 'terminal-abort-ready' })] as const
     })
     const runtime = createRuntime()
     let resolveReady!: (value: string) => void
@@ -493,7 +493,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       resolveReady = resolve
     })
     const query = host.liveQuery({
-      backendId: 'r11-terminal-abort-ready',
+      backendId: 'terminal-abort-ready',
       runtime,
       signal: readySignal,
       query: () => readyValue
@@ -529,7 +529,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       removeEventListener: () => undefined
     }
     const secondHost = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-terminal-abort-refresh' })] as const
+      plugins: [memoryReactive({ id: 'terminal-abort-refresh' })] as const
     })
     let resolveRefresh!: (value: string) => void
     const refreshValue = new Promise<string>((resolve) => {
@@ -537,7 +537,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     })
     let refreshReads = 0
     const secondQuery = secondHost.liveQuery({
-      backendId: 'r11-terminal-abort-refresh',
+      backendId: 'terminal-abort-refresh',
       runtime,
       signal: refreshSignal,
       query: () => (refreshReads++ === 0 ? 'initial' : refreshValue)
@@ -576,10 +576,10 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       }
     }
     const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'r11-cleanup-direct' })] as const
+      plugins: [memoryReactive({ id: 'cleanup-direct' })] as const
     })
     const query = host.liveQuery({
-      backendId: 'r11-cleanup-direct',
+      backendId: 'cleanup-direct',
       runtime: createRuntime(),
       signal,
       query: () => 'value'
@@ -623,7 +623,7 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
     const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const adapter = service.registerAdapter({
-      backendId: 'r11-cleanup-lifecycle',
+      backendId: 'cleanup-lifecycle',
       store,
       controller,
       consistency: { mode: 'push', visibility: 'instance' },
@@ -680,10 +680,10 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryReactive({ id: 'r11-cleanup-host' })] as const
+      plugins: [memoryReactive({ id: 'cleanup-host' })] as const
     })
     const query = host.liveQuery({
-      backendId: 'r11-cleanup-host',
+      backendId: 'cleanup-host',
       runtime: createRuntime(),
       signal,
       query: () => 'value'
@@ -729,10 +729,10 @@ describe('SWV4-B05 R11 Resource-backed queries', () => {
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryReactive({ id: 'r11-cleanup-unhandled' })] as const
+      plugins: [memoryReactive({ id: 'cleanup-unhandled' })] as const
     })
     const query = host.liveQuery({
-      backendId: 'r11-cleanup-unhandled',
+      backendId: 'cleanup-unhandled',
       runtime: createRuntime(),
       query: () => 'value'
     })

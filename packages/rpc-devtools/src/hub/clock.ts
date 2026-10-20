@@ -13,7 +13,7 @@ type IHubHost = {
 /** A structural host view avoids importing DOM or Node types into this runtime-neutral package. */
 export const hubHost = globalThis as typeof globalThis & IHubHost
 
-/** Five samples are the frozen R2 clock contract; only the smallest round trip is retained. */
+/** Five samples are the frozen clock contract; only the smallest round trip is retained. */
 const ALIGNMENT_SAMPLES = 5
 
 /** Align one active target and update its existing retained wrappers without copying wire events. */
@@ -46,7 +46,7 @@ export async function alignTarget(target: IHubTarget): Promise<void> {
   target.offset = offset
   target.uncertaintyMs = minimumRtt / 2
   for (let i = 0; i < target.count; i++) {
-    /** R2 realignment mutates the once-created wrapper; all query results retain that same identity. */
+    /** Realignment mutates the once-created wrapper; all query results retain that same identity. */
     const item = target.events[(target.head + i) % target.events.length] as IHubTimelineEvent
     item.alignedAt = item.event.at - offset
     item.uncertaintyMs = target.uncertaintyMs

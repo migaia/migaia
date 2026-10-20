@@ -7,7 +7,7 @@ import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runti
 import { coroutineFailure, coroutineService, coroutineTestHost } from './fixtures/coroutine.js'
 
 describe('coroutine runtime lifecycle', () => {
-  it('[A3] restarts, stops, replaces and reports listener failure through the original outlet', async () => {
+  it('restarts, stops, replaces and reports listener failure through the original outlet', async () => {
     /** Parent lifecycle remains the existing PluginHost owner. */
     const host = coroutineTestHost()
     /** Every cleanup or terminal diagnostic stays inspectable. */
@@ -76,15 +76,12 @@ describe('coroutine runtime lifecycle', () => {
       ).toBe(true)
     } finally {
       await host.dispose()
-      console.info(
-        '[coroutine A3 lifecycle reports]',
-        JSON.stringify(reports.map(coroutineFailure))
-      )
+      console.info('[coroutine lifecycle reports]', JSON.stringify(reports.map(coroutineFailure)))
     }
   })
 
   it.each([1, 2])(
-    '[A3] late old settlement retains lease with maxUnits %i and cannot retire a newer generation',
+    'late old settlement retains lease with maxUnits %i and cannot retire a newer generation',
     async (maxUnits) => {
       /** The two-unit case borrows a budget; the one-unit case exercises the actual family default. */
       const budget =
@@ -170,12 +167,12 @@ describe('coroutine runtime lifecycle', () => {
         old.finishes.forEach((finish) => finish.resolve())
         await host.dispose()
         budget?.close()
-        console.info('[coroutine A3 late reports]', JSON.stringify(reports.map(coroutineFailure)))
+        console.info('[coroutine late reports]', JSON.stringify(reports.map(coroutineFailure)))
       }
     }
   )
 
-  it('[A3] never-restart crash keeps terminal state and original crash on report cause', async () => {
+  it('never-restart crash keeps terminal state and original crash on report cause', async () => {
     /** The same-realm crash object remains reachable beneath supervision's terminal diagnostic. */
     const failure = new Error('coroutine never restart crash')
     /** Reports are actual supervision diagnostics, not fixture-generated substitutes. */

@@ -5,8 +5,8 @@ import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'
 
-/** A3 wrong-credit item must fail only its pending caller pull. */
-describe('streaming A3 credit order', () => {
+/** Wrong-credit item must fail only its pending caller pull. */
+describe('streaming credit order', () => {
   it('rejects an item with a sequence different from the pending pull', async () => {
     const [clientTransport, peer] = createMemoryTransportPair()
     const client = await createComposedEndpoint(

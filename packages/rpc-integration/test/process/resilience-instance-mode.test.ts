@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { parseProcessPluginDescriptor } from '@migaia/rpc-process'
 import { acceptsSchema, type ISchemaRule } from '../fixtures/schema-accepts.js'
 
-/** The published schema is the independent structure check for BC1. */
+/** The published schema is the independent structure check for instance mode. */
 const schema = JSON.parse(
   readFileSync(
     resolve(
@@ -22,13 +22,10 @@ const base = JSON.parse(
   )
 ).cases.find((entry: { id: string }) => entry.id === 'spawn-native-stdin').value
 
-describe('process resilience instance mode BC1', () => {
-  it('[A2] accepts per-connection in Schema and the canonical parser', () => {
+describe('process resilience instance mode', () => {
+  it('accepts per-connection in Schema and the canonical parser', () => {
     const input = { ...base, instanceMode: 'per-connection' }
-    expect(
-      acceptsSchema(schema, input, schema),
-      'SDD_BASE_RED_CONTRACT:A2 schema per-connection'
-    ).toBe(true)
+    expect(acceptsSchema(schema, input, schema), 'schema per-connection').toBe(true)
     expect(parseProcessPluginDescriptor(input)).toMatchObject({ instanceMode: 'per-connection' })
   })
 })

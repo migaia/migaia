@@ -6,7 +6,7 @@ import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
 import { createProviderFeature } from '@migaia/rpc-core/features/provider'
 import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'
 
-/** A2/S6 proves a package consumer can build both stream peers using published subpaths. */
+/** Proves a package consumer can build both stream peers using published subpaths. */
 function publicRoots() {
   const chunk = createCanonicalChunkFeature()
   const outbound = createOutboundFeature(chunk)

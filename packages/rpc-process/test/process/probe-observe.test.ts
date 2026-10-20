@@ -30,7 +30,7 @@ function bytePair(): readonly [IProcessByteChannel, IProcessByteChannel] {
 const probe: IRpcCarrierProbe = { capturing: false, emit: () => undefined }
 
 describe('process carrier observation', () => {
-  it('[carriers:A1][S2] byte transport exposes direct observe after the genuine handshake', async () => {
+  it('byte transport exposes direct observe after the genuine handshake', async () => {
     /** The raw I/O contract is shared by Node/Bun/Deno stdio and local socket adapters. */
     const [leftPort, rightPort] = bytePair()
     /** Ordinary diagnostics remain the same supplied process connection inputs. */
@@ -67,7 +67,7 @@ describe('process carrier observation', () => {
     }
   })
 
-  it('[carriers:A1][S2] static whole-message transport exposes direct observe for Electron', async () => {
+  it('static whole-message transport exposes direct observe for Electron', async () => {
     /** Electron utility processes supply this whole-message port rather than byte I/O. */
     const port: IProcessMessageChannel = {
       kind: 'message',

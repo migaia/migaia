@@ -18,7 +18,7 @@ const runtimeExports = [
   'createListenerFailureState',
   'drainListenerFailures',
   'drainTerminalListenerFailures',
-  // Adapter-facing identity for native transport failures (rpc-browser D01).
+  // Adapter-facing identity for native transport failures.
   'identifyRpcBoundaryFailure',
   'observeListener',
   'registerListeners',
@@ -59,7 +59,7 @@ function loopback(): readonly [IRpcTransport, IRpcTransport] {
 }
 
 describe('public transport kit', () => {
-  it('A5 exports exactly the adapter primitives and keeps browser adapters on the public boundary', () => {
+  it('exports exactly the adapter primitives and keeps browser adapters on the public boundary', () => {
     expect(Object.keys(kit).sort()).toEqual(runtimeExports)
     for (const name of readdirSync(adapters).filter((name) => name.endsWith('.ts'))) {
       const path = join(adapters, name)
@@ -81,7 +81,7 @@ describe('public transport kit', () => {
     }
   })
 
-  it('A5 runs request/response and preserves a tagged native send failure as the cause', async () => {
+  it('runs request/response and preserves a tagged native send failure as the cause', async () => {
     const [clientTransport, serverTransport] = loopback()
     const server = await createEndpoint({
       id: 'server',

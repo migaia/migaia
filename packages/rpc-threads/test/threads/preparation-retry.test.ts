@@ -53,7 +53,7 @@ describe('thread preparation and retry settlement', () => {
     expect(reads).toBe(0)
     expect(target.listenerCount('message')).toBe(0)
   })
-  it('[A9] withholds transport until private bootstrap preparation acknowledges', async () => {
+  it('withholds transport until private bootstrap preparation acknowledges', async () => {
     /** Event subscriptions prove the factory has not installed transport before readiness. */
     const target = new EventEmitter()
     /** Structural Web port tests supported ownership without claiming browser actual-exit support. */
@@ -97,7 +97,7 @@ describe('thread preparation and retry settlement', () => {
     await (await opening).close()
     expect(target.listenerCount('message')).toBe(0)
   })
-  it('[A5/A10] settles caller cancellation while waiting for replacement readiness without replay', async () => {
+  it('settles caller cancellation while waiting for replacement readiness without replay', async () => {
     /** The existing retry clock and cancellation signal own the logical request. */
     const scheduler = createManualScheduler()
     /** Caller cancellation remains observable even after departure removes the first generation. */
@@ -150,7 +150,7 @@ describe('thread preparation and retry settlement', () => {
     expect(sends).toBe(1)
     expect(scheduler.pendingCount).toBe(0)
   })
-  it('[A5] settles the wall cap before later cleanup can settle an otherwise pending request', async () => {
+  it('settles the wall cap before later cleanup can settle an otherwise pending request', async () => {
     /** A real Worker and manual deadline isolate logical settlement from cleanup cancellation. */
     const scheduler = createManualScheduler()
     /** Production fixture composes the actual thread facade and canonical endpoint. */

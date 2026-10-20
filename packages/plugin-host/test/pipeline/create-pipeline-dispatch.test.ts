@@ -6,7 +6,7 @@ import {
 } from '@migaia/middleware-pipeline'
 import { PluginHost, PluginHostError } from '../../src/index.js'
 
-/** A8 exercises Host dispatch, canonical lifting, mismatch causality and lane atomicity. */
+/** Exercises Host dispatch, canonical lifting, mismatch causality and lane atomicity. */
 /** Host exposing pipeline execution for each canonical runner mode. */
 class PipelineHost extends PluginHost<Record<string, never>, number> {
   constructor(mode: IMiddlewarePipelineMode) {

@@ -21,8 +21,8 @@ import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint
 import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
 import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
 
-it('[A59][A60] the real authenticated process listener injects one logical provider scope across accepted sockets', async () => {
-  /** Source offers are independent of defaults until all U25 ports are implemented. */
+it('the real authenticated process listener injects one logical provider scope across accepted sockets', async () => {
+  /** Source offers are independent of defaults until all runtime-api ports are implemented. */
   const capabilities = [
     ...RUNTIME_API_CAPABILITIES,
     RpcCapability.generation,
@@ -97,13 +97,13 @@ it('[A59][A60] the real authenticated process listener injects one logical provi
     assert.deepEqual(
       [...detail.methods].sort(),
       ['baseline', 'first', 'other', 'second'],
-      '[A24][D17] listener methods use the same local name-array contract before any accept'
+      'listener methods use the same local name-array contract before any accept'
     )
     assert.equal(accepted, 0)
     assert.throws(
       () => readRuntimePeerConnection(server),
       { code: 'TARGET_UNKNOWN' },
-      '[A24] an empty listener cannot publish a guessed accepted connection'
+      'an empty listener cannot publish a guessed accepted connection'
     )
     for (const index of [1, 2]) {
       const peer = await createRuntimePeer({
@@ -138,13 +138,13 @@ it('[A59][A60] the real authenticated process listener injects one logical provi
         assert.equal(
           readRuntimePeerConnection(server).peerId,
           'socket-caller-1',
-          '[A24] a sole accepted connection retains its genuine route identity'
+          'a sole accepted connection retains its genuine route identity'
         )
     }
     assert.throws(
       () => readRuntimePeerConnection(server),
       { code: 'CAPABILITY_CONFLICT' },
-      '[A24] multiple accepted sessions cannot silently select one target'
+      'multiple accepted sessions cannot silently select one target'
     )
     const first = clients[0]!.request('first', undefined, { orderKey: 'same' })
     calls.push(first)
@@ -159,11 +159,7 @@ it('[A59][A60] the real authenticated process listener injects one logical provi
     calls.push(second)
     void second.catch(() => undefined)
     assert.equal(await clients[1]!.request('other', undefined, { orderKey: 'other' }), 3)
-    assert.deepEqual(
-      effects,
-      ['first', 'other'],
-      '[A59] real accepts cannot create a queue per socket'
-    )
+    assert.deepEqual(effects, ['first', 'other'], 'real accepts cannot create a queue per socket')
     const sessions = readRuntimePeerSessions(server)!
     assert.equal(sessions.length, 2)
     const scopes = sessions.map((peer) =>

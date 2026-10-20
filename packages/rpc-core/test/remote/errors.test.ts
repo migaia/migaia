@@ -3,9 +3,9 @@ import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
 import { remoteHarness } from './fixture.js'
 
-describe('A7 remote errors and rollback boundary', () => {
+describe('remote errors and rollback boundary', () => {
   it.each(['terminalError', 'lastExit'] as const)(
-    '[K244] preserves %s before a rejected startup outcome',
+    'preserves %s before a rejected startup outcome',
     async (source) => {
       /** Existing startup errors retain priority over the newly retained capacity result. */
       const original = new Error('fixture original startup error')
@@ -35,7 +35,7 @@ describe('A7 remote errors and rollback boundary', () => {
     }
   )
 
-  it('[K195/K245] ignores a peer closed code until the local transport actually closes', async () => {
+  it('ignores a peer closed code until the local transport actually closes', async () => {
     /** Transport ownership, rather than an error code, proves physical departure. */
     const fixture = remoteHarness()
     /** The same error observation is delivered on both sides of actual local closure. */
@@ -79,7 +79,7 @@ describe('A7 remote errors and rollback boundary', () => {
     expect(remove).toHaveBeenCalledTimes(1)
   })
 
-  it('[A9] [K244] retains the exact rejected startup outcome when no error exists', async () => {
+  it('retains the exact rejected startup outcome when no error exists', async () => {
     /** Capacity rejection is a supervisor result, not a new thrown error identity. */
     const outcome = { state: 'stopped', rejection: 'full' } as const
     const fixture = remoteHarness()
@@ -87,7 +87,7 @@ describe('A7 remote errors and rollback boundary', () => {
     const error = await fixture.registration
       .prepareGeneration(new AbortController().signal, fixture.own)
       .catch((error: unknown) => error)
-    expect(error, 'SDD_BASE_RED_CONTRACT:A9').toMatchObject({
+    expect(error, 'remote error contract').toMatchObject({
       code: 'REMOTE_START_FAILED',
       cause: outcome
     })

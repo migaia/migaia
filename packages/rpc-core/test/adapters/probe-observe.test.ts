@@ -75,7 +75,7 @@ function fixture(kind: 'node' | 'browser' | 'worker') {
   return transport
 }
 
-describe('A1 Core physical carrier observation', () => {
+describe('Core physical carrier observation', () => {
   it('memory observes each physical delivery once with original content and no detail keys', async () => {
     const [left, right] = createMemoryTransportPair()
     /**

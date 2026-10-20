@@ -5,7 +5,7 @@
   "packages/web-rpc/test/tree-shaking-provenance.mjs": "retire: historical custody",
   "packages/web-rpc/test/tree-shaking-retained.mjs": "retain: RPC behavior",
   "packages/web-rpc/test/tree-shaking/approved-migration-candidate.test.ts": "retire: historical custody",
-  "packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts": "retain: RPC behavior",
+  "packages/web-rpc/test/tree-shaking/continuation-retained-graph.test.ts": "retain: RPC behavior",
   "packages/web-rpc/test/tree-shaking/core-retained-causal.mjs": "retain: RPC behavior",
   "packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts": "retain: RPC behavior",
   "packages/web-rpc/test/tree-shaking/delivery-successor-transaction.mjs": "retire: historical custody",

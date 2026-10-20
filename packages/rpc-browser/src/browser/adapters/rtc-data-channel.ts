@@ -179,7 +179,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     encodedType: 'string',
     send(message) {
       if (closed) throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
-      /** SC9b: the existing physical wire boundary serializes only non-string messages. */
+      /** The existing physical wire boundary serializes only non-string messages. */
       const data = typeof message === 'string' ? message : JSON.stringify(message)
       /** Observation sees the same physical string passed to the native channel. */
       const probe = observation.probe

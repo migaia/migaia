@@ -25,7 +25,7 @@ const bundleFixture = async (entry: string): Promise<string> => {
 }
 
 describe('tree shaking', () => {
-  it('A7 removes all runners from a type-and-constant-only bundle', async () => {
+  it('removes all runners from a type-and-constant-only bundle', async () => {
     /** Emitted fixture code must retain its function without retaining execution paths. */
     const code = await bundleFixture(MODE_ENTRY_PATH)
 

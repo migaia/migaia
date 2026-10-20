@@ -4,7 +4,7 @@ import * as runtimeOutlet from '../../../rpc-core/dist/remote/runtime-api/outlet
 import { createThreadPlugin } from '@migaia/rpc-threads'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 
-it('[A53][A54] one original outlet publisher snapshots listeners and closes bounded watch iterators', async () => {
+it('one original outlet publisher snapshots listeners and closes bounded watch iterators', async () => {
   /** Real Host registrations mint the publisher; structural facades cannot replace its ownership. */
   const hosts = [
     runtimeTestHost({
@@ -39,7 +39,7 @@ it('[A53][A54] one original outlet publisher snapshots listeners and closes boun
     assert.equal(
       typeof outlet.on,
       'function',
-      '[A53] the original outlet owns passive event subscriptions'
+      'the original outlet owns passive event subscriptions'
     )
     const read = Reflect.get(runtimeOutlet, 'readRuntimeOutletEvents') as (value: object) => {
       publish(
@@ -62,7 +62,7 @@ it('[A53][A54] one original outlet publisher snapshots listeners and closes boun
     assert.throws(
       () => outlet.on('unknown-event', () => undefined),
       { code: 'INVALID_CONFIG' },
-      '[A53] unsupported event names cannot create subscriptions'
+      'unsupported event names cannot create subscriptions'
     )
     assert.throws(() => outlet.on('ready', undefined as unknown as (event: unknown) => unknown), {
       code: 'INVALID_CONFIG'
@@ -175,9 +175,7 @@ it('[A53][A54] one original outlet publisher snapshots listeners and closes boun
     /** Closed subscriptions and newly created watches never revive the retired publisher. */
     const afterClose = outlet.watch()
     assert.deepEqual(await afterClose.next(), { done: true, value: undefined })
-    const unsubscribeClosed = outlet.on('ready', () =>
-      assert.fail('[A53] closed publisher revived')
-    )
+    const unsubscribeClosed = outlet.on('ready', () => assert.fail('closed publisher revived'))
     unsubscribeClosed()
     publisher.publish(event, (error) => reports.push(error))
   } finally {

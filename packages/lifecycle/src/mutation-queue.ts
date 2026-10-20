@@ -58,7 +58,7 @@ type IMutationRecord = {
  * verified as: strict FIFO, watchdog disarmed the instant a task settles, and — contrary to an
  * earlier reading of that code — no owner-aware self-dependency detection at all). This module adds
  * that detection as new behavior, plus makes the admission timeout a caller-supplied configuration
- * instead of a hardcoded domain SLA (§4.7).
+ * instead of a hardcoded domain SLA.
  */
 export function createMutationQueue(options: IMutationQueueOptions = {}): IMutationQueue {
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
@@ -109,7 +109,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     }
   }
 
-  /** 校验 scheduler.schedule 返回句柄含可调用 cancel（AF-32）：非法句柄 fail-fast，不裸抛 undefined.cancel。 */
+  /** 校验 scheduler.schedule 返回句柄含可调用 cancel：非法句柄 fail-fast，不裸抛 undefined.cancel。 */
   function validateScheduleHandle(handle: unknown): asserts handle is IScheduledTask {
     if (
       handle === null ||
@@ -123,7 +123,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     }
   }
 
-  /** 诊断回调隔离（AF-33）：同步抛/异步拒绝均被观测，不穿透 scheduler、不改变业务结果、不产生 unhandled rejection。 */
+  /** 诊断回调隔离：同步抛/异步拒绝均被观测，不穿透 scheduler、不改变业务结果、不产生 unhandled rejection。 */
   const reportAdmissionDiagnostic = (
     record: IMutationRecord,
     waitedMs: number,
@@ -274,8 +274,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     const owner = enqueueOptions.owner
     // A task awaiting a same-owner task it just enqueued cannot ever complete — the queue is FIFO
     // and won't run the new one until this one finishes. Unlabeled tasks are never flagged: without
-    // a reliable owner, rejecting a legitimate task would be worse than missing this diagnostic
-    // (§4.7).
+    // a reliable owner, rejecting a legitimate task would be worse than missing this diagnostic.
     //
     // This is a partial guard, not a general one: a running task that `enqueue()`s a *different*
     // or unlabeled task and then `await`s it right there deadlocks the exact same way — the queue
@@ -313,7 +312,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
         try {
           armAdmission(record, enqueueOptions.queueAdmissionTimeoutMs ?? defaultAdmissionTimeoutMs)
         } catch (error) {
-          // 排程失败不得留下幽灵任务（AF-32）：移除记录并 reject，后续任务不被阻塞、size 正确、原始错误可达。
+          // 排程失败不得留下幽灵任务：移除记录并 reject，后续任务不被阻塞、size 正确、原始错误可达。
           removeQueued(record)
           reject(error)
           return

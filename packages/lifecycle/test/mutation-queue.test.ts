@@ -11,7 +11,7 @@ const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => 
   return { promise, resolve }
 }
 
-describe('L-T13 MutationQueue: FIFO and settle-disarms-watchdog', () => {
+describe('MutationQueue: FIFO and settle-disarms-watchdog', () => {
   it('runs tasks strictly one at a time, in submission order', async () => {
     const queue = createMutationQueue()
     const order: string[] = []
@@ -88,7 +88,7 @@ describe('L-T13 MutationQueue: FIFO and settle-disarms-watchdog', () => {
     expect(queue.size).toBe(0)
   })
 
-  it('this port does not claim owner-aware self-dependency detection as pre-existing plugin-host behavior — it is new (see L-T43 for its own coverage)', async () => {
+  it('this port does not claim owner-aware self-dependency detection as pre-existing plugin-host behavior — it is new and covered separately', async () => {
     const queue = createMutationQueue()
     // Two DIFFERENT owners queued behind each other must both simply run in order — no rejection.
     const results: string[] = []
@@ -108,7 +108,7 @@ describe('L-T13 MutationQueue: FIFO and settle-disarms-watchdog', () => {
   })
 })
 
-describe('L-T42 MutationQueue: watchdog unconfigured (default) only diagnoses, never rejects', () => {
+describe('MutationQueue: watchdog unconfigured (default) only diagnoses, never rejects', () => {
   it('a task queued behind in-flight work is not rejected when queueAdmissionTimeoutMs is left unset', async () => {
     vi.useFakeTimers()
     try {
@@ -166,7 +166,7 @@ describe('L-T42 MutationQueue: watchdog unconfigured (default) only diagnoses, n
   })
 })
 
-describe('L-T43 MutationQueue: watchdog configured, disabled, and per-call override', () => {
+describe('MutationQueue: watchdog configured, disabled, and per-call override', () => {
   it('configuring a numeric queueAdmissionTimeoutMs dequeues and rejects with QUEUE_ADMISSION_TIMEOUT once exceeded', async () => {
     vi.useFakeTimers()
     try {
@@ -304,7 +304,7 @@ describe('MutationQueue: owner self-dependency detection', () => {
   })
 })
 
-describe('R-9 scheduler 注入（manualScheduler）', () => {
+describe('scheduler 注入（manualScheduler）', () => {
   it('推进才触发 watchdog 超时，未推进不触发', async () => {
     const manual = createManualScheduler()
     const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler: manual })
@@ -322,7 +322,7 @@ describe('R-9 scheduler 注入（manualScheduler）', () => {
   })
 })
 
-describe('L-T51 MutationQueue: synchronous timeout task cancellation', () => {
+describe('MutationQueue: synchronous timeout task cancellation', () => {
   it('cancels a synchronously fired timeout task exactly once and keeps queue usable', async () => {
     const cancel = vi.fn()
     const scheduler = {
@@ -380,7 +380,7 @@ describe('L-T51 MutationQueue: synchronous timeout task cancellation', () => {
   })
 })
 
-describe('L-T54 MutationQueue: normal dequeue cancellation failure isolation', () => {
+describe('MutationQueue: normal dequeue cancellation failure isolation', () => {
   it('reports a dequeue watchdog cancel failure, still settles B, and runs C without unhandled rejection', async () => {
     const cancelError = new Error('dequeue watchdog cancel failed')
     const diagnostics = vi.fn()
@@ -430,7 +430,7 @@ describe('L-T54 MutationQueue: normal dequeue cancellation failure isolation', (
   })
 })
 
-describe('AF-T32 mutation queue scheduling failure leaves no ghost task', () => {
+describe('mutation queue scheduling failure leaves no ghost task', () => {
   it('scheduler.now() throw removes the record and keeps the queue usable', async () => {
     const boom = new Error('now boom')
     const scheduler = {
@@ -494,7 +494,7 @@ describe('AF-T32 mutation queue scheduling failure leaves no ghost task', () => 
   })
 })
 
-describe('AF-T33 admission diagnostic callback isolation', () => {
+describe('admission diagnostic callback isolation', () => {
   it('rejects invalid diagnostic delay without retaining queued task', async () => {
     const manual = createManualScheduler()
     const queue = createMutationQueue({

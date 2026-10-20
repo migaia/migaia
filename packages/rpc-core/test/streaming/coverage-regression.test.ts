@@ -89,7 +89,7 @@ function frame(
   }
 }
 
-describe('streaming A8 producer failure paths', () => {
+describe('streaming producer failure paths', () => {
   it('reports an unknown cancelled frame and a failed fail notification', async () => {
     const fixture = producerFixture(true, true)
     fixture.owner.provide('count', function* () {

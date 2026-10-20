@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fixture } from './helper.js'
 
 describe('Tray discovery', () => {
-  it('[A4] filters all six ready native instances by runtime, host and state and merges unit detail', async () => {
+  it('filters all six ready native instances by runtime, host and state and merges unit detail', async () => {
     /** The shared module defines one genuine host for each supported runtime. */
     const api = await fixture()
     /** Six admissions remain independently discoverable. */

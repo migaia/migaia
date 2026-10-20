@@ -6,7 +6,7 @@ import { createJsonRpcBridgeError } from '@migaia/rpc-core/adapter/internal-adva
 import { bridgeFixture, request } from './fixture.js'
 
 describe('JSON-RPC error graph', () => {
-  it('[A7] preserves all wire error fields, cause/errors identity order and stack', async () => {
+  it('preserves all wire error fields, cause/errors identity order and stack', async () => {
     const original = new AggregateError(
       [new Error('first child'), new TypeError('second child')],
       'aggregate root',
@@ -60,7 +60,7 @@ describe('JSON-RPC error graph', () => {
       1
     ]
   ] as const)(
-    '[A7] isolates correlated error %# and allows the next request',
+    'isolates correlated error %# and allows the next request',
     async (error, source, code, reports) => {
       const fixture = bridgeFixture()
       const channel = await fixture.open()
@@ -84,7 +84,7 @@ describe('JSON-RPC error graph', () => {
       await channel.close()
     }
   )
-  it('[A7] gives all five codes one dedicated source and preserves native types', () => {
+  it('gives all five codes one dedicated source and preserves native types', () => {
     expect(Object.values(JsonRpcBridgeErrorCode)).toHaveLength(5)
     for (const code of Object.values(JsonRpcBridgeErrorCode)) {
       const error = createJsonRpcBridgeError(code)
@@ -98,14 +98,14 @@ describe('JSON-RPC error graph', () => {
       createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
     ).toBeInstanceOf(TypeError)
   })
-  it('[A7] closes raw once under concurrent close', async () => {
+  it('closes raw once under concurrent close', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     await Promise.all([channel.close(), channel.close(), channel.close()])
     expect(fixture.closes).toBe(1)
     expect(fixture.removals).toBe(2)
   })
-  it('[A7] retains write, cleanup and reporter failures without replacing the primary', async () => {
+  it('retains write, cleanup and reporter failures without replacing the primary', async () => {
     const fixture = bridgeFixture()
     const writeFailure = new Error('physical writer failed')
     const cleanupFailure = new Error('raw cleanup failed')

@@ -1,7 +1,7 @@
 import { ReduxDevToolsCommand, type IReduxDevToolsCommand } from '@migaia/store-middleware'
-// @ts-expect-error DT-C01 moves extension vocabulary to its actual adapter owner.
+// @ts-expect-error moves extension vocabulary to its actual adapter owner.
 import { StoreDevtoolsCommand } from '../src/index.js'
-// @ts-expect-error DT-C01 removes the old local diagnostic type export.
+// @ts-expect-error removes the old local diagnostic type export.
 import type { IStoreDevtoolsCommand } from '../src/index.js'
 // @ts-expect-error Diagnostic error classification is private implementation.
 import { identifyDevtoolsFailure } from '../src/index.js'

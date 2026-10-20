@@ -11,7 +11,7 @@ import type { IRpcProviderRejection } from '../../dist/core/provider-admission.j
 
 /** Capacity diagnostics exercise real owners and retain the existing RPC refusal behavior. */
 describe('local replay capacity reports', () => {
-  it('[L3b] shares one constant report budget across inbound and outbound namespaces', async () => {
+  it('shares one constant report budget across inbound and outbound namespaces', async () => {
     /** Both directions on this endpoint read one supported monotonic clock. */
     const scheduler = createManualScheduler()
     /** Real bidirectional peers isolate only the first endpoint's existing quotas. */
@@ -75,7 +75,7 @@ describe('local replay capacity reports', () => {
     }
   })
 
-  it('[L3b] does not report a cached rejection after actual capacity has returned', async () => {
+  it('does not report a cached rejection after actual capacity has returned', async () => {
     /** Expiry can free an accepted tombstone while a later rejected identity remains cached. */
     const scheduler = createManualScheduler()
     /** Real frames are retained only as fixture data for repeating the rejected request. */
@@ -142,7 +142,7 @@ describe('local replay capacity reports', () => {
     }
   })
 
-  it('[L3b] reports outbound exhaustion once per endpoint interval without rebuilding errors', async () => {
+  it('reports outbound exhaustion once per endpoint interval without rebuilding errors', async () => {
     /** Manual monotonic time isolates the report interval from wall-clock and replay retention. */
     const scheduler = createManualScheduler()
     /** Real memory peers execute one request before its released id occupies the whole budget. */
@@ -236,7 +236,7 @@ describe('local replay capacity reports', () => {
   })
 
   it.each(['none', 'ok', 'throw', 'reject'] as const)(
-    '[L3b] inbound request and one-way refusal preserve callback and wire behavior: %s',
+    'inbound request and one-way refusal preserve callback and wire behavior: %s',
     async (mode) => {
       /** Report rate limiting uses a supported injected monotonic scheduler. */
       const scheduler = createManualScheduler()

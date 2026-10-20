@@ -4,7 +4,7 @@ import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { it, expect, vi, type MockInstance } from 'vitest'
 import { defineMessageAdapter } from '../../dist/adapter.js'
 
-it('[P5] Host cancellation during actual launch terminates the unit once and retains its reason', async () => {
+it('Host cancellation during actual launch terminates the unit once and retains its reason', async () => {
   /** This physical unit is constructed only by the SDK's actual launch callback. */
   let worker: Worker | undefined
   /** Native termination remains real while the test counts invocations independently. */

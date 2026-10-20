@@ -10,7 +10,7 @@ import { hooks } from '../../dist/core/middleware/hooks.js'
 /** Exercises the optional owner observer through real core request admission and responses. */
 describe('provider concurrency observer', () => {
   it.each(['none', 'ok', 'throw', 'reject'] as const)(
-    '[K215] preserves request and one-way refusals with observer: %s',
+    'preserves request and one-way refusals with observer: %s',
     async (mode) => {
       /** Real provider work occupies the single concurrency lease until cleanup. */
       let finish!: () => void

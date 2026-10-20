@@ -4,7 +4,7 @@ import { createLifecycleScope } from '../src/lifecycle-scope'
 import { LifecycleErrorCode } from '../src/error-code'
 import type { ILifecycleOwner, IReleaseDescriptor } from '../src/types'
 
-describe('L-T11 ProvisionalScope: commit', () => {
+describe('ProvisionalScope: commit', () => {
   it('transfers every resource to the parent, in registration order', async () => {
     const provisional = createProvisionalScope()
     const a = provisional.own('a', { force: vi.fn() })
@@ -83,7 +83,7 @@ describe('L-T11 ProvisionalScope: commit', () => {
   })
 })
 
-describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
+describe('ProvisionalScope: rollback/abort/expiry', () => {
   it('releases every owned resource in reverse order', async () => {
     const calls: string[] = []
     const provisional = createProvisionalScope()
@@ -216,7 +216,7 @@ describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
     expect(provisional.signal.aborted).toBe(true)
   })
 
-  it('AF-T61: abort listener failures do not prevent provisional cleanup or later listeners', async () => {
+  it('abort listener failures do not prevent provisional cleanup or later listeners', async () => {
     const provisional = createProvisionalScope()
     const calls: string[] = []
     provisional.signal.addEventListener('abort', () => {
@@ -237,7 +237,7 @@ describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
   })
 })
 
-describe('L-T39 ProvisionalScope: construction-failure rollback', () => {
+describe('ProvisionalScope: construction-failure rollback', () => {
   it('releases part-way-allocated resources in strict reverse-of-registration order', async () => {
     const order: string[] = []
     const provisional = createProvisionalScope()
@@ -302,7 +302,7 @@ describe('L-T39 ProvisionalScope: construction-failure rollback', () => {
   })
 })
 
-describe('L-T49 ProvisionalScope: parent registration rollback', () => {
+describe('ProvisionalScope: parent registration rollback', () => {
   it('keeps addEventListener stored-then-throw primary and remove cleanup identities reachable', () => {
     const registrationError = new Error('parent registration failed')
     const removalError = new Error('parent removal failed')

@@ -25,7 +25,7 @@ describe.skipIf(process.platform === 'win32')('Node Unix listener close limitati
     [false, 'file'],
     [false, 'socket']
   ] as const)(
-    '[K237/K200/A10] reports native removal of a successor once (managed=%s, successor=%s)',
+    'reports native removal of a successor once (managed=%s, successor=%s)',
     async (managed, kind) => {
       /** Short private fixture paths keep platform address limits separate from the unlink oracle. */
       const directory = await mkdtemp('/tmp/rpc-inode-')
@@ -72,7 +72,7 @@ describe.skipIf(process.platform === 'win32')('Node Unix listener close limitati
   )
 
   it.skipIf(process.platform !== 'darwin')(
-    '[K237/A10] preserves the existing 104-byte Darwin path budget without staging',
+    'preserves the existing 104-byte Darwin path budget without staging',
     async () => {
       /** Construct the previously supported byte length, rather than a shorter temporary alias. */
       const directory = await mkdtemp('/tmp/rpc-path-')

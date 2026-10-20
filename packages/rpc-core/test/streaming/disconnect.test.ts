@@ -4,8 +4,8 @@ import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'
 
-/** A9 delivers no old item twice after the canonical transport reports disconnection. */
-describe('streaming A9 disconnect', () => {
+/** Delivers no old item twice after the canonical transport reports disconnection. */
+describe('streaming disconnect', () => {
   it('ends the pending and future pulls with one sticky unknown-result error', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createComposedEndpoint(

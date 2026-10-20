@@ -40,7 +40,7 @@ function imports(path: string): string[] {
 }
 
 describe('rpc-devtools layer-1 dependency direction', () => {
-  it('contract A1 keeps probe definitions free of host and carrier imports', () => {
+  it('contract keeps probe definitions free of host and carrier imports', () => {
     for (const path of sourceFiles(probeRoot))
       for (const specifier of imports(path))
         expect(specifier, path).not.toMatch(
@@ -48,7 +48,7 @@ describe('rpc-devtools layer-1 dependency direction', () => {
         )
   })
 
-  it('contract A3 keeps the devtools scaffold on public core and contract entries', () => {
+  it('contract keeps the devtools scaffold on public core and contract entries', () => {
     for (const path of sourceFiles(devtoolsRoot))
       for (const specifier of imports(path)) {
         if (specifier.startsWith('.')) expect(specifier, path).toMatch(/\.js$/u)

@@ -63,7 +63,7 @@ describe('public exports baseline', () => {
   })
 })
 
-describe('SWV2-T49 package-owner bundle boundary', () => {
+describe('package-owner bundle boundary', () => {
   it('keeps canonical owner roots and subpaths external instead of bundling duplicate code', () => {
     const source = readBuiltJavaScript()
     expect(source).toContain('from "@migaia/utils/promise"')
@@ -82,7 +82,7 @@ describe('SWV2-T49 package-owner bundle boundary', () => {
   })
 })
 
-describe('SWV4-R13 atomic consumer and artifact correction', () => {
+describe('atomic consumer and artifact correction', () => {
   it('rejects removed root backend imports in every tracked direct consumer', () => {
     for (const file of directConsumerFiles) {
       const source = readFileSync(resolve(import.meta.dirname, file), 'utf8')

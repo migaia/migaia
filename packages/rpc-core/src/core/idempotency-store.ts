@@ -38,7 +38,10 @@ export type IRpcIdempotencyClaim =
 /** Injectable store boundary; the session owner chooses scopes only after identity admission. */
 export type IRpcIdempotencyStore = Readonly<{
   claim: (scope: string, key: string, now: number, fingerprint?: string) => IRpcIdempotencyClaim
-  /** Optional U25 extension; a legacy store without lookup cannot advertise outcome semantics. */
+  /**
+   * Optional outcome-lookup extension; a legacy store without lookup cannot advertise outcome
+   * semantics.
+   */
   lookup?: (scope: string, key: string, now: number) => IRpcIdempotencyLookup
   /** Opt-in store facts describe this actual owner; ordinary claims never create or read an epoch. */
   readRuntimeFacts?: () => IRpcRuntimeStore
@@ -155,7 +158,7 @@ export function createRpcIdempotencyStore(
   let entries = 0
   let bytes = 0
   let sequence = 0
-  /** Lazily minted only when U25 queries this exact in-memory store incarnation. */
+  /** Lazily minted only when outcome lookup queries this exact in-memory store incarnation. */
   let epoch: string | undefined
 
   /** Remove an entry only if the same owner still holds that key. */

@@ -45,7 +45,7 @@ export async function coroutineAbort(signal: IAbortSignal): Promise<void> {
   )
 }
 
-/** One family fixture owns actual child hosts and accepts explicit raw task completion for A2/A3. */
+/** One family fixture owns actual child hosts and accepts explicit raw task completion. */
 export function coroutineService(label: string, report: (error: unknown) => void, late = false) {
   /** Each generation records independent task entry and cleanup, never guessed supervisor state. */
   const contexts: ICoroutineTaskContext[] = []

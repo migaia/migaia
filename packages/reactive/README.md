@@ -85,7 +85,7 @@ count.dispose()
 
 应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；自定义source/observer也只取得绑定到自身节点的能力，不取得内部服务或可变图边。三个节点类保持内部实现，不作为值导出。
 
-> 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。
+> 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已整体移出本包，改用 `@migaia/lifecycle` 的 `createLifecycleScope()`/`createSyncLifecycleScope()`。
 
 ## 8. 生命周期、错误与边界
 

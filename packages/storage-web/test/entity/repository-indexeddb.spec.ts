@@ -20,7 +20,7 @@ const freshIndexedDb = () =>
   })
 
 describe('repository over real indexedDbHost backend', () => {
-  it('SWV4-R07 uses the complete sidecar for exact/range/list/stream queries', async () => {
+  it('uses the complete sidecar for exact/range/list/stream queries', async () => {
     type IIndexedUser = { id: string; score: number }
     const store = freshIndexedDb()
     const baseline = defineEntity<IIndexedUser>({ name: 'native-users', key: 'id' }).connect(store)
@@ -55,7 +55,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R07 compiles narrow ranges into the lookup cursor before defensive filtering', async () => {
+  it('compiles narrow ranges into the lookup cursor before defensive filtering', async () => {
     type IRangeUser = { id: string; score: number }
     const store = freshIndexedDb()
     const baseline = defineEntity<IRangeUser>({ name: 'native-range-users', key: 'id' }).connect(
@@ -90,7 +90,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R07 keeps compound and deeply nested index keys inside the generation prefix', async () => {
+  it('keeps compound and deeply nested index keys inside the generation prefix', async () => {
     type INestedRangeUser = { id: string; values: IStorageKey[] }
     const store = freshIndexedDb()
     const baseline = defineEntity<INestedRangeUser>({
@@ -138,7 +138,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R10 enforces a unique index atomically across two connections', async () => {
+  it('enforces a unique index atomically across two connections', async () => {
     type IUniqueUser = { id: string; email: string }
     const factory = new IDBFactory()
     const dbName = `native-unique-${Math.random().toString(36).slice(2)}`
@@ -167,7 +167,7 @@ describe('repository over real indexedDbHost backend', () => {
     await secondStore.dispose()
   })
 
-  it('SWV2-T34 entity privately backfills normalized path and selector projections', async () => {
+  it('entity privately backfills normalized path and selector projections', async () => {
     type IIndexedUser = { id: string; profile: { email: string }; tags: string[] }
     const store = freshIndexedDb()
     const baseline = defineEntity<IIndexedUser>({ name: 'backfilled-users', key: 'id' })
@@ -223,7 +223,7 @@ describe('repository over real indexedDbHost backend', () => {
     expect(store.capabilities.secondaryIndexes).toBe(true)
   })
 
-  it('SOL-SWV2-061 measures decoded custom-codec payloads before issuing a batch', async () => {
+  it('measures decoded custom-codec payloads before issuing a batch', async () => {
     const store = freshIndexedDb()
     const baseline = defineEntity<{ id: string; email: string }>({
       name: 'decoded-cap-codec',
@@ -279,7 +279,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R28 fails closed for nested undefined in decoded entity budget', async () => {
+  it('fails closed for nested undefined in decoded entity budget', async () => {
     const store = freshIndexedDb()
     const baseline = defineEntity<{ id: string; email: string }>({
       name: 'nested-undefined-codec',
@@ -321,7 +321,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R06 keeps the canonical record when a legacy shadow has the same id', async () => {
+  it('keeps the canonical record when a legacy shadow has the same id', async () => {
     type IShadowedUser = { id: string; email: string }
     const store = freshIndexedDb()
     const entity = defineEntity<IShadowedUser>({ name: 'shadow-wins', key: 'id' })
@@ -344,7 +344,7 @@ describe('repository over real indexedDbHost backend', () => {
     ).resolves.toEqual([{ id: 'same', email: 'canonical@example.com' }])
   })
 
-  it('SWV4-R06 scans nested legacy IDs across foreign-key adjacency', async () => {
+  it('scans nested legacy IDs across foreign-key adjacency', async () => {
     type INestedUser = { id: IStorageKey; email: string }
     const store = freshIndexedDb()
     const diagnostics: string[] = []
@@ -381,7 +381,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-E28 rejects aggregate projection rows before any sidecar write', async () => {
+  it('rejects aggregate projection rows before any sidecar write', async () => {
     const store = freshIndexedDb()
     const scope = 'backfill-projection-cap'
     for (let index = 0; index < 8; index += 1)
@@ -417,7 +417,7 @@ describe('repository over real indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T34 keeps readiness non-complete until legacy winners are migrated', async () => {
+  it('keeps readiness non-complete until legacy winners are migrated', async () => {
     type ILegacyUser = { id: string; email: string }
     const store = freshIndexedDb()
     await store.putRecord({ __v: 1, data: { id: 'legacy', email: 'legacy@example.com' } }, [
@@ -444,7 +444,7 @@ describe('repository over real indexedDbHost backend', () => {
     }
     await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
       status: 'running',
-      // R06 inspects the legacy phase before readiness can become complete; migration status
+      // Inspects the legacy phase before readiness can become complete; migration status
       // still keeps this generation non-authoritative until the legacy winner is promoted.
       scanned: 1
     })
@@ -491,7 +491,7 @@ describe('repository over real indexedDbHost backend', () => {
     await expect(store.getRecord(['hanging-codec', 'u1'])).resolves.toBeUndefined()
   })
 
-  it('SWV2-T34 query-owned backfill propagates cancellation through a hanging decoder', async () => {
+  it('query-owned backfill propagates cancellation through a hanging decoder', async () => {
     const store = freshIndexedDb()
     await defineEntity<{ id: string; email: string }>({ name: 'abort-backfill', key: 'id' })
       .connect(store)
@@ -522,7 +522,7 @@ describe('repository over real indexedDbHost backend', () => {
     })
   })
 
-  it('SWV2-T13 active backfill lease keeps concurrent queries on authoritative fallback', async () => {
+  it('active backfill lease keeps concurrent queries on authoritative fallback', async () => {
     const store = freshIndexedDb()
     const baseline = defineEntity<{ id: string; email: string }>({
       name: 'leased-query-users',
@@ -553,7 +553,7 @@ describe('repository over real indexedDbHost backend', () => {
     owner.release()
   })
 
-  it('SWV2-T34 preserves selector failure identity and records failed readiness', async () => {
+  it('preserves selector failure identity and records failed readiness', async () => {
     const store = freshIndexedDb()
     const baseline = defineEntity<{ id: string; email: string }>({
       name: 'failed-selector-backfill',

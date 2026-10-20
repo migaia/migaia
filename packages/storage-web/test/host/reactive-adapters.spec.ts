@@ -23,8 +23,8 @@ import { memoryStorageHost } from '../../src/backends/memory.js'
 import { defineReactiveAdapterFeature } from '../../src/reactive-adapter.js'
 import type { IFeatureReference } from '@migaia/plugin-host'
 
-/** R10 proves the Host installs one exact adapter for each canonical fast-path plugin. */
-describe('SWV4-B05 R10 reactive adapters', () => {
+/** Proves the Host installs one exact adapter for each canonical fast-path plugin. */
+describe('reactive adapters', () => {
   it('snapshots custom adapter getters and subscriber before native Plugin construction', async () => {
     const originalSubscribe = vi.fn(() => () => undefined)
     const replacementSubscribe = vi.fn(() => () => undefined)
@@ -297,7 +297,7 @@ describe('SWV4-B05 R10 reactive adapters', () => {
     }
   })
 
-  it('YS29 accepts a short kind-hidden native definition with one shared Feature across exact stores', async () => {
+  it('accepts a short kind-hidden native definition with one shared Feature across exact stores', async () => {
     const cap = defineFeature((core) => ({
       readStore: () => core.featureExpose.getStore(),
       readBackendId: () => core.featureExpose.getBackendId()
@@ -812,7 +812,7 @@ describe('SWV4-B05 R10 reactive adapters', () => {
     await service.dispose()
   })
 
-  it('reports D79 sync admission failures as native coded TypeErrors with the original cause', () => {
+  it('reports sync admission failures as native coded TypeErrors with the original cause', () => {
     const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!
     const service = createStorageReactiveService()

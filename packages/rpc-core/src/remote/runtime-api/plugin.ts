@@ -334,7 +334,7 @@ function exposedCatalogMethods(
     for (const [feature, definition] of Object.entries(contract.features)) {
       for (const [key, declaration] of Object.entries(definition.methods)) {
         if (selected !== undefined && selected !== key) continue
-        /** BC3 folds the Feature segment while retaining the declared method's owner. */
+        /** Folds the Feature segment while retaining the declared method's owner. */
         const fullName = `${name}.${key}`
         if (owners.has(fullName) && owners.get(fullName) !== feature)
           throw createRpcError(

@@ -34,7 +34,7 @@ function throwingReason(cause: unknown, initialAborted = false) {
   }
 }
 
-describe('A4 serialize abort reason policies', () => {
+describe('serialize abort reason policies', () => {
   it('preserves the snapshot distinction between tagged and untagged failures', () => {
     const cause = new Error('reason getter')
     const untagged = throwingReason(cause)

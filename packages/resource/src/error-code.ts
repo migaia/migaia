@@ -2,10 +2,10 @@
  * Owns the error-code declarations for `@migaia/resource`. Under `docs/contracts/error-codes.md`,
  * `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/resource'`. Throw
  * sites reference these constants instead of inline literals. This table assigns codes to earlier
- * bare-error messages (`migration.sdd.md` §3.7.2). `REQUEST_ABORTED` and `REQUEST_CANCELLED` retain
- * `DOMException` with `name === 'AbortError'`. Callers, including `store-react` suspension paths,
- * recognize that native error type. Codes attach as properties and never replace the native type.
- * Code values are public API. Renaming a code is a breaking change.
+ * bare-error messages. `REQUEST_ABORTED` and `REQUEST_CANCELLED` retain `DOMException` with `name
+ * === 'AbortError'`. Callers, including `store-react` suspension paths, recognize that native error
+ * type. Codes attach as properties and never replace the native type. Code values are public API.
+ * Renaming a code is a breaking change.
  */
 export const ResourceErrorCode = {
   /**
@@ -33,8 +33,8 @@ export const ResourceErrorCode = {
   /**
    * Reports timer or listener cleanup failure after request cancellation converges state.
    * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code
-   * separates cleanup failures from state errors under `migration.sdd.md` §3.7.2. Record the
-   * cleanup failure and continue treating the `Resource` as cancelled.
+   * separates cleanup failures from state errors. Record the cleanup failure and continue treating
+   * the `Resource` as cancelled.
    */
   cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED',
 
@@ -63,8 +63,8 @@ export const ResourceErrorCode = {
   /**
    * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe
    * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the
-   * original thrown value and getter failure by identity. Enforces `error-codes.md` §2 and §3.2.
-   * Inspect the hostile getter instead of silently retrying it as an ordinary fetch failure.
+   * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the
+   * hostile getter instead of silently retrying it as an ordinary fetch failure.
    */
   suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED',
 

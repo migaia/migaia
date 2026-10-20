@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fixture, until } from './helper.js'
 
 describe('mesh routing and admission accounting', () => {
-  it('[A1 A2] interleaves both built-in forms with one cursor and counts pending requests', async () => {
+  it('interleaves both built-in forms with one cursor and counts pending requests', async () => {
     /** Genuine thread targets own their business calls and cancellation receipts. */
     const api = await fixture()
     /** Reporter retains contained native notices without printing redundant diagnostics. */
@@ -63,7 +63,7 @@ describe('mesh routing and admission accounting', () => {
       await tray.dispose()
     }
   }, 30000)
-  it('[A1 A2] registers custom policies from DSL and options, routes every kind and authenticates child declaration', async () => {
+  it('registers custom policies from DSL and options, routes every kind and authenticates child declaration', async () => {
     /** Shared branded policies are imported by genuine native entries. */
     const api = await fixture()
     /** This realm owns the parent policy callback; each native child keeps its own counter. */
@@ -161,7 +161,7 @@ describe('mesh routing and admission accounting', () => {
     }
   }, 30000)
 
-  it('[A1] preserves policy error identity, rejects invalid registration and never retries unavailable or unknown targets', async () => {
+  it('preserves policy error identity, rejects invalid registration and never retries unavailable or unknown targets', async () => {
     const api = await fixture()
     const original = Object.assign(new Error('fixture routing failure'), {
       source: '@fixture/tray',
@@ -291,7 +291,7 @@ describe('mesh routing and admission accounting', () => {
     }
   }, 30000)
 
-  it('[A1] routes immediate process calls after restart and forwards caller cancellation and remaining deadlines', async () => {
+  it('routes immediate process calls after restart and forwards caller cancellation and remaining deadlines', async () => {
     const api = await fixture()
     const reports: unknown[] = []
     const envelopes: any[] = []
@@ -370,7 +370,7 @@ describe('mesh routing and admission accounting', () => {
     }
   }, 30000)
 
-  it('[A2] releases admission counts for every completion and never decrements a new same-id admission', async () => {
+  it('releases admission counts for every completion and never decrements a new same-id admission', async () => {
     /** This existing owner accepts a transport callback, so no public test seam is introduced. */
     const { createRegistry } = await import('../../src/hosts/parent/registry.js')
     const { TrayCallKind } = await import('../../src/hosts/constants.js')

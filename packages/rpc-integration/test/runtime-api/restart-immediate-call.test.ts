@@ -20,7 +20,7 @@ import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 const entry = fileURLToPath(new URL('./fixtures/automatic-plugin.mjs', import.meta.url))
 
 it.each(['process', 'thread'] as const)(
-  '[serve-commit A4] %s automatic child admits an immediate exposed call after each of 20 restart ready events',
+  '%s automatic child admits an immediate exposed call after each of 20 restart ready events',
   async (kind) => {
     /** One true Host retains the public connection outlet across all native child replacements. */
     const host = runtimeTestHost({
@@ -154,7 +154,10 @@ it.each(['process', 'thread'] as const)(
         if (event.name !== 'bridge') return
         /** Distinct payloads prove the immediate call belongs to this ready generation. */
         const payload = `${kind}:${calls.length + 1}`
-        /** Invoke synchronously in the ready callback; no delay, commit ACK or retry masks F20. */
+        /**
+         * Invoke synchronously in the ready callback; no delay, commit ACK or retry masks the
+         * admission regression.
+         */
         const result = outlet.request('bridge', 'service.probe', payload).then(
           (value) => ({ value }),
           (error: unknown) => ({ error: classifyFailure(error) })
@@ -163,7 +166,7 @@ it.each(['process', 'thread'] as const)(
       })
       for (let restart = 0; restart < 20; restart++) {
         await outlet.restart('bridge')
-        assert.equal(calls.length, restart + 1, '[A4] every restart publishes one ready event')
+        assert.equal(calls.length, restart + 1, 'every restart publishes one ready event')
         await calls[restart]!.result
       }
       /** Retain every original rejection rather than retrying or suppressing a failed generation. */
@@ -175,20 +178,20 @@ it.each(['process', 'thread'] as const)(
           (outcome) => 'error' in outcome && outcome.error.code === 'REGISTRATION_REVOKED'
         ).length,
         0,
-        '[A4] no immediate exposed call fails REGISTRATION_REVOKED'
+        'no immediate exposed call fails REGISTRATION_REVOKED'
       )
       for (const [index, outcome] of outcomes.entries()) {
         assert.deepEqual(
           outcome,
           { value: [42, calls[index]!.payload] },
-          `[A4] restart ${index + 1} invokes its exposed method successfully`
+          `restart ${index + 1} invokes its exposed method successfully`
         )
       }
     } finally {
       removeReady?.()
       await host.dispose()
     }
-    /** Ordinary native stop reports remain evidence; only the admission regression fails A4. */
+    /** Ordinary native stop reports remain evidence; only the admission regression fails this check. */
     assert.equal(
       reports.some(
         (failure) =>
@@ -196,7 +199,7 @@ it.each(['process', 'thread'] as const)(
           failure.cause.some((cause) => cause.code === 'REGISTRATION_REVOKED')
       ),
       false,
-      '[A4] no reported cause chain contains REGISTRATION_REVOKED'
+      'no reported cause chain contains REGISTRATION_REVOKED'
     )
     /** Repeated native close diagnostics are grouped by their full classification and cause chain. */
     const diagnostics = new Map<
@@ -212,7 +215,7 @@ it.each(['process', 'thread'] as const)(
       else diagnostics.set(key, { count: 1, failure })
     }
     console.info(
-      '[serve-commit A4]',
+      '[serve-commit restart]',
       JSON.stringify({
         family: kind,
         readyCalls: calls.length,

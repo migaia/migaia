@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('A2 abort reason uses the guarded property read export', () => {
+describe('abort reason uses the guarded property read export', () => {
   it('keeps the removed special-purpose API absent and documents caller policy', async () => {
     const [error, root, promise] = await Promise.all([
       import('../dist/error.js'),

@@ -23,7 +23,7 @@ const collectCode = (fn: () => unknown): string | undefined => {
   }
 }
 
-describe('L-T41 lifecycle code table: every code has a precise trigger, phase matches, diagnostics never throw', () => {
+describe('lifecycle code table: every code has a precise trigger, phase matches, diagnostics never throw', () => {
   it('SCOPE_CLOSED: own() while closing (not reentrant)', () => {
     const scope = createLifecycleScope()
     scope.close()
@@ -259,7 +259,7 @@ describe('L-T41 lifecycle code table: every code has a precise trigger, phase ma
   })
 })
 
-describe('L-T44 error-code.ts: single declaration site with three-part JSDoc', () => {
+describe('error-code.ts: single declaration site with three-part JSDoc', () => {
   const sourcePath = fileURLToPath(new URL('../src/error-code.ts', import.meta.url))
   const source = readFileSync(sourcePath, 'utf8')
 

@@ -82,7 +82,7 @@ async function attach(
   }
 }
 
-it('[A99] method-level expose admits only add, and whole plus method is one union', async () => {
+it('method-level expose admits only add, and whole plus method is one union', async () => {
   /** The same real business owner is used before and after changing the explicit whitelist. */
   const owners = [managedHost(), managedHost()] as const
   /** Each accepted business execution is observed independently from RPC completion. */
@@ -115,27 +115,27 @@ it('[A99] method-level expose admits only add, and whole plus method is one unio
       },
       (error: unknown) => error
     )
-    assert.equal(installed, true, '[A99] method-level whitelist configures a real connection')
+    assert.equal(installed, true, 'method-level whitelist configures a real connection')
     calls.length = 0
     assert.equal(await owners[1].thread!.request('remote', 'math.add'), 42)
     await assert.rejects(
       Promise.resolve().then(() => owners[1].thread!.request('remote', 'math.sub')),
       { code: 'PROVIDER_NOT_FOUND' }
     )
-    assert.deepEqual(calls, ['add'], '[A99] unlisted provider never executes')
+    assert.deepEqual(calls, ['add'], 'unlisted provider never executes')
     await Promise.all(owners.map((owner) => owner.unUse('remote')))
     carriers.push(await attach(owners, { expose: ['math', 'math.add'] }))
     calls.length = 0
     assert.equal(await owners[1].thread!.request('remote', 'math.add'), 42)
     assert.equal(await owners[1].thread!.request('remote', 'math.sub'), -42)
-    assert.deepEqual(calls, ['add', 'sub'], '[A99] the union admits each callable once')
+    assert.deepEqual(calls, ['add', 'sub'], 'the union admits each callable once')
   } finally {
     for (const owner of owners) await owner.dispose()
     for (const carrier of carriers) carrier.close()
   }
 })
 
-it('[A100] current Feature replacement changes new calls while its original disabled guard remains', async () => {
+it('current Feature replacement changes new calls while its original disabled guard remains', async () => {
   /** These genuine registrations exercise name resolution through the original Host handle. */
   const owners = [managedHost(), managedHost()] as const
   /** The successor uses a distinct answer and the same public method contract. */
@@ -151,11 +151,11 @@ it('[A100] current Feature replacement changes new calls while its original disa
     const answer = await owners[1]
       .thread!.request('remote', 'math.add')
       .catch((error: unknown) => error)
-    assert.equal(answer, 84, '[A100] a new call resolves the current real Feature')
+    assert.equal(answer, 84, 'a new call resolves the current real Feature')
     const disabled = await owners[0].plugin.disable('math')
     calls.length = 0
     await assert.rejects(owners[1].thread!.request('remote', 'math.add'))
-    assert.equal(calls.length, 0, '[A100] disabled successor performs no business')
+    assert.equal(calls.length, 0, 'disabled successor performs no business')
     await disabled.token.enable()
     assert.equal(await owners[1].thread!.request('remote', 'math.add'), 84)
   } finally {
@@ -164,7 +164,7 @@ it('[A100] current Feature replacement changes new calls while its original disa
   }
 })
 
-it('[A101] Plugin provide uses the Peer method builder and rejects an exposure collision before opening', async () => {
+it('Plugin provide uses the Peer method builder and rejects an exposure collision before opening', async () => {
   /** Independent Hosts prove provide is an actual inbound public method rather than an export. */
   const owners = [managedHost(), managedHost()] as const
   /** A local ordinary Feature establishes a working baseline before the new provide path. */
@@ -181,7 +181,7 @@ it('[A101] Plugin provide uses the Peer method builder and rejects an exposure c
     const answer = await Promise.resolve()
       .then(() => owners[1].thread!.request('remote', 'application.echo', 43))
       .catch((error: unknown) => error)
-    assert.equal(answer, 43, '[A101] Plugin-owned provide reaches the canonical Peer provider')
+    assert.equal(answer, 43, 'Plugin-owned provide reaches the canonical Peer provider')
     await owners[0].unUse('remote')
     /** No source may run when the two builders compile the same full method name. */
     let opens = 0
@@ -193,7 +193,7 @@ it('[A101] Plugin provide uses the Peer method builder and rejects an exposure c
           provide: { math: { add: () => 0 } },
           connect: async () => {
             opens += 1
-            assert.fail('[A101] conflicting configuration acquired a physical source')
+            assert.fail('conflicting configuration acquired a physical source')
           },
           report: () => undefined
         } as IRuntimeThreadPluginOptions)
@@ -202,7 +202,7 @@ it('[A101] Plugin provide uses the Peer method builder and rejects an exposure c
         () => undefined,
         (error: unknown) => error
       )
-    assert.equal(opens, 0, '[A101] collision rejects at configuration time')
+    assert.equal(opens, 0, 'collision rejects at configuration time')
     /** Installation wrappers preserve the existing INVALID_CONFIG on their cause chain. */
     let error = rejected
     while (error && typeof error === 'object' && Reflect.get(error, 'code') !== 'INVALID_CONFIG')
@@ -214,7 +214,7 @@ it('[A101] Plugin provide uses the Peer method builder and rejects an exposure c
   }
 })
 
-it('[A62] a disabled exposed Feature refuses the complete group before any business or lease commit', async () => {
+it('a disabled exposed Feature refuses the complete group before any business or lease commit', async () => {
   /** Two genuine Host registrations supply independently counted group members. */
   const owners = [managedHost(), managedHost()] as const
   /** Invocation is observed at the business boundary, independently of returned step states. */
@@ -265,12 +265,12 @@ it('[A62] a disabled exposed Feature refuses the complete group before any busin
         (result) => ({ result }),
         (error: unknown) => ({ error })
       )
-    assert.deepEqual(calls, [], '[A62] an unavailable second Feature cannot execute the first')
-    assert.ok('error' in outcome, '[A62] permission refusal rejects the whole group')
+    assert.deepEqual(calls, [], 'an unavailable second Feature cannot execute the first')
+    assert.ok('error' in outcome, 'permission refusal rejects the whole group')
     assert.equal(Reflect.get(outcome.error as object, 'source'), '@migaia/plugin-host')
     assert.equal(Reflect.get(outcome.error as object, 'code'), PluginHostErrorCode.pluginDisabled)
     await vi.waitFor(() => assert.equal(admission.size, 0))
-    assert.equal(replay.size, before, '[A62] permission refusal allocates no replay tombstones')
+    assert.equal(replay.size, before, 'permission refusal allocates no replay tombstones')
     await disabled.token.enable()
     /** The same live reader admits its re-enabled owner without replacing the RPC connection. */
     const accepted = await owners[1].thread!.group('remote', [

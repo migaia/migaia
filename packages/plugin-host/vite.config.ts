@@ -18,7 +18,7 @@ const isRuntimeExternal = (id: string): boolean =>
 /**
  * Test files whose assertions compare wall-clock timings across input sizes. They run as a separate
  * project after every other file has finished and one file at a time, so parallel workers cannot
- * steal CPU from a timed section and turn a size ratio red (R18, X6).
+ * steal CPU from a timed section and turn a size ratio red.
  */
 const timingTestFiles = ['test/acceptance-contract.test.ts']
 

@@ -14,7 +14,7 @@ export async function fixture() {
   return { ...(await import(hostsUrl)), ...(await import(apiUrl)) }
 }
 
-/** Canonical parent assembly exposes its existing internal PluginHost for T3 outlet observation. */
+/** Canonical parent assembly exposes its existing internal PluginHost for outlet observation. */
 export async function assembled(options: any) {
   /** Internal owner is read directly; no public instrumentation method is introduced. */
   const ownerUrl = new URL('../../dist/hosts/parent/tray.js', import.meta.url).href

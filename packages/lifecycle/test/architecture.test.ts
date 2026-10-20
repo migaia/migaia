@@ -34,7 +34,7 @@ const readSrcFiles = (): Map<string, string> => {
   return files
 }
 
-describe('§5.1 structural gates', () => {
+describe('structural gates', () => {
   it('keeps unused units and implementation helpers behind package exports', () => {
     for (const name of [
       'createLifecycleUnit',
@@ -127,7 +127,7 @@ describe('§5.1 structural gates', () => {
     }
   })
 
-  it('DisposeTransaction accepts an already-ordered plan as input rather than computing one (D-3)', () => {
+  it('DisposeTransaction accepts an already-ordered plan as input rather than computing one', () => {
     // Structural proxy for "this package never computes order": the module only ever *sorts* by a
     // caller-supplied numeric key (`order`) or executes a caller-supplied sequence (`plan`) — it
     // never builds a dependency graph or walks edges.
@@ -136,7 +136,7 @@ describe('§5.1 structural gates', () => {
   })
 })
 
-describe('L-T20 cross-module: a downstream adapter uses only public primitives', () => {
+describe('cross-module: a downstream adapter uses only public primitives', () => {
   it('composes LifecycleScope + GenerationController + PendingTracker into a tiny "resource" without any internal import', async () => {
     // Simulates what a downstream package (e.g. a future @migaia/resource) would build: an
     // async-resource abstraction using only what index.ts exports, never reaching into this
@@ -226,8 +226,8 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
   })
 })
 
-describe('AF-T34 rule gate: no Function.prototype call/apply/bind; Reflect.apply only in the receiver boundary', () => {
-  // The five runtime-neutral foundation packages that AF-34 audits. `packages/` is two levels up
+describe('rule gate: no Function.prototype call/apply/bind; Reflect.apply only in the receiver boundary', () => {
+  // The five runtime-neutral foundation packages this audit covers. `packages/` is two levels up
   // from this test file (`packages/lifecycle/test/`).
   const foundationSrc = [
     'lifecycle/src',

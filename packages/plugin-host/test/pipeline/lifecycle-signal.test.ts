@@ -7,7 +7,7 @@ import {
 } from '@migaia/middleware-pipeline'
 import { PluginHost } from '../../src/index.js'
 
-/** A15 (BC5): every host mode hands stages the lifecycle abort signal that disposal aborts. */
+/** : every host mode hands stages the lifecycle abort signal that disposal aborts. */
 class SignalHost extends PluginHost<Record<string, never>, number> {
   constructor(mode: IMiddlewarePipelineMode) {
     super({
@@ -53,7 +53,7 @@ const registerRecorder = (
 
 describe('lifecycle abort signal in every host mode', () => {
   it.each(Object.values(MiddlewarePipelineMode))(
-    'BC5: %s stages observe the host lifecycle signal aborting on dispose',
+    '%s stages observe the host lifecycle signal aborting on dispose',
     async (mode) => {
       const host = new SignalHost(mode)
       const seen: Array<IMiddlewarePipelineContext | undefined> = []

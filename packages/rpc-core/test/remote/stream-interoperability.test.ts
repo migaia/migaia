@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { remoteHarness } from './fixture.js'
 
-describe('A9 remote stream dispatch', () => {
+describe('remote stream dispatch', () => {
   it.each(['generator', 'asyncGenerator'] as const)(
     '%s opens the stream only at first next and never sends a request',
     async (mode) => {

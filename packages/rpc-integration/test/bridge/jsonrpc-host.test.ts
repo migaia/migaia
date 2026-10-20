@@ -18,7 +18,7 @@ import {
 type IWireEvent = { method: string; params?: { method?: string; args?: unknown[] } }
 
 describe('JSON-RPC process Host ownership', () => {
-  it('[I17 A1/M2] runs Host controls through bridge and closes bytes before owned exit without a close frame', async () => {
+  it('runs Host controls through bridge and closes bytes before owned exit without a close frame', async () => {
     /**
      * The caller supplies a real dedicated-fd launcher, distinct from the built-in unsupported fd
      * adapter.

@@ -149,7 +149,7 @@ function allocationTrace(heap) {
  * @returns {import('node:inspector').HeapProfiler.SamplingHeapProfileNode} Redacted call tree.
  */
 function redactSamplingNode(node) {
-  // SC9(b): the inspector call tree becomes a redacted OOB representation, never a business copy.
+  // The inspector call tree becomes a redacted OOB representation, never a business copy.
   return {
     ...node,
     callFrame: {
@@ -268,7 +268,7 @@ export async function captureDiagnostic(boundary, mode) {
     if (mode === IpcBenchDiagnostic.sampling) {
       /** Native ids and samples retain the join needed for per-owner allocation attribution. */
       const { profile } = await capture.session.post(IpcBenchDiagnostic.heapSamplingStop)
-      // SC9(b): only native numeric samples and redacted call frames cross the OOB boundary.
+      // Only native numeric samples and redacted call frames cross the OOB boundary.
       return {
         mode,
         status: IpcBenchDiagnostic.captured,

@@ -40,7 +40,7 @@ function createReporterThenable(mode: IReporterMode, label: string): IReporterTh
   }
 
   thenable = {}
-  // oxlint-disable-next-line unicorn/no-thenable -- LG-T49 requires a hostile reporter thenable.
+  // oxlint-disable-next-line unicorn/no-thenable -- requires a hostile reporter thenable.
   Object.defineProperty(thenable, 'then', {
     configurable: true,
     get: () => {
@@ -90,8 +90,8 @@ function findLoggerCleanupError(value: unknown): Error & { cause?: unknown } {
   throw new Error('logger shutdown cleanup diagnostic not found')
 }
 
-describe('Round27 logger final cleanup containment', () => {
-  it('LG-T48 / LG-R32 continues frozen, sealed, primitive, and non-Error cleanup failures in order', async () => {
+describe('logger final cleanup containment', () => {
+  it('continues frozen, sealed, primitive, and non-Error cleanup failures in order', async () => {
     /** Runtime listener registry used to verify every attempted listener is removed. */
     const listeners = new Map<string, Set<(...args: any[]) => void>>()
     /** Original exit function captured before ProcessPlugin interception. */
@@ -105,20 +105,20 @@ describe('Round27 logger final cleanup containment', () => {
     /** Ordered listener cleanup attempts, including failures. */
     const removeAttempts: string[] = []
     /** Frozen native error thrown by exit restoration. */
-    const frozenRestoreError = Object.freeze(new TypeError('round27-frozen-exit'))
+    const frozenRestoreError = Object.freeze(new TypeError('frozen-exit'))
     /** Original frozen restoration stack, which must remain unchanged through wrapper cause. */
     const frozenRestoreStack = frozenRestoreError.stack
     /** Frozen native error thrown by the first listener removal. */
-    const frozenListenerError = Object.freeze(new Error('round27-frozen-listener'))
+    const frozenListenerError = Object.freeze(new Error('frozen-listener'))
     /** Sealed native error thrown by the second listener removal. */
-    const sealedListenerError = Object.seal(new RangeError('round27-sealed-listener'))
+    const sealedListenerError = Object.seal(new RangeError('sealed-listener'))
     /** Non-Error object thrown by a later listener removal. */
-    const objectThrow = Object.freeze({ marker: 'round27-object' })
+    const objectThrow = Object.freeze({ marker: 'object' })
     /** Ordered cleanup throws after exit restoration. */
     const cleanupThrows: readonly unknown[] = [
       frozenListenerError,
       sealedListenerError,
-      'round27-primitive',
+      'primitive',
       objectThrow,
       null
     ]
@@ -143,7 +143,7 @@ describe('Round27 logger final cleanup containment', () => {
         if (failCleanup && index >= 0) {
           const thrown = cleanupThrows[index]
           if (thrown !== undefined) throw thrown
-          throw new Error('round27-missing-cleanup-throw')
+          throw new Error('missing-cleanup-throw')
         }
         listeners.get(event)?.delete(listener)
       },
@@ -157,7 +157,7 @@ describe('Round27 logger final cleanup containment', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round27-cleanup',
+      randomUUID: () => 'cleanup',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -200,7 +200,7 @@ describe('Round27 logger final cleanup containment', () => {
       expect(cleanup[1]).toBeInstanceOf(Error)
       expect((cleanup[2] as Error & { cause?: unknown }).cause).toBe(sealedListenerError)
       expect(cleanup[2]).toBeInstanceOf(RangeError)
-      expect((cleanup[3] as Error & { cause?: unknown }).cause).toBe('round27-primitive')
+      expect((cleanup[3] as Error & { cause?: unknown }).cause).toBe('primitive')
       expect((cleanup[4] as Error & { cause?: unknown }).cause).toBe(objectThrow)
       expect((cleanup[5] as Error & { cause?: unknown }).cause).toBeNull()
       expect(tagged).toMatchObject({
@@ -230,9 +230,9 @@ describe('Round27 logger final cleanup containment', () => {
   })
 })
 
-describe('Round27 logger runtime reporter containment', () => {
+describe('logger runtime reporter containment', () => {
   it.each(['getter', 'invoke', 'reject'] as const)(
-    'LG-T49 / LG-R33 contains hostile console reporter %s with one diagnostic attempt',
+    'contains hostile console reporter %s with one diagnostic attempt',
     async (mode) => {
       /** Hostile rejection returned by the runtime reporter. */
       /** Preserve normal thenable microtasks while recording terminal host exceptions. */
@@ -247,9 +247,9 @@ describe('Round27 logger runtime reporter containment', () => {
           }
         })
       })
-      const reporter = createReporterThenable(mode, 'round27-console')
+      const reporter = createReporterThenable(mode, 'console')
       /** Primary process-exit failure that must remain reachable in the diagnostic. */
-      const exitError = new Error('round27-exit')
+      const exitError = new Error('exit')
       /** Process listeners registered by ProcessPlugin. */
       const listeners = new Map<string, (...args: any[]) => void>()
       /** Runtime process double whose exit path rejects graceful shutdown. */
@@ -276,7 +276,7 @@ describe('Round27 logger runtime reporter containment', () => {
       }
       const restore = setLoggerRuntimeManager({
         process: runtimeProcess,
-        randomUUID: () => `round27-reporter-${mode}`,
+        randomUUID: () => `reporter-${mode}`,
         defer: (task) => task(),
         write: () => undefined,
         console: { log: () => undefined, warn: () => undefined, error: consoleError }
@@ -320,7 +320,7 @@ describe('Round27 logger runtime reporter containment', () => {
     }
   )
 
-  it('LG-T50 / LG-R33 contains a thenable returned by write without retrying the diagnostic', async () => {
+  it('contains a thenable returned by write without retrying the diagnostic', async () => {
     /** Hostile write result whose rejection must be observed without a second write. */
     /** Preserve normal thenable microtasks while recording terminal host exceptions. */
     const hostErrors: unknown[] = []
@@ -334,7 +334,7 @@ describe('Round27 logger runtime reporter containment', () => {
         }
       })
     })
-    const reporter = createReporterThenable('reject', 'round27-write')
+    const reporter = createReporterThenable('reject', 'write')
     /** Process listeners registered by ProcessPlugin. */
     const listeners = new Map<string, (...args: any[]) => void>()
     /** Runtime process double whose exit path rejects graceful shutdown. */
@@ -348,7 +348,7 @@ describe('Round27 logger runtime reporter containment', () => {
         listeners.delete(event)
       },
       exit: (() => {
-        throw new Error('round27-write-exit')
+        throw new Error('write-exit')
       }) as (code?: number) => never
     }
     /** Single write diagnostic attempt, returning a rejecting thenable despite void typing. */
@@ -361,7 +361,7 @@ describe('Round27 logger runtime reporter containment', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round27-write',
+      randomUUID: () => 'write',
       defer: (task) => task(),
       write,
       console: undefined

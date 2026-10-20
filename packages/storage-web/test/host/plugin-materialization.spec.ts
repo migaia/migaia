@@ -78,7 +78,7 @@ const createReceiverDependentStore = () => {
   return { store: new ReceiverDependentStore() as IKeyValueStore, counts }
 }
 
-describe('SWV4-B02 R03 PluginHost materialization', () => {
+describe('PluginHost materialization', () => {
   it('materializes custom and four canonical synchronous backends with exact identities', async () => {
     const localStorageHost = createWebStorage()
     const sessionStorageHost = createWebStorage()

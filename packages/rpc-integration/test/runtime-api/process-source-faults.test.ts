@@ -16,7 +16,7 @@ for (const mode of [
   'wrong-token',
   'wrong-parent'
 ] as const) {
-  it(`[A1][A3] genuine process ${mode} rejects before automatic publication`, async () => {
+  it(`genuine process ${mode} rejects before automatic publication`, async () => {
     /** The child receives one fixture-only token through the original private bootstrap owner. */
     const token = 'c3-negative-fixture-token'
     /** Its trusted parent route must also be independently verified by the original responder. */
@@ -73,14 +73,14 @@ for (const mode of [
         assert.equal(
           (failure as { code?: string }).code,
           'HANDSHAKE_REJECTED',
-          '[A3] original responder rejects token or authenticated parent route'
+          'original responder rejects token or authenticated parent route'
         )
       }
       const status = await handle.exited
       assert.equal(
         status.code,
         0,
-        '[A3] actual fixture exit is observed after classified factory rejection'
+        'actual fixture exit is observed after classified factory rejection'
       )
       const receipt = JSON.parse(stderr.trim().split('\n').at(-1)!)
       assert.equal(
@@ -88,28 +88,20 @@ for (const mode of [
         mode === 'wrong-token' || mode === 'wrong-parent'
           ? 'PROCESS_CHANNEL_AUTH_REJECTED'
           : 'INVALID_CONFIG',
-        '[A3] the actual child factory rejects the invalid source/auth condition'
+        'the actual child factory rejects the invalid source/auth condition'
       )
-      assert.equal(
-        receipt.publications,
-        0,
-        '[A3] a rejected source never publishes a callable Peer'
-      )
-      assert.equal(receipt.sourceCalls, 0, '[A1] conflicting source callback never executes')
-      assert.equal(receipt.handlerCalls, 0, '[A3] rejected bootstrap dispatches no business')
+      assert.equal(receipt.publications, 0, 'a rejected source never publishes a callable Peer')
+      assert.equal(receipt.sourceCalls, 0, 'conflicting source callback never executes')
+      assert.equal(receipt.handlerCalls, 0, 'rejected bootstrap dispatches no business')
       if (mode === 'plain' || mode === 'explicit' || mode === 'invalid-marker') {
         assert.equal(receipt.beforeReaders, 0)
         assert.equal(
           receipt.afterReaders,
           0,
-          '[A1] configuration rejection installs no stdin data reader'
+          'configuration rejection installs no stdin data reader'
         )
       }
-      assert.equal(
-        stderr.includes(token),
-        false,
-        '[A3] classification never discloses bootstrap secret'
-      )
+      assert.equal(stderr.includes(token), false, 'classification never discloses bootstrap secret')
     } finally {
       handle.terminate('force')
       await handle.exited

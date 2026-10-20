@@ -12,7 +12,7 @@ import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import type { ICoroutineMessagePort } from '../../dist/remote/runtime-api/coroutine-task.js'
 
 describe('coroutine runtime binding', () => {
-  it('[A1] child recipe starts the genuine task port through EventTarget after capture', async () => {
+  it('child recipe starts the genuine task port through EventTarget after capture', async () => {
     /** The family wrapper supplies a genuine opaque token; no physical port is hand-passed. */
     const { wrapCoroutineTask, portOf } =
       await import('../../dist/remote/runtime-api/coroutine-task.js')
@@ -94,7 +94,7 @@ describe('coroutine runtime binding', () => {
       vi.restoreAllMocks()
     }
   })
-  it('[A1] uses only EventTarget listeners and starts once after the first message listener', async () => {
+  it('uses only EventTarget listeners and starts once after the first message listener', async () => {
     /** The native Node port supplies both branches, making facade selection observable. */
     const native = new MessageChannel()
     /** The new module is loaded inside the case so old main produces a genuine missing-owner red. */
@@ -126,7 +126,7 @@ describe('coroutine runtime binding', () => {
     }
   })
 
-  it('[A1] exchanges independently prepared identities without changing either self', async () => {
+  it('exchanges independently prepared identities without changing either self', async () => {
     /** Each real channel uses the resource's existing cold identity and ACK owners. */
     const { startOnListen } = await import('../../dist/remote/runtime-api/coroutine-binding.js')
     for (let index = 0; index < 2; index += 1) {
@@ -164,7 +164,7 @@ describe('coroutine runtime binding', () => {
   })
 
   it.each(['resolve', 'reject'] as const)(
-    '[A1] raw task %s keeps its supervisor outcome',
+    'raw task %s keeps its supervisor outcome',
     async (outcome) => {
       /** The wrapper adds only physical ports; supervision classifies the task's exact outcome. */
       const { wrapCoroutineTask } = await import('../../dist/remote/runtime-api/coroutine-task.js')
@@ -237,7 +237,7 @@ describe('coroutine runtime binding', () => {
     }
   )
 
-  it('[A1] aborts cooperatively and closes both ports after task finally, reporting close failure', async () => {
+  it('aborts cooperatively and closes both ports after task finally, reporting close failure', async () => {
     /** Replacement of the global physical constructor observes wrapper ownership only. */
     const { wrapCoroutineTask } = await import('../../dist/remote/runtime-api/coroutine-task.js')
     /** Ordering is recorded independently of supervision state. */
@@ -311,7 +311,7 @@ describe('coroutine runtime binding', () => {
     }
   })
 
-  it('[A1] abandons at reap timeout and retains the lease until actual late settlement', async () => {
+  it('abandons at reap timeout and retains the lease until actual late settlement', async () => {
     /** The raw wrapper never turns cooperative abort into forced termination. */
     const { wrapCoroutineTask } = await import('../../dist/remote/runtime-api/coroutine-task.js')
     /** The task deliberately ignores abort for the measured late-settlement interval. */

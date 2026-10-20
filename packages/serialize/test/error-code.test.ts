@@ -8,7 +8,7 @@ import {
   tagSerializeError
 } from '../src/errors'
 
-describe('serialize error-code contract (E-T7/E-T9)', () => {
+describe('serialize error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {
     const codes = Object.values(SerializeErrorCode)
     expect(codes).toHaveLength(8)
@@ -18,7 +18,7 @@ describe('serialize error-code contract (E-T7/E-T9)', () => {
   })
 })
 
-describe('T-21 tag 幂等（方案 A）', () => {
+describe('tag 幂等（方案 A）', () => {
   it('同 (source, code) 二次 tag 不抛、context 只在未定义时写入', () => {
     const error = new Error('boom')
     tagSerializeError(error, SerializeErrorCode.invalidOption, 'registry.plugin:x')
@@ -39,7 +39,7 @@ describe('T-21 tag 幂等（方案 A）', () => {
   })
 })
 
-describe('T-21 错误工厂返回类型', () => {
+describe('错误工厂返回类型', () => {
   it('createSerializeTypeError 返回原生 TypeError + code/source', () => {
     const error = createSerializeTypeError(SerializeErrorCode.invalidOption, 'bad scheduler')
     expect(error).toBeInstanceOf(TypeError)

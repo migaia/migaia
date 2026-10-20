@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createLifecycleUnit } from '../src/lifecycle-unit'
 import { LifecycleErrorCode } from '../src/error-code'
 
-describe('L-T5 LifecycleUnit: synchronous value vs thenable probing', () => {
+describe('LifecycleUnit: synchronous value vs thenable probing', () => {
   it('a synchronous return commits directly to loaded, never observed as loading', () => {
     const unit = createLifecycleUnit<number>()
     const states: string[] = []
@@ -67,7 +67,7 @@ describe('L-T5 LifecycleUnit: synchronous value vs thenable probing', () => {
   })
 })
 
-describe('L-T34 LifecycleUnit: failed retry vs terminal exit', () => {
+describe('LifecycleUnit: failed retry vs terminal exit', () => {
   it('start()/restart() from failed begins a new generation and can reach loaded', () => {
     const unit = createLifecycleUnit<number>()
     unit.start(() => {

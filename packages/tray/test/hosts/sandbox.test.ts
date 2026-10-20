@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { fixture, marker } from './helper.js'
 
 describe('Tray external process sandbox', () => {
-  it('[A9] applies an env command wrapper before init and every restart', async () => {
+  it('applies an env command wrapper before init and every restart', async () => {
     /** Wrapper remains caller-owned; Tray introduces no sandbox launcher. */
     const api = await fixture()
     /** The actual launch command passes through /usr/bin/env. */
@@ -32,7 +32,7 @@ describe('Tray external process sandbox', () => {
   }, 30000)
 
   it.skipIf(process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec'))(
-    '[A9] sandbox-exec denies writes with EPERM while real relayed calls succeed (requires macOS sandbox-exec)',
+    'sandbox-exec denies writes with EPERM while real relayed calls succeed (requires macOS sandbox-exec)',
     async () => {
       /** File path is supplied by config-independent test input, inside the worktree. */
       const destination = marker('denied-write')

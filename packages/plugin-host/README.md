@@ -194,7 +194,7 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 
 `useSync`（构造函数期）安装的插件允许注册 async disposer；Host 同步撤销可见状态并发布冻结的 `PLUGIN_INSTALL_FAILED.detail` 快照，随后通过 `detail.completion` 提供包含完整 rollback identities 的冻结结果。需要完整 secondary identity 的错误转换必须 await completion。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子（包括 setup、beforeRelease）内也不能调用当前 Host 的这些方法**——会同步抛 `LIFECYCLE_MUTATION`；终态已开始时抛 `HOST_DISPOSING`。setup 或 beforeRelease 等待期间外部发起的 Host mutation 与 `config.update` 同样同步抛 `LIFECYCLE_MUTATION`。
 
-插件可选声明 `beforeRelease(context)`：Host 在释放已安装的该代注册之前调用一次，钩子期间该注册仍可服务已有调用；结束后才排空租约并执行 `dispose` 和资源清理。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 的调度器及 `disposeStepTimeoutMs`；禁用、挂起或未激活惰性注册本身不触发释放。钩子失败或超时作为清理错误收集，已提交的卸载仍继续。迁移 BC1：`unUse` 的真实执行结果两种分支均带冻结 `affected: { policy, order, steps, edges }`；`dryRun: true` 返回计划且无 `ok`，旧读者若对 `{ok:true}` 做严格相等，应改为检查 `ok` 并读取 `affected`。迁移 BC2：TypeScript 读者用字面量 `dryRun: true` 选择计划重载，省略或传 `false` 选择执行重载；宽 `boolean` 先按值分支。迁移 BC3：旧定义里的非函数 `beforeRelease` 现在准入时抛 `INVALID_OPTION`。
+插件可选声明 `beforeRelease(context)`：Host 在释放已安装的该代注册之前调用一次，钩子期间该注册仍可服务已有调用；结束后才排空租约并执行 `dispose` 和资源清理。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 的调度器及 `disposeStepTimeoutMs`；禁用、挂起或未激活惰性注册本身不触发释放。钩子失败或超时作为清理错误收集，已提交的卸载仍继续。卸载结果迁移：`unUse` 的真实执行结果两种分支均带冻结 `affected: { policy, order, steps, edges }`；`dryRun: true` 返回计划且无 `ok`，旧读者若对 `{ok:true}` 做严格相等，应改为检查 `ok` 并读取 `affected`。类型迁移：TypeScript 读者用字面量 `dryRun: true` 选择计划重载，省略或传 `false` 选择执行重载；宽 `boolean` 先按值分支。定义迁移：旧定义里的非函数 `beforeRelease` 现在准入时抛 `INVALID_OPTION`。
 
 ### 安装前的异步 setup
 

@@ -32,7 +32,7 @@ function unexpectedTopologyFailure(message: string): never {
 
 describe('topology golden compatibility', () => {
   for (const fixture of golden.fixtures) {
-    it(`A6 preserves ${fixture.name} topology facts from ${golden.baseCommit}`, () => {
+    it(`preserves ${fixture.name} topology facts from ${golden.baseCommit}`, () => {
       /** Topology projection produced by the implementation under test. */
       const topology = buildCapabilityTopology(
         fixture.nodes,

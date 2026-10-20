@@ -37,7 +37,7 @@ beforeAll(async () => {
   if (!receipt.accepted) throw new Error(JSON.stringify(receipt))
 })
 
-describe('[A3] independent JSON-RPC business through public process facades', () => {
+describe('independent JSON-RPC business through public process facades', () => {
   for (const peer of peers.slice(0, 3))
     for (const host of [false, true]) {
       it(`${peer.language} JSON-RPC owned stdio Host=${host}`, async () => {
@@ -209,7 +209,7 @@ describe('[A3] independent JSON-RPC business through public process facades', ()
     }
 })
 
-describe('[A1] independent native business peers through public process facades', () => {
+describe('independent native business peers through public process facades', () => {
   for (const peer of peers)
     for (const host of businessVectors.hostProfiles as boolean[]) {
       it(`${peer.language} owned stdio Host=${host}`, async () => {
@@ -245,7 +245,7 @@ describe('[A1] independent native business peers through public process facades'
             wireFrames([await sentBeforeExit]).some(
               (frame) => frame.kind === 'variation' && frame.data.route.variation === 'close'
             ),
-            '[A1] close variation must be sent before a native signal exit'
+            'close variation must be sent before a native signal exit'
           ).toBe(true)
         }
         expect(Buffer.concat(active.output).toString()).toContain('READY')
@@ -386,7 +386,7 @@ describe('[A1] independent native business peers through public process facades'
     }
 })
 
-describe('[A1] default native health stays idle without restarting', () => {
+describe('default native health stays idle without restarting', () => {
   for (const peer of peers)
     it.concurrent(`${peer.language} default 20s health`, async () => {
       const active = await client(peer, false, randomUUID())

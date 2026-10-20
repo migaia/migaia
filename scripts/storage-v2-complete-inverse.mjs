@@ -48,7 +48,7 @@ const requireString = (value, label) => {
   return value
 }
 
-/** Reads the D43 base commit without recapturing or modifying the immutable snapshot. */
+/** Reads the observation base commit without recapturing or modifying the immutable snapshot. */
 const readObservationBaseCommit = (repositoryRoot, observationSnapshot) => {
   /** First JSONL row is the immutable metadata authority. */
   const firstLine = readFileSync(resolve(repositoryRoot, observationSnapshot), 'utf8').split(
@@ -117,7 +117,7 @@ export function deriveCompleteStorageInversePlan(
   }
 }
 
-/** Reads one file from the immutable D43 base commit or reports an absent historical path. */
+/** Reads one file from the immutable observation base commit or reports an absent historical path. */
 const readBaselineFile = (repositoryRoot, baseCommit, fileName) => {
   try {
     return execFileSync('git', ['show', `${baseCommit}:${fileName}`], {

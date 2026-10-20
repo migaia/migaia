@@ -21,8 +21,8 @@ const signal = (aborted = false, reason?: unknown): ITestSignal => ({
   removeEventListener: () => undefined
 })
 
-describe('signal round 2 contract', () => {
-  it('MP-T51/MP-T67 exports structural signal surface and preserves package boundary', async () => {
+describe('signal contract', () => {
+  it('exports structural signal surface and preserves package boundary', async () => {
     const module = await import('../src/index.js')
     expect(typeof module.createPipeline).toBe('function')
     expect(module).not.toHaveProperty('runSyncMiddleware')
@@ -36,7 +36,7 @@ describe('signal round 2 contract', () => {
     expect(module.MIDDLEWARE_PIPELINE_SOURCE).toBe('@migaia/middleware-pipeline')
   })
 
-  it('MP-T56 rejects sync candidate after cooperative abort', () => {
+  it('rejects sync candidate after cooperative abort', () => {
     let aborted = false
     const input = {
       get aborted() {
@@ -67,7 +67,7 @@ describe('signal round 2 contract', () => {
     expect(nextRuns).toBe(1)
   })
 
-  it('MP-T57/MP-T62 keeps cooperative async work strict-drained', async () => {
+  it('keeps cooperative async work strict-drained', async () => {
     let aborted = false
     const input = {
       get aborted() {
@@ -97,7 +97,7 @@ describe('signal round 2 contract', () => {
     expect(settled).toBe(true)
   })
 
-  it('MP-T58/MP-T63 preserves business failure over later abort', async () => {
+  it('preserves business failure over later abort', async () => {
     const failure = new Error('stage')
     let aborted = false
     const input = {
@@ -122,7 +122,7 @@ describe('signal round 2 contract', () => {
     ).rejects.toBe(failure)
   })
 
-  it('MP-T60 cleanup failure retains fixed primary-first slots', () => {
+  it('cleanup failure retains fixed primary-first slots', () => {
     let reads = 0
     const input = {
       get aborted() {
@@ -155,7 +155,7 @@ describe('signal round 2 contract', () => {
     }
   })
 
-  it('MP-T64 done admission and MP-T65 checkpoint reason reads are fail-closed', () => {
+  it('done admission and checkpoint reason reads are fail-closed', () => {
     const reason = new Error('abort')
     const input = { aborted: true, reason, addEventListener() {}, removeEventListener() {} }
     let done = false
@@ -173,7 +173,7 @@ describe('signal round 2 contract', () => {
     expect(done).toBe(false)
   })
 
-  it('MP-T66 isolates invocation contexts and MP-T68 keeps docs-facing host baseline callable', () => {
+  it('isolates invocation contexts and keeps docs-facing host baseline callable', () => {
     const first = signal()
     const second = signal()
     let contexts: unknown[] = []
@@ -205,7 +205,7 @@ describe('signal round 2 contract', () => {
     expect((contexts[2] as { signal: unknown }).signal).toBe(second)
   })
 
-  it('MP-T66 isolates concurrent async-generator cleanup failures', async () => {
+  it('isolates concurrent async-generator cleanup failures', async () => {
     const run = async (label: string): Promise<unknown> => {
       let aborted = false
       const input = {
@@ -244,7 +244,7 @@ describe('signal round 2 contract', () => {
     expect((second as AggregateError).errors[1]).toMatchObject({ message: 'second-cleanup' })
   })
 
-  it('MP-T57 keeps async middleware pending until cooperative work settles', async () => {
+  it('keeps async middleware pending until cooperative work settles', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve
@@ -267,7 +267,7 @@ describe('signal round 2 contract', () => {
     expect(nextCalled).toBe(false)
   })
 
-  it('MP-T58/MP-T63 preserves async control and business failure precedence', async () => {
+  it('preserves async control and business failure precedence', async () => {
     const business = new Error('business')
     let aborted = false
     const input = {
@@ -282,7 +282,7 @@ describe('signal round 2 contract', () => {
     await expect(run).rejects.toBe(business)
   })
 
-  it('MP-T62 keeps non-cooperative async work pending', async () => {
+  it('keeps non-cooperative async work pending', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve
@@ -310,7 +310,7 @@ describe('signal round 2 contract', () => {
     await expect(pending).rejects.toThrow('middleware pipeline aborted')
   })
 
-  it('MP-T64 keeps a started done callback responsible for its own cancellation', async () => {
+  it('keeps a started done callback responsible for its own cancellation', async () => {
     let aborted = false
     const input = {
       get aborted() {
@@ -333,7 +333,7 @@ describe('signal round 2 contract', () => {
     expect(started).toBe(true)
   })
 
-  it('MP-T65 observes hostile reason once at first abort checkpoint', () => {
+  it('observes hostile reason once at first abort checkpoint', () => {
     let reads = 0
     const reason = new Error('first')
     const input = {
@@ -358,7 +358,7 @@ describe('signal round 2 contract', () => {
     expect(reads).toBe(2)
   })
 
-  it('MP-T65 does not read reason while checkpoints remain active', () => {
+  it('does not read reason while checkpoints remain active', () => {
     let reasonReads = 0
     let aborted = false
     const input = {
@@ -395,7 +395,7 @@ describe('signal round 2 contract', () => {
     expect(reasonReads).toBe(1)
   })
 
-  it('MP-T65 freezes first abort reason before later getter mutation', () => {
+  it('freezes first abort reason before later getter mutation', () => {
     const first = new Error('first')
     const second = new Error('second')
     let abortedReads = 0
@@ -427,7 +427,7 @@ describe('signal round 2 contract', () => {
     expect(reasonReads).toBe(1)
   })
 
-  it('MP-T58 BC3 keeps an awaited downstream failure primary over a later abort and preserves combiner call count', async () => {
+  it('keeps an awaited downstream failure primary over a later abort and preserves combiner call count', async () => {
     const abort = new Error('abort')
     let aborted = false
     const input = {
@@ -460,7 +460,7 @@ describe('signal round 2 contract', () => {
     expect(combine).not.toHaveBeenCalled()
   })
 
-  it('MP-T58 separately proves ordinary dual failure combiner receives both exact failures once', async () => {
+  it('separately proves ordinary dual failure combiner receives both exact failures once', async () => {
     const stageFailure = new Error('stage')
     const downstreamFailure = new Error('downstream')
     const combine = vi.fn((stage: unknown, downstream: unknown) =>
@@ -489,7 +489,7 @@ describe('signal round 2 contract', () => {
     expect(combine).toHaveBeenCalledWith(stageFailure, downstreamFailure)
   })
 
-  it('MP-T58 BC3 keeps a downstream failure primary over a later post-stage abort', async () => {
+  it('keeps a downstream failure primary over a later post-stage abort', async () => {
     const abort = new Error('abort')
     const downstream = new Error('downstream')
     let aborted = false
@@ -522,7 +522,7 @@ describe('signal round 2 contract', () => {
     expect(combine).not.toHaveBeenCalled()
   })
 
-  it('MP-T58 collapses upstream and downstream throws of the same abort reason', async () => {
+  it('collapses upstream and downstream throws of the same abort reason', async () => {
     const abort = new Error('same-abort')
     let aborted = false
     const input = {
@@ -559,7 +559,7 @@ describe('signal round 2 contract', () => {
     expect(combine).not.toHaveBeenCalled()
   })
 
-  it('MP-T58 preserves independent upstream stage error over child abort control', async () => {
+  it('preserves independent upstream stage error over child abort control', async () => {
     const abort = new Error('child-abort')
     const stageFailure = new Error('upstream-stage')
     let aborted = false
@@ -590,7 +590,7 @@ describe('signal round 2 contract', () => {
     expect(combine).not.toHaveBeenCalled()
   })
 
-  it('MP-T52/MP-T55 preserves legacy callback arity and passes one frozen context when enabled', () => {
+  it('preserves legacy callback arity and passes one frozen context when enabled', () => {
     const legacy: number[] = []
     runSyncForTest(
       [
@@ -622,7 +622,7 @@ describe('signal round 2 contract', () => {
     expect(Object.isFrozen(observed)).toBe(true)
   })
 
-  it('MP-T53/MP-T54 fails invalid and pre-aborted admission before user code', async () => {
+  it('fails invalid and pre-aborted admission before user code', async () => {
     const input = signal(true, 'stop')
     let touched = false
     expect(() =>
@@ -677,7 +677,7 @@ describe('signal round 2 contract', () => {
     expect((malformedError as Error).cause).toBe(admissionCause)
   })
 
-  it('MP-T59/MP-T61 drains generator cleanup once without exposing cleanup yields', async () => {
+  it('drains generator cleanup once without exposing cleanup yields', async () => {
     let syncReads = 0
     const syncInput = {
       get aborted() {

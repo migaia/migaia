@@ -31,13 +31,13 @@ function foreignError(name: string, code: string, source = RPC_CORE_ERROR_SOURCE
   })
 }
 
-describe('B6 coded error families', () => {
+describe('coded error families', () => {
   it.each([
     RpcCoreErrorCode.deadlineExceeded,
     RpcCoreErrorCode.endpointDisposed,
     RpcCoreErrorCode.overloaded
   ] as const)(
-    '[C5-E14] public listener helper and native diagnostic tag with code %s cannot mint local control identity',
+    'public listener helper and native diagnostic tag with code %s cannot mint local control identity',
     (code) => {
       /** This is the real ordinary public helper, not a private mint factory. */
       const original = new RangeError('listener fixture')
@@ -98,7 +98,7 @@ describe('B6 coded error families', () => {
     ).toBe(false)
   })
 
-  it('[C5-E01] public classification, copied prototypes and returned constructors never mint live control identity', () => {
+  it('public classification, copied prototypes and returned constructors never mint live control identity', () => {
     /** Only the original owner factory registers this observed timeout instance. */
     const owned = createRpcTimeoutError()
     /** The same constructor remains reachable through every ordinary Error instance. */
@@ -134,7 +134,7 @@ describe('B6 coded error families', () => {
     expect(isLocalRpcError(owned, RpcTimeoutError)).toBe(true)
   })
 
-  it('[C5-E02] changing diagnostics or prototype of an observed error cannot change its original private family/code', () => {
+  it('changing diagnostics or prototype of an observed error cannot change its original private family/code', () => {
     /** The original owner chose a generic INTERNAL failure, not cancellation. */
     const owned = createRpcError(RpcCoreErrorCode.internal, 'owner fixture')
     /** Public observations can be changed independently from the retained owner facts. */
@@ -152,7 +152,7 @@ describe('B6 coded error families', () => {
     RpcCoreErrorCode.deadlineExceeded,
     RpcCoreErrorCode.endpointDisposed
   ] as const)(
-    '[C5-E13] an actual Core-created remote wrapper with peer code %s never acquires local control code',
+    'an actual Core-created remote wrapper with peer code %s never acquires local control code',
     (code) => {
       /** A real response decoder uses this exact factory for an unrestricted remote code. */
       const remote = createRpcRemoteError(code, 'remote wrapper fixture')

@@ -16,7 +16,7 @@ describe('resource foundation', () => {
     resource.dispose()
   })
 
-  it('RSC-T1 keeps data status and fetch activity in separate public domains', () => {
+  it('keeps data status and fetch activity in separate public domains', () => {
     expect(Object.keys(ResourceStatus)).toEqual([
       'idle',
       'pending',

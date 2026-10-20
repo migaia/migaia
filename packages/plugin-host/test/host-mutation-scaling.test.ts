@@ -8,7 +8,7 @@ describe('host mutation bench fixture', () => {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     try {
-      /** Unrelated registrations match the independent A18 benchmark's larger fixture. */
+      /** Unrelated registrations match the independent mutation-scaling benchmark's larger fixture. */
       const unrelated = Array.from({ length: 500 }, (_, index) =>
         definePlugin({
           name: `config-${index}`,

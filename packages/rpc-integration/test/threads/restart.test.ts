@@ -16,7 +16,7 @@ async function until(predicate: () => boolean): Promise<void> {
 }
 
 describe('thread generation recovery', () => {
-  it('[A4] retries a sent idempotent request once with its original key across real Node generations', async () => {
+  it('retries a sent idempotent request once with its original key across real Node generations', async () => {
     const factory = vi.spyOn(remoteRetry, 'createRemoteRetryPort')
     const fixture = nativeFixture({ keyFactory: () => 'thread-stable-key' }, { crash: true })
     try {
@@ -43,7 +43,7 @@ describe('thread generation recovery', () => {
     expect(fixture.budget.inUse).toBe(0)
     factory.mockRestore()
   })
-  it('[A4] never retries a sent non-idempotent request', async () => {
+  it('never retries a sent non-idempotent request', async () => {
     const fixture = nativeFixture({}, { crash: true })
     try {
       const feature = await fixture.install()
@@ -57,7 +57,7 @@ describe('thread generation recovery', () => {
       await fixture.close()
     }
   })
-  it('[A10] explicit retry port replaces default and receives one logical dispatch', async () => {
+  it('explicit retry port replaces default and receives one logical dispatch', async () => {
     const inputs: IRemoteRetryDispatch[] = []
     const factory = vi.spyOn(remoteRetry, 'createRemoteRetryPort')
     const fixture = nativeFixture(
@@ -94,7 +94,7 @@ describe('thread generation recovery', () => {
       factory.mockRestore()
     }
   })
-  it('[A5] caller cancellation settles once and does not replay on a new Worker', async () => {
+  it('caller cancellation settles once and does not replay on a new Worker', async () => {
     const fixture = nativeFixture()
     try {
       const feature = await fixture.install()
@@ -112,7 +112,7 @@ describe('thread generation recovery', () => {
       await fixture.close()
     }
   })
-  it('[A5] callWallTimeMs bounds the total request and cancels its timer', async () => {
+  it('callWallTimeMs bounds the total request and cancels its timer', async () => {
     /** Policy timers are virtual; original native generation jobs retain host ordering. */
     const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
     const fixture = nativeFixture({
@@ -136,7 +136,7 @@ describe('thread generation recovery', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
   it.each([60, 110])(
-    '[A5] preserves the original 100ms total deadline across a %sms rebind',
+    'preserves the original 100ms total deadline across a %sms rebind',
     async (delay) => {
       /** Policy timers are virtual; original native generation jobs retain host ordering. */
       const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
@@ -184,7 +184,7 @@ describe('thread generation recovery', () => {
       expect(scheduler.pendingCount).toBe(0)
     }
   )
-  it('[A4/A10] reports REMOTE_CLOSED with zero frames when departure wins before sendOnce', async () => {
+  it('reports REMOTE_CLOSED with zero frames when departure wins before sendOnce', async () => {
     let enter!: () => void
     const entered = new Promise<void>((resolve) => {
       enter = resolve
@@ -221,7 +221,7 @@ describe('thread generation recovery', () => {
       await fixture.close()
     }
   })
-  it('[A5] revokes a pulled stream without continuing it in the next generation', async () => {
+  it('revokes a pulled stream without continuing it in the next generation', async () => {
     const fixture = nativeFixture()
     try {
       const feature = await fixture.install()
@@ -254,7 +254,7 @@ describe('thread generation recovery', () => {
       await fixture.close()
     }
   })
-  it('[A5] terminal restart budget drains retry while another facade remains callable', async () => {
+  it('terminal restart budget drains retry while another facade remains callable', async () => {
     /** Policy timers are virtual; original native generation jobs retain host ordering. */
     const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
     const terminal = nativeFixture(

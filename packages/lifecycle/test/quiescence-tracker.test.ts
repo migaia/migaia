@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createQuiescenceTracker, createStringLeaseRegistry } from '../src/quiescence-tracker'
 import { LifecycleErrorCode } from '../src/error-code'
 
-describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
+describe('QuiescenceTracker: unsealed whenZero()', () => {
   it('throws synchronously, not a rejected Promise, when the key is not sealed', () => {
     const tracker = createStringLeaseRegistry()
     expect(() => tracker.whenZero('k')).toThrowError(
@@ -28,8 +28,8 @@ describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
   })
 })
 
-describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnce()', () => {
-  it('LC-B7 does not retain an idle string key after a loose wait', async () => {
+describe('QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnce()', () => {
+  it('does not retain an idle string key after a loose wait', async () => {
     /** Retention is observable through forget(), without relying on heap timing. */
     const tracker = createStringLeaseRegistry()
     await tracker.whenZeroOnce('never-retained')

@@ -11,7 +11,7 @@ import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
 
 describe('custom feature public boundary', () => {
-  it('YS32 installs the first-party chunk through endpoint capabilities and closes its framer once', async () => {
+  it('installs the first-party chunk through endpoint capabilities and closes its framer once', async () => {
     const [transport] = createMemoryTransportPair()
     const baseFramer = createStringFramer()
     let closes = 0
@@ -33,7 +33,7 @@ describe('custom feature public boundary', () => {
     expect(closes).toBe(1)
   })
 
-  it('YS30 creates a synchronous native Feature with only its selected root projection', async () => {
+  it('creates a synchronous native Feature with only its selected root projection', async () => {
     const [transport] = createMemoryTransportPair()
     const feature = defineFeature(() => ({ observe: () => 'native-root' }))
     const endpoint = await createFullEndpoint({
@@ -69,7 +69,7 @@ describe('custom feature public boundary', () => {
     expect(releases).toBe(1)
   })
 
-  it('YS31 injects declared Feature roots into native Middleware without publishing them directly', async () => {
+  it('injects declared Feature roots into native Middleware without publishing them directly', async () => {
     const [transport] = createMemoryTransportPair()
     const feature = defineFeature<
       { readonly root: () => string },
@@ -95,7 +95,7 @@ describe('custom feature public boundary', () => {
     await endpoint.dispose()
   })
 
-  it('YS31 isolates one declared Feature across native Middleware registrations', async () => {
+  it('isolates one declared Feature across native Middleware registrations', async () => {
     const [transport] = createMemoryTransportPair()
     const feature = defineFeature<
       { readonly root: () => string },
@@ -128,7 +128,7 @@ describe('custom feature public boundary', () => {
     await endpoint.dispose()
   })
 
-  it('YS31 rejects failed native Middleware installation before transport ingress', async () => {
+  it('rejects failed native Middleware installation before transport ingress', async () => {
     const [transport] = createMemoryTransportPair()
     const subscribe = transport.subscribe
     let subscriptions = 0
@@ -191,10 +191,10 @@ describe('custom feature public boundary', () => {
       await endpoint.dispose()
     }
 
-    await install('ys22-first', 'pass')
-    await install('ys22-failure', 'fail')
-    await install('ys22-restored', 'pass')
-    expect(trace).toEqual(['pass:ys22-first', 'fail:ys22-failure', 'pass:ys22-restored'])
+    await install('first-3', 'pass')
+    await install('fixture-failure', 'fail')
+    await install('fixture-restored', 'pass')
+    expect(trace).toEqual(['pass:first-3', 'fail:fixture-failure', 'pass:fixture-restored'])
   })
 
   it('rejects forged tokens and duplicate public keys before transport subscription', async () => {

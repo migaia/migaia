@@ -18,7 +18,7 @@ const valid = () => ({
   ]
 })
 
-it('[A7][A24][A82] a cold directory rejects invalid identity, paths and actual mode sets without leaking fields', () => {
+it('a cold directory rejects invalid identity, paths and actual mode sets without leaking fields', () => {
   /** Supported malformed messages exercise the closed public directory contract at its sole owner. */
   const malformed: unknown[] = [
     { ...valid(), nodeId: 'wrong-node' },
@@ -66,7 +66,7 @@ it('[A7][A24][A82] a cold directory rejects invalid identity, paths and actual m
   assert.ok(Object.isFrozen(accepted.methods))
 })
 
-it('[A7][A24] directory descriptors reject accessors without executing them and preserve reflection failure', () => {
+it('directory descriptors reject accessors without executing them and preserve reflection failure', () => {
   let reads = 0
   const accessor = Object.defineProperty(valid(), 'methods', {
     enumerable: true,

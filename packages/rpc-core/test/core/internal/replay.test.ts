@@ -3,10 +3,10 @@ import { ReplayWindow } from '../../../dist/core/internal/replay.js'
 import { countReplayEntryVisits } from './replay-iteration-observer.js'
 
 describe('ReplayWindow', () => {
-  it('C4 visits one live tombstone per access with 1101 retained ids and each expired id once', () => {
+  it('visits one live tombstone per access with 1101 retained ids and each expired id once', () => {
     /** Supported monotonic clock crosses the exact default 310-second boundary without sleeping. */
     let now = 0
-    /** The user A10 workload retains 1101 request ids; the product TTL remains its default. */
+    /** The reference workload retains 1101 request ids; the product TTL remains its default. */
     const window = new ReplayWindow(() => now, 1101)
     for (let index = 0; index < 1101; index++) {
       window.reserveId(`outbound-retained:${index}`)
@@ -27,7 +27,7 @@ describe('ReplayWindow', () => {
     expect(expiredVisits).toBe(1101)
   })
 
-  it('C4 expires only the ordered prefix at 310 seconds and preserves later live and active ids', () => {
+  it('expires only the ordered prefix at 310 seconds and preserves later live and active ids', () => {
     /** Release times stay monotonic while different entries reach their individual TTL. */
     let now = 0
     /** Active reservation remains independent from the ordered released prefix. */

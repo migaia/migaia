@@ -13,7 +13,7 @@ type IManifest = {
 /** Package root for manifest, documentation, and actual source inventory. */
 const packageRoot = resolve(import.meta.dirname, '..')
 
-/** Required peer ranges and package-local test versions from A1. */
+/** Required peer ranges and package-local test versions. */
 const optionalPeers = {
   '@bufbuild/protobuf': { peer: '^2.14.0', dev: '2.14.0' },
   '@msgpack/msgpack': { peer: '^3.1.3', dev: '3.1.3' },
@@ -108,7 +108,7 @@ const codecSections = (document: string): Readonly<Record<string, string>> => {
 }
 
 describe('serialize optional peer declaration', () => {
-  it('A1 declares workspace-only dependencies and exact optional peer versions', () => {
+  it('declares workspace-only dependencies and exact optional peer versions', () => {
     const manifest = readManifest()
     expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
       '@migaia/lifecycle',
@@ -128,7 +128,7 @@ describe('serialize optional peer declaration', () => {
     }
   })
 
-  it('A2 scans actual sources and rejects every forbidden declaration/import form', () => {
+  it('scans actual sources and rejects every forbidden declaration/import form', () => {
     const manifest = readManifest()
     const sources = readSources(join(packageRoot, 'src'))
     const observed = Object.entries(sources).flatMap(([file, source]) =>
@@ -193,7 +193,7 @@ describe('serialize optional peer declaration', () => {
     ).toEqual([])
   })
 
-  it('A4 explains installation and missing-peer errors for every codec in both guides', () => {
+  it('explains installation and missing-peer errors for every codec in both guides', () => {
     const commands = {
       '@migaia/serialize/codecs/protobuf': 'pnpm add @bufbuild/protobuf',
       '@migaia/serialize/codecs/message-pack': 'pnpm add @msgpack/msgpack',

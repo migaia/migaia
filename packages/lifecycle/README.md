@@ -2,7 +2,7 @@
 
 运行时中立的**生命周期原语**：作用域所有权、代数（generation）、静默追踪（quiescence）与释放事务。零领域知识——公开 API 里不出现 store / plugin / capability / service / rpc / storage 等词汇，只知道「资源」和「怎么释放资源」。
 
-设计文档：`docs/lifecycle/lifecycle-extraction.sdd.md`（SDD 1/3）；错误码契约：`docs/contracts/error-codes.md`。
+错误码契约：`docs/contracts/error-codes.md`。
 
 ## 适用与不适用场景
 
@@ -610,7 +610,7 @@ function withListeners() {
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
 
-验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。
+验收用例位于 `test/` 目录。
 
 ## 可中止的相对延时
 

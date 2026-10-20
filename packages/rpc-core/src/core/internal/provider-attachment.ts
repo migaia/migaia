@@ -351,8 +351,8 @@ export class RpcProviderAttachment {
   /** Extends outbound live counts with the provider security closure's current ownership. */
   debugSnapshot(): IRpcEndpointDebugSnapshot {
     /**
-     * Keeps provider-only counters available to provider RED evidence without widening the
-     * enumerable endpoint snapshot consumed by the pre-existing B12b04 exact-shape contracts.
+     * Keeps provider-only counters available to provider evidence without widening the enumerable
+     * endpoint snapshot consumed by the pre-existing exact-shape contracts.
      */
     const snapshot: IRpcEndpointDebugSnapshot = {
       phase: this.#kernel.state === 'disposed' ? 'disposed' : 'active',

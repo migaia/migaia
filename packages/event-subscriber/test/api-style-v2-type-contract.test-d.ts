@@ -1,6 +1,6 @@
 import { createEventChannel, createEventHub, type IEventApiStyleNames } from '../src/index.js'
 
-// ESV2-T06/T07/T09/T20/T21: custom styles require explicit generic placement and retain exact keys.
+// Custom styles require explicit generic placement and retain exact keys.
 const inlineChannel = createEventChannel<
   number,
   void,

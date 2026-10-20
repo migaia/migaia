@@ -88,10 +88,10 @@ function heldOpen() {
   }
 }
 
-/** A8 cancel cannot outrun the initial request's unresolved send Promise. */
-describe('streaming A8 send-order races', () => {
+/** Cancel cannot outrun the initial request's unresolved send Promise. */
+describe('streaming send-order races', () => {
   it.each(['tag', 'decode'] as const)(
-    '[C5-E10] %s forged overload cannot claim that the initial stream frame was never sent',
+    '%s forged overload cannot claim that the initial stream frame was never sent',
     async (kind) => {
       /** The actual stream owner waits for its original outbound completion. */
       const fixture = heldOpen()
@@ -118,7 +118,7 @@ describe('streaming A8 send-order races', () => {
     }
   )
 
-  it('[C5-E11] the original owner-minted overload keeps its exact no-send capacity refusal', async () => {
+  it('the original owner-minted overload keeps its exact no-send capacity refusal', async () => {
     /** A genuine original admission refusal retains its existing instance and semantic code. */
     const fixture = heldOpen()
     const original = createRpcError(RpcCoreErrorCode.overloaded, 'owner overload fixture')

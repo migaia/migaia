@@ -311,7 +311,7 @@ describeShared('SharedInt32Array：逐下标失效', () => {
 
   it('ignores initialValues when attaching to an existing buffer', () => {
     // 与 SharedInt32Signal 的 initialValue 一样：附着已有 buffer 时那块内存已经
-    // 有数据了，不该被 initialValues 覆盖（USEGUIDE §3.1 明确承诺的行为）。
+    // 有数据了，不该被 initialValues 覆盖（USEGUIDE 明确承诺的行为）。
     const runtime = syncRuntime()
     const writer = sharedInt32Array(runtime, 2, { initialValues: [1, 2] })
 
@@ -356,7 +356,7 @@ describeShared('SharedInt32Array：逐下标失效', () => {
   })
 
   it('rejects out-of-range int32 values from set() and update()', () => {
-    // asInt32 是三条写入路径共用的同一道校验（USEGUIDE §4.3），此前只有
+    // asInt32 是三条写入路径共用的同一道校验（USEGUIDE），此前只有
     // SharedInt32Signal.value 测过；set()/update() 这两条路径完全没测到。
     const runtime = syncRuntime()
     const array = sharedInt32Array(runtime, 1, { initialValues: [0] })
@@ -732,7 +732,7 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
   })
 
   maybe('returns the same stop function on repeated watch() calls', () => {
-    // USEGUIDE §3.2/§5：重复调用 watch() 不应叠加第二条回路，而是复用同一个
+    // USEGUIDE：重复调用 watch() 不应叠加第二条回路，而是复用同一个
     // 停止函数。此前只测过“stop 一次就彻底停”，没测过“调用两次不是两条回路”。
     const runtime = syncRuntime()
     const signal = sharedInt32(runtime, 0)
@@ -764,7 +764,7 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
   })
 
   it('throws instead of silently falling back to polling when Atomics.waitAsync is unavailable', () => {
-    // USEGUIDE §5/§8 明确承诺：环境不支持 waitAsync 时 watch() 直接抛错，而不是
+    // USEGUIDE 明确承诺：环境不支持 waitAsync 时 watch() 直接抛错，而不是
     // 静默退化成轮询。此前完全没有测过这条分支——不依赖当前环境是否真的支持
     // waitAsync，而是临时摘掉它来模拟“不支持”的环境。
     const original = (Atomics as unknown as { waitAsync?: unknown }).waitAsync
@@ -786,7 +786,7 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
   })
 })
 
-describeShared('ST-C5 watch scheduler ownership', () => {
+describeShared('watch scheduler ownership', () => {
   it('uses and cancels an injected scheduler for both watch loops', () => {
     const scheduler = createManualScheduler()
     const wait = vi

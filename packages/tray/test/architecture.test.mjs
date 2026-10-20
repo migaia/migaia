@@ -18,7 +18,7 @@ function readSources(directory) {
     .join('\n')
 }
 
-describe('TLAR-T19 closed-world architecture boundary', () => {
+describe('closed-world architecture boundary', () => {
   it('keeps one Host/Graph owner and excludes raw platform or domain runtime paths', () => {
     const packageDirectory = resolve(import.meta.dirname, '..')
     const tray = readSources(join(packageDirectory, 'src'))

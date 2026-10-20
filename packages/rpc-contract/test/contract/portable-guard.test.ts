@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { normalizePortable } from '../../dist/contract/index.js'
 
-it('SPB-R01 retains the bare native-input guard receiver and root error identity', () => {
+it('retains the bare native-input guard receiver and root error identity', () => {
   for (const value of [new Uint8Array(), new ArrayBuffer(0)]) {
     /** The old public callback receives no context receiver and propagates this exact failure. */
     const original = new RangeError('native guard receiver')

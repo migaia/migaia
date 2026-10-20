@@ -6,7 +6,7 @@ import { ResourceOwnershipRegistry } from '../src/store-resource-ownership.js'
 import { ResourceCachePolicy } from '../src/store-resource-cache-policy.js'
 import { createStoreResource, createStoreResourceScope } from '../src/store-resource.js'
 
-describe('ResourceOwnershipRegistry (M-T42)', () => {
+describe('ResourceOwnershipRegistry', () => {
   it('rejects invalid factory and options shapes before creating resource state', () => {
     expect(() => createStoreResource(null as never)).toThrow(
       '[store] resource factory must be a function or an object with a load function'
@@ -373,7 +373,7 @@ describe('createStoreResourceScope delegation', () => {
   })
 })
 
-describe('createStoreResource getSnapshot stability (M-T43)', () => {
+describe('createStoreResource getSnapshot stability', () => {
   it('getSnapshot() returns the same value across consecutive calls until a load notifies', async () => {
     const resource = createStoreResource<number>({
       load: async () => 1
@@ -424,7 +424,7 @@ describe('createStoreResource reporter failure policy', () => {
   )
 })
 
-describe('ST-C5 resource scheduler and Runtime ownership', () => {
+describe('resource scheduler and Runtime ownership', () => {
   it('captures scheduler accessors once and cancels cache expiry through the injected owner', async () => {
     const manual = createManualScheduler()
     let nowReads = 0

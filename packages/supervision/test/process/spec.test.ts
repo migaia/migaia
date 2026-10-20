@@ -4,7 +4,7 @@ import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
 import { BootstrapVia, createProcessSupervisor, StdinMode } from '../../src/process/index.js'
 import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.js'
 
-describe('A2 closed process specification', () => {
+describe('closed process specification', () => {
   it('rejects shell, malformed fields and bootstrap combinations before launch', () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher({

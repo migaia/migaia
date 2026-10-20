@@ -15,7 +15,7 @@ class ArchitectureHost extends PluginHost<Record<string, never>, string> {
 }
 
 describe('host mutation architecture', () => {
-  it('A19 has no whole-table or whole-lane mutation paths in host source', async () => {
+  it('has no whole-table or whole-lane mutation paths in host source', async () => {
     /** Owning source tree after the package build uses the same TypeScript implementation. */
     const sourceRoot = new URL('../src/', import.meta.url)
     /** Every direct source file participates in the forbidden-path scan. */
@@ -45,7 +45,7 @@ describe('host mutation architecture', () => {
         expect(source).not.toMatch(/\.(?:enabled|suspended|stale)\s*=(?!=)/)
   })
 
-  it('A19 preserves committed table and lane identities after a staged replace rollback', async () => {
+  it('preserves committed table and lane identities after a staged replace rollback', async () => {
     /** Original publication method retained while the test captures the exact host state. */
     const publish = PluginHostState.prototype.publishInstallBatch
     /** State captured through the actual host publication, not reconstructed in the test. */

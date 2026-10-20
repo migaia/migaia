@@ -10,8 +10,8 @@ afterEach(() => {
 })
 
 describe('JSON-RPC bounded native encoding', () => {
-  it('[C3] uses native body encoding once for ordinary payloads', () => {
-    /** Ordinary bodies must avoid the generator scan that caused the A10 regression. */
+  it('uses native body encoding once for ordinary payloads', () => {
+    /** Ordinary bodies must avoid the generator scan that caused the reference regression. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     /** Header encoding remains separate from the single body encoding operation. */
     const encodeInto = vi.spyOn(TextEncoder.prototype, 'encodeInto')
@@ -22,13 +22,13 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(encodeInto).toHaveBeenCalledOnce()
     expect(count).not.toHaveBeenCalled()
   })
-  it('[C3] retains the frozen UTF-8 wire vector', () => {
+  it('retains the frozen UTF-8 wire vector', () => {
     expect(Buffer.from(encodeJsonRpcFrame('é'))).toEqual(
       Buffer.from('Content-Length: 4\r\n\r\n"é"', 'utf8')
     )
   })
 
-  it('[C3] preserves every byte for JSON and Unicode boundary values', () => {
+  it('preserves every byte for JSON and Unicode boundary values', () => {
     /** The independent peer encoder uses native Buffer UTF-8, not product byte counting. */
     const values: unknown[] = [
       null,
@@ -47,7 +47,7 @@ describe('JSON-RPC bounded native encoding', () => {
       expect(Buffer.from(encodeJsonRpcFrame(value))).toEqual(Buffer.from(peerFrame(value)))
   })
 
-  it('[C3] preserves bytes across 1000 deterministic arbitrary UTF-16 payloads', () => {
+  it('preserves bytes across 1000 deterministic arbitrary UTF-16 payloads', () => {
     /** A fixed seed makes surrogate pairs, isolated surrogates and multibyte text reproducible. */
     let seed = 0x4c335754
     for (let index = 0; index < 1000; index++) {
@@ -64,7 +64,7 @@ describe('JSON-RPC bounded native encoding', () => {
   })
 
   it.each([undefined, Symbol('unencoded'), () => undefined])(
-    '[C3] retains FRAME_INVALID for JSON results without a body (%s)',
+    'retains FRAME_INVALID for JSON results without a body (%s)',
     (value) => {
       expect(() => encodeJsonRpcFrame(value)).toThrow(
         expect.objectContaining({ code: 'JSONRPC_FRAME_INVALID' })
@@ -72,7 +72,7 @@ describe('JSON-RPC bounded native encoding', () => {
     }
   )
 
-  it('[C3] rejects an oversized UTF-8 body before encoding or byte allocation', () => {
+  it('rejects an oversized UTF-8 body before encoding or byte allocation', () => {
     /** JSON quotes make this astral text exceed the exact byte ceiling by two bytes. */
     const value = '🙂'.repeat(JsonRpcLimit.bodyBytes / 4)
     /** No output allocation is allowed to precede the real production size decision. */
@@ -100,7 +100,7 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(encodeInto).not.toHaveBeenCalled()
   })
 
-  it('[C3] accepts the exact byte ceiling using one native body encoding and one copy', () => {
+  it('accepts the exact byte ceiling using one native body encoding and one copy', () => {
     /** Two JSON quote bytes complete the body budget without relying on string length. */
     const value = 'x'.repeat(JsonRpcLimit.bodyBytes - 2)
     /** The frozen header decimal and all body bytes are independently encoded by Buffer. */
@@ -116,7 +116,7 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(encode).toHaveBeenCalledOnce()
   })
 
-  it('[I21-F5] accepts surrogate pairs in the middle band with frozen 44f6296 bytes', () => {
+  it('accepts surrogate pairs in the middle band with frozen 44f6296 bytes', () => {
     /** This pair-heavy body is one code unit above the safe segment and below the byte limit. */
     const value = '🙂'.repeat(Math.floor(JsonRpcLimit.bodyBytes / 6))
     /** Frozen 44f6296 framing.ts uses native body/header encoding followed by these two copies. */
@@ -139,7 +139,7 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(encode).toHaveBeenCalledOnce()
   })
 
-  it.each([0, 1])('[C3] preserves bytes at the safe UTF-16 segment boundary +%i', (extra) => {
+  it.each([0, 1])('preserves bytes at the safe UTF-16 segment boundary +%i', (extra) => {
     /** Three UTF-8 bytes per UTF-16 code unit establish the native-only segment ceiling. */
     const jsonLength = Math.floor(JsonRpcLimit.bodyBytes / 3) + extra
     /** JSON quotes occupy two code units and two bytes of the prescribed length. */
@@ -155,7 +155,7 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(count).toHaveBeenCalledTimes(extra)
   })
 
-  it.each([0, 1])('[C3] checks the exact UTF-8 ceiling +%i before encoding', (extra) => {
+  it.each([0, 1])('checks the exact UTF-8 ceiling +%i before encoding', (extra) => {
     /** BMP text exercises exact counting in the narrow interval rather than ASCII pre-rejection. */
     const bodyBudget = JsonRpcLimit.bodyBytes - 2
     /** The remainder ensures the serialized body has precisely the requested byte length. */
@@ -178,7 +178,7 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(count).toHaveBeenCalledOnce()
   })
 
-  it('[C3] rejects a UTF-16 body length above the ceiling before native encoding', () => {
+  it('rejects a UTF-16 body length above the ceiling before native encoding', () => {
     /** Including JSON quotes yields exactly the length ceiling plus one code unit and byte. */
     const value = 'x'.repeat(JsonRpcLimit.bodyBytes - 1)
     /** The length-only segment must reject before native encoding allocates its output. */
@@ -192,7 +192,7 @@ describe('JSON-RPC bounded native encoding', () => {
     expect(count).not.toHaveBeenCalled()
   })
 
-  it('[C3] serializes a user value exactly once before output allocation', () => {
+  it('serializes a user value exactly once before output allocation', () => {
     /** JSON user callbacks must not run again during byte counting or encoding. */
     const toJSON = vi.fn(() => ({ result: '你好🙂' }))
     /** This observable JSON hook establishes the existing serialization call count. */

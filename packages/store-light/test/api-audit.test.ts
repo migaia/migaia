@@ -12,7 +12,7 @@ import {
 
 describe('store-light audit regressions', () => {
   it.each(['sync', 'async'] as const)(
-    'SL-D01 reports %s late field cleanup after initialization fails',
+    'reports %s late field cleanup after initialization fails',
     async (mode) => {
       /** Observe the exact errors delivered to the actual owning Runtime. */
       const reports: unknown[] = []
@@ -65,7 +65,7 @@ describe('store-light audit regressions', () => {
     }
   )
   it.each(['sync', 'async'] as const)(
-    'SL-D02 classifies %s initialization failures without replacing native errors',
+    'classifies %s initialization failures without replacing native errors',
     async (mode) => {
       /** The builder owns the original stack and message. */
       const primary = new Error('field initialization failed')
@@ -97,7 +97,7 @@ describe('store-light audit regressions', () => {
     }
   )
 
-  it('SL-D02 preserves a frozen initialization failure through the coded cause', async () => {
+  it('preserves a frozen initialization failure through the coded cause', async () => {
     /** Frozen native failures cannot accept identity properties. */
     const primary = Object.freeze(new Error('frozen field failure'))
     await expect(
@@ -118,7 +118,7 @@ describe('store-light audit regressions', () => {
   })
 
   it.each(['retain', 'capture'] as const)(
-    'SL-D03 rejects %s of an evicted actual version',
+    'rejects %s of an evicted actual version',
     async (operation) => {
       /** The actual public snapshot identifies the formerly live value. */
       const value = {}
@@ -154,7 +154,7 @@ describe('store-light audit regressions', () => {
     }
   )
 
-  it('SL-D04 shares the completion Promise with a synchronous reentrant disposer', async () => {
+  it('shares the completion Promise with a synchronous reentrant disposer', async () => {
     /** The store is fully initialized before any owned disposer runs. */
     const store = createStore({ value: 1 })
     /** Capture the actual nested result without replacing the lifecycle owner. */
@@ -174,7 +174,7 @@ describe('store-light audit regressions', () => {
   })
 
   it.each([isRaw, isFieldBuilder])(
-    'SL-D05 contains revoked unknown inputs in the public guard',
+    'contains revoked unknown inputs in the public guard',
     (guard) => {
       /** A real revoked native Proxy cannot reveal even its brand. */
       const revoked = Proxy.revocable({}, {})
@@ -183,7 +183,7 @@ describe('store-light audit regressions', () => {
     }
   )
 
-  it('SL-D06 rolls back a constructed field when an input key conflicts with the store API', async () => {
+  it('rolls back a constructed field when an input key conflicts with the store API', async () => {
     /** An ordinary public builder owns a real disposable field. */
     const dispose = vi.fn()
     expect(() =>
@@ -198,7 +198,7 @@ describe('store-light audit regressions', () => {
     ).toThrow(expect.objectContaining({ source: '@migaia/store-light', code: 'INVALID_OPTION' }))
     await vi.waitFor(() => expect(dispose).toHaveBeenCalledTimes(1), { timeout: 200, interval: 5 })
   })
-  it('SL-C02 rejects a pre-discriminant builder before starting its creation', async () => {
+  it('rejects a pre-discriminant builder before starting its creation', async () => {
     /** The retired shape must not start extension I/O through the async entry. */
     const create = vi.fn(async () => ({ disposed: false, dispose() {} }))
     await expect(

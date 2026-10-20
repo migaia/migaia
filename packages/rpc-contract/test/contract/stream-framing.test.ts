@@ -47,7 +47,7 @@ const vectors = JSON.parse(
 ) as readonly IStreamVector[]
 
 describe('rpc native stream framing', () => {
-  it('[C6-F1][A21][A35] direct text encoding preserves wire bytes with a drained backing and an inconclusive bound', () => {
+  it('direct text encoding preserves wire bytes with a drained backing and an inconclusive bound', () => {
     /** The production text encoder supplies the same UTF-8 behavior as the original byte path. */
     const encoder = new TextEncoder()
     /** A nonzero offset proves prefix writes honor the borrowed view's real boundary. */
@@ -73,7 +73,7 @@ describe('rpc native stream framing', () => {
     )
   })
 
-  it('[A3] encodes the vector prefixes and delivers fragmented/coalesced frames in order', () => {
+  it('encodes the vector prefixes and delivers fragmented/coalesced frames in order', () => {
     for (const vector of vectors) {
       const input = vector.payloadHex ?? vector.payload
       if (input !== undefined && !vector.error) {
@@ -107,7 +107,7 @@ describe('rpc native stream framing', () => {
     }
   })
 
-  it('[A4] rejects empty and oversized frames before retaining payload bytes', () => {
+  it('rejects empty and oversized frames before retaining payload bytes', () => {
     expect(() => encodeRpcStreamFrame(new Uint8Array())).toThrowError(
       expect.objectContaining({ code: 'INVALID_FRAME' })
     )
@@ -127,7 +127,7 @@ describe('rpc native stream framing', () => {
     )
   })
 
-  it('[A4/F3] never allocates an oversized payload before rejecting its header', () => {
+  it('never allocates an oversized payload before rejecting its header', () => {
     const errors: Error[] = []
     const decoder = createRpcStreamFrameDecoder({
       onFrame: () => expect.unreachable(),
@@ -152,7 +152,7 @@ describe('rpc native stream framing', () => {
     expect(allocations.every((size) => size < RPC_STREAM_MAX_FRAME_BYTES)).toBe(true)
   })
 
-  it('[A3/A4] owns delivered bytes and distinguishes EOF from intentional close', () => {
+  it('owns delivered bytes and distinguishes EOF from intentional close', () => {
     /** A reused source chunk must not change a previously delivered frame. */
     const chunk = Uint8Array.from([0, 0, 0, 1, 0x41])
     const delivered: Uint8Array[] = []

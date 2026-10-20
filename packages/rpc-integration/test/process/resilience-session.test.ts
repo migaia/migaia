@@ -14,7 +14,7 @@ import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/r
 import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 describe('process resilience session ownership', () => {
-  it('[A3] drains a real PluginHost unUse before disposing the process endpoint', async () => {
+  it('drains a real PluginHost unUse before disposing the process endpoint', async () => {
     const fixture = remoteHarness()
     const scheduler = fixture.binding.scheduler
     const host = new PluginHost<Record<string, never>>({
@@ -108,7 +108,7 @@ describe('process resilience session ownership', () => {
     }
   })
 
-  it('[A1] keeps one deduplication store and scope per verified principal across connections', () => {
+  it('keeps one deduplication store and scope per verified principal across connections', () => {
     const manager = createProcessSessionManager({
       scheduler: createManualScheduler(),
       report: () => undefined
@@ -142,7 +142,7 @@ describe('process resilience session ownership', () => {
     expect(first.limits).toEqual({ maxGlobal: 32, maxPerPeer: 32 })
   })
 
-  it('[A1] admits at most the configured physical connections and returns a lease once', () => {
+  it('admits at most the configured physical connections and returns a lease once', () => {
     const manager = createProcessSessionManager({
       scheduler: createManualScheduler(),
       report: () => undefined,
@@ -165,7 +165,7 @@ describe('process resilience session ownership', () => {
     )
   })
 
-  it('[A2] validates numeric quotas and report offsets before any connection is opened', () => {
+  it('validates numeric quotas and report offsets before any connection is opened', () => {
     expect(() =>
       createProcessSessionManager({
         scheduler: createManualScheduler(),
@@ -185,7 +185,7 @@ describe('process resilience session ownership', () => {
 
 describe('unpublished process service rollback', () => {
   it.each(['child', 'listener'] as const)(
-    '[A3/A5] closes a returned %s service when recovery rejects before publication',
+    'closes a returned %s service when recovery rejects before publication',
     async (kind) => {
       /** The neutral endpoint recorder isolates the service-to-session ownership transfer. */
       const fixture = remoteHarness()

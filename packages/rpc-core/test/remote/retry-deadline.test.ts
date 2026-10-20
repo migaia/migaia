@@ -4,7 +4,7 @@ import { createRemoteRetryPort } from '../../dist/remote/retry.js'
 import type { IRemoteGenerationEvents } from '../../dist/remote/types.js'
 
 describe('shared retry deadline', () => {
-  it('[A9] expires the original deadline while waiting for the next generation', async () => {
+  it('expires the original deadline while waiting for the next generation', async () => {
     const scheduler = createManualScheduler()
     let leave: (reason: unknown) => void = () => undefined
     let canceled = false

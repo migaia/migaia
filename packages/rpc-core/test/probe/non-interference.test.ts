@@ -35,10 +35,10 @@ import { registerBatchAgreement } from '../../dist/core/internal/batch-frame.js'
 import type { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 
-/** The same five configurations define every A6 business/path comparison in this file. */
+/** The same five configurations define every business/path comparison in this file. */
 const probeModes = ['absent', 'recording', 'throw', 'reject', 'reentrant'] as const
 
-describe('probe non-interference A6', () => {
+describe('probe non-interference', () => {
   it.each(probeModes)(
     'preserves runtime results, business error chain, 64 calls and path state with %s probe',
     async (mode) => {
@@ -207,7 +207,7 @@ describe('probe non-interference A6', () => {
       /** Probe failures and the actual business failure must remain distinguishable. */
       const sinkFailure = new Error('encrypted probe sink failure'),
         original = new RangeError('encrypted probe business failure')
-      /** Retained views use the public explicit snapshot boundary, SC9(c). */
+      /** Retained views use the public explicit snapshot boundary. */
       const events: IRpcProbeEventView[] = [],
         reports: unknown[] = []
       /** A reentrant request completes before the quota refusal scenario begins. */
@@ -261,7 +261,7 @@ describe('probe non-interference A6', () => {
           encrypt: (value) => {
             transforms[side].encrypt++
             return `encrypted:${JSON.stringify(value)}`
-          }, // SC9(b): physical wire representation.
+          }, // Physical wire representation.
           sign: (value) => {
             transforms[side].sign++
             return `signed:${String(value)}`
@@ -275,7 +275,7 @@ describe('probe non-interference A6', () => {
             transforms[side].decrypt++
             expect(String(value).startsWith('encrypted:')).toBe(true)
             return JSON.parse(String(value).slice('encrypted:'.length))
-          } // SC9(b): restore the wire representation.
+          } // Restore the wire representation.
         })
       /** Provider execution remains owned by the original public Core endpoint. */
       const server = await createEndpoint({
@@ -480,7 +480,7 @@ describe('probe non-interference A6', () => {
           signature: createHmac('sha256', 'probe-transfer-fixture')
             .update(JSON.stringify(value))
             .digest('hex')
-        }) // SC9(b): wire-signature representation.
+        }) // Wire-signature representation.
         /**
          * Verification uses the same existing boundary representation after actual structured
          * clone.
@@ -506,7 +506,7 @@ describe('probe non-interference A6', () => {
                 verify,
                 encrypt: (value: unknown) => JSON.stringify(value),
                 decrypt: (value: unknown) => JSON.parse(String(value))
-              } // SC9(b): encrypted wire representation.
+              } // Encrypted wire representation.
         /**
          * Explicit static source endpoints are the same public Peer factory used by production
          * adapters.

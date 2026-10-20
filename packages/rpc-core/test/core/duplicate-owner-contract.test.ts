@@ -113,7 +113,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-001 keeps one canonical endpoint root owner', async () => {
+  it('keeps one canonical endpoint root owner', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
       createFirstPartyRoots(new Set(['first-party-outbound']))
@@ -124,7 +124,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-002 installs a feature without constructing a nested endpoint', async () => {
+  it('installs a feature without constructing a nested endpoint', async () => {
     let installs = 0
     const feature = defineTestRoot(['featureValue'], () => {
       installs += 1
@@ -140,7 +140,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-004 composes independent feature surfaces through one root', async () => {
+  it('composes independent feature surfaces through one root', async () => {
     const first = defineTestRoot(['first'], () => Object.freeze({ first: () => 'first' }))
     const second = defineTestRoot(['second'], () => Object.freeze({ second: () => 'second' }))
     const endpoint = await createComposedEndpoint(
@@ -155,7 +155,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-005 uses the canonical transport and outbound sender', async () => {
+  it('uses the canonical transport and outbound sender', async () => {
     let subscriptions = 0
     const endpoint = await createClientEndpoint(
       createConfig(() => {
@@ -170,7 +170,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-007 delegates rollback ownership to one PluginHost', async () => {
+  it('delegates rollback ownership to one PluginHost', async () => {
     const [transport] = createMemoryTransportPair()
     const sharedKey = Symbol('candidate-007-shared')
     const sharedValue = Object.freeze({ owner: 'candidate-007' })
@@ -212,7 +212,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await host.dispose()
   })
 
-  it('proves MET-RED-008 leaves generic pipeline ownership in PluginHost', async () => {
+  it('leaves generic pipeline ownership in PluginHost', async () => {
     const endpoint = await createClientEndpoint(createConfig(() => undefined))
     // 宿主壳层已从「继承 PluginHost」改为「defineHost 产出句柄」；这条断言要观测的是
     // 「通用 pipeline 所有权留在 plugin-host 里」，用宿主入口而不是继承关系来表达。
@@ -222,14 +222,14 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-009 invokes current middleware directly without a legacy adapter', async () => {
+  it('invokes current middleware directly without a legacy adapter', async () => {
     const endpoint = await createClientEndpoint(createConfig(() => undefined, [connect()]))
     expect(typeof endpoint.send).toBe('function')
     expect(Object.values(SOURCES).join('\n')).not.toContain('adaptLegacyMiddleware')
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-010 owns pending settlement in one construction control', () => {
+  it('owns pending settlement in one construction control', () => {
     let now = 100
     let disposed = 0
     const control = createConstructionControl({
@@ -254,7 +254,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(disposed).toBe(0)
   })
 
-  it('proves MET-RED-011 keeps replay admission in ReplayWindow', () => {
+  it('keeps replay admission in ReplayWindow', () => {
     const replay = new ReplayWindow(() => Date.now(), 2, 1_000)
     expect(replay.reserveId('candidate-011')).toBe(true)
     expect(replay.reserveId('candidate-011')).toBe(false)
@@ -264,7 +264,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(replay.hasReservedId('candidate-011')).toBe(false)
   })
 
-  it('proves MET-RED-012 keeps peer leases in PeerRegistry', () => {
+  it('keeps peer leases in PeerRegistry', () => {
     const peers = new PeerRegistry<string>(() => Date.now(), 2, 1_000)
     peers.add('configured', true)
     peers.add('learned')
@@ -273,7 +273,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(peers.snapshot()).toEqual(['configured'])
   })
 
-  it('proves MET-RED-013 keeps provider admission in ProviderAdmissionRegistry', () => {
+  it('keeps provider admission in ProviderAdmissionRegistry', () => {
     const admission = new ProviderAdmissionRegistry(2, 1)
     expect(admission.acquire('task-a', 'peer-a')).toBe(true)
     expect(admission.acquire('task-b', 'peer-a')).toBe(false)
@@ -282,7 +282,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(admission.size).toBe(1)
   })
 
-  it('proves MET-RED-014 keeps chunk assembly in the D13 framer owner', () => {
+  it('keeps chunk assembly in the canonical framer owner', () => {
     const framer = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
     const context = { source: 'peer', messageId: 'candidate-014' }
     const frames = framer.frame('ab', context)
@@ -290,7 +290,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(framer.accept(frames[1], context)).toEqual({ status: 'complete', value: 'ab' })
   })
 
-  it('proves MET-RED-015 installs dependencies before the requesting feature', async () => {
+  it('installs dependencies before the requesting feature', async () => {
     const order: string[] = []
     const dependency = defineTestRoot([], () => {
       order.push('dependency')
@@ -322,7 +322,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-017 accepts only package-minted feature definitions', async () => {
+  it('accepts only package-minted feature definitions', async () => {
     const feature = defineTestRoot([], () => Object.freeze({}))
     await expect(
       createComposedEndpoint(
@@ -332,7 +332,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     ).rejects.toMatchObject({ code: 'INVALID_OPTION' })
   })
 
-  it('proves MET-RED-018 rejects shadow public writes before install effects', async () => {
+  it('rejects shadow public writes before install effects', async () => {
     let installs = 0
     const first = defineTestRoot(['shadow'], () => {
       installs += 1
@@ -351,7 +351,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(installs).toBe(0)
   })
 
-  it('proves MET-RED-019 keeps named ports endpoint-local', async () => {
+  it('keeps named ports endpoint-local', async () => {
     const [firstTransport, secondTransport] = createMemoryTransportPair()
     const portName = 'candidate019'
     const firstHost = createWebRpcPluginHost(
@@ -386,7 +386,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await Promise.all([firstHost.dispose(), secondHost.dispose()])
   })
 
-  it('proves MET-RED-020 exposes provider behavior without provider controllers', async () => {
+  it('exposes provider behavior without provider controllers', async () => {
     const endpoint = await createProviderEndpoint(createConfig(() => undefined))
     expect(Reflect.ownKeys(endpoint)).toEqual([
       'on',
@@ -405,7 +405,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-023 uses one absolute construction deadline', () => {
+  it('uses one absolute construction deadline', () => {
     let now = 1_000
     const control = createConstructionControl({
       signal: new AbortController().signal as IAbortSignal,
@@ -426,7 +426,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     control.close()
   })
 
-  it('proves MET-RED-025 injects one canonical dependency owner without public leakage', async () => {
+  it('injects one canonical dependency owner without public leakage', async () => {
     const owner = Object.freeze({ id: 'candidate-025-owner' })
     const dependency = defineRpcFeature(
       {
@@ -471,7 +471,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-026 slim features use canonical lifecycle owners', async () => {
+  it('slim features use canonical lifecycle owners', async () => {
     const endpoint = await createClientEndpoint(createConfig(() => undefined))
     expect(typeof endpoint.send).toBe('function')
     expect(Object.values(SOURCES).join('\n')).not.toContain('EndpointResourceManager')
@@ -479,7 +479,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-027 does not leak implicit dependency surfaces', async () => {
+  it('does not leak implicit dependency surfaces', async () => {
     const dependency = defineTestRoot(['hidden'], () => Object.freeze({ hidden: () => undefined }))
     const root = defineRpcFeature(
       {
@@ -506,7 +506,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-028 gives D13 framing expiry one injected timer owner', () => {
+  it('gives framing expiry one injected timer owner', () => {
     let timers = 0
     let clears = 0
     const framer = createStringFramer({
@@ -529,7 +529,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(clears).toBe(1)
   })
 
-  it('proves MET-RED-029 returns the canonical root projection without a full wrapper', async () => {
+  it('returns the canonical root projection without a full wrapper', async () => {
     const endpoint = await createClientEndpoint(createConfig(() => undefined))
     expect(Reflect.ownKeys(endpoint)).toEqual([
       'hooks',
@@ -546,7 +546,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-030 uses canonical configuration error semantics', () => {
+  it('uses canonical configuration error semantics', () => {
     expect(() =>
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
@@ -559,7 +559,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     )
   })
 
-  it('proves MET-RED-032 keeps diagnostic cleanup at the Host disposal boundary', async () => {
+  it('keeps diagnostic cleanup at the Host disposal boundary', async () => {
     const cleanup = new Error('candidate-032 cleanup')
     const [transport] = createMemoryTransportPair()
     const host = createWebRpcPluginHost(
@@ -591,8 +591,8 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 })
 
-describe('MET-RED-022/035 projection and public lifecycle surface', () => {
-  it('proves MET-RED-022/035 projection avoids last-write-wins merge and returns the exact Host Promise', async () => {
+describe('projection and public lifecycle surface', () => {
+  it('projection avoids last-write-wins merge and returns the exact Host Promise', async () => {
     const projectionSource = source('../../src/core/internal/endpoint-projection.ts')
     let sendCalls = 0
     const host = {
@@ -658,8 +658,8 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
   })
 })
 
-describe('MET-RED-003/024/039/040 capability topology admission', () => {
-  it('proves MET-RED-003/024/039/040 capability topology owns ordering and rejects conflicts before install effects', async () => {
+describe('capability topology admission', () => {
+  it('capability topology owns ordering and rejects conflicts before install effects', async () => {
     const installs: string[] = []
     let subscriptions = 0
     topologyMock.build.mockClear()

@@ -79,7 +79,7 @@ describe('throwIfAborted', () => {
 })
 
 describe('mergeSignals', () => {
-  it('SWV2-T47 preserves the migrated signal getter and event-reason trace', () => {
+  it('preserves the migrated signal getter and event-reason trace', () => {
     let aborted = false
     let listener: (() => void) | undefined
     const reason = new Error('storage external abort')
@@ -135,7 +135,7 @@ describe('mergeSignals', () => {
     expect(calls.removeCall).toBe(1)
   })
 
-  it('SWV2-T47 maps a post-subscribe observation failure and rolls cleanup back once', () => {
+  it('maps a post-subscribe observation failure and rolls cleanup back once', () => {
     const failure = new Error('storage post-subscribe observation failed')
     let abortedReads = 0
     let removeCount = 0
@@ -157,7 +157,7 @@ describe('mergeSignals', () => {
     expect(removeCount).toBe(1)
   })
 
-  it('SWV2-T47 keeps the timeout error identity reachable through the storage abort cause', () => {
+  it('keeps the timeout error identity reachable through the storage abort cause', () => {
     const merged = mergeSignals({ timeoutMs: 0 }, noopReporter)
     const timeoutReason = merged.signal?.reason
     expect(timeoutReason).toMatchObject({ source: '@migaia/storage-contract', code: 'ABORTED' })

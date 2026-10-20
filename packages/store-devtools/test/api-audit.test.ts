@@ -3,7 +3,7 @@ import { createStore } from '@migaia/store-light'
 import { createStoreDevTools, type IStoreDevTools } from '../src/index.js'
 
 describe('store-devtools audit regressions', () => {
-  it('DT-D01 rejects publication when cloning disposes the actual session', async () => {
+  it('rejects publication when cloning disposes the actual session', async () => {
     /** Business Store ownership is independent of the diagnostic session. */
     const store = createStore({ count: 0 })
     /** Closure is enabled only after the initial snapshot and subscriptions exist. */
@@ -32,7 +32,7 @@ describe('store-devtools audit regressions', () => {
     }
   })
 
-  it('DT-D01 rejects action publication when the clock disposes the session', async () => {
+  it('rejects action publication when the clock disposes the session', async () => {
     /** The same terminal publication boundary applies to the actual action queue. */
     const store = createStore({ count: 0 })
     /** Initial creation remains active before the callback can access the returned session. */
@@ -58,7 +58,7 @@ describe('store-devtools audit regressions', () => {
     }
   })
 
-  it('DT-D02 codes a manual clock failure without consuming a history id', async () => {
+  it('codes a manual clock failure without consuming a history id', async () => {
     /** Only the diagnostic preparation fails; the real Store remains usable. */
     const store = createStore({ count: 0 })
     /** The callback starts failing after the initial successful history entry. */
@@ -88,7 +88,7 @@ describe('store-devtools audit regressions', () => {
   })
 
   it.each(['native', 'frozen'] as const)(
-    'DT-D02 retains the %s action getter failure and leaves the queue unchanged',
+    'retains the %s action getter failure and leaves the queue unchanged',
     async (kind) => {
       /** Public action metadata can contain a supported application getter. */
       const store = createStore({ count: 0 })

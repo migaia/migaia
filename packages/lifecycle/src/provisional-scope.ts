@@ -50,7 +50,7 @@ type IEntry = {
 /**
  * A two-phase ownership transaction for async `setup()` work: resources accumulate here first, then
  * either move to a real owner via prefix transfer + awaited compensation (`commitTo`) or get torn
- * down (`rollback`) — never both, never neither (§4.9).
+ * down (`rollback`) — never both, never neither.
  */
 export function createProvisionalScope(options: IProvisionalScopeOptions = {}): IProvisionalScope {
   const createController = captureAbortControllerFactory()
@@ -143,7 +143,7 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
   }
 
   const rollback = (): Promise<void> => {
-    // 复用唯一 settle Promise：并发第二次 rollback 严格 `===` 首个 rollback（AF-27），而非 async 包装新 Promise。
+    // 复用唯一 settle Promise：并发第二次 rollback 严格 `===` 首个 rollback，而非 async 包装新 Promise。
     if (rollbackPromise) return rollbackPromise
     try {
       assertPending() // throws PROVISIONAL_SETTLED if already committed
@@ -274,7 +274,7 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
       // is awaited before this Promise settles, so no background release outlives the commit.
       const leftover = remaining.slice(index)
       state = ProvisionalScopeState.rolledBack
-      // 补偿即回滚：复用唯一 `rollbackPromise`，禁止第三条独立释放路径（AF-15）。
+      // 补偿即回滚：复用唯一 `rollbackPromise`，禁止第三条独立释放路径。
       const cleanupPromise = releaseEntriesCollecting(leftover)
       rollbackPromise = cleanupPromise.then(() => undefined)
       const cleanupErrors = await cleanupPromise

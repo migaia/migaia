@@ -43,48 +43,47 @@ export const PluginHostErrorCode = {
 
   /**
    * A handle member, or an extension taken from it, is used while that plugin is disabled; also
-   * thrown by `activate()` on a disabled lazy plugin. Enforces per-registration liveness (R2); the
+   * thrown by `activate()` on a disabled lazy plugin. Enforces per-registration liveness; the
    * caller should `enable` the plugin (or its restore token) before retrying.
    */
   pluginDisabled: 'PLUGIN_DISABLED',
   /**
    * A dependent plugin is temporarily suspended because one of its required providers is inactive.
    * The caller must restore or reinstall the provider and wait for automatic resume before
-   * retrying. Enforces the R3 suspend dependency policy without treating the registration as
-   * removed.
+   * retrying. Enforces the suspend dependency policy without treating the registration as removed.
    */
   pluginSuspended: 'PLUGIN_SUSPENDED',
   /**
    * A lazy plugin is accessed synchronously before activation, or a synchronous install needs an
-   * inactive lazy provider. Activation is an explicit async step (R9); the caller should `await
+   * inactive lazy provider. Activation is an explicit async step; the caller should `await
    * host.activate(name)` or install through the async `use()` path.
    */
   pluginNotActivated: 'PLUGIN_NOT_ACTIVATED',
   /**
    * `definition.getFeature(name)` or `handle.getFeature(name)` named a Feature the plugin does not
-   * declare. Lookups never return `undefined` (R4); the caller has a wrong name or wrong plugin.
+   * declare. Lookups never return `undefined`; the caller has a wrong name or wrong plugin.
    */
   featureNotDeclared: 'FEATURE_NOT_DECLARED',
   /**
    * A required Feature provider was never installed in this host (a removed one reports
-   * `PREREQUISITE_REMOVED`). Thrown before any install hook runs (R5); install the provider first
-   * or in the same batch.
+   * `PREREQUISITE_REMOVED`). Thrown before any install hook runs; install the provider first or in
+   * the same batch.
    */
   prerequisiteMissing: 'PREREQUISITE_MISSING',
   /**
    * Cross-plugin Feature references inside one batch form a cycle. Detected before any install hook
-   * runs (R5); the caller must break the cycle in its plugin definitions.
+   * runs; the caller must break the cycle in its plugin definitions.
    */
   dependencyCycle: 'DEPENDENCY_CYCLE',
   /**
    * `unUse`/`disable` (or a managed removal) would leave required dependents behind and cascade was
-   * not requested. State is unchanged (R6); `detail.blockedBy` lists every transitive dependent in
+   * not requested. State is unchanged; `detail.blockedBy` lists every transitive dependent in
    * cascade order — pass `policy: 'cascade'`, include them, or inspect `dryRun` first.
    */
   dependencyBlocked: 'DEPENDENCY_BLOCKED',
   /**
-   * `replace(name, next)` received a candidate whose name differs from `name`. Nothing is installed
-   * (R8); the caller passed the wrong definition.
+   * `replace(name, next)` received a candidate whose name differs from `name`. Nothing is
+   * installed; the caller passed the wrong definition.
    */
   replaceNameMismatch: 'REPLACE_NAME_MISMATCH',
   /**
@@ -98,29 +97,29 @@ export const PluginHostErrorCode = {
   /**
    * A plugin definition carries a retired or unsupported field (for example `shared`), or its
    * dependency data is structurally invalid, or runtime integration is requested from an object
-   * that is not a canonical package-minted core. Definition admission and the D9 integration port
-   * reject these inputs; migrate to Feature dependencies or use the original install core.
+   * that is not a canonical package-minted core. Definition admission and the runtime integration
+   * port reject these inputs; migrate to Feature dependencies or use the original install core.
    */
   pluginDefinitionInvalid: 'PLUGIN_DEFINITION_INVALID',
 
   /**
    * Thrown when plugin installation or publication fails. Native shared-publication TypeErrors
    * retain their runtime type with this code. The original installation error always remains
-   * primary and is reachable by identity through `cause`, as required by the error-code contract
-   * §3.2.
+   * primary and is reachable by identity through `cause`, as required by the error-code contract.
    *
    * `detail` retains the failed plugin name and original rollback failures in rollback order. Async
    * `use()` publishes the completed frozen detail directly. Sync `useSync()` publishes a frozen
    * snapshot and exposes the final frozen detail through `detail.completion`. Rollback or cleanup
    * failures use the diagnostic code `PLUGIN_INSTALL_ROLLBACK_FAILED`. They never replace the
-   * original construction failure (L-T39 / `docs/lifecycle/migration.sdd.md` §3.7.4 M-T44). Await
-   * completion before converting errors that require complete secondary failure identities.
+   * original construction failure. Await completion before converting errors that require complete
+   * secondary failure identities.
    */
   pluginInstallFailed: 'PLUGIN_INSTALL_FAILED',
 
   /**
-   * A plugin selected for immediate `useSync()` installation declares async setup (R5). The caller
-   * must install it through `use()` so setup can settle before features and install run.
+   * A plugin selected for immediate `useSync()` installation declares async setup.
+   *
+   * Callers must install it through `use()` so setup settles before features and install run.
    */
   setupRequiresAsyncInstall: 'SETUP_REQUIRES_ASYNC_INSTALL',
 
@@ -238,9 +237,9 @@ export const PluginHostErrorCode = {
    * Thrown when an async stage and its downstream both fail. An `AggregateError` retains `errors`
    * in the fixed order `[stageError, downstreamError]`.
    *
-   * Enforces the boundary error identity contract in `docs/contracts/error-codes.md` §2 and §3.2.
-   * Both original errors remain reachable by identity in `errors`. Handle each failure rather than
-   * retrying it as one stage failure.
+   * Enforces the boundary error identity contract in `docs/contracts/error-codes.md`. Both original
+   * errors remain reachable by identity in `errors`. Handle each failure rather than retrying it as
+   * one stage failure.
    */
   pipelineFailed: 'PIPELINE_FAILED',
 
@@ -248,10 +247,10 @@ export const PluginHostErrorCode = {
    * Diagnostic code that is reported, never thrown.
    *
    * Reports through `diagnostic` when `install()` fails and rollback also fails. The primary error
-   * retains `PLUGIN_INSTALL_FAILED` and `cause` equal to the original installation error. See L-T39
-   * / `docs/lifecycle/migration.sdd.md` §3.7.4 M-T44. This additional signal never rewrites or
-   * replaces the primary error. Some installed plugins may remain incompletely unloaded, leaving
-   * inconsistent host state. Treat the failure as unrecoverable and rebuild the host.
+   * retains `PLUGIN_INSTALL_FAILED` and `cause` equal to the original installation error. This
+   * additional signal never rewrites or replaces the primary error. Some installed plugins may
+   * remain incompletely unloaded, leaving inconsistent host state. Treat the failure as
+   * unrecoverable and rebuild the host.
    */
   pluginInstallRollbackFailed: 'PLUGIN_INSTALL_ROLLBACK_FAILED',
 
@@ -295,9 +294,8 @@ export const PluginHostErrorCode = {
    * include plugin names, configuration paths, stages, extensions, domain cores, and resource
    * disposers.
    *
-   * Enforces the untagged-error gate in `docs/contracts/error-codes.md` §7 and input-validation
-   * rules in `error-code-rollout.sdd.md` §3. Correct the input before retrying. This is a
-   * programming error, not a runtime state failure.
+   * Enforces the untagged-error gate in `docs/contracts/error-codes.md` and input-validation rules.
+   * Correct the input before retrying. This is a programming error, not a runtime state failure.
    */
   invalidOption: 'INVALID_OPTION',
   /** Config value violates the admitted plain-data grammar; caller must supply an allowed value. */
@@ -343,8 +341,7 @@ export const PluginHostErrorCode = {
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]
 
 /**
- * The single declaration site for `source` in `(source, code)` (`docs/contracts/error-codes.md`
- * §2).
+ * The single declaration site for `source` in `(source, code)` (`docs/contracts/error-codes.md` ).
  *
  * Every error leaving the plugin-host boundary uses this value. Throw sites and `error-text.ts`
  * must not repeat its string literal.

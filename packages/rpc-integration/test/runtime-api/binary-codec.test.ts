@@ -55,23 +55,23 @@ async function createNativeProcessCodec() {
     const [channel, peer] = await Promise.all([
       createProcessTransport(left, {
         role: 'initiator',
-        peerId: 'a61-native-right',
-        offer: createNativeProcessOffer({ peer: { id: 'a61-native-left', runtime: 'node' } }),
+        peerId: 'native-right',
+        offer: createNativeProcessOffer({ peer: { id: 'native-left', runtime: 'node' } }),
         ipc: {
-          connectionId: 'a61-native-left',
-          sessionId: 'a61-native-left',
+          connectionId: 'native-left',
+          sessionId: 'native-left',
           log: () => undefined
         },
         report: () => undefined
       }),
       createProcessTransport(right, {
         role: 'responder',
-        peerId: 'a61-native-left',
-        offer: createNativeProcessOffer({ peer: { id: 'a61-native-right', runtime: 'node' } }),
+        peerId: 'native-left',
+        offer: createNativeProcessOffer({ peer: { id: 'native-right', runtime: 'node' } }),
         auth: { mode: 'none' },
         ipc: {
-          connectionId: 'a61-native-right',
-          sessionId: 'a61-native-right',
+          connectionId: 'native-right',
+          sessionId: 'native-right',
           log: () => undefined
         },
         report: () => undefined
@@ -95,7 +95,7 @@ async function createNativeProcessCodec() {
 }
 
 for (const size of [64 * 1024, 1024 * 1024]) {
-  it(`[A61][A21] ${size} owned inline bytes encode natively once without a second business walk`, async () => {
+  it(`${size} owned inline bytes encode natively once without a second business walk`, async () => {
     /** The actual public handshake supplies Core's resource-bound production codec. */
     const fixture = await createNativeProcessCodec()
     /** The same real codec/framer identities select the encoder held by the Node byte adapter. */
@@ -156,12 +156,12 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       assert.equal(
         json.envelope.payload,
         prepared.manifest.envelope.payload,
-        '[A61] same encoded business root'
+        'same encoded business root'
       )
       /** Compare the actual process codec against the unchanged source JSON codec's wire order. */
       const encoded = fixture.codec.encode(prepared.manifest)
       assert.equal(encoded, defineJsonCodec({ version: 1 }).encode(asCodecValue(prepared.manifest)))
-      assert.equal(nativeCalls, 1, '[A61] real native base64 once per binary leaf')
+      assert.equal(nativeCalls, 1, 'real native base64 once per binary leaf')
       assert.ok(Buffer.byteLength(encoded as string) <= retained.byteUpperBound)
       /** The shipped restore owner decides offset, zero-prefix, text and visible byte equality. */
       const restored = await restoreRpcBinary(
@@ -182,7 +182,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
   })
 }
 
-it('[A61][A21] private owned capture preserves public preparation shape and native digest order', async () => {
+it('private owned capture preserves public preparation shape and native digest order', async () => {
   /** Two actual backings distinguish sequential digest order from view alias handling. */
   const first = new Uint8Array([9, 1, 2, 8]).buffer
   const second = new Uint8Array([3, 4]).buffer

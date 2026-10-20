@@ -7,7 +7,7 @@ import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js
 import { connected, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
 
 it.each([false, true])(
-  '[A67] late item completion keeps one discard credit with another pull %s',
+  'late item completion keeps one discard credit with another pull %s',
   async (pulled) => {
     /**
      * Real iterator calls expose concurrent credit without an async generator hiding it in its
@@ -106,17 +106,13 @@ it.each([false, true])(
       releaseWrite()
       await vi.waitFor(() => assert.ok(calls >= 2), { interval: 5 })
       assert.equal(await fixture.peers[0].request('barrier'), 7)
-      assert.equal(peak, 1, '[A67] physical completion cannot create another discard drain')
+      assert.equal(peak, 1, 'physical completion cannot create another discard drain')
       assert.equal(active, 1)
       releaseBusiness()
       assert.deepEqual(await returned, { done: true, value: 42 })
       if (pendingNext) assert.deepEqual(await pendingNext, { done: true, value: 42 })
       assert.equal(calls, 4)
-      assert.equal(
-        returns,
-        0,
-        '[A67] discard must reach real done without interrupting the iterator'
-      )
+      assert.equal(returns, 0, 'discard must reach real done without interrupting the iterator')
       assert.equal(fixture.failures.length, 0)
     } finally {
       releaseWrite()

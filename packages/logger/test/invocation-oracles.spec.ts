@@ -4,7 +4,7 @@ import { Logger } from '../src/log.js'
 import type { ILogEntry } from '../src/typing.js'
 
 describe('logger invocation ownership', () => {
-  it('MRC-SOL-F01 keeps hook registration and fireHook behavior observable at the Logger boundary', () => {
+  it('keeps hook registration and fireHook behavior observable at the Logger boundary', () => {
     const logger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -21,7 +21,7 @@ describe('logger invocation ownership', () => {
     expect(seen).toEqual(['first', 'late'])
   })
 
-  it('MRC-SOL-F02 removes only its registration and permits additional registration', () => {
+  it('removes only its registration and permits additional registration', () => {
     const logger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -43,7 +43,7 @@ describe('logger invocation ownership', () => {
     expect(seen).toEqual(['hook', 'hook', 'replacement'])
   })
 
-  it('MRC-SOL-F02 keeps the named hook map as a derived exact-channel route', () => {
+  it('keeps the named hook map as a derived exact-channel route', () => {
     const source = readFileSync(new URL('../src/log.ts', import.meta.url), 'utf8')
     expect(source).toContain(
       'if (channel.size === 0 && this.#hooks.get(name) === channel) this.#hooks.delete(name)'

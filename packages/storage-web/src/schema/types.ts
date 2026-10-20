@@ -3,7 +3,7 @@ import type { IOperationContext } from '../types/context.js'
 /**
  * Defines an optional schema contract without depending on a validation library. `encode` and
  * `decode` convert domain representations, such as dates to ISO strings or removal of internal
- * fields. Codecs handle storage formats, such as objects to strings or bytes (see §7). Writes run
+ * fields. Codecs handle storage formats, such as objects to strings or bytes. Writes run
  * `validate`, optional `normalize`, `encode`, then `codec.encode`. Reads run `codec.decode`,
  * `decode`, then `validate` when read validation is enabled.
  */

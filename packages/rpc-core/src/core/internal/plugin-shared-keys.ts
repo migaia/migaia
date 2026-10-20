@@ -259,7 +259,7 @@ export type IRpcVariationCoordinatorPort = {
   ) => boolean | { readonly found: boolean; readonly reason: unknown } | (() => void) | void
 }
 
-/** Exact D87 outbound operation; provider dispatch uses the existing send owner. */
+/** Exact outbound operation; provider dispatch uses the existing send owner. */
 export type IRpcOutboundOperationsPort = {
   /** Package-private allocator shared with stream; no new public generator configuration. */
   readonly defaultGenerate?: () => string

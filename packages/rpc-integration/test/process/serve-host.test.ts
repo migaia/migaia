@@ -51,7 +51,7 @@ async function independentHostPeer(resolverMode = '') {
 
 describe('process Host real Unix service', () => {
   it.each(['wrong-name', 'promise', 'invalid', 'throw'])(
-    '[A5] keeps invalid local resolver output off the real Host while other control stays live (%s)',
+    'keeps invalid local resolver output off the real Host while other control stays live (%s)',
     async (mode) => {
       const peer = await independentHostPeer(mode)
       let client: Awaited<ReturnType<typeof nativeBorrowedPeer>> | undefined
@@ -81,7 +81,7 @@ describe('process Host real Unix service', () => {
       }
     }
   )
-  it('[A6] refuses connection 65 and request 33 at the default limits while another connection remains live', async () => {
+  it('refuses connection 65 and request 33 at the default limits while another connection remains live', async () => {
     const peer = await independentHostPeer()
     const clients: Awaited<ReturnType<typeof nativeBorrowedPeer>>[] = []
     try {
@@ -111,7 +111,7 @@ describe('process Host real Unix service', () => {
       await peer.close()
     }
   })
-  it('[A2/A5/A6] shares authenticated caches but releases only the borrowed connection', async () => {
+  it('shares authenticated caches but releases only the borrowed connection', async () => {
     const peer = await independentHostPeer()
     const [first, second, other] = await Promise.all([
       nativeBorrowedPeer(peer.address),

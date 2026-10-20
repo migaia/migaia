@@ -49,7 +49,7 @@ const createObservedBackends = (): IObservedBackend[] => [
   })()
 ]
 
-describe('B04 R08 private backend reactive controller', () => {
+describe('private backend reactive controller', () => {
   it('registers one exact controller for each canonical factory and publishes after success', async () => {
     const backends = createObservedBackends()
     try {

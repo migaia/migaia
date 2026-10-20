@@ -41,7 +41,7 @@ function runServicePortable(mode: string): Promise<IServicePortableReceipt> {
       }
       try {
         if (stderr.trim()) console.info(stderr.trim())
-        // SC9(b): parse the standalone receipt, not an alternate service serialization path.
+        // Parse the standalone receipt, not an alternate service serialization path.
         resolve(JSON.parse(stdout) as IServicePortableReceipt)
       } catch (cause) {
         reject(cause)
@@ -51,7 +51,7 @@ function runServicePortable(mode: string): Promise<IServicePortableReceipt> {
 }
 
 for (const mode of Object.values(ServicePortableFixture.modes)) {
-  it(`[A5] real Process service query/watch/stats/describe/record.stop are portable with ${mode} content`, async () => {
+  it(`real Process service query/watch/stats/describe/record.stop are portable with ${mode} content`, async () => {
     /** Child assertions exercise native bytes/errors and class/function conversion at the service. */
     const receipt = await runServicePortable(mode)
     expect(receipt.acceptance).toBe(ServicePortableFixture.acceptance)

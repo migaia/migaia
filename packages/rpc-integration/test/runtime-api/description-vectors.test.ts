@@ -3,7 +3,7 @@ import { it } from 'vitest'
 import vectors from '../../schema/vectors/runtime-description.json'
 import { normalizeRuntimeDescription } from '../../../rpc-core/dist/remote/runtime-api/description.js'
 
-it('[A32] the separate v2 vectors admit generated directories and reject old versions, secret fields and duplicate modes', () => {
+it('the separate v2 vectors admit generated directories and reject old versions, secret fields and duplicate modes', () => {
   for (const vector of vectors.valid) {
     assert.equal(normalizeRuntimeDescription(vector).schemaVersion, 2)
   }

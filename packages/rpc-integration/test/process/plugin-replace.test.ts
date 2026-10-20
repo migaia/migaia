@@ -98,7 +98,7 @@ function fixture(withHostReplace = true) {
 }
 
 describe('process plugin whole-process replacement', () => {
-  it('[A9] synchronously rejects both strategies on a replaced definition', async () => {
+  it('synchronously rejects both strategies on a replaced definition', async () => {
     const test = fixture()
     let currentFeature: { request(params: unknown[]): Promise<unknown> } | undefined
     const plugin = createProcessPlugin({
@@ -129,7 +129,7 @@ describe('process plugin whole-process replacement', () => {
   })
 
   it.each([null, undefined])(
-    '[A2/K229] codes malformed bootstrap payload %s before launch',
+    'codes malformed bootstrap payload %s before launch',
     async (payload) => {
       /** The native byte deployment is valid except for the malformed bootstrap bytes. */
       const test = fixture()
@@ -165,7 +165,7 @@ describe('process plugin whole-process replacement', () => {
     }
   )
 
-  it('[A2/A5] rejects an invalid local owner or missing default ping before launch', async () => {
+  it('rejects an invalid local owner or missing default ping before launch', async () => {
     const test = fixture()
     try {
       expect(() =>
@@ -219,7 +219,7 @@ describe('process plugin whole-process replacement', () => {
     }
   })
 
-  it('[A9] keeps trusted frozen metadata and delegates stop-then-start to its supervisor', async () => {
+  it('keeps trusted frozen metadata and delegates stop-then-start to its supervisor', async () => {
     const test = fixture()
     const plugin = createProcessPlugin(test.options)
     expect(isDefinedPlugin(plugin)).toBe(true)
@@ -241,7 +241,7 @@ describe('process plugin whole-process replacement', () => {
     }
   })
 
-  it('[A9] rejects invalid strategy and bootstrap before any replacement owner is called', async () => {
+  it('rejects invalid strategy and bootstrap before any replacement owner is called', async () => {
     const test = fixture()
     const plugin = createProcessPlugin(test.options)
     try {
@@ -262,7 +262,7 @@ describe('process plugin whole-process replacement', () => {
     }
   })
 
-  it('[A9] routes start-then-switch through Host with a distinct trusted candidate', async () => {
+  it('routes start-then-switch through Host with a distinct trusted candidate', async () => {
     const test = fixture()
     const plugin = createProcessPlugin(test.options)
     try {
@@ -281,7 +281,7 @@ describe('process plugin whole-process replacement', () => {
     }
   })
 
-  it('[A9] invalidates the caller pool once and never takes it for a candidate', async () => {
+  it('invalidates the caller pool once and never takes it for a candidate', async () => {
     const test = fixture()
     if (test.options.deployment.kind !== 'spawn') throw new Error('spawn fixture required')
     const deployment = test.options.deployment
@@ -329,7 +329,7 @@ describe('process plugin whole-process replacement', () => {
     }
   })
 
-  it('[A9] rejects borrowed connect replacement and missing Host replacement synchronously', async () => {
+  it('rejects borrowed connect replacement and missing Host replacement synchronously', async () => {
     const test = fixture(false)
     const spawn = createProcessPlugin(test.options)
     try {

@@ -9,14 +9,14 @@ import { createLifecycleFailure } from '../src/errors.js'
 import { snapshotScheduler } from '../src/scheduler-entry.js'
 
 describe('lifecycle audited error observation', () => {
-  it('D-03 requires a reporter at the public collector entry', () => {
+  it('requires a reporter at the public collector entry', () => {
     for (const policy of ['report', 'firstError'] as const)
       expect(() => createErrorCollector(policy, undefined)).toThrowError(
         expect.objectContaining({ source: '@migaia/lifecycle', code: 'INVALID_OPTION' })
       )
   })
 
-  it('D-04 annotates admitted scheduler calls without changing native identity', () => {
+  it('annotates admitted scheduler calls without changing native identity', () => {
     /** Clock, registration and deferred calls are supported public scheduler operations. */
     const failure = new RangeError('scheduler failed')
     /** Snapshot retains the captured receiver and the exact native failure. */
@@ -40,7 +40,7 @@ describe('lifecycle audited error observation', () => {
     expect(failure).toMatchObject({ source: '@migaia/lifecycle', code: 'INVALID_OPTION' })
   })
 
-  it('D-05 rejects provisional detach failure after releasing every resource', async () => {
+  it('rejects provisional detach failure after releasing every resource', async () => {
     /** Listener release failure must enter rollback settlement, not an abandoned admission array. */
     const failure = new Error('parent listener removal')
     /** Every owned resource still releases even when detaching its cancellation parent fails. */
@@ -62,7 +62,7 @@ describe('lifecycle audited error observation', () => {
     expect(release).toHaveBeenCalledTimes(1)
   })
 
-  it('D-05 reports parent-driven generation cleanup after admission ends', () => {
+  it('reports parent-driven generation cleanup after admission ends', () => {
     /** Native callbacks have no awaiting caller; the configured reporter owns cleanup failures. */
     const failure = new Error('parent removal')
     /** Captured callback models supported structural signal dispatch. */
@@ -97,7 +97,7 @@ describe('lifecycle audited error observation', () => {
     generations.dispose()
   })
 
-  it('D-06 retains the original thrown value when diagnostic getters fail', () => {
+  it('retains the original thrown value when diagnostic getters fail', () => {
     /** Diagnostic accessor failure is secondary to the hostile thrown object itself. */
     const getterFailure = new Error('message getter')
     /** Factory must never replace this original with its message getter failure. */
@@ -115,7 +115,7 @@ describe('lifecycle audited error observation', () => {
     expect(walkErrorCauses(wrapped).includes(getterFailure)).toBe(true)
   })
 
-  it('D-09 observes asynchronous onSuperseded failure through the existing reporter', async () => {
+  it('observes asynchronous onSuperseded failure through the existing reporter', async () => {
     /** Nominal void observers may be async under the public TypeScript contract. */
     const failure = new Error('superseded observer')
     /** Explicit reporter must observe secondary failure after adopt returns. */
@@ -136,7 +136,7 @@ describe('lifecycle audited error observation', () => {
     generations.dispose()
   })
 
-  it('D-10 annotates unclassified release failures and preserves foreign coded errors', () => {
+  it('annotates unclassified release failures and preserves foreign coded errors', () => {
     /** A single native disposer failure needs package identity without object replacement. */
     const original = new TypeError('release')
     /** Policy retains the same native object and stack. */

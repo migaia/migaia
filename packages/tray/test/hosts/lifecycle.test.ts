@@ -4,7 +4,7 @@ import { assembled, chainHas, fixture, lines, marker, until } from './helper.js'
 
 describe('Tray lifecycle management', () => {
   it.each([0, 1, 2])(
-    '[A5] runtime %i drops a stale background ready receipt queued behind a newer replace',
+    'runtime %i drops a stale background ready receipt queued behind a newer replace',
     async (index) => {
       /**
        * Existing internal registry owner supplies the real queue and record, without new production
@@ -98,7 +98,7 @@ describe('Tray lifecycle management', () => {
     30000
   )
   it.each([0, 1, 2])(
-    '[A5] runtime %i immediately calls every restarted generation for 20 iterations, replaces config and restarts from stopped',
+    'runtime %i immediately calls every restarted generation for 20 iterations, replaces config and restarts from stopped',
     async (index) => {
       /** Shared declarations preserve one business path across all runtime families. */
       const api = await fixture()
@@ -154,7 +154,7 @@ describe('Tray lifecycle management', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A5] runtime %i uses one body for crash restart, clean stop and first-exit idempotency',
+    'runtime %i uses one body for crash restart, clean stop and first-exit idempotency',
     async (index) => {
       /** All three definitions run the exact same exit Feature methods. */
       const api = await fixture()
@@ -198,7 +198,7 @@ describe('Tray lifecycle management', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A5] runtime %i preserves never-restart and the non-default maxRestarts 2 bound',
+    'runtime %i preserves never-restart and the non-default maxRestarts 2 bound',
     async (index) => {
       /** Existing supervision owns crash classification and budget exhaustion. */
       const reports: unknown[] = []
@@ -268,7 +268,7 @@ describe('Tray lifecycle management', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A5] runtime %i reports a background generation init failure and never presents it ready',
+    'runtime %i reports a background generation init failure and never presents it ready',
     async (index) => {
       /** Actual parent reporting receives the rejected background init. */
       const reports: unknown[] = []
@@ -302,7 +302,7 @@ describe('Tray lifecycle management', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A5] runtime %i serializes config snapshots and generation init for overlapping replace calls',
+    'runtime %i serializes config snapshots and generation init for overlapping replace calls',
     async (index) => {
       /** Physical init log distinguishes the two queued replacements. */
       const initMarker = marker('replace-queue')
@@ -347,7 +347,7 @@ describe('Tray lifecycle management', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A5] runtime %i keeps held request and stream receipts on the retired generation',
+    'runtime %i keeps held request and stream receipts on the retired generation',
     async (index) => {
       /** One remote admission stays valid while native generations change. */
       const api = await fixture()
@@ -394,7 +394,7 @@ describe('Tray lifecycle management', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A5] runtime %i runs PluginHost cleanup once before every Tray ending and reports bounded shutdown failure',
+    'runtime %i runs PluginHost cleanup once before every Tray ending and reports bounded shutdown failure',
     async (index) => {
       /** Native file appends are the cleanup oracle across all three realms. */
       const cleanupMarker = marker('cleanup')
@@ -469,7 +469,7 @@ describe('Tray lifecycle management', () => {
     50000
   )
 
-  it('[A5] T3 publishes real RPC exit before Tray restarting and reads the deferred supervision snapshot', async () => {
+  it('publishes real RPC exit before Tray restarting and reads the deferred supervision snapshot', async () => {
     /** Longer native backoff holds the restart state long enough for its own event read. */
     const api = await fixture()
     /** A genuine process exit proves the cross-realm outlet event path. */
@@ -520,7 +520,7 @@ describe('Tray lifecycle management', () => {
     }
   }, 30000)
 
-  it('[A5] drops a deferred old exit snapshot after a newer process replace commits', async () => {
+  it('drops a deferred old exit snapshot after a newer process replace commits', async () => {
     /** Tray's existing accessor reads the actual RPC outlet without creating another facade owner. */
     const runtimeUrl = new URL('../../dist/hosts/runtime.js', import.meta.url).href
     /** This exact package module is also consumed by the parent registry. */
@@ -602,7 +602,7 @@ describe('Tray lifecycle management', () => {
     }
   }, 30000)
 
-  it('[A5] returns a successful replace and then a failed startup restart in the same queue order', async () => {
+  it('returns a successful replace and then a failed startup restart in the same queue order', async () => {
     /** The second queued entry sees this file only after the first entry's new init writes it. */
     const launchFailureMarker = marker('queued-start-failure')
     /** Native startup diagnostic remains available on the failed result's original cause. */
@@ -654,7 +654,7 @@ describe('Tray lifecycle management', () => {
     }
   }, 30000)
 
-  it('[A5] background process relaunch failures reach terminal without another Tray call', async () => {
+  it('background process relaunch failures reach terminal without another Tray call', async () => {
     /** First init creates this launch-side marker for every subsequent process generation. */
     const launchFailureMarker = marker('launch-failure')
     /** The original supervision report must explain terminal exhaustion. */
@@ -698,7 +698,7 @@ describe('Tray lifecycle management', () => {
     }
   }, 40000)
 
-  it('[A5] resubscribes a recreated thread family before crash re-init', async () => {
+  it('resubscribes a recreated thread family before crash re-init', async () => {
     /** Removing the last native Worker removes its existing family outlet. */
     const api = await fixture()
     /** Family recreation must attach fresh lifecycle subscriptions. */

@@ -1,5 +1,5 @@
 /**
- * Disposal symbols for resource contracts (R-7).
+ * Disposal symbols for resource contracts.
  *
  * Synchronous resources use the native Symbol.dispose or a callback. Async callers may use the
  * exported asyncDisposeKey when the host lacks a native symbol. Admission and extension validation

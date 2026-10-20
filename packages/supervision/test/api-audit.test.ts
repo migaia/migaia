@@ -18,7 +18,7 @@ async function flush(): Promise<void> {
 }
 
 describe('audited supervision contracts', () => {
-  it('D04 handles acquireUnit failure through launch policy without acquiring a lease', async () => {
+  it('handles acquireUnit failure through launch policy without acquiring a lease', async () => {
     /** Acquisition can fail before any unit or lifecycle scope exists. */
     const primary = new Error('acquire unit failed')
     /** The policy report preserves the original hook error on its cause chain. */
@@ -58,7 +58,7 @@ describe('audited supervision contracts', () => {
     }
   })
 
-  it('D05 reports an aborted health check own failure after its monitor closes', async () => {
+  it('reports an aborted health check own failure after its monitor closes', async () => {
     /** Manual health scheduling avoids any real polling or timer race. */
     const scheduler = createManualScheduler()
     /** The checker rejects its own error while observing cancellation. */
@@ -112,7 +112,7 @@ describe('audited supervision contracts', () => {
     }
   })
 
-  it('D06 adopts the exact warm durable record without duplicate add or removal', async () => {
+  it('adopts the exact warm durable record without duplicate add or removal', async () => {
     /** The registry rejects duplicate ids, like the supported durable port. */
     const registry = memoryRegistry()
     /** Counts only removal of the original warm record, independently of pool refill. */
@@ -168,7 +168,7 @@ describe('audited supervision contracts', () => {
     }
   })
 
-  it('D08 contains and reports both replayed and live prewarm output observer failures', async () => {
+  it('contains and reports both replayed and live prewarm output observer failures', async () => {
     /** The output callback fails without owning the process drain loop. */
     const primary = new Error('prewarm output sink failed')
     /** Reports retain one exact failure per delivery. */
@@ -209,7 +209,7 @@ describe('audited supervision contracts', () => {
     }
   })
 
-  it('D09 collects and reports registry list failure with its original cause', async () => {
+  it('collects and reports registry list failure with its original cause', async () => {
     /** No process record is touched when listing fails. */
     const primary = new Error('registry list failed')
     /** Recovery already exposes collected failures instead of a raw rejection. */
@@ -241,7 +241,7 @@ describe('audited supervision contracts', () => {
   })
 
   it.each(['intervalMs', 'failureThreshold'] as const)(
-    'D10 rejects zero pool usage %s before filling',
+    'rejects zero pool usage %s before filling',
     async (field) => {
       /** Admission is tested with an empty pool, never a zero-interval polling loop. */
       const budget = createUnitBudget({ kind: 'process', maxUnits: 1, launchRate: false })
@@ -271,7 +271,7 @@ describe('audited supervision contracts', () => {
     }
   )
 
-  it('D01 settles startup timeout through the existing failure policy', async () => {
+  it('settles startup timeout through the existing failure policy', async () => {
     /** One manual clock owns startup and teardown deadlines. */
     const scheduler = createManualScheduler()
     /** Reports expose the actual timeout as the terminal policy cause. */
@@ -322,7 +322,7 @@ describe('audited supervision contracts', () => {
     }
   })
 
-  it('D02 keeps the old coroutine alive until the candidate is ready and switched', async () => {
+  it('keeps the old coroutine alive until the candidate is ready and switched', async () => {
     /** Two leases allow a serving task and its replacement to overlap. */
     const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2, launchRate: false })
     /** The second task starts before its readiness gate is opened. */
@@ -386,7 +386,7 @@ describe('audited supervision contracts', () => {
     }
   })
 
-  it('D03 retains the lease and pending exit when iterator return rejects before next settles', async () => {
+  it('retains the lease and pending exit when iterator return rejects before next settles', async () => {
     /** Reap is bounded while the original iterator next is independently held. */
     const scheduler = createManualScheduler()
     /** Actual pending work, rather than a return request, determines disappearance. */

@@ -11,7 +11,7 @@ import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcStreamErrorText } from '../../dist/core/internal/stream/error-text.js'
 
-/** A12 uses the stream ports directly because IPC queue admission belongs to its later leaf. */
+/** Uses the stream ports directly because IPC queue admission belongs to its later leaf. */
 function streamPorts(rejectFrame?: (command: IRpcOutboundCommand) => unknown) {
   const commands: IRpcOutboundCommand[] = []
   let route!: IEndpointKernelRoute
@@ -126,7 +126,7 @@ function request(id: string, senderId = 'client') {
   }
 }
 
-describe('streaming A12 admission', () => {
+describe('streaming admission', () => {
   it('bounds early-cancel keys per peer and rejects late opens after saturation', async () => {
     const fixture = streamPorts()
     let calls = 0

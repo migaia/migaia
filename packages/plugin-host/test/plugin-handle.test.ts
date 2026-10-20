@@ -44,7 +44,7 @@ describe('plugin handles', () => {
   })
 })
 
-describe('K257 exact handle registration probe', () => {
+describe('exact handle registration probe', () => {
   it('does not retain a removed registration while its old handle remains reachable', () => {
     /** Run real garbage collection in an isolated process with the published runtime. */
     const fixture = fileURLToPath(new URL('./fixtures/plugin-handle-gc.mjs', import.meta.url))

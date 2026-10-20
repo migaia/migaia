@@ -7,10 +7,10 @@ import { describe, expect, it } from 'vitest'
 import * as SubscriberEntry from '../src/subscriber.js'
 
 describe('public exports', () => {
-  it('ES-T202 keeps literal style inference in TypeScript without a runtime identity helper', () => {
+  it('keeps literal style inference in TypeScript without a runtime identity helper', () => {
     expect('defineEventApiStyle' in EventSubscriber).toBe(false)
   })
-  it('ES-T182 exposes subscription helpers through the focused subscriber entry', () => {
+  it('exposes subscription helpers through the focused subscriber entry', () => {
     expect(SubscriberEntry.subscribeOnce).toBeTypeOf('function')
     expect('subscribeOnce' in EventSubscriber).toBe(false)
     expect(SubscriberEntry.subscribeUntil).toBeTypeOf('function')
@@ -19,7 +19,7 @@ describe('public exports', () => {
     expect('subscribeSubscriber' in EventSubscriber).toBe(false)
   })
 
-  it('ES-T16 exposes one root with all runtime helpers', () => {
+  it('exposes one root with all runtime helpers', () => {
     expect(EventSubscriber.createEventChannel).toBeTypeOf('function')
     expect(EventSubscriber.EventAdmissionPolicy).toEqual({ multiple: 'multiple', unique: 'unique' })
     expect('EventSyncErrorPolicy' in EventSubscriber).toBe(false)
@@ -40,7 +40,7 @@ describe('public exports', () => {
     expect('getCapability' in EventSubscriber).toBe(false)
   })
 
-  it('ES-T01 keeps public type contracts structural and payload-associated', () => {
+  it('keeps public type contracts structural and payload-associated', () => {
     class Subscriber implements IEventSubscriber<number, string> {
       handle(event: { value: number }): string {
         return String(event.value)
@@ -85,7 +85,7 @@ describe('public exports', () => {
     void typeNegativeCases
   })
 
-  it('ES-T48 accepts the host AbortSignal structure without lifecycle runtime import', () => {
+  it('accepts the host AbortSignal structure without lifecycle runtime import', () => {
     const channel = createEventChannel<number>()
     const nativeSignal: IAbortSignal = new AbortController().signal
     const stop = subscribeUntil(channel, nativeSignal, () => undefined)
@@ -93,7 +93,7 @@ describe('public exports', () => {
     stop()
   })
 
-  it('ES-T110 keeps implementation-only handle factory out of root exports', () => {
+  it('keeps implementation-only handle factory out of root exports', () => {
     expect('createSubscriptionHandle' in EventSubscriber).toBe(false)
     expect('ISubscriptionHandle' in EventSubscriber).toBe(false)
     const sourceRoot = new URL('../src/', import.meta.url)

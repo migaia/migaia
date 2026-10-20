@@ -270,11 +270,11 @@ function check(verdict: IVerdict, name: string, assertion: () => void): void {
   }
 }
 
-/** Runs current wire rows and the mandatory U36 offer without loading an RPC implementation. */
+/** Runs current wire rows and the mandatory baseline offer without loading an RPC implementation. */
 function run(directory: string): IVerdict {
   const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [] }
-  check(verdict, 'U36/required-baseline-offer', () => {
-    /** The real executable offer must expose both mandatory U36 capabilities. */
+  check(verdict, 'required-baseline-offer', () => {
+    /** The real executable offer must expose both mandatory baseline capabilities. */
     const offer = localOffer('ts-peer')
     assert.equal((offer.capabilities as string[]).includes('runtime-api@1'), true)
     assert.equal((offer.capabilities as string[]).includes('batch@1'), true)

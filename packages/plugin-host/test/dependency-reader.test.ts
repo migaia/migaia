@@ -7,7 +7,7 @@ import * as admissionRuntime from '../src/admission-runtime.js'
 const createHost = (): PluginHost<Record<string, never>> =>
   new PluginHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
 
-/** Builds the A1 direct and nested references while recording accidental lifecycle evaluation. */
+/** Builds direct and nested references while recording accidental lifecycle evaluation. */
 const createDefinitions = () => {
   /** Any lifecycle call during dependency reading violates the projection-only contract. */
   const calls = { factory: 0, setup: 0, install: 0 }
@@ -63,14 +63,14 @@ const createDefinitions = () => {
   return { calls, order, p, q, r, descriptor, consumer: definePlugin(descriptor) }
 }
 
-/** First-reference order and required-wins strength are the public A1 projection. */
+/** First-reference order and required-wins strength are the public projection. */
 const expected = [
   { provider: 'p', required: true },
   { provider: 'q', required: false },
   { provider: 'r', required: true }
 ] as const
 
-describe('A1 readPluginDependencies', () => {
+describe('readPluginDependencies', () => {
   it('reads minted inputs, merges strength and follows local closures without running hooks', () => {
     /** Shared graph with two p references and a nested r reference. */
     const definitions = createDefinitions()

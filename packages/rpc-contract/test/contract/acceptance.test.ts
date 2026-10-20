@@ -25,7 +25,7 @@ function sourceFiles(root: string): string[] {
   })
 }
 
-describe('RPCC-T01 architecture and export boundary', () => {
+describe('architecture and export boundary', () => {
   it('publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist', () => {
     const metadata = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
@@ -59,7 +59,7 @@ describe('RPCC-T01 architecture and export boundary', () => {
   })
 })
 
-describe('RPCC-T02 descriptor identity', () => {
+describe('descriptor identity', () => {
   it('freezes exact identities and rejects invalid versions before publication', () => {
     const descriptor = createDescriptor('test.protocol', 7)
     expect(Object.isFrozen(descriptor)).toBe(true)
@@ -71,7 +71,7 @@ describe('RPCC-T02 descriptor identity', () => {
   })
 })
 
-describe('RPCC-T04 hostile normalization', () => {
+describe('hostile normalization', () => {
   it('snapshots every envelope getter once and fails closed with causes', () => {
     const reads = new Map<string, number>()
     const input = {
@@ -129,7 +129,7 @@ describe('RPCC-T04 hostile normalization', () => {
   })
 })
 
-describe('RPCC-T05 portable vectors', () => {
+describe('portable vectors', () => {
   it('accepts canonical values and rejects the complete forbidden matrix', () => {
     const vectors = JSON.parse(
       readFileSync(
@@ -160,7 +160,7 @@ describe('RPCC-T05 portable vectors', () => {
   })
 })
 
-describe('RPCC-T06 serialized error graphs', () => {
+describe('serialized error graphs', () => {
   it('preserves foreign realm identity, stack, cause order, and aggregate errors', () => {
     const context = createContext({})
     const remote = runInContext(
@@ -191,7 +191,7 @@ describe('RPCC-T06 serialized error graphs', () => {
   })
 })
 
-describe('RPCC-T07 framing matrix', () => {
+describe('framing matrix', () => {
   it('prepares native ingress once without reflecting opaque custom frames', () => {
     const framer = createStringFramer({ chunkBytes: 2 })
     const context = { source: 'source-a', messageId: 'native' } as const
@@ -305,7 +305,7 @@ describe('RPCC-T07 framing matrix', () => {
   })
 })
 
-describe('RPCC-T08 framing races and cleanup', () => {
+describe('framing races and cleanup', () => {
   it('keeps NUL-delimited source/message pairs collision-free and drains resources', () => {
     const timers: Array<() => void> = []
     let cancelled = 0

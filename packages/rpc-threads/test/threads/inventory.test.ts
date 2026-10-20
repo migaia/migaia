@@ -6,10 +6,7 @@ import { describe, expect, it } from 'vitest'
 const entry = fileURLToPath(new URL('../../src/threads/index.ts', import.meta.url))
 
 describe('threads base inventory', () => {
-  it.each(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10'])(
-    '[%s] has its assembly entry',
-    (id) => {
-      expect(existsSync(entry), `SDD_BASE_RED_CONTRACT:${id}`).toBe(true)
-    }
-  )
+  it('has its assembly entry', () => {
+    expect(existsSync(entry), 'threads assembly entry').toBe(true)
+  })
 })

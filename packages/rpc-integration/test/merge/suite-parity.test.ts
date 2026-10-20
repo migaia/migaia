@@ -162,14 +162,14 @@ const migratedFiles: Readonly<Record<string, string>> = {
   'packages/web-rpc/test/root-disposal.test.ts':
     'packages/rpc-core/test/core/root-disposal.test.ts',
   'packages/web-rpc/test/storage-v2-t53-event-trace.test.ts':
-    'packages/rpc-core/test/core/storage-v2-t53-event-trace.test.ts',
+    'packages/rpc-core/test/core/storage-v2-event-trace.test.ts',
   'packages/web-rpc/test/time-port.test.ts': 'packages/rpc-core/test/core/time-port.test.ts',
   'packages/web-rpc/test/topology-rollback.test.ts':
     'packages/rpc-core/test/core/topology-rollback.test.ts',
   'packages/web-rpc/test/transaction-contract.test.ts':
     'packages/rpc-core/test/core/transaction-contract.test.ts',
   'packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts':
-    'packages/rpc-core/test/core/tree-shaking/continuation-b01.red.test.ts',
+    'packages/rpc-core/test/core/tree-shaking/continuation-retained-graph.test.ts',
   'packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts':
     'packages/rpc-core/test/core/tree-shaking/core-retained-causal.test.ts',
   'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts':
@@ -194,7 +194,7 @@ const retiredSuites = new Set([
   'intended-cost-custody.test.ts',
   'error-serialization.test.ts'
 ])
-/** Exact historical titles retired by rpc-layering R5 after deleting unused control code. */
+/** Exact historical titles retired by rpc-layering after deleting unused control code. */
 const retiredLayeringTitles = new Set([
   'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry purges expired unordered aborts before applying its hard cap',
   'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry deduplicates control tasks before they reach the wire owner',
@@ -343,7 +343,7 @@ function readerExists(path: string): boolean {
   return existsSync(path) || existsSync(path.replace(/\.js$/, '.ts'))
 }
 
-describe('A7 migrated suite parity', () => {
+describe('migrated suite parity', () => {
   it('keeps every non-retired legacy file and title passed', () => {
     /** Frozen expectations choose exact owner files, including every current concern in those files. */
     const expected = [...legacyTitles.contract, ...legacyTitles.core]

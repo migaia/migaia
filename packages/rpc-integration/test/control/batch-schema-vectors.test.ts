@@ -15,7 +15,7 @@ const vectors = JSON.parse(
 }
 
 describe('independent physical batch schema vectors', () => {
-  it('[A28] keeps physical shape outside the semantic envelope namespace', () => {
+  it('keeps physical shape outside the semantic envelope namespace', () => {
     const schema = JSON.parse(
       readFileSync(
         new URL('../../../rpc-contract/schema/batch.schema.json', import.meta.url),
@@ -41,7 +41,7 @@ describe('independent physical batch schema vectors', () => {
         vector.id
       )
   })
-  it('[A28] semantic failures remain per-member while the physical wrapper remains valid', () => {
+  it('semantic failures remain per-member while the physical wrapper remains valid', () => {
     for (const vector of vectors.isolated) {
       const valid: number[] = []
       for (const [index, member] of readRpcBatchMembers(vector.value)!.entries()) {

@@ -279,7 +279,7 @@
   ],
   "targetedRules": [
     {
-      "id": "SWV2-RED02",
+      "id": "DUPLICATE_STORAGE_LISTENER_OWNER",
       "packages": ["@migaia/storage-web"],
       "pathPattern": "^src/backends/(?!index\\.ts$)[^/]+\\.ts$",
       "sourcePatterns": [
@@ -288,7 +288,7 @@
       ]
     },
     {
-      "id": "SWV2-RED03",
+      "id": "DUPLICATE_REACTIVE_SCHEDULER",
       "packages": ["@migaia/storage-web"],
       "pathPattern": "^src/",
       "sourcePatterns": [
@@ -297,7 +297,7 @@
       ]
     },
     {
-      "id": "SWV2-RED07",
+      "id": "DUPLICATE_OPERATION_TIMEOUT",
       "packages": ["@migaia/storage-web"],
       "pathPattern": "^src/core/operation\\.ts$",
       "sourcePatterns": [
@@ -306,7 +306,7 @@
       ]
     },
     {
-      "id": "SWV2-RED10",
+      "id": "INSTANCEOF_BYTE_BOUNDARY",
       "packages": [
         "@migaia/rpc-contract",
         "@migaia/rpc-core",

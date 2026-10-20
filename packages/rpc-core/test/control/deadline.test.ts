@@ -13,7 +13,7 @@ import { connect } from '../../dist/core/middleware/connect.js'
 import { timeout } from '../../dist/core/middleware/timeout.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
-describe('provider relative deadline (A6)', () => {
+describe('provider relative deadline', () => {
   it('subtracts receiver resolution delay from the outbound wire budget', async () => {
     const scheduler = createManualScheduler()
     const wallClock = { timestamp: () => 0 }

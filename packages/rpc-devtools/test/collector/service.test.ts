@@ -5,7 +5,7 @@ import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '@m
 import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'
 import { CollectorFixture, collectorView } from './fixture.js'
 
-describe('collector A4 query, watch and service', () => {
+describe('collector query, watch and service', () => {
   it('serves query, stats, watch, lifecycle and recording through actual memory Peers', async () => {
     /** Capture is local opt-in; the service remains metadata-only without exposeContent. */
     const devtools = createRpcDevtools({ stages: ['message', 'encoded'], capture: ['encoded'] })

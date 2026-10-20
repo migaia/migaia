@@ -5,7 +5,7 @@ import {
   STORE_INDEXED_SOURCE
 } from '../src/errors'
 
-describe('store-indexed error-code contract (E-T9)', () => {
+describe('store-indexed error-code contract', () => {
   it('declares 6 unique codes under the package source', () => {
     const codes = Object.values(StoreIndexedErrorCode)
     expect(codes).toHaveLength(6)

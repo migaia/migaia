@@ -183,7 +183,7 @@ afterEach(() => {
   observed.views.length = 0
 })
 
-describe('MET-RED-006 PluginHost batch completeness', () => {
+describe('PluginHost batch completeness', () => {
   it('proves one Host receives the complete kernel, middleware, feature, and activation batch', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
@@ -205,7 +205,7 @@ describe('MET-RED-006 PluginHost batch completeness', () => {
   })
 })
 
-describe('MET-RED-007 Host rollback ownership', () => {
+describe('Host rollback ownership', () => {
   it('proves extension, shared publication, and resources roll back once', async () => {
     const sharedKey = 'transaction-shared'
     const firstValue = Object.freeze({ owner: 'first' })
@@ -253,7 +253,7 @@ describe('MET-RED-007 Host rollback ownership', () => {
   })
 })
 
-describe('MET-RED-016 activation boundary', () => {
+describe('activation boundary', () => {
   it('proves transport subscription is deferred until the complete Host batch commits', async () => {
     let subscriptions = 0
     let installSubscriptionCount = -1
@@ -309,7 +309,7 @@ describe('MET-RED-016 activation boundary', () => {
   })
 })
 
-describe('MET-RED-021 feature disposer and public surface ownership', () => {
+describe('feature disposer and public surface ownership', () => {
   it('proves a feature disposer stays Host-owned while only its admitted surface is public', async () => {
     let disposerCalls = 0
     const featureDisposer = (): void => {
@@ -338,7 +338,7 @@ describe('MET-RED-021 feature disposer and public surface ownership', () => {
   })
 })
 
-describe('MET-RED-024 preflight conflict ownership', () => {
+describe('preflight conflict ownership', () => {
   it('proves duplicate route, port, and public-key claims reject before Host or install effects', async () => {
     const cases = [
       { claims: { routes: ['transaction-route'] }, label: 'route' },
@@ -384,7 +384,7 @@ describe('MET-RED-024 preflight conflict ownership', () => {
   })
 })
 
-describe('MET-RED-031 construction and disposal race', () => {
+describe('construction and disposal race', () => {
   it('proves a pending install abort settles before late rejection with one terminal path', async () => {
     const controller = new AbortController()
     let installStarted = false
@@ -517,7 +517,7 @@ describe('MET-RED-031 construction and disposal race', () => {
   })
 })
 
-describe('MET-RED-033 public endpoint boundary', () => {
+describe('public endpoint boundary', () => {
   it('proves the endpoint is a projection and never the PluginHost object', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),
@@ -545,7 +545,7 @@ describe('MET-RED-033 public endpoint boundary', () => {
   })
 })
 
-describe('MET-RED-034 per-endpoint batch cardinality', () => {
+describe('per-endpoint batch cardinality', () => {
   it('proves one endpoint invokes exactly one Host install batch', async () => {
     const endpoint = await createComposedEndpoint(
       createConfig(() => undefined),

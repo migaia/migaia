@@ -60,7 +60,7 @@ type IFullEndpointSurface<
 /**
  * Creates the complete endpoint through one canonical kernel and attachment closure. The `ping`/
  * `pingAll` surface remains conditional on the selected `TMiddlewares` tuple, matching the legacy
- * factory's middleware-derived capability typing (`WRC-C-D31`); the runtime `ping()` gate lives in
+ * factory's middleware-derived capability typing; the runtime `ping()` gate lives in
  * `RpcControlAttachment` and throws `MIDDLEWARE_MISSING` when the type says the capability is
  * absent, so the type and the runtime observable contract stay in agreement.
  */

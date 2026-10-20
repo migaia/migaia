@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createParentLossGuard, ParentLossExitCode } from '../../src/process/index.js'
 
-describe('A9 parent disappearance guard', () => {
+describe('parent disappearance guard', () => {
   it('completes once when shutdown settles within the grace period', async () => {
     const scheduler = createManualScheduler()
     let resolveShutdown: () => void = () => undefined

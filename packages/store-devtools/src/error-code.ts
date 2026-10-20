@@ -2,8 +2,7 @@
  * Owns the error-code declarations for `@migaia/store-devtools`. Under
  * `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is
  * always `'@migaia/store-devtools'`. Throw sites reference these constants instead of inline
- * literals. Code values are public API. Renaming a code is a breaking change
- * (`error-code-rollout.sdd.md` §1.2).
+ * literals. Code values are public API. Renaming a code is a breaking change.
  */
 export const StoreDevtoolsErrorCode = {
   /**

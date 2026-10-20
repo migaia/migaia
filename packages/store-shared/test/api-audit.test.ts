@@ -5,7 +5,7 @@ import { UtilsAbortError } from '@migaia/utils/promise'
 import { sharedInt32, sharedInt32Array, SharedInt32Signal } from '../src/index.js'
 
 describe('store-shared audit regressions', () => {
-  it('SS-D01 preserves unseen remote cells across a local write to another cell', () => {
+  it('preserves unseen remote cells across a local write to another cell', () => {
     /** Each real Runtime owns its own wrapper over the same buffer. */
     const writer = sharedInt32Array(createRuntime(), 2)
     /** Observe only the remote index so local notification cannot accidentally pull it. */
@@ -33,7 +33,7 @@ describe('store-shared audit regressions', () => {
   })
 
   it.each(['signal', 'array'] as const)(
-    'SS-D02 reconciles the native %s watch rearm gap',
+    'reconciles the native %s watch rearm gap',
     async (kind) => {
       /** The native waiter is not replaced; the canonical scheduler controls only the yielding task. */
       const clock = createManualScheduler()
@@ -81,7 +81,7 @@ describe('store-shared audit regressions', () => {
     }
   )
 
-  it('SS-D03 stops a real initial-values generator at the required prefix and closes it', () => {
+  it('stops a real initial-values generator at the required prefix and closes it', () => {
     /** Any second pull would fail even though the required initial prefix is complete. */
     let pulls = 0
     /** IteratorClose remains responsible for this generator cleanup. */
@@ -108,7 +108,7 @@ describe('store-shared audit regressions', () => {
     }
   })
 
-  it('SS-D02 publishes the stop handle before initial reconciliation can reenter or dispose', () => {
+  it('publishes the stop handle before initial reconciliation can reenter or dispose', () => {
     /** A missed write before watch starts can synchronously notify this real graph observer. */
     const source = sharedInt32(createRuntime())
     /** The observer closes the actual wrapper while its initial watch synchronization is running. */
@@ -141,7 +141,7 @@ describe('store-shared audit regressions', () => {
   })
 
   it.each(['native', 'frozen', 'foreign'] as const)(
-    'SS-D04 preserves %s updater failure identity and lock usability',
+    'preserves %s updater failure identity and lock usability',
     (kind) => {
       /** Real foreign identity and non-extensible native values share the same public updater path. */
       const original = kind === 'foreign' ? new UtilsAbortError() : new TypeError('updater failed')
@@ -177,7 +177,7 @@ describe('store-shared audit regressions', () => {
     }
   )
 
-  it('SS-D05 publishes a low-level write before copying its observed cursor', () => {
+  it('publishes a low-level write before copying its observed cursor', () => {
     /** The documented extension recipe must notify an already materialized local cell. */
     const runtime = createRuntime()
     /** The public low-level primitives retain their separate responsibilities. */

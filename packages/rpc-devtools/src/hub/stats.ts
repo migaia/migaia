@@ -30,8 +30,8 @@ type IHubStatsEntry = {
 }
 
 /**
- * Build an aggregate only when another source contributes to the same endpoint/method pair. SC9(b):
- * bucket arithmetic requires a new summed service representation; boundaries retain refs.
+ * Build an aggregate only when another source contributes to the same endpoint/method pair. bucket
+ * arithmetic requires a new summed service representation; boundaries retain refs.
  */
 function createMethodAggregate(row: IHubMethodStats): IHubMethodAggregate {
   /** Counts become the new sum, rather than a defensive copy of a query result. */
@@ -110,7 +110,7 @@ export function mergeStats(input: readonly IRpcDevtoolsStats[]): IRpcDevtoolsSta
   if (input.length === 1) return input[0]!
   /** The earliest target start bounds the period represented by the merged counters. */
   let since = input[0]!.since
-  /** SC9 permits a result array containing unique source rows and necessary aggregate rows. */
+  /** Permits a result array containing unique source rows and necessary aggregate rows. */
   const methods: IHubMethodStats[] = []
   /** Endpoint and method occupy separate Map keys, preserving their complete string identities. */
   const groups = new Map<string, Map<string, IHubStatsEntry>>()

@@ -6,7 +6,7 @@ import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { persist } from '../src/light-index.js'
 import { StorePersistErrorCode } from '../src/error-code.js'
 
-describe('ST-B1/D4 bounded persistence debounce', () => {
+describe('bounded persistence debounce', () => {
   it('enqueues the latest continuous change at maxWait and starts a fresh next window', async () => {
     /** The persistence timer is fully controlled without changing the reactive graph clock. */
     const scheduler = createManualScheduler()

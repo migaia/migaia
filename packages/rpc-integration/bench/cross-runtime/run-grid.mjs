@@ -132,7 +132,10 @@ writeFileSync(join(output, 'plan.json'), JSON.stringify(plan, null, 2) + '\n')
 /** Results are appended after each actual terminal runner exit, including refused windows. */
 const results = []
 for (const row of rows) {
-  /** Every direction selects the same actual final source, with BC14 already implemented. */
+  /**
+   * Every direction selects the same actual final source, with the responder candidate already
+   * implemented.
+   */
   const variant = 'base'
   /** Plain functional/timing source carries loaded hashes without counter overlays. */
   const capture = mode === 'count' ? 'count' : 'plain'

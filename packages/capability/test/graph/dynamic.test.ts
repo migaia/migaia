@@ -37,7 +37,7 @@ const node = (
 
 describe('dynamic capability graph', () => {
   it.each(['register', 'replace'] as const)(
-    'CAP-C2 snapshots %s getters once and preserves the original start receiver',
+    'snapshots %s getters once and preserves the original start receiver',
     async (operation) => {
       /** Count only caller accessors, independently of reads of the frozen admitted data. */
       const reads = { id: 0, kind: 0, dependencies: 0, start: 0, provider: 0, required: 0 }
@@ -105,7 +105,7 @@ describe('dynamic capability graph', () => {
     }
   )
 
-  it('CAP-C2 codes a node getter failure before mutation while preserving its native identity', async () => {
+  it('codes a node getter failure before mutation while preserving its native identity', async () => {
     /** Exact original failure remains the thrown graph error after identity attachment. */
     const failure = new TypeError('node getter')
     /** Failed admission must leave this real dynamic graph usable for the next registration. */
@@ -127,7 +127,7 @@ describe('dynamic capability graph', () => {
     await graph.dispose()
   })
 
-  it('TPD-T55 seals the exact binding generation until every acquired lease releases', async () => {
+  it('seals the exact binding generation until every acquired lease releases', async () => {
     let fenceObserved = false
     const graph = createDynamicCapabilityGraph<INodeBinding>({
       startBatch: (entries) =>
@@ -268,7 +268,7 @@ describe('dynamic capability graph', () => {
     await graph.dispose()
   })
 
-  it('TPD-T08 preserves node identity on same-edge replacement across graph sizes', async () => {
+  it('preserves node identity on same-edge replacement across graph sizes', async () => {
     const states: IGraphNodeDiagnostic[] = []
     const sizes: number[] = []
     for (const unrelatedCount of [0, 1_000, 4_000, 8_000]) {
@@ -299,7 +299,7 @@ describe('dynamic capability graph', () => {
     ])
   })
 
-  it('TPD-T56 reconciles the affected frontier in large sparse and dense graphs', async () => {
+  it('reconciles the affected frontier in large sparse and dense graphs', async () => {
     const samples: Array<{
       readonly size: number
       readonly backgroundNodes: number

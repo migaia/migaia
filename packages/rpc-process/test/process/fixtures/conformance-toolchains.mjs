@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 /** Installed TypeScript is resolved locally; this harness never invokes a package downloader. */
 const require = createRequire(import.meta.url)
 
-/** D1 freezes these tool minima; Rust and Cargo are recorded independently. */
+/** Freezes these tool minima; Rust and Cargo are recorded independently. */
 export const ConformanceToolchainMinimum = Object.freeze({
   python: '3.9.6',
   rust: '1.96.0',
@@ -25,7 +25,7 @@ export const ConformanceAdmissionStatus = Object.freeze({
 /**
  * Read one already installed executable's version without building or installing anything.
  *
- * @param {string} tool D1 tool identifier.
+ * @param {string} tool Toolchain identifier.
  * @param {{ execute?: typeof execFileSync }} [options] Read-only execution boundary for command
  *   tracing.
  * @returns {{ path: string; output: string } | undefined} Executable and raw version, or an absent
@@ -68,7 +68,7 @@ export function inspectInstalledToolchain(tool, options = {}) {
 }
 
 /**
- * Admit all D1 tools before any peer launch. Failure returns a receipt and performs no recovery.
+ * Admit all toolchains before any peer launch. Failure returns a receipt and performs no recovery.
  *
  * @param {{ inspect?: (tool: string) => { path: string; output: string } | undefined }} [options]
  *   Read-only version probe, injectable for lower/missing fixtures.
@@ -98,7 +98,7 @@ export function admitConformanceToolchains(options = {}) {
     if (!matched) return { tool, minimum, ...observed, status: ConformanceAdmissionStatus.invalid }
     /** Lexicographic numeric comparison preserves major/minor/patch boundaries. */
     const actual = matched.slice(1, 4).map(Number)
-    /** D1 has exactly three numeric components for every admitted tool. */
+    /** Has exactly three numeric components for every admitted tool. */
     const required = minimum.split('.').map(Number)
     /** The first unequal version component decides admission. */
     const difference = actual.findIndex((value, index) => value !== required[index])

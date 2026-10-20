@@ -68,7 +68,7 @@ function invalid(run: () => unknown, violation: string): TypeError & { cause: un
 
 /** Demand that every error projection omit a chosen adversarial field or value. */
 function redacted(error: unknown, token: string, marker: string): void {
-  expect(leaks(error, token), `SDD_BASE_RED_CONTRACT:${marker}`).toBe(false)
+  expect(leaks(error, token), `redaction:${marker}`).toBe(false)
 }
 
 /** Exercise an independently received first message with one adversarial edit. */
@@ -80,7 +80,7 @@ function invalidHello(
 }
 
 describe('handshake redaction', () => {
-  it('[A10] redacts AggregateError errors arrays before any diagnostic projection', () => {
+  it('redacts AggregateError errors arrays before any diagnostic projection', () => {
     const aggregate = new AggregateError([new Error(TOKEN)], 'aggregate failure')
     const result = redactWireFailure(aggregate)
     expect(result).not.toBe(aggregate)
@@ -90,7 +90,7 @@ describe('handshake redaction', () => {
     expect(JSON.stringify(result)).not.toContain(TOKEN)
   })
 
-  it('[A10] redacts a secret beyond the 16-layer traversal limit', () => {
+  it('redacts a secret beyond the 16-layer traversal limit', () => {
     let chain: unknown = { secret: TOKEN }
     for (let depth = 0; depth < 17; depth++) chain = new Error('clean', { cause: chain })
     const result = redactWireFailure(chain)
@@ -99,13 +99,13 @@ describe('handshake redaction', () => {
     expect(inspect(result, { depth: null, showHidden: true })).not.toContain(TOKEN)
   })
 
-  it('[A5] retains an identity-safe four-layer Error chain', () => {
+  it('retains an identity-safe four-layer Error chain', () => {
     let chain: Error = new Error('leaf')
     for (let depth = 0; depth < 3; depth++) chain = new Error('clean', { cause: chain })
     expect(redactWireFailure(chain)).toBe(chain)
   })
 
-  it('A1 redacts responder input in all input forms', () => {
+  it('redacts responder input in all input forms', () => {
     const malformed = [
       [JSON.stringify({ ...HELLO, kind: 'request' }), 'required'],
       [JSON.stringify({ ...HELLO, step: 'resume' }), 'step'],
@@ -141,7 +141,7 @@ describe('handshake redaction', () => {
     })
   })
 
-  it('A2 redacts initiator replies and describes the normalized message', () => {
+  it('redacts initiator replies and describes the normalized message', () => {
     const helloError = invalid(() => completeRpcHandshake(OFFER, JSON.stringify(HELLO)), 'step')
     expect(leaks(helloError, TOKEN)).toBe(false)
     expect(helloError.cause).toMatchObject({ step: 'hello', auth: '[redacted]' })
@@ -152,7 +152,7 @@ describe('handshake redaction', () => {
     expect(mismatch.cause).not.toHaveProperty('auth')
   })
 
-  it('A3 redacts local offers without reading them again', () => {
+  it('redacts local offers without reading them again', () => {
     const badOffer = { ...OFFER, kind: 'x' }
     for (const run of [
       () => createRpcHello(badOffer as never),
@@ -177,7 +177,7 @@ describe('handshake redaction', () => {
     expect(reads).toBe(1)
   })
 
-  it('A4 withholds engine excerpts for malformed JSON text and bytes', () => {
+  it('withholds engine excerpts for malformed JSON text and bytes', () => {
     const invalidJson = `{"kind":"handshake","auth":${TOKEN}}`
     for (const input of [invalidJson, new TextEncoder().encode(invalidJson)]) {
       const error = invalid(() => normalizeRpcHandshake(input), 'type')
@@ -194,7 +194,7 @@ describe('handshake redaction', () => {
     ).toBe(false)
   })
 
-  it('A5 preserves clean original errors and non-input causes', () => {
+  it('preserves clean original errors and non-input causes', () => {
     expect(invalid(() => normalizeRpcHandshake('{'), 'type').cause).toBeInstanceOf(SyntaxError)
     const quoted = `{"kind":"handshake","auth":"${TOKEN}",}`
     const clean = invalid(() => normalizeRpcHandshake(quoted), 'type')
@@ -256,7 +256,7 @@ describe('handshake redaction', () => {
     ).toMatchObject({ code: 'INVALID_ENVELOPE' })
   })
 
-  it('A4/A5 retains a clean engine instance and withholds a four-unit excerpt', () => {
+  it('retains a clean engine instance and withholds a four-unit excerpt', () => {
     const clean = new SyntaxError('clean engine failure')
     const cleanParse = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
       throw clean
@@ -285,7 +285,7 @@ describe('handshake redaction', () => {
     }
   })
 
-  it('[A6] bounds and freezes the summary without changing the top-level error', () => {
+  it('bounds and freezes the summary without changing the top-level error', () => {
     const unknown = Object.fromEntries(
       Array.from({ length: 20 }, (_, index) => [`z${index}`, index])
     )
@@ -310,7 +310,7 @@ describe('handshake redaction', () => {
     const summary = error.cause as Record<string, unknown>
     expect(Object.isFrozen(summary)).toBe(true)
     expect(Object.isFrozen(summary.fields)).toBe(true)
-    expect(summary.fields, 'SDD_BASE_RED_CONTRACT:A6').toEqual([
+    expect(summary.fields, 'redacted summary fields').toEqual([
       'auth',
       'capabilities',
       'codecs',
@@ -332,7 +332,7 @@ describe('handshake redaction', () => {
     for (const omitted of ['versions', 'peer', 'codecs'])
       expect(summary).not.toHaveProperty(omitted)
     const report = vi.fn()
-    /** K232 keeps even the redacted diagnostic local to the controlled Contract factory. */
+    /** Keeps even the redacted diagnostic local to the controlled Contract factory. */
     const wire = serializeRpcError(error, { report })
     expect(wire).toMatchObject({
       source: '@migaia/rpc/contract',
@@ -350,35 +350,35 @@ describe('handshake redaction', () => {
     expect(empty.cause).not.toHaveProperty('protocol')
   })
 
-  it('[A9] unknown-kind hides short unknown field names', () => {
+  it('unknown-kind hides short unknown field names', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello({ kind: 'request', [token]: 1 }, 'required')
-    redacted(error, token, 'A9:unknown-kind')
+    redacted(error, token, 'unknown-kind')
     expect(error.cause).toMatchObject({ unknownFieldCount: 1 })
   })
 
-  it('[A9] unknown-step hides short unknown field names', () => {
+  it('unknown-step hides short unknown field names', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello({ step: 'resume', [token]: 1 }, 'step')
-    redacted(error, token, 'A9:unknown-step')
+    redacted(error, token, 'unknown-step')
     expect(error.cause).toMatchObject({ unknownFieldCount: 1 })
   })
 
-  it('[A9] kind allows only the reserved handshake kind', () => {
+  it('kind allows only the reserved handshake kind', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello({ kind: token }, 'required')
-    redacted(error, token, 'A9:kind')
+    redacted(error, token, 'kind')
     expect(error.cause).toMatchObject({ kind: '[redacted]' })
   })
 
-  it('[A9] step allows only handshake steps', () => {
+  it('step allows only handshake steps', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello({ step: token }, 'step')
-    redacted(error, token, 'A9:step')
+    redacted(error, token, 'step')
     expect(error.cause).toMatchObject({ step: '[redacted]' })
   })
 
-  it('[A9] protocol hides unrecognized values across call paths', () => {
+  it('protocol hides unrecognized values across call paths', () => {
     const token = 'toksecret9f8e'
     for (const [run, violation] of [
       [
@@ -418,28 +418,28 @@ describe('handshake redaction', () => {
       ]
     ] as const) {
       const error = invalid(run, violation)
-      redacted(error, token, 'A9:protocol')
+      redacted(error, token, 'protocol')
       expect(error.cause).toMatchObject({ protocol: '[redacted]' })
     }
   })
 
-  it('[A9] codec hides an invalid accept label', () => {
+  it('codec hides an invalid accept label', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello(
       { step: 'accept', major: 0, minor: 0, codec: token.toUpperCase() },
       'type'
     )
-    redacted(error, token.toUpperCase(), 'A9:codec')
+    redacted(error, token.toUpperCase(), 'codec')
     expect(error.cause).toMatchObject({ codec: '[redacted]' })
     const permittedShape = invalidHello(
       { step: 'accept', major: 0, minor: 0, codec: token },
       'type'
     )
-    redacted(permittedShape, token, 'A9:codec')
+    redacted(permittedShape, token, 'codec')
     expect(permittedShape.cause).toMatchObject({ codec: '[redacted]' })
   })
 
-  it('[A9] codec-complete uses the local offer as its allowed codec set', () => {
+  it('codec-complete uses the local offer as its allowed codec set', () => {
     const token = 'toksecret9f8e'
     const accept = JSON.stringify({ ...HELLO, step: 'accept', major: 1, minor: 1, codec: token })
     for (const [run, violation] of [
@@ -447,7 +447,7 @@ describe('handshake redaction', () => {
       [() => acceptRpcHandshake(OFFER, accept), 'step']
     ] as const) {
       const error = invalid(run, violation)
-      redacted(error, token, 'A9:codec-complete')
+      redacted(error, token, 'codec-complete')
       expect(error.cause).toMatchObject({ codec: '[redacted]' })
     }
     const known = invalid(
@@ -466,7 +466,7 @@ describe('handshake redaction', () => {
     })
   })
 
-  it('[A10] peer hides scalar, known value and unknown key', () => {
+  it('peer hides scalar, known value and unknown key', () => {
     const token = 'toksecret9f8e'
     for (const [peer, violation] of [
       [token, 'type'],
@@ -474,7 +474,7 @@ describe('handshake redaction', () => {
       [{ id: 'caller', runtime: token.toUpperCase() }, 'required']
     ] as const) {
       const error = invalidHello({ peer }, violation)
-      redacted(error, token, 'A10:peer')
+      redacted(error, token, 'peer')
       expect(error.cause).toMatchObject({ path: '/peer' })
     }
     for (const [peer, valueType] of [
@@ -500,21 +500,21 @@ describe('handshake redaction', () => {
         ),
       'required'
     )
-    redacted(acceptPeer, token, 'A10:peer')
+    redacted(acceptPeer, token, 'peer')
     expect(acceptPeer.cause).toMatchObject({ path: '/peer' })
   })
 
-  it('[A10] peer-runtime-version hides unknown keys and values', () => {
+  it('peer-runtime-version hides unknown keys and values', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello(
       { peer: { id: 'caller', runtime: 'node', runtimeVersion: 1, [token]: 1 } },
       'type'
     )
-    redacted(error, token, 'A10:peer-runtime-version')
+    redacted(error, token, 'peer-runtime-version')
     expect(error.cause).toMatchObject({ path: '/peer', unknownFieldCount: 1 })
   })
 
-  it('[A10] implementation hides scalar and nested values', () => {
+  it('implementation hides scalar and nested values', () => {
     const token = 'toksecret9f8e'
     for (const [implementation, violation] of [
       [token, 'type'],
@@ -524,12 +524,12 @@ describe('handshake redaction', () => {
         { peer: { id: 'caller', runtime: 'node', implementation } },
         violation
       )
-      redacted(error, token, 'A10:implementation')
+      redacted(error, token, 'implementation')
       expect(error.cause).toMatchObject({ path: '/peer/implementation' })
     }
   })
 
-  it('[A10] versions hides scalar, entry and nested key', () => {
+  it('versions hides scalar, entry and nested key', () => {
     const token = 'toksecret9f8e'
     for (const versions of [
       token,
@@ -538,12 +538,12 @@ describe('handshake redaction', () => {
       { major: 1, minor: 0, [token]: 1 }
     ]) {
       const error = invalidHello({ versions }, 'type')
-      redacted(error, token, 'A10:versions')
+      redacted(error, token, 'versions')
       expect(error.cause).toMatchObject({ path: '/versions' })
     }
   })
 
-  it('[A10] versions-duplicate hides repeated entries', () => {
+  it('versions-duplicate hides repeated entries', () => {
     const token = 'toksecret9f8e'
     const error = invalidHello(
       {
@@ -554,11 +554,11 @@ describe('handshake redaction', () => {
       },
       'duplicate'
     )
-    redacted(error, token, 'A10:versions-duplicate')
+    redacted(error, token, 'versions-duplicate')
     expect(error.cause).toMatchObject({ path: '/versions', length: 2 })
   })
 
-  it('[A10] codecs hides scalar, invalid label and missing baseline', () => {
+  it('codecs hides scalar, invalid label and missing baseline', () => {
     const token = 'toksecret9f8e'
     for (const [codecs, violation] of [
       [token, 'type'],
@@ -567,36 +567,36 @@ describe('handshake redaction', () => {
       [[token], 'baseline']
     ] as const) {
       const error = invalidHello({ codecs }, violation)
-      redacted(error, token, 'A10:codecs')
+      redacted(error, token, 'codecs')
       expect(error.cause).toMatchObject({ path: '/codecs' })
     }
   })
 
-  it('[A10] codecs-duplicate hides array contents', () => {
+  it('codecs-duplicate hides array contents', () => {
     const token = 'toksecret9f8e'
     for (const codecs of [
       ['json', token, token],
       ['json', 'json']
     ]) {
       const error = invalidHello({ codecs }, 'duplicate')
-      redacted(error, token, 'A10:codecs-duplicate')
+      redacted(error, token, 'codecs-duplicate')
       expect(error.cause).toMatchObject({ redacted: true, path: '/codecs', length: codecs.length })
     }
   })
 
-  it('[A10] capabilities hides labels in hello and accept', () => {
+  it('capabilities hides labels in hello and accept', () => {
     const token = 'toksecret9f8e'
     for (const message of [
       { ...HELLO, capabilities: [token] },
       { ...HELLO, step: 'accept', major: 1, minor: 1, codec: 'json', capabilities: [token] }
     ]) {
       const error = invalid(() => normalizeRpcHandshake(JSON.stringify(message)), 'type')
-      redacted(error, token, 'A10:capabilities')
+      redacted(error, token, 'capabilities')
       expect(error.cause).toMatchObject({ path: '/capabilities' })
     }
   })
 
-  it('[A10] reject hides invalid wire-error subtrees', () => {
+  it('reject hides invalid wire-error subtrees', () => {
     const token = 'toksecret9f8e'
     for (const wireError of [
       { [token]: 1 },
@@ -604,12 +604,12 @@ describe('handshake redaction', () => {
       { source: 'rpc-contract', code: 5, message: token }
     ]) {
       const error = invalidHello({ step: 'reject', error: wireError }, 'type')
-      redacted(error, token, 'A10:reject')
+      redacted(error, token, 'reject')
       expect(error.cause).toMatchObject({ path: '/error', wireCode: 'INVALID_WIRE_ERROR' })
     }
   })
 
-  it('A7 verifies current baseline handshake bytes without credentials', () => {
+  it('verifies current baseline handshake bytes without credentials', () => {
     const directory = resolve(PACKAGE_ROOT, '../rpc-integration/schema/vectors')
     const vector = readFileSync(resolve(directory, 'handshake.json'))
     const sums = readFileSync(resolve(directory, 'SHA256SUMS'), 'utf8')
@@ -617,7 +617,7 @@ describe('handshake redaction', () => {
     expect(vector.toString('utf8')).not.toContain('"auth"')
   })
 
-  it('A8 keeps handshake modules outside the root retained graph', () => {
+  it('keeps handshake modules outside the root retained graph', () => {
     const run = spawnSync('node', ['test/core/tree-shaking-baseline.mjs'], {
       cwd: CORE_PACKAGE_ROOT,
       encoding: 'utf8'

@@ -145,7 +145,7 @@ describe('canonical endpoint projection', () => {
     try {
       const construction = createComposedEndpoint(
         {
-          id: 'round14-projection-hostile',
+          id: 'projection-hostile',
           transport,
           middlewares: [connect({ transport })],
           features: [hostileProjectionFeature] as const

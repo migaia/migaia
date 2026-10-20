@@ -27,12 +27,12 @@ export type ILifecycleUnit<T> = {
   readonly error: unknown
   /**
    * Runtime-probes `factory()`'s return: a synchronous non-thenable value commits to `loaded`
-   * immediately, without ever passing through `loading` (L-T5, D-2). A thenable commits to
-   * `loading` and transitions on settle — but only if this call's generation is still current; a
-   * superseded generation's late result is discarded silently (§4.2, L-T34).
+   * immediately, without ever passing through `loading`. A thenable commits to `loading` and
+   * transitions on settle — but only if this call's generation is still current; a superseded
+   * generation's late result is discarded silently.
    */
   start(factory: () => T | PromiseLike<T>): void
-  /** Alias for `start()` — same behavior, named for the "retry after `failed`" call site (L-T34). */
+  /** Alias for `start()` — same behavior, named for the "retry after `failed`" call site. */
   restart(factory: () => T | PromiseLike<T>): void
   close(): void
   /** Synchronous — a unit owns no user resource to await releasing, only its own bookkeeping. */
@@ -89,7 +89,7 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
       reportStartFailed(thrown)
       return
     }
-    // Single `.then` probe: a hostile/stateful getter must be read exactly once (L-T5 / §3). The
+    // Single `.then` probe: a hostile/stateful getter must be read exactly once. The
     // captured `then` is applied directly, so we never hand the value back to `Promise.resolve()` to
     // read `.then` a second time.
     const probe = probeThenable(result)
@@ -111,7 +111,7 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
     state = LifecycleUnitState.loading
     assimilateCapturedThen<T>(probe.thenFn, result).then(
       (settled) => {
-        if (!generations.isCurrent(request.token)) return // superseded — discard (L-T34)
+        if (!generations.isCurrent(request.token)) return // superseded — discard
         state = LifecycleUnitState.loaded
         value = settled
         error = undefined

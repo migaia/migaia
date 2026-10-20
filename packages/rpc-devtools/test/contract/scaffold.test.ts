@@ -54,7 +54,7 @@ const service: IRpcDevtoolsServiceApi = {
   resume: () => {}
 }
 
-describe('A3 public scaffold', () => {
+describe('public scaffold', () => {
   it('imports the implemented collector and hub entries and preserves their CLOSED identity', async () => {
     /** The integrated layer replaces both placeholders with live owners and real closure. */
     const collector = createRpcDevtools()

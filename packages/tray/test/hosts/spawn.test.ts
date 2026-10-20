@@ -11,7 +11,7 @@ import {
 } from './helper.js'
 
 describe('Tray instance admission and discovery', () => {
-  it('[A3 A4] admits two genuine units per runtime, filters discovery and physically removes them', async () => {
+  it('admits two genuine units per runtime, filters discovery and physically removes them', async () => {
     /** Six declarations use one shared business Feature implementation. */
     const api = await fixture()
     /** Canonical family outlets reveal physical connection removal. */
@@ -69,7 +69,7 @@ describe('Tray instance admission and discovery', () => {
     })
   }, 30000)
 
-  it('[A3] rejects every named non-portable config before admitting a connection', async () => {
+  it('rejects every named non-portable config before admitting a connection', async () => {
     /** Deliberate cycle exercises the canonical portability owner. */
     const cyclic: any = {}
     cyclic.self = cyclic
@@ -103,7 +103,7 @@ describe('Tray instance admission and discovery', () => {
     }
   })
 
-  it('[A3] retains the primary init failure and reports rollback cleanup failure without a leftover unit', async () => {
+  it('retains the primary init failure and reports rollback cleanup failure without a leftover unit', async () => {
     /** File receives genuine child reports from PluginHost rollback. */
     const reportMarker = marker('rollback')
     /** Parent report list observes only the actual runtime reporter. */
@@ -144,7 +144,7 @@ describe('Tray instance admission and discovery', () => {
   }, 15000)
 
   it.each([0, 1, 2])(
-    '[A3] runtime %i removes pending install and pending init without a stale ready write',
+    'runtime %i removes pending install and pending init without a stale ready write',
     async (index) => {
       /** Config marker confirms init has begun before the second remove. */
       const initMarker = marker('pending-init')
@@ -181,7 +181,7 @@ describe('Tray instance admission and discovery', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A3] runtime %i disposes a pending init with TRAY_DISPOSED',
+    'runtime %i disposes a pending init with TRAY_DISPOSED',
     async (index) => {
       /** Init marker proves disposal overlaps the child's actual install transaction. */
       const initMarker = marker('dispose-init')

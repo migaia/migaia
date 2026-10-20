@@ -7,8 +7,7 @@ import { LifecycleErrorPolicy, LifecycleState, LifecycleUnitState } from './stat
  * Synchronous, idempotent teardown/unregister function.
  *
  * Declared locally rather than imported from `@migaia/reactive`: this runtime-neutral foundation
- * depends on utils and must not depend outward on reactive merely to share a structural type
- * (`docs/lifecycle/lifecycle-extraction.sdd.md` §1.1).
+ * depends on utils and must not depend outward on reactive merely to share a structural type.
  */
 export type IDisposer = () => void
 
@@ -19,9 +18,9 @@ export type IDisposer = () => void
  *
  * The descriptor is required, not optional — this package never sniffs a resource's shape to guess
  * a release strategy (that would be a small but real piece of domain knowledge about what
- * "disposable" looks like, which §1.1 rules out). Every SDD example registers a resource with an
- * explicit descriptor, and `commitTo()` always has one on hand (the descriptor the resource was
- * originally `own()`-ed with), so requiring it here costs nothing.
+ * "disposable" looks like). Every documented example registers a resource with an explicit
+ * descriptor, and `commitTo()` always has one on hand (the descriptor the resource was originally
+ * `own()`-ed with), so requiring it here costs nothing.
  */
 export type ILifecycleOwner = {
   own<T>(resource: T, descriptor: IReleaseDescriptor): T
@@ -30,33 +29,33 @@ export type ILifecycleOwner = {
 /**
  * Brands every `LifecycleScope` and `ProvisionalScope` for the internal cross-module check.
  * `SyncLifecycleScope.own()` rejects these instances even when the supplied descriptor claims
- * `syncSafe: true` (§4.5). The symbol is exported between source modules but is not exposed by
- * package entry points.
+ * `syncSafe: true`. The symbol is exported between source modules but is not exposed by package
+ * entry points.
  */
 export const ASYNC_OWNER_BRAND: unique symbol = Symbol('@migaia/lifecycle/async-owner')
 
-/** Container survival axis (`lifecycle-extraction.sdd.md` §4.2, axis 1). */
+/** Container survival axis (, axis 1). */
 export type ILifecycleState = (typeof LifecycleState)[keyof typeof LifecycleState]
 
-/** Unit loading axis (`lifecycle-extraction.sdd.md` §4.2, axis 2). */
+/** Unit loading axis (, axis 2). */
 export type IUnitState = (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState]
 
 /**
  * Supplies context to a release descriptor's `graceful`, `force`, or `custom` callback.
  * `deadlineAt` is one shared absolute deadline for every item in a `DisposeTransaction` run. It is
- * not recomputed per item (§4.6 / L-T32).
+ * not recomputed per item.
  */
 export type IReleaseContext = {
-  /** Aborts when the owning transaction/scope enters `closing` (L-T26). */
+  /** Aborts when the owning transaction/scope enters `closing`. */
   readonly signal: IAbortSignal
   readonly deadlineAt: number | undefined
   /**
-   * Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract.
+   * Uses the scheduler whose `now()` produces `deadlineAt` under the shared clock-domain contract.
    * Defaults to `systemScheduler`. Callbacks and the graceful-phase deadline share this clock
    * source so clock domains do not mix.
    */
   readonly scheduler?: IScheduler
-  /** Side-channel diagnostic reporter; its own throws are contained (L-T26). */
+  /** Side-channel diagnostic reporter; its own throws are contained. */
   readonly report: (error: unknown) => void
   /** Owner-bound self-join guard; absent when a generic transaction has no scope owner. */
   readonly disposer?: IDisposerContext
@@ -64,21 +63,20 @@ export type IReleaseContext = {
 
 /**
  * Declares how one resource is released. The core package has zero knowledge of what a resource
- * _is_ — descriptors are the only vocabulary a domain package uses to express release intent
- * (`lifecycle-extraction.sdd.md` §4.4).
+ * _is_ — descriptors are the only vocabulary a domain package uses to express release intent.
  */
 export type IReleaseDescriptor = {
   /**
    * Declares this descriptor may be accepted by `SyncLifecycleScope`. Does not change the static
-   * type of the general-purpose `LifecycleScope` (D-6) — a scope's sync/async nature is determined
-   * by which concrete type you construct, never inferred from descriptor content.
+   * type of the general-purpose `LifecycleScope` — a scope's sync/async nature is determined by
+   * which concrete type you construct, never inferred from descriptor content.
    */
   readonly syncSafe?: boolean
   /**
    * Release ordering key. Higher values release first, lower values release last (lower "sinks to
    * the bottom" of the release order — the opposite of allocation order). Omitted keys are treated
-   * as `0`. Only meaningful in `DisposeTransaction`'s `order` mode (D-3: this package never
-   * computes order, it only executes an order supplied by the caller).
+   * as `0`. Only meaningful in `DisposeTransaction`'s `order` mode (this package never computes
+   * order, it only executes an order supplied by the caller).
    */
   readonly order?: number
   /**
@@ -111,7 +109,7 @@ export type ICollectedError = {
 }
 
 /**
- * The four release error outcomes (`lifecycle-extraction.sdd.md` §4.5, D-4).
+ * The four release error outcomes.
  *
  * `firstError` is not a general-purpose default — it exists only to give a caller migrating
  * `web-rpc`'s `discovery-registry` first-error-wins semantics an exact equivalent; new call sites

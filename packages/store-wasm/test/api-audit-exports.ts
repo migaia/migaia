@@ -1,14 +1,14 @@
 import { array, number } from '../src/index.js'
-// @ts-expect-error SW-C02 removes the duplicate mode constant.
+// @ts-expect-error removes the duplicate mode constant.
 import { WasmFieldMode } from '../src/index.js'
-// @ts-expect-error SW-C02 removes the duplicate sync-only type mirror.
+// @ts-expect-error removes the duplicate sync-only type mirror.
 import type { IWasmFieldMode } from '../src/index.js'
-// @ts-expect-error SW-D03 keeps shared cancellation classification private.
+// @ts-expect-error keeps shared cancellation classification private.
 import { assertWasmFieldNotAborted } from '../src/index.js'
 
-// @ts-expect-error SW-C01 removes the unused item argument and old three-argument ordering.
+// @ts-expect-error removes the unused item argument and old three-argument ordering.
 array(number(), 2, 1)
-// @ts-expect-error SW-C01 the first argument is now the numeric length.
+// @ts-expect-error the first argument is now the numeric length.
 array(number(), 2)
 void WasmFieldMode
 void assertWasmFieldNotAborted

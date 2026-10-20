@@ -122,7 +122,7 @@ function outlet() {
 
 describe('remaining trust markers reject copied reflected descriptors', () => {
   it.each(['success', 'failed'] as const)(
-    '[APS7-S6] rejects a copied %s settlement and preserves genuine business metadata',
+    'rejects a copied %s settlement and preserves genuine business metadata',
     async (kind) => {
       /** Genuine result creation snapshots this exact transfer object without rebuilding it. */
       const transfer = {}
@@ -189,7 +189,7 @@ describe('remaining trust markers reject copied reflected descriptors', () => {
     }
   )
 
-  it('[APS7-S7] ignores copied route descriptors while preserving query retention and wire projection', () => {
+  it('ignores copied route descriptors while preserving query retention and wire projection', () => {
     /** A valid signed route is retained by identity until canonical wire normalization snapshots it. */
     const route = Object.freeze([
       '0123456789abcdef0123456789abcdef',
@@ -224,7 +224,7 @@ describe('remaining trust markers reject copied reflected descriptors', () => {
     expect(readForwardRoute(retainForwardOptions(query, {}))).toBe(route)
   })
 
-  it('[APS7-S8] rejects copied stream preparation while preserving iterator, callback and Promise identity', async () => {
+  it('rejects copied stream preparation while preserving iterator, callback and Promise identity', async () => {
     /** The original preparation operation returns this same Promise without issuing a pull. */
     const prepared = Promise.resolve()
     /** A public pull observes business data only when explicitly requested. */
@@ -255,7 +255,7 @@ describe('remaining trust markers reject copied reflected descriptors', () => {
     await expect(genuine.next()).resolves.toEqual({ done: false, value: 'stream-business-value' })
   })
 
-  it('[APS7-S9] ignores a copied facade publisher while genuine lifecycle events still reach subscribers', () => {
+  it('ignores a copied facade publisher while genuine lifecycle events still reach subscribers', () => {
     /** The canonical owner supplies one genuine frozen outlet and its original publisher. */
     const { facade } = outlet()
     /** Every public callback and every vulnerable private publisher descriptor is copied. */
@@ -285,7 +285,7 @@ describe('remaining trust markers reject copied reflected descriptors', () => {
     events.close()
   })
 
-  it('[APS7-S10] ignores copied connection receipts while genuine routing preserves the original Promise', async () => {
+  it('ignores copied connection receipts while genuine routing preserves the original Promise', async () => {
     /** Only this exact facade is registered with the original slot reader. */
     const { facade, connection, find, invoke, result } = outlet()
     /** The attacker copies all methods and private properties without registering another receipt. */

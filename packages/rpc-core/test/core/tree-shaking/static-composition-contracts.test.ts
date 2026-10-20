@@ -32,8 +32,8 @@ const missingFeatureEntrypoints = [
   ['features/canonical-chunk.js', '../../../dist/core/features/canonical-chunk.js']
 ] as const
 
-/** WRC-B01 contracts become green as static composition entries land. */
-describe('WRC-B01 static composition contracts', () => {
+/** Contracts become green as static composition entries land. */
+describe('static composition contracts', () => {
   for (const [legacyLeaf, entrypoint] of missingPresetEntrypoints)
     it(`publishes preset: ${['..', '..', 'src', legacyLeaf].join('/')}`, async () => {
       const module = await import(entrypoint)

@@ -64,7 +64,7 @@ function launch() {
 
 describe('runtime message resource control and cleanup', () => {
   it.each(['outbound', 'malformed'] as const)(
-    '[HC1] rejects %s initial input without installing a receiver',
+    'rejects %s initial input without installing a receiver',
     async (kind) => {
       /** Initial admission precedes cold subscription and any capability write. */
       const physical = messaging()
@@ -85,7 +85,7 @@ describe('runtime message resource control and cleanup', () => {
     }
   )
 
-  it('[HC2] captures a genuine initial message once and retains control/open/close Promise identity', async () => {
+  it('captures a genuine initial message once and retains control/open/close Promise identity', async () => {
     /** A received bootstrap creates the existing principal association through actual admission. */
     const physical = messaging()
     /** Only this Core-created held resource owns capture, control admission and channel retirement. */
@@ -130,7 +130,7 @@ describe('runtime message resource control and cleanup', () => {
     expect(physical.events.listenerCount('message')).toBe(0)
   })
 
-  it('[HC3] refuses ordinary traffic while waiting for initial control and removes cold hooks', async () => {
+  it('refuses ordinary traffic while waiting for initial control and removes cold hooks', async () => {
     /** Raw event operations observe startup output and listener cleanup on the original port. */
     const physical = messaging()
     /** Only this Core-created held resource owns capture, control admission and channel retirement. */
@@ -148,7 +148,7 @@ describe('runtime message resource control and cleanup', () => {
     await resource.close()
   })
 
-  it('[HC4] consumes actual initial control received by a waiting resource', async () => {
+  it('consumes actual initial control received by a waiting resource', async () => {
     /** Raw event operations observe startup output and listener cleanup on the original port. */
     const physical = messaging()
     /** Only this Core-created held resource owns capture, control admission and channel retirement. */
@@ -163,7 +163,7 @@ describe('runtime message resource control and cleanup', () => {
     await resource.close()
   })
 
-  it('[HC5] ignores readiness control but rejects a duplicate ACK with the original native cause', async () => {
+  it('ignores readiness control but rejects a duplicate ACK with the original native cause', async () => {
     /** Raw event operations observe startup output and listener cleanup on the original port. */
     const physical = messaging()
     /** Only this Core-created held resource owns capture, control admission and channel retirement. */
@@ -189,7 +189,7 @@ describe('runtime message resource control and cleanup', () => {
   })
 
   it.each(['static', 'prepare', 'open', 'descriptor'] as const)(
-    '[HC6] rejects invalid %s capability configuration before physical output',
+    'rejects invalid %s capability configuration before physical output',
     async (kind) => {
       /** Raw event operations observe startup output and listener cleanup on the original port. */
       const physical = messaging()
@@ -224,7 +224,7 @@ describe('runtime message resource control and cleanup', () => {
     }
   )
 
-  it('[HC7] preserves an already aborted opening reason without sending control', async () => {
+  it('preserves an already aborted opening reason without sending control', async () => {
     /** Raw event operations observe startup output and listener cleanup on the original port. */
     const physical = messaging()
     /** Only this Core-created held resource owns capture, control admission and channel retirement. */
@@ -247,7 +247,7 @@ describe('runtime message resource control and cleanup', () => {
     await resource.close()
   })
 
-  it('[HC8] removes the active abort listener and terminates its held launch exactly once', async () => {
+  it('removes the active abort listener and terminates its held launch exactly once', async () => {
     /** Raw event operations observe startup output and listener cleanup on the original port. */
     const physical = messaging()
     /** Actual launch completion and termination stay on this one held launcher resource. */
@@ -277,7 +277,7 @@ describe('runtime message resource control and cleanup', () => {
     expect(native.terminate).toHaveBeenCalledOnce()
   })
 
-  it('[HC9] uses an outbound launch proposal without echoing an ACK', async () => {
+  it('uses an outbound launch proposal without echoing an ACK', async () => {
     /** Raw event operations observe startup output and listener cleanup on the original port. */
     const physical = messaging()
     /** Only this Core-created held resource owns capture, control admission and channel retirement. */
@@ -297,7 +297,7 @@ describe('runtime message resource control and cleanup', () => {
   })
 
   it.each(['exit', 'exitRejection', 'failure', 'failureRejection'] as const)(
-    '[HC10] reports early %s through startup failure and requests one termination',
+    'reports early %s through startup failure and requests one termination',
     async (kind) => {
       /** Raw event operations observe startup output and listener cleanup on the original port. */
       const physical = messaging()
@@ -328,7 +328,7 @@ describe('runtime message resource control and cleanup', () => {
     }
   )
 
-  it('[HC11] constructs an EventTarget borrowed static channel and closes it without native termination', async () => {
+  it('constructs an EventTarget borrowed static channel and closes it without native termination', async () => {
     /** The original raw event owner exposes subscription retirement without another message queue. */
     const events = new EventEmitter()
     /** Observe resource retirement separately from facade construction and ownership selection. */
@@ -361,7 +361,7 @@ describe('runtime message resource control and cleanup', () => {
 })
 
 describe('message receive handoff errors and subscription cleanup', () => {
-  it('[HC12] removes a synchronous failure registration and retains its cause for activation', () => {
+  it('removes a synchronous failure registration and retains its cause for activation', () => {
     /** The original native cause remains reachable through the startup failure object. */
     const cause = { failed: 'during-subscribe' }
     /** The native failure registration supplies the remover even when it fails synchronously. */
@@ -397,7 +397,7 @@ describe('message receive handoff errors and subscription cleanup', () => {
     handoff.close()
   })
 
-  it('[HC13] unsubscribes the cold receiver and transfers later subscriptions without redelivery', () => {
+  it('unsubscribes the cold receiver and transfers later subscriptions without redelivery', () => {
     /** The original raw event owner exposes subscription retirement without another message queue. */
     const events = new EventEmitter()
     /**
@@ -433,7 +433,7 @@ describe('message receive handoff errors and subscription cleanup', () => {
     expect(events.listenerCount('message')).toBe(0)
   })
 
-  it('[HC14] delegates a failure reporter exception without replacing the retained startup error', () => {
+  it('delegates a failure reporter exception without replacing the retained startup error', () => {
     /** A reporter exception is secondary and must not replace the retained startup failure. */
     const reporterFailure = { report: 'failed' }
     /**
@@ -469,7 +469,7 @@ describe('message receive handoff errors and subscription cleanup', () => {
   })
 
   it.each([undefined, 42, {}, { error: undefined }, { error: null }, { error: 'native-error' }])(
-    '[HC15] preserves EventTarget failure cause for %j and removes original listeners',
+    'preserves EventTarget failure cause for %j and removes original listeners',
     (event) => {
       /** The original raw event owner exposes subscription retirement without another message queue. */
       const events = new EventEmitter()

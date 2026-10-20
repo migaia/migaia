@@ -152,9 +152,9 @@ export async function observedCore() {
     assert.ok(protectedEvents.length > 0)
     assert.ok(frames[0].content !== undefined)
     assert.ok(protectedEvents[0].content !== undefined)
-    /** SC9(b): CBOR provides a comparison representation without mutating stored event content. */
+    /** CBOR provides a comparison representation without mutating stored event content. */
     const frameBytes = encode(frames[0].content)
-    /** SC9(b): compare the actual protected boundary representation to its clear frame. */
+    /** Compare the actual protected boundary representation to its clear frame. */
     const protectedBytes = encode(protectedEvents[0].content)
     assert.notDeepEqual(frameBytes, protectedBytes)
     /** The nonempty recording is decoded by the canonical frozen record owner. */
@@ -183,7 +183,7 @@ export async function observedCore() {
     /** Evidence is emitted only after each applicable local/record assertion actually passes. */
     console.error(
       JSON.stringify({
-        acceptance: 'A-total applicable direct-Core local capture and service-record/offline-hub',
+        acceptance: 'applicable direct-Core local capture and service-record/offline-hub',
         result,
         localEvents: events.length,
         localFrameEvents: frames.length,
@@ -595,14 +595,14 @@ export async function proveLiveTrace(services, recording, report) {
         stream: (method, payload) =>
           service.peer.stream(FixtureTrace.servicePrefix + method, payload)
       })
-    /** Only genuine caller-provided T1 membership may select the two actual interactions. */
+    /** Only genuine caller-provided trace membership may select the two actual interactions. */
     const interactions = hub.interactions(FixtureTrace.id)
     assert.equal(interactions.length, 2)
     assert.deepEqual(
       interactions.map((hop) => hop.method).sort(),
       [FixtureMethod.cascade, FixtureMethod.increment].sort()
     )
-    /** Receipt projections exist only at this explicit acceptance boundary (SC9b). */
+    /** Receipt projections exist only at this explicit acceptance boundary. */
     const hops = interactions.map((hop) => {
       assert.equal(hop.oneSided, false)
       assert.ok(

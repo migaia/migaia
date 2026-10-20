@@ -69,7 +69,7 @@ const assertNestedControlDoesNotEraseStageError = async (
   }
 }
 
-/** A3 reuses this unchanged behavior suite through the unified pipeline factory. */
+/** Reuses this unchanged behavior suite through the unified pipeline factory. */
 describe('runSyncMiddleware', () => {
   it('snapshots replacement, insertion, and deletion before sync dispatch', () => {
     const stages: Array<ISyncMiddlewareStage<number>> = []
@@ -762,7 +762,7 @@ describe('runAsyncMiddleware', () => {
       ).rejects.toBe(activeError)
       expect(combinations).toEqual([])
       if (style === 'await') {
-        // MP-T37: nested post-stage control must not erase an independent middle stage error.
+        // Nested post-stage control must not erase an independent middle stage error.
         await assertNestedControlDoesNotEraseStageError('post-stage')
       }
     }
@@ -798,7 +798,7 @@ describe('runAsyncMiddleware', () => {
       ).rejects.toBe(activeError)
       expect(combinations).toEqual([])
       if (style === 'await') {
-        // MP-T36: nested entry control must not erase an independent middle stage error.
+        // Nested entry control must not erase an independent middle stage error.
         await assertNestedControlDoesNotEraseStageError('entry')
       }
     }

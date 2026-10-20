@@ -173,7 +173,7 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
         return binding.trackRequest(() => retry!.dispatch(input))
       }
     }
-    /** D1/M6 retains this lower Host controller; no removed process facade is recreated. */
+    /** Retains this lower Host controller; no removed process facade is recreated. */
     const remoteFor = <TUnit extends object, TSpec>(owner: IProcessPluginBinding<TUnit, TSpec>) =>
       createRemoteHost({
         catalog: { p: selectedContract },
@@ -288,7 +288,7 @@ function receipt(active: Awaited<ReturnType<typeof faultClient>>, label: string)
   writeFileSync(join(evidence, `hf-${label}.sent.bin`), Buffer.concat(active.sent), { mode: 0o600 })
 }
 
-describe('[A5] canonical raw physical frame boundaries', () => {
+describe('canonical raw physical frame boundaries', () => {
   it('accepts exactly 16 MiB and rejects oversized length before payload allocation', () => {
     /** Exact physical maximum includes arbitrary payload bytes, not a business JSON value. */
     const payload = new Uint8Array(RPC_STREAM_MAX_FRAME_BYTES).fill(97)
@@ -366,7 +366,7 @@ describe('[A5] canonical raw physical frame boundaries', () => {
   })
 })
 
-describe('[A4] borrowed hang retains external process ownership', () => {
+describe('borrowed hang retains external process ownership', () => {
   for (const peer of peers)
     it(`${peer.language} closes only the hung socket and redials the same external PID`, async () => {
       /** The test owns the listener; the public connect facade owns only each socket. */
@@ -457,7 +457,7 @@ describe('[A4] borrowed hang retains external process ownership', () => {
     }, 15000)
 })
 
-describe('[A5] real native business budget and independent session', () => {
+describe('real native business budget and independent session', () => {
   for (const peer of peers)
     it(`${peer.language} near limit succeeds; encoded overflow writes zero; resources return`, async () => {
       const active = await faultClient(peer)
@@ -489,7 +489,7 @@ describe('[A5] real native business budget and independent session', () => {
     }, 30000)
 })
 
-describe('[A5] independent peer rejects raw malformed input', () => {
+describe('independent peer rejects raw malformed input', () => {
   for (const peer of peers)
     it(`${peer.language} rejects malicious length, UTF-8, JSON and truncated EOF independently`, async () => {
       /** Every malformed connection is independent of this continuously usable deployment. */
@@ -549,7 +549,7 @@ describe('[A5] independent peer rejects raw malformed input', () => {
     }, 30000)
 })
 
-describe('[A4] real owned terminal guards', () => {
+describe('real owned terminal guards', () => {
   for (const peer of peers)
     for (const host of [false, true])
       it(`${peer.language} Host=${host} crash terminal rejects all new calls with zero frames`, async () => {
@@ -605,7 +605,7 @@ describe('[A4] real owned terminal guards', () => {
       }, 15000)
 })
 
-describe('[A4] explicit persistent authenticated scope', () => {
+describe('explicit persistent authenticated scope', () => {
   it('replays the original key once after committed crash without executing the side effect twice', async () => {
     /**
      * File backing is private, bounded to one benign result, and removed after all child ownership
@@ -653,7 +653,7 @@ describe('[A4] explicit persistent authenticated scope', () => {
   }, 15000)
 })
 
-describe('[A4] physical departure before sendOnce admission', () => {
+describe('physical departure before sendOnce admission', () => {
   for (const peer of peers)
     it(`${peer.language} returns REMOTE_CLOSED with zero business frames`, async () => {
       const scheduler = createManualScheduler()
@@ -726,7 +726,7 @@ async function settleFaultTurn(scheduler?: ReturnType<typeof createManualSchedul
   }
 }
 
-describe('[A4] default native health detects real CPU loops', () => {
+describe('default native health detects real CPU loops', () => {
   for (const peer of peers)
     it(`${peer.language} busy loop fails at 17000ms and restarts owned PID`, async () => {
       const scheduler = createManualScheduler()
@@ -781,7 +781,7 @@ describe('[A4] default native health detects real CPU loops', () => {
     }, 20000)
 })
 
-describe('[A5] capacity one real stopped reader', () => {
+describe('capacity one real stopped reader', () => {
   for (const peer of peers)
     it(`${peer.language} keeps send pending, rejects overload, reports backlog and recovers`, async () => {
       const active = await faultClient(peer, { maxPendingData: 1 })
@@ -848,7 +848,7 @@ describe('[A5] capacity one real stopped reader', () => {
     }, 15000)
 })
 
-describe('[A4] real owned crash retry eligibility', () => {
+describe('real owned crash retry eligibility', () => {
   for (const peer of peers)
     for (const disposition of ['ready', 'cancel', 'deadline', 'release', 'no-generation'] as const)
       it(`${peer.language} sends ${disposition === 'ready' ? 'one' : 'zero'} replay after ${disposition}`, async () => {
@@ -930,7 +930,7 @@ describe('[A4] real owned crash retry eligibility', () => {
       }, 15000)
 })
 
-describe('[A4] real started streams do not resume after crash', () => {
+describe('real started streams do not resume after crash', () => {
   for (const peer of peers)
     it(`${peer.language} closes the old stream without another stream request`, async () => {
       const scheduler = createManualScheduler()
@@ -977,7 +977,7 @@ describe('[A4] real started streams do not resume after crash', () => {
     }, 15000)
 })
 
-describe('[A4] owned bridge hang has no default health detector', () => {
+describe('owned bridge hang has no default health detector', () => {
   for (const peer of peers.slice(0, 3))
     it(`${peer.language} settles only the call deadline and retains its hung PID`, async () => {
       const scheduler = createManualScheduler()
@@ -1011,7 +1011,7 @@ describe('[A4] owned bridge hang has no default health detector', () => {
     }, 15000)
 })
 
-describe('[A4] standalone Host restart keeps local ownership and does not replay use', () => {
+describe('standalone Host restart keeps local ownership and does not replay use', () => {
   for (const peer of peers)
     it(`${peer.language} leaves the new remote catalog uninstalled until explicit use`, async () => {
       const scheduler = createManualScheduler()
@@ -1048,7 +1048,7 @@ describe('[A4] standalone Host restart keeps local ownership and does not replay
     }, 15000)
 })
 
-describe('[A4] real non-idempotent request crash', () => {
+describe('real non-idempotent request crash', () => {
   for (const original of peers)
     it(`${original.language} reports unknown result without replay`, async () => {
       /** Publish the matching explicit declaration to both public caller and real independent peer. */

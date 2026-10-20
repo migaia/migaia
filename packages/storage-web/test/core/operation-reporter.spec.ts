@@ -4,7 +4,7 @@ import {
   createStorageOperationReporter
 } from '../../src/core/operation-reporter.js'
 
-describe('operation reporter（T-14 cleanup 观测）', () => {
+describe('operation reporter（cleanup 观测）', () => {
   it('cleanup 错误传给 primary reporter（原始错误）', () => {
     const received: unknown[] = []
     reportCleanupError((error) => {

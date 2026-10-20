@@ -44,8 +44,8 @@ export class RequestReplayLedger {
   readonly #release?: (peerKey: string) => void
   /**
    * Per-peer completed-tombstone counts, owned by `@migaia/lifecycle`'s `LeaseRegistry` so
-   * `admit()`/`canAdmit()` read the count in O(1) instead of scanning `#completed` (M-T27). Each
-   * admitted tombstone holds one lease; purging/clearing releases it.
+   * `admit()`/`canAdmit()` read the count in O(1) instead of scanning `#completed`. Each admitted
+   * tombstone holds one lease; purging/clearing releases it.
    */
   readonly #peerCounts: ILeaseRegistry<string> = createStringLeaseRegistry()
 

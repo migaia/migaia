@@ -58,7 +58,7 @@ function mutatedDescriptor(vector: (typeof vectors.securityMutations)[number]): 
 }
 
 describe('process plugin descriptor', () => {
-  it('[A10] mirrors the canonical name and enum domains', () => {
+  it('mirrors the canonical name and enum domains', () => {
     expect(schema.$defs.name?.pattern).toBe(REMOTE_NAME_PATTERN)
     expect(schema.$defs.strategy?.enum).toEqual(Object.values(ReplaceStrategy))
     expect(schema.$defs.instanceMode?.enum).toEqual(Object.values(ProcessPluginInstanceMode))
@@ -67,7 +67,7 @@ describe('process plugin descriptor', () => {
     })
   })
 
-  it.each(vectors.cases)('[A10] $id checks Schema structure and parser semantics', (vector) => {
+  it.each(vectors.cases)('$id checks Schema structure and parser semantics', (vector) => {
     expect(acceptsSchema(schema, vector.value, schema)).toBe(vector.schemaValid)
     if (vector.semanticValid) {
       const parsed = parseProcessPluginDescriptor(vector.value)
@@ -87,7 +87,7 @@ describe('process plugin descriptor', () => {
   })
 
   it.each(vectors.securityMutations)(
-    '[A10/R7] $id checks persisted-secret schema and semantic admission',
+    '$id checks persisted-secret schema and semantic admission',
     (vector) => {
       const input = mutatedDescriptor(vector)
       expect(acceptsSchema(schema, input, schema)).toBe(vector.schemaValid)
@@ -104,7 +104,7 @@ describe('process plugin descriptor', () => {
     }
   )
 
-  it('[A10/R7] persists only an inherited env name and restores it in the child', async () => {
+  it('persists only an inherited env name and restores it in the child', async () => {
     /** The secret belongs to the launcher environment, never the persisted descriptor. */
     const key = 'MIGAI_DESCRIPTOR_TEST_SECRET'
     const secret = 'runtime-only-secret-72d1'
@@ -154,7 +154,7 @@ describe('process plugin descriptor', () => {
     '--password=value',
     '--API-KEY=value',
     '--access-key'
-  ])('[A10/R7] rejects secret-bearing argument %s without reflecting its value', (argument) => {
+  ])('rejects secret-bearing argument %s without reflecting its value', (argument) => {
     const vector = vectors.securityMutations.find(
       (item) => item.id === 'secret-in-argument-rejected'
     )!
@@ -168,7 +168,7 @@ describe('process plugin descriptor', () => {
     )
   })
 
-  it('[A10/BC4] rejects an explicitly false nonSecret literal marker', () => {
+  it('rejects an explicitly false nonSecret literal marker', () => {
     /** A valid descriptor changes only the public literal's required explicit opt-in. */
     const input = JSON.parse(
       JSON.stringify(vectors.cases.find((item) => item.id === 'spawn-native-stdin')!.value)
@@ -182,7 +182,7 @@ describe('process plugin descriptor', () => {
     )
   })
 
-  it('[A10] sorts and freezes the two normalized host catalog entries', () => {
+  it('sorts and freezes the two normalized host catalog entries', () => {
     const input = vectors.cases.find((vector) => vector.id === 'host-spawn')!.value
     const result = parseProcessPluginDescriptor(input) as {
       catalog: Record<string, { features: unknown }>
@@ -192,7 +192,7 @@ describe('process plugin descriptor', () => {
     expect(Object.isFrozen(result.catalog.p?.features)).toBe(true)
   })
 
-  it('[A10] does not carry an untrusted getter secret into the parser error chain', () => {
+  it('does not carry an untrusted getter secret into the parser error chain', () => {
     const secret = 'descriptor-private-token'
     const input = { descriptorVersion: 1 }
     Object.defineProperty(input, 'runtime', {
@@ -234,7 +234,7 @@ describe('process plugin descriptor', () => {
       'deployment.budget.launchRate.windowMs'
     ]
   ] as const)(
-    '[A10] rejects malformed persisted field %s before creating a process',
+    'rejects malformed persisted field %s before creating a process',
     (path, value, field) => {
       /** A valid published vector is changed at one exact persisted field. */
       const source = vectors.cases.find((vector) => vector.id === 'spawn-native-stdin')!.value

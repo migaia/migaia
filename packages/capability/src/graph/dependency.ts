@@ -420,7 +420,7 @@ export function planActivation(
    * Inactive required providers reached upstream from the requested roots. The walk never enters an
    * activated provider: activation always activates a node's providers first, so everything above
    * an activated provider is already activated, and walking it would make every install under a
-   * deep chain cost the whole ancestry (R16).
+   * deep chain cost the whole ancestry.
    */
   const reached = new Set<string>()
   /** Upstream traversal queue: the roots, then only inactive providers. */

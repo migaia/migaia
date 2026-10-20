@@ -383,7 +383,7 @@ pub fn serve(
     if bridge {
         if bare {
             while let Some(body) = bridge_body(input)? {
-                // A10 includes exactly one payload parse and serialization on both sides.
+                // The reference baseline includes exactly one payload parse and serialization on both sides.
                 let payload = json::parse(&body)
                     .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_JSON"))?;
                 if value(&payload, "xrtReverse") == &Value::Bool(true) {

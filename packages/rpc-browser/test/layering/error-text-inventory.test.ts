@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BrowserRpcErrorText } from '../../src/browser/error-text.js'
 
 describe('error text inventory', () => {
-  it('[A2] preserves every browser error text from the pre-migration inventory', () => {
+  it('preserves every browser error text from the pre-migration inventory', () => {
     expect(
       BrowserRpcErrorText.rtcDataChannelMustExposeReadyStateAndTerminalEventListeners,
       'rtcDataChannelMustExposeReadyStateAndTerminalEventListeners'

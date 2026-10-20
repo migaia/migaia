@@ -22,8 +22,8 @@ import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint
 import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
 import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
 
-it('[A59][A67][A69] authenticated native stream retains its shared lease through discard and seals real final outcome', async () => {
-  /** Fixture source offers are independent from unadvertised production U25 defaults. */
+it('authenticated native stream retains its shared lease through discard and seals real final outcome', async () => {
+  /** Fixture source offers are independent from unadvertised production runtime-api defaults. */
   const capabilities = [
     ...RUNTIME_API_CAPABILITIES,
     RpcCapability.generation,
@@ -159,7 +159,7 @@ it('[A59][A67][A69] authenticated native stream retains its shared lease through
     const outcome = await client.outcome('native-final')
     assert.equal(outcome.state, 'done')
     if (outcome.state !== 'done')
-      assert.fail('[A69] native completion must be sealed before return resolves')
+      assert.fail('native completion must be sealed before return resolves')
     assert.deepEqual(outcome.outcome.completion, { ok: true, result: 99 })
     /** Unselected legacy native streaming keeps its original wrapper's terminal behavior. */
     const ordinary = client.stream('values')

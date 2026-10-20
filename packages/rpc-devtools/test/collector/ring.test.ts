@@ -3,13 +3,13 @@ import { RpcProbeStage } from '@migaia/rpc-core/probe'
 import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '@migaia/rpc-devtools'
 import { CollectorFixture, collectorView } from './fixture.js'
 
-describe('collector A1 ingestion and ring', () => {
+describe('collector ingestion and ring', () => {
   it('retains the newest four of six views, converts every field and never retains the mutable view', () => {
     /** Four slots force two overwrites on the public ingestion path. */
     const devtools = createRpcDevtools({ maxEvents: 4 })
     /** One view is intentionally reused; primitive columns must keep each emission. */
     const view = collectorView()
-    /** Detail is owned by the caller and retained by reference under SC9. */
+    /** Detail is owned by the caller and retained by reference. */
     const detail = { protocol: 1 }
     view.detail = detail
     view.chunkIndex = 2

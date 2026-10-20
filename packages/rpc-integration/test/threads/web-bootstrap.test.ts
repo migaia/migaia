@@ -29,7 +29,7 @@ function webFixture() {
 }
 
 describe('Web thread bootstrap failure', () => {
-  it('[A9] production channel open remains pending until the Worker acknowledges bootstrap', async () => {
+  it('production channel open remains pending until the Worker acknowledges bootstrap', async () => {
     /** No test-created prepared Promise can stand in for the production launcher barrier. */
     const fixture = webFixture()
     /** Bootstrap receives no acknowledgement until the explicit fixture event below. */
@@ -59,7 +59,7 @@ describe('Web thread bootstrap failure', () => {
     handle.terminate()
   })
 
-  it('[A6/A9] rejects preparation with the original Worker error before acknowledgement', async () => {
+  it('rejects preparation with the original Worker error before acknowledgement', async () => {
     /** This failure is independent from the launch signal, which remains live. */
     const original = new Error('worker bootstrap original failure')
     /** The candidate receives a real EventTarget error before its private ack. */

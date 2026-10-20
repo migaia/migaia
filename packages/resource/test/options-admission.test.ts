@@ -3,7 +3,7 @@ import { createRuntime } from '@migaia/reactive'
 import { Resource } from '../src/index.js'
 import { ResourceErrorCode } from '../src/error-code.js'
 
-describe('Round24 R-T01 Resource option admission', () => {
+describe('Resource option admission', () => {
   it('snapshots every public option once before ownership, listeners, or fetch', () => {
     const runtime = createRuntime()
     const reads = new Map<string, number>()
@@ -18,7 +18,7 @@ describe('Round24 R-T01 Resource option admission', () => {
     const options = {
       get debugName() {
         count('debugName')
-        return 'round24'
+        return 'option-value'
       },
       get ttl() {
         count('ttl')

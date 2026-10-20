@@ -101,7 +101,7 @@ export class VerifiedPeerRegistry {
    * `createdAt`, fixed at registration, not from the idle-tracking `verifiedAt`): a retain must
    * never revive a binding past `#maxBindingLifetimeMs`, or the cap `has()`/`#purgeExpired()`
    * enforce becomes bypassable simply by calling retain() directly instead of going through `has()`
-   * first — see WR-R3-1 in docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+   * first.
    */
   retain(token: string): boolean {
     const now = this.#now()

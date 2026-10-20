@@ -8,7 +8,7 @@ test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
   expect(result.metadata).toEqual({ ready: true })
 })
 
-test('R09 distinct pages receive a BroadcastChannel hint then reread authoritative IndexedDB state', async ({
+test('distinct pages receive a BroadcastChannel hint then reread authoritative IndexedDB state', async ({
   page,
   context
 }) => {
@@ -160,7 +160,7 @@ test('真实 IndexedDB 失败 transaction 回滚且 pre-abort 不写入', async 
   expect(result.policyReads).toBe(1)
 })
 
-test('SWV2-T46 真实 IndexedDB commit 后 listener/report failure 不反转 write', async ({ page }) => {
+test('真实 IndexedDB commit 后 listener/report failure 不反转 write', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbPostCommitFailureScenario())
   expect(result).toEqual({

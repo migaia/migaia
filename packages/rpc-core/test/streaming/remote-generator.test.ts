@@ -4,8 +4,8 @@ import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'
 
-/** A1 requires one producer next for each caller pull and preserves the generator return value. */
-describe('streaming A1 remote generators', () => {
+/** Requires one producer next for each caller pull and preserves the generator return value. */
+describe('streaming remote generators', () => {
   it('delivers three values lazily from a synchronous generator', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createComposedEndpoint(

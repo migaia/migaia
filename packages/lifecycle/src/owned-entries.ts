@@ -4,8 +4,8 @@ export type IOwnedEntry = {
 }
 
 /**
- * Registration-ordered storage shared by `LifecycleScope` and `SyncLifecycleScope` (LC-P1). Gives
- * O(1) `release(resource)` through a per-resource index plus a tombstoned insertion array, while
+ * Registration-ordered storage shared by `LifecycleScope` and `SyncLifecycleScope`. Gives O(1)
+ * `release(resource)` through a per-resource index plus a tombstoned insertion array, while
  * `drain()` still returns live entries in registration order for the scopes' LIFO teardown.
  */
 export type IOwnedEntryList<E extends IOwnedEntry> = {

@@ -25,7 +25,7 @@ function stripComments(source: string): string {
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
-describe('AF-T4 reactive runtime-neutrality', () => {
+describe('reactive runtime-neutrality', () => {
   it('core modules (excluding the adapter boundary) never touch host clock/timer/console directly', () => {
     const allowed = new Set(['default-runtime-adapter.ts', 'ambient.d.ts'])
     const offenders: string[] = []
@@ -63,7 +63,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
     signal.dispose()
   })
 
-  it('AF-T20: a non-function adapter field is rejected with INVALID_OPTION at construction', () => {
+  it('a non-function adapter field is rejected with INVALID_OPTION at construction', () => {
     for (const key of ['scheduleMicrotask', 'now', 'timestamp', 'reportError'] as const) {
       expect(() => createRuntime({ adapter: { [key]: 'not-a-function' } as any })).toThrow(
         expect.objectContaining({ code: 'INVALID_OPTION' })
@@ -71,7 +71,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
     }
   })
 
-  it('AF-T20: a throwing reporter does not break Runtime construction (copy warning containment)', () => {
+  it('a throwing reporter does not break Runtime construction (copy warning containment)', () => {
     /** Reporter containment preserves the failure on utils' terminal host queue. */
     const callbacks: (() => void)[] = []
     /** Inspect the terminal channel separately from the construction result. */
@@ -94,7 +94,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
     resetRuntimeCopiesForTest()
   })
 
-  it('AF-T20: an async-rejecting reporter is contained without unhandled rejection', async () => {
+  it('an async-rejecting reporter is contained without unhandled rejection', async () => {
     /** Async reporter rejection must use the same terminal channel as a synchronous failure. */
     const callbacks: (() => void)[] = []
     /** Capture reporting without crashing the host process. */
@@ -115,7 +115,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
     resetRuntimeCopiesForTest()
   })
 
-  it('AF-T25: explicit undefined adapter field keeps the default (no overwrite)', async () => {
+  it('explicit undefined adapter field keeps the default (no overwrite)', async () => {
     const runtime = createRuntime({ adapter: { now: undefined } as any })
     // 显式 undefined 视为 omitted：默认 now 仍可用，不延迟产生裸 TypeError。
     const signal = runtime.signal(0)
@@ -125,7 +125,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
     signal.dispose()
   })
 
-  it('AF-T28: hostile adapter getter is wrapped as INVALID_OPTION with the original as cause', () => {
+  it('hostile adapter getter is wrapped as INVALID_OPTION with the original as cause', () => {
     const getterError = new Error('adapter getter boom')
     const adapter = new Proxy(
       {},
@@ -146,7 +146,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
   })
 })
 
-describe('AF-T71 runtime callback admission', () => {
+describe('runtime callback admission', () => {
   it('rejects non-function scheduleIdle, onError, and onTrace during construction', () => {
     for (const key of ['scheduleIdle', 'onError', 'onTrace'] as const) {
       expect(() => createRuntime({ [key]: 1 } as never)).toThrowError(
@@ -467,7 +467,7 @@ describe('scheduler strategy runtime contract', () => {
   })
 })
 
-describe('AF-T78 maxFlushPasses admission', () => {
+describe('maxFlushPasses admission', () => {
   it('reads a hostile maxFlushPasses getter once and preserves its cause', () => {
     const getterError = new Error('maxFlushPasses getter boom')
     let reads = 0

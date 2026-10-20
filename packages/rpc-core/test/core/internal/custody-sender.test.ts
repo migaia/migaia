@@ -52,7 +52,7 @@ function request(id: string, payload: unknown = id, receiverId = 'b'): IRpcEnvel
 }
 
 describe('custody physical sender settlements', () => {
-  it('[A37] sourceful multiplexed receivers retain one batch and one physical authentication counter', async () => {
+  it('sourceful multiplexed receivers retain one batch and one physical authentication counter', async () => {
     /** Real transport backpressure puts both distinct destinations into the canonical FIFO. */
     let release!: () => void
     /** Holds only the initial accepted write, without changing the production batch owner. */
@@ -131,7 +131,7 @@ describe('custody physical sender settlements', () => {
     }
   })
 
-  it('[A26] failed queued authentication rejects only its group and continues the next physical boundary', async () => {
+  it('failed queued authentication rejects only its group and continues the next physical boundary', async () => {
     /** Genuine protection completion is independent of the initial held host write. */
     let release!: () => void
     /** The first physical write makes later semantic messages queue before protection. */
@@ -207,7 +207,7 @@ describe('custody physical sender settlements', () => {
     await sender.send(request('recovered'))
     expect(frames.map((frame) => frame.id)).toEqual(['first', 'boundary', 'recovered'])
   })
-  it('[A26/A27] rejects an oversized queued singleton with its native cause and sends its survivor', async () => {
+  it('rejects an oversized queued singleton with its native cause and sends its survivor', async () => {
     /** Hold only the initial physical write so subsequent requests really enter the sender queue. */
     let release!: () => void
     /** The first accepted host write remains live independently of queued sizing failure. */
@@ -260,7 +260,7 @@ describe('custody physical sender settlements', () => {
     expect(frames.map((frame) => frame.id)).toEqual(['first', 'survivor'])
   })
 
-  it('[A26] a failed physical batch settles all members and keeps whenIdle pending until drain', async () => {
+  it('a failed physical batch settles all members and keeps whenIdle pending until drain', async () => {
     /** Each physical write has independent completion ownership. */
     let releaseFirst!: () => void
     /** Rejects the held second host invocation with the original cause. */
@@ -330,7 +330,7 @@ describe('custody physical sender settlements', () => {
     gate.close()
   })
 
-  it('[A25] fast gated sending rechecks admission immediately before its started callback and write', async () => {
+  it('fast gated sending rechecks admission immediately before its started callback and write', async () => {
     /** Observable ordering protects admission from moving after the physical host invocation. */
     const order: string[] = []
     const { gate } = createIpcSendQueueFeature({ connectionId: 'custody-fast-admission' })

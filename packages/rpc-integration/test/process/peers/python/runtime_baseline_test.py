@@ -1,4 +1,4 @@
-"""Unit checks for the Python fixture's U36 directory and capability claims."""
+"""Unit checks for the Python fixture's runtime-baseline directory and capability claims."""
 import unittest
 import io
 import json

@@ -1,7 +1,7 @@
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 
-/** Existing first-party diagnostic family names remain recognizable by Core's public B6 guards. */
+/** Existing first-party diagnostic family names remain recognizable by Core's public error guards. */
 const BrowserRpcErrorFamily = {
   /** Window admission historically reports the generic RpcError family. */
   rpc: 'RpcError',

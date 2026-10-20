@@ -8,7 +8,7 @@ import { nativeFixture } from '../../../rpc-threads/test/threads/fixture.js'
 
 /** Public assembly must publish only after describe and use no message handshake. */
 describe('thread Plugin facade', () => {
-  it('[A1] installs a real Worker and immediately calls its declared Feature', async () => {
+  it('installs a real Worker and immediately calls its declared Feature', async () => {
     const fixture = nativeFixture()
     try {
       const feature = await fixture.install()
@@ -36,7 +36,7 @@ describe('thread Plugin facade', () => {
     expect(fixture.handles).toHaveLength(1)
     expect(fixture.handles[0]?.identity.threadId).toBeGreaterThan(0)
   })
-  it('[A1] prepares a dependent install and preserves scheduler identity at every boundary', async () => {
+  it('prepares a dependent install and preserves scheduler identity at every boundary', async () => {
     const scheduler = createManualScheduler()
     const assembly = vi.spyOn(remoteProxy, 'createRemoteRuntimeRegistration')
     /** The supervisor receives the exact same clock as binding and channel construction. */
@@ -73,7 +73,7 @@ describe('thread Plugin facade', () => {
     }
     expect(scheduler.pendingCount).toBe(0)
   })
-  it('[A1] rejects scheduler mismatch before endpoint or business publication', async () => {
+  it('rejects scheduler mismatch before endpoint or business publication', async () => {
     const scheduler = createManualScheduler()
     const factory = vi.fn()
     const fixture = nativeFixture({
@@ -92,7 +92,7 @@ describe('thread Plugin facade', () => {
       await fixture.close()
     }
   })
-  it('[A1][A31] rejects an explicitly narrowed missing baseline before endpoint creation or business frame', async () => {
+  it('rejects an explicitly narrowed missing baseline before endpoint creation or business frame', async () => {
     const { createNodeThreadChannelFactory } = await import('@migaia/rpc-threads/adapters/node')
     const { systemScheduler } = await import('@migaia/utils/scheduler')
     const fixture = nativeFixture({

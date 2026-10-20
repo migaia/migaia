@@ -8,9 +8,8 @@ export const ERROR_SOURCE = '@migaia/rpc/core'
  * `source` is always `@migaia/rpc/core`. Throw sites reference these constants rather than inline
  * literals.
  *
- * Code values are public API, so renaming one is a breaking change. See
- * `docs/contracts/error-code-rollout.sdd.md` §1.2. Only codes with actual throw sites remain here.
- * `rpc-layering.sdd.md` R2 records historical reserved codes removed during migration.
+ * Code values are public API, so renaming one is a breaking change. Only codes with actual throw
+ * sites remain here. Records historical reserved codes removed during migration.
  */
 export const RpcCoreErrorCode = {
   /**
@@ -23,23 +22,23 @@ export const RpcCoreErrorCode = {
    * again.
    */
   providerGenerationMismatch: 'PROVIDER_GENERATION_MISMATCH',
-  /** U38 retires an admitted forward execution with its exact generation; never replay it. */
+  /** Retires an admitted forward execution with its exact generation; never replay it. */
   providerGenerationRetired: 'PROVIDER_GENERATION_RETIRED',
   /**
-   * A signed route already contains this Host or the selected next Host. D51 rejects before
+   * A signed route already contains this Host or the selected next Host. Forwarding rejects before
    * admission and sending; callers must choose a route that does not revisit a Host.
    */
   forwardLoop: 'FORWARD_LOOP',
   /**
-   * Three forwarding nodes have already been visited. D51 rejects a fourth before admission and
-   * sending; callers may establish a direct connect/listen channel instead.
+   * Three forwarding nodes have already been visited. Forwarding rejects a fourth before admission
+   * and sending; callers may establish a direct connect/listen channel instead.
    */
   forwardHopLimit: 'FORWARD_HOP_LIMIT',
   /**
    * Two middleware declarations in the same factory use the same `name`.
    *
    * The installer rejects before installing any middleware. The caller gives each middleware a
-   * unique `name`. Enforces the duplicate singleton middleware creation rule in §7.1.
+   * unique `name`. Enforces the duplicate singleton middleware creation rule.
    */
   middlewareDuplicated: 'MIDDLEWARE_DUPLICATED',
 
@@ -53,7 +52,7 @@ export const RpcCoreErrorCode = {
 
   /**
    * A Runtime API operation requires a mode or capability absent from the actual peer agreement.
-   * Enforces D5/D42; choose a supported method/mode rather than retrying the same operation.
+   * Choose a supported method/mode rather than retrying the same operation.
    */
   capabilityUnsupported: 'CAPABILITY_UNSUPPORTED',
 
@@ -208,8 +207,8 @@ export const RpcCoreErrorCode = {
   schemaInvalid: 'SCHEMA_INVALID',
 
   /**
-   * A capability is published twice, or a frozen capability registry receives another write. I28
-   * D8/D11 also rejects folded Feature method collisions and ambiguous runtime instances.
+   * A capability is published twice, or a frozen capability registry receives another write. Also
+   * rejects folded Feature method collisions and ambiguous runtime instances.
    *
    * The caller checks middleware for duplicate declarations of reserved capabilities. This is a
    * configuration error.
@@ -227,7 +226,7 @@ export const RpcCoreErrorCode = {
 
   /**
    * A stream frame may have been sent before its transport rejected; the caller must open a fresh
-   * stream and never replay delivered values (streaming R7).
+   * stream and never replay delivered values.
    */
   streamResultUnknown: 'STREAM_RESULT_UNKNOWN',
 
@@ -241,8 +240,8 @@ export const RpcCoreErrorCode = {
 
   /**
    * A getter or Proxy throws during `safeRead` without a synchronous reporter, or the reporter
-   * itself throws (R11). The caller repairs the input or supplies a synchronous `report` at a
-   * boundary that owns a diagnostic sink.
+   * itself throws. The caller repairs the input or supplies a synchronous `report` at a boundary
+   * that owns a diagnostic sink.
    */
   propertyReadFailed: 'PROPERTY_READ_FAILED',
 
@@ -253,13 +252,13 @@ export const RpcCoreErrorCode = {
   idempotencyResultUnavailable: 'IDEMPOTENCY_RESULT_UNAVAILABLE',
 
   /**
-   * A string conversion throws without a synchronous reporter, or its reporter throws (cleanup
-   * R12). The caller must repair the input or provide a synchronous diagnostic sink.
+   * A string conversion throws without a synchronous reporter, or its reporter throws (cleanup ).
+   * The caller must repair the input or provide a synchronous diagnostic sink.
    */
   stringConversionFailed: 'STRING_CONVERSION_FAILED'
 } as const
 
-/** U40 refines the existing authentication failure without creating another top-level code. */
+/** Refines the existing authentication failure without creating another top-level code. */
 export const RpcAuthenticationRejectionReason = {
   /** Receiver discarded or never issued this challenge; discard the cached challenge only. */
   sessionUnknown: 'SESSION_UNKNOWN',

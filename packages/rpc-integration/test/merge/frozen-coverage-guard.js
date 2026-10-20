@@ -54,7 +54,7 @@ export function assertFrozenMergeCoverage(files, legacy) {
     const covered = legacy['rpc-contract'][metric].covered + legacy['web-rpc'][metric].covered
     /** Both legacy packages still define the original threshold denominator. */
     const total = legacy['rpc-contract'][metric].total + legacy['web-rpc'][metric].total
-    /** Match A10's original rounding exactly. */
+    /** Match the reference coverage's original rounding exactly. */
     const pct = Math.round((covered / total) * 10_000) / 100
     assert.ok(current[metric].pct >= pct, `${metric}: frozen pct ${current[metric].pct} < ${pct}`)
   }

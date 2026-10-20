@@ -18,7 +18,7 @@ import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js
 import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 
-it('[A60][A74] default custom factory retains ordinary Host calls without declaring unavailable shared ordering', async () => {
+it('default custom factory retains ordinary Host calls without declaring unavailable shared ordering', async () => {
   /** The fixture joins both actual default source contexts rather than supplying stronger tags. */
   const offers: string[][] = [[], []]
   const channel = runtimeSources(offers[0], offers[1])
@@ -77,7 +77,7 @@ it('[A60][A74] default custom factory retains ordinary Host calls without declar
     assert.equal(
       preparationFailure,
       undefined,
-      '[A60] ordinary custom factory must prepare on its truthful default offer'
+      'ordinary custom factory must prepare on its truthful default offer'
     )
     caller = await preparing
     assert.equal(await caller.request('baseline'), 42)
@@ -95,7 +95,7 @@ it('[A60][A74] default custom factory retains ordinary Host calls without declar
   }
 })
 
-it('[A59][A60] genuine process and thread Plugin installs share one final Host provider key owner', async () => {
+it('genuine process and thread Plugin installs share one final Host provider key owner', async () => {
   const capabilities = [
     RpcCapability.runtimeApi,
     RpcCapability.batch,
@@ -186,7 +186,7 @@ it('[A59][A60] genuine process and thread Plugin installs share one final Host p
     assert.deepEqual(
       effects,
       ['first', 'other'],
-      '[A59] adapter family cannot create another FIFO for the same final Host'
+      'adapter family cannot create another FIFO for the same final Host'
     )
     const processConnection = readRuntimeOutletConnection(host.process, 'process-source')!
     const threadConnection = readRuntimeOutletConnection(host.thread, 'thread-source')!
@@ -267,7 +267,7 @@ it('[A59][A60] genuine process and thread Plugin installs share one final Host p
       assert.equal(
         quotaStarted,
         2,
-        '[A60][A33] a failed candidate cannot tighten the committed provider scope'
+        'a failed candidate cannot tighten the committed provider scope'
       )
     )
     releaseQuota()

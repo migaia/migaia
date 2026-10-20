@@ -9,9 +9,9 @@ import { assertErrorPolicyReporter } from './error-boundary.js'
 export const LIFECYCLE_SOURCE = '@migaia/lifecycle'
 
 /**
- * The structural error contract every package in the workspace follows
- * (`docs/contracts/error-codes.md` §2). Attached as properties on a real `Error`, never used to
- * replace it — callers that branch on `instanceof DOMException`/`RangeError`/etc. keep working.
+ * The structural error contract every package in the workspace follows. Attached as properties on a
+ * real `Error`, never used to replace it — callers that branch on `instanceof
+ * DOMException`/`RangeError`/etc. keep working.
  */
 export type ILifecycleError = Error & {
   readonly source: string
@@ -149,7 +149,7 @@ export function createLifecycleFailure(
 
 /**
  * Creates a native `RangeError` for input validation and attaches the supplied code. Preserves the
- * native type required by `docs/contracts/error-codes.md` §2.2.
+ * native type required by `docs/contracts/error-codes.md`.
  */
 export function createLifecycleRangeError(
   code: string,
@@ -181,7 +181,7 @@ export function createLifecycleTypeError(
   return error
 }
 
-/** Collects errors under one of the four policies (D-4) and produces the correct finalize behavior. */
+/** Collects errors under one of the four policies and produces the correct finalize behavior. */
 export type IErrorCollector = {
   readonly policy: IErrorPolicy
   /** Records one item's failure. For `report`, this is also where the reporter is invoked. */
@@ -245,7 +245,7 @@ export function createErrorCollector(
           hasFirstError = true
           firstError = error
         } else {
-          // L-T38：后续错误必须被观测，但不得改变「首错原样抛出」的结果。经 reporter 观测（与 `report`
+          // 后续错误必须被观测，但不得改变「首错原样抛出」的结果。经 reporter 观测（与 `report`
           // 策略同通道），绝不静默吞掉；reporter 由创建方经 `assertErrorPolicyReporter` 保证存在。
           invokeReport(error)
         }
@@ -282,8 +282,7 @@ export function createErrorCollector(
  *
  * `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release
  * callback's return value for a thenable and observes its rejection, so a callback that turns out
- * to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later
- * (L-T17, L-T26, L-T35).
+ * to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later .
  */
 export function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void {
   observeThenableRejection(value, inspectThenable(value), onRejected)

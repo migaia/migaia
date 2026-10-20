@@ -2,8 +2,7 @@ import type { IRpcProbe, IRpcProbeDefinition } from './types.js'
 
 /**
  * Only package-owned emitters can access compiled fields, callbacks and stage-change subscribers.
- * D7 installs these references once into an emitter's fixed-shape record; hot paths never read
- * hosts.
+ * Installs these references once into an emitter's fixed-shape record; hot paths never read hosts.
  */
 export type IRpcProbeState = {
   stageMask: number

@@ -33,7 +33,7 @@ import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runti
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
 
 it.each(['memory', 'external'] as const)(
-  '[A69][A70][A71] true Worker execution restart reports actual %s store continuity and sealed generation',
+  'true Worker execution restart reports actual %s store continuity and sealed generation',
   async (kind) => {
     /** One real Worker budget and Host control own termination and the next successful launch. */
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
@@ -42,7 +42,7 @@ it.each(['memory', 'external'] as const)(
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const capabilities = [
-      /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+      /** Default request/stream deadlines are genuinely offered by both source owners. */
       RpcCapability.deadline,
       ...RUNTIME_API_CAPABILITIES,
       RpcCapability.generation,
@@ -98,13 +98,13 @@ it.each(['memory', 'external'] as const)(
       assert.deepEqual(
         { ...(initialGeneration as object) },
         before.state === 'done' && before.outcome.targetGeneration,
-        '[A71] Host get exposes the actual first accepted restart identity'
+        'Host get exposes the actual first accepted restart identity'
       )
       const oldInstance = readRuntimeOutletConnection(host.thread, 'store-child')!.instanceId
       await host.thread!.restart('store-child')
       await vi.waitFor(() => {
         const connection = readRuntimeOutletConnection(host.thread, 'store-child')
-        assert.ok(connection, '[A71] the original holder must publish a real ready replacement')
+        assert.ok(connection, 'the original holder must publish a real ready replacement')
         assert.notEqual(connection.instanceId, oldInstance)
       })
       const after = await outlet.outcome('store-child', 'retained-key')
@@ -113,17 +113,17 @@ it.each(['memory', 'external'] as const)(
       assert.equal(
         after.store.continuity,
         kind === 'external' ? 'retained' : 'lost-since-restart',
-        '[A70] only real execution/store replacement establishes loss'
+        'only real execution/store replacement establishes loss'
       )
       assert.ok(
         before.store.epoch && after.store.epoch,
-        '[A70] both real default stores have readable epochs'
+        'both real default stores have readable epochs'
       )
       if (kind === 'external') {
         assert.deepEqual(
           after,
           before,
-          '[A70] current lookup tuple returns the complete original sealed generation'
+          'current lookup tuple returns the complete original sealed generation'
         )
         assert.deepEqual(
           await outlet.request('store-child', 'value', undefined, {
@@ -131,7 +131,7 @@ it.each(['memory', 'external'] as const)(
             idempotencyKey: 'retained-key'
           }),
           first,
-          '[A70] retained result prevents a second real business execution'
+          'retained result prevents a second real business execution'
         )
       } else assert.notEqual(after.store.epoch, before.store.epoch)
       const fresh = (await outlet.request('store-child', 'value', undefined, {
@@ -142,16 +142,16 @@ it.each(['memory', 'external'] as const)(
       assert.notEqual(
         fresh.threadId,
         first.threadId,
-        '[A70] actual isolate identity changes rather than merely reconnecting'
+        'actual isolate identity changes rather than merely reconnecting'
       )
       const done = await outlet.outcome('store-child', 'fresh-key')
-      if (done.state !== 'done') assert.fail('[A71] current generation owns its new completion')
+      if (done.state !== 'done') assert.fail('current generation owns its new completion')
       assert.equal(done.outcome.targetGeneration.kind, 'restart')
       assert.equal(done.outcome.targetGeneration.value, 1)
       assert.deepEqual(
         { ...(Reflect.get(await host.thread!.get('store-child'), 'generation') as object) },
         done.outcome.targetGeneration,
-        '[A72] Host get reports the replacement identity rather than an attempt number'
+        'Host get reports the replacement identity rather than an attempt number'
       )
       assert.equal(before.state === 'done' && before.outcome.targetGeneration.value, 0)
     } finally {
@@ -166,14 +166,14 @@ it.each(['memory', 'external'] as const)(
 const generation = { kind: 'restart', value: 2, providerId: 'logical-child' } as const
 
 it.each(['signal', 'deadline'] as const)(
-  '[A66] managed Worker retains a started request terminal after its start %s',
+  'managed Worker retains a started request terminal after its start %s',
   async (intent) => {
     /** A real managed source exercises the registration's original retry and terminal owners. */
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
     const peer = await createThreadPeer<IRuntimeDynamicSurface>({
       spawn: {
         spec: {
-          entry: fileURLToPath(new URL('./fixtures/runtime-u25-worker.mjs', import.meta.url))
+          entry: fileURLToPath(new URL('./fixtures/runtime-api-worker.mjs', import.meta.url))
         },
         budget,
         scheduler: systemScheduler,
@@ -218,7 +218,7 @@ it.each(['signal', 'deadline'] as const)(
                   name: rejected.name,
                   message: rejected.message
                 })
-              : '[A66] the real provider reaches its start barrier'
+              : 'the real provider reaches its start barrier'
           ),
         { timeout: 3000 }
       )
@@ -228,7 +228,7 @@ it.each(['signal', 'deadline'] as const)(
       assert.equal(
         settled,
         false,
-        '[A66] the managed wrapper cannot suppress the final provider start winner'
+        'the managed wrapper cannot suppress the final provider start winner'
       )
       assert.equal(await peer.request('release'), 7)
       assert.equal(await pending, 42)
@@ -245,7 +245,7 @@ it.each(['signal', 'deadline'] as const)(
   }
 )
 
-it('[A71] original registration increments the accepted session only after publication and not after failed preparation', async () => {
+it('original registration increments the accepted session only after publication and not after failed preparation', async () => {
   const fixture = remoteHarness()
   const ordinals: unknown[] = []
   const pairs: Awaited<ReturnType<typeof connected>>[] = []
@@ -268,7 +268,7 @@ it('[A71] original registration increments the accepted session only after publi
   const signal = new AbortController().signal
   try {
     await registration.prepareGeneration(signal, fixture.own)
-    assert.deepEqual(ordinals, [0], '[A71] original accepted session begins at zero')
+    assert.deepEqual(ordinals, [0], 'original accepted session begins at zero')
     fixture.nextGeneration()
     rejectNext = true
     await assert.rejects(registration.prepareGeneration(signal, fixture.own))
@@ -278,7 +278,7 @@ it('[A71] original registration increments the accepted session only after publi
     assert.deepEqual(
       ordinals,
       [0, 1, 1, 2],
-      '[A71] a failed describe/preparation cannot consume a session ordinal'
+      'a failed describe/preparation cannot consume a session ordinal'
     )
   } finally {
     await registration.release()
@@ -287,7 +287,7 @@ it('[A71] original registration increments the accepted session only after publi
   }
 })
 
-it('[A71] original process bootstrap carries the real execution ordinal and stable logical provider namespace', () => {
+it('original process bootstrap carries the real execution ordinal and stable logical provider namespace', () => {
   const options = { name: 'child', parentInstanceId: 'parent', generation }
   const prepared = prepareProcessRuntimeBootstrap(
     options,
@@ -297,24 +297,24 @@ it('[A71] original process bootstrap carries the real execution ordinal and stab
   assert.deepEqual(
     Reflect.get(bootstrap, 'generation'),
     generation,
-    '[A71] restart facts must survive the original single bootstrap frame'
+    'restart facts must survive the original single bootstrap frame'
   )
   assert.equal(bootstrap.self.instanceId, prepared.self.instanceId)
   assert.notEqual(bootstrap.self.instanceId, generation.providerId)
 })
 
-it('[A71] original Worker bootstrap carries generation separately from its real launch fingerprint', () => {
+it('original Worker bootstrap carries generation separately from its real launch fingerprint', () => {
   const context = { self: { name: 'parent', instanceId: 'parent' }, capabilities: [], generation }
   const bootstrap = createThreadRuntimeBootstrap('child', 'actual-fingerprint', context)
   assert.deepEqual(
     Reflect.get(bootstrap, 'generation'),
     generation,
-    '[A71] Worker metadata must retain the original launch generation'
+    'Worker metadata must retain the original launch generation'
   )
   assert.equal(bootstrap.self.instanceId, 'actual-fingerprint')
 })
 
-it('[A73] managed native request cannot silently drop an explicitly unsupported order option', async () => {
+it('managed native request cannot silently drop an explicitly unsupported order option', async () => {
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
   const native = createNodeThreadLauncher()
   let calls = 0
@@ -356,7 +356,7 @@ it('[A73] managed native request cannot silently drop an explicitly unsupported 
     await assert.rejects(
       peer.request('probe', 'ordered', { orderKey: 'same' }),
       { code: 'CAPABILITY_UNSUPPORTED' },
-      '[A73] the original managed dispatch must retain explicit U25 requirements'
+      'the original managed dispatch must retain explicit runtime-api requirements'
     )
     assert.equal(calls, 0)
   } finally {

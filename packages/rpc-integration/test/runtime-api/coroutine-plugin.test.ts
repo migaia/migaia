@@ -4,7 +4,7 @@ import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runti
 import { coroutineFailure, coroutineService, coroutineTestHost } from './fixtures/coroutine.js'
 
 describe('coroutine runtime plugin modes', () => {
-  it('[A2] constructs only one mode before any Host call', () => {
+  it('constructs only one mode before any Host call', () => {
     expect(() => createCoroutinePlugin({ name: 'neither' } as never)).toThrow(
       expect.objectContaining({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' })
     )
@@ -13,7 +13,7 @@ describe('coroutine runtime plugin modes', () => {
     ).toThrow(expect.objectContaining({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' }))
   })
 
-  it('[A2] publishes managed controls and symmetric calls with one announced and described self', async () => {
+  it('publishes managed controls and symmetric calls with one announced and described self', async () => {
     /** Each original diagnostic remains visible for cause classification at closure. */
     const reports: unknown[] = []
     /** Parent and task each install a complete genuine Host. */
@@ -128,11 +128,11 @@ describe('coroutine runtime plugin modes', () => {
       await host.coroutine!.kill('c')
     } finally {
       await host.dispose()
-      console.info('[coroutine A2 reports]', JSON.stringify(reports.map(coroutineFailure)))
+      console.info('[coroutine reports]', JSON.stringify(reports.map(coroutineFailure)))
     }
   })
 
-  it('[A2] preserves pre-connect task rejection beneath Host and managed start owners', async () => {
+  it('preserves pre-connect task rejection beneath Host and managed start owners', async () => {
     /** One native task object proves no replacement error is invented by family assembly. */
     const failure = new Error('coroutine rejected before connecting')
     /** Host rollback must leave no coroutine extension or indexed receipt. */
@@ -157,7 +157,7 @@ describe('coroutine runtime plugin modes', () => {
         rejected = error
       }
       console.info(
-        '[coroutine A2 preconnect]',
+        '[coroutine preconnect]',
         JSON.stringify({
           install: coroutineFailure(rejected),
           reports: reports.map(coroutineFailure)
@@ -179,7 +179,7 @@ describe('coroutine runtime plugin modes', () => {
       expect(chain[1]).toMatchObject({ source: '@migaia/rpc/remote' })
       expect(host.coroutine).toBeUndefined()
       console.info(
-        '[coroutine A2 preconnect]',
+        '[coroutine preconnect]',
         JSON.stringify({
           install: coroutineFailure(rejected),
           reports: reports.map(coroutineFailure)
@@ -192,7 +192,7 @@ describe('coroutine runtime plugin modes', () => {
 })
 
 it.each(['thread', 'process'] as const)(
-  '[A2] coroutine exchanges every call mode with a %s native other end',
+  'coroutine exchanges every call mode with a %s native other end',
   async (family) => {
     const { fileURLToPath } = await import('node:url')
     const { defineFeature, definePlugin } = await import('@migaia/plugin-host')
@@ -276,7 +276,7 @@ it.each(['thread', 'process'] as const)(
             expose: ['parent'],
             report: (error) => reports.push(error),
             spawn: {
-              spec: { entry, name: 'a2-coroutine-native-thread' },
+              spec: { entry, name: 'coroutine-native-thread' },
               budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
               scheduler: systemScheduler,
               launcher: {
@@ -299,7 +299,7 @@ it.each(['thread', 'process'] as const)(
         /** Raw channel and remote identity belong to this precise native launch. */
         let handle: Awaited<ReturnType<typeof launcher.launch>> | undefined
         /** Fixture authentication travels only through native bootstrap and handshake. */
-        const token = 'a2-coroutine-native-process'
+        const token = 'coroutine-native-process'
         /** This native deployment owns execution separately from the coroutine unit. */
         const spawn: import('../../../rpc-process/dist/process/plugin/types.js').ISpawnProcessPluginDeployment =
           {
@@ -308,7 +308,7 @@ it.each(['thread', 'process'] as const)(
             wire: 'native',
             token,
             supervision: {
-              id: 'a2-coroutine-native-process',
+              id: 'coroutine-native-process',
               spec: {
                 command: process.execPath,
                 args: [entry],
@@ -435,7 +435,7 @@ it.each(['thread', 'process'] as const)(
       expect(reverseReasons[0]).toMatchObject({ source: '@migaia/rpc/core', code: 'CANCELLED' })
       /** Full cancellation evidence is distinct from expected background cleanup diagnostics. */
       console.info(
-        '[coroutine A2 native cancellation]',
+        '[coroutine native cancellation]',
         JSON.stringify({
           family,
           forward: coroutineFailure(forwardError),
@@ -453,7 +453,7 @@ it.each(['thread', 'process'] as const)(
         ...processes.map((handle) => handle.exited)
       ])
       console.info(
-        '[coroutine A2 native reports]',
+        '[coroutine native reports]',
         JSON.stringify({ family, reports: reports.map(coroutineFailure) })
       )
     }

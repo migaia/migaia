@@ -15,10 +15,9 @@ import {
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
 /**
- * Regression gate for `SOL-CB-R7-P1-001`/`SOL-CB-R7-P1-002`: exercises the composed root
- * (`createEndpoint`/`createFullEndpoint`) so a future regression in the migrated `ping()`
- * capability gate, identifier validation, or per-call `timeoutMs`/`signal` handling fails a test
- * instead of passing silently.
+ * Regression gate: exercises the composed root (`createEndpoint`/`createFullEndpoint`) so a future
+ * regression in the migrated `ping()` capability gate, identifier validation, or per-call
+ * `timeoutMs`/`signal` handling fails a test instead of passing silently.
  */
 describe('composed root ping() parity', () => {
   it('root createEndpoint is the same value as createFullEndpoint', () => {

@@ -7,7 +7,7 @@ import { hooks } from '../../dist/core/middleware/hooks.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
-describe('close control intention (A10)', () => {
+describe('close control intention', () => {
   it('delivers one peer-close event and rejects invalid duration before sending', async () => {
     const [firstWire, secondWire] = createMemoryTransportPair()
     const sent: unknown[] = []

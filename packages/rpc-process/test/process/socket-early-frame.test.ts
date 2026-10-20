@@ -11,7 +11,7 @@ import type { IAuthenticatedProcessChannel } from '@migaia/rpc-process'
 
 /** Exercise the first-subscriber race across a real loopback socket. */
 describe('process socket early business frames', () => {
-  it('[D2] delivers 200/200 frames after a 2 ms subscription delay', async () => {
+  it('delivers 200/200 frames after a 2 ms subscription delay', async () => {
     /** Each side uses the same framing implementation as the public process channel. */
     const encoder = new TextEncoder()
     const frame = (value: string): Uint8Array => encodeRpcStreamFrame(encoder.encode(value))

@@ -5,14 +5,14 @@ import { process as processPlugin } from '../src/plugins/process.js'
 import { LoggerErrorCode, LOGGER_SOURCE } from '../src/errors.js'
 import { setLoggerRuntimeManager } from '../src/runtime-manager.js'
 
-describe('Round24 logger construction admission', () => {
+describe('logger construction admission', () => {
   it('rejects a hostile on getter before installing resource-owning plugins and permits reinstall', async () => {
     /** Tracks runtime listeners so failed construction can prove no process resource leaked. */
     const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
     /** Tracks whether a resource-owning core plugin was ever installed or disposed. */
     const resourceState = { installs: 0, disposals: 0 }
     /** Error thrown by the hostile public option accessor. */
-    const optionError = new Error('round24-on-getter')
+    const optionError = new Error('on-getter')
     /** Runtime process double with observable listener ownership. */
     const runtimeProcess = {
       env: {},
@@ -29,7 +29,7 @@ describe('Round24 logger construction admission', () => {
     }
     /** Plugin that would own core resources if construction reached installation. */
     const resourcePlugin = {
-      name: 'round24-resource',
+      name: 'resource',
       install: (core: { onDispose(resource: () => void): void }): Record<string, never> => {
         resourceState.installs += 1
         core.onDispose(() => {
@@ -48,7 +48,7 @@ describe('Round24 logger construction admission', () => {
     /** Restores the process runtime capability after this isolated test. */
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round24-construction',
+      randomUUID: () => 'construction',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -84,7 +84,7 @@ describe('Round24 logger construction admission', () => {
 
   it('wraps an Object.entries proxy failure as logger INVALID_OPTION before plugin side effects', () => {
     /** Error thrown while enumerating the hostile `on` proxy. */
-    const optionError = new Error('round24-on-entries')
+    const optionError = new Error('on-entries')
     /** Public option proxy whose `on` value fails during own-key enumeration. */
     const hostileOn = new Proxy(
       {},
@@ -113,7 +113,7 @@ describe('Round24 logger construction admission', () => {
   })
 })
 
-describe('Round24 HTTP shutdown admission', () => {
+describe('HTTP shutdown admission', () => {
   it('drains final entries before disposal abort even when the signal does not replay abort', async () => {
     /** Records every controller so request-controller abort state is observable. */
     const controllers: Array<{ readonly signal: { readonly aborted: boolean } }> = []
@@ -176,7 +176,7 @@ describe('Round24 HTTP shutdown admission', () => {
     }
     /** Restores the runtime transport capability after this isolated test. */
     const restore = setLoggerRuntimeManager({
-      randomUUID: () => 'round24-http-shutdown',
+      randomUUID: () => 'http-shutdown',
       defer: (task) => task(),
       write: () => undefined,
       // Inject hostility at the Logger-owned HTTP controller seam; PluginHost/lifecycle retains

@@ -108,7 +108,7 @@ export type IRemoteRetryDispatch = Readonly<{
   ): Promise<IRpcPortableValue>
 }>
 
-/** Explicit retry ports replace the I13 single-send default as a whole. */
+/** Explicit retry ports replace the single-send default as a whole. */
 export type IRemoteRetryPort = Readonly<{
   dispatch(input: IRemoteRetryDispatch): Promise<IRpcPortableValue>
 }>

@@ -36,11 +36,11 @@ import type { IStorageCapabilities } from '../types/capabilities.js'
 
 /**
  * `changeFeed: true` only for this backend: `memoryStorageHost()` creates one isolated, unshared
- * store per call (§ own doc comment below), so SWV2-R16's "same-page multiple instances" and
- * "cross-tab" clauses have no referent here — there is no second instance or tab that could ever
- * observe the same data, unlike localStorageHost/sessionStorageHost/IndexedDB. The single-instance
- * local change feed below is therefore this backend's _entire_ meaningful scope for
- * SWV2-B05/R05/R16, not a partial slice of a larger cross-tab feature still to come.
+ * store per call (see the doc comment below), so the "same-page multiple instances" and "cross-tab"
+ * requirements have no referent here — there is no second instance or tab that could ever observe
+ * the same data, unlike localStorageHost/sessionStorageHost/IndexedDB. The single-instance local
+ * change feed below is therefore this backend's _entire_ meaningful scope for Not a partial slice
+ * of a larger cross-tab feature still to come.
  */
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -79,10 +79,10 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
   })
 
   /**
-   * SWV2-R16/I05/I06/E08: fires only after a mutation has fully and durably committed (never from
-   * inside a `try` that could still fail, never on validation/conflict/rollback failure), and
-   * isolates each listener's own throw so one bad listener cannot block delivery to the rest or
-   * corrupt the write that already happened — the write itself is done by the time this runs.
+   * Fires only after a mutation has fully and durably committed (never from inside a `try` that
+   * could still fail, never on validation/conflict/rollback failure), and isolates each listener's
+   * own throw so one bad listener cannot block delivery to the rest or corrupt the write that
+   * already happened — the write itself is done by the time this runs.
    */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
     controller.publish(change)
@@ -175,8 +175,8 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
     remove: (key) => {
       assertLive()
       assertStringStorageKey(key, StorageBackend.memory)
-      // SWV2-§4.6 ties an event to a successful mutation: removing an absent key changed
-      // nothing, so it must not publish (SOL-SWV2-047).
+      // SWV2- ties an event to a successful mutation: removing an absent key changed
+      // nothing, so it must not publish.
       if (kv.delete(key)) publishChange({ channel: 'value', kind: 'remove', keys: [key] })
     },
     has: (key) => {
@@ -224,7 +224,7 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
     let snapshotEpoch: number | undefined
     const revisionOf = (encoded: string): number => recordRevisions.get(encoded) ?? 0
     const trackRevision = (encoded: string): void => {
-      // 惰性捕获 snapshot epoch（SW-A28/A29「快照在首次读取时建立」）：与 indexed-db 一致。事务开始后才发生的
+      // 惰性捕获 snapshot epoch（快照在首次读取时建立）：与 indexed-db 一致。事务开始后才发生的
       // clearRecords 不影响「首次读取之后」的快照一致性——首次读取前就 clear 的，读到的是 post-clear 的一致状态，
       // 不应误报冲突。空事务（无任何读写）不建立快照，也不做 epoch 检查。
       if (snapshotEpoch === undefined) snapshotEpoch = recordEpoch
@@ -322,7 +322,7 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
         committedKeys.push(draftKeys.get(encoded)!)
       }
     }
-    // SWV2-B05 "batch one-event": the whole transaction's writes/deletes fanout as a single
+    // "batch one-event": the whole transaction's writes/deletes fanout as a single
     // `kind:'batch'` event after every entry above committed, not one event per key — and only
     // reached at all when the loop above didn't throw (rollback ⇒ no event). A read-only
     // transaction (`draft` empty) has nothing to report.
@@ -355,7 +355,7 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
     clearAll: (ctx) =>
       withAbort(ctx, async () => {
         assertLive()
-        // SOL-SWV2-047: a clear over an already-empty store changed nothing.
+        // A clear over an already-empty store changed nothing.
         const hadEntries = kv.size > 0 || bytes.size > 0 || documents.size > 0
         kv.clear()
         bytes.clear()

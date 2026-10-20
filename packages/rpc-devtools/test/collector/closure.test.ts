@@ -23,7 +23,7 @@ import { NameTable, CarrierTable } from '../../src/collector/intern.js'
 import { CollectorStats } from '../../src/collector/stats.js'
 import { collectorView } from './fixture.js'
 
-it('[closure A3] translates independent source ordinals and preserves a recording-owned carrier link', () => {
+it('translates independent source ordinals and preserves a recording-owned carrier link', () => {
   /** One-slot main retention must not retire an alias still held by the explicit recording. */
   const devtools = createRpcDevtools({ stages: ['carrier', 'protected', 'envelope'], maxEvents: 1 })
   /** Recording owns the original carrier even after another endpoint displaces it from query. */
@@ -68,7 +68,7 @@ it('[closure A3] translates independent source ordinals and preserves a recordin
   }
 })
 
-it('[closure A6] restores stages added before pause and keeps repeated pause idempotent', () => {
+it('restores stages added before pause and keeps repeated pause idempotent', () => {
   /** Direct ingestion must follow the same current mask as installed Core emitters. */
   const devtools = createRpcDevtools({ stages: ['message'] })
   try {
@@ -89,7 +89,7 @@ it('[closure A6] restores stages added before pause and keeps repeated pause ide
   }
 })
 
-it('[closure A1/A6] applies the same outcome filter to query and active watch delivery', async () => {
+it('applies the same outcome filter to query and active watch delivery', async () => {
   /** One retained ring and one active watcher must agree on the canonical outcome vocabulary. */
   const devtools = createRpcDevtools()
   /** Failed-only watch starts before either event arrives. */
@@ -113,7 +113,7 @@ it('[closure A1/A6] applies the same outcome filter to query and active watch de
   }
 })
 
-it('[closure A6] reports an open terminal bound and clamps every quantile to the observed maximum', () => {
+it('reports an open terminal bound and clamps every quantile to the observed maximum', () => {
   /** A duration inside the terminal bucket formerly interpolated beyond its sole observed sample. */
   const devtools = createRpcDevtools()
   try {
@@ -133,7 +133,7 @@ it('[closure A6] reports an open terminal bound and clamps every quantile to the
   }
 })
 
-it('[closure A6 revision 2] defaults to message and peer and admits physical stages only after selection', () => {
+it('defaults to message and peer and admits physical stages only after selection', () => {
   /** Default mask retains mandatory logical messages and peer lifecycle without physical overhead. */
   const devtools = createRpcDevtools()
   try {
@@ -151,7 +151,7 @@ it('[closure A6 revision 2] defaults to message and peer and admits physical sta
   }
 })
 
-it('[closure A6 revision 2] performs no hot interning or translation and schedules one notification for a shared burst', async () => {
+it('performs no hot interning or translation and schedules one notification for a shared burst', async () => {
   /** Instrument existing owners, without introducing a production instrumentation seam. */
   const intern = vi.spyOn(NameTable.prototype, 'id')
   /** The same cold carrier owner is observed before any reader runs. */
@@ -203,7 +203,7 @@ it('[closure A6 revision 2] performs no hot interning or translation and schedul
   }
 })
 
-it('[closure A6 revision 2] keeps retained reader results equal across query, watch, record and service', async () => {
+it('keeps retained reader results equal across query, watch, record and service', async () => {
   /** Physical stages are explicit; this fixed script names two actual endpoints and two methods. */
   const devtools = createRpcDevtools({ stages: ['message', 'carrier', 'protected'], maxEvents: 16 })
   /** Recording and watch own the complete script independently of query materialization. */
@@ -270,7 +270,7 @@ it('[closure A6 revision 2] keeps retained reader results equal across query, wa
   }
 })
 
-it('[closure A6 revision 2] preserves ten settlements independently of two retained rows', () => {
+it('preserves ten settlements independently of two retained rows', () => {
   /**
    * No reader runs until after eight evictions, so cold derivation cannot reconstruct statistics
    * from retention.
@@ -285,7 +285,7 @@ it('[closure A6 revision 2] preserves ten settlements independently of two retai
   }
 })
 
-it('[closure A1 revision 2] preserves all variation strings through a method-filtered record boundary', () => {
+it('preserves all variation strings through a method-filtered record boundary', () => {
   /**
    * The source method filter must retain controls with no method while dropping another business
    * method.
@@ -325,7 +325,7 @@ it('[closure A1 revision 2] preserves all variation strings through a method-fil
   }
 })
 
-it('[closure A1 revision 2] keeps all genuine variations through Core and collector echo filters', async () => {
+it('keeps all genuine variations through Core and collector echo filters', async () => {
   /** One collector observes both genuine memory-Peer endpoints through its default logical stages. */
   const devtools = createRpcDevtools({ methods: ['echo'] })
   /** A separate Core consumer checks its own method filter on original normalized envelopes. */
@@ -489,7 +489,7 @@ it('[closure A1 revision 2] keeps all genuine variations through Core and collec
   }
 })
 
-it('[closure A6 revision 2] keeps a learned carrier link across exposure changes and recorded copies', () => {
+it('keeps a learned carrier link across exposure changes and recorded copies', () => {
   /** Two slots allow a readable origin, followed by its retirement before the next projection. */
   const devtools = createRpcDevtools({ stages: ['carrier', 'protected', 'message'], maxEvents: 2 })
   /** Metadata service and local content queries build different cached representations. */
@@ -519,7 +519,7 @@ it('[closure A6 revision 2] keeps a learned carrier link across exposure changes
   }
 })
 
-it('[closure A3 revision 2] never revives a watcher-retained origin after an observed source reset', async () => {
+it('never revives a watcher-retained origin after an observed source reset', async () => {
   /** Tiny main retention makes an old idle watcher the only remaining owner of its physical origin. */
   const devtools = createRpcDevtools({ stages: ['message', 'carrier', 'protected'], maxEvents: 1 })
   /** Different physical outcomes leave the old origin queued while filtering out its replacement. */

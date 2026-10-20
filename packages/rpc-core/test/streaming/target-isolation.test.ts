@@ -88,7 +88,7 @@ function frame(
   }
 }
 
-describe('streaming A11 target and sender isolation', () => {
+describe('streaming target and sender isolation', () => {
   it('keeps two caller streams with the same id separate by target', async () => {
     const fixture = streamOwner('client')
     const first = fixture.owner.open('alpha', 'count', null)

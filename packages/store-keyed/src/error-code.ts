@@ -5,8 +5,7 @@
  * `source` is always `'@migaia/store-keyed'`. Throw sites use these constants instead of inline
  * literals.
  *
- * Code values are public API. Renaming a code is a breaking change
- * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
+ * Code values are public API. Renaming a code is a breaking change.
  */
 export const StoreKeyedErrorCode = {
   /**

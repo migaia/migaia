@@ -67,7 +67,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('A2 systemScheduler monotonic clock and host capability failures', () => {
+describe('systemScheduler monotonic clock and host capability failures', () => {
   it('reads performance.now with its host receiver instead of Date.now', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
     /** Stubbed performance host that asserts its receiver. */
@@ -148,7 +148,7 @@ describe('A2 systemScheduler monotonic clock and host capability failures', () =
   })
 })
 
-describe('A3 systemScheduler timers, segments, unref and cancellation', () => {
+describe('systemScheduler timers, segments, unref and cancellation', () => {
   it('segments delays above the host maximum and runs the callback once', () => {
     vi.useFakeTimers()
     const callback = vi.fn()
@@ -246,7 +246,7 @@ describe('A3 systemScheduler timers, segments, unref and cancellation', () => {
   })
 })
 
-describe('A4 manual scheduler ordering, overflow, reentrancy and runaway', () => {
+describe('manual scheduler ordering, overflow, reentrancy and runaway', () => {
   it('manualScheduler.now() 单调不递减，相同值合法', () => {
     const scheduler = createManualScheduler()
     expect(scheduler.now()).toBe(0)
@@ -411,7 +411,7 @@ describe('A4 manual scheduler ordering, overflow, reentrancy and runaway', () =>
   })
 })
 
-describe('A6 wall clock stays separate from the monotonic clock', () => {
+describe('wall clock stays separate from the monotonic clock', () => {
   it('reads Date.now for timestamps and performance.now for now(), independently', async () => {
     /** Date.now stub that can move backwards. */
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_123)
@@ -427,7 +427,7 @@ describe('A6 wall clock stays separate from the monotonic clock', () => {
   })
 })
 
-describe('A9 scheduler module stays runtime-neutral', () => {
+describe('scheduler module stays runtime-neutral', () => {
   it('references no host types, no bare host identifiers and only utils-local imports', () => {
     /** Source text of the scheduler module. */
     const text = readFileSync(new URL('../src/internal/scheduler.ts', import.meta.url), 'utf8')

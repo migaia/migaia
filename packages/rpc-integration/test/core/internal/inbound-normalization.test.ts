@@ -37,7 +37,7 @@ function request() {
   }
 }
 
-it('[K284/A45] only an exact canonical receiver payload is reusable through held forward options', () => {
+it('only an exact canonical receiver payload is reusable through held forward options', () => {
   /** Successful canonical validation owns the sole membership insertion. */
   const envelope = normalizeInboundRpcEnvelope(request(), rpcProtocol)
   if (envelope.kind !== 'request') assert.fail('request must remain a request')
@@ -61,13 +61,13 @@ it('[K284/A45] only an exact canonical receiver payload is reusable through held
   assert.equal(isForwardedPayload(retainForwardOptions(options, {}), payload), true)
 })
 
-it('[K284/A45] a custom normalizer is read once, retains its receiver and cannot mint canonical membership', () => {
+it('a custom normalizer is read once, retains its receiver and cannot mint canonical membership', () => {
   /** The custom getter deliberately changes on a second read. */
   let reads = 0
   /** Retain the actual receiver without aliasing the method's `this` binding. */
   const observation: { receiver?: unknown } = {}
   const protocol: IRpcProtocol<IRpcEnvelope, string, number> = {
-    id: 'k284-custom',
+    id: 'fixture-custom',
     version: 1,
     get normalize() {
       reads++
@@ -91,7 +91,7 @@ it('[K284/A45] a custom normalizer is read once, retains its receiver and cannot
   )
 })
 
-it('[K284/A45] whole runtime group admission records its actual steps and every provider payload', async () => {
+it('whole runtime group admission records its actual steps and every provider payload', async () => {
   /** The existing runtime grammar vector retains the complete group metadata. */
   const template = vectors.valid.find((value) => value.kind === 'runtime-group')!
   const envelope = await normalizeInboundRuntimeEnvelope({

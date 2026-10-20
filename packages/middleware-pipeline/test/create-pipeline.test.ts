@@ -66,7 +66,7 @@ describe('createPipeline', () => {
     expect(reads).toEqual([1, 1, 1])
   })
 
-  it('A1 runs all modes through one stable argument list', async () => {
+  it('runs all modes through one stable argument list', async () => {
     /** Values committed by each mode's terminal callback. */
     const values: number[] = []
     /** Two sync stages representing one complete sync chain. */
@@ -140,7 +140,7 @@ describe('createPipeline', () => {
     expect(values).toEqual([3, 3, 3, 3])
   })
 
-  it('A2 applies active checks at every mode boundary and prefers run control signal', async () => {
+  it('applies active checks at every mode boundary and prefers run control signal', async () => {
     /** Exact host activity failure that must remain top-level. */
     const activeFailure = new Error('inactive')
     /** Records each mode's stage and terminal activity. */
@@ -279,7 +279,7 @@ describe('createPipeline', () => {
     expect(stageCalls).toBe(0)
   })
 
-  it('A4 lifts only supported mode pairs and preserves adapter semantics', async () => {
+  it('lifts only supported mode pairs and preserves adapter semantics', async () => {
     /** Violation stream emitted by the lifted sync stage. */
     const violations: string[] = []
     /** Async target owns violation reporting for lifted sync stages. */
@@ -336,7 +336,7 @@ describe('createPipeline', () => {
     expect(values).toEqual([2])
   })
 
-  it('A6 rejects malformed createPipeline options before runner construction', () => {
+  it('rejects malformed createPipeline options before runner construction', () => {
     /** Invalid calls bypass static typing to exercise package-boundary admission. */
     const invalidCalls: readonly (() => unknown)[] = [
       () => createPipeline(null as never),
@@ -363,7 +363,7 @@ describe('createPipeline', () => {
     }
   })
 
-  it('A8 keeps ordinary failures primary across every mode', async () => {
+  it('keeps ordinary failures primary across every mode', async () => {
     /** Mutable signal state used to place abort after downstream entry. */
     let asyncAborted = false
     /** Abort reason must never replace an already captured ordinary failure. */
@@ -559,7 +559,7 @@ describe('createPipeline', () => {
     ).rejects.toBe(asyncGeneratorFailure)
   })
 
-  it('A8 propagates one same-error identity while the signal is active', async () => {
+  it('propagates one same-error identity while the signal is active', async () => {
     /** Same object occupies both channels without cancellation. */
     const downstream = new Error('downstream')
     /** Captures the exact pair and the number of combination calls. */
@@ -591,7 +591,7 @@ describe('createPipeline', () => {
     expect(pairs).toEqual([])
   })
 
-  it('A8 keeps a fire-and-forget downstream failure after abort', async () => {
+  it('keeps a fire-and-forget downstream failure after abort', async () => {
     /** Mutable cancellation state switched after downstream dispatch starts. */
     let aborted = false
     /** Distinct cancellation reason. */
@@ -637,7 +637,7 @@ describe('createPipeline', () => {
     expect(combineCalls).toBe(0)
   })
 
-  it('A8 keeps done failures primary after abort in every mode', async () => {
+  it('keeps done failures primary after abort in every mode', async () => {
     /** One failure identity returned by every terminal callback. */
     const doneFailure = new Error('done')
     /** Separate cancellation reason must not become the result. */
@@ -735,7 +735,7 @@ describe('createPipeline', () => {
     ).rejects.toBe(doneFailure)
   })
 
-  it('A8/A9 stops every mode at the first successful post-stage abort checkpoint', async () => {
+  it('stops every mode at the first successful post-stage abort checkpoint', async () => {
     /** Shared abort reason expected from every mode. */
     const abortFailure = new Error('stop')
     /** Trace proves no second stage or terminal callback runs. */
@@ -869,7 +869,7 @@ describe('createPipeline', () => {
     expect(trace).toEqual(['sync:first', 'async:first', 'generator:first', 'async-generator:first'])
   })
 
-  it('A9 passes the effective signal to native and lifted stages in every mode', async () => {
+  it('passes the effective signal to native and lifted stages in every mode', async () => {
     /** Construction-time signal used by the fallback runs. */
     const creationSignal = new AbortController().signal
     /** Call-time signal that must override construction state. */

@@ -1345,7 +1345,7 @@ export class RpcOutboundSender {
     }
   }
 
-  /** SC9(a): only bytes whose actual transfer backing will detach receive a capture copy. */
+  /** Only bytes whose actual transfer backing will detach receive a capture copy. */
   #probeContent(value: unknown, transfer: readonly unknown[] | undefined): unknown {
     if (transfer === undefined || transfer.length === 0) return value
     if (isUint8Array(value)) {

@@ -48,7 +48,7 @@ const browserBackfillLeaseContenders = new Map<
   string,
   { store: { dispose(): Promise<void> }; handle: IRecordIndexHandle }
 >()
-/** Keeps cross-page R09 receiver stores and their first transport hint waiters alive. */
+/** Keeps cross-page coordination receiver stores and their first transport hint waiters alive. */
 const browserCoordinationReceivers = new Map<
   string,
   {
@@ -56,7 +56,10 @@ const browserCoordinationReceivers = new Map<
     hint: Promise<IStorageChange>
   }
 >()
-/** Keeps cross-page R09 writer stores alive until the receiver performs its authoritative read. */
+/**
+ * Keeps cross-page coordination writer stores alive until the receiver performs its authoritative
+ * read.
+ */
 const browserCoordinationWriters = new Map<string, ReturnType<typeof indexedDbHost>>()
 
 declare global {
@@ -753,10 +756,7 @@ window.runStorageFailureScenario = async () => {
   }
 }
 
-/**
- * 浏览器决定 Secure cookie 的写入与可见性；loopback HTTP 可能被视为可信来源， 普通 HTTP 主机仍拒绝 Secure
- * cookie。使用真实浏览器分别验证两类来源（SDD §12.4）。
- */
+/** 浏览器决定 Secure cookie 的写入与可见性；loopback HTTP 可能被视为可信来源， 普通 HTTP 主机仍拒绝 Secure cookie。使用真实浏览器分别验证两类来源。 */
 window.runCookieSecureScenario = async () => {
   const namespace = `secure-${Math.random().toString(36).slice(2)}`
   const insecureStore = cookiesHost({ namespace })
@@ -1819,7 +1819,7 @@ window.runByteBrandScenario = async () => {
   }
 }
 
-/** 真实浏览器验证 SWV2-D27 对每个非 canonical key 域的原子 generation rotation。 */
+/** 真实浏览器验证对每个非 canonical key 域的原子 generation rotation。 */
 window.runIndexedDbRawIndexFirewallScenario = async () => {
   const dbName = `raw-index-firewall-${Math.random().toString(36).slice(2)}`
   const store = indexedDbHost({ dbName })

@@ -87,7 +87,7 @@ function createResumeFixture(
 }
 
 describe('dependency planner', () => {
-  it('A7 plans reject, cascade, and suspend dependency mutations', () => {
+  it('plans reject, cascade, and suspend dependency mutations', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
@@ -153,7 +153,7 @@ describe('dependency planner', () => {
     ).toThrow('status sentinel')
   })
 
-  it('A8 separates direct rebinds from dependent-first restart closure', () => {
+  it('separates direct rebinds from dependent-first restart closure', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
@@ -177,7 +177,7 @@ describe('dependency planner', () => {
     ])
   })
 
-  it('A9 resumes only satisfiable suspended closures with generation-aware actions', () => {
+  it('resumes only satisfiable suspended closures with generation-aware actions', () => {
     const index = createTestIndex()
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
     index.add({ id: 'b', dependencies: [{ provider: 'a', required: true }] })
@@ -237,7 +237,7 @@ describe('dependency planner', () => {
     ])
   })
 
-  it('A10 plans lazy activation, install membership, and inverse teardown', () => {
+  it('plans lazy activation, install membership, and inverse teardown', () => {
     const index = createTestIndex()
     index.add({ id: 'l1', dependencies: [] })
     index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
@@ -262,7 +262,7 @@ describe('dependency planner', () => {
     expect(planTeardown(index).order).toEqual([...index.order()].reverse())
   })
 
-  it('A11 deeply freezes plans and leaves the index unchanged', () => {
+  it('deeply freezes plans and leaves the index unchanged', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
@@ -283,7 +283,7 @@ describe('dependency planner', () => {
     expect(projectSnapshot(index.snapshot())).toEqual(before)
   })
 
-  it('A7 plans the same leaf mutation across graph sizes', () => {
+  it('plans the same leaf mutation across graph sizes', () => {
     for (const background of [1_000, 8_000]) {
       const index = createTestIndex()
       index.add({ id: 'p', dependencies: [] })
@@ -300,7 +300,7 @@ describe('dependency planner', () => {
     }
   })
 
-  it('A14 reads disabled and suspended as orthogonal state flags', () => {
+  it('reads disabled and suspended as orthogonal state flags', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
@@ -324,7 +324,7 @@ describe('dependency planner', () => {
     ])
   })
 
-  it('A15 resumes a provider without serving through a disabled recovered node', () => {
+  it('resumes a provider without serving through a disabled recovered node', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
@@ -357,7 +357,7 @@ describe('dependency planner', () => {
     ).toEqual([{ id: 's', action: DependencyAction.resume }])
   })
 
-  it('A16 invalidates suspended bindings and restarts disabled consumers', () => {
+  it('invalidates suspended bindings and restarts disabled consumers', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
@@ -400,7 +400,7 @@ describe('dependency planner', () => {
     ).toContainEqual({ id: 'x', action: DependencyAction.restart })
   })
 
-  it('A17 preserves empty and suspended-frontier resume plans across graph sizes', () => {
+  it('preserves empty and suspended-frontier resume plans across graph sizes', () => {
     for (const length of [100, 2_000]) {
       const empty = createResumeFixture(length)
       expect(
@@ -425,7 +425,7 @@ describe('dependency planner', () => {
       )
     }
   })
-  it('A18 plans activation without walking activated ancestors', () => {
+  it('plans activation without walking activated ancestors', () => {
     /** Builds an activated chain of the given length, then three inactive lazy providers and a root. */
     const fixture = (size: number) => {
       const index = createTestIndex()

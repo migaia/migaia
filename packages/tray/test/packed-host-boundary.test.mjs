@@ -39,7 +39,7 @@ const packageSources = [
   ['undici-types', resolve(undiciTypesManifest, '..')]
 ]
 
-describe('TPD-T60 packed consumer boundary', () => {
+describe('packed consumer boundary', () => {
   it('installs explicit local tarballs and resolves runtime plus declarations outside the workspace', () => {
     try {
       const consumerDirectory = installTarballs()

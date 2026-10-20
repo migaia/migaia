@@ -94,7 +94,7 @@ async function flushMicrotasks(): Promise<void> {
 afterEach(() => vi.useRealTimers())
 
 describe('endpoint scheduler ownership', () => {
-  it('A6 owns manual timer order, cancellation, and disposal through one time port', () => {
+  it('owns manual timer order, cancellation, and disposal through one time port', () => {
     const scheduler = createManualScheduler()
     const time = createEndpointTimePort(scheduler)
     expect(time.scheduler).toBe(scheduler)
@@ -115,7 +115,7 @@ describe('endpoint scheduler ownership', () => {
     expect(fired).toEqual(['first', 'second'])
   })
 
-  it('A6 injects manual time into an endpoint deadline and rejects malformed schedulers', async () => {
+  it('injects manual time into an endpoint deadline and rejects malformed schedulers', async () => {
     const scheduler = createManualScheduler()
     const transport = silentTransport()
     const endpoint = await createEndpoint({
@@ -154,7 +154,7 @@ describe('endpoint scheduler ownership', () => {
     }
   })
 
-  it('A6 times out construction through the injected scheduler', async () => {
+  it('times out construction through the injected scheduler', async () => {
     const scheduler = createManualScheduler()
     const transport = silentTransport()
     const stall = defineMiddleware('scheduler-stall', () => ({
@@ -176,7 +176,7 @@ describe('endpoint scheduler ownership', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('A6 preserves original scheduler identity through kernel and PluginHost', async () => {
+  it('preserves original scheduler identity through kernel and PluginHost', async () => {
     const scheduler = createManualScheduler()
     const transport = silentTransport()
     const injected = await createEndpoint({
@@ -205,7 +205,7 @@ describe('endpoint scheduler ownership', () => {
     await defaultEndpoint.dispose()
   })
 
-  it('A6 timestamps failed responses and expires replay using manual time', async () => {
+  it('timestamps failed responses and expires replay using manual time', async () => {
     const scheduler = createManualScheduler()
     /** Diagnostic wall clock; wire sentAt comes from it, never from the manual scheduler. */
     const wallClock = { timestamp: () => 1_700_000_000_042 }
@@ -266,7 +266,7 @@ describe('endpoint scheduler ownership', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('A6 expires an early abort before a delayed provider request arrives', async () => {
+  it('expires an early abort before a delayed provider request arrives', async () => {
     const scheduler = createManualScheduler()
     /** Diagnostic wall clock; the abort variation sentAt comes from it. */
     const wallClock = { timestamp: () => 1_700_000_000_050 }
@@ -327,7 +327,7 @@ describe('endpoint scheduler ownership', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('A6 leaves no global Date or old timer owners in core source', () => {
+  it('leaves no global Date or old timer owners in core source', () => {
     const systemOwners = new Set<string>()
     for (const path of sources(coreRoot)) {
       new Visitor({
@@ -343,7 +343,7 @@ describe('endpoint scheduler ownership', () => {
     expect([...systemOwners]).toEqual(['adapters/memory.ts', 'endpoint-kernel.ts'])
   })
 
-  it('A10 retains very long endpoint deadlines and requests unref for system timers', async () => {
+  it('retains very long endpoint deadlines and requests unref for system timers', async () => {
     vi.useFakeTimers()
     const transport = silentTransport()
     const endpoint = await createEndpoint({

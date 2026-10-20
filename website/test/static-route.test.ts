@@ -133,7 +133,7 @@ function emittedFiles(directory: string): string[] {
   })
 }
 
-test('SITE-T-HOME uses the header language control and explains the documentation paths', () => {
+test('uses the header language control and explains the documentation paths', () => {
   assert.doesNotMatch(homeSource, />\s*English\s*</)
   assert.doesNotMatch(homeSource, />\s*中文\s*</)
   assert.match(homeSource, /API reference/)
@@ -146,9 +146,8 @@ test('SITE-T-HOME uses the header language control and explains the documentatio
   )
 })
 
-// SITE-T-LANGUAGE-HOME retired 2026-10-16: the scenario and combination landing page merged into
-// the docs home. SITE-T-DOCS-HOME-MERGED replaces it; the old ID is not reused.
-test('SITE-T-DOCS-HOME-MERGED serves the docs home at the language root and redirects the old index', () => {
+// The scenario and combination landing page merged into the docs home on 2026-10-16.
+test('serves the docs home at the language root and redirects the old index', () => {
   assert.match(languageSource, /function DocsIndex\(/)
   assert.doesNotMatch(languageSource, /HeroShader|homeScenarios/)
   assert.doesNotMatch(
@@ -180,7 +179,7 @@ test('SITE-T-DOCS-HOME-MERGED serves the docs home at the language root and redi
   }
 })
 
-test('SITE-T-DOCS-NAV classifies public symbols by developer-facing role', () => {
+test('classifies public symbols by developer-facing role', () => {
   for (const label of [
     '根包 API',
     '端点 API',
@@ -218,7 +217,7 @@ test('SITE-T-DOCS-NAV classifies public symbols by developer-facing role', () =>
   assert.doesNotMatch(docsSource, /candidate === api\s*\? apiLinks/)
 })
 
-test('SITE-T-STORAGE-WEB-NAV groups APIs by caller task instead of export module', () => {
+test('groups APIs by caller task instead of export module', () => {
   for (const label of [
     '存储后端',
     '实体、Schema 与序列化',
@@ -235,7 +234,7 @@ test('SITE-T-STORAGE-WEB-NAV groups APIs by caller task instead of export module
   assert.match(docsSource, /librarySlug !== 'storage-web'\s*&&\s*nestedGroups\.map/)
 })
 
-test('SITE-T-DOCS-RAIL keeps the expanded API navigation visible below the sticky header', () => {
+test('keeps the expanded API navigation visible below the sticky header', () => {
   assert.match(
     styleSource,
     /\.left-rail-sticky \{[\s\S]*?align-self: start;[\s\S]*?height: calc\(100dvh - var\(--header-height\) - var\(--space-8\)\);[\s\S]*?position: sticky;[\s\S]*?top: calc\(var\(--header-height\) \+ var\(--space-6\)\);/
@@ -255,7 +254,7 @@ test('SITE-T-DOCS-RAIL keeps the expanded API navigation visible below the stick
   }
 })
 
-test('SITE-T-API-STRUCTURE presents a purpose, example, option table, related APIs, then collapsed types', () => {
+test('presents a purpose, example, option table, related APIs, then collapsed types', () => {
   for (const locale of ['zh', 'en']) {
     /** A maintained callable with configuration exercises the complete reference layout. */
     const html = readFileSync(
@@ -281,7 +280,7 @@ test('SITE-T-API-STRUCTURE presents a purpose, example, option table, related AP
   }
 })
 
-test('SITE-T-WEBRPC-CONTRACT-TRANSPORTS documents contract use across host boundaries', () => {
+test('documents contract use across host boundaries', () => {
   for (const scenario of [
     'createWindowMessageTransport',
     'createWebWorkerTransport',
@@ -298,7 +297,7 @@ test('SITE-T-WEBRPC-CONTRACT-TRANSPORTS documents contract use across host bound
     assert.match(webRpcGuideSource, new RegExp(`id: '${exampleId}'`))
 })
 
-test('SITE-T-WEBRPC-MIDDLEWARE-TRANSPORTS applies real-host examples to every middleware guide', () => {
+test('applies real-host examples to every middleware guide', () => {
   assert.match(webRpcGuideSource, /function middlewareTransportExamples/)
   assert.match(
     webRpcGuideSource,
@@ -310,7 +309,7 @@ test('SITE-T-WEBRPC-MIDDLEWARE-TRANSPORTS applies real-host examples to every mi
   )
 })
 
-test('SITE-T-WEBRPC-PING-SCENARIOS documents operational liveness decisions', () => {
+test('documents operational liveness decisions', () => {
   for (const exampleId of [
     'preflight-liveness',
     'fanout-liveness',
@@ -321,7 +320,7 @@ test('SITE-T-WEBRPC-PING-SCENARIOS documents operational liveness decisions', ()
   assert.match(webRpcGuideSource, /\.\.\.pingUsageExamples\('zh'\)/)
 })
 
-test('SITE-T01 emits the admitted nested static route set', () => {
+test('emits the admitted nested static route set', () => {
   const routePaths = [
     'index.html',
     'en/index.html',
@@ -334,7 +333,7 @@ test('SITE-T01 emits the admitted nested static route set', () => {
   }
 })
 
-test('SITE-T-NO-INDEX keeps repository entry names out of public docs routes', () => {
+test('keeps repository entry names out of public docs routes', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   assert.ok(routes.has('/zh/docs/event-subscriber'))
   assert.ok(routes.has('/zh/docs/event-subscriber/api/createEventChannel'))
@@ -355,7 +354,7 @@ test('SITE-T-NO-INDEX keeps repository entry names out of public docs routes', (
   }
 })
 
-test('SITE-T-TOC renders only right-rail anchors backed by real page sections', () => {
+test('renders only right-rail anchors backed by real page sections', () => {
   const docsArtifacts = emittedFiles(buildRoot).filter(
     (path) => path.endsWith('index.html') && path.includes('/docs/')
   )
@@ -387,7 +386,7 @@ test('SITE-T-TOC renders only right-rail anchors backed by real page sections', 
   }
 })
 
-test('SITE-T-SEMANTIC-ROUTES keeps API links stable, readable, and collision-safe', () => {
+test('keeps API links stable, readable, and collision-safe', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   assert.ok(routes.has('/zh/docs/event-subscriber/api/createEventChannel'))
   assert.equal(
@@ -412,7 +411,7 @@ test('SITE-T-SEMANTIC-ROUTES keeps API links stable, readable, and collision-saf
   assert.doesNotMatch(moduleHtml, /href="[^"]+-[a-f0-9]{10}"/)
 })
 
-test('SITE-T-NESTED-MODULES preserves export hierarchy in routes and navigation', () => {
+test('preserves export hierarchy in routes and navigation', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   /** Every nested export must retain its slash-delimited module identity. */
   const nestedApis = apiManifest.apis.filter((api) => api.module.includes('/'))
@@ -444,7 +443,7 @@ test('SITE-T-NESTED-MODULES preserves export hierarchy in routes and navigation'
   assert.doesNotMatch(featureRail, /rpc-core\/features-[^/"]+/)
 })
 
-test('SITE-T-LEFT-RAIL-INVARIANT keeps every module tree stable across all API routes', () => {
+test('keeps every module tree stable across all API routes', () => {
   for (const api of apiManifest.apis) {
     const modulePath = publicModulePath('zh', api.library, api.module)
     const baseline = stableLeftRail(readFileSync(join(buildRoot, artifactPath(modulePath)), 'utf8'))
@@ -457,7 +456,7 @@ test('SITE-T-LEFT-RAIL-INVARIANT keeps every module tree stable across all API r
   }
 })
 
-test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () => {
+test('keeps Chinese navigation and introductions localized', () => {
   const chineseHome = readFileSync(join(buildRoot, 'zh/index.html'), 'utf8')
 
   assert.match(chineseHome, /<html[^>]+lang="zh"/)
@@ -475,7 +474,7 @@ test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () =>
   assert.doesNotMatch(chineseHome, /Find the API you need|Library index/)
 })
 
-test('SITE-T-BRAND uses the canonical Migaia name on every rendered page', () => {
+test('uses the canonical Migaia name on every rendered page', () => {
   const home = readFileSync(join(buildRoot, 'en/index.html'), 'utf8')
   assert.match(home, /Migaia library home|>migaia</)
   for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
@@ -483,7 +482,7 @@ test('SITE-T-BRAND uses the canonical Migaia name on every rendered page', () =>
   }
 })
 
-test('SITE-T-THEME exposes persistent light, dark, and system color modes', () => {
+test('exposes persistent light, dark, and system color modes', () => {
   assert.match(rootSource, /type IThemeChoice = 'light' \| 'dark' \| 'system'/)
   assert.match(rootSource, /localStorage\.setItem\(THEME_STORAGE_KEY/)
   /** The boot script resolves `system` before paint and maps retired time-theme values to it. */
@@ -494,7 +493,7 @@ test('SITE-T-THEME exposes persistent light, dark, and system color modes', () =
     assert.doesNotMatch(rootSource + styleSource, new RegExp(retired))
 })
 
-test('SITE-T01 embeds route content before JavaScript', () => {
+test('embeds route content before JavaScript', () => {
   const ownerApi = apiManifest.apis.find((api) => api.symbols.length > 0)
   assert.ok(ownerApi)
   const ownerRoute = artifactPath(publicModulePath('en', ownerApi.library, ownerApi.module))
@@ -513,7 +512,7 @@ test('SITE-T01 embeds route content before JavaScript', () => {
   )
 })
 
-test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces', () => {
+test('emits semantic symbol lists and labelled code surfaces', () => {
   const symbol = apiManifest.apis
     .find((api) => api.library === 'event-subscriber' && api.module === 'index')
     ?.symbols.find((candidate) => candidate.name === 'createEventChannel')
@@ -547,7 +546,7 @@ test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces'
   assert.doesNotMatch(html, / · [a-f0-9]{8}\./)
 })
 
-test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by declaration expansion', () => {
+test('renders maintained constructor fields omitted by declaration expansion', () => {
   const resourceHtml = readFileSync(
     join(buildRoot, 'zh/docs/resource/api/Resource/index.html'),
     'utf8'
@@ -574,7 +573,7 @@ test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by d
   assert.match(resourceHtml, /systemScheduler/)
 })
 
-test('SITE-T-RESOURCE-OVERVIEW keeps concrete learning content without the generated reading checklist', () => {
+test('keeps concrete learning content without the generated reading checklist', () => {
   const html = readFileSync(join(buildRoot, 'zh/docs/resource/api/index.html'), 'utf8')
   const text = renderedText(html)
 
@@ -598,7 +597,7 @@ test('SITE-T-RESOURCE-OVERVIEW keeps concrete learning content without the gener
   assert.match(readme, /generation 校验.*?旧结果/s)
 })
 
-test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
+test('explains request generations, observation, and terminal cleanup', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -613,7 +612,7 @@ test('SITE-T-RESOURCE-START explains request generations, observation, and termi
   assert.match(text, /暂时停止当前请求.*?cancel\(\)/s)
 })
 
-test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain', () => {
+test('shows the complete invalidation and render chain', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -629,7 +628,7 @@ test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain'
   assert.match(text, /先停止渲染 Effect，再终止 Resource，最后释放输入 Signal/)
 })
 
-test('SITE-T-RESOURCE-DECISION keeps use cases and direct-await tradeoffs above the example', () => {
+test('keeps use cases and direct-await tradeoffs above the example', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -649,7 +648,7 @@ test('SITE-T-RESOURCE-DECISION keeps use cases and direct-await tradeoffs above 
   assert.ok(decisionIndex >= 0 && decisionIndex < exampleIndex)
 })
 
-test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every host capability', () => {
+test('renders the process-wide layer contract and every host capability', () => {
   const loggerHtml = readFileSync(
     join(buildRoot, 'zh/docs/logger/api/setLoggerRuntimeManager/index.html'),
     'utf8'
@@ -680,7 +679,7 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
   }
 })
 
-test('SITE-T-PLUGIN-HOST-ERROR explains stable codes, original causes, and retained diagnostic detail', () => {
+test('explains stable codes, original causes, and retained diagnostic detail', () => {
   const errorHtml = readFileSync(
     join(buildRoot, 'zh/docs/plugin-host/api/PluginHostError/index.html'),
     'utf8'
@@ -700,7 +699,7 @@ test('SITE-T-PLUGIN-HOST-ERROR explains stable codes, original causes, and retai
   }
 })
 
-test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths', () => {
+test('render distinct static and dynamic ownership paths', () => {
   const staticHtml = readFileSync(
     join(buildRoot, 'zh/docs/tray/api/createTrayGraph/index.html'),
     'utf8'
@@ -727,7 +726,7 @@ test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths
   assert.match(hostHtml, /--option-shutdown-mode"/)
 })
 
-test('SITE-T-CAPABILITY-ENTRYPOINTS render distinct ownership and mutation paths', () => {
+test('render distinct ownership and mutation paths', () => {
   const hostHtml = readFileSync(
     join(buildRoot, 'zh/docs/capability/api/createCapabilityHost/index.html'),
     'utf8'
@@ -758,7 +757,7 @@ test('SITE-T-CAPABILITY-ENTRYPOINTS render distinct ownership and mutation paths
   assert.match(topologyHtml, /不拥有节点启动、状态、回滚或释放/)
 })
 
-test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported adapter', () => {
+test('render each control algebra and supported adapter', () => {
   /** Reads one maintained middleware API page. */
   const readMiddleware = (symbol: string): string =>
     readFileSync(join(buildRoot, `zh/docs/middleware-pipeline/api/${symbol}/index.html`), 'utf8')
@@ -781,7 +780,7 @@ test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported ad
   assert.match(text, /取消/)
 })
 
-test('SITE-T-WASM-API-ENTRYPOINTS render exact memory and conversion ownership', () => {
+test('render exact memory and conversion ownership', () => {
   /** Reads one maintained WASM API page. */
   const readWasm = (symbol: string): string =>
     readFileSync(join(buildRoot, `zh/docs/wasm/api/${symbol}/index.html`), 'utf8')
@@ -795,7 +794,7 @@ test('SITE-T-WASM-API-ENTRYPOINTS render exact memory and conversion ownership',
   assert.match(readWasm('msgpack_to_json'), /尾随字节或第二个文档会失败/)
 })
 
-test('SITE-T-STORE-SHARED-API-ENTRYPOINTS render ABI, synchronization, and error identity', () => {
+test('render ABI, synchronization, and error identity', () => {
   /** Reads one maintained Store Shared API page. */
   const readShared = (routeSegment: string): string =>
     readFileSync(join(buildRoot, `zh/docs/store-shared/api/${routeSegment}/index.html`), 'utf8')
@@ -827,7 +826,7 @@ test('SITE-T-STORE-SHARED-API-ENTRYPOINTS render ABI, synchronization, and error
   )
 })
 
-test('SITE-T-STORE-WORKER-API-ENTRYPOINTS render compute, streaming, and ownership boundaries', () => {
+test('render compute, streaming, and ownership boundaries', () => {
   /** Reads one maintained Store Worker API page. */
   const readWorker = (moduleName: string, symbol: string): string =>
     readFileSync(
@@ -876,7 +875,7 @@ test('SITE-T-STORE-WORKER-API-ENTRYPOINTS render compute, streaming, and ownersh
   )
 })
 
-test('SITE-T-STORE-WASM-API-ENTRYPOINTS render readiness, field layout, and cleanup', () => {
+test('render readiness, field layout, and cleanup', () => {
   /** Reads one maintained Store WASM API page. */
   const readStoreWasm = (symbol: string): string =>
     readFileSync(join(buildRoot, 'zh/docs/store-wasm/api/' + symbol + '/index.html'), 'utf8')
@@ -908,7 +907,7 @@ test('SITE-T-STORE-WASM-API-ENTRYPOINTS render readiness, field layout, and clea
   )
 })
 
-test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampoline routes', () => {
+test('renders maintained guidance without architecture trampoline routes', () => {
   assert.equal(
     routeManifest.entries.some((entry) =>
       /^\/(?:en|zh)\/architecture\/[^/]+\/(?:index|overview|ownership)$/.test(entry.path)
@@ -1023,7 +1022,7 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
   }
 })
 
-test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable and navigable', () => {
+test('makes maintained cross-library references explainable and navigable', () => {
   const capability = readFileSync(join(buildRoot, 'zh/docs/capability/readme/index.html'), 'utf8')
   assert.match(capability, /class="library-reference"[^>]*href="\/zh\/docs\/plugin-host"/)
   assert.match(renderedText(capability), /安装和卸载插件.*配置共享能力与处理步骤.*安装失败时回滚/s)
@@ -1047,7 +1046,7 @@ test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable
   }
 })
 
-test('SITE-T-CODE-EXPLANATIONS keeps example guidance plain and label-free', () => {
+test('keeps example guidance plain and label-free', () => {
   const capabilityArchitecture = readFileSync(
     join(buildRoot, 'zh/docs/capability/index.html'),
     'utf8'
@@ -1058,7 +1057,7 @@ test('SITE-T-CODE-EXPLANATIONS keeps example guidance plain and label-free', () 
   assert.doesNotMatch(capabilityArchitecture, /finally、组件卸载或任务结束时调用 dispose\(\)/)
 })
 
-test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neighboring APIs', () => {
+test('separates signatures, fields, validation, and neighboring APIs', () => {
   const capabilityArchitecture = readFileSync(
     join(buildRoot, 'zh/docs/capability/readme/index.html'),
     'utf8'
@@ -1082,7 +1081,7 @@ test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neigh
   assert.doesNotMatch(storeLightArchitecture, /<div class="contract-signature">[\s\S]{0,500}签名：/)
 })
 
-test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and dispose', () => {
+test('shows when to enable, consume, disable, and dispose', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/capability/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1098,7 +1097,7 @@ test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and di
   assert.match(text, /配置或权限被撤回时用 setFlag\('notificationCenter', false\)/)
 })
 
-test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', () => {
+test('explains composition terms in reader language', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1112,7 +1111,7 @@ test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', ()
   assert.match(text, /仍须等待返回的 physicalCompletion Promise/)
 })
 
-test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed view', () => {
+test('uses definePlugin and consumes the committed view', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1127,7 +1126,7 @@ test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed vie
   assert.match(text, /use\(\) 成功后按输入顺序返回插件句柄.*handle/)
 })
 
-test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and transition', () => {
+test('explains the control signal and transition', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1141,10 +1140,10 @@ test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and tran
 })
 
 /**
- * SITE-T-HEADER-SHELL replaces SITE-T-HEADER-RADIUS, retired on 2026-10-16 when the visual system
- * dropped the rounded floating header for a full-width sticky bar.
+ * The rounded floating header was replaced on 2026-10-16 when the visual system adopted a
+ * full-width sticky bar.
  */
-test('SITE-T-HEADER-SHELL keeps a sticky translucent header that draws its rule only after scroll', () => {
+test('keeps a sticky translucent header that draws its rule only after scroll', () => {
   assert.match(
     styleSource,
     /\.site-header \{[\s\S]*?backdrop-filter:[\s\S]*?border-bottom: 1px solid transparent;[\s\S]*?height: var\(--header-height\);[\s\S]*?position: sticky;/
@@ -1156,14 +1155,14 @@ test('SITE-T-HEADER-SHELL keeps a sticky translucent header that draws its rule 
   assert.match(rootSource, /className="site-header" data-scrolled=/)
 })
 
-test('SITE-T-ROOT-LANGUAGE-SWITCH sends the unprefixed landing page to Chinese', () => {
+test('sends the unprefixed landing page to Chinese', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/')), 'utf8')
 
   assert.match(html, /aria-label="Switch to Chinese"[^>]+href="\/zh"/)
   assert.doesNotMatch(html, /aria-label="Switch to Chinese"[^>]+href="\/"/)
 })
 
-test('SITE-T01 uses one static React Router pipeline without legacy framework leftovers', () => {
+test('uses one static React Router pipeline without legacy framework leftovers', () => {
   assert.match(routeConfig, /ssr: false/)
   assert.match(routeConfig, /routeManifest\.entries\.map/)
   const legacyFramework = String.fromCharCode(97, 115, 116, 114, 111)
@@ -1174,7 +1173,7 @@ test('SITE-T01 uses one static React Router pipeline without legacy framework le
   assert.ok(!existsSync(join(websiteRoot, '.' + legacyName.slice(0, -7))))
 })
 
-test('SITE-T-A05/A10 closes every generated route and API body artifact', () => {
+test('closes every generated route and API body artifact', () => {
   const seen = new Set<string>()
   for (const entry of routeManifest.entries) {
     assert.ok(!seen.has(entry.path), `duplicate canonical route: ${entry.path}`)
@@ -1229,7 +1228,7 @@ test('SITE-T-A05/A10 closes every generated route and API body artifact', () => 
   }
 })
 
-test('SITE-T-A26/A30 closes emitted chunk and terminology boundaries', () => {
+test('closes emitted chunk and terminology boundaries', () => {
   const files = emittedFiles(join(buildRoot, 'assets'))
   assert.ok(files.length > 0)
   const assetText = files.map((file) => readFileSync(file, 'utf8')).join('\n')
@@ -1264,7 +1263,7 @@ test('SITE-T-A26/A30 closes emitted chunk and terminology boundaries', () => {
   }
 })
 
-test('SITE-T-PERF keeps route code separate from generated library data', () => {
+test('keeps route code separate from generated library data', () => {
   const assets = emittedFiles(join(buildRoot, 'assets'))
   const docsChunk = assets.find((file) => /\/docs-[^/]+\.js$/.test(file))
   assert.ok(docsChunk, 'missing Docs route chunk')
@@ -1298,7 +1297,7 @@ test('SITE-T-PERF keeps route code separate from generated library data', () => 
   }
 })
 
-test('SITE-T-A34/A35 closes API ordering and exposes a meaningful next action for every page', () => {
+test('closes API ordering and exposes a meaningful next action for every page', () => {
   for (const entry of routeManifest.entries) {
     if (LEGACY_DOCS_INDEX_REDIRECTS.has(entry.path)) continue
     const html = readFileSync(join(buildRoot, artifactPath(entry.path)), 'utf8')
@@ -1309,14 +1308,14 @@ test('SITE-T-A34/A35 closes API ordering and exposes a meaningful next action fo
   }
 })
 
-test('SITE-T-ARCHITECTURE-INDEX groups every library by family on the docs home', () => {
+test('groups every library by family on the docs home', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh')), 'utf8')
 
   assert.match(html, /class="architecture-stack"/)
   assert.doesNotMatch(html, /阅读架构时先回答三个问题/)
 })
 
-test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slogans', () => {
+test('uses concrete responsibilities instead of slogans', () => {
   const docsIndex = readFileSync(join(buildRoot, artifactPath('/zh')), 'utf8')
   const utilsArchitecture = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/utils/readme')),
@@ -1340,7 +1339,7 @@ test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slog
   }
 })
 
-test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design on every README page', () => {
+test('explain capability, pain, and design on every README page', () => {
   const packageHomes = routeManifest.entries.filter(
     (entry) => entry.locale === 'zh' && /^\/zh\/docs\/[^/]+\/readme$/.test(entry.path)
   )
@@ -1374,7 +1373,7 @@ test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design on every RE
   assert.match(trayText, /跨机器发现、browser Worker 与持久消息不在当前范围/)
 })
 
-test('SITE-T-ARCHITECTURE-API-NAV shares one library sidebar between guides and API pages', () => {
+test('shares one library sidebar between guides and API pages', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const apiHtml = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/api')), 'utf8')
 
@@ -1385,14 +1384,14 @@ test('SITE-T-ARCHITECTURE-API-NAV shares one library sidebar between guides and 
   assert.match(html, /href="\/zh\/docs\/utils\/api\/function\/onceAsync"/)
 })
 
-test('SITE-T-CODE-EXPLANATION-PROSE renders authored code without synthesized walkthrough prose', () => {
+test('renders authored code without synthesized walkthrough prose', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /<figure class="code-frame">/)
   assert.doesNotMatch(html, /class="code-walkthrough(?:-notes)?"/)
 })
 
-test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hierarchy', () => {
+test('gives inline and block code a consistent themed hierarchy', () => {
   assert.match(styleSource, /--inline-code-background:/)
   assert.match(styleSource, /--inline-code-border:/)
   assert.match(styleSource, /--inline-code-text:/)
@@ -1409,7 +1408,7 @@ test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hiera
   )
 })
 
-test('SITE-T-GUIDE-API-NAV renders symbols as plain navigation text', () => {
+test('renders symbols as plain navigation text', () => {
   /** The unified left rail replaced the guide API menu; a guide page exercises it. */
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/lifecycle')), 'utf8')
   const rail = html.match(/<aside class="left-rail-content"[\s\S]*?<\/aside>/)?.[0]
@@ -1428,7 +1427,7 @@ test('SITE-T-GUIDE-API-NAV renders symbols as plain navigation text', () => {
   )
 })
 
-test('SITE-T-CONTENT-LISTS renders API and re-export entries as responsive cards', () => {
+test('renders API and re-export entries as responsive cards', () => {
   assert.match(
     styleSource,
     /\.api-reference-list,[\s\S]*?\.reexport-list ul \{[\s\S]*?grid-template-columns: repeat\(auto-fit,[\s\S]*?list-style: none;/
@@ -1440,7 +1439,7 @@ test('SITE-T-CONTENT-LISTS renders API and re-export entries as responsive cards
   assert.match(styleSource, /\.reexport-list li:hover \{[\s\S]*?transform: translateY\(-1px\);/)
 })
 
-test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => {
+test('keeps catalogue introductions compact', () => {
   assert.match(languageSource, /className="page-shell content-page domain-index-page"/)
   assert.match(
     styleSource,
@@ -1452,7 +1451,7 @@ test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => 
   )
 })
 
-test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler and repeated prose on every rendered page', () => {
+test('rejects generated filler and repeated prose on every rendered page', () => {
   /** Synthesized commentary must never become reader-facing copy or example comments. */
   const forbidden = [
     '先从示例标出的公开路径引入',
@@ -1540,7 +1539,7 @@ test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler and repeated pros
   }
 })
 
-test('SITE-T-PAGE-META gives every rendered page a nonempty title and purpose description', () => {
+test('gives every rendered page a nonempty title and purpose description', () => {
   for (const path of emittedFiles(buildRoot).filter((entry) => entry.endsWith('.html'))) {
     if (isLegacyRedirectArtifact(path)) continue
     /** Metadata must exist in static HTML before the client starts. */
@@ -1559,7 +1558,7 @@ test('SITE-T-PAGE-META gives every rendered page a nonempty title and purpose de
   }
 })
 
-test('SITE-T-API-EXAMPLE-COMMENTARY keeps examples without synthesized walkthroughs', () => {
+test('keeps examples without synthesized walkthroughs', () => {
   for (const locale of ['zh', 'en']) {
     for (const path of emittedFiles(join(buildRoot, `${locale}/docs`)).filter((entry) =>
       entry.endsWith('index.html')
@@ -1580,7 +1579,7 @@ test('SITE-T-API-EXAMPLE-COMMENTARY keeps examples without synthesized walkthrou
   }
 })
 
-test('SITE-T-API-SIGNATURE-COMMENTARY collapses complete declarations without synthesized walkthroughs', () => {
+test('collapses complete declarations without synthesized walkthroughs', () => {
   for (const locale of ['zh', 'en']) {
     for (const path of emittedFiles(join(buildRoot, `${locale}/docs`)).filter((entry) =>
       entry.endsWith('index.html')
@@ -1611,7 +1610,7 @@ test('SITE-T-API-SIGNATURE-COMMENTARY collapses complete declarations without sy
   }
 })
 
-test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle', () => {
+test('explains its complete production lifecycle', () => {
   const html = readFileSync(
     join(buildRoot, 'zh/docs/capability/api/createCapabilityHost/index.html'),
     'utf8'
@@ -1628,7 +1627,7 @@ test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle'
   assert.doesNotMatch(text, /class="code-walkthrough"|输出用于确认上一操作的结果/)
 })
 
-test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal behavior', () => {
+test('explains the exact subscription, delivery, and removal behavior', () => {
   const html = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
     'utf8'
@@ -1642,7 +1641,7 @@ test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal 
   assert.doesNotMatch(text, /最后执行这一项操作/)
 })
 
-test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary precisely', () => {
+test('uses its subpath and states the style boundary precisely', () => {
   const html = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
     'utf8'
@@ -1656,7 +1655,7 @@ test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary pre
   assert.match(text, /不会带上 off、dispose、unlisten 等 style alias/)
 })
 
-test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was removed', () => {
+test('explains why the legacy class event name was removed', () => {
   const html = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
     'utf8'
@@ -1672,7 +1671,7 @@ test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was 
   assert.match(text, /hub\.subscribe\('count', listener\)/)
 })
 
-test('SITE-T-EVENT-TASK defines the channel, registration, payload, and settled result', () => {
+test('defines the channel, registration, payload, and settled result', () => {
   const html = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
     'utf8'
@@ -1687,7 +1686,7 @@ test('SITE-T-EVENT-TASK defines the channel, registration, payload, and settled 
   assert.match(text, /result 则明确区分发送成功的 receipt 与发送失败的原因/)
 })
 
-test('SITE-T-API-EXAMPLES import the primary API from its public owner', () => {
+test('import the primary API from its public owner', () => {
   const host = readFileSync(
     join(buildRoot, 'zh/docs/capability/api/createCapabilityHost/index.html'),
     'utf8'
@@ -1707,7 +1706,7 @@ test('SITE-T-API-EXAMPLES import the primary API from its public owner', () => {
   )
 })
 
-test('SITE-T-FUNCTION-EXAMPLE-COVERAGE gives every function detail page a copyable example', () => {
+test('gives every function detail page a copyable example', () => {
   const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
     path.endsWith('index.html')
   )
@@ -1729,7 +1728,7 @@ test('SITE-T-FUNCTION-EXAMPLE-COVERAGE gives every function detail page a copyab
   }
 })
 
-test('SITE-T-CLASS-EXAMPLE-COVERAGE gives every class detail page a maintained example', () => {
+test('gives every class detail page a maintained example', () => {
   const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
     path.endsWith('index.html')
   )
@@ -1744,7 +1743,7 @@ test('SITE-T-CLASS-EXAMPLE-COVERAGE gives every class detail page a maintained e
   }
 })
 
-test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API first', () => {
+test('recommends the native Promise.withResolvers API first', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /优先使用原生 API/)
@@ -1752,7 +1751,7 @@ test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API firs
   assert.match(html, /兼容旧运行时/)
 })
 
-test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs', () => {
+test('explains execution timing and identity tradeoffs', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /当前调用栈立即执行/)
@@ -1761,7 +1760,7 @@ test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs',
   assert.match(html, /新的链式 Promise/)
 })
 
-test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', () => {
+test('marks repository-only test infrastructure', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /本仓测试专用/)
@@ -1769,7 +1768,7 @@ test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', 
   assert.match(html, /测试框架提供的 fake timers/)
 })
 
-test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date.now', () => {
+test('distinguishes the injectable clock from Date.now', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1781,7 +1780,7 @@ test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date
   assert.doesNotMatch(text, /数值与 Date\.now\(\) 相同|Unix 时间戳，数值与精度没有区别/)
 })
 
-test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () => {
+test('renders every code as a described list item', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1792,7 +1791,7 @@ test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () 
   assert.match(text, /NUMBER_FORMAT_INVALID.*Intl\.NumberFormat/s)
 })
 
-test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array views', () => {
+test('explains ArrayBuffer storage and Uint8Array views', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1803,7 +1802,7 @@ test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array view
   assert.match(text, /SharedArrayBuffer.*并发语义不同/s)
 })
 
-test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches', () => {
+test('shows its input object and all result branches', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1817,7 +1816,7 @@ test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches
   assert.match(text, /字段不存在.*读取字段失败.*分开/s)
 })
 
-test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and limits', () => {
+test('explains structured clone mechanics and limits', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1829,7 +1828,7 @@ test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and li
   assert.match(text, /copy\.primary === copy\.alias.*true.*共享引用关系被保留/s)
 })
 
-test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning', () => {
+test('contrasts strict and best-effort cloning', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1841,7 +1840,7 @@ test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning'
   assert.match(text, /diagnostics 非空.*不能把返回值宣称为完全隔离快照/s)
 })
 
-test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', () => {
+test('documents its only meaningful policy use', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1852,7 +1851,7 @@ test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', 
   assert.match(text, /外部输入.*历史状态.*跨边界传输.*immutableSnapshot/s)
 })
 
-test('SITE-T-UTILS-SET explains immutable updates and structural sharing precisely', () => {
+test('explains immutable updates and structural sharing precisely', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1863,7 +1862,7 @@ test('SITE-T-UTILS-SET explains immutable updates and structural sharing precise
   assert.match(text, /Object\.is\(\).*相等.*直接返回原根对象/s)
 })
 
-test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed successors', () => {
+test('demonstrates admission, isolation, and managed successors', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1875,7 +1874,7 @@ test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed suc
   assert.match(text, /返回对象没有被冻结.*运行时配置.*不应当作可序列化数据/s)
 })
 
-test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an explicit diff', () => {
+test('shows both inputs, merged output, and an explicit diff', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1888,7 +1887,7 @@ test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an expli
   assert.match(text, /diff 只是把结果变化写明，不是 combineConfig 的额外返回值/)
 })
 
-test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy responsibility', () => {
+test('explains module scope, singleton limits, and Proxy responsibility', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1902,7 +1901,7 @@ test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy respo
   assert.match(text, /不适合需要重试、重置、热更新或按请求隔离的初始化/)
 })
 
-test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure boundaries', () => {
+test('explains concrete use cases and shared-failure boundaries', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /export const loadAppConfig = onceAsync/)
@@ -1915,7 +1914,7 @@ test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure bou
   assert.match(html, /模块重复实例化或跨 iframe、Worker、Node <code>vm<\/code> 时不会共享/)
 })
 
-test('SITE-T-UTILS-READONLY-CONFIG explains read-only behavior in plain language', () => {
+test('explains read-only behavior in plain language', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -1927,7 +1926,7 @@ test('SITE-T-UTILS-READONLY-CONFIG explains read-only behavior in plain language
   assert.doesNotMatch(text, /门面/)
 })
 
-test('SITE-T-API-TYPING keeps runtime APIs primary and typing subordinate', () => {
+test('keeps runtime APIs primary and typing subordinate', () => {
   for (const api of apiManifest.apis) {
     const html = readFileSync(
       join(buildRoot, artifactPath(publicModulePath('en', api.library, api.module))),
@@ -1954,7 +1953,7 @@ test('SITE-T-API-TYPING keeps runtime APIs primary and typing subordinate', () =
   }
 })
 
-test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module disclosure', () => {
+test('renders legacy type paths inside the subordinate module disclosure', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   assert.ok(routes.has('/zh/docs/utils/api/promise/IAbortSignal'))
   assert.match(docsSource, /const selectedType = selectedApi\?\.symbols\.find/)
@@ -1967,7 +1966,7 @@ test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module 
   assert.match(docsSource, /target\.scrollIntoView\(\{ block: 'start' }\)/)
 })
 
-test('SITE-T-NO-ACCORDION keeps prose visible while complete signatures stay subordinate', () => {
+test('keeps prose visible while complete signatures stay subordinate', () => {
   /** Approved inventory links must resolve to a real generated API route. */
   const apiRoutes = new Set(
     routeManifest.entries
@@ -2018,7 +2017,7 @@ test('SITE-T-NO-ACCORDION keeps prose visible while complete signatures stay sub
   }
 })
 
-test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code', () => {
+test('keeps every module type declaration visible with its code', () => {
   for (const api of apiManifest.apis) {
     const types = api.symbols.filter(
       (symbol) => symbol.kind === 'type' || symbol.kind === 'interface'
@@ -2047,7 +2046,7 @@ test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code
   }
 })
 
-test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', () => {
+test('gives primary tasks independent bilingual pages', () => {
   const expectations = [
     ['/zh/docs/store-react', '把 Store 状态带进 React', '状态仍由原来的包持有'],
     ['/en/docs/store-react', 'Bring Store state into React', 'State stays with its owning package'],
@@ -4567,7 +4566,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   }
 })
 
-test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect', () => {
+test('flushes the queued rerun before disposing the Effect', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/reactive/getting-started`)),
@@ -4582,7 +4581,7 @@ test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect
   }
 })
 
-test('SITE-T-REACTIVE-START explains graph tracking, scheduling, and exact cleanup', () => {
+test('explains graph tracking, scheduling, and exact cleanup', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/reactive/readme')), 'utf8')
   const text = renderedText(html)
 
@@ -4595,7 +4594,7 @@ test('SITE-T-REACTIVE-START explains graph tracking, scheduling, and exact clean
   assert.match(text, /Scope.*?统一释放/s)
 })
 
-test('SITE-T-MIDDLEWARE-ADAPTERS documents every supported lift direction and the forbidden one', () => {
+test('documents every supported lift direction and the forbidden one', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/middleware-pipeline/sync-and-async`)),
@@ -4618,7 +4617,7 @@ test('SITE-T-MIDDLEWARE-ADAPTERS documents every supported lift direction and th
   }
 })
 
-test('SITE-T-EVENT-STYLE teaches aliases while preserving the canonical Channel contract', () => {
+test('teaches aliases while preserving the canonical Channel contract', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/event-subscriber/getting-started`)),
@@ -4645,7 +4644,7 @@ test('SITE-T-EVENT-STYLE teaches aliases while preserving the canonical Channel 
   }
 })
 
-test('SITE-T-WEBRPC-LINKS keeps every maintained RPC continuation resolvable', () => {
+test('keeps every maintained RPC continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -4677,7 +4676,7 @@ test('SITE-T-WEBRPC-LINKS keeps every maintained RPC continuation resolvable', (
   }
 })
 
-test('SITE-T-WEBRPC-TRANSPORTS renders every adapter tutorial in both locales', () => {
+test('renders every adapter tutorial in both locales', () => {
   const factories = [
     'createMemoryTransportPair',
     'createWindowMessageTransport',
@@ -4698,7 +4697,7 @@ test('SITE-T-WEBRPC-TRANSPORTS renders every adapter tutorial in both locales', 
   }
 })
 
-test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left rail', () => {
+test('exposes primary endpoints and every guide from the left rail', () => {
   for (const locale of ['en', 'zh']) {
     /** Each factory remains navigable from the actual package that owns its public API. */
     const factoryOwners = [
@@ -4744,7 +4743,7 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
   }
 })
 
-test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains advanced factories and the lower-level call boundary', () => {
+test('explains advanced factories and the lower-level call boundary', () => {
   for (const locale of ['en', 'zh']) {
     const path = `/${locale}/docs/rpc-core/endpoint-composition`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
@@ -4773,7 +4772,7 @@ test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains advanced factories and the lower
   }
 })
 
-test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom middleware', () => {
+test('documents the public Feature boundary and custom middleware', () => {
   for (const locale of ['en', 'zh']) {
     const path = `/${locale}/docs/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
@@ -4789,7 +4788,7 @@ test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom 
   }
 })
 
-test('SITE-T-WEBRPC-GUIDE-NAV keeps guide topics, primary endpoints, and plugins in one rail', () => {
+test('keeps guide topics, primary endpoints, and plugins in one rail', () => {
   for (const locale of ['en', 'zh'] as const) {
     const path = `/${locale}/docs/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
@@ -4811,7 +4810,7 @@ test('SITE-T-WEBRPC-GUIDE-NAV keeps guide topics, primary endpoints, and plugins
   }
 })
 
-test('SITE-T-UTILS-LINKS keeps every maintained Utils continuation resolvable', () => {
+test('keeps every maintained Utils continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -4844,7 +4843,7 @@ test('SITE-T-UTILS-LINKS keeps every maintained Utils continuation resolvable', 
   }
 })
 
-test('SITE-T-TRAY-LINKS keeps every maintained Tray continuation resolvable', () => {
+test('keeps every maintained Tray continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -4879,7 +4878,7 @@ test('SITE-T-TRAY-LINKS keeps every maintained Tray continuation resolvable', ()
   }
 })
 
-test('SITE-T-TRAY-RUNTIME explains Host options, managed reads, and every mutation outcome', () => {
+test('explains Host options, managed reads, and every mutation outcome', () => {
   const expectations = [
     [
       '/zh/docs/tray/dynamic-host',
@@ -4916,7 +4915,7 @@ test('SITE-T-TRAY-RUNTIME explains Host options, managed reads, and every mutati
   }
 })
 
-test('SITE-T-WASM-LINKS keeps every maintained WASM continuation resolvable', () => {
+test('keeps every maintained WASM continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -4945,7 +4944,7 @@ test('SITE-T-WASM-LINKS keeps every maintained WASM continuation resolvable', ()
   }
 })
 
-test('SITE-T-WASM-OWNERSHIP releases both arena ids and ConversionResult wrappers', () => {
+test('releases both arena ids and ConversionResult wrappers', () => {
   for (const locale of ['en', 'zh']) {
     const gettingStarted = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/wasm/getting-started`)),
@@ -4965,7 +4964,7 @@ test('SITE-T-WASM-OWNERSHIP releases both arena ids and ConversionResult wrapper
   }
 })
 
-test('SITE-T-STORE-LIGHT-LINKS keeps every maintained Store Light continuation resolvable', () => {
+test('keeps every maintained Store Light continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -4995,7 +4994,7 @@ test('SITE-T-STORE-LIGHT-LINKS keeps every maintained Store Light continuation r
   }
 })
 
-test('SITE-T-STORE-LIGHT-CONFIG explains Store, hydration, and Resource option defaults', () => {
+test('explains Store, hydration, and Resource option defaults', () => {
   const expectations = [
     [
       'getting-started',
@@ -5030,7 +5029,7 @@ test('SITE-T-STORE-LIGHT-CONFIG explains Store, hydration, and Resource option d
   }
 })
 
-test('SITE-T-STORE-KEYED-LINKS keeps every maintained Store Keyed continuation resolvable', () => {
+test('keeps every maintained Store Keyed continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5060,7 +5059,7 @@ test('SITE-T-STORE-KEYED-LINKS keeps every maintained Store Keyed continuation r
   }
 })
 
-test('SITE-T-STORE-KEYED-FAMILY explains key domain, cache bounds, and split ownership', () => {
+test('explains key domain, cache bounds, and split ownership', () => {
   for (const locale of ['en', 'zh']) {
     const family = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/store-keyed/families-and-cache-identity`)),
@@ -5085,7 +5084,7 @@ test('SITE-T-STORE-KEYED-FAMILY explains key domain, cache bounds, and split own
   }
 })
 
-test('SITE-T-STORE-INDEXED-LINKS keeps every maintained Store Indexed continuation resolvable', () => {
+test('keeps every maintained Store Indexed continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5115,7 +5114,7 @@ test('SITE-T-STORE-INDEXED-LINKS keeps every maintained Store Indexed continuati
   }
 })
 
-test('SITE-T-STORE-INDEXED-CONFIG explains construction defaults and mutation boundaries', () => {
+test('explains construction defaults and mutation boundaries', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/store-indexed/getting-started`)),
@@ -5136,7 +5135,7 @@ test('SITE-T-STORE-INDEXED-CONFIG explains construction defaults and mutation bo
   }
 })
 
-test('SITE-T-STORE-MIDDLEWARE-LINKS keeps every maintained Store Middleware continuation resolvable', () => {
+test('keeps every maintained Store Middleware continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5167,7 +5166,7 @@ test('SITE-T-STORE-MIDDLEWARE-LINKS keeps every maintained Store Middleware cont
   }
 })
 
-test('SITE-T-STORE-MIDDLEWARE-CONFIG makes every binding default and ownership edge explicit', () => {
+test('makes every binding default and ownership edge explicit', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/store-middleware/binding-and-shared-policy`)),
@@ -5189,7 +5188,7 @@ test('SITE-T-STORE-MIDDLEWARE-CONFIG makes every binding default and ownership e
   }
 })
 
-test('SITE-T-STORE-PERSIST-LINKS keeps every maintained Store Persist continuation resolvable', () => {
+test('keeps every maintained Store Persist continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5220,7 +5219,7 @@ test('SITE-T-STORE-PERSIST-LINKS keeps every maintained Store Persist continuati
   }
 })
 
-test('SITE-T-STORE-PERSIST-KEYED exposes the real handle and post-hydration read path', () => {
+test('exposes the real handle and post-hydration read path', () => {
   for (const locale of ['en', 'zh']) {
     /** Adapter selection and retry guidance document the shared handle controls. */
     const handleGuides = ['choose-an-adapter', 'retry-errors-and-shutdown']
@@ -5252,7 +5251,7 @@ test('SITE-T-STORE-PERSIST-KEYED exposes the real handle and post-hydration read
   }
 })
 
-test('SITE-T-STORE-REACT-LINKS keeps every maintained Store React continuation resolvable', () => {
+test('keeps every maintained Store React continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5283,7 +5282,7 @@ test('SITE-T-STORE-REACT-LINKS keeps every maintained Store React continuation r
   }
 })
 
-test('SITE-T-STORE-SSR-LINKS keeps every maintained Store SSR continuation resolvable', () => {
+test('keeps every maintained Store SSR continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5315,7 +5314,7 @@ test('SITE-T-STORE-SSR-LINKS keeps every maintained Store SSR continuation resol
   }
 })
 
-test('SITE-T-STORE-DEVTOOLS-LINKS keeps every maintained Store Devtools continuation resolvable', () => {
+test('keeps every maintained Store Devtools continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5346,7 +5345,7 @@ test('SITE-T-STORE-DEVTOOLS-LINKS keeps every maintained Store Devtools continua
   }
 })
 
-test('SITE-T-STORE-WORKER-LINKS keeps every maintained Store Worker continuation resolvable', () => {
+test('keeps every maintained Store Worker continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5378,7 +5377,7 @@ test('SITE-T-STORE-WORKER-LINKS keeps every maintained Store Worker continuation
   }
 })
 
-test('SITE-T-STORE-WASM-LINKS keeps every maintained Store WASM continuation resolvable', () => {
+test('keeps every maintained Store WASM continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5410,7 +5409,7 @@ test('SITE-T-STORE-WASM-LINKS keeps every maintained Store WASM continuation res
   }
 })
 
-test('SITE-T-STORE-SHARED-LINKS keeps every maintained Store Shared continuation resolvable', () => {
+test('keeps every maintained Store Shared continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5443,7 +5442,7 @@ test('SITE-T-STORE-SHARED-LINKS keeps every maintained Store Shared continuation
   }
 })
 
-test('SITE-T-STORAGE-CONTRACT-LINKS keeps every maintained Storage Contract continuation resolvable', () => {
+test('keeps every maintained Storage Contract continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5472,7 +5471,7 @@ test('SITE-T-STORAGE-CONTRACT-LINKS keeps every maintained Storage Contract cont
   }
 })
 
-test('SITE-T-SERIALIZE-LINKS keeps every maintained Serialize continuation resolvable', () => {
+test('keeps every maintained Serialize continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5502,7 +5501,7 @@ test('SITE-T-SERIALIZE-LINKS keeps every maintained Serialize continuation resol
   }
 })
 
-test('SITE-T-PLUGIN-HOST-LINKS keeps every maintained Plugin Host continuation resolvable', () => {
+test('keeps every maintained Plugin Host continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5531,7 +5530,7 @@ test('SITE-T-PLUGIN-HOST-LINKS keeps every maintained Plugin Host continuation r
   }
 })
 
-test('SITE-T-RESOURCE-LINKS keeps every maintained Resource continuation resolvable', () => {
+test('keeps every maintained Resource continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5558,7 +5557,7 @@ test('SITE-T-RESOURCE-LINKS keeps every maintained Resource continuation resolva
   }
 })
 
-test('SITE-T-LOGGER-LINKS keeps every maintained Logger continuation resolvable', () => {
+test('keeps every maintained Logger continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5588,7 +5587,7 @@ test('SITE-T-LOGGER-LINKS keeps every maintained Logger continuation resolvable'
   }
 })
 
-test('SITE-T-STORAGE-WEB-LINKS keeps every maintained Storage Web continuation resolvable', () => {
+test('keeps every maintained Storage Web continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   const topics = [
     '',
@@ -5618,7 +5617,7 @@ test('SITE-T-STORAGE-WEB-LINKS keeps every maintained Storage Web continuation r
   }
 })
 
-test('SITE-T-STORAGE-WEB-STRUCTURED-CODEC explains selection and the real clone boundary', () => {
+test('explains selection and the real clone boundary', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/storage-web/readme')), 'utf8')
 
   assert.match(html, /四者不是同一种格式的别名/)

@@ -46,8 +46,8 @@ function pair(capabilities: readonly string[] = []) {
   }
 }
 
-describe('C12 resource possession', () => {
-  it('[A45/BC13] selects physical request grammar once before capture', async () => {
+describe('resource possession', () => {
+  it('selects physical request grammar once before capture', async () => {
     /** No binary agreement selects the original scalar legacy grammar. */
     const fixture = pair()
     /** The selector and original options spread each read this accessor once. */
@@ -77,7 +77,7 @@ describe('C12 resource possession', () => {
     }
   })
 
-  it('[A44/BC13] leaves an unpulled cold stream on the original ready rejection', async () => {
+  it('leaves an unpulled cold stream on the original ready rejection', async () => {
     /** This actual Feature failure rejects the original installation resource. */
     const failure = new RpcError(
       RpcCoreErrorCode.invalidConfig,
@@ -125,7 +125,7 @@ describe('C12 resource possession', () => {
     transports[0].close?.()
   })
 
-  it('[A44/BC13] returns sync resource and snapshots a cold request before ready', async () => {
+  it('returns sync resource and snapshots a cold request before ready', async () => {
     /** Mutation after invocation must not change the captured new resource request. */
     const fixture = pair()
     /** Caller retains the original object; Core captures its supported portable data once. */
@@ -151,7 +151,7 @@ describe('C12 resource possession', () => {
     }
   })
 
-  it('[A44/BC13] cold stream controls share one original lazy consumer', async () => {
+  it('cold stream controls share one original lazy consumer', async () => {
     /** The actual installed agreement supplies streaming rather than caller option claims. */
     const fixture = pair([RpcCapability.runtimeApi, RpcCapability.stream])
     /** Provider construction remains observable independently of local consumer construction. */
@@ -185,7 +185,7 @@ describe('C12 resource possession', () => {
     }
   })
 
-  it('[A44/BC13] held binding preserves operation Promise and lazy stream identity', async () => {
+  it('held binding preserves operation Promise and lazy stream identity', async () => {
     /** Readiness belongs to the supplied binding; this resource owns no replacement readiness gate. */
     const readiness = Promise.resolve()
     /** Each original operation returns its own exact settled Promise. */
@@ -222,7 +222,7 @@ describe('C12 resource possession', () => {
     await closing
   })
 
-  it('[A44/BC12] cold constraints validate without saving limits or leaking prepare authority', () => {
+  it('cold constraints validate without saving limits or leaking prepare authority', () => {
     /** This handle has no prepared quota until the first actual Core construction attaches. */
     const scope = createProviderAdmissionScope()
     expect(Reflect.ownKeys(scope).sort()).toEqual(['clear', 'constrain'])

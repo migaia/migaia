@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcCapability, RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
 
-describe('process channel S1 upstream inventory', () => {
+describe('process channel upstream inventory', () => {
   it('uses the existing portable-value guard before the JSON codec', () => {
     /** The future boundary adapter must delegate to this exact codec. */
     const codec = defineJsonCodec({ version: 1 })

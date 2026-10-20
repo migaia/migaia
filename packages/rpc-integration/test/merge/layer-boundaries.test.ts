@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
-/** Source root whose dependency direction is enforced by A2. */
+/** Source root whose dependency direction is enforced here. */
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core/src')
 /** Actual independent owner roots make the source-tree assertion non-vacuous after physical split. */
 const ownerRoots = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map(
@@ -132,8 +132,8 @@ function sourceFiles(directory: string): string[] {
   })
 }
 
-describe('A2 layer dependency direction', () => {
-  it('[A10] keeps remote retry independent of process and coroutine launchers', () => {
+describe('layer dependency direction', () => {
+  it('keeps remote retry independent of process and coroutine launchers', () => {
     const source = readFileSync(
       join(import.meta.dirname, '../../../rpc-core/src/remote/retry.ts'),
       'utf8'

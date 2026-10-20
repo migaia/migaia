@@ -15,7 +15,7 @@ const resourceLaunchRate = { max: 8, windowMs: 1000 }
 const resourceDeadlineMarginMs = 30_000
 /** Four runtime warmups plus all 1000 required launches share the same rate limiter. */
 const resourceTotalLaunches = 1000 + 4
-/** K252 user ruling derives acceptance time from the unchanged production launch rate. */
+/** User ruling derives acceptance time from the unchanged production launch rate. */
 const resourceDeadlineMs =
   Math.ceil(resourceTotalLaunches / resourceLaunchRate.max) * resourceLaunchRate.windowMs +
   resourceDeadlineMarginMs
@@ -141,7 +141,7 @@ async function rotations(perLanguage: number) {
   }
 }
 
-describe('[A6] actual language process resource ownership', () => {
+describe('actual language process resource ownership', () => {
   for (const peer of peers.slice(0, 4))
     it(`${peer.language} pause physical reader emits ACK and resumes the same business PID`, async () => {
       const active = await client(peer, false, randomUUID())

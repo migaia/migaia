@@ -13,7 +13,7 @@ import { endpointFactory, nativeFixture, nativeWorkerFor } from './fixture.js'
 /** Node fixtures cannot establish Web/Bun/Electron actual-exit enforcement. */
 describe('platform capability admission', () => {
   it.each([['web', createWebThreadLauncher]] as const)(
-    '[A7] %s uses default health and rejects required isolation before Worker construction',
+    '%s uses default health and rejects required isolation before Worker construction',
     async (_platform, factory) => {
       const constructor = vi.fn()
       const Worker = class {
@@ -99,79 +99,76 @@ describe('platform capability admission', () => {
       }
     }
   )
-  it('[A7] Electron main retains independent unsupported evidence until an Electron fixture runs', () => {
+  it('Electron main retains independent unsupported evidence until an Electron fixture runs', () => {
     expect(createElectronMainThreadLauncher().capabilities).toMatchObject({
       termination: 'unsupported',
       'exit-observation': 'unsupported'
     })
   })
-  it.each([false, true])(
-    '[A7] real Worker ping health with missing server ping=%s',
-    async (noPing) => {
-      const scheduler = createManualScheduler()
-      const endpoints = new Map<
-        string,
-        {
-          ping(
-            peer: string,
-            params: undefined,
-            options: { timeoutMs: false; signal: unknown }
-          ): Promise<unknown>
-        }
-      >()
-      const fixture = nativeFixture(
-        {
-          scheduler,
-          health: {
-            intervalMs: 10_000,
-            timeoutMs: 5,
-            failureThreshold: 3,
-            check: async (handle, signal) => {
-              await endpoints
-                .get(handle.identity.fingerprint)!
-                .ping(handle.identity.fingerprint, undefined, { timeoutMs: false, signal })
-            }
-          },
-          endpointFactory: async (channel, signal) => {
-            const built = await endpointFactory(channel, signal)
-            endpoints.set(
-              channel.peerId,
-              built.endpoint as unknown as {
-                ping(
-                  peer: string,
-                  params: undefined,
-                  options: { timeoutMs: false; signal: unknown }
-                ): Promise<unknown>
-              }
-            )
-            return built
+  it.each([false, true])('real Worker ping health with missing server ping=%s', async (noPing) => {
+    const scheduler = createManualScheduler()
+    const endpoints = new Map<
+      string,
+      {
+        ping(
+          peer: string,
+          params: undefined,
+          options: { timeoutMs: false; signal: unknown }
+        ): Promise<unknown>
+      }
+    >()
+    const fixture = nativeFixture(
+      {
+        scheduler,
+        health: {
+          intervalMs: 10_000,
+          timeoutMs: 5,
+          failureThreshold: 3,
+          check: async (handle, signal) => {
+            await endpoints
+              .get(handle.identity.fingerprint)!
+              .ping(handle.identity.fingerprint, undefined, { timeoutMs: false, signal })
           }
         },
-        { noPing }
-      )
-      try {
-        await fixture.install()
-        for (let round = 0; round < 3; round += 1) {
-          scheduler.advance(10_000)
-          for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
-          await new Promise((resolve) => setTimeout(resolve, 5))
-          if (noPing) scheduler.advance(5)
-          for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
+        endpointFactory: async (channel, signal) => {
+          const built = await endpointFactory(channel, signal)
+          endpoints.set(
+            channel.peerId,
+            built.endpoint as unknown as {
+              ping(
+                peer: string,
+                params: undefined,
+                options: { timeoutMs: false; signal: unknown }
+              ): Promise<unknown>
+            }
+          )
+          return built
         }
-        if (noPing) {
-          await fixture.handles[0]!.exited
-          expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBe(-1)
-        } else {
-          expect(fixture.handles).toHaveLength(1)
-          expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBeGreaterThan(0)
-        }
-      } finally {
-        await fixture.close()
+      },
+      { noPing }
+    )
+    try {
+      await fixture.install()
+      for (let round = 0; round < 3; round += 1) {
+        scheduler.advance(10_000)
+        for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        if (noPing) scheduler.advance(5)
+        for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
       }
-      // Deferred generation notifications are non-cancellable jobs, like native microtasks.
-      scheduler.advance(0)
-      expect(fixture.budget.inUse).toBe(0)
-      expect(scheduler.pendingCount).toBe(0)
+      if (noPing) {
+        await fixture.handles[0]!.exited
+        expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBe(-1)
+      } else {
+        expect(fixture.handles).toHaveLength(1)
+        expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBeGreaterThan(0)
+      }
+    } finally {
+      await fixture.close()
     }
-  )
+    // Deferred generation notifications are non-cancellable jobs, like native microtasks.
+    scheduler.advance(0)
+    expect(fixture.budget.inUse).toBe(0)
+    expect(scheduler.pendingCount).toBe(0)
+  })
 })

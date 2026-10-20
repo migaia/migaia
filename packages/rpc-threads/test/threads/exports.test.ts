@@ -25,17 +25,15 @@ function importClosure(file: string, visited = new Set<string>()): string[] {
 }
 
 describe('threads public exports', () => {
-  it('[A1][A25] removes all three directional thread factories from the built namespace', async () => {
+  it('removes all three directional thread factories from the built namespace', async () => {
     /** Ordinary packed-subpath resolution must not retain aliases after the consumer migration. */
     const runtime = await import('@migaia/rpc-threads')
     for (const name of ['createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
-      expect(Object.hasOwn(runtime, name), '[A25] retired thread factory must be absent').toBe(
-        false
-      )
+      expect(Object.hasOwn(runtime, name), 'retired thread factory must be absent').toBe(false)
     expect(runtime.createThreadPeer).toBeTypeOf('function')
     expect(runtime.createThreadPlugin).toBeTypeOf('function')
   })
-  it('[A8] exports canonical factories through existing public foundations without platform root imports', async () => {
+  it('exports canonical factories through existing public foundations without platform root imports', async () => {
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
     const base = JSON.parse(
       readFileSync(resolve(root, 'test/threads/fixtures/base-manifest.json'), 'utf8')

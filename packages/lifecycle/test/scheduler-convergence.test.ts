@@ -90,7 +90,7 @@ const candidateTokens = [
   '@migaia/utils/scheduler'
 ]
 
-describe('A1 single scheduler contract across the workspace', () => {
+describe('single scheduler contract across the workspace', () => {
   it('keeps no deleted type, duplicate implementation, former-owner import or re-export', () => {
     /** Identifier hits of deleted type names as `file:name`. */
     const deletedHits: string[] = []

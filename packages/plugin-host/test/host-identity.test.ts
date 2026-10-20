@@ -16,7 +16,7 @@ const execution = { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: f
 class Host extends PluginHost<Record<string, never>> {}
 
 describe('host identity', () => {
-  it('[A111] runtime node identity is shared per Host and separate from public labels', async () => {
+  it('runtime node identity is shared per Host and separate from public labels', async () => {
     /** Both Host entry points reuse the canonical identity owner through their actual Plugin core. */
     const hosts = [new Host({ execution }), defineHost({ host: { execution } })] as const
     /** Separate connection families must see one node for their shared Host instance. */
@@ -102,7 +102,7 @@ describe('host identity', () => {
   })
 })
 
-it('[A24] public Host identity and genuine integration port share the canonical issuing identity', async () => {
+it('public Host identity and genuine integration port share the canonical issuing identity', async () => {
   /** Both public entries represent exactly one canonical Host and perform actual installation. */
   const hosts = [new Host({ execution }), defineHost({ host: { execution } })]
   try {
@@ -121,7 +121,7 @@ it('[A24] public Host identity and genuine integration port share the canonical 
           }
         })
       )
-      expect(observed, '[A24] Host query identity must equal the public Host identity').toBe(
+      expect(observed, 'Host query identity must equal the public Host identity').toBe(
         host.identity
       )
     }

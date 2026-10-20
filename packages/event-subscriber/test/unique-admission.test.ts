@@ -10,11 +10,11 @@ import {
 import { measureRootClosure } from './bundle-size-closure.js'
 
 describe('channel admission policies', () => {
-  it('ES-T189 ESUA A8 exports the stable admission modes without a sync error policy', () => {
+  it('exports the stable admission modes without a sync error policy', () => {
     expect(EventAdmissionPolicy).toEqual({ multiple: 'multiple', unique: 'unique' })
   })
 
-  it('ES-T190 ESUA A9 rejects an invalid mode and preserves default duplicate and throw behavior', () => {
+  it('rejects an invalid mode and preserves default duplicate and throw behavior', () => {
     /** Runtime validation must reject a value that TypeScript already excludes. */
     let invalid: unknown
     try {
@@ -52,7 +52,7 @@ describe('channel admission policies', () => {
     }
   })
 
-  it('ES-T191 ESUA A1 admits one listener identity across direct, chained, styled, and reentrant calls', () => {
+  it('admits one listener identity across direct, chained, styled, and reentrant calls', () => {
     /** Invocation order exposes both duplicate admission and reentrant insertion. */
     const order: string[] = []
     const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
@@ -94,7 +94,7 @@ describe('channel admission policies', () => {
     expect(styled.size).toBe(1)
   })
 
-  it('ES-T192 ESUA A2 binds every disposer to its original registration generation', () => {
+  it('binds every disposer to its original registration generation', () => {
     const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
     const listener = vi.fn()
     const d1 = channel.subscribe(listener)
@@ -130,7 +130,7 @@ describe('channel admission policies', () => {
     expect(listenerAll.size).toBe(1)
   })
 
-  it('ES-T193 ESUA A3 keeps the existing owner when a duplicate handle projection fails', () => {
+  it('keeps the existing owner when a duplicate handle projection fails', () => {
     const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
     const listener = vi.fn()
     channel.subscribe(listener)
@@ -157,7 +157,7 @@ describe('channel admission policies', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('ES-T194 ESUA A4 rejects conflicting task labels without changing the owner', async () => {
+  it('rejects conflicting task labels without changing the owner', async () => {
     const channel = createEventChannel<number>({ admissionPolicy: EventAdmissionPolicy.unique })
     const listener = vi.fn()
     channel.subscribe(listener, { taskId: 'a' })
@@ -178,7 +178,7 @@ describe('channel admission policies', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('ES-T195 ESUA A11 measures the complete root closure against the pre-change base', () => {
+  it('measures the complete root closure against the pre-change base', () => {
     /** The existing gate and this case must share the closure measurement. */
     const packageRoot = resolve(import.meta.dirname, '..')
     const baseline = JSON.parse(

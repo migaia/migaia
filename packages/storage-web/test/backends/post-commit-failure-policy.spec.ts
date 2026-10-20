@@ -11,7 +11,7 @@ const freshIndexedDb = () =>
     dbName: `storage-v2-t46-${Math.random().toString(36).slice(2)}`
   })
 
-describe('storage-web T46 post-commit failure policy', () => {
+describe('storage-web post-commit failure policy', () => {
   it('resolves a committed write after synchronous listener failure and continues fanout', async () => {
     const store = memoryStorageHost()
     const listenerFailure = new Error('synchronous listener failure')
@@ -106,7 +106,7 @@ describe('storage-web T46 post-commit failure policy', () => {
     }
   })
 
-  it('SWV2-T46 observes a hostile thenable returned by the diagnostic reporter', async () => {
+  it('observes a hostile thenable returned by the diagnostic reporter', async () => {
     const store = memoryStorageHost()
     const listenerFailure = new Error('listener failure before reporter thenable')
     const reporterFailure = new Error('reporter then getter failure')
@@ -138,7 +138,7 @@ describe('storage-web T46 post-commit failure policy', () => {
     }
   })
 
-  it('SWV2-T46 preserves IndexedDB commit results across all post-commit failures', async () => {
+  it('preserves IndexedDB commit results across all post-commit failures', async () => {
     const syncFailure = new Error('indexed synchronous listener failure')
     const lateFailure = new Error('indexed late listener failure')
     const cases = [

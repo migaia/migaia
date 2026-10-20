@@ -79,7 +79,10 @@ async function installBarrier(rollback = false) {
   const calls = { request: 0, notify: 0, stream: 0 }
   /** Notify completion is observed independently of its caller's one-way send completion. */
   const notified = deferred<void>()
-  /** A cold Feature snapshot belongs to this candidate registration, reproducing F20 exactly. */
+  /**
+   * A cold Feature snapshot belongs to this candidate registration, reproducing the original
+   * failure exactly.
+   */
   const business = definePlugin({
     name: 'business',
     features: {
@@ -133,7 +136,7 @@ async function installBarrier(rollback = false) {
             if (arrivals.length >= waiter.count) waiter.resolve()
           preflight?.(route)
         })
-        /** Reflective access keeps this same A1 oracle runnable before the side table exists. */
+        /** Reflective access keeps this same oracle runnable before the side table exists. */
         const readGate = Reflect.get(catalog, 'readCommitGate') as
           | ((method: Function) => IObservedCommitGate | undefined)
           | undefined
@@ -223,7 +226,7 @@ async function installBarrier(rollback = false) {
 }
 
 describe('runtime exposed methods serve after commit', () => {
-  it('[A1] holds request, notify and stream until the installing Host batch commits', async () => {
+  it('holds request, notify and stream until the installing Host batch commits', async () => {
     /** A real paused Host install makes arrival timing deterministic for all three call kinds. */
     const fixture = await installBarrier()
     /** Request and stream outcomes are handled before the original guard can reject either one. */
@@ -258,7 +261,7 @@ describe('runtime exposed methods serve after commit', () => {
       const streamResult = await stream
       if ('error' in requestResult || 'error' in streamResult)
         console.info(
-          '[serve-commit A1 red]',
+          '[serve-commit red]',
           JSON.stringify({
             request: 'error' in requestResult ? classify(requestResult.error) : requestResult,
             stream: 'error' in streamResult ? classify(streamResult.error) : streamResult,
@@ -275,7 +278,7 @@ describe('runtime exposed methods serve after commit', () => {
     }
   })
 
-  it('[A2] refuses all held calls when the prepared install batch rolls back', async () => {
+  it('refuses all held calls when the prepared install batch rolls back', async () => {
     /** A later install failure rolls back the same genuine prepared runtime registration. */
     const fixture = await installBarrier(true)
     /** Caller outcomes are recorded immediately because rollback may close their transport first. */
@@ -315,7 +318,7 @@ describe('runtime exposed methods serve after commit', () => {
       /** Stream may lose its error response to the same rollback transport close. */
       const streamResult = await stream
       console.info(
-        '[serve-commit A2 rollback]',
+        '[serve-commit rollback]',
         JSON.stringify({
           request: 'error' in requestResult ? classify(requestResult.error) : requestResult,
           stream: 'error' in streamResult ? classify(streamResult.error) : streamResult,
@@ -347,7 +350,7 @@ describe('runtime exposed methods serve after commit', () => {
   })
 
   it.each(['abort', 'deadline'] as const)(
-    '[A3] never invokes held request or stream after caller %s, then admits fresh calls',
+    'never invokes held request or stream after caller %s, then admits fresh calls',
     async (interruption) => {
       /** Both provider owners remain behind one genuine uncommitted Host batch. */
       const fixture = await installBarrier()

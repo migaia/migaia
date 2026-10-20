@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise U36 directory and batch admission against each independent process."""
+"""Exercise runtime-baseline directory and batch admission against each independent process."""
 import argparse
 import json
 from pathlib import Path

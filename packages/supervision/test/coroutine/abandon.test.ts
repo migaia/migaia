@@ -9,7 +9,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 45; index++) await Promise.resolve()
 }
 
-describe('A13 coroutine abandonment and heartbeat', () => {
+describe('coroutine abandonment and heartbeat', () => {
   it('retains budget capacity until a noncooperative task exits', async () => {
     const scheduler = createManualScheduler()
     const first = deferred<void>()

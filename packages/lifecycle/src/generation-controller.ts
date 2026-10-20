@@ -34,14 +34,14 @@ export type IGenerationRequest = {
 }
 
 export type IGenerationControllerOptions = {
-  /** When this aborts, the currently-active generation's `signal` aborts too (L-T31). */
+  /** When this aborts, the currently-active generation's `signal` aborts too. */
   readonly parentSignal?: IAbortSignal
   /**
    * Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the
    * release attempt, regardless of whether it succeeds. The value is a
    * `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is
-   * explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want
-   * to notice the race without treating it as an error.
+   * explicitly _not_ a failure signal, just an observability hook for callers that want to notice
+   * the race without treating it as an error.
    */
   readonly onSuperseded?: (info: ILifecycleError) => void
   /**
@@ -81,9 +81,8 @@ export type IGenerationController = {
   /**
    * Adopts `value` under `token`'s generation. Returns `true` and keeps `value` with the caller if
    * that generation is still current. Otherwise releases `value` via `release` and returns `false`
-   * (L-T6) — a release failure is funneled to `onReleaseError` (or the controller `report` when
-   * omitted) and never mutates controller state, so it cannot poison whichever generation is
-   * current now (L-T30).
+   * — a release failure is funneled to `onReleaseError` (or the controller `report` when omitted)
+   * and never mutates controller state, so it cannot poison whichever generation is current now.
    */
   adopt<T>(
     token: IGenerationToken,
@@ -303,11 +302,11 @@ export function createGenerationController(
       )
       generation++
       const token: IGenerationToken = {}
-      /** Per-generation signal source, created on the first `request.signal` read (LC-P3). */
+      /** Per-generation signal source, created on the first `request.signal` read. */
       const controller = createLazyAbortController(createController)
       currentToken = token
       currentController = controller
-      // parent abort 与 timeout 都原子作废当前 token（AF-14）：作废 = 取消 timer + 移除 parent listener。
+      // parent abort 与 timeout 都原子作废当前 token：作废 = 取消 timer + 移除 parent listener。
       let invalidatedByParent = false
       let admissionRegistration: IParentListenerRegistration | undefined
       try {

@@ -30,7 +30,7 @@ function webPair() {
 }
 
 describe('thread channel ownership and portable boundary', () => {
-  it('[A1/A9] borrows Node message listeners with identity pipeline and zero hello', async () => {
+  it('borrows Node message listeners with identity pipeline and zero hello', async () => {
     const port = Object.assign(new EventEmitter(), { postMessage: vi.fn() })
     const channel = createNodeThreadChannel(port, 'peer', { scheduler: systemScheduler })
     const unsubscribe = channel.transport.subscribe(() => undefined)
@@ -45,7 +45,7 @@ describe('thread channel ownership and portable boundary', () => {
     await closing
     expect(port.listenerCount('message')).toBe(0)
   })
-  it('[A9] rejects functions, cycles, MessagePort and SharedArrayBuffer before a public request frame', async () => {
+  it('rejects functions, cycles, MessagePort and SharedArrayBuffer before a public request frame', async () => {
     const fixture = nativeFixture()
     const ports = new MessageChannel()
     const cycle: unknown[] = []
@@ -82,7 +82,7 @@ describe('thread channel ownership and portable boundary', () => {
     }
   })
   it.each([() => undefined, new SharedArrayBuffer(8)])(
-    '[A9] rejects facade spec.data synchronously without a Worker',
+    'rejects facade spec.data synchronously without a Worker',
     async (data) => {
       const launch = vi.fn()
       const common = {
@@ -134,7 +134,7 @@ describe('thread channel ownership and portable boundary', () => {
       }
     }
   )
-  it('[A9] consumes and removes Web bootstrap before acknowledging and installing client transport', async () => {
+  it('consumes and removes Web bootstrap before acknowledging and installing client transport', async () => {
     const pair = webPair()
     const launched: IThreadWebPort[] = []
     const Worker = class {

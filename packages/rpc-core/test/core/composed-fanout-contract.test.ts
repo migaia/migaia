@@ -18,13 +18,12 @@ import {
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /**
- * Regression gate for `SOL-CB-R8-P2-003`: `sendAll`/`pingAll` must key their fulfilled/rejected
- * records with the canonical tagged `fanoutDeliveryKey` shape (`["target", id]`) inside a
- * `createSafeRecord` (null-prototype) accumulator, exactly like legacy `src/endpoint.ts`'s
- * `#fanoutDeliveryKey`/`createSafeRecord` pair — so an attacker-controlled `__proto__`-shaped
- * target id cannot be silently dropped or misread as a prototype mutation — and `pingAll` must
- * rethrow a `WebRpcLifecycleError` raised by any individual `ping()` instead of folding it into the
- * per-target result.
+ * Regression gate: `sendAll`/`pingAll` must key their fulfilled/rejected records with the canonical
+ * tagged `fanoutDeliveryKey` shape (`["target", id]`) inside a `createSafeRecord` (null-prototype)
+ * accumulator, exactly like legacy `src/endpoint.ts`'s `#fanoutDeliveryKey`/`createSafeRecord` pair
+ * — so an attacker-controlled `__proto__`-shaped target id cannot be silently dropped or misread as
+ * a prototype mutation — and `pingAll` must rethrow a `WebRpcLifecycleError` raised by any
+ * individual `ping()` instead of folding it into the per-target result.
  */
 describe('composed sendAll/pingAll fanout contract', () => {
   it('sendAll keys results by the tagged fanoutDeliveryKey shape and tolerates a __proto__ target', async () => {
@@ -104,7 +103,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
     await expect(client.pingAll!()).rejects.toBeInstanceOf(RpcLifecycleError)
   })
 
-  it('sendAll rethrows a RpcLifecycleError instead of resolving with per-target rejections (SOL-CB-R9-P2-003)', async () => {
+  it('sendAll rethrows a RpcLifecycleError instead of resolving with per-target rejections', async () => {
     const [clientTransport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
       id: 'client-disposed-send-fanout',
@@ -117,7 +116,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
   })
 
   it.each(['class', 'constructor', 'tag', 'decode'] as const)(
-    '[C5-E07] %s forged lifecycle failure cannot close the endpoint or escape fanout as its own lifecycle decision',
+    '%s forged lifecycle failure cannot close the endpoint or escape fanout as its own lifecycle decision',
     async (kind) => {
       /**
        * This public constructor legitimately describes caller-owned lifecycle errors, without

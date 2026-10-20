@@ -12,7 +12,7 @@ import { SerializeErrorCode } from '../src/error-code.js'
 import { base64ToBytes, bytesToBase64 } from '../src/base64.js'
 import { rpcPortableStrategy, rpcPortableWalker } from './fixtures/rpc-portable-strategy.js'
 
-/** Package-owned copy of RPCC-T05 data; no RPC implementation participates in this oracle. */
+/** Package-owned copy of the RPC portable data; no RPC implementation participates in this oracle. */
 type IPortableVectors = {
   cases: { id: string; value: unknown }[]
   invalid: string[]
@@ -93,7 +93,7 @@ function expectByteBound(result: ReturnType<typeof rpcPortableWalker>): void {
 }
 
 describe('serialize portable convergence oracle', () => {
-  it('[SP-T01] owns RPCC-T05 values through a caller strategy and existing codec consumer', () => {
+  it('owns values through a caller strategy and existing codec consumer', () => {
     for (const vector of vectors.cases) {
       /** The factory reports metadata while fixture callbacks own RPC wire policy. */
       const result = rpcPortableWalker(vector.value)
@@ -104,7 +104,7 @@ describe('serialize portable convergence oracle', () => {
     }
   })
 
-  it('[SP-T02] owns the complete RPCC-T05 forbidden matrix and caller-owned error identity', () => {
+  it('owns the complete forbidden matrix and caller-owned error identity', () => {
     for (const id of vectors.invalid) {
       /** Domain identity originates in the fixture callback, never serialize production policy. */
       const error = captureFailure(() => rpcPortableWalker(forbiddenValue(id)))
@@ -118,7 +118,7 @@ describe('serialize portable convergence oracle', () => {
     }
   })
 
-  it('[SP-T03] preserves finite scalars and negative zero; rejects undefined and nonfinite inputs', () => {
+  it('preserves finite scalars and negative zero; rejects undefined and nonfinite inputs', () => {
     /** The kernel retains the scalar selected by caller strategy rather than JSON coercing it. */
     const negativeZero = rpcPortableWalker(-0)
     expect(Object.is(negativeZero.value, -0)).toBe(true)
@@ -141,8 +141,8 @@ describe('serialize portable convergence oracle', () => {
     expect(() => assertPortableValue(undefined)).toThrow()
   })
 
-  it('[SP-T04] copies R14-A22 parent capture order, frozen null prototypes and repeated references', () => {
-    /** Reads record the complete copied R14-A22 getter order. */
+  it('copies parent capture order, frozen null prototypes and repeated references', () => {
+    /** Reads record the complete copied getter order. */
     const reads: string[] = []
     /** One caller object receives an independent snapshot at every accepted occurrence. */
     const shared = {
@@ -210,7 +210,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.isFrozen((outputs[1]!.second as Record<string, unknown>).child)).toBe(true)
   })
 
-  it('[SP-T05] preserves sorted interleaved codec getters and mutable ordinary projection', () => {
+  it('preserves sorted interleaved codec getters and mutable ordinary projection', () => {
     /** Codec projection recurses before reading the next sorted parent field. */
     const reads: string[] = []
     /** Repeated child references remain independent copies in the legacy codec path. */
@@ -245,7 +245,7 @@ describe('serialize portable convergence oracle', () => {
     expect(reads).toEqual(['a', 'shared.value', 'z', 'shared.value'])
   })
 
-  it('[SP-T06] retains integer-key enumeration and ignores nonenumerable and symbol properties', () => {
+  it('retains integer-key enumeration and ignores nonenumerable and symbol properties', () => {
     /** Own string enumeration precedes non-integer insertion order exactly as Object.keys. */
     const input = { z: 1, '10': 10, a: 2, '2': 2 }
     Object.defineProperty(input, 'hidden', { value: undefined })
@@ -260,7 +260,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Reflect.ownKeys(codec)).toHaveLength(4)
   })
 
-  it('[SP-T07] accepts null prototypes and own __proto__ data without publishing caller objects', () => {
+  it('accepts null prototypes and own __proto__ data without publishing caller objects', () => {
     /** Null-prototype input includes an own spelling that cannot mutate output prototypes. */
     const input = Object.create(null) as Record<string, unknown>
     input.__proto__ = { safe: true }
@@ -278,7 +278,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.getPrototypeOf(codecValue(input))).toBe(Object.prototype)
   })
 
-  it('[SP-T08] rejects nonplain RPC snapshots while retaining legacy codec own-key projection', () => {
+  it('rejects nonplain RPC snapshots while retaining legacy codec own-key projection', () => {
     /** Class data has a nonplain prototype but legacy projection consumes its own fields. */
     class OwnedRecord {
       /** Own caller data becomes a plain codec record. */
@@ -304,7 +304,7 @@ describe('serialize portable convergence oracle', () => {
     }
   })
 
-  it('[SP-T09] rejects ancestor cycles while allowing repeated siblings in both consumers', () => {
+  it('rejects ancestor cycles while allowing repeated siblings in both consumers', () => {
     /** Repeating a completed child is accepted; referencing the active root is not. */
     const shared = { value: 1 }
     /** A cycle can occur through an array as well as a record field. */
@@ -323,7 +323,7 @@ describe('serialize portable convergence oracle', () => {
     }
   })
 
-  it('[SP-T10] takes depth from caller strategy and preserves unlimited existing codec depth', () => {
+  it('takes depth from caller strategy and preserves unlimited existing codec depth', () => {
     expect(() => rpcPortableWalker(nestedValue(64))).not.toThrow()
     expect(() => rpcPortableWalker(nestedValue(65))).toThrowError(
       expect.objectContaining({ code: 'INVALID_ENVELOPE' })
@@ -340,7 +340,7 @@ describe('serialize portable convergence oracle', () => {
     expect(() => largerBudget(nestedValue(65))).not.toThrow()
   })
 
-  it('[SP-T11] preserves sparse RPC arrays and rejects them in the existing codec consumer', () => {
+  it('preserves sparse RPC arrays and rejects them in the existing codec consumer', () => {
     /** A hole remains absent in a snapshot; its JSON byte contribution is null. */
     const sparse: unknown[] = []
     sparse.length = 3
@@ -366,7 +366,7 @@ describe('serialize portable convergence oracle', () => {
     expect(() => codecValue([undefined])).toThrow()
   })
 
-  it('[SP-T12] retains array map getter order and inherited index behavior', () => {
+  it('retains array map getter order and inherited index behavior', () => {
     /** Array map reads each present element before normalizing that child. */
     const reads: string[] = []
     /** Accessors distinguish array traversal from parent-record field capture. */
@@ -407,7 +407,7 @@ describe('serialize portable convergence oracle', () => {
     expect(codecValue(sparse)).toEqual([9])
   })
 
-  it('[SP-T13] snapshots U8, Buffer, foreign views and SharedArrayBuffer-backed bytes', () => {
+  it('snapshots U8, Buffer, foreign views and SharedArrayBuffer-backed bytes', () => {
     /** Fixtures cover each supported brand and every base64url remainder. */
     const inputs = [
       new Uint8Array(),
@@ -440,7 +440,7 @@ describe('serialize portable convergence oracle', () => {
     expect(result.value).toEqual({ $rpc: 'bytes', base64url: 'AH__' })
   })
 
-  it('[SP-T14] rejects non-U8 views and preserves legacy retagged-view codec projection', () => {
+  it('rejects non-U8 views and preserves legacy retagged-view codec projection', () => {
     for (const input of [new Uint16Array([1]), new Uint8ClampedArray([1])]) {
       expect(() => rpcPortableWalker(input)).toThrow()
       expect(() => codecValue(input)).toThrow()
@@ -457,7 +457,7 @@ describe('serialize portable convergence oracle', () => {
     expect(() => assertPortableValue(retagged)).toThrow()
   })
 
-  it('[SP-T15] snapshots visible bytes without invoking shadowed view length properties', () => {
+  it('snapshots visible bytes without invoking shadowed view length properties', () => {
     /** Only the view's visible two bytes belong to portable payload data. */
     const input = new Uint8Array(new Uint8Array([9, 0, 255, 9]).buffer, 1, 2)
     /** Access counters distinguish true slots from mutable application properties. */
@@ -477,7 +477,7 @@ describe('serialize portable convergence oracle', () => {
     expectByteBound(result)
   })
 
-  it('[SP-T16] validates canonical RPC tag bits while preserving regex-only existing codec tags', () => {
+  it('validates canonical RPC tag bits while preserving regex-only existing codec tags', () => {
     for (const base64url of ['', 'AA', 'AAE', 'AH__', '-_8']) {
       /** Existing tagged values participate in binary metadata without native bytes. */
       const input = { $rpc: 'bytes', base64url }
@@ -502,7 +502,7 @@ describe('serialize portable convergence oracle', () => {
     }
   })
 
-  it('[SP-T17] lets caller strategy reject reserved keys, tag extras and nonstring payloads', () => {
+  it('lets caller strategy reject reserved keys, tag extras and nonstring payloads', () => {
     for (const input of [
       { $rpc: 'reserved' },
       { $rpc: 'bytes', base64url: 'AA', extra: 1 },
@@ -518,7 +518,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.keys(rpcPortableWalker(reversed).value as object)).toEqual(['$rpc', 'base64url'])
   })
 
-  it('[SP-T18] computes conservative byte bounds and binary flags in one getter traversal', () => {
+  it('computes conservative byte bounds and binary flags in one getter traversal', () => {
     /** Scalars exercise UTF-8, JSON escapes, lone surrogates and numeric spelling. */
     const scalarValues = [null, false, true, -0, 1e30, '文😀', '\ud800', '"\\\n\u0000']
     for (const value of scalarValues) expectByteBound(rpcPortableWalker(value))
@@ -548,7 +548,7 @@ describe('serialize portable convergence oracle', () => {
     expect(rpcPortableWalker({ child: ['ordinary', 1] }).hasBinary).toBe(false)
   })
 
-  it('[SP-T19] wraps getter and reflection failures once with original cause identity intact', () => {
+  it('wraps getter and reflection failures once with original cause identity intact', () => {
     /** Original application errors remain reachable with the original stack. */
     const original = new Error('portable getter failure')
     /** The parent accessor fails before any child graph can be consumed. */
@@ -582,7 +582,7 @@ describe('serialize portable convergence oracle', () => {
     expect(captureFailure(() => rpcPortableWalker(hostile)).cause).toBe(original)
   })
 
-  it('[SP-T20] invokes caller violation once and preserves the exact caller-thrown error', () => {
+  it('invokes caller violation once and preserves the exact caller-thrown error', () => {
     /** An application trap is distinct from policy rejection and must survive on cause. */
     const original = new Error('strategy application trap')
     /** One caller-owned error object is returned through every recursion frame unchanged. */
@@ -628,7 +628,7 @@ describe('serialize portable convergence oracle', () => {
     expect(policyCauses).toEqual([undefined])
   })
 
-  it('[SP-T21] retains legacy assertion return value and caller record identity', () => {
+  it('retains legacy assertion return value and caller record identity', () => {
     /** Assertion validates caller data without changing identity or descriptors. */
     const input = { z: 1, a: { value: 2 } }
     /** Child identity distinguishes validation from normalization. */
@@ -644,7 +644,7 @@ describe('serialize portable convergence oracle', () => {
     expect(projected.a).not.toBe(child)
   })
 
-  it('[SP-T22] snapshots tag getters once and retains legacy assertion getter counts', () => {
+  it('snapshots tag getters once and retains legacy assertion getter counts', () => {
     /** Source insertion puts payload before discriminator to expose key policy. */
     const reads: string[] = []
     /** Valid tag accessors exercise capture and assertion as separate existing contracts. */
@@ -668,7 +668,7 @@ describe('serialize portable convergence oracle', () => {
     expect(reads).toEqual(['$rpc', 'base64url', 'base64url'])
   })
 
-  it('[SP-T23] keeps padded base64 and portable unpadded base64url as distinct spellings', () => {
+  it('keeps padded base64 and portable unpadded base64url as distinct spellings', () => {
     /** The shared bytes use padding in base64 and omit padding in caller wire-tag policy. */
     const bytes = new Uint8Array([0, 255])
     expect(bytesToBase64(bytes)).toBe('AP8=')
@@ -684,7 +684,7 @@ describe('serialize portable convergence oracle', () => {
     expect(() => rpcPortableWalker({ $rpc: 'bytes', base64url: '+/8' })).toThrow()
   })
 
-  it('[SP-T24] preserves base64 rejection identity for malformed padding and unused bits', () => {
+  it('preserves base64 rejection identity for malformed padding and unused bits', () => {
     for (const input of ['A', 'AAAA=', 'AAAA===', 'AB==', 'A===', 'AA=A']) {
       /** Public base64 keeps its existing invalid-option identity and text. */
       const error = captureFailure(() => base64ToBytes(input))
@@ -698,7 +698,7 @@ describe('serialize portable convergence oracle', () => {
     }
   })
 
-  it('[SP-T25] owns dense arrays and records while caller finish selects freeze policy', () => {
+  it('owns dense arrays and records while caller finish selects freeze policy', () => {
     /** Array and child-record ownership remain independent from record key policy. */
     const input = [{ value: 1 }, [true, null]]
     /** The fixture's finish callback applies RPC's immutable ownership policy. */
@@ -725,7 +725,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.isFrozen(projected[1])).toBe(false)
   })
 
-  it('[SP-T26] keeps codec projection errors ahead of later portable assertion failures', () => {
+  it('keeps codec projection errors ahead of later portable assertion failures', () => {
     /** Old projection copies NaN unchanged, then a later getter supplies the primary error. */
     const original = new Error('codec projection getter failure')
     /** Sorted a precedes b; rejecting a too early would hide the observable b getter failure. */
@@ -745,7 +745,7 @@ describe('serialize portable convergence oracle', () => {
     expect(error.cause).toBe(original)
   })
 
-  it('[SP-T27] preserves own-tag array codec projection while RPC map ignores extra fields', () => {
+  it('preserves own-tag array codec projection while RPC map ignores extra fields', () => {
     /** Existing projection checks an own discriminator before choosing array traversal. */
     const input: unknown[] = []
     Object.defineProperties(input, {
@@ -762,7 +762,7 @@ describe('serialize portable convergence oracle', () => {
     expectByteBound(result)
   })
 
-  it('[SP-T28] preserves one own-key reflection for legacy tagged-value assertion', () => {
+  it('preserves one own-key reflection for legacy tagged-value assertion', () => {
     /** Proxy reflection count is part of the existing assertion's caller-observable behavior. */
     let reads = 0
     /** A valid caller-owned tag exercises Object.keys without projection or copy. */
@@ -780,7 +780,7 @@ describe('serialize portable convergence oracle', () => {
   })
 })
 
-it('[SP-T29] RPC scalar rejection precedes nested getters while classified errors keep identity', () => {
+it('RPC scalar rejection precedes nested getters while classified errors keep identity', () => {
   /** Child reads distinguish eager RPC rejection from serialize's deferred codec validation. */
   let reads = 0
   /** The parent pre-captures b, but the rejected a prevents walking b's own fields. */
@@ -810,7 +810,7 @@ it('[SP-T29] RPC scalar rejection precedes nested getters while classified error
   ).toBe(original)
 })
 
-it('[SP-T30] legacy iterator-only array assertion adds no caller length reads', () => {
+it('legacy iterator-only array assertion adds no caller length reads', () => {
   /** A supported array iterator supplies portable values without consulting its own length. */
   /** Sentinel catches any extra metadata read after the custom iterator completes. */
   const original = new Error('unexpected caller length read')
@@ -827,7 +827,7 @@ it('[SP-T30] legacy iterator-only array assertion adds no caller length reads', 
   expect(assertPortableValue(input)).toBeUndefined()
 })
 
-it('[SP-T31] RPC root byte-copy errors stay raw while enclosing containers retain cause', () => {
+it('RPC root byte-copy errors stay raw while enclosing containers retain cause', () => {
   /** Copy the original detached byte-view case without importing RPC or adding wire behavior. */
   const bytes = new Uint8Array([1])
   structuredClone(bytes.buffer, { transfer: [bytes.buffer] })

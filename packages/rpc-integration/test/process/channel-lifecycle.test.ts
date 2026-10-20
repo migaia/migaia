@@ -93,7 +93,7 @@ function createBytePort(): Readonly<{
 }
 
 describe('process channel boundary', () => {
-  it('[A2/C1] validates unknown values and delegates valid JSON byte-for-byte', () => {
+  it('validates unknown values and delegates valid JSON byte-for-byte', () => {
     /** The original codec is the reference implementation, not a second serializer. */
     const original = defineJsonCodec({ version: 1 })
     /** A nontrivial portable value checks ordering and Unicode output exactly. */
@@ -126,7 +126,7 @@ describe('process channel boundary', () => {
     )
   })
 
-  it('[A6] rejects an in-flight write on close and observes its late failure', async () => {
+  it('rejects an in-flight write on close and observes its late failure', async () => {
     /** A fake physical writer deliberately never settles until the test releases it. */
     const port = createBytePort()
     /** Late physical rejection must reach this report port after the caller has settled. */
@@ -167,7 +167,7 @@ describe('process channel boundary', () => {
     ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
   })
 
-  it('[A6] rejects a second pre-ready frame without delivering business data', async () => {
+  it('rejects a second pre-ready frame without delivering business data', async () => {
     const port = createBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const read = wire.readHandshakeFrame()
@@ -178,7 +178,7 @@ describe('process channel boundary', () => {
     await expect(wire.close()).resolves.toBeUndefined()
   })
 
-  it('[D2] delivers activated frames in order to the first late subscriber', async () => {
+  it('delivers activated frames in order to the first late subscriber', async () => {
     const port = createBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const handshake = wire.readHandshakeFrame()
@@ -195,7 +195,7 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
-  it('[D2] reports and closes instead of discarding an overflowing early queue', async () => {
+  it('reports and closes instead of discarding an overflowing early queue', async () => {
     const port = createBytePort()
     const reports: unknown[] = []
     const wire = bindProcessByteWire(port.channel, {
@@ -215,7 +215,7 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
-  it('[D3] bounds early business bytes independently of the frame count', async () => {
+  it('bounds early business bytes independently of the frame count', async () => {
     const port = createBytePort()
     const reports: unknown[] = []
     const wire = bindProcessByteWire(port.channel, {
@@ -237,7 +237,7 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
-  it('[D4] rejects a 16 MiB unauthenticated frame at its header', async () => {
+  it('rejects a 16 MiB unauthenticated frame at its header', async () => {
     const port = createBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const handshake = wire.readHandshakeFrame()
@@ -248,7 +248,7 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
-  it('[C2] rejects malformed UTF-8 before admitting a handshake', async () => {
+  it('rejects malformed UTF-8 before admitting a handshake', async () => {
     const port = createBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const handshake = wire.readHandshakeFrame()
@@ -258,7 +258,7 @@ describe('process channel boundary', () => {
     await wire.close()
   })
 
-  it('[A2/A6] installs one IPC composition and redacts each stderr record', async () => {
+  it('installs one IPC composition and redacts each stderr record', async () => {
     /** The physical transport is closed through the single gate wrapper. */
     let physicalCloses = 0
     const physical: IRpcTransport = {
@@ -313,7 +313,7 @@ describe('process channel boundary', () => {
     expect(physicalCloses).toBe(1)
   })
 
-  it('[A6] rolls back the physical wrapper when stderr setup fails', () => {
+  it('rolls back the physical wrapper when stderr setup fails', () => {
     /** A setup failure after wrapping must not strand the physical connection. */
     let closes = 0
     const physical: IRpcTransport = {
@@ -342,7 +342,7 @@ describe('process channel boundary', () => {
     expect(closes).toBe(1)
   })
 
-  it('[A2/A6] keeps message port identity framing and terminal replay local', async () => {
+  it('keeps message port identity framing and terminal replay local', async () => {
     /** A message port already carries complete values and needs no JSON conversion. */
     let inbound: ((value: unknown) => void) | undefined
     let physicalCloses = 0
@@ -457,14 +457,14 @@ function stderrBudgetFixture(
   }
 }
 
-describe('A32 BC6 session stderr budget prototype', () => {
+describe('session stderr budget prototype', () => {
   it.each([0, 32, 33, 1000])(
-    'A32 preserves normal records and bounds %i chunks exactly',
+    'preserves normal records and bounds %i chunks exactly',
     async (count) => {
       /** One first-chunk interval decides the fixed normal and summary totals. */
       const fixture = stderrBudgetFixture(`chunks-${count}`)
       fixture.emit(count)
-      expect(fixture.records, 'A32 stderr normal-event budget missing').toHaveLength(
+      expect(fixture.records, 'stderr normal-event budget missing').toHaveLength(
         Math.min(count, 32)
       )
       expect(fixture.scheduler.pendingCount).toBe(count > 32 ? 1 : 0)
@@ -490,7 +490,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     }
   )
 
-  it('A32 keeps first-chunk boundaries when the host timer runs late', async () => {
+  it('keeps first-chunk boundaries when the host timer runs late', async () => {
     /** A supported scheduler can run late but never invokes schedule synchronously. */
     let now = 0
     /** The fixture retains only the active callback, as the system scheduler does. */
@@ -527,7 +527,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     ).toEqual([1, 1])
   })
 
-  it('A32 isolates sessions and accounts both intervals plus final close exactly', async () => {
+  it('isolates sessions and accounts both intervals plus final close exactly', async () => {
     /** Independent session owners must never borrow each other's capacity or totals. */
     const first = stderrBudgetFixture('first')
     const second = stderrBudgetFixture('second')
@@ -559,7 +559,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     expect(first.scheduler.pendingCount + second.scheduler.pendingCount).toBe(0)
   })
 
-  it('A32 detaches flush totals before synchronous reporter reentry and close', async () => {
+  it('detaches flush totals before synchronous reporter reentry and close', async () => {
     /** The summary reporter delivers one next-interval chunk synchronously. */
     let reentered = false
     /** The fixture is assigned before any record can call its reporter. */
@@ -599,7 +599,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     expect(closing.removals).toBe(1)
   })
 
-  it('A32 final summary preserves close Promise identity through synchronous reporter reentry', async () => {
+  it('final summary preserves close Promise identity through synchronous reporter reentry', async () => {
     /** The summary sink may join close before the outer call has returned. */
     let reentrant: Promise<void> | undefined
     /** This session overflows once so close synchronously publishes its final summary. */
@@ -609,7 +609,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     fixture.emit(33)
     /** The first caller and summary sink must receive the same original settlement Promise. */
     const closing = fixture.attached.close()
-    expect(reentrant, 'A32 final-summary close Promise identity').toBe(closing)
+    expect(reentrant, 'final-summary close Promise identity').toBe(closing)
     expect(fixture.attached.close()).toBe(closing)
     /** The original async close becomes observable after its one physical-close await. */
     let observed = false
@@ -631,7 +631,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
   })
 
   it.each(['throw', 'reject'] as const)(
-    'A32 keeps reporter %s failures reachable and drains subsequent chunks',
+    'keeps reporter %s failures reachable and drains subsequent chunks',
     async (mode) => {
       /** The logging Feature must report this exact object rather than rebuild it. */
       const failure = new TypeError('fixture diagnostic sink failed', {
@@ -653,7 +653,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     }
   )
 
-  it('A32 drains a real flooding Node child through the original binding stderr source', async () => {
+  it('drains a real flooding Node child through the original binding stderr source', async () => {
     /** Virtual intervals let exact chunk accounting ignore native scheduling variability. */
     const scheduler = createManualScheduler()
     /** Binding onChunk counts the actual pipe chunks before redacted projection. */
@@ -665,7 +665,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
     /** Failures stay on the original binding reporter, never become quota events. */
     const reports: unknown[] = []
     /** The fixture waits for a parent trigger after original source subscription. */
-    const program = `const { once } = require('node:events'); let text = ''; let started = false; process.stdin.on('data', async bytes => { text += bytes.toString(); if (started || !text.includes('BC6-FLOOD')) return; started = true; for (let i = 0; i < 1000; i++) { if (!process.stderr.write(Buffer.alloc(8192, 115))) await once(process.stderr, 'drain'); await new Promise(resolve => setImmediate(resolve)); } process.stdin.destroy(); });`
+    const program = `const { once } = require('node:events'); let text = ''; let started = false; process.stdin.on('data', async bytes => { text += bytes.toString(); if (started || !text.includes('STDERR-FLOOD')) return; started = true; for (let i = 0; i < 1000; i++) { if (!process.stderr.write(Buffer.alloc(8192, 115))) await once(process.stderr, 'drain'); await new Promise(resolve => setImmediate(resolve)); } process.stdin.destroy(); });`
     /** The original native launcher and supervisor own the stderr reader. */
     const binding = createSpawnProcessBinding(
       {
@@ -741,14 +741,14 @@ describe('A32 BC6 session stderr budget prototype', () => {
     /** The binding supplies its original stderr source to the existing projection owner. */
     const channel = await binding.openChannel(ready.unit, new AbortController().signal)
     try {
-      await ready.unit.channel!.write(new TextEncoder().encode('BC6-FLOOD'))
+      await ready.unit.channel!.write(new TextEncoder().encode('STDERR-FLOOD'))
       expect(await ready.unit.exited).toMatchObject({ code: 0, signal: null })
       await channel.close()
       expect(receivedBytes).toBe(8192 * 1000)
       expect(receivedChunks).toBeGreaterThan(32)
       expect(
         records.filter((record) => record.droppedChunks === undefined),
-        'A32 native stderr budget missing'
+        'native stderr budget missing'
       ).toHaveLength(32)
       expect(records.filter((record) => record.droppedChunks !== undefined)).toHaveLength(1)
       expect(records.at(-1)?.droppedChunks).toBe(receivedChunks - 32)
@@ -756,7 +756,7 @@ describe('A32 BC6 session stderr budget prototype', () => {
       // Keep the complete native receipt outside the aggregate JSON reporter's stdout document.
       process.stderr.write(
         JSON.stringify({
-          acceptance: 'A32',
+          acceptance: 'stderr budget',
           runtime: 'node',
           receivedChunks,
           receivedBytes,

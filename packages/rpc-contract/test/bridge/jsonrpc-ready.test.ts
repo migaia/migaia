@@ -12,7 +12,7 @@ import {
 } from '../../../rpc-integration/test/bridge/fixture.js'
 
 describe('JSON-RPC bridge readiness', () => {
-  it('[A4] completes control negotiation with diagnostic peer identity and no native capabilities', async () => {
+  it('completes control negotiation with diagnostic peer identity and no native capabilities', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     expect(channel.agreement).toEqual({
@@ -36,7 +36,7 @@ describe('JSON-RPC bridge readiness', () => {
     expect(fixture.closes).toBe(1)
   })
   it.each(['ping@1', 'close@1', 'stream@1'])(
-    '[A4] refuses unsupported capability %s before bytes',
+    'refuses unsupported capability %s before bytes',
     async (capability) => {
       const fixture = bridgeFixture()
       await expect(
@@ -45,14 +45,14 @@ describe('JSON-RPC bridge readiness', () => {
       expect(fixture.writes).toEqual([])
     }
   )
-  it.each(['', undefined])('[A4] refuses missing/empty token before bytes', async (token) => {
+  it.each(['', undefined])('refuses missing/empty token before bytes', async (token) => {
     const fixture = bridgeFixture()
     await expect(fixture.open({ token: token as string })).rejects.toMatchObject({
       code: 'JSONRPC_PROFILE_INVALID'
     })
     expect(fixture.writes).toEqual([])
   })
-  it('[A3] refuses local streams and ambiguous target before bytes', async () => {
+  it('refuses local streams and ambiguous target before bytes', async () => {
     const fixture = bridgeFixture()
     const streaming = {
       ...BRIDGE_CONTRACT,
@@ -76,7 +76,7 @@ describe('JSON-RPC bridge readiness', () => {
     ).rejects.toBeInstanceOf(TypeError)
     expect(fixture.writes).toEqual([])
   })
-  it.each(BRIDGE_METHODS)('[A3] rejects missing method %s and closes once', async (missing) => {
+  it.each(BRIDGE_METHODS)('rejects missing method %s and closes once', async (missing) => {
     const fixture = bridgeFixture({
       responder(message) {
         const answer = acceptRpcHandshake(
@@ -98,7 +98,7 @@ describe('JSON-RPC bridge readiness', () => {
     expect(fixture.messages).toHaveLength(1)
   })
   it.each(['jsonrpc-bridge@1', 'abort@1', 'wire-error@1'])(
-    '[A3] rejects absent capability %s after otherwise valid control accept',
+    'rejects absent capability %s after otherwise valid control accept',
     async (missing) => {
       const fixture = bridgeFixture({
         responder(message) {
@@ -125,24 +125,21 @@ describe('JSON-RPC bridge readiness', () => {
   it.each([
     [-32601, 'JSONRPC_EXTENSION_MISSING'],
     [-32602, 'JSONRPC_PROFILE_INVALID']
-  ])(
-    '[A3] classifies hello integer error %s without losing foreign cause',
-    async (code, expected) => {
-      const fixture = bridgeFixture({
-        responder: (message) => ({
-          jsonrpc: '2.0',
-          id: message.id,
-          error: { code, message: 'foreign hello failure' }
-        })
+  ])('classifies hello integer error %s without losing foreign cause', async (code, expected) => {
+    const fixture = bridgeFixture({
+      responder: (message) => ({
+        jsonrpc: '2.0',
+        id: message.id,
+        error: { code, message: 'foreign hello failure' }
       })
-      await expect(fixture.open()).rejects.toMatchObject({
-        code: expected,
-        cause: { source: 'jsonrpc-2.0', code: String(code) }
-      })
-      expect(fixture.closes).toBe(1)
-    }
-  )
-  it('[A4] times out at 10000ms, rejects abort by identity, and releases timers', async () => {
+    })
+    await expect(fixture.open()).rejects.toMatchObject({
+      code: expected,
+      cause: { source: 'jsonrpc-2.0', code: String(code) }
+    })
+    expect(fixture.closes).toBe(1)
+  })
+  it('times out at 10000ms, rejects abort by identity, and releases timers', async () => {
     const silent = bridgeFixture({ autoHello: false })
     const timed = silent.open()
     silent.scheduler.advance(9999)
@@ -162,7 +159,7 @@ describe('JSON-RPC bridge readiness', () => {
     expect(fixture.closes).toBe(1)
   })
   it.each(['kind', 'step', 'protocol', 'codec', 'unknown-field', 'peer'])(
-    '[A11] preserves original control failure and redacts hostile reply %s',
+    'preserves original control failure and redacts hostile reply %s',
     async (field) => {
       const fixture = bridgeFixture({ autoHello: false })
       const pending = fixture.open()
@@ -216,7 +213,7 @@ describe('JSON-RPC bridge readiness', () => {
     }
   )
   it.each([true, false])(
-    '[A7] reclaims resources when timer cancellation throws (hello=%s)',
+    'reclaims resources when timer cancellation throws (hello=%s)',
     async (hello) => {
       /** Both completed hello and an existing abort primary exercise the same cleanup owner. */
       const fixture = bridgeFixture({ autoHello: hello })
@@ -248,7 +245,7 @@ describe('JSON-RPC bridge readiness', () => {
       const [outcome] = await opening
       expect(outcome!.status).toBe('rejected')
       if (outcome!.status !== 'rejected') throw new Error('fixture unexpectedly ready')
-      expect(cleanup, 'SDD_BASE_RED_CONTRACT:A7').toMatchObject({
+      expect(cleanup, 'cleanup contract').toMatchObject({
         source: '@migaia/rpc/core',
         code: 'INTERNAL'
       })
@@ -270,7 +267,7 @@ describe('JSON-RPC bridge readiness', () => {
       expect(fixture.removals).toBe(2)
     }
   )
-  it('[A11] redacts malformed JSON, truncated bodies and nonstring replies', async () => {
+  it('redacts malformed JSON, truncated bodies and nonstring replies', async () => {
     for (const kind of ['json', 'truncated', 'shape']) {
       const fixture = bridgeFixture({ autoHello: false })
       const pending = fixture.open()

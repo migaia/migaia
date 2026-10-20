@@ -104,14 +104,14 @@ export type ISSRRequestScopeOptions = {
 type ISSRRegistration = {
   readonly store: ISSRStore
   readonly owned: boolean
-  /** 释放顺序键（migration.sdd.md §3.1/M-T31）：store 晚于其所属 resource 释放。 */
+  /** 释放顺序键：store 晚于其所属 resource 释放。 */
   readonly order: 1
 }
 
 type ISSRResourceRegistration = {
   readonly resource: ISSRResource
   readonly owned: boolean
-  /** 释放顺序键（migration.sdd.md §3.1/M-T31）：resource 早于 store 释放。 */
+  /** 释放顺序键：resource 早于 store 释放。 */
   readonly order: 0
 }
 
@@ -634,7 +634,7 @@ export class SSRRequestScope {
     // Sync callers may never observe async completion; the stable public Promise still replays it.
     void this.#disposePromise.catch(() => undefined)
     this.#resolveDisposedSignal()
-    // 显式释放顺序（migration.sdd.md §3.1/M-T31）：resource（order 0）先于 store（order 1）——
+    // 显式释放顺序：resource（order 0）先于 store（order 1）——
     // store 逻辑上拥有 resource，必须先摘子资源再释放 store。组内仍按注册逆序（LIFO）。
     const entries = [
       ...[...this.#resources.values()].reverse().map((registration) => ({

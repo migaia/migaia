@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createStoreResource } from '../src/store-resource.js'
 
 describe('event-subscriber listener migration', () => {
-  it('ES-T53 preserves Set dedupe, snapshot dispatch, and idempotent unsubscribe', async () => {
+  it('preserves Set dedupe, snapshot dispatch, and idempotent unsubscribe', async () => {
     let resolveLoad!: (value: object) => void
     const load = new Promise<object>((resolve) => {
       resolveLoad = resolve
@@ -22,7 +22,7 @@ describe('event-subscriber listener migration', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('ES-T19 keeps listener failure in the resource listener error phase', () => {
+  it('keeps listener failure in the resource listener error phase', () => {
     const onError = vi.fn()
     const listener = vi.fn(() => {
       throw new Error('listener failure')

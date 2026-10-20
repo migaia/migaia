@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { client, expected, peers, wireFrames } from '../process/fixtures/conformance-business.js'
 
-/** The U36 independent providers retain genuine process control and physical exit ownership. */
+/** The independent baseline providers retain genuine process control and physical exit ownership. */
 for (const peer of peers.filter((value) => ['python', 'go', 'rust'].includes(value.language))) {
-  it(`[A9][A16] ${peer.language} managed close uses the original native drain once`, async () => {
+  it(`${peer.language} managed close uses the original native drain once`, async () => {
     /** The fixture installs the actual new process Peer over its original supervised binding. */
     const active = await client(peer, false, randomUUID())
     try {
@@ -20,7 +20,7 @@ for (const peer of peers.filter((value) => ['python', 'go', 'rust'].includes(val
           (frame) => frame.kind === 'variation' && frame.data.route.variation === 'close'
         ).length,
         1,
-        '[A9][A16] managed process closure sends the original native close before disposing its endpoint'
+        'managed process closure sends the original native close before disposing its endpoint'
       )
       /** A released caller cannot emit another physical frame or acquire a replacement. */
       const sent = active.sent.length
@@ -37,7 +37,7 @@ for (const peer of peers.filter((value) => ['python', 'go', 'rust'].includes(val
   }, 30_000)
 }
 
-it('[A9] managed native cancellation reaches the independent provider', async () => {
+it('managed native cancellation reaches the independent provider', async () => {
   /** Python's retained pending provider gives a real cancellation observation, not a local mock. */
   const peer = peers.find((value) => value.language === 'python')!
   /** The same public source and native lifecycle are exercised by conformance. */
@@ -59,7 +59,7 @@ it('[A9] managed native cancellation reaches the independent provider', async ()
     assert.equal(
       Array.isArray(reasons) && reasons.length,
       1,
-      '[A9] installed native abort capability must deliver the caller reason to the provider'
+      'installed native abort capability must deliver the caller reason to the provider'
     )
     expect(reasons).toMatchObject([expected.cancel.providerReason])
   } finally {

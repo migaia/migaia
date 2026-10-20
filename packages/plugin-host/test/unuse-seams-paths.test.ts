@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 import { openComposition } from '../src/composition-entry.js'
 
-describe('A6 release paths', () => {
+describe('release paths', () => {
   it('runs the old dependent and provider hooks before replacement cleanup, once per generation', async () => {
     const events: string[] = []
     const host = new PluginHost<Record<string, never>>({

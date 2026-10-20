@@ -11,8 +11,8 @@ type ICompletionController = ReturnType<typeof createGenerationController> & {
   readonly complete?: (token: object) => boolean
 }
 
-describe('P2-A generation completion', () => {
-  it('[A16] completes only the current token and cleans timer before parent without abort', () => {
+describe('generation completion', () => {
+  it('completes only the current token and cleans timer before parent without abort', () => {
     /** Parent cleanup is a real native subscription and is observed independently of timer cleanup. */
     const parent = new AbortController()
     /** Records canonical cleanup order without adding a second lifecycle implementation. */
@@ -37,7 +37,7 @@ describe('P2-A generation completion', () => {
       }
     })
     try {
-      assert.equal(typeof controller.complete, 'function', '[A16] lifecycle complete must exist')
+      assert.equal(typeof controller.complete, 'function', 'lifecycle complete must exist')
       assert.ok(controller.complete)
       /** First token becomes stale through the original begin cancellation path. */
       const first = controller.begin({ timeoutMs: 10 })
@@ -62,7 +62,7 @@ describe('P2-A generation completion', () => {
     }
   })
 
-  it('[A16] completion cleanup failures preserve the native primary and still remove parent', () => {
+  it('completion cleanup failures preserve the native primary and still remove parent', () => {
     /** Native parent subscription is still released after timer cancellation fails. */
     const parent = new AbortController()
     /** Original supported scheduler failure must stay reachable from the package error. */
@@ -82,7 +82,7 @@ describe('P2-A generation completion', () => {
       }
     })
     try {
-      assert.equal(typeof controller.complete, 'function', '[A16] lifecycle complete must exist')
+      assert.equal(typeof controller.complete, 'function', 'lifecycle complete must exist')
       assert.ok(controller.complete)
       /** Current generation must be invalidated before any fallible cleanup. */
       const current = controller.begin({ timeoutMs: 10 })
@@ -109,10 +109,10 @@ describe('P2-A generation completion', () => {
     }
   })
 
-  it('[A16] later real cancellation retains the exact native reason after successful completion', () => {
+  it('later real cancellation retains the exact native reason after successful completion', () => {
     /** Completion must leave the controller reusable for a later supported generation. */
     const controller: ICompletionController = createGenerationController()
-    assert.equal(typeof controller.complete, 'function', '[A16] lifecycle complete must exist')
+    assert.equal(typeof controller.complete, 'function', 'lifecycle complete must exist')
     assert.ok(controller.complete)
     /** First generation is genuinely completed while its signal remains live. */
     const completed = controller.begin()
@@ -130,8 +130,8 @@ describe('P2-A generation completion', () => {
   })
 })
 
-describe('L-T6 GenerationController: new generation, late arrival, disposed', () => {
-  it('Round24 L-T60: invalid timeout preserves current generation state exactly', () => {
+describe('GenerationController: new generation, late arrival, disposed', () => {
+  it('invalid timeout preserves current generation state exactly', () => {
     const schedule = vi.fn(() => ({ cancel: vi.fn() }))
     const controller = createGenerationController({
       scheduler: { now: () => 0, schedule }
@@ -163,7 +163,7 @@ describe('L-T6 GenerationController: new generation, late arrival, disposed', ()
     expect(schedule).toHaveBeenCalledTimes(1)
   })
 
-  it('Round24 L-T60: timeout accessor is read before superseding current state', () => {
+  it('timeout accessor is read before superseding current state', () => {
     const controller = createGenerationController({
       scheduler: { now: () => 0, schedule: () => ({ cancel: () => undefined }) }
     })
@@ -197,7 +197,7 @@ describe('L-T6 GenerationController: new generation, late arrival, disposed', ()
     expect(schedule).not.toHaveBeenCalled()
     expect(() => controller.begin({ timeoutMs: 0 })).not.toThrow()
   })
-  it('AF-T62: snapshots scheduler methods once at controller construction', () => {
+  it('snapshots scheduler methods once at controller construction', () => {
     let scheduleReads = 0
     let optionReads = 0
     const scheduler = {
@@ -327,7 +327,7 @@ describe('L-T6 GenerationController: new generation, late arrival, disposed', ()
   })
 })
 
-describe('L-T30 GenerationController: old generation cleanup failure does not poison new generation', () => {
+describe('GenerationController: old generation cleanup failure does not poison new generation', () => {
   it('a release failure for a superseded token leaves the new generation state untouched', () => {
     const controller = createGenerationController()
     const stale = controller.begin()
@@ -393,7 +393,7 @@ describe('L-T30 GenerationController: old generation cleanup failure does not po
   })
 })
 
-describe('AF-T73 GenerationController cancellation cleanup boundary', () => {
+describe('GenerationController cancellation cleanup boundary', () => {
   it('single cleanup Error keeps identity and receives GENERATION_CANCELLATION_FAILED', () => {
     const cleanupError = new Error('timer cleanup failed')
     const controller = createGenerationController({
@@ -491,7 +491,7 @@ describe('AF-T73 GenerationController cancellation cleanup boundary', () => {
   })
 })
 
-describe('L-T31 GenerationController: parent closing', () => {
+describe('GenerationController: parent closing', () => {
   it("auto-aborts the current generation's signal when the parent signal aborts", () => {
     const parent = new AbortController()
     const controller = createGenerationController({ parentSignal: parent.signal })
@@ -517,7 +517,7 @@ describe('L-T31 GenerationController: parent closing', () => {
   })
 })
 
-describe('AF-T74 GenerationController parent admission races', () => {
+describe('GenerationController parent admission races', () => {
   it('rolls back a failed parent listener registration and keeps primary plus cleanup identity', () => {
     const primaryError = new Error('parent registration failed')
     const cleanupError = new Error('parent listener removal failed')
@@ -634,7 +634,7 @@ describe('AF-T74 GenerationController parent admission races', () => {
   })
 })
 
-describe('Round25 L-T61 synchronous scheduler callback cleanup boundary', () => {
+describe('synchronous scheduler callback cleanup boundary', () => {
   it('captures parent cleanup failure until task acquisition, cancels once, and removes residual listener', () => {
     const primaryError = new Error('parent cleanup failed')
     const listeners = new Set<() => void>()

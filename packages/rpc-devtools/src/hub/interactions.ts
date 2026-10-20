@@ -167,7 +167,7 @@ export function queryInteractions(
 ): IRpcDevtoolsInteraction[] {
   /** Explicit traces select keys directly rather than scanning unrelated wire events. */
   const keys = trace === undefined ? index.interactions.keys() : index.traces.get(trace)?.values()
-  /** SC9 permits result arrays whose elements are the stored readonly interaction objects. */
+  /** Permits result arrays whose elements are the stored readonly interaction objects. */
   const result: IRpcDevtoolsInteraction[] = []
   if (!keys) return result
   for (const key of keys) {

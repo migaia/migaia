@@ -43,7 +43,7 @@ function connection(name: string, source: IRuntimePeerSource) {
   })
 }
 
-it('[A11] two genuine Host installations flatten real Feature names into plugin.method in both directions', async () => {
+it('two genuine Host installations flatten real Feature names into plugin.method in both directions', async () => {
   /** Each side is a real frozen managed Host with its original installation transaction. */
   const hosts = [
     runtimeTestHost({
@@ -103,7 +103,7 @@ it('[A11] two genuine Host installations flatten real Feature names into plugin.
           (value) => value,
           (failure) => failure
         )
-      assert.equal(result, 42, '[A11] public plugin.method reaches the whitelisted real Feature')
+      assert.equal(result, 42, 'public plugin.method reaches the whitelisted real Feature')
     }
     assert.equal(calls, 4)
   } finally {
@@ -150,7 +150,7 @@ async function attach(
   return { channels, reports }
 }
 
-it('[A11][A14] default empty exposure keeps the connection ready, hides business, and grants no Host control', async () => {
+it('default empty exposure keeps the connection ready, hides business, and grants no Host control', async () => {
   /** Genuine Feature execution is checked before the remote empty-directory assertions. */
   let calls = 0
   /** Both sides use the same entry rather than a special service Host API. */
@@ -180,22 +180,22 @@ it('[A11][A14] default empty exposure keeps the connection ready, hides business
     assert.equal(
       Object.hasOwn(child, 'host'),
       false,
-      '[A14] empty expose cannot create a mutable Host facet'
+      'empty expose cannot create a mutable Host facet'
     )
     for (const mode of ['request', 'notify', 'stream'] as const)
       assert.throws(
         () => hosts[0].thread![mode]('remote', 'service.read'),
         { code: 'PROVIDER_NOT_FOUND' },
-        '[A11] hidden methods reject before transport dispatch'
+        'hidden methods reject before transport dispatch'
       )
-    assert.equal(calls, 0, '[A11] hidden real Feature executes zero times')
+    assert.equal(calls, 0, 'hidden real Feature executes zero times')
   } finally {
     for (const host of hosts) await host.dispose()
     connection?.channels.close()
   }
 })
 
-it('[A11][A12] explicit Feature exposure supports all three modes and keeps other Plugins hidden', async () => {
+it('explicit Feature exposure supports all three modes and keeps other Plugins hidden', async () => {
   /** Original Feature business, notification and generator execution each have independent evidence. */
   const invoked: unknown[] = []
   /** A source callback runs only after both Host installations are legitimately admitted. */
@@ -227,7 +227,7 @@ it('[A11][A12] explicit Feature exposure supports all three modes and keeps othe
         features: {
           data: defineFeature(() => ({
             read: () => {
-              assert.fail('[A12] hidden Feature cannot execute')
+              assert.fail('hidden Feature cannot execute')
             }
           }))
         },
@@ -241,7 +241,7 @@ it('[A11][A12] explicit Feature exposure supports all three modes and keeps othe
     assert.deepEqual(
       invoked,
       ['request', 'notify', 'barrier'],
-      '[A11] scalar and one-way use the same genuine method'
+      'scalar and one-way use the same genuine method'
     )
     /** Original stream iteration yields in order without collecting inside the facade. */
     const values: IRpcPortableValue[] = []
@@ -260,7 +260,7 @@ it('[A11][A12] explicit Feature exposure supports all three modes and keeps othe
   }
 })
 
-it('[A12] conflicting real Feature methods reject before source effects without replacing the original business', async () => {
+it('conflicting real Feature methods reject before source effects without replacing the original business', async () => {
   /** The genuine existing registration stays active through failed connection construction. */
   const host = managedHost()
   /** No transport acquisition can precede folded-name validation. */
@@ -284,7 +284,7 @@ it('[A12] conflicting real Feature methods reject before source effects without 
           expose: ['service'],
           connect: async () => {
             sourceCalls += 1
-            assert.fail('[A12] source opened before conflict rejection')
+            assert.fail('source opened before conflict rejection')
           },
           report: () => undefined
         })
@@ -295,14 +295,14 @@ it('[A12] conflicting real Feature methods reject before source effects without 
       }
     )
     assert.equal(sourceCalls, 0)
-    assert.equal(host.thread, undefined, '[A12] a failed candidate cannot publish a slot')
+    assert.equal(host.thread, undefined, 'a failed candidate cannot publish a slot')
     assert.equal(service.getFeature('first').read(), 42)
   } finally {
     await host.dispose()
   }
 })
 
-it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dry-run transaction', async () => {
+it('child Host controls reuse the real resolver, exact adopter and dry-run transaction', async () => {
   /** Source and destination are genuine managed Hosts with separate mutation queues. */
   const hosts = [managedHost(), managedHost()] as const
   /** Resolver business is counted independently of Host-use results. */
@@ -344,7 +344,7 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
     assert.deepEqual(
       child.methods,
       [RemoteMethodName.hostUse, RemoteMethodName.hostUnUse, RemoteMethodName.hostInspect],
-      '[A14] explicit Host exposure advertises the actual reserved control operations'
+      'explicit Host exposure advertises the actual reserved control operations'
     )
     assert.equal(hosts[1].revision, 1)
     await assert.rejects(
@@ -354,7 +354,7 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
         return true
       }
     )
-    assert.equal(hosts[1].revision, 1, '[A15] unadopted removal mutates zero times')
+    assert.equal(hosts[1].revision, 1, 'unadopted removal mutates zero times')
     assert.equal(resolved, 0)
     assert.deepEqual(
       await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added', { answer: 42 }]),
@@ -384,7 +384,7 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
       'added',
       { dryRun: true }
     ])
-    assert.equal(hosts[1].revision, 2, '[A15] dryRun leaves the adopted registration intact')
+    assert.equal(hosts[1].revision, 2, 'dryRun leaves the adopted registration intact')
     assert.deepEqual(
       await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
       Object.assign(Object.create(null), { ok: true })
@@ -395,7 +395,7 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
         (method) => method === RemoteMethodName.hostUse
       ),
       false,
-      '[A14] the reverse empty exposure has no control grant'
+      'the reverse empty exposure has no control grant'
     )
   } finally {
     for (const host of hosts) await host.dispose()
@@ -403,7 +403,7 @@ it('[A14][A15] child Host controls reuse the real resolver, exact adopter and dr
   }
 })
 
-it('[A14][A15][A25] explicit catalog methods prepare before local installation and remain adopter guarded', async () => {
+it('explicit catalog methods prepare before local installation and remain adopter guarded', async () => {
   /** Both callers and the empty destination use genuine managed Host transactions. */
   const hosts = [managedHost(), managedHost()] as const
   /** One original reference carrier is borrowed by the genuine opposing registrations. */
@@ -419,7 +419,7 @@ it('[A14][A15][A25] explicit catalog methods prepare before local installation a
       data: defineFeature(() => ({
         read: () => ++calls,
         hidden: () => {
-          assert.fail('[A25] an unexposed catalog method cannot execute')
+          assert.fail('an unexposed catalog method cannot execute')
         }
       }))
     },
@@ -475,7 +475,7 @@ it('[A14][A15][A25] explicit catalog methods prepare before local installation a
     assert.equal(
       'entered' in starting,
       true,
-      '[A25] an explicitly exposed catalog method must not require its target to be installed'
+      'an explicitly exposed catalog method must not require its target to be installed'
     )
     await hosts[0].use(
       createThreadPlugin({ name: 'remote', connect: channels.sources[0], report: () => undefined })

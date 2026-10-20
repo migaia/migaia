@@ -33,13 +33,19 @@ export async function measureRuntimeUnits({
   const units = inventory.units.filter((unit) => !selectedId || unit.id === selectedId)
   if (!units.length || !output) throw new TypeError(IpcBenchErrorText.configuration)
   await mkdir(output, { recursive: true })
-  /** This scope tracks SDK absolute measurements; original 76 normalized W3 cells stay untouched. */
+  /**
+   * This scope tracks SDK absolute measurements; original 76 normalized baseline cells stay
+   * untouched.
+   */
   const results = []
-  /** Final SDK source baselines are shared with original W3, without inventing a bare topology. */
+  /**
+   * Final SDK source baselines are shared with the original baseline, without inventing a bare
+   * topology.
+   */
   const baseline =
     prepare || freezeSdk
       ? undefined
-      : JSON.parse(await readFile(new URL('./w3-sdk-baseline.json', import.meta.url)))
+      : JSON.parse(await readFile(new URL('./sdk-baseline.json', import.meta.url)))
   const noise = prepare || freezeSdk ? undefined : JSON.parse(await readFile(noisePath))
   /** Fail closed before launching if a registered supplemental cell lacks its own current A/A. */
   if (baseline && units.some((unit) => !baseline.cells[unit.id] || !noise.sdkCells?.[unit.id]))

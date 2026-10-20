@@ -4,7 +4,7 @@ import { createSupervisor, createUnitBudget } from '../../src/index.js'
 import { createMemoryLauncher, deferred, type IMemoryHandle } from '../support/memory-launcher.js'
 import { createMemoryProfile } from '../support/memory-profile.js'
 
-it('[A71] launch metadata counts accepted executions from zero and failed replacements reuse the next ordinal', async () => {
+it('launch metadata counts accepted executions from zero and failed replacements reuse the next ordinal', async () => {
   const native = createMemoryLauncher()
   const ordinals: unknown[] = []
   let rejectNext = false
@@ -29,14 +29,12 @@ it('[A71] launch metadata counts accepted executions from zero and failed replac
   })
   try {
     await supervisor.start()
-    expect(ordinals, '[A71] first genuine execution is generation zero').toEqual([0])
+    expect(ordinals, 'first genuine execution is generation zero').toEqual([0])
     rejectNext = true
     expect((await supervisor.replace({ strategy: 'start-then-switch' })).kind).toBe('failed')
     expect((await supervisor.replace({ strategy: 'start-then-switch' })).kind).toBe('replaced')
     await supervisor.restart()
-    expect(ordinals, '[A71] rejection is an attempt, not an accepted execution').toEqual([
-      0, 1, 1, 2
-    ])
+    expect(ordinals, 'rejection is an attempt, not an accepted execution').toEqual([0, 1, 1, 2])
     expect(supervisor.generation).toBeGreaterThan(3)
   } finally {
     await supervisor.dispose()
@@ -49,7 +47,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 40; index++) await Promise.resolve()
 }
 
-it('[A46] per-command grace bounds the original beforeTerminate phase', async () => {
+it('per-command grace bounds the original beforeTerminate phase', async () => {
   /** One deterministic clock owns all drain, exit and reap deadlines. */
   const scheduler = createManualScheduler()
   /** The genuine supervisor handle observes each original termination invocation. */
@@ -75,7 +73,7 @@ it('[A46] per-command grace bounds the original beforeTerminate phase', async ()
     expect(launcher.launched[0]!.termination).toEqual([])
     scheduler.advance(10)
     await flush()
-    expect(launcher.launched[0]!.termination, '[A46] grace applies to beforeTerminate').toEqual([
+    expect(launcher.launched[0]!.termination, 'grace applies to beforeTerminate').toEqual([
       'graceful'
     ])
     await stopping
@@ -88,7 +86,7 @@ it('[A46] per-command grace bounds the original beforeTerminate phase', async ()
   }
 })
 
-it('[A46/A47] kill upgrades the same pending drain and shares its exact stop promise', async () => {
+it('kill upgrades the same pending drain and shares its exact stop promise', async () => {
   /** Force must happen without waiting for or advancing the current grace deadline. */
   const scheduler = createManualScheduler()
   /** Actual exit is independently controlled after the force request. */
@@ -125,9 +123,7 @@ it('[A46/A47] kill upgrades the same pending drain and shares its exact stop pro
     await flush()
     expect(drains).toBe(1)
     expect(launcher.launched[0]!.termination).toEqual([])
-    expect(typeof supervisor.kill, '[A46] force belongs to the canonical supervisor').toBe(
-      'function'
-    )
+    expect(typeof supervisor.kill, 'force belongs to the canonical supervisor').toBe('function')
     /** Joining force may not create a second teardown, reap deadline or stop promise. */
     const killing = supervisor.kill()
     expect(killing).toBe(stopping)
@@ -149,7 +145,7 @@ it('[A46/A47] kill upgrades the same pending drain and shares its exact stop pro
   }
 })
 
-it('[A52] restartCount counts successful restart causes rather than generation numbers', async () => {
+it('restartCount counts successful restart causes rather than generation numbers', async () => {
   /** All retirement calls fulfill through the genuine profile and original exited owner. */
   const launcher = createMemoryLauncher()
   /** Exactly one execution lease forces stop-first replacement. */
@@ -166,7 +162,7 @@ it('[A52] restartCount counts successful restart causes rather than generation n
   try {
     await supervisor.start()
     await supervisor.start()
-    expect(supervisor.inspect().restartCount, '[A52] initial start is not a restart').toBe(0)
+    expect(supervisor.inspect().restartCount, 'initial start is not a restart').toBe(0)
     await supervisor.restart()
     expect(supervisor.generation).toBe(3)
     expect(supervisor.inspect().restartCount).toBe(1)
@@ -184,7 +180,7 @@ it.each([
   ['ready', 'restart-first'],
   ['backoff', 'stop-first'],
   ['backoff', 'restart-first']
-] as const)('[A49] %s retains original command order when %s', async (state, order) => {
+] as const)('%s retains original command order when %s', async (state, order) => {
   /** A manual clock independently proves an obsolete backoff timer cannot resurrect a stopped unit. */
   const scheduler = createManualScheduler()
   /** Every actual launch remains in the existing owner fixture's original receipt array. */
@@ -225,7 +221,7 @@ it.each([
   expect(budget.inUse).toBe(0)
 })
 
-it('[A53] event snapshots survive listener mutation and report a returned thenable rejection', async () => {
+it('event snapshots survive listener mutation and report a returned thenable rejection', async () => {
   /** The callback error stays the exact original value at the report boundary. */
   const failure = new Error('runtime listener fixture')
   /** Reports are passive and cannot change the readiness transition. */
@@ -270,11 +266,7 @@ it('[A53] event snapshots survive listener mutation and report a returned thenab
   try {
     expect((await supervisor.start()).state).toBe('ready')
     await flush()
-    expect(order, '[A53] each captured listener runs once; D starts next event').toEqual([
-      'a',
-      'b',
-      'c'
-    ])
+    expect(order, 'each captured listener runs once; D starts next event').toEqual(['a', 'b', 'c'])
     expect(reported).toEqual([failure, failure])
     await supervisor.restart()
     await flush()
@@ -286,7 +278,7 @@ it('[A53] event snapshots survive listener mutation and report a returned thenab
 })
 
 it.each(['launch', 'ready'] as const)(
-  '[A50] kill cancels starting %s immediately and reaps only the original handle',
+  'kill cancels starting %s immediately and reaps only the original handle',
   async (phase) => {
     /** Kill must not require a startup-timeout or a renewed reap deadline. */
     const scheduler = createManualScheduler()

@@ -159,7 +159,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
   // Instance ownership is orthogonal to atom routing: releasing a definition
   // removes only that instance, while store disposal drains the scope in LIFO.
   // Every owned instance wraps a pure reactive node (Signal/Computed) — never wasm/I/O — so this
-  // can stay the synchronous scope (D-6) and `IAtomStore.dispose()` keeps its sync contract.
+  // can stay the synchronous scope and `IAtomStore.dispose()` keeps its sync contract.
   const instanceScope: ISyncLifecycleScope = createSyncLifecycleScope()
   const nodeRuntime = internalRuntimeOf(runtime)
   const overrides = new Map<IAtomDefinition<unknown>, IOverrideLayer[]>()

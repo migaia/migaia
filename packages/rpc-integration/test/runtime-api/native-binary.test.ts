@@ -476,7 +476,7 @@ it('process byte carriers keep inline binary despite bilateral native capability
   }
 })
 
-it('[A86] real sign-only MessagePort transfer detaches all sender views and restores the complete receiver backing', async () => {
+it('real sign-only MessagePort transfer detaches all sender views and restores the complete receiver backing', async () => {
   /** The same genuine native fixture retains independent physical/provider observations. */
   const fixture = await nativePair()
   const { peers, received, reports } = fixture
@@ -491,7 +491,7 @@ it('[A86] real sign-only MessagePort transfer detaches all sender views and rest
     assert.equal(
       backing.byteLength,
       0,
-      '[A86] actual native commit must detach the original complete backing'
+      'actual native commit must detach the original complete backing'
     )
     assert.equal(first.byteLength, 0)
     assert.equal(second.byteLength, 0)
@@ -510,7 +510,7 @@ it('[A86] real sign-only MessagePort transfer detaches all sender views and rest
 })
 
 it.each(['portable-binary@1', 'native-binary-authenticated-manifest@1', 'transfer@1'])(
-  '[A87] native transfer requires bilateral %s and leaves original ownership intact when absent',
+  'native transfer requires bilateral %s and leaves original ownership intact when absent',
   async (missing) => {
     /** Only one actual source removes the selected capability; the other still declares support. */
     const fixture = await nativePair(undefined, undefined, [
@@ -542,7 +542,7 @@ it.each([
   'pre-abort',
   'whole-backing-limit'
 ] as const)(
-  '[A87] %s rejects before native commit without losing original backing ownership',
+  '%s rejects before native commit without losing original backing ownership',
   async (invalid) => {
     const fixture = await nativePair()
     const send = vi.spyOn(fixture.transports[0]!, 'send')
@@ -585,7 +585,7 @@ it.each([
   }
 )
 
-it('[A86] lazy native stream transfers its input on first next through the original sender', async () => {
+it('lazy native stream transfers its input on first next through the original sender', async () => {
   const fixture = await nativePair()
   const backing = new Uint8Array([1, 2]).buffer
   const stream = fixture.peers[0]!.stream('values', backing, { transfer: [backing] })
@@ -593,13 +593,13 @@ it('[A86] lazy native stream transfers its input on first next through the origi
     assert.equal(
       backing.byteLength,
       2,
-      '[A86] constructing the canonical lazy iterator performs no native commit'
+      'constructing the canonical lazy iterator performs no native commit'
     )
     const item = await stream.next()
     assert.equal(
       backing.byteLength,
       0,
-      '[A86] first-next must retain the original explicit transfer input'
+      'first-next must retain the original explicit transfer input'
     )
     assert.ok(item.value instanceof ArrayBuffer)
     assert.deepEqual([...new Uint8Array(item.value)], [1, 2])
@@ -612,7 +612,7 @@ it('[A86] lazy native stream transfers its input on first next through the origi
 })
 
 it.each(['request', 'notify', 'stream', 'group'] as const)(
-  '[A87] process %s rejects every own transfer field before native send or detach',
+  'process %s rejects every own transfer field before native send or detach',
   async (mode) => {
     /**
      * The actual process public factory must enforce its family contract even on a capable test
@@ -638,7 +638,7 @@ it.each(['request', 'notify', 'stream', 'group'] as const)(
         assert.equal(
           (result as { code?: string })?.code,
           RpcCoreErrorCode.invalidConfig,
-          '[A87] process transfer is a configuration error, including []/undefined'
+          'process transfer is a configuration error, including []/undefined'
         )
         assert.equal(send.mock.calls.length, 0)
         assert.equal(backing.byteLength, 1)
@@ -651,7 +651,7 @@ it.each(['request', 'notify', 'stream', 'group'] as const)(
   }
 )
 
-it('[A86] tampered view-external bytes cannot consume the genuine counter, and replay cannot run the provider twice', async () => {
+it('tampered view-external bytes cannot consume the genuine counter, and replay cannot run the provider twice', async () => {
   const fixture = await nativePair()
   /**
    * Observe the actual first native host write without replacing crypto, replay or provider
@@ -682,7 +682,7 @@ it('[A86] tampered view-external bytes cannot consume the genuine counter, and r
     assert.equal(
       fixture.received.length,
       1,
-      '[A86] the subsequent genuine frame must retain its unspent counter'
+      'the subsequent genuine frame must retain its unspent counter'
     )
     await vi.waitFor(() =>
       assert.ok(
@@ -700,11 +700,7 @@ it('[A86] tampered view-external bytes cannot consume the genuine counter, and r
         2
       )
     )
-    assert.equal(
-      fixture.received.length,
-      1,
-      '[A86] only the first completely validated counter commits'
-    )
+    assert.equal(fixture.received.length, 1, 'only the first completely validated counter commits')
     assert.equal(backing.byteLength, 0)
   } finally {
     observation.mockRestore()
@@ -712,7 +708,7 @@ it('[A86] tampered view-external bytes cannot consume the genuine counter, and r
   }
 })
 
-it('[A84] an authenticated malformed native reference reports PROTOCOL_INVALID before provider', async () => {
+it('an authenticated malformed native reference reports PROTOCOL_INVALID before provider', async () => {
   const fixture = await nativePair()
   /** The peer holds the real signing fixture key but still cannot bypass the closed native grammar. */
   const send = fixture.transports[0]!.send
@@ -750,7 +746,7 @@ it('[A84] an authenticated malformed native reference reports PROTOCOL_INVALID b
       fixture.reports.some(
         (error) => (error as { code?: string }).code === RpcCoreErrorCode.protocolInvalid
       ),
-      '[A84] a valid signature does not turn structural corruption into an authentication diagnosis'
+      'a valid signature does not turn structural corruption into an authentication diagnosis'
     )
   } finally {
     observation.mockRestore()
@@ -758,7 +754,7 @@ it('[A84] an authenticated malformed native reference reports PROTOCOL_INVALID b
   }
 })
 
-it('[A88] actual async signing mutation is rejected without treating detach as provider success', async () => {
+it('actual async signing mutation is rejected without treating detach as provider success', async () => {
   /** Only the fixture pauses the real signature; digest, counter, sender and receiver are unchanged. */
   let release!: () => void
   const held = new Promise<void>((resolve) => {
@@ -793,7 +789,7 @@ it('[A88] actual async signing mutation is rejected without treating detach as p
     assert.equal(
       backing.byteLength,
       0,
-      '[A88] native commit occurred but does not prove valid delivery or business success'
+      'native commit occurred but does not prove valid delivery or business success'
     )
     assert.equal(fixture.received.length, 0)
     assert.ok(
@@ -808,7 +804,7 @@ it('[A88] actual async signing mutation is rejected without treating detach as p
   }
 })
 
-it('[A86] retiring the real receiver during native digest prevents its original counter commit and provider', async () => {
+it('retiring the real receiver during native digest prevents its original counter commit and provider', async () => {
   /**
    * This spy only delays delivery of a real WebCrypto digest result; no digest or replay owner is
    * replaced.
@@ -854,7 +850,7 @@ it('[A86] retiring the real receiver during native digest prevents its original 
       assert.equal(
         counters.mock.calls.length,
         0,
-        '[A86] a late digest cannot commit against the retired physical context'
+        'a late digest cannot commit against the retired physical context'
       )
     } finally {
       counters.mockRestore()
@@ -867,7 +863,7 @@ it('[A86] retiring the real receiver during native digest prevents its original 
   }
 })
 
-it('[A87] native physical measurement never reads application properties on a backing', async () => {
+it('native physical measurement never reads application properties on a backing', async () => {
   /** Only standard backing slots and raw bytes belong to a native sidecar. */
   const fixture = await nativePair()
   const backing = new Uint8Array([1, 2]).buffer
@@ -881,7 +877,7 @@ it('[A87] native physical measurement never reads application properties on a ba
   })
   try {
     const result = await fixture.peers[0]!.request('echo', backing, { transfer: [backing] })
-    assert.equal(reads, 0, '[A87] complete backing measurement must use only intrinsic slots')
+    assert.equal(reads, 0, 'complete backing measurement must use only intrinsic slots')
     assert.equal(backing.byteLength, 0)
     assert.deepEqual([...new Uint8Array(result as ArrayBuffer)], [1, 2])
     assert.equal(fixture.received.length, 1)
@@ -890,20 +886,20 @@ it('[A87] native physical measurement never reads application properties on a ba
   }
 })
 
-it('[A87] an own non-enumerable transfer option survives the simple default deadline copy', async () => {
+it('an own non-enumerable transfer option survives the simple default deadline copy', async () => {
   const fixture = await nativePair()
   const backing = new Uint8Array([1]).buffer
   /** Own presence is the documented ownership selector; enumerability cannot silently change it. */
   const options = Object.defineProperty({}, 'transfer', { value: [backing] })
   try {
     await fixture.peers[0]!.request('echo', backing, options)
-    assert.equal(backing.byteLength, 0, '[A87] the original explicit list reaches native commit')
+    assert.equal(backing.byteLength, 0, 'the original explicit list reaches native commit')
   } finally {
     await fixture.close()
   }
 })
 
-it('[A88][A68] retiring a receiver during actual binary fingerprint preparation prevents a new store claim', async () => {
+it('retiring a receiver during actual binary fingerprint preparation prevents a new store claim', async () => {
   /** The external store is the real canonical implementation and survives physical retirement. */
   const retained = createRpcIdempotencyStore()
   /** Observation delegates every claim to the unchanged real store, which is deliberately frozen. */
@@ -950,12 +946,12 @@ it('[A88][A68] retiring a receiver during actual binary fingerprint preparation 
     assert.equal(
       await Promise.race([preparing.then(() => true), result.then(() => false)]),
       true,
-      '[A68] the genuine receiver reaches its original fingerprint owner'
+      'the genuine receiver reaches its original fingerprint owner'
     )
     await fixture.peers[1]!.close()
     release()
     await result
-    assert.equal(claims, 0, '[A68] retired preparation cannot publish a key claim')
+    assert.equal(claims, 0, 'retired preparation cannot publish a key claim')
     assert.equal(fixture.received.length, 0)
   } finally {
     release()
@@ -965,7 +961,7 @@ it('[A88][A68] retiring a receiver during actual binary fingerprint preparation 
   }
 })
 
-it('[A84][A68] native keyed bytes remain part of the operation fingerprint after restoration', async () => {
+it('native keyed bytes remain part of the operation fingerprint after restoration', async () => {
   const fixture = await nativePair()
   const first = new Uint8Array([1]).buffer
   const second = new Uint8Array([2]).buffer
@@ -981,7 +977,7 @@ it('[A84][A68] native keyed bytes remain part of the operation fingerprint after
     assert.equal(
       (result as { code?: string })?.code,
       RpcCoreErrorCode.contractInvalid,
-      '[A68] restored native values cannot fingerprint as empty JSON objects'
+      'restored native values cannot fingerprint as empty JSON objects'
     )
     assert.equal(fixture.received.length, 1)
   } finally {
@@ -1012,7 +1008,7 @@ it('unauthenticated negotiated native transfer remains explicit and detaches the
 })
 
 it.each(['encrypt-presence', 'missing-digest'] as const)(
-  '[A87] actual native carrier refuses transfer when its canonical auth facts are %s',
+  'actual native carrier refuses transfer when its canonical auth facts are %s',
   async (mode) => {
     /** This required unavailable-API case removes only digest access, without faking crypto outputs. */
     const missing =
@@ -1046,7 +1042,7 @@ it.each(['encrypt-presence', 'missing-digest'] as const)(
   }
 )
 
-it('[A86][A87] native group transfer keeps one physical frame and one real signature for the complete group', async () => {
+it('native group transfer keeps one physical frame and one real signature for the complete group', async () => {
   /** Signatures observe the real original auth envelope, excluding directory/control traffic. */
   let signatures = 0
   const fixture = await nativePair((index, value) => {

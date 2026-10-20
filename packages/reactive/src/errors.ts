@@ -2,8 +2,8 @@
 export const REACTIVE_SOURCE = '@migaia/reactive'
 
 /**
- * Shared error contract from `docs/contracts/error-codes.md` §2. `source` and `code` are attached
- * as properties without replacing the error. Checks such as `instanceof RangeError` and `instanceof
+ * Shared error contract from `docs/contracts/error-codes.md`. `source` and `code` are attached as
+ * properties without replacing the error. Checks such as `instanceof RangeError` and `instanceof
  * AggregateError` keep their meaning.
  */
 export type IReactiveError = Error & {

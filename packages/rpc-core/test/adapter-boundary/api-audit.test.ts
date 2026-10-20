@@ -6,7 +6,7 @@ import {
 import { connectionOptions, diagnostics, duplex, reaches } from './audit-byte-fixture.js'
 import { defineByteAdapter } from '../../dist/adapter.js'
 
-it('[RC-D14] refuses a pre-aborted peer signal before opening its byte source', async () => {
+it('refuses a pre-aborted peer signal before opening its byte source', async () => {
   /** A complete byte source remains available, but cancellation must prevent acquisition. */
   const physical = duplex()
   /** Opening is counted separately from handshake writes. */
@@ -38,7 +38,7 @@ it('[RC-D14] refuses a pre-aborted peer signal before opening its byte source', 
   }
 })
 
-it('[RC-D14] aborts and physically releases an in-progress byte handshake', async () => {
+it('aborts and physically releases an in-progress byte handshake', async () => {
   /** No responder is started: the actual outgoing hello remains pending for its peer reply. */
   const physical = duplex()
   /** Observe the genuine first write rather than waiting for an arbitrary timeout. */
@@ -88,7 +88,7 @@ it('[RC-D14] aborts and physically releases an in-progress byte handshake', asyn
   }
 })
 
-it('[RC-D15] releases remaining IPC resources and the physical stream after an owned close fails', async () => {
+it('releases remaining IPC resources and the physical stream after an owned close fails', async () => {
   /** Both sides complete the public control exchange before cleanup is admitted. */
   const physical = duplex()
   /** Preserve this actual failure while proving later releases still execute. */
@@ -133,7 +133,7 @@ it('[RC-D15] releases remaining IPC resources and the physical stream after an o
   }
 })
 
-it('[RC-D15] contains a transport error listener failure and still closes the message port once', async () => {
+it('contains a transport error listener failure and still closes the message port once', async () => {
   /** These sets observe the actual structural port subscriptions. */
   const messages = new Set<(value: unknown) => void>()
   /** Physical terminal callbacks have a separate remover. */
@@ -190,7 +190,7 @@ it('[RC-D15] contains a transport error listener failure and still closes the me
   expect(report).toHaveBeenCalledWith(original)
 })
 
-it('[RC-D17] keeps the verifier failure out of every report, cause and peer rejection', async () => {
+it('keeps the verifier failure out of every report, cause and peer rejection', async () => {
   /** Real control bytes, not a forged agreement, connect the two supported public operations. */
   const physical = duplex()
   /** Stands in for a verifier exception that carries the offered token. */

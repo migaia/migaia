@@ -7,7 +7,7 @@ import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
 const entry = fileURLToPath(new URL('./fixtures/lifecycle-worker.mjs', import.meta.url))
 
 describe('Node thread launcher', () => {
-  it('[A3] captures threadId once and resolves only after native exit', async () => {
+  it('captures threadId once and resolves only after native exit', async () => {
     const launcher = createNodeThreadLauncher()
     const handle = await launcher.launch({ entry }, { signal: new AbortController().signal })
     /** Observe the actual native Worker beneath the production messaging shim. */
@@ -44,7 +44,7 @@ describe('Node thread launcher', () => {
     terminate.mockRestore()
   })
   it.each(['natural', 'error'] as const)(
-    '[A3/A7] keeps host alive on %s exit and retains original failure',
+    'keeps host alive on %s exit and retains original failure',
     async (mode) => {
       const handle = await createNodeThreadLauncher().launch(
         { entry, data: { mode } },
@@ -59,7 +59,7 @@ describe('Node thread launcher', () => {
       else expect(status).toEqual({ code: 0 })
     }
   )
-  it('[A7] forwards heap limit and classifies actual Worker OOM after exit', async () => {
+  it('forwards heap limit and classifies actual Worker OOM after exit', async () => {
     const handle = await createNodeThreadLauncher().launch(
       { entry, data: { mode: 'heap' }, limits: { heapBytes: 8 * 1024 * 1024 } },
       { signal: new AbortController().signal }
@@ -70,7 +70,7 @@ describe('Node thread launcher', () => {
       error: { code: 'ERR_WORKER_OUT_OF_MEMORY' }
     })
   })
-  it('[A6] rejects relative entry and pre-aborted launch before constructing a Worker', async () => {
+  it('rejects relative entry and pre-aborted launch before constructing a Worker', async () => {
     const launcher = createNodeThreadLauncher()
     await expect(
       launcher.launch({ entry: './worker.mjs' }, { signal: new AbortController().signal })
@@ -80,7 +80,7 @@ describe('Node thread launcher', () => {
     controller.abort(reason)
     await expect(launcher.launch({ entry }, { signal: controller.signal })).rejects.toBe(reason)
   })
-  it('[A3/A9] conveys unique launcher addresses while retaining the original portable data', async () => {
+  it('conveys unique launcher addresses while retaining the original portable data', async () => {
     const launcher = createNodeThreadLauncher()
     const launched = await Promise.all(
       [1, 2].map(async (value) => {

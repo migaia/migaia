@@ -24,7 +24,7 @@ export const RpcStreamViolation = {
 } as const
 export type RpcStreamViolation = keyof typeof RpcStreamViolation
 
-/** Portable value budget and per-peer admission ceiling from streaming R6. */
+/** Portable value budget and per-peer admission ceiling for streaming. */
 export const RpcStreamLimit = {
   maxItemValueBytes: 16_384,
   maxOpenStreamsPerPeer: 256

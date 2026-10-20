@@ -118,7 +118,7 @@ const plugin = (name: string, providers: readonly string[] = [], events: string[
 })
 
 describe('@migaia/tray/host', () => {
-  it('A2 reads one raw Feature snapshot and keeps the required consumer blocked', async () => {
+  it('reads one raw Feature snapshot and keeps the required consumer blocked', async () => {
     /** Provider identity used by the consumer's Feature reference. */
     const provider = definePlugin({
       name: 'p',
@@ -168,7 +168,7 @@ describe('@migaia/tray/host', () => {
     await managed.dispose()
   })
 
-  it('A2 reconciles a required consumer admitted through use', async () => {
+  it('reconciles a required consumer admitted through use', async () => {
     /** Provider declaration remains absent until the second mutation. */
     const provider = definePlugin({
       name: 'p',
@@ -191,7 +191,7 @@ describe('@migaia/tray/host', () => {
   })
 
   it.each([false, true])(
-    'A2 treats optional providers as ordering-only, present=%s',
+    'treats optional providers as ordering-only, present=%s',
     async (present) => {
       /** Installation log proves present optional providers precede their consumer. */
       const events: string[] = []
@@ -224,13 +224,13 @@ describe('@migaia/tray/host', () => {
   )
 
   it.each(['createHost', 'use', 'replace'] as const)(
-    'A3 rejects own requires before %s changes state',
+    'rejects own requires before %s changes state',
     async (entry) => {
       /** Records installation and detects any forbidden getter read. */
       const events: string[] = []
       /** Existing replacement target must keep serving after rejection. */
       const original = { name: 'target', install: () => ({ target: 'original' }) }
-      /** Canonical rejection fixture preserves BC1 proof without reading its value. */
+      /** Canonical rejection fixture preserves the rejection proof without reading its value. */
       const stale = {
         name: 'target',
         get requires() {
@@ -263,7 +263,7 @@ describe('@migaia/tray/host', () => {
   )
 
   it.each(['createHost', 'use', 'replace'] as const)(
-    'A3 preserves the exact admission TypeError through %s',
+    'preserves the exact admission TypeError through %s',
     async (entry) => {
       /** Admission producer's exact thrown object must survive as the direct cause. */
       let original: unknown
@@ -352,7 +352,7 @@ describe('@migaia/tray/host', () => {
     expect(managed.isActive).toBe(false)
   })
 
-  it('TPD-T57 does not retain a rejected duplicate candidate for a later restart', async () => {
+  it('does not retain a rejected duplicate candidate for a later restart', async () => {
     const events: string[] = []
     const managed = await createHost(
       options([plugin('provider', [], events), plugin('consumer', ['provider'], events)])
@@ -379,7 +379,7 @@ describe('@migaia/tray/host', () => {
     await managed.dispose()
   })
 
-  it('TPD-T58 fails managed reads closed inside the Host-to-Graph publication interval', async () => {
+  it('fails managed reads closed inside the Host-to-Graph publication interval', async () => {
     let raw: PublicationBarrierHost | undefined
     let managed: Awaited<ReturnType<typeof createHost>>
     const observed: string[] = []
@@ -467,7 +467,7 @@ describe('@migaia/tray/host', () => {
     await managed.dispose()
   })
 
-  it('TPD-T54 uses quiescenceMs as a logical wait budget without premature cleanup', async () => {
+  it('uses quiescenceMs as a logical wait budget without premature cleanup', async () => {
     const scheduler = createManualScheduler()
     const timeline: string[] = []
     let raw: AsyncTestHost | undefined
@@ -542,7 +542,7 @@ describe('@migaia/tray/host', () => {
     await managed.dispose()
   })
 
-  it('PCC-T2 keeps physical cleanup from a Host-owned resource in another realm', async () => {
+  it('keeps physical cleanup from a Host-owned resource in another realm', async () => {
     /** A Host subclass can own additional realm-specific resources after its base cleanup. */
     const failure = new Error('foreign resource cleanup')
     /** Completes the actual foreign Promise after the managed result is returned. */

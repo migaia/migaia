@@ -23,7 +23,7 @@ function streamPair() {
   }
 }
 
-it('[RP-D01] publishes one close settlement before invoking a reentrant listener', async () => {
+it('publishes one close settlement before invoking a reentrant listener', async () => {
   /** The public stream adapter owns the real native reader and writer. */
   const pair = streamPair()
   /** No internal helper or synthetic transport participates in this close operation. */
@@ -44,7 +44,7 @@ it('[RP-D01] publishes one close settlement before invoking a reentrant listener
   expect(pair.counts).toEqual({ cancels: 1, aborts: 1 })
 })
 
-it('[RP-D01] releases both native streams when one close observer throws', async () => {
+it('releases both native streams when one close observer throws', async () => {
   /** Native callbacks prove cleanup still runs after the user callback fails. */
   const pair = streamPair()
   /** This exact original callback exception must remain reachable from close rejection. */
@@ -70,7 +70,7 @@ it('[RP-D01] releases both native streams when one close observer throws', async
   expect(pair.counts).toEqual({ cancels: 1, aborts: 1 })
 })
 
-it('[RP-D02] releases its acquired reader when the actual writable stream is already locked', () => {
+it('releases its acquired reader when the actual writable stream is already locked', () => {
   /** One caller-held writer triggers the native acquisition failure without an invalid fake port. */
   const pair = streamPair()
   /** This writer remains owned by the caller throughout the failed construction. */
@@ -83,7 +83,7 @@ it('[RP-D02] releases its acquired reader when the actual writable stream is alr
   }
 })
 
-it('[RP-D03] classifies a synchronous native spawn failure while retaining TypeError', async () => {
+it('classifies a synchronous native spawn failure while retaining TypeError', async () => {
   /** Native spawn rejects this NUL command before acquiring a child process. */
   const operation = createNodeProcessLauncher().launch(
     {
@@ -101,7 +101,7 @@ it('[RP-D03] classifies a synchronous native spawn failure while retaining TypeE
   })
 })
 
-it('[RP-D03] classifies the managed Unix parent read failure before binding', async () => {
+it('classifies the managed Unix parent read failure before binding', async () => {
   /** The intentionally missing parent is only inspected; no socket or owner file is written. */
   const address = new URL('./audit-absent-parent/service.sock', import.meta.url).pathname
   await expect(
@@ -115,7 +115,7 @@ it('[RP-D03] classifies the managed Unix parent read failure before binding', as
   ).rejects.toMatchObject({ source: '@migaia/rpc/process', code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
 })
 
-it('[RP-D03/RP-D04] classifies actual bind reports and shares the native listener close Promise', async () => {
+it('classifies actual bind reports and shares the native listener close Promise', async () => {
   /** The public listener occupies an ephemeral loopback port without filesystem side effects. */
   const errors: unknown[] = []
   /** Both bind attempts retain the normal authenticated public listener configuration. */

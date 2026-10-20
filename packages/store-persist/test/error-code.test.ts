@@ -8,7 +8,7 @@ import {
   STORE_PERSIST_SOURCE
 } from '../src/errors'
 
-describe('store-persist error-code contract (E-T9)', () => {
+describe('store-persist error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {
     const codes = Object.values(StorePersistErrorCode)
     expect(codes).toHaveLength(8)

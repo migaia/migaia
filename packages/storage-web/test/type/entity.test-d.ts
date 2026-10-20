@@ -61,19 +61,19 @@ indexedRepo.findBy('customMany', 'admin')
 indexedRepo.list({ index: 'email', range: { lower: 'ada@example.com' } })
 indexedRepo.list({ index: 'compound', range: { lower: ['Ada', 1] } })
 indexedRepo.stream({ index: 'email', range: { lower: 'ada@example.com' } })
-// @ts-expect-error R05 indexed stream ranges use the exact query-key type.
+// @ts-expect-error indexed stream ranges use the exact query-key type.
 indexedRepo.stream({ index: 'name', range: { lower: 1 } })
 // @ts-expect-error undeclared index names are rejected by the inferred index map.
 indexedRepo.findBy('missing', 'ada@example.com')
-// @ts-expect-error R05 index keys are derived from the declared projection and remain exact.
+// @ts-expect-error index keys are derived from the declared projection and remain exact.
 indexedRepo.findBy('tags', ['admin'])
-// @ts-expect-error R05 indexed ranges use the exact query-key type.
+// @ts-expect-error indexed ranges use the exact query-key type.
 indexedRepo.list({ index: 'name', range: { lower: 1 } })
 
 defineEntity<IUser>({
   name: 'direct-indexed',
   key: 'id',
-  // @ts-expect-error SWV2-T35 direct indexed declarations are forbidden; use the curried form above.
+  // @ts-expect-error direct indexed declarations are forbidden; use the curried form above.
   indexes: { id: { path: 'id' } }
 })
 

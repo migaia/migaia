@@ -22,7 +22,7 @@ function median(values: readonly number[]): number {
 }
 
 describe('trusted admission scaling', () => {
-  it('PHV3-T10: bounds the 8k to 1k median ratio by 10', async () => {
+  it('bounds the 8k to 1k median ratio by 10', async () => {
     /** The four medians preserve the original 1k, 2k, 4k, 8k dataset. */
     const medians: number[] = []
     /** Raw samples remain available to inspect a noisy benchmark failure. */
@@ -51,7 +51,7 @@ describe('trusted admission scaling', () => {
       medians.push(median(samples))
       rawSamples.push(samples)
     }
-    console.info('[PHV3-T10]', JSON.stringify({ medians, rawSamples }))
+    console.info('[trusted admission scaling]', JSON.stringify({ medians, rawSamples }))
     expect(medians.at(-1)! / medians[0]).toBeLessThanOrEqual(10)
   }, 120000)
 })

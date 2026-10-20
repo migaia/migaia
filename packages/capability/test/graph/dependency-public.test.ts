@@ -7,8 +7,8 @@ import type { IGraphDependents as IDynamicGraphDependents } from '../../src/grap
 import type { IGraphDependents as ITopologyGraphDependents } from '../../src/graph/topology.js'
 
 describe('dependency planner public contract', () => {
-  it('A13 exposes the dependency planner and incremental topology entry points', () => {
-    /** Runtime dependency-planner surface promised by SDD section 4.3. */
+  it('exposes the dependency planner and incremental topology entry points', () => {
+    /** Runtime dependency-planner surface. */
     const dependencyExports = Object.keys(dependency).sort()
     expect(dependencyExports).toEqual([
       'DependencyAction',
@@ -27,12 +27,12 @@ describe('dependency planner public contract', () => {
     expect(topology.createTopologyIndex).toBeTypeOf('function')
   })
 
-  it('A14 exposes invalidate without the removed single-value status constant', () => {
+  it('exposes invalidate without the removed single-value status constant', () => {
     expect(dependency).not.toHaveProperty('DependencyNodeStatus')
     expect(dependency.DependencyAction.invalidate).toBe('invalidate')
   })
 
-  it('A13 declares the dependency planner package subpath', () => {
+  it('declares the dependency planner package subpath', () => {
     /** Package manifest governing built consumer resolution. */
     const manifest = JSON.parse(
       readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8')
@@ -43,7 +43,7 @@ describe('dependency planner public contract', () => {
     })
   })
 
-  it('A13 keeps dynamic and topology dependent views mutually assignable', () => {
+  it('keeps dynamic and topology dependent views mutually assignable', () => {
     /** Compile-time witness from the dynamic public entry point. */
     const dynamicView: IDynamicGraphDependents = { required: ['a'], optional: ['b'] }
     /** Topology view must accept the dynamic entry-point declaration. */

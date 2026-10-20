@@ -12,12 +12,12 @@ import { ping } from '../../dist/core/middleware/ping.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 
 /**
- * Regression gate for `SOL-CB-R8-P1-002`: the legacy endpoint only replies to an inbound `ping`
- * variation (`src/endpoint.ts:2703`, `#features.ping === true`) or honors an inbound `abort`
- * variation (`src/endpoint.ts:2690-2692`, `#features.abort === true`) when the _receiving_ side
- * selected the matching capability middleware — the variation route itself stays registered either
- * way (one always-listening receiver), only the side effect is gated. These tests prove both the
- * enabled and disabled configuration for each capability against the canonical composed root.
+ * Regression gate: the legacy endpoint only replies to an inbound `ping` variation
+ * (`src/endpoint.ts:2703`, `#features.ping === true`) or honors an inbound `abort` variation
+ * (`src/endpoint.ts:2690-2692`, `#features.abort === true`) when the _receiving_ side selected the
+ * matching capability middleware — the variation route itself stays registered either way (one
+ * always-listening receiver), only the side effect is gated. These tests prove both the enabled and
+ * disabled configuration for each capability against the canonical composed root.
  */
 describe('composed inbound variation capability gating', () => {
   it('replies pong only when the receiver selected the ping() middleware', async () => {

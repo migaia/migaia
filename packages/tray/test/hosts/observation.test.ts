@@ -6,7 +6,7 @@ import * as ProcessSupervision from '@migaia/supervision/process'
 import { chainHas, classify, fixture, lines, marker, until } from './helper.js'
 
 describe('Tray runtime observation', () => {
-  it('[A7] observes parent messages for two units per runtime and child serve messages in native realms', async () => {
+  it('observes parent messages for two units per runtime and child serve messages in native realms', async () => {
     /** Snapshots survive the probe's mutable view reuse. */
     const events: any[] = []
     /** Counting belongs to the runtime's genuine message probe. */
@@ -43,7 +43,7 @@ describe('Tray runtime observation', () => {
     }
   }, 30000)
 
-  it('[A7] projects the non-default heapBytes into the real Worker resource limit', async () => {
+  it('projects the non-default heapBytes into the real Worker resource limit', async () => {
     /** The actual Worker returns resourceLimits from node:worker_threads. */
     const api = await fixture()
     /** 96 MiB is deliberately distinct from runtime defaults. */
@@ -66,7 +66,7 @@ describe('Tray runtime observation', () => {
   }, 30000)
 
   it.each([0, 1, 2])(
-    '[A7] runtime %i forwards startupTimeoutMs to the real native launch/ready deadline',
+    'runtime %i forwards startupTimeoutMs to the real native launch/ready deadline',
     async (index) => {
       /** Native report classifies the real startup deadline rather than a Tray init timer. */
       const reports: unknown[] = []
@@ -75,7 +75,7 @@ describe('Tray runtime observation', () => {
        * only a state.
        */
       const nativeFailures: unknown[] = []
-      /** Specific A7 slow phase honors the existing native launch/ready cancellation signal. */
+      /** The specific slow phase honors the existing native launch/ready cancellation signal. */
       const slowPhase = (signal: any) =>
         new Promise<void>((resolve, reject) => {
           /** This fixture timer delays the native operation; the deadline remains supervision-owned. */
@@ -211,7 +211,7 @@ describe('Tray runtime observation', () => {
     30000
   )
 
-  it('[A7] delivers the process CAPABILITY_UNSUPPORTED supervision notice to the parent report', async () => {
+  it('delivers the process CAPABILITY_UNSUPPORTED supervision notice to the parent report', async () => {
     /** Canonical process launcher advertises its existing capability strengths. */
     const reports: unknown[] = []
     /** Native process path is required for the degradation notice. */

@@ -64,7 +64,7 @@ const validateHostController = (candidate: unknown): IAbortController => {
 }
 
 /**
- * Host constructors whose first instance already passed `validateHostController` (LC-P3). Native
+ * Host constructors whose first instance already passed `validateHostController`. Native
  * constructors produce one fixed instance shape, so later instances skip the five-property check.
  */
 const validatedConstructors = new WeakSet<IHostAbortControllerConstructor>()
@@ -105,12 +105,12 @@ export const instantiateCurrentAbortController = (): IAbortController =>
   instantiate(resolveHostConstructor())
 
 /**
- * Defers controller creation until `signal` is first read (LC-P3), for owners whose signal is often
- * never observed (a `LifecycleUnit` generation, a scope disposed with nothing owned). An
- * `abort(reason)` before that read only records the first reason; the first `signal` read then
- * creates the controller and aborts it with that reason, so the already-aborted state is preserved.
- * After materialization every call forwards to the real controller, including its failures. A
- * creation failure (`ENV_UNSUPPORTED`) surfaces at the first `signal` read.
+ * Defers controller creation until `signal` is first read, for owners whose signal is often never
+ * observed (a `LifecycleUnit` generation, a scope disposed with nothing owned). An `abort(reason)`
+ * before that read only records the first reason; the first `signal` read then creates the
+ * controller and aborts it with that reason, so the already-aborted state is preserved. After
+ * materialization every call forwards to the real controller, including its failures. A creation
+ * failure (`ENV_UNSUPPORTED`) surfaces at the first `signal` read.
  */
 export const createLazyAbortController = (create: () => IAbortController): IAbortController => {
   /** Real controller, created on the first `signal` read. */

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('carriers A1: real Window observe preserves transfers and rejects sibling capture', async ({
+test('carriers: real Window observe preserves transfers and rejects sibling capture', async ({
   page
 }) => {
   await page.goto('/browser-peer/observe.html')

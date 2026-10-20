@@ -127,7 +127,7 @@ export function mergeTimeline(
   query?: IRpcDevtoolsTimelineQuery,
   compare: IHubTimelineComparator = compareTimelineEvents
 ): IRpcDevtoolsTimelineEvent[] {
-  /** The public query owns its result array; SC9 permits its elements as retained references. */
+  /** The public query owns its result array; its elements are retained references. */
   const result: IRpcDevtoolsTimelineEvent[] = []
   /** The public hub validates limits; absence permits the entire retained timeline. */
   const limit = query?.limit ?? Infinity

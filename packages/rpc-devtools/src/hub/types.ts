@@ -1,7 +1,7 @@
 import type { IRpcDevtoolsStats } from '../contract/service.js'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
 
-/** Target states are events/return values, never thrown error codes (hub R1 and §5). */
+/** Target states are events/return values, never thrown error codes. */
 export const RpcDevtoolsTargetStatus = {
   connecting: 'connecting',
   connected: 'connected',
@@ -50,7 +50,7 @@ export type IRpcDevtoolsTimelineQuery = Readonly<{
   limit?: number
 }>
 
-/** Options preserve the public hub §4 realignMs spelling; implementation belongs to layer 2. */
+/** Options preserve the public hub realignMs spelling; implementation belongs to layer 2. */
 export type IRpcDevtoolsHubOptions = Readonly<{
   maxEvents?: number
   realignMs?: number

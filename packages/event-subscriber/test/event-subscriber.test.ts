@@ -11,7 +11,7 @@ import {
 } from '../src/index.js'
 
 describe('event channel', () => {
-  it('ES-T28 preserves the receiver and rejects synchronous structural delivery', () => {
+  it('preserves the receiver and rejects synchronous structural delivery', () => {
     const release = vi.fn()
     const channel = {
       marker: 7,
@@ -32,7 +32,7 @@ describe('event channel', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T03 publishes a stable registration snapshot in order', () => {
+  it('publishes a stable registration snapshot in order', () => {
     const channel = createEventChannel<number, number>()
     const calls: number[] = []
     let stopSecond: () => void = () => undefined
@@ -52,7 +52,7 @@ describe('event channel', () => {
     expect(calls).toEqual([1, 2, 2, 12])
   })
 
-  it('ES-T06 keeps additions and removals outside the current dispatch snapshot', () => {
+  it('keeps additions and removals outside the current dispatch snapshot', () => {
     const channel = createEventChannel<number>()
     const calls: string[] = []
     let stopSecond!: () => void
@@ -73,7 +73,7 @@ describe('event channel', () => {
     expect(calls).toEqual(['first', 'second', 'first', 'added'])
   })
 
-  it('ES-T29 keeps the current snapshot after clear and isolates stale unsubscribers', () => {
+  it('keeps the current snapshot after clear and isolates stale unsubscribers', () => {
     const channel = createEventChannel<number>()
     const calls: string[] = []
     let releaseFirst!: () => void
@@ -104,7 +104,7 @@ describe('event channel', () => {
     releaseNew()
   })
 
-  it('ES-T02 keeps repeated listener subscriptions independent and idempotently releasable', () => {
+  it('keeps repeated listener subscriptions independent and idempotently releasable', () => {
     const channel = createEventChannel<number>()
     const listener = vi.fn()
     const first = channel.subscribe(listener)
@@ -120,7 +120,7 @@ describe('event channel', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T07 treats an empty channel as a synchronous and async no-op', async () => {
+  it('treats an empty channel as a synchronous and async no-op', async () => {
     const channel = createEventChannel<number>()
     expect(() => channel.publish(1)).not.toThrow()
     await expect(invokeParallelSettled(channel, 1)).resolves.toEqual([])
@@ -128,7 +128,7 @@ describe('event channel', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T08 once is removed before invocation and resists synchronous reentry', () => {
+  it('once is removed before invocation and resists synchronous reentry', () => {
     const channel = createEventChannel<number>()
     let calls = 0
     subscribeOnce(channel, (event) => {
@@ -139,7 +139,7 @@ describe('event channel', () => {
     expect(calls).toBe(1)
   })
 
-  it('ES-T04 aggregates synchronous failures but observes late rejection', async () => {
+  it('aggregates synchronous failures but observes late rejection', async () => {
     const report = vi.fn()
     const channel = createEventChannel<number>({ report })
     const syncFailure = new Error('sync')
@@ -155,7 +155,7 @@ describe('event channel', () => {
     expect(report.mock.calls[0][0].error).toBe(lateFailure)
   })
 
-  it('ES-T05 observes a hostile then getter asynchronously without an unhandled rejection', async () => {
+  it('observes a hostile then getter asynchronously without an unhandled rejection', async () => {
     const report = vi.fn()
     const channel = createEventChannel<number>({ report })
     const getterFailure = new Error('then getter')
@@ -174,7 +174,7 @@ describe('event channel', () => {
     expect(report.mock.calls[0][0].error).toBe(getterFailure)
   })
 
-  it('ES-T80 assimilates a custom thenable with its original receiver and first settlement', async () => {
+  it('assimilates a custom thenable with its original receiver and first settlement', async () => {
     const channel = createEventChannel<number, string>()
     const thenable = { marker: 'original' }
     const thenProperty = ['t', 'h', 'e', 'n'].join('')
@@ -196,7 +196,7 @@ describe('event channel', () => {
     ])
   })
 
-  it('ES-T39 supports task selection and rejects ambiguous selection synchronously', async () => {
+  it('supports task selection and rejects ambiguous selection synchronously', async () => {
     const channel = createEventChannel<number, number>()
     channel.subscribe((event) => event.value + 1, { taskId: 'one' })
     const settled = await invokeTaskSettled(channel, 'one', 2)
@@ -213,7 +213,7 @@ describe('event channel', () => {
     )
   })
 
-  it('ES-T22 supports object subscribers and read-only task views', async () => {
+  it('supports object subscribers and read-only task views', async () => {
     const channel = createEventChannel<number, number>()
     const calls: number[] = []
     const subscriber = {
@@ -241,7 +241,7 @@ describe('event channel', () => {
     expect(calls).toEqual([3])
   })
 
-  it('ES-T38 keeps filtered views read-only while reflecting live registration state', async () => {
+  it('keeps filtered views read-only while reflecting live registration state', async () => {
     const channel = createEventChannel<number, number>()
     const selected = vi.fn((event: { value: number }) => event.value + 1)
     const stop = channel.subscribe(selected, { taskId: 'selected' })
@@ -257,7 +257,7 @@ describe('event channel', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T11 runs parallel calls before awaiting and serial calls after settlement', async () => {
+  it('runs parallel calls before awaiting and serial calls after settlement', async () => {
     const channel = createEventChannel<number, number>()
     const order: string[] = []
     let resolveParallel!: () => void
@@ -304,7 +304,7 @@ describe('event channel', () => {
 })
 
 describe('abort overlay', () => {
-  it('ES-T187 rejects callable and array signals before observing members, and codes revoked predicates', () => {
+  it('rejects callable and array signals before observing members, and codes revoked predicates', () => {
     let reads = 0
     const signal = () => undefined
     Object.defineProperty(signal, 'aborted', {
@@ -348,7 +348,7 @@ describe('abort overlay', () => {
     expect(revokedFailure).toMatchObject({ code: EventSubscriberErrorCode.invalidSignal })
   })
 
-  it('ES-T183 keeps pre-aborted admission silent by default and rejects it only for strict channels', () => {
+  it('keeps pre-aborted admission silent by default and rejects it only for strict channels', () => {
     const signal = {
       aborted: true,
       addEventListener: () => undefined,
@@ -363,13 +363,13 @@ describe('abort overlay', () => {
     )
   })
 
-  it('ES-T184 rejects non-boolean strict abort configuration with INVALID_OPTIONS', () => {
+  it('rejects non-boolean strict abort configuration with INVALID_OPTIONS', () => {
     expect(() => createEventChannel<number>({ throwOnAborted: null as never })).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.invalidOptions })
     )
   })
 
-  it('ES-T185 completes second-site cleanup before strict abort is thrown', () => {
+  it('completes second-site cleanup before strict abort is thrown', () => {
     let reads = 0
     const remove = vi.fn()
     const signal = {
@@ -389,7 +389,7 @@ describe('abort overlay', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T54 marks canonical event context aborted and releases once on signal abort', () => {
+  it('marks canonical event context aborted and releases once on signal abort', () => {
     let abortListener!: () => void
     const remove = vi.fn()
     const signal = {
@@ -414,7 +414,7 @@ describe('abort overlay', () => {
     expect(remove).toHaveBeenCalledOnce()
   })
 
-  it('ES-T32 releases a structural registration when abort fires during listener installation', () => {
+  it('releases a structural registration when abort fires during listener installation', () => {
     let abortListener!: () => void
     const release = vi.fn()
     const signal = {
@@ -438,7 +438,7 @@ describe('abort overlay', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T45 copies reason once and exposes it to a running structural subscription', () => {
+  it('copies reason once and exposes it to a running structural subscription', () => {
     let abortListener!: () => void
     let reasonReads = 0
     const reason = new Error('cancel')
@@ -499,7 +499,7 @@ describe('abort overlay', () => {
 })
 
 describe('hub', () => {
-  it('ES-T33 keeps total size exact across clear and stale unsubscribe', () => {
+  it('keeps total size exact across clear and stale unsubscribe', () => {
     const hub = createEventHub<{ message: string }>()
     const stop = hub.subscribe('message', () => undefined)
     expect(hub.size()).toBe(1)
@@ -509,7 +509,7 @@ describe('hub', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T10 keeps string, number, and symbol keys isolated', () => {
+  it('keeps string, number, and symbol keys isolated', () => {
     const symbolKey = Symbol('message')
     const hub = createEventHub<{ message: string; 1: number; [symbolKey]: boolean }>()
     const calls = { string: 0, number: 0, symbol: 0 }
@@ -532,7 +532,7 @@ describe('hub', () => {
     expect(hub.size(symbolKey)).toBe(1)
   })
 
-  it('ES-T34 protects a recreated hub channel from a stale disposer', () => {
+  it('protects a recreated hub channel from a stale disposer', () => {
     const hub = createEventHub<{ message: string }>()
     const oldStop = hub.subscribe('message', () => undefined)
     hub.clear('message')
@@ -545,7 +545,7 @@ describe('hub', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T59 decrements total size once when event abort deactivates a registration', () => {
+  it('decrements total size once when event abort deactivates a registration', () => {
     const hub = createEventHub<{ message: string }>()
     let firstEvent!: { abort(reason?: unknown): void }
     const oldStop = hub.subscribe('message', (event) => {
@@ -586,7 +586,7 @@ describe('hub', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T57 separates outer and reentrant task snapshots', async () => {
+  it('separates outer and reentrant task snapshots', async () => {
     const channel = createEventChannel<number>()
     const calls: string[] = []
     let reentered = false

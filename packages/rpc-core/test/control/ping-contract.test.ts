@@ -8,7 +8,7 @@ import { ping } from '../../dist/core/middleware/ping.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
-describe('ping and unknown variation controls (A2)', () => {
+describe('ping and unknown variation controls', () => {
   it('exchanges a ping/pong pair and reports unknown controls once per connection', async () => {
     const [clientWire, serverWire] = createMemoryTransportPair()
     const sent: unknown[] = []

@@ -6,8 +6,10 @@ import { extractPackedPackage } from './executable-acceptance-tooling.mjs'
 
 const archive = process.argv[2]
 if (!archive) throw new Error('packed archive path required')
-const selectedCase = process.argv[3] === '--case' ? process.argv[4] : (process.argv[3] ?? 'YS28')
-if (selectedCase !== 'YS28') throw new Error(`unknown packed feature case: ${selectedCase}`)
+const selectedCase =
+  process.argv[3] === '--case' ? process.argv[4] : (process.argv[3] ?? 'feature-types')
+if (selectedCase !== 'feature-types')
+  throw new Error(`unknown packed feature case: ${selectedCase}`)
 const root = resolve(new URL('..', import.meta.url).pathname)
 const workspace = resolve(root, '../..')
 const temporary = mkdtempSync(join(tmpdir(), 'plugin-host-feature-types-'))

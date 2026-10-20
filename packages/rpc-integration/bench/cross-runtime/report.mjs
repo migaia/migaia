@@ -104,7 +104,7 @@ writeFileSync(
       qualification:
         'optionA start only; end report; each metric actual AA tolerance, no10percent gate',
       boundary:
-        'current C3 + disposable BC14 reverse baseline, not final optimized production acceptance',
+        'current source + disposable responder reverse baseline, not final optimized production acceptance',
       rows
     },
     null,

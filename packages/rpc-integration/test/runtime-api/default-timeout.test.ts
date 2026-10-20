@@ -85,14 +85,14 @@ it.each([
   [1_600, 1_600],
   [80, 80]
 ] as const)(
-  '[A79] request uses factory default %s in the original timeout scope',
+  'request uses factory default %s in the original timeout scope',
   async (configured, expected) => {
     const fixture = await timeoutPair(configured)
     try {
       assert.equal(await fixture.peer.request('echo', 7), 7)
       assert.ok(
         fixture.delays.some((delay) => delay > expected * 0.9 && delay <= expected),
-        `[A79] expected original deadline ${expected}; observed ${fixture.delays}`
+        `expected original deadline ${expected}; observed ${fixture.delays}`
       )
     } finally {
       await fixture.close()
@@ -100,7 +100,7 @@ it.each([
   }
 )
 
-it('[A79] explicit per-call deadline and false override stay in the original request and stream scope', async () => {
+it('explicit per-call deadline and false override stay in the original request and stream scope', async () => {
   const fixture = await timeoutPair(80)
   try {
     await assert.rejects(fixture.peer.request('delayed', 120), {
@@ -123,7 +123,7 @@ it('[A79] explicit per-call deadline and false override stay in the original req
 })
 
 it.each(['request', 'stream'] as const)(
-  '[A80] default deadline cannot discard a %s whose before-start permission already won',
+  'default deadline cannot discard a %s whose before-start permission already won',
   async (mode) => {
     const fixture = await timeoutPair(80)
     try {
@@ -142,7 +142,7 @@ it.each(['request', 'stream'] as const)(
   }
 )
 
-it('[A80] queued default expiry never starts the final provider', async () => {
+it('queued default expiry never starts the final provider', async () => {
   const fixture = await timeoutPair(80)
   const holding = fixture.peer.request('delayed', 160, { orderKey: 'same', timeoutMs: false })
   try {
@@ -151,7 +151,7 @@ it('[A80] queued default expiry never starts the final provider', async () => {
       fixture.peer.request('delayed', 1, { orderKey: 'same', cancel: 'before-start' }),
       { code: RpcCoreErrorCode.deadlineExceeded }
     )
-    assert.equal(fixture.signals.length, 1, '[A80] expiry before final start leaves provider0')
+    assert.equal(fixture.signals.length, 1, 'expiry before final start leaves provider0')
     assert.equal(await holding, 7)
   } finally {
     await holding.catch(() => undefined)
@@ -159,7 +159,7 @@ it('[A80] queued default expiry never starts the final provider', async () => {
   }
 })
 
-it('[A79][A74] a default ordered deadline requires the real bilateral capability while false remains valid', async () => {
+it('a default ordered deadline requires the real bilateral capability while false remains valid', async () => {
   /** Explicit missing deadline is preserved instead of silently completing the peer's offer. */
   const capabilities = RUNTIME_API_CAPABILITIES.filter((value) => value !== RpcCapability.deadline)
   let effects = 0
@@ -186,35 +186,32 @@ it.each([
   ['thread-peer', createThreadPeer],
   ['process-plugin', createProcessPlugin],
   ['thread-plugin', createThreadPlugin]
-] as const)(
-  '[A79] %s rejects an invalid default before source acquisition',
-  async (_name, factory) => {
-    /** All four public entries use the same real source acquisition boundary. */
-    let opens = 0
-    const options = {
-      name: 'invalid-default',
-      defaultTimeoutMs: 0,
-      connect: async () => {
-        opens++
-        throw new RangeError(RuntimeApiFixtureText.businessRange)
-      },
-      report: () => undefined
-    }
-    await assert.rejects(
-      Promise.resolve().then(() => Reflect.apply(factory, undefined, [options])),
-      {
-        code: RpcCoreErrorCode.invalidConfig
-      }
-    )
-    assert.equal(opens, 0)
+] as const)('%s rejects an invalid default before source acquisition', async (_name, factory) => {
+  /** All four public entries use the same real source acquisition boundary. */
+  let opens = 0
+  const options = {
+    name: 'invalid-default',
+    defaultTimeoutMs: 0,
+    connect: async () => {
+      opens++
+      throw new RangeError(RuntimeApiFixtureText.businessRange)
+    },
+    report: () => undefined
   }
-)
+  await assert.rejects(
+    Promise.resolve().then(() => Reflect.apply(factory, undefined, [options])),
+    {
+      code: RpcCoreErrorCode.invalidConfig
+    }
+  )
+  assert.equal(opens, 0)
+})
 
-it('[A79][A80] stream starts one total factory deadline at first next, while notify and group have no implicit deadline', async () => {
+it('stream starts one total factory deadline at first next, while notify and group have no implicit deadline', async () => {
   const fixture = await timeoutPair(80)
   try {
     const stream = fixture.peer.stream('values')
-    assert.deepEqual(fixture.delays, [], '[A80] constructing a lazy iterator starts no timer')
+    assert.deepEqual(fixture.delays, [], 'constructing a lazy iterator starts no timer')
     assert.deepEqual(await stream.next(), { value: 1, done: false })
     assert.equal(fixture.delays.filter((delay) => delay > 72 && delay <= 80).length, 1)
     assert.deepEqual(await stream.next(), { value: 2, done: false })
@@ -233,7 +230,7 @@ it('[A79][A80] stream starts one total factory deadline at first next, while not
 })
 
 it.each([0, -1, Number.POSITIVE_INFINITY, Number.NaN, false, '30000', null])(
-  '[A79] invalid factory default %s rejects before opening the source',
+  'invalid factory default %s rejects before opening the source',
   async (defaultTimeoutMs) => {
     /** Source invocation is a real construction side effect, never a fake provider counter. */
     let opened = 0
@@ -251,7 +248,7 @@ it.each([0, -1, Number.POSITIVE_INFINITY, Number.NaN, false, '30000', null])(
       () => undefined,
       (error: unknown) => error
     )
-    assert.equal(opened, 0, '[A79] invalid defaults cannot acquire a channel')
+    assert.equal(opened, 0, 'invalid defaults cannot acquire a channel')
     assert.equal(Reflect.get(failure as object, 'code'), RpcCoreErrorCode.invalidConfig)
   }
 )

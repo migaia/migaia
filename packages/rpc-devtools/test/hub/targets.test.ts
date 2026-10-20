@@ -10,7 +10,7 @@ import { event, fakeTarget, until, type IFakeTargetOptions, type ITestClock } fr
 
 afterEach(() => vi.restoreAllMocks())
 
-describe('hub A1 targets and alignment', () => {
+describe('hub targets and alignment', () => {
   it('selects minimum RTT from five samples for +1000 and -500 ms clocks', async () => {
     /** Shared monotonic clock makes all five request round trips reproducible. */
     const clock: ITestClock = { now: 100 }

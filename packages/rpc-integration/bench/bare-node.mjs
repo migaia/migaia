@@ -193,7 +193,7 @@ export async function createBareNodeSession(payload) {
   }
 }
 
-/** Echo framed payloads after one JSON parse and serialization, matching the A10 baseline. */
+/** Echo framed payloads after one JSON parse and serialization, matching the reference baseline. */
 async function echo() {
   process.stderr.write(readyText)
   /**
@@ -241,7 +241,7 @@ async function main() {
   try {
     observer = await createMacPidObserver([process.pid, session.peerPid])
     if (process.argv.includes('--check')) {
-      /** Three real echoes and two native readings prove preparation only; no A10 sample set. */
+      /** Three real echoes and two native readings prove preparation only; no reference sample set. */
       const first = await observer.read()
       for (let index = 0; index < 3; index++) await session.exchange()
       /** Both PIDs stay live until the second native snapshot succeeds. */

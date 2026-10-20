@@ -4,7 +4,7 @@ import { createRuntime } from '@migaia/reactive'
 const memory = new WebAssembly.Memory({ initial: 1 })
 let nextId = 1
 const allocations = new Map<number, number>()
-/** 记录正常 dispose() 的实际释放顺序，用于断言「子资源 → block」（migration.sdd.md §5.7 / M-T35）。 */
+/** 记录正常 dispose() 的实际释放顺序，用于断言「子资源 → block」。 */
 const disposeOrder: string[] = []
 
 vi.mock('@migaia/wasm', () => ({
@@ -119,7 +119,7 @@ describe('WASM cleanup error contract', () => {
   })
 })
 
-describe('array normal dispose order (M-T35)', () => {
+describe('array normal dispose order', () => {
   beforeEach(async () => {
     allocations.clear()
     disposeOrder.length = 0
@@ -153,7 +153,7 @@ describe('array normal dispose order (M-T35)', () => {
   })
 })
 
-describe('array construction-failure rollback (M-T34)', () => {
+describe('array construction-failure rollback', () => {
   beforeEach(async () => {
     allocations.clear()
     disposeOrder.length = 0

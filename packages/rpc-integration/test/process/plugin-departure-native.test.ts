@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { matrixFixture, matrixDependency, type IMatrixFeature } from './matrix-fixture.js'
 
-describe('I15 real native generation departure', () => {
+describe('real native generation departure', () => {
   it.concurrent.each([false, true])(
-    '[A5] real %s departure rejects inflight request and stream; proxy resumes only after describe',
+    'real %s departure rejects inflight request and stream; proxy resumes only after describe',
     async (borrowed) => {
       const test = await matrixFixture({ borrowed, gated: true })
       const dependent = matrixDependency(test)
@@ -25,7 +25,7 @@ describe('I15 real native generation departure', () => {
         }
         await vi.waitFor(() => expect(test.disable).toHaveBeenCalledTimes(1))
         const departed = await request
-        expect(departed, 'SDD_BASE_RED_CONTRACT:A5').toMatchObject({
+        expect(departed, 'plugin departure contract').toMatchObject({
           code: 'REMOTE_RESULT_UNKNOWN',
           detail: { generation: 1 },
           cause: expect.anything()

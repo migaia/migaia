@@ -56,7 +56,7 @@ function normalized(check: () => unknown): boolean {
   }
 }
 
-describe('A1 remote contract and Schema', () => {
+describe('remote contract and Schema', () => {
   it('mirrors the stable name grammar and method declarations', () => {
     const definitions = schema.$defs
     expect((definitions.name as ISchema).pattern).toBe(REMOTE_NAME_PATTERN)
@@ -88,7 +88,7 @@ describe('A1 remote contract and Schema', () => {
   })
 })
 
-describe('K194 bounded catalog admission', () => {
+describe('bounded catalog admission', () => {
   it('rejects over-limit tables before invoking their entry getters', () => {
     /** Rejected catalog entries must never reach portable normalization or resolver inputs. */
     const read = vi.fn(() => null)

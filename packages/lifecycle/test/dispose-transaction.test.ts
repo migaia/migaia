@@ -12,7 +12,7 @@ const baseContext = (overrides: Partial<IReleaseContext> = {}): IReleaseContext 
   ...overrides
 })
 
-describe('L-T21 custom escape hatch', () => {
+describe('custom escape hatch', () => {
   it('skips graceful and force entirely when custom is present', async () => {
     const graceful = vi.fn()
     const force = vi.fn()
@@ -50,7 +50,7 @@ describe('L-T21 custom escape hatch', () => {
   })
 })
 
-describe('AF-T62 direct release descriptor scheduler boundary', () => {
+describe('direct release descriptor scheduler boundary', () => {
   it('snapshots a hostile context scheduler before invoking graceful', async () => {
     let reads = 0
     const scheduler = {
@@ -82,7 +82,7 @@ describe('AF-T62 direct release descriptor scheduler boundary', () => {
   })
 })
 
-describe('L-T22 graceful success stops the chain', () => {
+describe('graceful success stops the chain', () => {
   it('does not call force after graceful succeeds', async () => {
     const force = vi.fn()
     const descriptor: IReleaseDescriptor = { graceful: async () => undefined, force }
@@ -112,7 +112,7 @@ describe('L-T22 graceful success stops the chain', () => {
   })
 })
 
-describe('L-T23 graceful timeout abandons waiting without cancelling it, then runs force', () => {
+describe('graceful timeout abandons waiting without cancelling it, then runs force', () => {
   it('proceeds to force once the deadline passes, without recording a graceful error', async () => {
     vi.useFakeTimers()
     try {
@@ -158,7 +158,7 @@ describe('L-T23 graceful timeout abandons waiting without cancelling it, then ru
   })
 })
 
-describe('L-T24 graceful throwing still runs force', () => {
+describe('graceful throwing still runs force', () => {
   it('records the graceful error and still calls force', async () => {
     const gracefulError = new Error('graceful failed')
     const force = vi.fn()
@@ -188,7 +188,7 @@ describe('L-T24 graceful throwing still runs force', () => {
   })
 })
 
-describe('L-T25 force errors flow to the policy outcome without dangling rejections', () => {
+describe('force errors flow to the policy outcome without dangling rejections', () => {
   it("force's error is returned for the caller to fold into the policy sink", async () => {
     const forceError = new Error('force failed')
     const descriptor: IReleaseDescriptor = {
@@ -225,7 +225,7 @@ describe('L-T25 force errors flow to the policy outcome without dangling rejecti
   })
 })
 
-describe('L-T26 IReleaseContext: report and signal', () => {
+describe('IReleaseContext: report and signal', () => {
   it('report is invoked and a reporter throw is contained', async () => {
     /** Host reporting stays observable without throwing into the test process. */
     const callbacks: (() => void)[] = []
@@ -317,7 +317,7 @@ describe('L-T26 IReleaseContext: report and signal', () => {
   })
 })
 
-describe('L-T50 DisposeTransaction: signal registration and cleanup failures', () => {
+describe('DisposeTransaction: signal registration and cleanup failures', () => {
   it('releases items and drains pending work when signal registration throws after storing', async () => {
     const registrationError = new Error('signal registration failed')
     const removalError = new Error('signal removal failed')
@@ -472,7 +472,7 @@ describe('L-T50 DisposeTransaction: signal registration and cleanup failures', (
   })
 })
 
-describe('L-T14 DisposeTransaction: order mode', () => {
+describe('DisposeTransaction: order mode', () => {
   it('uses an inert signal without allocating a controller when no external signal exists', async () => {
     const original = globalThis.AbortController
     let allocations = 0
@@ -587,7 +587,7 @@ describe('L-T14 DisposeTransaction: order mode', () => {
   })
 })
 
-describe('L-T15 DisposeTransaction: ordered-plan mode', () => {
+describe('DisposeTransaction: ordered-plan mode', () => {
   it('executes items strictly in the given sequence', async () => {
     const calls: string[] = []
     const transaction = createDisposeTransaction({ kind: 'plan' }, { errorPolicy: 'throw' })
@@ -625,7 +625,7 @@ describe('L-T15 DisposeTransaction: ordered-plan mode', () => {
   })
 })
 
-describe('L-T53 Luna descriptor admission isolation', () => {
+describe('Luna descriptor admission isolation', () => {
   it.each(['custom', 'graceful', 'force'] as const)(
     'plan mode keeps releasing later items when %s getter throws',
     async (field) => {
@@ -817,7 +817,7 @@ describe('L-T53 Luna descriptor admission isolation', () => {
   })
 })
 
-describe('L-T55 Luna descriptor timeout admission', () => {
+describe('Luna descriptor timeout admission', () => {
   it.each(['plan', 'order'] as const)(
     '%s mode rejects invalid gracefulTimeoutMs per policy',
     async (kind) => {
@@ -906,7 +906,7 @@ describe('L-T55 Luna descriptor timeout admission', () => {
   )
 })
 
-describe('L-T32 DisposeTransaction: shared deadline across steps, not reset per step', () => {
+describe('DisposeTransaction: shared deadline across steps, not reset per step', () => {
   it('the same absolute deadlineAt value is handed to every item, unchanged', async () => {
     const deadlineAt = systemScheduler.now() + 50_000
     const observed: (number | undefined)[] = []

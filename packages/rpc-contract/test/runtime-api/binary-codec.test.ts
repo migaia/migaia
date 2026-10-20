@@ -22,7 +22,7 @@ const envelope = (payload: unknown) => normalizeRuntimeEnvelope({ ...vectors.val
 const digest = async (backing: ArrayBuffer) =>
   createHash('sha256').update(new Uint8Array(backing)).digest('hex')
 
-it('[C6-L1][A27][A21] cold binary preparation captures inline bytes and starts the first native digest synchronously', async () => {
+it('cold binary preparation captures inline bytes and starts the first native digest synchronously', async () => {
   /** The internal lazy seam is the same preparation function used by actual outbound owners. */
   const { prepareRpcBinaryLazy } = await import('../../dist/contract/runtime-api/binary-lazy.js')
   /** Hidden bytes distinguish the captured visible slice from a whole-backing copy. */
@@ -78,7 +78,7 @@ it('[C6-L1][A27][A21] cold binary preparation captures inline bytes and starts t
 })
 
 for (const kind of ['buffer', 'view'] as const) {
-  it(`[A84][A87] ${kind} stream budget uses native slots and never invokes a byteLength shadow`, () => {
+  it(`${kind} stream budget uses native slots and never invokes a byteLength shadow`, () => {
     /** Supported native objects retain their real slots despite unrelated own application fields. */
     const value = kind === 'buffer' ? new ArrayBuffer(2) : new Uint8Array(2)
     /** Any public property read is observed independently of the stream's returned value. */
@@ -111,7 +111,7 @@ for (const kind of ['buffer', 'view'] as const) {
   })
 }
 
-it('[A84] inline tag-shaped business records and view boundaries restore without leaking outside bytes', async () => {
+it('inline tag-shaped business records and view boundaries restore without leaking outside bytes', async () => {
   /** Prefix and suffix are deliberately different from the visible view data. */
   const backing = new Uint8Array([9, 1, 2, 8]).buffer
   /** Collision shapes remain ordinary arrays/records because every business node is tagged. */
@@ -135,7 +135,7 @@ it('[A84] inline tag-shaped business records and view boundaries restore without
   assert.deepEqual(JSON.parse(JSON.stringify(value.object)), payload.object)
 })
 
-it('[A84][A85] native refs preserve original complete backings and aliases without making a transfer copy', async () => {
+it('native refs preserve original complete backings and aliases without making a transfer copy', async () => {
   const backing = new Uint8Array([9, 1, 2, 8]).buffer
   const prepared = await prepareRpcBinary(
     envelope({
@@ -151,7 +151,7 @@ it('[A84][A85] native refs preserve original complete backings and aliases witho
   assert.equal(
     prepared.sidecars[0],
     backing,
-    '[A85] native preparation must retain the original transfer identity'
+    'native preparation must retain the original transfer identity'
   )
   assert.equal(prepared.backingBytes, 4)
   assert.equal(prepared.manifest.backings[0]!.sha256, await digest(backing))
@@ -175,7 +175,7 @@ it('[A84][A85] native refs preserve original complete backings and aliases witho
   )
 })
 
-it('[A84][A87] full backing overflow and invalid business graphs fail before digest work', async () => {
+it('full backing overflow and invalid business graphs fail before digest work', async () => {
   /** Counting invokes the real digest only when graph and complete budget admission succeed. */
   let hashes = 0
   const observedDigest = async (backing: ArrayBuffer) => {
@@ -192,7 +192,7 @@ it('[A84][A87] full backing overflow and invalid business graphs fail before dig
     ),
     { code: 'INVALID_ENVELOPE' }
   )
-  assert.equal(hashes, 0, '[A87] tiny visible views cannot evade the full-backing limit')
+  assert.equal(hashes, 0, 'tiny visible views cannot evade the full-backing limit')
   for (const payload of [
     new Int32Array([1]),
     new SharedArrayBuffer(1),
@@ -237,21 +237,18 @@ it.each([
   ],
   ['oversize-offset', ['uint8array', 16 * 1024 * 1024, 'AQ']],
   ['inline-native-reference', ['buffer', 0]]
-])(
-  '[A84] inline decoder rejects %s before producing a semantic envelope',
-  async (_name, payload) => {
-    const prepared = await prepareRpcBinary(envelope(null), RpcBinaryStorage.inline)
-    await assert.rejects(
-      restoreRpcBinary(
-        { ...prepared.manifest, envelope: { ...prepared.manifest.envelope, payload } },
-        RpcBinaryStorage.inline
-      ),
-      { code: 'INVALID_ENVELOPE' }
-    )
-  }
-)
+])('inline decoder rejects %s before producing a semantic envelope', async (_name, payload) => {
+  const prepared = await prepareRpcBinary(envelope(null), RpcBinaryStorage.inline)
+  await assert.rejects(
+    restoreRpcBinary(
+      { ...prepared.manifest, envelope: { ...prepared.manifest.envelope, payload } },
+      RpcBinaryStorage.inline
+    ),
+    { code: 'INVALID_ENVELOPE' }
+  )
+})
 
-it('[A84] binary graph normalization never executes an inherited array method', async () => {
+it('binary graph normalization never executes an inherited array method', async () => {
   /** The supported dense own-data array may inherit methods, but the data codec must not call them. */
   const payload = [new Uint8Array([1])]
   /** A custom prototype exposes whether normalization escapes its admitted descriptor snapshot. */
@@ -269,12 +266,12 @@ it('[A84] binary graph normalization never executes an inherited array method', 
   )
   const prepared = await prepareRpcBinary(envelope(payload), RpcBinaryStorage.inline)
   const restored = await restoreRpcBinary(prepared.manifest, RpcBinaryStorage.inline)
-  assert.equal(reads, 0, '[A84] only the owned array elements enter the portable graph')
+  assert.equal(reads, 0, 'only the owned array elements enter the portable graph')
   assert.ok('payload' in restored)
   assert.deepEqual([...(restored.payload as Uint8Array[])[0]!], [1])
 })
 
-it('[A84][A85] binary vectors match the shipped closed schema and canonical restoration', async () => {
+it('binary vectors match the shipped closed schema and canonical restoration', async () => {
   /** Original schema evaluator is reused; real sidecars are materialized solely from fixture bytes. */
   const root = schema as ISchemaRule & { $defs: Record<string, ISchemaRule> }
   for (const vector of vectors.binary.valid) {
@@ -300,7 +297,7 @@ it('[A84][A85] binary vectors match the shipped closed schema and canonical rest
   }
 })
 
-it('[A84] inline Uint8Array restoration materializes one backing including its zero prefix', async () => {
+it('inline Uint8Array restoration materializes one backing including its zero prefix', async () => {
   const value = normalizeRuntimeEnvelope({ ...vectors.valid[0], payload: new Uint8Array([1, 2]) })
   const prepared = await prepareRpcBinary(value, RpcBinaryStorage.inline)
   const manifest = {
@@ -332,7 +329,7 @@ it('[A84] inline Uint8Array restoration materializes one backing including its z
   )
   try {
     const restored = await restoreRpcBinary(manifest, RpcBinaryStorage.inline)
-    assert.equal(allocations, 1, '[A84] decode writes directly into the final backing')
+    assert.equal(allocations, 1, 'decode writes directly into the final backing')
     assert.ok('payload' in restored)
     const bytes = restored.payload as Uint8Array
     assert.equal(bytes.byteOffset, 3)

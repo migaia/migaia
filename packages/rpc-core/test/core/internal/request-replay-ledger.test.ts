@@ -3,10 +3,13 @@ import { RequestReplayLedger } from '../../../dist/core/internal/request-replay-
 import { countReplayEntryVisits } from './replay-iteration-observer.js'
 
 describe('RequestReplayLedger', () => {
-  it('C4 visits one accepted tombstone per access with 1101 entries and releases each once at TTL', () => {
+  it('visits one accepted tombstone per access with 1101 entries and releases each once at TTL', () => {
     /** Original binding release order remains visible across bulk expiration and later access. */
     const released: string[] = []
-    /** Explicit fixture per-peer budget fits A10's 1101 entries; default global and TTL remain. */
+    /**
+     * Explicit fixture per-peer budget fits the reference workload's 1101 entries; default global
+     * and TTL remain.
+     */
     const ledger = new RequestReplayLedger(4096, 1101, 310000, {
       retain: () => true,
       release: (peer) => released.push(peer)
@@ -30,7 +33,7 @@ describe('RequestReplayLedger', () => {
     expect(released).toHaveLength(1101)
   })
 
-  it('C4 expires only the accepted prefix at the default TTL and retains later peer leases', () => {
+  it('expires only the accepted prefix at the default TTL and retains later peer leases', () => {
     /** Binding releases identify exactly which prefix entries expired, in original order. */
     const released: string[] = []
     /** Independently labelled peer leases prove no live suffix is prematurely released. */
@@ -54,7 +57,7 @@ describe('RequestReplayLedger', () => {
     expect(released).toEqual(['peer-first', 'peer-second', 'peer-third'])
   })
 
-  it('C4 visits one live rejection with 1101 rejected keys and purges each once at fixed expiry', () => {
+  it('visits one live rejection with 1101 rejected keys and purges each once at fixed expiry', () => {
     /** One peer's retained accepted request fills only its own per-peer budget. */
     const ledger = new RequestReplayLedger(4096, 1, 310000)
     expect(ledger.admit('accepted', 'full-peer', 0)).toBe(true)
@@ -73,7 +76,7 @@ describe('RequestReplayLedger', () => {
     expect(ledger.has('accepted', 1000)).toBe(true)
   })
 
-  it('C4 duplicate rejection does not refresh expiry or reorder the live suffix', () => {
+  it('duplicate rejection does not refresh expiry or reorder the live suffix', () => {
     /** Distinct rejected timestamps expose any accidental refresh without private inspection. */
     const ledger = new RequestReplayLedger(4, 1, 310000)
     expect(ledger.admit('accepted', 'full-peer', 0)).toBe(true)
@@ -124,7 +127,7 @@ describe('RequestReplayLedger', () => {
     expect(ledger.admit('fresh', 'peer', 1_000)).toBe(true)
   })
 
-  it('tracks per-peer capacity independently (M-T27 per-key count)', () => {
+  it('tracks per-peer capacity independently (per-key count)', () => {
     const ledger = new RequestReplayLedger(4, 2, 100)
     expect(ledger.admit('a1', 'peer-a', 0)).toBe(true)
     expect(ledger.admit('a2', 'peer-a', 1)).toBe(true)

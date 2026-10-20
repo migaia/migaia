@@ -19,7 +19,7 @@ import { objectFixtureEndpoint } from '../bridge/json-object-fixture.js'
 import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
 
 it.each([false, true])(
-  '[A65][A72] actual JSON-RPC bridge fallback=%s refuses group without a JSON-RPC batch or member send',
+  'actual JSON-RPC bridge fallback=%s refuses group without a JSON-RPC batch or member send',
   async (fallback) => {
     /** The independent raw JSON-RPC peer establishes a genuine negotiated bridge channel. */
     const fixture = bridgeFixture()
@@ -66,7 +66,7 @@ function group(): IRpcRuntimeEnvelope {
   })
 }
 
-it('[A59][A64] native splitting and an opaque whole-frame wrapper both reject before the first physical send', async () => {
+it('native splitting and an opaque whole-frame wrapper both reject before the first physical send', async () => {
   let sends = 0
   let opaqueCalls = 0
   for (const selected of [
@@ -111,11 +111,11 @@ it('[A59][A64] native splitting and an opaque whole-frame wrapper both reject be
   assert.equal(
     opaqueCalls,
     0,
-    '[A59] matching metadata and a one-frame result cannot substitute native proof'
+    'matching metadata and a one-frame result cannot substitute native proof'
   )
 })
 
-it('[A64] complete carrier at 16 MiB or a tighter channel limit sends once; one byte more never splits or sends', async () => {
+it('complete carrier at 16 MiB or a tighter channel limit sends once; one byte more never splits or sends', async () => {
   for (const limit of [512, 16 * 1024 * 1024]) {
     const frames: unknown[] = []
     const sender = new RpcOutboundSender(
@@ -160,15 +160,15 @@ it('[A64] complete carrier at 16 MiB or a tighter channel limit sends once; one 
       async () => sender.sendRuntime(tooLarge, runtimeOperationCapabilities('group')),
       { code: 'FRAME_LIMIT_EXCEEDED' }
     )
-    assert.equal(frames.length, 1, '[A64] over-limit complete group has zero additional sends')
+    assert.equal(frames.length, 1, 'over-limit complete group has zero additional sends')
   }
 })
 
-it('[A59][A64] single-frame facts come from the actual paired native callables and once-read framing limits', () => {
+it('single-frame facts come from the actual paired native callables and once-read framing limits', () => {
   assert.equal(
     typeof framing.bindRpcFrameIngress,
     'function',
-    '[A59][A64] original framing owner supplies bounded whole-frame facts'
+    'original framing owner supplies bounded whole-frame facts'
   )
   let reads = 0
   const native = createStringFramer({
@@ -184,7 +184,7 @@ it('[A59][A64] single-frame facts come from the actual paired native callables a
     maxConcurrentMessages: 3,
     maxMessageBytes: 32
   })
-  assert.equal(reads, 1, '[A59] runtime selection never rereads user framing options')
+  assert.equal(reads, 1, 'runtime selection never rereads user framing options')
   assert.equal(
     framing.bindRpcFrameIngress(() => ({ status: 'pending' }), native.frame).singleFrameLimits,
     undefined
@@ -198,7 +198,7 @@ it('[A59][A64] single-frame facts come from the actual paired native callables a
   )
 })
 
-it('[A64][A73] one complete group uses the original codec/protect/write once and missing capabilities send nothing', async () => {
+it('one complete group uses the original codec/protect/write once and missing capabilities send nothing', async () => {
   const frames: unknown[] = []
   let protects = 0
   const components: IRpcSelectedComponents = {
@@ -230,7 +230,7 @@ it('[A64][A73] one complete group uses the original codec/protect/write once and
   assert.equal(
     typeof Reflect.get(sender, 'sendRuntime'),
     'function',
-    '[A64] original sender provides an independent prepared single-frame port'
+    'original sender provides an independent prepared single-frame port'
   )
   const send = sender as RpcOutboundSender & {
     sendRuntime(message: IRpcRuntimeEnvelope, capabilities: readonly string[]): Promise<void>
@@ -249,6 +249,6 @@ it('[A64][A73] one complete group uses the original codec/protect/write once and
   assert.equal(protects, 0)
   await send.sendRuntime(group(), required)
   assert.equal(frames.length, 1)
-  assert.equal(protects, 1, '[A64] the complete semantic group is protected once')
+  assert.equal(protects, 1, 'the complete semantic group is protected once')
   assert.deepEqual(readRuntimeCarrier(frames[0])?.frame, group())
 })

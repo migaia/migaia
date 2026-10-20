@@ -15,7 +15,7 @@ export type ISessionStorageBackendStore = ReturnType<typeof sessionStorageHost>
 export type ICookieBackendStore = ReturnType<typeof cookiesHost>
 export type IIndexedDbBackendStore = ReturnType<typeof indexedDbHost>
 
-/** Sole owner of the four R03 built-in kind identities; this module imports no backend code. */
+/** Sole owner of the four built-in kind identities; this module imports no backend code. */
 export const memoryBackendKind = defineBuiltInBackendKind<IMemoryBackendStore>()('memory')
 export const localStorageBackendKind =
   defineBuiltInBackendKind<ILocalStorageBackendStore>()('local-storage')

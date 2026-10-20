@@ -15,7 +15,7 @@ const asObserver = (o: IMockObserver) => o as unknown as IObserver
 const asObservable = (o: IMockObservable) => o as unknown as IObservable
 
 describe('getDependencyTree', () => {
-  it('A5 accepts public effect handles and traverses the computed-to-signal chain', () => {
+  it('accepts public effect handles and traverses the computed-to-signal chain', () => {
     /** One runtime owns the public handles and the dependency graph inspected below. */
     const runtime = createRuntime()
     /** Named writable source lets the forward and reverse trees identify the same node. */

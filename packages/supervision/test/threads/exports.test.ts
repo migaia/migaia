@@ -5,7 +5,7 @@ import * as root from '@migaia/supervision'
 import * as threads from '@migaia/supervision/threads'
 import { SupervisionErrorCode } from '../../src/index.js'
 
-describe('A9 thread public contract', () => {
+describe('thread public contract', () => {
   it('exports exactly the thread API from its own subpath', () => {
     expect(Object.keys(threads).sort()).toEqual(
       ['ThreadCapability', 'ThreadLimit', 'ThreadUnitKind', 'createThreadSupervisor'].sort()

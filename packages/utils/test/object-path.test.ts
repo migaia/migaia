@@ -24,7 +24,7 @@ const fixture: IFixture = {
 }
 
 describe('object path primitives', () => {
-  it('U-D01 preserves genuine sparse arrays, descriptors and unchanged branches on writes', () => {
+  it('preserves genuine sparse arrays, descriptors and unchanged branches on writes', () => {
     /** Sparse frozen input exercises array identity without losing holes or source ownership. */
     const items = Object.freeze(
       Object.assign([] as { name: string }[], {

@@ -24,14 +24,14 @@ const generatedApiManifest = JSON.parse(
 /** Typed subset of generated API facts required by documentation acceptance. */
 const generatedApis = generatedApiManifest.apis as readonly IApi[]
 
-test('SITE-T-SIGNATURES-DIRECT-ENTRY validates bounded writer selection before generation', () => {
+test('validates bounded writer selection before generation', () => {
   assert.equal(parseSelectedLibrary([]), null)
   assert.equal(parseSelectedLibrary(['--library', 'plugin-host']), 'plugin-host')
   assert.throws(() => parseSelectedLibrary(['--library']))
   assert.throws(() => parseSelectedLibrary(['--library', 'unknown']))
 })
 
-test('SITE-T-SIGNATURES-DIRECT-ENTRY preserves unselected order through shrink, equal, and grow', () => {
+test('preserves unselected order through shrink, equal, and grow', () => {
   const previous = [
     { library: 'utils', id: 'before' },
     { library: 'plugin-host', id: 'old-a' },
@@ -88,7 +88,7 @@ function packagePath(name: string, fromDirectory: string): string | undefined {
   return existsSync(candidate) ? candidate : undefined
 }
 
-test('SITE-T-A01 assigns route, transform, and diagnostics to one selected chain', () => {
+test('assigns route, transform, and diagnostics to one selected chain', () => {
   assert.equal(manifest.dependencies['react-router'], '8.3.1')
   assert.equal(manifest.devDependencies['@react-router/dev'], '8.3.1')
   assert.equal(manifest.devDependencies['@vitejs/plugin-react'], '6.1.0')
@@ -105,7 +105,7 @@ test('SITE-T-A01 assigns route, transform, and diagnostics to one selected chain
   assert.match(readFileSync(join(websiteRoot, 'react-router.config.ts'), 'utf8'), /ssr: false/)
 })
 
-test('SITE-T-A19 excludes forbidden direct dependencies while retaining TypeScript 7', () => {
+test('excludes forbidden direct dependencies while retaining TypeScript 7', () => {
   const directNames = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
   assert.deepEqual(
     directNames.filter((name) => /^(?:@astrojs|astro|@babel|babel|@swc|swc)$/i.test(name)),
@@ -114,7 +114,7 @@ test('SITE-T-A19 excludes forbidden direct dependencies while retaining TypeScri
   assert.equal(manifest.devDependencies.typescript, '7.0.2')
 })
 
-test('SITE-T-A20 contains Babel utilities only below the React Router framework closure', () => {
+test('contains Babel utilities only below the React Router framework closure', () => {
   const queue = Object.entries({ ...manifest.dependencies, ...manifest.devDependencies }).flatMap(
     ([name]) => {
       const packageJson = packagePath(name, websiteRoot)
@@ -154,7 +154,7 @@ test('SITE-T-A20 contains Babel utilities only below the React Router framework 
   assert.doesNotMatch(lockfile.split('"packages":')[0], /@babel|babel-dead-code-elimination/)
 })
 
-test('SITE-T-A21 config and scripts select Oxc without a fallback compiler', () => {
+test('config and scripts select Oxc without a fallback compiler', () => {
   const configFiles = [
     'vite.config.ts',
     'react-router.config.ts',
@@ -169,14 +169,14 @@ test('SITE-T-A21 config and scripts select Oxc without a fallback compiler', () 
   assert.doesNotMatch(`${configText}\n${scriptText}`, /(?:babel|swc)/i)
 })
 
-test('SITE-T-A22 production output includes the Oxc compiler runtime artifact', () => {
+test('production output includes the Oxc compiler runtime artifact', () => {
   const assetsDirectory = join(websiteRoot, 'build/client/assets')
   const outputManifest = readdirSync(assetsDirectory).find((name) => /^manifest-.*\.js$/.test(name))
   assert.ok(outputManifest, 'run the production build before the output contract test')
   assert.match(readFileSync(join(assetsDirectory, outputManifest), 'utf8'), /compiler-runtime/)
 })
 
-test('SITE-T-A23 compiler packages are direct website dependencies and resolve locally', () => {
+test('compiler packages are direct website dependencies and resolve locally', () => {
   for (const name of ['@react-router/dev', 'react-router', 'vite', 'typescript']) {
     const packageJson = packagePath(name, websiteRoot)
     assert.ok(packageJson)
@@ -184,7 +184,7 @@ test('SITE-T-A23 compiler packages are direct website dependencies and resolve l
   }
 })
 
-test('SITE-T-A24 generated projections contain no volatile metadata', () => {
+test('generated projections contain no volatile metadata', () => {
   const generatedFiles = ['signatures', 'error-codes'].flatMap((directory) => {
     const names =
       directory === 'signatures'
@@ -405,7 +405,7 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   }
 })
 
-test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contract', () => {
+test('gives every public configuration field a readable contract', () => {
   for (const api of generatedApis) {
     for (const symbol of api.symbols) {
       if (symbol.kind === 'type' || symbol.kind === 'interface') continue
@@ -441,7 +441,7 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
   assert.ok(!pluginHost.configuration.some((field) => field.name === 'mode'))
 })
 
-test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual decision guide', () => {
+test('gives every RPC runtime export an explicit bilingual decision guide', () => {
   const runtimeSymbols = generatedApis
     .filter((api) =>
       [
@@ -469,7 +469,10 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    * Devtools retains its nine canonical runtime symbols. The contract entry's error-code/source
    * re-exports are alias-only and are not counted twice.
    */
-  /** Coroutine BC1 removes createCoroutineHost while keeping the createCoroutinePlugin export. */
+  /**
+   * The coroutine change removes createCoroutineHost while keeping the createCoroutinePlugin
+   * export.
+   */
   /** The canonical defaultRpcReporter adds one runtime export to the reviewed RPC surface. */
   /** Removing four Bridge exports and adding one Process binding yields net minus three. */
   /**
@@ -490,7 +493,7 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
     }
 })
 
-test('SITE-T-WEB-RPC-TRANSPORTS gives every public adapter a bilingual runnable tutorial', () => {
+test('gives every public adapter a bilingual runnable tutorial', () => {
   /** Each adapter retains its Core overview section, public API owner and maintained example. */
   const transports = [
     [
@@ -649,7 +652,7 @@ test('SITE-T-WEB-RPC-TRANSPORTS gives every public adapter a bilingual runnable 
   }
 })
 
-test('SITE-T-UTILS-GUIDES gives every runtime export an explicit bilingual decision guide', () => {
+test('gives every utils runtime export an explicit bilingual decision guide', () => {
   const runtimeSymbols = generatedApis
     .filter((api) => api.library === 'utils')
     .flatMap((api) =>
@@ -674,7 +677,7 @@ test('SITE-T-UTILS-GUIDES gives every runtime export an explicit bilingual decis
     }
 })
 
-test('SITE-T-UTILS-COLLECTOR publishes a bilingual API and task guide', () => {
+test('publishes a bilingual API and task guide', () => {
   const collectorApi = generatedApis
     .filter((api) => api.library === 'utils')
     .flatMap((api) => api.symbols.map((symbol) => ({ api, symbol })))
@@ -702,7 +705,7 @@ test('SITE-T-UTILS-COLLECTOR publishes a bilingual API and task guide', () => {
   }
 })
 
-test('SITE-T-CONFIG-LOCALE gives every runtime option a Chinese explanation', () => {
+test('gives every runtime option a Chinese explanation', () => {
   for (const api of generatedApis)
     for (const symbol of api.symbols) {
       if (symbol.kind === 'type' || symbol.kind === 'interface') continue
@@ -718,7 +721,7 @@ test('SITE-T-CONFIG-LOCALE gives every runtime option a Chinese explanation', ()
     }
 })
 
-test('SITE-T-CONFIG-LOCALE closes both locales for every runtime option', () => {
+test('closes both locales for every runtime option', () => {
   for (const api of generatedApis) {
     for (const symbol of api.symbols) {
       if (symbol.kind === 'type' || symbol.kind === 'interface') continue
@@ -736,7 +739,7 @@ test('SITE-T-CONFIG-LOCALE closes both locales for every runtime option', () => 
   }
 })
 
-test('SITE-T-EXAMPLES keeps maintained runtime examples and rejects generated casts', () => {
+test('keeps maintained runtime examples and rejects generated casts', () => {
   let maintainedExampleCount = 0
   for (const api of generatedApis) {
     for (const symbol of api.symbols as Array<
@@ -762,7 +765,7 @@ test('SITE-T-EXAMPLES keeps maintained runtime examples and rejects generated ca
   assert.match(channel.examples[0] ?? '', /\.publish\(/)
 })
 
-test('SITE-T-EVENT-GUIDES gives every event-subscriber function a bilingual task guide', () => {
+test('gives every event-subscriber function a bilingual task guide', () => {
   const apis = generatedApis.filter(
     (candidate) =>
       candidate.id === 'event-subscriber:index' || candidate.id === 'event-subscriber:subscriber'
@@ -783,7 +786,7 @@ test('SITE-T-EVENT-GUIDES gives every event-subscriber function a bilingual task
     }
 })
 
-test('SITE-T-LIFECYCLE-GUIDES protects the primary ownership and sequencing paths', () => {
+test('protects the primary ownership and sequencing paths', () => {
   const primaryApis = [
     ['scope', 'createLifecycleScope'],
     ['generation', 'createGenerationController'],
@@ -807,7 +810,7 @@ test('SITE-T-LIFECYCLE-GUIDES protects the primary ownership and sequencing path
       assert.ok(findApiGuide('lifecycle', moduleName, symbolName, locale)!.options.length >= 3)
 })
 
-test('SITE-T-LIFECYCLE-COMPOSITION documents release, quiescence, time, and cancellation axes', () => {
+test('documents release, quiescence, time, and cancellation axes', () => {
   const compositionApis = [
     ['lifecycle', 'disposal', 'createDisposeTransaction'],
     ['lifecycle', 'disposal', 'executeReleaseDescriptor'],
@@ -826,7 +829,7 @@ test('SITE-T-LIFECYCLE-COMPOSITION documents release, quiescence, time, and canc
     }
 })
 
-test('SITE-T-LIFECYCLE-INFRA documents advanced containment and lease primitives', () => {
+test('documents advanced containment and lease primitives', () => {
   const infrastructureApis = [
     ['abort', 'observeAbortSubscription'],
     ['disposal', 'createSyncStartedDisposalLedger'],
@@ -846,7 +849,7 @@ test('SITE-T-LIFECYCLE-INFRA documents advanced containment and lease primitives
     }
 })
 
-test('SITE-T-LIFECYCLE-COVERAGE gives every public lifecycle function a bilingual guide', () => {
+test('gives every public lifecycle function a bilingual guide', () => {
   const lifecycleApis = generatedApis.filter((api) => api.library === 'lifecycle')
   const functions = lifecycleApis.flatMap((api) =>
     api.symbols.filter((symbol) => /^[a-z]/.test(symbol.name)).map((symbol) => ({ api, symbol }))
@@ -862,7 +865,7 @@ test('SITE-T-LIFECYCLE-COVERAGE gives every public lifecycle function a bilingua
     }
 })
 
-test('SITE-T-RESOURCE-GUIDE documents its complete constructor and ownership contract', () => {
+test('documents its complete constructor and ownership contract', () => {
   /** Public constructor fields that readers must be able to configure deliberately. */
   const expectedOptions = [
     'debugName',
@@ -896,7 +899,7 @@ test('SITE-T-RESOURCE-GUIDE documents its complete constructor and ownership con
   }
 })
 
-test('SITE-T-LOGGER-RUNTIME-GUIDE documents host replacement and restoration', () => {
+test('documents host replacement and restoration', () => {
   /** Host capability fields that a runtime replacement must explain explicitly. */
   const expectedOptions = [
     'process',
@@ -929,7 +932,7 @@ test('SITE-T-LOGGER-RUNTIME-GUIDE documents host replacement and restoration', (
   }
 })
 
-test('SITE-T-LOGGER-PRIMARY-GUIDES documents the Logger and every user-facing plugin', () => {
+test('documents the Logger and every user-facing plugin', () => {
   const targets = [
     ['index', 'Logger'],
     ['index', 'getLoggerRuntimeManager'],
@@ -954,7 +957,7 @@ test('SITE-T-LOGGER-PRIMARY-GUIDES documents the Logger and every user-facing pl
     }
 })
 
-test('SITE-T-PLUGIN-HOST-COVERAGE gives both public classes bilingual decision guides', () => {
+test('gives both public classes bilingual decision guides', () => {
   /** Runtime and failure classes that form the Plugin Host entry boundary. */
   const targets = ['PluginHost', 'PluginHostError'] as const
   for (const symbolName of targets)
@@ -996,7 +999,7 @@ test('SITE-T-PLUGIN-HOST-COVERAGE gives both public classes bilingual decision g
   }
 })
 
-test('SITE-T-TRAY-COVERAGE separates static composition from managed Host mutation', () => {
+test('separates static composition from managed Host mutation', () => {
   /** Tray entry points and the option fields each one owns. */
   const targets = [
     [
@@ -1046,7 +1049,7 @@ test('SITE-T-TRAY-COVERAGE separates static composition from managed Host mutati
     }
 })
 
-test('SITE-T-CAPABILITY-COVERAGE separates gates, static graphs, dynamic graphs, and topology', () => {
+test('separates gates, static graphs, dynamic graphs, and topology', () => {
   /** Capability callable entry points and the configuration each one owns. */
   const targets = [
     ['index', 'createCapabilityHost', ['flags', 'onError']],
@@ -1080,7 +1083,7 @@ test('SITE-T-CAPABILITY-COVERAGE separates gates, static graphs, dynamic graphs,
     }
 })
 
-test('SITE-T-MIDDLEWARE-API-COVERAGE documents the canonical runner and supported adaptation boundary', () => {
+test('documents the canonical runner and supported adaptation boundary', () => {
   /**
    * Commit ac5ed837 removed the eight public run/adapt helpers; createPipeline owns run() and
    * lift().
@@ -1112,7 +1115,7 @@ test('SITE-T-MIDDLEWARE-API-COVERAGE documents the canonical runner and supporte
     }
 })
 
-test('SITE-T-WASM-API-COVERAGE documents every initialization, arena, and conversion entry', () => {
+test('documents every initialization, arena, and conversion entry', () => {
   const targets = [
     'initSync',
     'alloc_bytes',
@@ -1134,7 +1137,7 @@ test('SITE-T-WASM-API-COVERAGE documents every initialization, arena, and conver
     }
 })
 
-test('SITE-T-STORE-SHARED-API-COVERAGE separates shared values, arrays, and error factories', () => {
+test('separates shared values, arrays, and error factories', () => {
   const targets = [
     ['sharedInt32', ['runtime', 'initialValue', 'buffer']],
     ['SharedInt32Signal', ['runtime', 'initialValue', 'buffer']],
@@ -1164,7 +1167,7 @@ test('SITE-T-STORE-SHARED-API-COVERAGE separates shared values, arrays, and erro
     }
 })
 
-test('SITE-T-STORE-DEVTOOLS-API-COVERAGE explains sessions, graph projections, and errors', () => {
+test('explains sessions, graph projections, and errors', () => {
   const targets = [
     [
       'createStoreDevTools',
@@ -1205,7 +1208,7 @@ test('SITE-T-STORE-DEVTOOLS-API-COVERAGE explains sessions, graph projections, a
     }
 })
 
-test('SITE-T-STORE-WORKER-COMPUTE-COVERAGE separates client, provider, and Resource ownership', () => {
+test('separates client, provider, and Resource ownership', () => {
   const targets = [
     [
       'WorkerAdapter',
@@ -1245,7 +1248,7 @@ test('SITE-T-STORE-WORKER-COMPUTE-COVERAGE separates client, provider, and Resou
     }
 })
 
-test('SITE-T-STORE-WORKER-SERIALIZE-COVERAGE explains streams, byte ownership, and cleanup', () => {
+test('explains streams, byte ownership, and cleanup', () => {
   /** API audit a384c4d3 keeps only serialize/worker public; wire-value helpers are internal. */
   const targets = [
     [
@@ -1284,7 +1287,7 @@ test('SITE-T-STORE-WORKER-SERIALIZE-COVERAGE explains streams, byte ownership, a
     }
 })
 
-test('SITE-T-STORE-WASM-FIELD-COVERAGE separates readiness, scalar, bucket, and record semantics', () => {
+test('separates readiness, scalar, bucket, and record semantics', () => {
   /** The array(length, granularity) function stores f64 values; it has no item-builder parameter. */
   const targets = [
     ['ensureWasm', []],
@@ -1321,7 +1324,7 @@ test('SITE-T-STORE-WASM-FIELD-COVERAGE separates readiness, scalar, bucket, and 
     }
 })
 
-test('SITE-T-STORE-SSR-API-COVERAGE explains request isolation, hydration, transport, and trust', () => {
+test('explains request isolation, hydration, transport, and trust', () => {
   const targets = [
     [
       'SSRRequestScope',
@@ -1365,7 +1368,7 @@ test('SITE-T-STORE-SSR-API-COVERAGE explains request isolation, hydration, trans
     }
 })
 
-test('SITE-T-STORE-LIGHT-API-COVERAGE separates Store creation, brands, and Resource ownership', () => {
+test('separates Store creation, brands, and Resource ownership', () => {
   const creationOptions = ['shape', 'runtime', 'debugName', 'warnAsyncActions', 'mutationPolicy']
   const targets = [
     ['createStore', creationOptions],
@@ -1406,7 +1409,7 @@ test('SITE-T-STORE-LIGHT-API-COVERAGE separates Store creation, brands, and Reso
     }
 })
 
-test('SITE-T-STORE-KEYED-ATOM-CORE documents definition identity, preview safety, and Store scope', () => {
+test('documents definition identity, preview safety, and Store scope', () => {
   const targets = [
     ['atom-definition', 'atomDef', ['init', 'debugLabel']],
     ['atom-definition', 'atomDefFactory', ['create', 'debugLabel']],
@@ -1438,7 +1441,7 @@ test('SITE-T-STORE-KEYED-ATOM-CORE documents definition identity, preview safety
     }
 })
 
-test('SITE-T-STORE-KEYED-COMPOSITION documents family bounds, optics, and split ownership', () => {
+test('documents family bounds, optics, and split ownership', () => {
   const targets = [
     ['familyDef', ['initial', 'maxSize', 'debugLabel']],
     ['derivedFamilyDef', ['read', 'maxSize', 'debugLabel']],
@@ -1469,7 +1472,7 @@ test('SITE-T-STORE-KEYED-COMPOSITION documents family bounds, optics, and split 
     }
 })
 
-test('SITE-T-STORE-KEYED-PROTOCOL documents brands, cross-runtime access, and immutable paths', () => {
+test('documents brands, cross-runtime access, and immutable paths', () => {
   const targets = [
     ['atom-definition', 'isAtomDefinition', ['value']],
     ['atom-definition', 'assertNotThenable', ['value', 'context']],
@@ -1500,7 +1503,7 @@ test('SITE-T-STORE-KEYED-PROTOCOL documents brands, cross-runtime access, and im
     }
 })
 
-test('SITE-T-STORE-KEYED-HELPERS documents keyed lookup, transforms, and cache cleanup', () => {
+test('documents keyed lookup, transforms, and cache cleanup', () => {
   const targets = [
     ['findKeyIndex', ['items', 'keyOf', 'key']],
     ['computeUniqueKeys', ['items', 'keyOf', 'label']],
@@ -1533,7 +1536,7 @@ test('SITE-T-STORE-KEYED-HELPERS documents keyed lookup, transforms, and cache c
     }
 })
 
-test('SITE-T-STORE-KEYED-ERRORS documents native error identity and traceability', () => {
+test('documents native error identity and traceability', () => {
   const targets = [
     ['createStoreKeyedError', ['code', 'message', 'options.cause']],
     ['createStoreKeyedRangeError', ['code', 'message', 'options.cause']],
@@ -1562,7 +1565,7 @@ test('SITE-T-STORE-KEYED-ERRORS documents native error identity and traceability
     }
 })
 
-test('SITE-T-STORE-KEYED-CONSTANTS explains discriminators without fake configuration', () => {
+test('explains discriminators without fake configuration', () => {
   for (const symbolName of ['AtomKind', 'STORE_KEYED_SOURCE'] as const)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide('store-keyed', 'index', symbolName, locale)
@@ -1575,7 +1578,7 @@ test('SITE-T-STORE-KEYED-CONSTANTS explains discriminators without fake configur
     }
 })
 
-test('SITE-T-STORE-INDEXED-COLLECTIONS documents classes and ownership', () => {
+test('documents classes and ownership', () => {
   /** API audit 87ed84be removed lowercase observableObject/Array/Map/Set factories. */
   const targets = ['ObservableObject', 'ObservableArray', 'ObservableMap', 'ObservableSet'] as const
 
@@ -1600,7 +1603,7 @@ test('SITE-T-STORE-INDEXED-COLLECTIONS documents classes and ownership', () => {
     }
 })
 
-test('SITE-T-STORE-INDEXED-DIAGNOSTICS documents constants and native error identity', () => {
+test('documents constants and native error identity', () => {
   const targets = [
     ['IndexedOperation', []],
     ['STORE_INDEXED_SOURCE', []],
@@ -1630,7 +1633,7 @@ test('SITE-T-STORE-INDEXED-DIAGNOSTICS documents constants and native error iden
     }
 })
 
-test('SITE-T-STORE-MIDDLEWARE-POLICY-CLONE separates mutation admission and snapshot guarantees', () => {
+test('separates mutation admission and snapshot guarantees', () => {
   /** API audit 7f681bd4 removed tolerantClone; callers choose an explicit clone policy. */
   const targets = [
     ['index', 'createMutationPolicy', ['mode']],
@@ -1662,7 +1665,7 @@ test('SITE-T-STORE-MIDDLEWARE-POLICY-CLONE separates mutation admission and snap
     }
 })
 
-test('SITE-T-STORE-MIDDLEWARE-HOST documents binding, plugins, DevTools, and every Host control', () => {
+test('documents binding, plugins, DevTools, and every Host control', () => {
   /** API audit 7f681bd4 removed middlewarePlugin; install native plugins through the Host. */
   const hostOptions = [
     'execution.mutationTimeoutMs',
@@ -1720,7 +1723,7 @@ test('SITE-T-STORE-MIDDLEWARE-HOST documents binding, plugins, DevTools, and eve
     }
 })
 
-test('SITE-T-STORE-MIDDLEWARE-DIAGNOSTICS documents event domains and cleanup traceability', () => {
+test('documents event domains and cleanup traceability', () => {
   const targets = [
     ['MiddlewareEventType', []],
     ['MiddlewareEventPhase', []],
@@ -1751,7 +1754,7 @@ test('SITE-T-STORE-MIDDLEWARE-DIAGNOSTICS documents event domains and cleanup tr
     }
 })
 
-test('SITE-T-STORE-PERSIST-CORE documents lifecycle, codec routing, and every core option', () => {
+test('documents lifecycle, codec routing, and every core option', () => {
   const targets = [
     [
       'persistUnit',
@@ -1797,7 +1800,7 @@ test('SITE-T-STORE-PERSIST-CORE documents lifecycle, codec routing, and every co
     }
 })
 
-test('SITE-T-STORE-PERSIST-BOUNDARIES documents envelopes, states, and traceable errors', () => {
+test('documents envelopes, states, and traceable errors', () => {
   const targets = [
     ['assertEnvelope', ['value', 'key']],
     ['PersistEnvelopeError', ['message']],
@@ -1831,7 +1834,7 @@ test('SITE-T-STORE-PERSIST-BOUNDARIES documents envelopes, states, and traceable
     }
 })
 
-test('SITE-T-STORE-PERSIST-ADAPTERS separates flat, collection, keyed, and family ownership', () => {
+test('separates flat, collection, keyed, and family ownership', () => {
   const targets = [
     [
       'light',
@@ -1908,7 +1911,7 @@ test('SITE-T-STORE-PERSIST-ADAPTERS separates flat, collection, keyed, and famil
     }
 })
 
-test('SITE-T-STORE-REACT-HOOKS separates selectors, nodes, atoms, resources, and Provider definitions', () => {
+test('separates selectors, nodes, atoms, resources, and Provider definitions', () => {
   const targets = [
     ['useTracked', ['read', 'isEqual', 'runtime']],
     ['useSignal', ['s']],
@@ -1946,7 +1949,7 @@ test('SITE-T-STORE-REACT-HOOKS separates selectors, nodes, atoms, resources, and
     }
 })
 
-test('SITE-T-STORE-REACT-PROVIDER documents Registry ownership, injection, and every Provider control', () => {
+test('documents Registry ownership, injection, and every Provider control', () => {
   const targets = [
     [
       'StoreProvider',
@@ -2002,7 +2005,7 @@ test('SITE-T-STORE-REACT-PROVIDER documents Registry ownership, injection, and e
     }
 })
 
-test('SITE-T-STORE-REACT-CONFIG-ERRORS documents feature admission, readiness, and traceability', () => {
+test('documents feature admission, readiness, and traceability', () => {
   const targets = [
     [
       'normalizeStoreConfig',
@@ -2040,7 +2043,7 @@ test('SITE-T-STORE-REACT-CONFIG-ERRORS documents feature admission, readiness, a
     }
 })
 
-test('SITE-T-STORAGE-CONTRACT-CAPABILITIES documents boundary admission and capability composition', () => {
+test('documents boundary admission and capability composition', () => {
   const targets = [
     ['snapshotStorageCapabilities', ['value']],
     ['isStorageCapabilities', ['value']],
@@ -2077,7 +2080,7 @@ test('SITE-T-STORAGE-CONTRACT-CAPABILITIES documents boundary admission and capa
     }
 })
 
-test('SITE-T-STORAGE-CONTRACT-INPUTS documents keys, operation context, and transactions', () => {
+test('documents keys, operation context, and transactions', () => {
   const targets = [
     [
       'snapshotOperationContext',
@@ -2116,7 +2119,7 @@ test('SITE-T-STORAGE-CONTRACT-INPUTS documents keys, operation context, and tran
     }
 })
 
-test('SITE-T-STORAGE-CONTRACT-CODECS-ERRORS documents wire identity, policy, and traceability', () => {
+test('documents wire identity, policy, and traceability', () => {
   const targets = [
     ['snapshotCodec', ['codec']],
     ['assertCodec', ['codec']],
@@ -2154,7 +2157,7 @@ test('SITE-T-STORAGE-CONTRACT-CODECS-ERRORS documents wire identity, policy, and
     }
 })
 
-test('SITE-T-SERIALIZE-FORMATS-BASE64 documents protocol constants, guards, and text transport', () => {
+test('documents protocol constants, guards, and text transport', () => {
   const targets = [
     ['index', 'SerializeChunkKind', []],
     ['index', 'SerializeCleanupKind', []],
@@ -2191,7 +2194,7 @@ test('SITE-T-SERIALIZE-FORMATS-BASE64 documents protocol constants, guards, and 
     }
 })
 
-test('SITE-T-SERIALIZE-STREAM-REGISTRY documents backpressure, collection, and lifecycle', () => {
+test('documents backpressure, collection, and lifecycle', () => {
   const targets = [
     [
       'core',
@@ -2266,7 +2269,7 @@ test('SITE-T-SERIALIZE-STREAM-REGISTRY documents backpressure, collection, and l
     }
 })
 
-test('SITE-T-SERIALIZE-PLUGINS-ERRORS documents JSON configuration and native error identity', () => {
+test('documents JSON configuration and native error identity', () => {
   const targets = [
     ['plugins', 'jsonParser', ['replacer', 'reviver', 'space', 'decoder']],
     ['plugins', 'jsonPlugin', ['replacer', 'reviver', 'space', 'decoder']],
@@ -2317,7 +2320,7 @@ test('SITE-T-SERIALIZE-PLUGINS-ERRORS documents JSON configuration and native er
     }
 })
 
-test('SITE-T-STORAGE-WEB-BACKENDS documents durability, capability, and every constructor option', () => {
+test('documents durability, capability, and every constructor option', () => {
   const targets = [
     ['memory', 'memoryStorageHost', []],
     ['local-storage', 'localStorageHost', ['storage']],
@@ -2359,7 +2362,7 @@ test('SITE-T-STORAGE-WEB-BACKENDS documents durability, capability, and every co
     }
 })
 
-test('SITE-T-STORAGE-WEB-CODECS-SCHEMA documents selection, validation, and migration contracts', () => {
+test('documents selection, validation, and migration contracts', () => {
   const targets = [
     ['serialize', 'jsonCodec', []],
     ['serialize', 'binaryCodec', []],
@@ -2394,7 +2397,7 @@ test('SITE-T-STORAGE-WEB-CODECS-SCHEMA documents selection, validation, and migr
     }
 })
 
-test('SITE-T-STORAGE-WEB-ENTITY documents repository composition and every definition option', () => {
+test('documents repository composition and every definition option', () => {
   const expectedOptions = [
     'name',
     'key',
@@ -2429,7 +2432,7 @@ test('SITE-T-STORAGE-WEB-ENTITY documents repository composition and every defin
   }
 })
 
-test('SITE-T-STORAGE-WEB-HOST documents authority, topology, installation, and lifecycle options', () => {
+test('documents authority, topology, installation, and lifecycle options', () => {
   const targets = [
     ['assertStorageBackendId', ['id']],
     ['createStorageHost', ['plugins', 'installTimeoutMs', 'scheduler', 'report']],
@@ -2457,7 +2460,7 @@ test('SITE-T-STORAGE-WEB-HOST documents authority, topology, installation, and l
     }
 })
 
-test('SITE-T-STORAGE-WEB-BOUNDARIES documents public namespace and errors while keeping Host helpers private', () => {
+test('documents public namespace and errors while keeping Host helpers private', () => {
   /** Commit 8e6e59ed removed these Host implementation helpers from public exports. */
   const privateHostEntries = [
     'pluginNameFromBackendId',
@@ -2505,7 +2508,7 @@ test('SITE-T-STORAGE-WEB-BOUNDARIES documents public namespace and errors while 
     }
 })
 
-test('SITE-T-STORAGE-WEB-PLUGINS documents non-reactive factories and custom reactive adapters', () => {
+test('documents non-reactive factories and custom reactive adapters', () => {
   /**
    * Commit c8d24f68 made custom reactive features store-owned; the definition no longer takes
    * backendKind.
@@ -2561,7 +2564,7 @@ test('SITE-T-STORAGE-WEB-PLUGINS documents non-reactive factories and custom rea
     }
 })
 
-test('SITE-T-STORAGE-WEB-REACTIVE-PLUGINS documents honest visibility and every factory option', () => {
+test('documents honest visibility and every factory option', () => {
   const targets = [
     ['plugins-reactive-memory', 'memoryReactive', ['id']],
     ['plugins-reactive-local-storage', 'localStorageReactive', ['storage']],
@@ -2608,7 +2611,7 @@ test('SITE-T-STORAGE-WEB-REACTIVE-PLUGINS documents honest visibility and every 
     }
 })
 
-test('SITE-T-REACTIVE-GUIDES documents the primary graph path and every public option', () => {
+test('documents the primary graph path and every public option', () => {
   const targets = [
     ['index', 'IReactiveSignal', ['debugName']],
     ['index', 'IReactiveComputed', ['equals', 'keepAlive', 'debugName']],

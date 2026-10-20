@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 describe('runtime-neutral boundary', () => {
-  it('ES-T12 ships side-effect-free admitted entries with only the utils foundation dependency', () => {
+  it('ships side-effect-free admitted entries with only the utils foundation dependency', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
       readonly sideEffects?: boolean
@@ -15,7 +15,7 @@ describe('runtime-neutral boundary', () => {
     expect(Object.keys(manifest.exports ?? {})).toEqual(['.', './subscriber'])
   })
 
-  it('ES-T17 confines host scheduler access to the terminal adapter', () => {
+  it('confines host scheduler access to the terminal adapter', () => {
     const sourceRoot = resolve(import.meta.dirname, '../src')
     const sourceFiles = (directory: string): string[] =>
       readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -43,7 +43,7 @@ describe('runtime-neutral boundary', () => {
     expect(terminalSource ?? '').toContain('queueMicrotask')
   })
 
-  it('ES-T24 keeps event fan-out independent from middleware execution', () => {
+  it('keeps event fan-out independent from middleware execution', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
       readonly dependencies?: Record<string, string>
@@ -54,7 +54,7 @@ describe('runtime-neutral boundary', () => {
     expect(source).not.toContain('middleware-pipeline')
   })
 
-  it('ES-T25 keeps heavy lifecycle ownership outside the package runtime graph', () => {
+  it('keeps heavy lifecycle ownership outside the package runtime graph', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
       readonly dependencies?: Record<string, string>
@@ -65,19 +65,19 @@ describe('runtime-neutral boundary', () => {
     expect(manifest.devDependencies ?? {}).not.toHaveProperty('@migaia/lifecycle')
   })
 
-  it('ES-T27 keeps pipeline and generator control flow out of the public root', () => {
+  it('keeps pipeline and generator control flow out of the public root', () => {
     const source = readFileSync(resolve(import.meta.dirname, '../src/index.ts'), 'utf8')
     expect(source).not.toMatch(/waterfall|next\(|generator|middleware/)
   })
 
-  it('ES-T13 keeps registration removal structural rather than scan-based', () => {
+  it('keeps registration removal structural rather than scan-based', () => {
     const source = readFileSync(resolve(import.meta.dirname, '../src/channel.ts'), 'utf8')
     expect(source).not.toMatch(/\.indexOf\(|\.find\(|\.filter\(/)
     expect(source).toContain('owner.previous')
     expect(source).toContain('owner.next')
   })
 
-  it('ES-T113 verifies the callable documentation contract and rejects stale scope claims', () => {
+  it('verifies the callable documentation contract and rejects stale scope claims', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const readme = readFileSync(resolve(packageRoot, 'README.md'), 'utf8')
     const useguide = readFileSync(resolve(packageRoot, 'USEGUIDE.md'), 'utf8')
@@ -103,7 +103,7 @@ describe('runtime-neutral boundary', () => {
     ).toContain('IEventHubSubscription')
   })
 
-  it('ES-T114 uses explicit owner import graph and runtime recursion trap', async () => {
+  it('uses explicit owner import graph and runtime recursion trap', async () => {
     const sourceRoot = resolve(import.meta.dirname, '../src')
     const hub = readFileSync(resolve(sourceRoot, 'hub.ts'), 'utf8')
     const channel = readFileSync(resolve(sourceRoot, 'channel.ts'), 'utf8')
@@ -127,15 +127,13 @@ describe('runtime-neutral boundary', () => {
     expect(channelSource).toContain('const nextAdmission = registerRaw(nextListener, nextTaskId)')
   })
 
-  it('ES-T51 gives every package test a stable ES-T identifier', () => {
+  it('gives every package test a unique name', () => {
     const testRoot = resolve(import.meta.dirname)
     const testFiles = readdirSync(testRoot)
       .filter((entry) => entry.endsWith('.test.ts') && entry !== 'architecture.test.ts')
       .map((entry) => readFileSync(resolve(testRoot, entry), 'utf8'))
     const testNames = testFiles.flatMap((source) => source.match(/it\('([^']+)'/g) ?? [])
     expect(testNames.length).toBeGreaterThan(0)
-    expect(testNames.every((name) => /it\('ES-T\d+ /.test(name))).toBe(true)
-    const ids = testNames.map((name) => name.match(/it\('(ES-T\d+) /)?.[1])
-    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(testNames).size).toBe(testNames.length)
   })
 })

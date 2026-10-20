@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { connected } from './fixture.js'
 
-it('[A43] cold query reads original client pending size without counting provider executions', async () => {
+it('cold query reads original client pending size without counting provider executions', async () => {
   /** A genuine pending request remains in the canonical registry until its original response. */
   let release!: () => void
   /** The provider barrier makes the query's logical in-flight count deterministic. */
@@ -34,10 +34,7 @@ it('[A43] cold query reads original client pending size without counting provide
     const detail = (await fixture.peers[0].describe()) as unknown as {
       connections: { counters: { inFlight?: { value: number; scope: string; unit: string } } }[]
     }
-    expect(
-      detail.connections[0]!.counters.inFlight,
-      '[A43] canonical pending Map.size'
-    ).toMatchObject({
+    expect(detail.connections[0]!.counters.inFlight, 'canonical pending Map.size').toMatchObject({
       value: 1,
       scope: 'endpoint-client',
       unit: 'calls'

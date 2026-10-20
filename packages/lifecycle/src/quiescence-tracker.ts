@@ -133,8 +133,8 @@ function createStringQuiescenceTracker(): IQuiescenceTracker<string> {
 
 /**
  * `LeaseRegistry` — the same engine as `QuiescenceTracker`, re-exported under the name lease call
- * sites reach for. §4.8 requires it to pass `whenZero()`/`whenZeroOnce()`/`seal()` straight through
- * rather than hiding them behind `count()` polling.
+ * sites reach for. It must pass `whenZero()`/`whenZeroOnce()`/`seal()` straight through rather than
+ * hiding them behind `count()` polling.
  */
 export type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>
 
@@ -155,7 +155,7 @@ export type IPendingTracker = {
   track<T>(promise: Promise<T>): Promise<T>
   /**
    * Waits until nothing is in flight, looping via `whenZeroOnce()` so work started while draining
-   * is never missed (L-T10).
+   * is never missed.
    */
   drain(): Promise<void>
   readonly size: number

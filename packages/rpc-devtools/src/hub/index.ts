@@ -30,7 +30,7 @@ import {
   type IRpcDevtoolsTimelineQuery
 } from './types.js'
 
-/** Default per-target retention is the hub R4 bound, independent of each collector's ring. */
+/** Default per-target retention is the hub bound, independent of each collector's ring. */
 const DEFAULT_MAX_EVENTS = 50_000
 
 /** JavaScript array length bounds the registration-time ring allocation. */
@@ -183,7 +183,7 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
   function accept(target: IHubTarget, event: IRpcDevtoolsWireEvent): void {
     if (!target.active || event.seq <= target.lastSeq) return
     target.lastSeq = event.seq
-    /** One wrapper is created at ingest; SC9 keeps the entire wire event and its payload references. */
+    /** One wrapper is created at ingest; it keeps the entire wire event and its payload references. */
     const item: IRpcDevtoolsTimelineEvent = {
       target: target.name,
       alignedAt: event.at - target.offset,
@@ -351,7 +351,7 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
   function importRecord(name: string, text: string): void {
     assertOpen()
     assertAvailable(name)
-    /** SC9(b): codec output is the owned NDJSON boundary representation, not a copied live event. */
+    /** Codec output is the owned NDJSON boundary representation, not a copied live event. */
     const record = decodeRpcDevtoolsRecord(text)
     /** Reuse the codec-owned event array; only restored native errors need a wire representation. */
     const events = record.events as IRpcDevtoolsWireEvent[]
@@ -359,10 +359,7 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
       /** The decoded event retains its content/detail references through any error conversion. */
       const event = record.events[i]!
       if (event.error instanceof Error) {
-        /**
-         * SC9(b): the service wire boundary requires serialized errors, preserving the entire
-         * chain.
-         */
+        /** The service wire boundary requires serialized errors, preserving the entire chain. */
         events[i] = {
           ...event,
           error: serializeRpcError(event.error, {
@@ -389,7 +386,7 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
     assertOpen()
     if (name !== undefined)
       return removed.has(name) ? RpcDevtoolsTargetStatus.removed : getTarget(name).status
-    /** SC9(b): a public status Map is a boundary projection from private target resource owners. */
+    /** A public status Map is a boundary projection from private target resource owners. */
     const statuses = new Map<string, RpcDevtoolsTargetStatus>()
     for (const [targetName, target] of targets) statuses.set(targetName, target.status)
     for (const targetName of removed) statuses.set(targetName, RpcDevtoolsTargetStatus.removed)

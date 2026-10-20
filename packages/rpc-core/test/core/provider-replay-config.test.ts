@@ -7,7 +7,7 @@ import { connect } from '../../dist/core/middleware/connect.js'
 
 describe('provider replay workload configuration', () => {
   it.each([undefined, 1101])(
-    '[K255/K256] retains the default 1024 while accepting an explicit %s workload',
+    'retains the default 1024 while accepting an explicit %s workload',
     async (maximum) => {
       /** Both peers exercise the canonical provider replay ledger through real routed requests. */
       const [clientTransport, serverTransport] = createMemoryTransportPair()
@@ -41,7 +41,7 @@ describe('provider replay workload configuration', () => {
       }
     }
   )
-  it.each([0, -1, 1.5, NaN])('[K256] rejects invalid explicit replay limit %s', async (value) => {
+  it.each([0, -1, 1.5, NaN])('rejects invalid explicit replay limit %s', async (value) => {
     /** Invalid new configuration rejects before the provider receives any requests. */
     const [, transport] = createMemoryTransportPair()
     await expect(

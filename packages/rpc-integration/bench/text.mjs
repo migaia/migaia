@@ -1,4 +1,4 @@
-/** Stable assertion diagnostics consumed by the offline canonical FD fixture loader (K249). */
+/** Stable assertion diagnostics consumed by the offline canonical FD fixture loader. */
 export const IpcBenchPreparationText = Object.freeze({
   /** Missing function boundaries prevent loading a partial or unrelated fixture. */
   fdDeclarationMissing: 'Canonical FD fixture declaration missing',
@@ -18,7 +18,7 @@ export const IpcBenchControl = Object.freeze({
 
 /** Peer heap evidence is opt-in and remains separate from ordinary timing diagnostics. */
 export const IpcBenchObservation = Object.freeze({
-  /** Only the ignored I22 soak driver enables explicit peer collection at snapshot boundaries. */
+  /** Only the ignored soak driver enables explicit peer collection at snapshot boundaries. */
   forcePeerGcEnvironment: 'IPC_BENCH_FORCE_PEER_GC',
   /** Only a confirmed GROWING arm's profile rerun may write peer heap snapshots. */
   heapProfileEnvironment: 'IPC_BENCH_HEAP_PROFILE',
@@ -32,7 +32,7 @@ export const IpcBenchObservation = Object.freeze({
   heapBoundaries: Object.freeze(['start', 'end'])
 })
 
-/** P3 diagnostics travel only on the existing observation control and never qualify timing. */
+/** Diagnostics travel only on the existing observation control and never qualify timing. */
 export const IpcBenchDiagnostic = Object.freeze({
   /** The child receives only the selected diagnostic mode, without credential configuration. */
   environment: 'IPC_BENCH_DIAGNOSTIC',
@@ -50,7 +50,7 @@ export const IpcBenchDiagnostic = Object.freeze({
   /** Boundaries enclose warmed business samples and the explicitly included control work. */
   start: 'start',
   stop: 'stop',
-  /** These receipts cannot be used as the uninstrumented P3 latency qualification lane. */
+  /** These receipts cannot be used as the uninstrumented latency qualification lane. */
   timingStatus: 'INSTRUMENTED_DIAGNOSTIC_NOT_QUALIFICATION',
   /** Missing or failed capture is never represented by a numeric zero. */
   started: 'STARTED',
@@ -117,15 +117,24 @@ export const IpcProbeBenchStages = Object.freeze({
   fixedBudget: 'FIXED_BUDGET'
 })
 
-/** Frozen reference ownership is retained in every W3 result so primitive history stays distinct. */
+/**
+ * Frozen reference ownership is retained in every baseline result so primitive history stays
+ * distinct.
+ */
 export const IpcW3Reference = Object.freeze({
   /** Explicit final-source collection still reports the unchanged old primitive guard separately. */
   historical: 'historical-primitive',
-  /** Ordinary final W3 uses the repaired public Peer baseline and its own current-window A/A. */
+  /**
+   * The ordinary final baseline uses the repaired public Peer baseline and its own current-window
+   * A/A.
+   */
   public: 'public-peer'
 })
 
-/** Fixed supplemental graphs declare their actual carriers and methods without changing DA1 cells. */
+/**
+ * Fixed supplemental graphs declare their actual carriers and methods without changing budget
+ * cells.
+ */
 export const RuntimeBench = Object.freeze({
   /** Worker itself issues and times reverse calls through the independently accepted parent route. */
   reverse: 'reverse',

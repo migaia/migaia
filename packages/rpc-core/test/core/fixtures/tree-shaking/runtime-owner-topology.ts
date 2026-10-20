@@ -20,7 +20,7 @@ export const fullRuntimeOwnerKeys = Object.freeze([
   'variation-coordinator'
 ] as const)
 
-/** D34: every outbound-capable root owns one selected-framer bridge. */
+/** Every outbound-capable root owns one selected-framer bridge. */
 export const defaultRuntimeOwnerKeys = fullRuntimeOwnerKeys
 
 /** Exact outbound/client allocation closure; no concrete inbound feature owner is present. */

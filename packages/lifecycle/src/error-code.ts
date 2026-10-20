@@ -7,16 +7,16 @@
 export const LifecycleErrorCode = {
   /**
    * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces
-   * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to
-   * retry or stop. Cancellation itself resolves the wait and does not use this code.
+   * Retain the original failure while the owner decides whether to retry or stop. Cancellation
+   * itself resolves the wait and does not use this code.
    */
   delayFailed: 'DELAY_FAILED',
   /**
    * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer
-   * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in
-   * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also
-   * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or
-   * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string.
+   * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract:
+   * `close()` changes state synchronously, cannot fail, and does not call user code. Also tags the
+   * `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or `dispose()`,
+   * so cancelled work observes a coded Error with a stack instead of a string.
    */
   scopeClosed: 'SCOPE_CLOSED',
 
@@ -76,8 +76,8 @@ export const LifecycleErrorCode = {
   /**
    * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or
    * completion. Invalidation first converges state, then preserves cleanup failures in registration
-   * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new
-   * generation. Do not revive the old generation.
+   * order. Enforces generation supersession. Handle the error and use a new generation. Do not
+   * revive the old generation.
    */
   generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED',
 
@@ -169,9 +169,8 @@ export const LifecycleErrorCode = {
    * Examples include throwing accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction
    * `unref`. Also rejects nonfinite time values, nonfinite or negative delays, addition that
    * overflows, or cleanup observations without the error array required by `mergeCleanupResults`.
-   * Enforces scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite
-   * nonnegative delays in R-9. Correct the scheduler or delay instead of retrying the same invalid
-   * input.
+   * Enforces scheduler admission and finite nonnegative delays. Correct the scheduler or delay
+   * instead of retrying the same invalid input.
    */
   invalidOption: 'INVALID_OPTION'
 } as const

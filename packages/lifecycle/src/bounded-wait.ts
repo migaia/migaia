@@ -16,12 +16,12 @@ import {
 /**
  * Waits for one awaitable until an existing absolute deadline, without cancelling it.
  *
- * Ported from `@migaia/logger`'s `bounded-wait.ts` (`LG-R5-1/2/3`), generalized off any
- * logger-specific naming. Default behavior is unchanged: it never cancels the task, it always
- * observes the task even when the deadline has already passed, and it always clears its own timer.
- * The deadline clock and timer come from the injected scheduler (default `systemScheduler`), never
- * raw host globals. Cleanup failures reject by default; reportCleanup keeps them diagnostic without
- * replacing the task/deadline winner.
+ * Ported from `@migaia/logger`'s `bounded-wait.ts`, generalized off any logger-specific naming.
+ * Default behavior is unchanged: it never cancels the task, it always observes the task even when
+ * the deadline has already passed, and it always clears its own timer. The deadline clock and timer
+ * come from the injected scheduler (default `systemScheduler`), never raw host globals. Cleanup
+ * failures reject by default; reportCleanup keeps them diagnostic without replacing the
+ * task/deadline winner.
  */
 export const boundedWait = async (
   task: PromiseLike<unknown>,
@@ -44,7 +44,7 @@ export const boundedWait = async (
   // deadline has already elapsed by the time this is called, returning `false` without ever
   // touching `task` would let a `task` that later rejects surface as a genuine unhandled rejection
   // instead of being contained here. This extra handler only marks the promise as handled; it never
-  // swallows the rejection seen by the real race below (`LG-R5-3`).
+  // swallows the rejection seen by the real race below.
   const observedTask = Promise.resolve(task)
   void observedTask.catch(() => undefined)
   const remainingMs = deadlineAt - scheduler.now()

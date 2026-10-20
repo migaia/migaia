@@ -22,7 +22,7 @@ const processEntry = fileURLToPath(
   new URL('../runtime-api/fixtures/automatic-process.mjs', import.meta.url)
 )
 
-it('[A7] thread probe observes handshake, ready and a genuine supervised crash/restart', async () => {
+it('thread probe observes handshake, ready and a genuine supervised crash/restart', async () => {
   /** Retain lifecycle strings synchronously; the reusable event view never escapes emit. */
   const lifecycle: string[] = []
   /** Reporting remains observable and separate from the business result. */
@@ -66,14 +66,8 @@ it('[A7] thread probe observes handshake, ready and a genuine supervised crash/r
   })
   try {
     assert.equal(await peer.request('service.data.stable'), 3)
-    assert.ok(
-      lifecycle.includes('handshake'),
-      '[A7] actual thread negotiation reaches the peer probe'
-    )
-    assert.ok(
-      lifecycle.includes('ready'),
-      '[A7] initial accepted thread readiness reaches the probe'
-    )
+    assert.ok(lifecycle.includes('handshake'), 'actual thread negotiation reaches the peer probe')
+    assert.ok(lifecycle.includes('ready'), 'initial accepted thread readiness reaches the probe')
     handles[0]!.terminate()
     await handles[0]!.exited
     await vi.waitFor(() => assert.ok(lifecycle.includes('restart')), { timeout: 3000 })
@@ -90,7 +84,7 @@ it('[A7] thread probe observes handshake, ready and a genuine supervised crash/r
   assert.equal(budget.inUse, 0)
 }, 15000)
 
-it('[A7] process spawn:true forwards probe through ordinary entry discovery and emits handshake/ready', async () => {
+it('process spawn:true forwards probe through ordinary entry discovery and emits handshake/ready', async () => {
   /** Lifecycle strings are copied as scalar fixture observations during the synchronous callback. */
   const lifecycle: string[] = []
   /** Probe callback failures are retained rather than silently swallowed by this fixture. */
@@ -121,8 +115,8 @@ it('[A7] process spawn:true forwards probe through ordinary entry discovery and 
   }
   try {
     assert.equal(((await peer.request('probe', 'observed')) as { value: string }).value, 'observed')
-    assert.ok(lifecycle.includes('handshake'), '[A7] process negotiation reaches the peer probe')
-    assert.ok(lifecycle.includes('ready'), '[A7] process readiness reaches the peer probe')
+    assert.ok(lifecycle.includes('handshake'), 'process negotiation reaches the peer probe')
+    assert.ok(lifecycle.includes('ready'), 'process readiness reaches the peer probe')
     assert.deepEqual(probeErrors, [])
     for (const report of reports)
       assert.deepEqual(
@@ -131,7 +125,7 @@ it('[A7] process spawn:true forwards probe through ordinary entry discovery and 
           code: (report as { code?: unknown }).code
         },
         { source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' },
-        '[A7] only the existing best-effort termination notice reaches the Peer reporter'
+        'only the existing best-effort termination notice reaches the Peer reporter'
       )
   } finally {
     await peer.close()

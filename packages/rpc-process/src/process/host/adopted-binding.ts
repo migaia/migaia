@@ -27,7 +27,10 @@ import { RpcProcessErrorCode } from '../error-code.js'
 export type IAdoptedProcessBinding = IProcessPluginBinding<IProcessConnectionUnit, string> &
   Readonly<{ adopt(): void }>
 
-/** Consume one already established channel with PP2's canonical close-only supervision profile. */
+/**
+ * Consume one already established channel with the process plugin's canonical close-only
+ * supervision profile.
+ */
 export function createAdoptedProcessBinding(
   candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal }>,
   report: (error: unknown) => void

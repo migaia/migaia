@@ -64,7 +64,7 @@ function streamRoots() {
 
 describe('native process plugin', () => {
   it.each(['default-stop', 'external-switch'] as const)(
-    '[A1/A8/A9/K226] serves and replaces a real Node child over native stdio (%s)',
+    'serves and replaces a real Node child over native stdio (%s)',
     async (mode) => {
       const token = 'native-process-plugin-token'
       const launcher = createNodeProcessLauncher()

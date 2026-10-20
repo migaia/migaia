@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 
-/** Retains WebRPC coverage at the D13 physical framing boundary. */
-describe('canonical D13 framing', () => {
+/** Retains WebRPC coverage at the physical framing boundary. */
+describe('canonical physical framing', () => {
   it('roundtrips ordered fragments', () => {
     const f = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
     const c = { source: 'a', messageId: 'm' }

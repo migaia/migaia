@@ -4,7 +4,7 @@ import { connect } from '../../../dist/core/middleware/connect.js'
 import { installPlugin } from './helpers.js'
 
 describe('connect middleware', () => {
-  it('[A28] awaits a foreign-realm identifier rejection instead of trusting the Promise object', async () => {
+  it('awaits a foreign-realm identifier rejection instead of trusting the Promise object', async () => {
     /** A native Promise from a different realm is supported by the public async identifier. */
     const rejectedIdentity = runInNewContext('Promise.resolve(false)') as Promise<boolean>
     expect(rejectedIdentity instanceof Promise).toBe(false)

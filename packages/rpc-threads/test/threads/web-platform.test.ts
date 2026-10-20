@@ -10,7 +10,7 @@ describe('Web Worker platform error cancellation', () => {
     /** Missing platforms remain unsupported, with no success claim from another runtime. */
     const available = spawnSync(runtime, ['--version']).status === 0
     it.skipIf(!available)(
-      `[A7] ${runtime} prevents native Worker error from terminating the host`,
+      `${runtime} prevents native Worker error from terminating the host`,
       () => {
         /** Deno permissions apply only to this local fixture and its workspace imports. */
         const args = runtime === 'deno' ? ['run', '-A', entry] : [entry]

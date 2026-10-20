@@ -4,7 +4,7 @@ import { createLifecycleScope } from '../src/lifecycle-scope'
 import { createProvisionalScope } from '../src/provisional-scope'
 import { LifecycleErrorCode } from '../src/error-code'
 
-describe('L-T4 SyncLifecycleScope: rejects async descriptors and async-owner instances at registration time', () => {
+describe('SyncLifecycleScope: rejects async descriptors and async-owner instances at registration time', () => {
   it('rejects a descriptor missing syncSafe: true', () => {
     const scope = createSyncLifecycleScope()
     expect(() => scope.own({}, { force: () => {} } as never)).toThrowError(
@@ -62,7 +62,7 @@ describe('L-T4 SyncLifecycleScope: rejects async descriptors and async-owner ins
   })
 })
 
-describe('LC-C2 shared release admission', () => {
+describe('shared release admission', () => {
   it.each(['order', 'force'] as const)(
     're-admits a changed %s before any release runs',
     (field) => {

@@ -47,16 +47,16 @@ function runEval(entry: string | URL): Record<string, unknown> {
 }
 
 describe('thread source shorthand', () => {
-  it.each(['self', 'path', 'typescript', 'short'])('[P1] %s uses the public Peer path', (mode) => {
+  it.each(['self', 'path', 'typescript', 'short'])('%s uses the public Peer path', (mode) => {
     expect(runFixture(mode)).toMatchObject({ value: 42, child: true })
   })
 
-  it('[P1] self spawn retains runtime flags and guarded module execution', () => {
+  it('self spawn retains runtime flags and guarded module execution', () => {
     expect(runFixture('self')).toMatchObject({ flags: ['--no-warnings'] })
   })
 
   it.each(['path', 'url'] as const)(
-    '[P1] eval starts an explicit %s without controller flags',
+    'eval starts an explicit %s without controller flags',
     (kind) => {
       /** The same actual service entry proves path normalization and exact URL handling. */
       const entry = new URL('./fixtures/short-spawn-worker.mjs', import.meta.url)
@@ -67,7 +67,7 @@ describe('thread source shorthand', () => {
     }
   )
 
-  it('[P1] absolute filesystem punctuation is encoded without becoming URL query or fragment', async () => {
+  it('absolute filesystem punctuation is encoded without becoming URL query or fragment', async () => {
     /** Native path conversion preserves a real filesystem basename rather than parsing it as a URI. */
     const path = fileURLToPath(new URL('./fixtures/', import.meta.url)) + 'worker #1?.mjs'
     /** Expansion performs no filesystem read or Worker construction for this nonexistent fixture. */
@@ -75,19 +75,19 @@ describe('thread source shorthand', () => {
     expect(source.spec.entry).toBe(pathToFileURL(path).href)
   })
 
-  it('[P1] Plugin accepts the same short URL without separate launch wiring', () => {
+  it('Plugin accepts the same short URL without separate launch wiring', () => {
     expect(runFixture('plugin')).toEqual({ value: 42 })
   })
 
-  it('[P1] Node .ts entry retains the original unresolved .js cause', () => {
+  it('Node .ts entry retains the original unresolved .js cause', () => {
     expect(runFixture('missing-js').codes).toContain('ERR_MODULE_NOT_FOUND')
   })
 
-  it('[P1] the native parent is not a library child', async () => {
+  it('the native parent is not a library child', async () => {
     expect(await isThreadChild()).toBe(false)
   })
 
-  it('[P1] self spawn rejects a test runner main module before native acquisition', async () => {
+  it('self spawn rejects a test runner main module before native acquisition', async () => {
     /** The failure must occur before a caller-held runtime loader can construct a Worker. */
     const load = vi.fn(threadRuntimeResource.load)
     await expect(
@@ -98,7 +98,7 @@ describe('thread source shorthand', () => {
     expect(load).not.toHaveBeenCalled()
   })
 
-  it('[P1] browser shorthand requires a URL and preserves its exact entry', async () => {
+  it('browser shorthand requires a URL and preserves its exact entry', async () => {
     /**
      * Preserve the native test host while hiding only the production runtime selector's Node
      * marker.

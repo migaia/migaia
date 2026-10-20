@@ -26,7 +26,7 @@ type IFixtureIntegration = Readonly<{
 }>
 
 for (const kind of ['class', 'frozen'] as const) {
-  it(`[A13][A34] genuine ${kind} Host shares one family slot and retires only exact contributions`, async () => {
+  it(`genuine ${kind} Host shares one family slot and retires only exact contributions`, async () => {
     /** Both supported public Host entries retain their original mutation/disposal owner. */
     const hostOptions = {
       execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
@@ -100,11 +100,7 @@ for (const kind of ['class', 'frozen'] as const) {
         })
       await host.use(connection('first', 'first-instance'))
       assert.equal(firstFacade!.read('first-instance'), 42)
-      assert.equal(
-        calls,
-        2,
-        '[A13] first real Feature dispatch succeeds before the shared-slot RED'
-      )
+      assert.equal(calls, 2, 'first real Feature dispatch succeeds before the shared-slot RED')
       /** Catch the old canonical collision so only the intended business assertion counts as RED. */
       const secondFailure = await host.use(connection('second', 'second-instance')).then(
         () => undefined,
@@ -113,15 +109,15 @@ for (const kind of ['class', 'frozen'] as const) {
       assert.equal(
         secondFailure,
         undefined,
-        '[A13] another same-family registration must join the original committed slot'
+        'another same-family registration must join the original committed slot'
       )
       assert.equal(
         Reflect.get(host, 'runtimeSource'),
         firstFacade,
-        '[A13] both connections publish one canonical facade'
+        'both connections publish one canonical facade'
       )
       assert.equal(firstFacade!.read('second-instance'), 42)
-      assert.equal(calls, 3, '[A13] the second exact contribution reaches genuine Feature business')
+      assert.equal(calls, 3, 'the second exact contribution reaches genuine Feature business')
       assert.throws(() => pluginHost.getPluginRuntimeIntegration({}), {
         code: 'PLUGIN_DEFINITION_INVALID'
       })
@@ -133,7 +129,7 @@ for (const kind of ['class', 'frozen'] as const) {
               pluginHost
                 .getPluginRuntimeIntegration(core)
                 .acquireSharedSlot('runtimeSource', Object.freeze({}), () => {
-                  assert.fail('[A13] another family must not construct a shared facade')
+                  assert.fail('another family must not construct a shared facade')
                 })
               return {}
             }
@@ -159,13 +155,13 @@ for (const kind of ['class', 'frozen'] as const) {
       assert.equal(
         Reflect.get(host, 'runtimeSource'),
         firstFacade,
-        '[A13] rejected owners cannot retire a committed slot'
+        'rejected owners cannot retire a committed slot'
       )
       await host.unUse('first')
       assert.equal(
         Reflect.get(host, 'runtimeSource'),
         firstFacade,
-        '[A34] the first contribution does not own slot destruction'
+        'the first contribution does not own slot destruction'
       )
       assert.equal(firstFacade!.read('first-instance'), undefined)
       assert.equal(firstFacade!.read('second-instance'), 42)
@@ -173,7 +169,7 @@ for (const kind of ['class', 'frozen'] as const) {
       assert.equal(
         Reflect.get(host, 'runtimeSource'),
         undefined,
-        '[A34] only the final contribution retires the public slot'
+        'only the final contribution retires the public slot'
       )
     } finally {
       await host.dispose()

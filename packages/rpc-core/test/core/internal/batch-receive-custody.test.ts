@@ -6,7 +6,7 @@ import { createFullOneWayEndpoint } from '../../../dist/core/index.js'
 import { connect } from '../../../dist/core/middleware/connect.js'
 import { registerBatchAgreement } from '../../../dist/core/internal/batch-frame.js'
 
-it('[A28] reports each rejected batch member independently when replay refusal cannot be written', async () => {
+it('reports each rejected batch member independently when replay refusal cannot be written', async () => {
   /** The fixture grants the same static factory agreement consumed by the physical receiver. */
   const [peer, transport] = createMemoryTransportPair()
   registerBatchAgreement(transport, [RpcCapability.batch])

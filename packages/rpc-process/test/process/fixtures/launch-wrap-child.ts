@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { createProcessPeer } from '@migaia/rpc-process'
 
-/** The parent selects a post-bootstrap crash only for A2's launched-handle case. */
+/** The parent selects a post-bootstrap crash only for the launched-handle case. */
 const crashAfterReply = process.argv.includes('crash-after-reply')
 
 /** The public automatic child path proves the original byte channel and stdin bootstrap survive. */

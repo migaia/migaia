@@ -15,7 +15,7 @@ import {
 import { runtimeSources, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
 
 it.each(['full', 'fingerprint'] as const)(
-  '[A62][A68] real non-L group store %s refusal rolls back the original provisional replay entries',
+  'real non-L group store %s refusal rolls back the original provisional replay entries',
   async (refusal) => {
     /** Both sides negotiate genuine profile support over the original non-exclusive memory owner. */
     const capabilities = [
@@ -74,7 +74,7 @@ it.each(['full', 'fingerprint'] as const)(
       await vi.waitFor(() => assert.equal(admission.size, 0))
       assert.equal(effects, 2)
       assert.equal(replay.activeSize, 0)
-      assert.equal(replay.size, initial + 2, '[A62] committed execution keeps legacy anti-replay')
+      assert.equal(replay.size, initial + 2, 'committed execution keeps legacy anti-replay')
       /** Capture genuine retained occupancy after the prior accepted task has completely settled. */
       const before = replay.size
       for (let index = 0; index < 2; index += 1) {
@@ -88,13 +88,9 @@ it.each(['full', 'fingerprint'] as const)(
           }
         )
         await vi.waitFor(() => assert.equal(admission.size, 0))
-        assert.equal(effects, 2, '[A62] refused group executes no member')
+        assert.equal(effects, 2, 'refused group executes no member')
         assert.equal(replay.activeSize, 0)
-        assert.equal(
-          replay.size,
-          before,
-          '[A62] pre-start store refusal has zero replay net growth'
-        )
+        assert.equal(replay.size, before, 'pre-start store refusal has zero replay net growth')
       }
       assert.equal((await peers[0]!.outcome('sealed-key')).state, 'done')
       /** Unkeyed work remains admissible after repeated keyed refusal without another store claim. */
@@ -104,7 +100,7 @@ it.each(['full', 'fingerprint'] as const)(
         ['success', 'success']
       )
       assert.equal(effects, 4)
-      assert.ok(failures.length >= 2, '[A62] store refusal remains observable')
+      assert.ok(failures.length >= 2, 'store refusal remains observable')
     } finally {
       for (const peer of peers) await peer.close()
       carrier.close()

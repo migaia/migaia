@@ -4,9 +4,9 @@ export const UtilsErrorCode = {
    * A caller passed an argument outside its documented domain: a non-finite or negative delay or
    * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine
    * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite
-   * non-negative number or overflows the virtual clock/shared absolute deadline (FP4), or a
-   * deferred callback/scheduler method that is not callable. The native `TypeError`/`RangeError`
-   * type is kept; the caller must fix the argument, retrying the same value fails again.
+   * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred
+   * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is
+   * kept; the caller must fix the argument, retrying the same value fails again.
    */
   invalidArgument: 'INVALID_ARGUMENT',
   /**
@@ -45,8 +45,8 @@ export const UtilsErrorCode = {
   errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',
   /**
    * An incoming serialized error tree or its plain data violates the configured field, scalar,
-   * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract (K289 and
-   * error-codes §3.4); callers correct the input or supply their boundary's owning strategy.
+   * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers
+   * correct the input or supply their boundary's owning strategy.
    */
   errorChainInvalid: 'ERROR_CHAIN_INVALID',
   /**

@@ -16,7 +16,7 @@ function bucketWidth(value: number, boundaries: readonly number[]): number {
   return boundaries[boundaries.length - 1]!
 }
 
-describe('collector A2 statistics', () => {
+describe('collector statistics', () => {
   it('counts 1,000 settlements and each failure class independently of eviction, then clears all state', () => {
     /** Four retained views cannot contain the complete statistics fixture. */
     const devtools = createRpcDevtools({ maxEvents: 4 })
@@ -92,7 +92,7 @@ describe('collector A2 statistics', () => {
   })
 })
 
-it('[closure A6 revision 2] merges cold intern-overflow pairs before histogram quantiles', () => {
+it('merges cold intern-overflow pairs before histogram quantiles', () => {
   /**
    * Endpoint and first method exhaust this table; later raw methods share the public overflow
    * identity.

@@ -40,7 +40,7 @@ function memoryStore(
 }
 
 describe('store-ssr audit regressions', () => {
-  it('SSR-D01 rejects Store admission when pending hydration closes the scope', async () => {
+  it('rejects Store admission when pending hydration closes the scope', async () => {
     /** Pending hydration is genuine scope state entered through its public API. */
     const scope = createSSRRequestScope()
     scope.hydrate({ version: 1, stores: { app: { count: 1 } } })
@@ -60,7 +60,7 @@ describe('store-ssr audit regressions', () => {
     }
   })
 
-  it('SSR-D01 applies the same post-hydration admission check to a real Resource', async () => {
+  it('applies the same post-hydration admission check to a real Resource', async () => {
     /** This actual Resource cache snapshot is pending before its candidate is registered. */
     const scope = createSSRRequestScope()
     scope.hydrate({
@@ -95,7 +95,7 @@ describe('store-ssr audit regressions', () => {
   })
 
   it.each(['async', 'sync'] as const)(
-    'SSR-D02 shares completion during %s disposal and waits for every cleanup',
+    'shares completion during %s disposal and waits for every cleanup',
     async (entry) => {
       /** These complete Store ports use the actual scope Runtime and cleanup accounting. */
       const scope = createSSRRequestScope()
@@ -138,41 +138,38 @@ describe('store-ssr audit regressions', () => {
     }
   )
 
-  it.each([0, 10])(
-    'SSR-D03 excludes already settled resources from a %sms timeout',
-    async (timeoutMs) => {
-      /** Both resources are canonical Resource instances; only the second loader remains pending. */
-      const scope = createSSRRequestScope()
-      /** A successful cache entry is explicitly settled before the SSR wait begins. */
-      const ready = new Resource(async () => 7, scope.runtime, { ttl: 60_000 })
-      await ready.promise
-      /** Pending native work has no fabricated state or readonly result mutation. */
-      const pending = new Resource(() => new Promise<never>(() => {}), scope.runtime)
-      scope.registerResource('ready', ready)
-      scope.registerResource('pending', pending)
-      /** Record exactly the failure keys/code at the public reporting boundary. */
-      const failures: Array<{ key: string; error: unknown }> = []
-      try {
-        /** The successful cache remains eligible for dehydration even when the other item times out. */
-        const state = await scope.dehydrateAsync({
-          timeoutMs,
-          onResourceError: (failure) => {
-            failures.push(failure)
-          }
-        })
-        expect(failures.map((failure) => failure.key)).toEqual(['pending'])
-        expect(failures[0]?.error).toMatchObject({
-          source: '@migaia/store-ssr',
-          code: 'RESOURCE_TIMEOUT'
-        })
-        expect(state.resources?.ready.data).toBe(7)
-      } finally {
-        await scope.disposeAsync()
-      }
+  it.each([0, 10])('excludes already settled resources from a %sms timeout', async (timeoutMs) => {
+    /** Both resources are canonical Resource instances; only the second loader remains pending. */
+    const scope = createSSRRequestScope()
+    /** A successful cache entry is explicitly settled before the SSR wait begins. */
+    const ready = new Resource(async () => 7, scope.runtime, { ttl: 60_000 })
+    await ready.promise
+    /** Pending native work has no fabricated state or readonly result mutation. */
+    const pending = new Resource(() => new Promise<never>(() => {}), scope.runtime)
+    scope.registerResource('ready', ready)
+    scope.registerResource('pending', pending)
+    /** Record exactly the failure keys/code at the public reporting boundary. */
+    const failures: Array<{ key: string; error: unknown }> = []
+    try {
+      /** The successful cache remains eligible for dehydration even when the other item times out. */
+      const state = await scope.dehydrateAsync({
+        timeoutMs,
+        onResourceError: (failure) => {
+          failures.push(failure)
+        }
+      })
+      expect(failures.map((failure) => failure.key)).toEqual(['pending'])
+      expect(failures[0]?.error).toMatchObject({
+        source: '@migaia/store-ssr',
+        code: 'RESOURCE_TIMEOUT'
+      })
+      expect(state.resources?.ready.data).toBe(7)
+    } finally {
+      await scope.disposeAsync()
     }
-  )
+  })
 
-  it('SSR-D04 reads the client payload through the complete explicitly injected document port', () => {
+  it('reads the client payload through the complete explicitly injected document port', () => {
     /** Runtime-neutral decoding reads this complete structural host instead of a hidden global DOM. */
     const text = serializeSSRState({ version: 1, stores: { app: { count: 7 } } })
     expect(
@@ -186,7 +183,7 @@ describe('store-ssr audit regressions', () => {
   })
 
   it.each(['version', 'stores', 'resources'] as const)(
-    'SSR-D05 codes an inaccessible %s without replacing the native error',
+    'codes an inaccessible %s without replacing the native error',
     (key) => {
       /** This native application error must keep its original class and exact identity. */
       const original = new TypeError('state getter failed')
@@ -203,7 +200,7 @@ describe('store-ssr audit regressions', () => {
     }
   )
 
-  it('SSR-D05 keeps native JSON SyntaxError while adding the invalid-state-script identity', () => {
+  it('keeps native JSON SyntaxError while adding the invalid-state-script identity', () => {
     expect(() => deserializeSSRState('{')).toThrow(SyntaxError)
     expect(() => deserializeSSRState('{')).toThrow(
       expect.objectContaining({ source: '@migaia/store-ssr', code: 'INVALID_STATE_SCRIPT' })

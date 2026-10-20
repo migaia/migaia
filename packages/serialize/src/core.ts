@@ -4,9 +4,9 @@
  *
  * Core's lifecycle dependency is limited to the cancellation leaf `@migaia/lifecycle/abort`. Timers
  * use an injected `scheduler`; encoding uses injected `ITextEncoder` and `ITextDecoder`
- * capabilities (R-4). This entry does not reexport the registry, which depends on other lifecycle
- * leaves. Packed consumers retain the required abort dependency closure and tree-shake unrelated
- * lifecycle modules.
+ * capabilities. This entry does not reexport the registry, which depends on other lifecycle leaves.
+ * Packed consumers retain the required abort dependency closure and tree-shake unrelated lifecycle
+ * modules.
  */
 export {
   SERIALIZE_TYPE_PATTERN,

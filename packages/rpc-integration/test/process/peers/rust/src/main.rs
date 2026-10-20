@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 const MAX_FRAME: usize = 16_777_216;
 const MAX_HANDSHAKE: usize = 65_536;
-/// Every real session uses the U36 directory and native physical batch baseline.
+/// Every real session uses the runtime-baseline directory and native physical batch baseline.
 const CAPABILITIES: [&str; 6] = [
     "abort@1",
     "ping@1",

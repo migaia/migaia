@@ -13,7 +13,7 @@ import type { IThreadWebPort } from '@migaia/rpc-threads'
 /** The genuine Worker reports native bytes through its own parentPort. */
 const entry = fileURLToPath(new URL('./fixtures/transfer-echo-worker.mjs', import.meta.url))
 
-it('[A86] original Node launcher/channel forwards the transfer list to a real Worker', async () => {
+it('original Node launcher/channel forwards the transfer list to a real Worker', async () => {
   const handle = await createNodeThreadLauncher().launch(
     { entry },
     { signal: new AbortController().signal }
@@ -33,7 +33,7 @@ it('[A86] original Node launcher/channel forwards the transfer list to a real Wo
     assert.equal(
       backing.byteLength,
       0,
-      '[A86] the parent shim must pass the real original list to Worker.postMessage'
+      'the parent shim must pass the real original list to Worker.postMessage'
     )
     assert.deepEqual(await message, { bytes: [9, 1, 2, 8], length: 4 })
   } finally {
@@ -44,7 +44,7 @@ it('[A86] original Node launcher/channel forwards the transfer list to a real Wo
   }
 })
 
-it('[A86] EventTarget thread adaptation forwards transfer to the actual native postMessage boundary', async () => {
+it('EventTarget thread adaptation forwards transfer to the actual native postMessage boundary', async () => {
   const ports = new MessageChannel()
   const message = new Promise<unknown>((resolve) => ports.port2.once('message', resolve))
   const port = threadWebPort(ports.port1 as unknown as IThreadWebPort)
@@ -54,7 +54,7 @@ it('[A86] EventTarget thread adaptation forwards transfer to the actual native p
     assert.equal(
       backing.byteLength,
       0,
-      '[A86] EventTarget adaptation must not erase an explicit original transfer list'
+      'EventTarget adaptation must not erase an explicit original transfer list'
     )
     const value = await message
     assert.ok(value instanceof ArrayBuffer)

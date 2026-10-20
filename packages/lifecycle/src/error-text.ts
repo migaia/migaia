@@ -54,8 +54,8 @@ export const LifecycleErrorText = {
   /**
    * Explains that the `report`/`firstError` error policy was chosen without a `report` callback.
    * Thrown at creation by `createErrorCollector`, `createDisposeTransaction`,
-   * `createLifecycleScope` and `createSyncLifecycleScope` (X2=a) instead of silently dropping the
-   * failures later.
+   * `createLifecycleScope` and `createSyncLifecycleScope` instead of silently dropping the failures
+   * later.
    */
   errorPolicyReporterMissing:
     '[lifecycle] errorPolicy "report" and "firstError" require a report callback',

@@ -98,8 +98,8 @@ const t09 = result.t09.medians
 /** Full 1k -> 8k growth ratio used by the stable scaling oracle. */
 const overallScalingRatio = scaling.at(-1).median / scaling[0].median
 if (t09.coldTrusted > t09.generic * 1.1 || t09.warmTrusted > t09.generic * 0.8)
-  throw new Error('PHV3-T09 performance oracle failed')
+  throw new Error('admission performance oracle failed')
 // Compare the complete 1k -> 8k interval. Adjacent sub-millisecond samples are
 // too sensitive to scheduler noise, while 10x still caps 8x growth at 25% overhead.
-if (overallScalingRatio > 10) throw new Error('PHV3-T10 scaling oracle failed')
+if (overallScalingRatio > 10) throw new Error('admission scaling oracle failed')
 console.log(JSON.stringify({ ...result, t10OverallRatio: overallScalingRatio }))

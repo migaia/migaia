@@ -101,9 +101,9 @@ export type IResourceOptions<T = unknown> = {
   /** SSR/persisted success cache used before optional revalidation. */
   initialSnapshot?: IResourceCacheSnapshot<T>
   /**
-   * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays
-   * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to utils/scheduler `systemScheduler`.
-   * Missing host capabilities fail immediately instead of silently falling back to microtasks.
+   * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays. Defaults to
+   * utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of
+   * silently falling back to microtasks.
    */
   scheduler?: IScheduler
 }
@@ -1168,7 +1168,7 @@ export class Resource<T> implements IObserver, IDisposable {
       if (cancellationError) throw cancellationError
       return
     }
-    // AF-07 / AL-02: an in-flight SWR refresh was superseded. Keep the stale success data visible
+    // An in-flight SWR refresh was superseded. Keep the stale success data visible
     // but clear `refreshing` so `fetchStatus === 'idle'` and `refreshing === false` stay consistent
     // instead of leaving a permanent `refreshing: true` with no current request.
     if (current.status === ResourceStatus.success && current.refreshing === true) {

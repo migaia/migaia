@@ -16,7 +16,7 @@ import {
 } from '../src/object.js'
 
 describe('function and object primitives', () => {
-  it('U-C04 reserves the manual scheduler for the explicit testing entry', async () => {
+  it('reserves the manual scheduler for the explicit testing entry', async () => {
     expect(Object.hasOwn(utils, 'createManualScheduler')).toBe(false)
     /** The dedicated entry retains the existing deterministic scheduler behavior. */
     const testing = await import('../src/testing.js')

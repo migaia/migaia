@@ -34,7 +34,7 @@ function hostileSignal(cause: unknown, initialAborted = false) {
   }
 }
 
-describe('A3 utils abort reason policy', () => {
+describe('utils abort reason policy', () => {
   it('uses a getter failure as the reason for event and pre-aborted races', async () => {
     const cause = new Error('reason getter')
     const later = hostileSignal(cause)

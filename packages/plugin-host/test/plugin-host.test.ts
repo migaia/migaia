@@ -75,7 +75,7 @@ const plugin = (
   extra: Record<string, unknown> = {}
 ) => ({ name, install, ...extra }) as never
 
-/** Moved from round30.test.ts (BZ05): overrides disposal error translation for PH-R41. */
+/** Overrides disposal error translation. */
 class TranslatingHost extends PluginHost<Record<string, never>> {
   readonly translations = vi.fn()
 
@@ -94,12 +94,12 @@ class TranslatingHost extends PluginHost<Record<string, never>> {
 }
 
 describe('PluginHost', () => {
-  it('YS23: keeps object extension members named install and expose while rejecting the legacy function sentinel', async () => {
+  it('keeps object extension members named install and expose while rejecting the legacy function sentinel', async () => {
     const object = definePlugin({
-      name: 'ys23-object',
+      name: 'fixture-object',
       install: () => ({ install: true, expose: true })
     })
-    const legacySentinel = definePlugin('ys23-legacy-sentinel', () => ({ legacy: true }) as never)
+    const legacySentinel = definePlugin('legacy-sentinel', () => ({ legacy: true }) as never)
     const host = new FeatureHost()
     const [handle] = await host.use(object)
     expect(handle.extensions).toMatchObject({ install: true, expose: true })
@@ -110,7 +110,7 @@ describe('PluginHost', () => {
     await host.dispose()
   })
 
-  it('YS25: captures one descriptor per registration and forwards only its declared hooks', async () => {
+  it('captures one descriptor per registration and forwards only its declared hooks', async () => {
     let descriptorCalls = 0
     let installCalls = 0
     let exposeCalls = 0
@@ -136,7 +136,7 @@ describe('PluginHost', () => {
   })
 
   it('rejects descriptor expose collisions without invoking callback results as hooks', async () => {
-    // @ts-expect-error YS28 rejects overlapping install/expose Host projections statically.
+    // @ts-expect-error rejects overlapping install/expose Host projections statically.
     const plugin = definePlugin('descriptor-collision', () => ({
       install: () => ({ duplicate: 1 }),
       expose: () => ({ duplicate: 2 })
@@ -146,7 +146,7 @@ describe('PluginHost', () => {
     })
   })
 
-  it('YS25: rejects Feature-core reads from a descriptor before Feature initialization', async () => {
+  it('rejects Feature-core reads from a descriptor before Feature initialization', async () => {
     const plugin = definePlugin('early-feature-read', (core) => {
       void (core as unknown as { readonly features: object }).features
       return { install: () => ({}) }
@@ -159,7 +159,7 @@ describe('PluginHost', () => {
     })
   })
 
-  it('YS25: initializes Feature output after descriptor featureExpose and before install', async () => {
+  it('initializes Feature output after descriptor featureExpose and before install', async () => {
     const feature = defineFeature<
       { readonly read: () => number },
       Record<never, never>,
@@ -450,10 +450,10 @@ describe('PluginHost', () => {
 
   it('fails closed when a duplicate module instance reads a genuine Host node', async () => {
     const producerModule = await import(
-      new URL('../src/host-runtime.js?round20-producer', import.meta.url).href
+      new URL('../src/host-runtime.js?producer', import.meta.url).href
     )
     const foreignModule = await import(
-      new URL('../src/host-runtime.js?round20-foreign', import.meta.url).href
+      new URL('../src/host-runtime.js?foreign', import.meta.url).href
     )
     const DuplicateHost = class extends producerModule.PluginHost {
       constructor() {
@@ -1000,7 +1000,7 @@ describe('PluginHost', () => {
     expect(() => host.config.get('config-facade.enabled')).toThrow(PluginHostError)
   })
 
-  it('keeps the original construct error as primary and reports a rollback failure via diagnostic (M-T44/L-T39)', async () => {
+  it('keeps the original construct error as primary and reports a rollback failure via diagnostic', async () => {
     const diagnostics: Array<{ message: string; code?: string }> = []
     const host = new Host({
       diagnostic: (message: string, code?: string) => diagnostics.push({ message, code })
@@ -1121,7 +1121,7 @@ describe('PluginHost', () => {
     release()
   })
 
-  it('YS11 cause chain: captured Feature expose revocation keeps declared code and text', async () => {
+  it('cause chain: captured Feature expose revocation keeps declared code and text', async () => {
     const feature = defineFeature<{ readonly read: () => number }>((core) => ({
       read: core.featureExpose.read as () => number
     }))
@@ -1148,7 +1148,7 @@ describe('PluginHost', () => {
     )
   })
 
-  it('YS12 thenable install result: async path reports INSTALL_RESULT_THENABLE', async () => {
+  it('thenable install result: async path reports INSTALL_RESULT_THENABLE', async () => {
     // oxlint-disable-next-line unicorn/no-thenable -- contract requires an own then install result.
     const thenable = Object.defineProperty({}, 'then', {
       value: (resolve: (value: unknown) => void) => resolve({})
@@ -1160,7 +1160,7 @@ describe('PluginHost', () => {
     ).rejects.toMatchObject({ cause: { code: 'INSTALL_RESULT_THENABLE' } })
   })
 
-  it('YS12 thenable install result: sync path reports INSTALL_RESULT_THENABLE', () => {
+  it('thenable install result: sync path reports INSTALL_RESULT_THENABLE', () => {
     // oxlint-disable-next-line unicorn/no-thenable -- contract requires an own then install result.
     const thenable = Object.defineProperty({}, 'then', {
       value: (resolve: (value: unknown) => void) => resolve({})
@@ -1454,7 +1454,7 @@ describe('PluginHost', () => {
     await host.use(plugin('allowed-finally', () => ({ finally: () => undefined })))
   })
 
-  it('YS24: preflights an entire batch before running install', async () => {
+  it('preflights an entire batch before running install', async () => {
     let installed = 0
     const host = new Host()
     const first = plugin('first', () => {
@@ -1718,7 +1718,7 @@ describe('PluginHost', () => {
     await closing
   })
 
-  it('PH-T07a: propagates exact HOST_DISPOSING from an async entry guard', async () => {
+  it('propagates exact HOST_DISPOSING from an async entry guard', async () => {
     const host = new Host({ pipeline: { mode: 'async' } })
     let started: (() => void) | undefined
     let release: (() => void) | undefined
@@ -1962,9 +1962,9 @@ describe('PluginHost', () => {
   })
 })
 
-describe('PH-R41: canonical disposal error transformation', () => {
+describe('canonical disposal error transformation', () => {
   it('preserves the base error identity and transforms only at the sole disposal Promise', async () => {
-    const raw = new Error('round41 disposer')
+    const raw = new Error('disposer failure')
     const install = (core: { onDispose: (dispose: () => void) => void }) => {
       core.onDispose(() => {
         throw raw
@@ -1973,14 +1973,14 @@ describe('PH-R41: canonical disposal error transformation', () => {
     }
 
     const base = new Host()
-    await base.use({ name: 'round41-base', install } as never)
+    await base.use({ name: 'base', install } as never)
     const baseResult = await base.dispose()
     expect(baseResult.logicalTerminal).toBe(true)
     expect(baseResult.cleanupComplete).toBe(true)
     expect((baseResult.cleanupErrors[0] as { readonly cause?: unknown }).cause).toBe(raw)
 
     const translating = new TranslatingHost()
-    await translating.use({ name: 'round41-translating', install } as never)
+    await translating.use({ name: 'translating', install } as never)
     const first = translating.dispose()
     expect(translating.dispose()).toBe(first)
     const translated = await first

@@ -66,9 +66,8 @@ export type IRpcProbeDefinition = Readonly<{
 
 /**
  * Frozen public handle retains compiled filters while private stage updates can pause or resume it.
- * Standalone stageMask is a getter; a host's data field retains its initial compiled mask (D7).
- * Emitters read private state once at installation and use their own fixed-shape records
- * thereafter.
+ * Standalone stageMask is a getter; a host's data field retains its initial compiled mask. Emitters
+ * read private state once at installation and use their own fixed-shape records thereafter.
  */
 export type IRpcProbe = Readonly<{
   readonly stageMask: number

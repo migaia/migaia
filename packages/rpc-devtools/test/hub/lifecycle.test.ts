@@ -9,7 +9,7 @@ import {
 import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '../../src/hub/index.js'
 import { deferred, drain, event, fakeTarget, until } from './helpers.js'
 
-describe('hub A4 lifecycle', () => {
+describe('hub lifecycle', () => {
   it('awaits pending removal cleanup when its removed-status listener reenters close', async () => {
     /** Iterator release stays pending while the status callback initiates hub-wide close. */
     const gate = deferred<void>()

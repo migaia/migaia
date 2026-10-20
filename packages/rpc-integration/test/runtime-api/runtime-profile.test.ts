@@ -6,7 +6,7 @@ import { RpcError, RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.j
 import { serializeRpcError } from '@migaia/rpc-contract'
 import { RpcCoreErrorText } from '../../../rpc-core/dist/core/error-text.js'
 
-it('[A69][A73] failed read-only lookup returns an exact same-task terminal error without fabricating an outcome', () => {
+it('failed read-only lookup returns an exact same-task terminal error without fabricating an outcome', () => {
   /** The original error chain is serialized by the existing package boundary owner. */
   const failure = serializeRpcError(
     new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported),
@@ -22,7 +22,7 @@ it('[A69][A73] failed read-only lookup returns an exact same-task terminal error
     operation: 'terminal',
     completion: { ok: false, error: failure }
   }
-  assert.deepEqual(parser()(value), value, '[A69] lookup failure must settle its original query')
+  assert.deepEqual(parser()(value), value, 'lookup failure must settle its original query')
   assert.throws(() => parser()({ ...value, completion: { ok: true } }), {
     code: 'INVALID_ENVELOPE'
   })
@@ -31,14 +31,14 @@ it('[A69][A73] failed read-only lookup returns an exact same-task terminal error
   })
 })
 
-it('[A73][A74] the new profile schema and independent vectors share the same closed contract', () => {
+it('the new profile schema and independent vectors share the same closed contract', () => {
   /** Existence is asserted before reading so absence is a semantic RED, not a loader failure. */
   const path = new URL('../../../rpc-contract/schema/runtime-api.schema.json', import.meta.url)
-  assert.equal(existsSync(path), true, '[A74] runtime union has its owning wire schema')
+  assert.equal(existsSync(path), true, 'runtime union has its owning wire schema')
   const schema = JSON.parse(readFileSync(path, 'utf8'))
   assert.equal(schema.$id, 'migaia.rpc.runtime-api/1')
   const vectorPath = new URL('../../schema/vectors/runtime-api.json', import.meta.url)
-  assert.equal(existsSync(vectorPath), true, '[A74] new union has independent normative vectors')
+  assert.equal(existsSync(vectorPath), true, 'new union has independent normative vectors')
   const vectors = JSON.parse(readFileSync(vectorPath, 'utf8')) as {
     valid: unknown[]
     invalid: unknown[]
@@ -47,12 +47,12 @@ it('[A73][A74] the new profile schema and independent vectors share the same clo
   for (const value of vectors.invalid) assert.throws(() => parser()(value))
 })
 
-it('[A73] each requested operation requires every actual capability without filling an offer closure', () => {
+it('each requested operation requires every actual capability without filling an offer closure', () => {
   const required = Reflect.get(contract, 'runtimeOperationCapabilities')
   assert.equal(
     typeof required,
     'function',
-    '[A73] the contract owns one exact capability dependency table'
+    'the contract owns one exact capability dependency table'
   )
   for (const [mode, options, expected] of [
     ['request', {}, ['runtime-api@1', 'generation@1']],
@@ -76,11 +76,7 @@ it('[A73] each requested operation requires every actual capability without fill
 /** The existing contract entry permits a semantic RED before the new parser is implemented. */
 function parser(): (value: unknown) => unknown {
   const normalize = Reflect.get(contract, 'normalizeRuntimeEnvelope')
-  assert.equal(
-    typeof normalize,
-    'function',
-    '[A73][A75] the contract owns the complete runtime union'
-  )
+  assert.equal(typeof normalize, 'function', 'the contract owns the complete runtime union')
   return normalize
 }
 
@@ -106,7 +102,7 @@ function common(mode = 'request') {
   }
 }
 
-it('[A62][A68][A73][A75] correlated group terminals reject contradictory outcomes and cannot resume after failure', () => {
+it('correlated group terminals reject contradictory outcomes and cannot resume after failure', () => {
   /** A genuine serialized provider failure is the same graph admitted by production completion. */
   const failure = serializeRpcError(
     new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported),
@@ -172,7 +168,7 @@ it('[A62][A68][A73][A75] correlated group terminals reject contradictory outcome
     assert.throws(() => normalize(value), { code: 'INVALID_ENVELOPE' })
 })
 
-it('[A73][A75] the four closed runtime envelopes preserve their distinct task and completion semantics', () => {
+it('the four closed runtime envelopes preserve their distinct task and completion semantics', () => {
   const normalize = parser()
   for (const value of [
     { ...common(), kind: 'runtime-call', options: {}, payload: 42 },
@@ -207,11 +203,11 @@ it('[A73][A75] the four closed runtime envelopes preserve their distinct task an
   assert.equal(
     Object.hasOwn(withoutResult.completion, 'result'),
     false,
-    '[A75] undefined completion is omitted, never replaced by null'
+    'undefined completion is omitted, never replaced by null'
   )
 })
 
-it('[A73][A75] wrong variants, unknown fields and fake execution fences are rejected before an owner can execute', () => {
+it('wrong variants, unknown fields and fake execution fences are rejected before an owner can execute', () => {
   const normalize = parser()
   const call = { ...common(), kind: 'runtime-call', options: {} }
   for (const value of [
@@ -264,22 +260,18 @@ it('[A73][A75] wrong variants, unknown fields and fake execution fences are reje
     })
   }
   assert.throws(() => normalize(hostile), { code: 'INVALID_ENVELOPE' })
-  assert.equal(reads, 0, '[A75] closed metadata grammar never executes a getter')
+  assert.equal(reads, 0, 'closed metadata grammar never executes a getter')
 })
 
-it('[A64][A74] carrier selection preserves the original object, string or byte representation without decoding protected content', () => {
+it('carrier selection preserves the original object, string or byte representation without decoding protected content', () => {
   /**
    * RED reads existing exports so a missing implementation is an assertion rather than import
    * failure.
    */
   const wrap = Reflect.get(contract, 'wrapRuntimeCarrier')
   const read = Reflect.get(contract, 'readRuntimeCarrier')
-  assert.equal(
-    typeof wrap,
-    'function',
-    '[A64][A74] original sender has one runtime carrier grammar'
-  )
-  assert.equal(typeof read, 'function', '[A74] canonical ingress reads the same selector')
+  assert.equal(typeof wrap, 'function', 'original sender has one runtime carrier grammar')
+  assert.equal(typeof read, 'function', 'canonical ingress reads the same selector')
   for (const frame of [{ protected: 'opaque' }, 'signed:opaque', new Uint8Array([0, 1, 255])]) {
     const carrier = wrap(frame)
     const selected = read(carrier)
@@ -300,7 +292,7 @@ it('[A64][A74] carrier selection preserves the original object, string or byte r
     }
   })
   assert.throws(() => read(hostile), { code: 'INVALID_ENVELOPE' })
-  assert.equal(reads, 0, '[A74] selector inspection cannot execute a frame getter')
+  assert.equal(reads, 0, 'selector inspection cannot execute a frame getter')
   assert.throws(() => read({ kind: 'rpc.runtime-api.v1', frame: {}, task: {} }), {
     code: 'INVALID_ENVELOPE'
   })

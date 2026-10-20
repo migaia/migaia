@@ -213,7 +213,7 @@ describe('outbound sender encoded type boundary', () => {
       createProtect: (): IRpcAuthenticationTransform => () => 42
     }
   ])(
-    'H-T18 classifies unchunked authentication $label as AUTHENTICATION_FAILED',
+    'classifies unchunked authentication $label as AUTHENTICATION_FAILED',
     async ({ label, createProtect }) => {
       const cause = new Error(`authentication ${label}`)
       let sends = 0
@@ -595,7 +595,7 @@ describe('outbound sender encoded type boundary', () => {
     await expect(pipeline.send(canonicalRequest())).rejects.toMatchObject({ code: 'TRANSPORT' })
   })
 
-  it('HR-T01 waits for every selected frame send to settle before rejecting', async () => {
+  it('waits for every selected frame send to settle before rejecting', async () => {
     let sendCount = 0
     let rejectFirst: ((error: unknown) => void) | undefined
     let resolveSecond: (() => void) | undefined
@@ -639,7 +639,7 @@ describe('outbound sender encoded type boundary', () => {
     })
   })
 
-  it('HR-T02 retains a selected-framer failure as the primary sender cause', () => {
+  it('retains a selected-framer failure as the primary sender cause', () => {
     const frameError = new Error('frame encode failed')
     let encodes = 0
     let sends = 0

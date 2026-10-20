@@ -10,7 +10,7 @@ function sourceFiles(directory: string): string[] {
   })
 }
 
-describe('A9 abort reason read convergence', () => {
+describe('abort reason read convergence', () => {
   it('uses the shared guarded read at every owned reason site', () => {
     const repository = join(import.meta.dirname, '../../..')
     const files = [

@@ -33,7 +33,7 @@ function rtcChannel() {
 }
 
 describe('browser native transport error identity', () => {
-  it('[A4] tags an already closed RTC channel with the original native text', () => {
+  it('tags an already closed RTC channel with the original native text', () => {
     const transport = createRtcDataChannelTransport({
       readyState: 'closed',
       send() {},
@@ -51,7 +51,7 @@ describe('browser native transport error identity', () => {
     expect((observed[0] as Error).constructor).toBe(Error)
   })
 
-  it('[A4] tags a WebTransport datagram EOF', async () => {
+  it('tags a WebTransport datagram EOF', async () => {
     let reader!: ReadableStreamDefaultController<Uint8Array>
     const transport = createWebTransportDatagramTransport({
       readable: new ReadableStream<Uint8Array>({
@@ -75,7 +75,7 @@ describe('browser native transport error identity', () => {
     await transport.close?.()
   })
 
-  it('[A4] converts a non-Error RTC terminal event to a tagged native Error', () => {
+  it('converts a non-Error RTC terminal event to a tagged native Error', () => {
     const fixture = rtcChannel()
     const transport = createRtcDataChannelTransport(fixture.channel)
     const observed: unknown[] = []
@@ -90,7 +90,7 @@ describe('browser native transport error identity', () => {
     expect(aggregate.errors[0].constructor).toBe(Error)
   })
 
-  it('[A4] preserves a hostile Worker message read as cause of the native error', () => {
+  it('preserves a hostile Worker message read as cause of the native error', () => {
     const listeners = new Map<string, (event: Event) => void>()
     const transport = createWebWorkerTransport({
       postMessage() {},
@@ -118,7 +118,7 @@ describe('browser native transport error identity', () => {
     })
   })
 
-  it('[A4] tags SharedWorker messageerror and both Worker failure events', () => {
+  it('tags SharedWorker messageerror and both Worker failure events', () => {
     const listeners = new Map<string, (event: Event) => void>()
     const port = {
       postMessage() {},
@@ -150,7 +150,7 @@ describe('browser native transport error identity', () => {
     }
   })
 
-  it('[A10] tags an extensible RTC error once and replays that same object', () => {
+  it('tags an extensible RTC error once and replays that same object', () => {
     const fixture = rtcChannel()
     const transport = createRtcDataChannelTransport(fixture.channel)
     const original = new Error('terminal failure')
@@ -172,7 +172,7 @@ describe('browser native transport error identity', () => {
   it.each([
     Object.freeze(new Error('frozen terminal')),
     new DOMException('dom terminal', 'OperationError')
-  ])('[A10] wraps an untaggable RTC error and retains its cause', (original) => {
+  ])('wraps an untaggable RTC error and retains its cause', (original) => {
     const fixture = rtcChannel()
     const transport = createRtcDataChannelTransport(fixture.channel)
     const received: unknown[] = []

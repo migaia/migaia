@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { RPC_STREAM_MAX_FRAME_BYTES } from '@migaia/rpc-contract/framing/stream'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
 
-describe('[A5] canonical raw physical frame boundaries', () => {
+describe('canonical raw physical frame boundaries', () => {
   it('accepts exact 16 MiB Content-Length; rejects +1 before retaining body', () => {
     /** JSON quotes count toward the physical Content-Length budget. */
     const body = 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES - 2)

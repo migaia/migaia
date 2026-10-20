@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { observeAbortSubscription } from '../src/observed-subscription.js'
 
-describe('A5 lifecycle abort listener reason policy', () => {
+describe('lifecycle abort listener reason policy', () => {
   it.each([false, true])(
     'reports before callback and contains a throwing sink (%s)',
     (sinkThrows) => {

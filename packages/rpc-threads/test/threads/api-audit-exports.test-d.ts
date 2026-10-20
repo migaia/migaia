@@ -3,17 +3,17 @@ import type {
   IWebThreadHandle,
   IWebThreadLauncherOptions
 } from '@migaia/rpc-threads'
-// @ts-expect-error C01 removes the redundant Bun subpath; use the root Web factories.
+// @ts-expect-error removes the redundant Bun subpath; use the root Web factories.
 import type { createBunThreadLauncher } from '@migaia/rpc-threads/adapters/bun'
-// @ts-expect-error C01 removes the redundant Deno subpath; use the root Web factories.
+// @ts-expect-error removes the redundant Deno subpath; use the root Web factories.
 import type { createDenoThreadLauncher } from '@migaia/rpc-threads/adapters/deno'
-// @ts-expect-error C01 removes the redundant browser subpath; use the root Web factories.
+// @ts-expect-error removes the redundant browser subpath; use the root Web factories.
 import type { createBrowserThreadLauncher } from '@migaia/rpc-threads/adapters/browser'
-// @ts-expect-error C01 removes the redundant renderer subpath; use the root Web factories.
+// @ts-expect-error removes the redundant renderer subpath; use the root Web factories.
 import type { createElectronRendererThreadLauncher } from '@migaia/rpc-threads/adapters/electron-renderer'
-// @ts-expect-error C02 retains one public import location for this handle type at the root.
+// @ts-expect-error retains one public import location for this handle type at the root.
 import type { INodeThreadHandle as IRetiredNodeHandle } from '@migaia/rpc-threads/adapters/node'
-// @ts-expect-error C02 retains one public import location for this handle type at the root.
+// @ts-expect-error retains one public import location for this handle type at the root.
 import type { INodeThreadHandle as IRetiredElectronHandle } from '@migaia/rpc-threads/adapters/electron-main'
 
 /** Canonical types remain available while every retired import is used by the compiler oracle. */

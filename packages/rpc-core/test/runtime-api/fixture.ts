@@ -35,7 +35,7 @@ export const RUNTIME_API_FIXTURE_BASE_CAPABILITIES = Object.freeze([
 /** Native fixture messages are local test data, with one owner and unchanged RED spellings. */
 export const RuntimeApiFixtureText = {
   /** Tests the result wrapper's preservation of its child summary secret boundary. */
-  resultGetterFailure: 'a7-private-result-marker',
+  resultGetterFailure: 'private-result-marker',
   /** Distinguishes local cancellation after a notify send has already completed. */
   postCommitCancellation: 'post-commit fixture cancellation',
   /** This native business cause must keep its original name, message and stack. */
@@ -51,16 +51,19 @@ export const RuntimeApiFixtureText = {
   /** Native caller cancellation during asynchronous signing must not become a transport failure. */
   signingAbort: 'signing cancellation fixture',
   /** A notify business rejection is independent from successful physical send completion. */
-  notifyFailure: 'a5-notify-business-rejection',
+  notifyFailure: 'notify-business-rejection',
   /** Ordered native children prove AggregateError.errors transfer rather than only a cause chain. */
-  aggregateType: 'a10-aggregate-type',
+  aggregateType: 'aggregate-type',
   /** The second native child must retain its distinct identity and serialized stack. */
-  aggregateRange: 'a10-aggregate-range',
+  aggregateRange: 'aggregate-range',
   /** The aggregate's message and original native type are retained in both directions. */
-  aggregateFailure: 'a10-aggregate-business-failure'
+  aggregateFailure: 'aggregate-business-failure'
 } as const
 
-/** The loaded legacy owner establishes the actual callable business baseline before C2 exists. */
+/**
+ * The loaded legacy owner establishes the actual callable business baseline before the new owner
+ * exists.
+ */
 export async function legacyEndpoint(
   id: string,
   transport: ReturnType<typeof createMemoryTransportPair>[number]

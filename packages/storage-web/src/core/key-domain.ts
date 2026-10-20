@@ -117,7 +117,7 @@ export const decodeFlatStorageKey = (
   } catch (error) {
     // 线材畸形（JSON 解析失败 / 形状非法）→ undefined，由调用方把损坏记录过滤掉。
     // 但「线材合法、域校验失败」的 `assertStorageKey` → StorageContractError(invalidKey) 必须冒泡，
-    // 不得被静默吞掉（SW-A11「解码结果走同一 validator」，违规键必须可观测而非隐形孤儿记录）。
+    // 不得被静默吞掉（解码结果走同一 validator，违规键必须可观测而非隐形孤儿记录）。
     if (error instanceof StorageContractError) throw error
     return undefined
   }

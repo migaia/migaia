@@ -9,7 +9,7 @@ import {
 /** Fixture reads remain on the canonical slot, with no test-created registry or index. */
 type IQueryFixture = Readonly<{ values(): readonly object[]; registered(): readonly object[] }>
 
-it('[A41/A42] registered cold metadata survives ready withdrawal and retires with its registration', async () => {
+it('registered cold metadata survives ready withdrawal and retires with its registration', async () => {
   /** The actual frozen Host controls publication, rollback and final slot retirement. */
   const host = defineHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -53,7 +53,7 @@ it('[A41/A42] registered cold metadata survives ready withdrawal and retires wit
     expect(facade.values()).toEqual([{ value: 42 }])
     withdraw()
     expect(facade.values()).toEqual([])
-    expect(facade.registered(), '[A41] all registered includes non-ready native owner').toEqual([
+    expect(facade.registered(), 'all registered includes non-ready native owner').toEqual([
       metadata
     ])
     await host.unUse('query-member')

@@ -96,19 +96,19 @@ class AuditFailure extends Error {
 /** Repository root that owns the independent architecture command. */
 const repositoryRoot = resolve(import.meta.dirname, '..')
 
-/** Reviewed finite capability catalog required by SWV2-D42/T44. */
+/** Reviewed finite capability catalog for the bounded architecture audit. */
 const catalogPath = resolve(
   repositoryRoot,
   'packages/storage-web/test/fixtures/storage-v2-bounded-capability-catalog.json'
 )
 
-/** Permanent finite hostile mutations for the declared T44 failure surface. */
+/** Permanent finite hostile mutations for the declared failure surface. */
 const hostilePath = resolve(
   repositoryRoot,
-  'packages/storage-web/test/fixtures/storage-v2-bounded-t44-hostile.json'
+  'packages/storage-web/test/fixtures/storage-v2-bounded-hostile.json'
 )
 
-/** Exact hostile IDs, mutation kinds, and failure codes required by C2-R2 acceptance. */
+/** Exact hostile IDs, mutation kinds, and failure codes required by the audit acceptance. */
 const requiredHostileCaseContract = [
   ['unknown-route', 'catalog-route', 'UNKNOWN_CATALOG_ROUTE'],
   ['unknown-symbol', 'catalog-symbol', 'UNKNOWN_CATALOG_SYMBOL'],
@@ -124,17 +124,17 @@ const requiredHostileCaseContract = [
   ['namespace-reexport-dependency', 'append-module-source', 'MISSING_MANIFEST_DEPENDENCY'],
   ['named-reexport-unknown-symbol', 'append-module-source', 'UNKNOWN_WORKSPACE_SYMBOL'],
   ['import-type-unknown-route', 'append-module-source', 'UNKNOWN_WORKSPACE_ROUTE'],
-  ['red02-parallel-fanout', 'append-source', 'SWV2-RED02'],
-  ['red02-non-memory-backend', 'append-source', 'SWV2-RED02'],
-  ['red03-parallel-scheduler', 'append-source', 'SWV2-RED03'],
-  ['red07-parallel-timeout', 'append-source', 'SWV2-RED07'],
-  ['red10-instanceof-byte-boundary', 'append-source', 'SWV2-RED10']
+  ['parallel-listener-fanout', 'append-source', 'DUPLICATE_STORAGE_LISTENER_OWNER'],
+  ['listener-non-memory-backend', 'append-source', 'DUPLICATE_STORAGE_LISTENER_OWNER'],
+  ['parallel-reactive-scheduler', 'append-source', 'DUPLICATE_REACTIVE_SCHEDULER'],
+  ['parallel-operation-timeout', 'append-source', 'DUPLICATE_OPERATION_TIMEOUT'],
+  ['instanceof-byte-boundary', 'append-source', 'INSTANCEOF_BYTE_BOUNDARY']
 ] as const satisfies readonly (readonly [string, IHostileCase['kind'], string])[]
 
-/** Exact finite rule ownership, path scopes, and source patterns authorized by SWV2-D42. */
+/** Exact finite rule ownership, path scopes, and source patterns authorized by the audit. */
 const requiredTargetedRuleContract = [
   {
-    id: 'SWV2-RED02',
+    id: 'DUPLICATE_STORAGE_LISTENER_OWNER',
     packages: ['@migaia/storage-web'],
     pathPattern: '^src/backends/(?!index\\.ts$)[^/]+\\.ts$',
     sourcePatterns: [
@@ -143,13 +143,13 @@ const requiredTargetedRuleContract = [
     ]
   },
   {
-    id: 'SWV2-RED03',
+    id: 'DUPLICATE_REACTIVE_SCHEDULER',
     packages: ['@migaia/storage-web'],
     pathPattern: '^src/',
     sourcePatterns: ['class\\s+StorageReactiveScheduler', 'createStorageReactiveScheduler\\s*[=(]']
   },
   {
-    id: 'SWV2-RED07',
+    id: 'DUPLICATE_OPERATION_TIMEOUT',
     packages: ['@migaia/storage-web'],
     pathPattern: '^src/core/operation\\.ts$',
     sourcePatterns: [
@@ -158,7 +158,7 @@ const requiredTargetedRuleContract = [
     ]
   },
   {
-    id: 'SWV2-RED10',
+    id: 'INSTANCEOF_BYTE_BOUNDARY',
     packages: [
       '@migaia/serialize',
       '@migaia/storage-contract',
@@ -548,7 +548,7 @@ const deriveUsedNonCapabilityEdges = (
   )
 }
 
-/** Runs the finite D42 module/catalog/rule gate against immutable facts. */
+/** Runs the finite module/catalog/rule gate against immutable facts. */
 const audit = (
   workspace: ReadonlyMap<string, IWorkspacePackage>,
   facts: IAuditFacts,
@@ -695,15 +695,15 @@ const audit = (
       )
   }
 
-  /** RED02 rule whose path scope must cover every concrete backend source except the barrel. */
-  const red02Rule = catalog.targetedRules.find((rule) => rule.id === 'SWV2-RED02')!
+  /** Rule whose path scope must cover every concrete backend source except the barrel. */
+  const listenerOwnerRule = catalog.targetedRules.find((rule) => rule.id === 'DUPLICATE_STORAGE_LISTENER_OWNER')!
   /** Current finite backend source inventory derived independently from storage-web. */
   const backendPaths = [...(facts.sources.get('@migaia/storage-web')?.keys() ?? [])]
     .filter((path) => /^src\/backends\/[^/]+\.ts$/.test(path) && path !== 'src/backends/index.ts')
     .sort()
-  /** Backend files selected by the reviewed RED02 path expression. */
+  /** Backend files selected by the reviewed listener-owner path expression. */
   const reviewedBackendPaths = backendPaths.filter((path) =>
-    new RegExp(red02Rule.pathPattern).test(path)
+    new RegExp(listenerOwnerRule.pathPattern).test(path)
   )
   if (JSON.stringify(reviewedBackendPaths) !== JSON.stringify(backendPaths))
     throw new AuditFailure(
@@ -913,7 +913,7 @@ const runHostileCase = (
   throw new AuditFailure('HOSTILE_CASE_DID_NOT_FAIL', hostile.id)
 }
 
-/** Runs cold facts, permanent hostile cases and warm immutable-fact replay under D45 budgets. */
+/** Runs cold facts, permanent hostile cases and warm immutable-fact replay under the audit time budgets. */
 const main = (): void => {
   /** Reviewed catalog loaded once for immutable baseline comparison. */
   const catalog = readJson<ICatalog>(catalogPath)
@@ -930,18 +930,18 @@ const main = (): void => {
   /** Immutable compiler-backed facts shared only after their cold construction. */
   const facts = buildFacts(workspace)
   audit(workspace, facts, catalog)
-  /** Cold elapsed milliseconds checked against the 60-second D45 budget. */
+  /** Cold elapsed milliseconds checked against the 60-second budget. */
   const coldMs = performance.now() - coldStart
   if (coldMs > 60_000) throw new AuditFailure('COLD_BUDGET_EXCEEDED', `${coldMs.toFixed(2)}ms`)
   for (const hostile of hostileFixture.cases) runHostileCase(hostile, workspace, facts, catalog)
   /** Warm replay start reusing only the same immutable Program-derived facts. */
   const warmStart = performance.now()
   audit(workspace, facts, catalog)
-  /** Warm elapsed milliseconds checked against the 30-second D45 budget. */
+  /** Warm elapsed milliseconds checked against the 30-second budget. */
   const warmMs = performance.now() - warmStart
   if (warmMs > 30_000) throw new AuditFailure('WARM_BUDGET_EXCEEDED', `${warmMs.toFixed(2)}ms`)
   process.stdout.write(
-    `SWV2-T44 PASS packages=${workspace.size} edges=${facts.imports.length} hostile=${hostileFixture.cases.length} coldMs=${coldMs.toFixed(2)} warmMs=${warmMs.toFixed(2)}\n`
+    `storage architecture audit PASS packages=${workspace.size} edges=${facts.imports.length} hostile=${hostileFixture.cases.length} coldMs=${coldMs.toFixed(2)} warmMs=${warmMs.toFixed(2)}\n`
   )
 }
 

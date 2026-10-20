@@ -129,7 +129,7 @@ function owner(
   }
 }
 
-it('[A66] a serialized original deadline retains DEADLINE_EXCEEDED when it wins the final queued start decision', async () => {
+it('a serialized original deadline retains DEADLINE_EXCEEDED when it wins the final queued start decision', async () => {
   const harness = owner()
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
@@ -173,11 +173,11 @@ it('[A66] a serialized original deadline retains DEADLINE_EXCEEDED when it wins 
       terminal.operation !== 'terminal' ||
       terminal.completion.ok
     )
-      assert.fail('[A66] queued deadline must produce a failed terminal')
+      assert.fail('queued deadline must produce a failed terminal')
     assert.equal(
       terminal.completion.error.code,
       'DEADLINE_EXCEEDED',
-      '[A66] crossing the wire cannot change deadline into caller cancellation'
+      'crossing the wire cannot change deadline into caller cancellation'
     )
     assert.equal(terminal.completion.error.source, '@migaia/rpc/core')
     assert.equal(terminal.completion.error.stack, restored.stack)
@@ -237,7 +237,7 @@ function forgedDeadline(kind: 'class' | 'constructor' | 'tag' | 'decode' | 'wire
 }
 
 it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
-  '[C5-E03] %s caller reason is presented as admitted deadline without minting or changing the queued cancellation decision',
+  '%s caller reason is presented as admitted deadline without minting or changing the queued cancellation decision',
   async (kind) => {
     /** The original FIFO holds the following task before its final start. */
     const harness = owner()
@@ -302,7 +302,7 @@ it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
 )
 
 it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
-  '[C5-E04] %s admitted deadline label is presented on wire without performing provider cancellation',
+  '%s admitted deadline label is presented on wire without performing provider cancellation',
   async (kind) => {
     /** One actual executor owns the real stream admission and failure response. */
     const harness = owner()
@@ -334,7 +334,7 @@ it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
 )
 
 it.each([RpcCoreErrorCode.cancelled, RpcCoreErrorCode.deadlineExceeded] as const)(
-  '[C5-E05] genuine stored %s stream replay restores only wire cancellation after store cloning',
+  'genuine stored %s stream replay restores only wire cancellation after store cloning',
   async (code) => {
     /** The actual store persists original owner-set outcomes; its adapter returns fresh snapshots. */
     const originalStore = createRpcIdempotencyStore()
@@ -432,7 +432,7 @@ it.each([RpcCoreErrorCode.cancelled, RpcCoreErrorCode.deadlineExceeded] as const
   }
 )
 
-it('[C5-E06] a send adapter forged FRAME_LIMIT code cannot rewrite the original completed group replay outcome', async () => {
+it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed group replay outcome', async () => {
   /** No custom store is involved; the original memory owner must keep the real completed business. */
   const harness = owner()
   harness.registry.register('value', (context) => context.success(42))
@@ -467,7 +467,7 @@ it('[C5-E06] a send adapter forged FRAME_LIMIT code cannot rewrite the original 
   assert.equal(completion.result[0].result, 42)
 })
 
-it('[A59][A66] same provider/key queues across callers, other keys run, and final start defeats caller cancellation for the entire group', async () => {
+it('same provider/key queues across callers, other keys run, and final start defeats caller cancellation for the entire group', async () => {
   const harness = owner()
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
@@ -507,31 +507,27 @@ it('[A59][A66] same provider/key queues across callers, other keys run, and fina
     'peer',
     harness.ports
   )
-  assert.deepEqual(
-    effects,
-    ['hold', 'other'],
-    '[A59] original key scope never partitions by caller'
-  )
+  assert.deepEqual(effects, ['hold', 'other'], 'original key scope never partitions by caller')
   assert.equal(harness.admission.size, 4)
   const controllers = [...harness.controllers.values()]
   controllers[0]!.cancelIntent!('started fixture intent')
-  assert.equal(signal!.aborted, false, '[A66] start won; the original native signal stays live')
+  assert.equal(signal!.aborted, false, 'start won; the original native signal stays live')
   controllers[1]!.cancelIntent!('queued fixture intent')
   await queued
   await other
-  assert.deepEqual(effects, ['hold', 'other'], '[A66] queued cancel won; provider stays zero')
+  assert.deepEqual(effects, ['hold', 'other'], 'queued cancel won; provider stays zero')
   complete()
   await first
   assert.deepEqual(
     effects,
     ['hold', 'other', 'after'],
-    '[A66] later group members cannot be cancelled after group start'
+    'later group members cannot be cancelled after group start'
   )
   assert.equal(harness.admission.size, 0)
   assert.equal(harness.controllers.size, 0)
 })
 
-it('[A63][A68][A69] an original pending keyed claim prevents duplicate execution and seals the complete group before terminal send', async () => {
+it('an original pending keyed claim prevents duplicate execution and seals the complete group before terminal send', async () => {
   const harness = owner()
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
@@ -554,7 +550,7 @@ it('[A63][A68][A69] an original pending keyed claim prevents duplicate execution
     'peer',
     harness.ports
   )
-  assert.equal(effects, 1, '[A63] pending original claim cannot run the first duplicate member')
+  assert.equal(effects, 1, 'pending original claim cannot run the first duplicate member')
   assert.equal(harness.admission.size, 2)
   const scope = JSON.stringify(['migaia.rpc.runtime-api/1', 'provider', 'peer'])
   assert.deepEqual(harness.store.lookup!(scope, 'key', 0), { state: 'pending' })
@@ -568,14 +564,10 @@ it('[A63][A68][A69] an original pending keyed claim prevents duplicate execution
   assert.equal(harness.controllers.size, 0)
 })
 
-it('[A62][A63] every group member shares one all-or-none replay reservation, including exact rollback after a competing quota refusal', () => {
+it('every group member shares one all-or-none replay reservation, including exact rollback after a competing quota refusal', () => {
   const replay = new RequestReplayLedger(3, 3)
   const reserve = Reflect.get(replay, 'reserveMany')
-  assert.equal(
-    typeof reserve,
-    'function',
-    '[A62] original replay owner reserves the complete group'
-  )
+  assert.equal(typeof reserve, 'function', 'original replay owner reserves the complete group')
   const owner = replay as RequestReplayLedger & {
     reserveMany(
       keys: readonly string[],
@@ -590,15 +582,15 @@ it('[A62][A63] every group member shares one all-or-none replay reservation, inc
   assert.equal(replay.size, 2)
   first.rollback()
   first.rollback()
-  assert.equal(replay.size, 0, '[A63] quota refusal leaves no replay tombstone or half slot')
+  assert.equal(replay.size, 0, 'quota refusal leaves no replay tombstone or half slot')
   const next = owner.reserveMany(['b:0', 'b:1'], 'peer', 0)!
   assert.ok(next)
   next.release(1)
   assert.equal(replay.activeSize, 0)
-  assert.equal(replay.size, 2, '[A62] executed members retain original legacy replay protection')
+  assert.equal(replay.size, 2, 'executed members retain original legacy replay protection')
 })
 
-it('[A62][A76] unknown or over-budget groups execute nothing; accepted groups preserve success then failure and mark later steps not-executed', async () => {
+it('unknown or over-budget groups execute nothing; accepted groups preserve success then failure and mark later steps not-executed', async () => {
   const harness = owner(3)
   let effects = 0
   harness.registry.register('first', (context) => {
@@ -615,7 +607,7 @@ it('[A62][A76] unknown or over-budget groups execute nothing; accepted groups pr
   assert.equal(
     typeof Reflect.get(harness.executor, 'executeRuntime'),
     'function',
-    '[A62] original final executor owns runtime group execution'
+    'original final executor owns runtime group execution'
   )
   await harness.executor.executeRuntime(
     group('unknown', ['first', 'missing']),
@@ -638,7 +630,7 @@ it('[A62][A76] unknown or over-budget groups execute nothing; accepted groups pr
     'peer',
     harness.ports
   )
-  assert.equal(effects, 1, '[A76] the successful first side effect is preserved, never rolled back')
+  assert.equal(effects, 1, 'the successful first side effect is preserved, never rolled back')
   const terminal = harness.replies.at(-1) as Extract<IRpcRuntimeEnvelope, { operation: 'terminal' }>
   assert.equal(terminal.completion.ok, true)
   if (terminal.completion.ok) {

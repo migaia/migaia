@@ -87,25 +87,25 @@ try {
   assert.equal(
     result.value,
     'actual-runtime-ready',
-    '[A2] forward business ran in the actual platform child'
+    'forward business ran in the actual platform child'
   )
   assert.equal(
     result.self.name,
     'cross-runtime-child',
-    '[A17] child identity belongs to its real launcher'
+    'child identity belongs to its real launcher'
   )
   assert.equal(
     result.self.instanceId,
     handle.identity.fingerprint,
-    '[A17] exact launch fingerprint survives bootstrap'
+    'exact launch fingerprint survives bootstrap'
   )
   assert.equal(
     result.parent,
     'cross-runtime-parent',
-    '[A2] actual child reverse request returns parent business'
+    'actual child reverse request returns parent business'
   )
-  assert.equal(reverseCalls, 1, '[A2] exactly one genuine reverse dispatch executed')
-  assert.equal(JSON.stringify(result).includes(token), false, '[A3] token remains private')
+  assert.equal(reverseCalls, 1, 'exactly one genuine reverse dispatch executed')
+  assert.equal(JSON.stringify(result).includes(token), false, 'token remains private')
   console.log(
     JSON.stringify({
       runtime: deno ? 'deno' : 'bun',

@@ -185,7 +185,7 @@ async function eventually(assertion: () => void): Promise<void> {
   throw lastError
 }
 
-describe('A7 endpoint clocks: wall clock stamps diagnostics, scheduler owns deadlines', () => {
+describe('endpoint clocks: wall clock stamps diagnostics, scheduler owns deadlines', () => {
   it('stamps response and abort variation sentAt and hook event at from the wall clock', async () => {
     const scheduler = createManualScheduler()
     scheduler.advance(5)
@@ -412,7 +412,7 @@ describe('A7 endpoint clocks: wall clock stamps diagnostics, scheduler owns dead
   })
 })
 
-/** Root of the rpc core sources inspected by the A8 static rules. */
+/** Root of the rpc core sources inspected by the static clock rules. */
 const coreRoot = join(import.meta.dirname, '../../src/core')
 
 /** Recursively lists executable core sources. */
@@ -480,7 +480,7 @@ const arithmeticOrComparison = new Set<string>([
   '-='
 ])
 
-describe('A8 rpc core timestamp sources', () => {
+describe('rpc core timestamp sources', () => {
   it('produces every hook event at and wire sentAt from a timestamp() call', () => {
     const atCounts: readonly [string, number][] = [
       ['internal/outbound-attachment.ts', 3],
@@ -557,7 +557,7 @@ describe('A8 rpc core timestamp sources', () => {
   })
 })
 
-describe('A12 server metadata times follow the endpoint scheduler', () => {
+describe('server metadata times follow the endpoint scheduler', () => {
   it('records registeredAt and lastSeenAt in scheduler time and ages them on the scheduler', async () => {
     const scheduler = createManualScheduler()
     scheduler.advance(1_000)

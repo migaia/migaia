@@ -4,7 +4,7 @@ import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
 import { createProcessSupervisor } from '../../src/process/index.js'
 import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.js'
 
-describe('A3 process capability admission', () => {
+describe('process capability admission', () => {
   it('fails closed for absent standard and requested guarantees', () => {
     const scheduler = createManualScheduler()
     const budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler })

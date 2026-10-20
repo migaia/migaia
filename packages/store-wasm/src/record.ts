@@ -140,7 +140,7 @@ export function record<Shape extends IRecordShape>(
             disposing = true
             disposed = true
             try {
-              // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
+              // 逆序释放：先摘子资源边，再 dealloc block。
               disposeWasmField(block, field, sources)
             } finally {
               disposing = false

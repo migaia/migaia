@@ -175,7 +175,7 @@ describe('hot replacement transaction', () => {
     expect(previousDispose).toHaveBeenCalledTimes(1)
   })
 
-  it('PHP-T1 drains every retired snapshot containing the same owner', async () => {
+  it('drains every retired snapshot containing the same owner', async () => {
     /** Executes two versions while their common plugin remains in flight. */
     class PipelineHost extends PluginHost<Record<string, never>, number> {
       run(value: number): Promise<void> {
@@ -233,7 +233,7 @@ describe('hot replacement transaction', () => {
     await host.dispose()
   })
 
-  it('A23 keeps the previous lease key while a replace candidate stages before publication', async () => {
+  it('keeps the previous lease key while a replace candidate stages before publication', async () => {
     class PipelineHost extends PluginHost<Record<string, never>, number> {
       run(): Promise<void> {
         return this.runPipeline(1, () => undefined) as Promise<void>
@@ -300,7 +300,7 @@ describe('hot replacement transaction', () => {
     await host.dispose()
   })
 
-  it('A23 preserves the old lease after a staged replace candidate fails', async () => {
+  it('preserves the old lease after a staged replace candidate fails', async () => {
     class PipelineHost extends PluginHost<Record<string, never>, number> {
       run(): Promise<void> {
         return this.runPipeline(1, () => undefined) as Promise<void>

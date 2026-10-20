@@ -342,7 +342,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       throw error
     }
     try {
-      // wasm 字段持有真实外部资源，不是纯 reactive 节点：syncSafe: false + gcFallback（§4.2）。
+      // wasm 字段持有真实外部资源，不是纯 reactive 节点：syncSafe: false + gcFallback。
       flushPureNodes()
       ensureScope().own(field, { syncSafe: false, gcFallback: true, force: () => field.dispose() })
     } catch (error) {
@@ -407,7 +407,7 @@ function createStoreCore<S extends Record<string, unknown>>(
     disposed = true
     status = StoreInitializationStatus.failed
     initAbort?.abort()
-    // `createStoreCore()` itself is synchronous (D-1 gives LifecycleScope no sync dispose()), so
+    // `createStoreCore()` itself is synchronous (LifecycleScope has no sync dispose()), so
     // this cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
     // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead
     // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
@@ -642,7 +642,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       disposed = true
       initAbort?.abort()
       // 初始化失败即回收已创建资源。清理错误不能替换原始初始化错误。这里已经在异步延续里，可以
-      // 真正 await disposeOwned()（D-1：LifecycleScope 没有同步 dispose()），因此仍能像迁移前
+      // 真正 await disposeOwned()（LifecycleScope 没有同步 dispose()），因此仍能像迁移前
       // 一样把 cleanup 失败原样附加到原始错误的 cause 上，不需要退化成 fire-and-forget。
       try {
         await disposeOwned()
@@ -853,7 +853,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       assertNotDisposed()
       assertOwnedBy(resource, runtime, 'resource')
       if (!ownerOf(resource)) claimOwnership(resource, runtime)
-      // 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理（§4.2）。
+      // 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理。
       flushPureNodes()
       return ensureScope().own(resource, { syncSafe: false, force: () => resource.dispose() })
     },

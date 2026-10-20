@@ -42,7 +42,7 @@ also evolvable. `handshake.json` records offer pairs, negotiated values, invalid
 and accept values outside an offer. These vectors contain JSON values and protocol text only; they
 do not depend on JavaScript error prototypes.
 
-U36 replaces the unpublished frozen 1.0/1.1 snapshots with `protocol-baseline.json` and the
+The unpublished frozen 1.0/1.1 snapshots are replaced by with `protocol-baseline.json` and the
 current vector files named by it. `SHA256SUMS` covers that baseline, its independent selftest
 groups, and the v2 directory and batch contracts. There is one canonical copy of each group.
 Network peers require protocol 1.1, `runtime-api@1`, `batch@1` and v2 describe; missing baseline
@@ -54,5 +54,5 @@ functions; they do not authorize an older network baseline.
 The obsolete frozen-file identity assertions are replaced by checks of this manifest. First
 violations, JSON pointers, wire-error graphs, warning order, framing bytes and stream credit
 assertions remain. V1 remote-contract and Host-control vectors remain local advanced facade
-configuration until C7 removes those APIs; foreign network selftests do not interpret them as
+configuration until those APIs are removed; foreign network selftests do not interpret them as
 describe responses.

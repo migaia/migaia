@@ -40,7 +40,7 @@ const createHostileReasonSignal = (cause: Error) => {
 
 describe('promise primitives', () => {
   it.each(['sleep', 'withTimeout', 'raceWithAbort'] as const)(
-    'U-D13 rolls back partial signal registration in %s',
+    'rolls back partial signal registration in %s',
     async (operation) => {
       /** Registration can acquire a listener before the structural host reports failure. */
       const listeners = new Set<() => void>()
@@ -143,7 +143,7 @@ describe('promise primitives', () => {
     ).toEqual({ kind: 'invalid', reason: 'listener-not-function' })
   })
 
-  it('UT-T145 normalizes synchronous values without deferring the computation', async () => {
+  it('normalizes synchronous values without deferring the computation', async () => {
     let calls = 0
     const pending = toPromise(() => {
       calls += 1
@@ -155,7 +155,7 @@ describe('promise primitives', () => {
     expect(calls).toBe(1)
   })
 
-  it('UT-T145 assimilates thenables and preserves a native Promise identity', async () => {
+  it('assimilates thenables and preserves a native Promise identity', async () => {
     const native = Promise.resolve(42)
     // oxlint-disable-next-line unicorn/no-thenable -- Assimilation is the behavior under test.
     const thenable = Object.defineProperty({}, 'then', {
@@ -166,7 +166,7 @@ describe('promise primitives', () => {
     await expect(toPromise(() => thenable)).resolves.toBe(43)
   })
 
-  it('UT-T145 converts a synchronous throw into rejection with exact reason identity', async () => {
+  it('converts a synchronous throw into rejection with exact reason identity', async () => {
     const reason = new Error('synchronous failure')
     let pending: Promise<never> | undefined
 
@@ -178,7 +178,7 @@ describe('promise primitives', () => {
     await expect(pending).rejects.toBe(reason)
   })
 
-  it('SWV2-T47 snapshots abort-timeout options and contains a throwing timeout reason', () => {
+  it('snapshots abort-timeout options and contains a throwing timeout reason', () => {
     const scheduler = createManualScheduler()
     const timeoutFailure = new Error('timeout reason factory failed')
     const reads = { timeoutMs: 0, signal: 0, scheduler: 0, timeoutReason: 0, report: 0 }
@@ -215,7 +215,7 @@ describe('promise primitives', () => {
     merged.dispose()
   })
 
-  it('SWV2-T47 preserves abort getter counts and the original event reason', () => {
+  it('preserves abort getter counts and the original event reason', () => {
     const scheduler = createManualScheduler()
     const reason = new Error('external abort reason')
     let aborted = false
@@ -251,7 +251,7 @@ describe('promise primitives', () => {
     expect(calls.remove).toBe(1)
   })
 
-  it('SWV2-T47 rolls back when the post-subscribe abort observation fails', () => {
+  it('rolls back when the post-subscribe abort observation fails', () => {
     const scheduler = createManualScheduler()
     const observationFailure = new Error('post-subscribe aborted getter failed')
     let abortedReads = 0
@@ -289,7 +289,7 @@ describe('promise primitives', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('SWV2-T47 preserves pre-abort cleanup parity without subscribing', () => {
+  it('preserves pre-abort cleanup parity without subscribing', () => {
     const reason = new Error('already aborted')
     let addCount = 0
     let removeCount = 0
@@ -311,7 +311,7 @@ describe('promise primitives', () => {
     expect(removeCount).toBe(1)
   })
 
-  it('SWV2-T48 distinguishes callback signal reachability from settlement ownership', async () => {
+  it('distinguishes callback signal reachability from settlement ownership', async () => {
     const scheduler = createManualScheduler()
     let firstRequestSignal: unknown
     let secondRequestSignal: unknown
@@ -329,7 +329,7 @@ describe('promise primitives', () => {
     await expect(pending).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
   })
 
-  it('SWV2-T48 composes a standalone signal with settlement utilities without policy leakage', async () => {
+  it('composes a standalone signal with settlement utilities without policy leakage', async () => {
     const scheduler = createManualScheduler()
     const timeoutReason = new Error('generic deadline')
     const merged = createAbortTimeoutSignal({
@@ -362,14 +362,14 @@ describe('promise primitives', () => {
     merged.dispose()
   })
 
-  it('SWV2-T48 keeps the signal primitive runtime-neutral and storage-policy free', () => {
+  it('keeps the signal primitive runtime-neutral and storage-policy free', () => {
     const source = readFileSync(new URL('../src/promise.ts', import.meta.url), 'utf8')
     expect(source).not.toContain('@migaia/storage')
     expect(source).not.toContain('StorageContractError')
     expect(createAbortTimeoutSignal.name).toBe('createAbortTimeoutSignal')
   })
 
-  it('SWV2-T48 reports cleanup under its signal-only operation identity', () => {
+  it('reports cleanup under its signal-only operation identity', () => {
     const cleanupFailure = new Error('signal cleanup failed')
     const reports: unknown[] = []
     const merged = createAbortTimeoutSignal({

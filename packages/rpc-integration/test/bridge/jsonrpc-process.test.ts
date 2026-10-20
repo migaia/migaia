@@ -67,7 +67,7 @@ async function exercise(host: PluginHost<Record<string, never>>, plugin: IProces
 }
 
 describe('JSON-RPC real process carriers', () => {
-  it('[A8] uses fd bootstrap and real stdio with redacted, unsubscribed stderr', async () => {
+  it('uses fd bootstrap and real stdio with redacted, unsubscribed stderr', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -150,7 +150,7 @@ describe('JSON-RPC real process carriers', () => {
   })
 
   it.each(['stdio', 'socket'])(
-    '[A4/A8] refuses missing/wrong tokens before ready over real %s bytes',
+    'refuses missing/wrong tokens before ready over real %s bytes',
     async (carrier) => {
       if (carrier === 'socket' && process.platform === 'win32') return
       const address =
@@ -201,7 +201,7 @@ describe('JSON-RPC real process carriers', () => {
   )
 
   it.skipIf(process.platform === 'win32')(
-    '[I15 A8/M2] forwards a wrong connect token through plugin establish without disturbing the borrowed peer',
+    'forwards a wrong connect token through plugin establish without disturbing the borrowed peer',
     async () => {
       /** The independently owned listener retains a second authenticated connection. */
       const address = join(tmpdir(), `ja-${randomUUID().slice(0, 8)}.sock`)
@@ -302,7 +302,7 @@ describe('JSON-RPC real process carriers', () => {
   )
 
   it.skipIf(process.platform === 'win32')(
-    '[A8] borrows a Unix socket process and preserves its second connection',
+    'borrows a Unix socket process and preserves its second connection',
     async () => {
       const address = join(tmpdir(), `jc-${randomUUID().slice(0, 8)}.sock`)
       const child = spawn(process.execPath, [childPath, address], {
@@ -341,7 +341,7 @@ describe('JSON-RPC real process carriers', () => {
             dial: (path, signal) =>
               dialProcessByteChannel({ address: path, signal: signal as AbortSignal }),
             establish: open,
-            /** JSON-RPC uses UD1 default none without a native ping workaround. */
+            /** JSON-RPC uses the default health none without a native ping workaround. */
             supervision: { restart: { maxRestarts: 0 } }
           },
           endpointFactory: async (channel) => {

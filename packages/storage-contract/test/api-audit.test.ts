@@ -57,7 +57,7 @@ const makeStore = (): contract.IRecordStore => ({
 })
 
 describe('storage-contract audit boundary regressions', () => {
-  it('SC-D01 keeps revoked proxies within nonthrowing admission results', () => {
+  it('keeps revoked proxies within nonthrowing admission results', () => {
     /** Revocation makes Array.isArray throw before any property getter runs. */
     const revoked = Proxy.revocable({}, {})
     revoked.revoke()
@@ -79,7 +79,7 @@ describe('storage-contract audit boundary regressions', () => {
     'assertCodec',
     'snapshotSyncWriteOptions',
     'assertSyncWriteOptions'
-  ] as const)('SC-D01 %s wraps revoked-proxy reflection with the registered identity', (name) => {
+  ] as const)('%s wraps revoked-proxy reflection with the registered identity', (name) => {
     /** Each boundary gets its own revoked input and native reflection failure. */
     const revoked = Proxy.revocable({}, {})
     revoked.revoke()
@@ -93,7 +93,7 @@ describe('storage-contract audit boundary regressions', () => {
   })
 
   it.each(['asRecordStore', 'asSecondaryIndexRecordStore', 'asChangeFeedStore'] as const)(
-    'SC-D02 %s preserves a failing capability accessor as the exact cause',
+    '%s preserves a failing capability accessor as the exact cause',
     (name) => {
       /** The original error remains reachable without replacing its object or stack. */
       const original = new Error('capability accessor failed')
@@ -117,7 +117,7 @@ describe('storage-contract audit boundary regressions', () => {
   it.each([
     ['asSecondaryIndexRecordStore', 'ensureRecordIndexes'],
     ['asChangeFeedStore', 'subscribeChanges']
-  ] as const)('SC-D02 %s preserves its extension-method getter failure', (name, method) => {
+  ] as const)('%s preserves its extension-method getter failure', (name, method) => {
     /** Extension inspection must retain failures after successful base admission. */
     const original = new Error('extension accessor failed')
     /** Base admission succeeds without invoking any operation. */

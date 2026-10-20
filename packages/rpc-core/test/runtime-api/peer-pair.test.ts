@@ -7,7 +7,7 @@ import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
 import { connected } from './fixture.js'
 
-it('[A92] pair snapshots the second-side configuration before acquiring the original carrier', async () => {
+it('pair snapshots the second-side configuration before acquiring the original carrier', async () => {
   /** The spy observes the real carrier factory and never substitutes a fake transport. */
   const allocation = vi.spyOn(memory, 'createMemoryTransportPair')
   /** Construction must retain this exact primary configuration failure. */
@@ -27,7 +27,7 @@ it('[A92] pair snapshots the second-side configuration before acquiring the orig
     assert.equal(
       allocation.mock.calls.length,
       0,
-      '[A92] no carrier or first Peer exists on config failure'
+      'no carrier or first Peer exists on config failure'
     )
   } finally {
     /** RED evidence still closes an actually allocated pair without taking ownership of other work. */
@@ -37,7 +37,7 @@ it('[A92] pair snapshots the second-side configuration before acquiring the orig
   }
 })
 
-it('[A89][A94] testing pair exports the canonical callable owner instead of a separate dispatcher', async () => {
+it('testing pair exports the canonical callable owner instead of a separate dispatcher', async () => {
   /** Actual production roots establish the business baseline before testing export admission. */
   const baseline = await connected({}, { echo: (value: unknown) => value })
   try {
@@ -49,16 +49,16 @@ it('[A89][A94] testing pair exports the canonical callable owner instead of a se
   assert.equal(
     metadata.exports['./testing']?.default,
     './dist/testing/index.js',
-    '[A94] the explicit testing-only subpath must be packed'
+    'the explicit testing-only subpath must be packed'
   )
   assert.equal(
     existsSync(new URL('../../src/testing/index.ts', import.meta.url)),
     true,
-    '[A89] the canonical helper owns that single export'
+    'the canonical helper owns that single export'
   )
 })
 
-it('[A89][A90][A91] pair uses canonical binary, group, outcome and provider errors with honest memory metadata', async () => {
+it('pair uses canonical binary, group, outcome and provider errors with honest memory metadata', async () => {
   const reports: unknown[] = []
   let effects = 0
   const pair = await createPeerPair({
@@ -90,7 +90,7 @@ it('[A89][A90][A91] pair uses canonical binary, group, outcome and provider erro
     await assert.rejects(pair.a.request('echo', backing, { transfer: [backing] }), {
       code: RpcCoreErrorCode.capabilityUnsupported
     })
-    assert.equal(backing.byteLength, 2, '[A91] reference memory cannot pretend ownership transfer')
+    assert.equal(backing.byteLength, 2, 'reference memory cannot pretend ownership transfer')
     const group = await pair.a.group([{ method: 'count' }, { method: 'count' }], {
       idempotencyKey: 'pair-group'
     })
@@ -111,7 +111,7 @@ it('[A89][A90][A91] pair uses canonical binary, group, outcome and provider erro
   }
 })
 
-it('[A89][A92] pair preserves original deadline, abort reason, close Promise and in-flight retirement', async () => {
+it('pair preserves original deadline, abort reason, close Promise and in-flight retirement', async () => {
   const reports: unknown[] = []
   /** The second actual handler invocation is the in-flight close observation. */
   let reached!: () => void
@@ -154,7 +154,7 @@ it('[A89][A92] pair preserves original deadline, abort reason, close Promise and
   }
 })
 
-it('[A92] a second-side canonical compilation failure rolls back the original pair without leaking the first', async () => {
+it('a second-side canonical compilation failure rolls back the original pair without leaking the first', async () => {
   let reads = 0
   const invalid = Object.defineProperty({}, 'secret', {
     enumerable: true,

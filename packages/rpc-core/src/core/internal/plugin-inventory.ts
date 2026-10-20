@@ -78,7 +78,7 @@ export type IRpcNativePluginBatchOptions = {
 }
 
 /**
- * Builds the exact production Host batch without allocating runtime state. The runtime and B12a
+ * Builds the exact production Host batch without allocating runtime state. The runtime and the
  * failure matrix both consume this list; only the bounded install callback may alter role
  * behavior.
  */

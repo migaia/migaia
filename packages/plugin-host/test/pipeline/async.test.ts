@@ -72,10 +72,10 @@ class AsyncHostWithDiagnostic extends PluginHost<Record<string, never>, number> 
 }
 
 /**
- * Host-owned failure and closing semantics of an async host. These restore the R2 baselines that
- * exercised the retired `runAsyncPipeline` wrapper directly; they now run through a real host so
- * the host's combiner (`PIPELINE_FAILED`, source `@migaia/plugin-host`) and active checks are what
- * is asserted, not middleware-pipeline's defaults.
+ * Host-owned failure and closing semantics of an async host. These restore the earlier baselines
+ * that exercised the retired `runAsyncPipeline` wrapper directly; they now run through a real host
+ * so the host's combiner (`PIPELINE_FAILED`, source `@migaia/plugin-host`) and active checks are
+ * what is asserted, not middleware-pipeline's defaults.
  */
 describe('async host pipeline failure and closing baselines', () => {
   /** Runs once and returns the rejection value, or a sentinel when the run resolved. */
@@ -120,7 +120,7 @@ describe('async host pipeline failure and closing baselines', () => {
     }
   )
 
-  it('AF-T24: throw undefined and reject(undefined) are not swallowed as success', async () => {
+  it('throw undefined and reject(undefined) are not swallowed as success', async () => {
     const thrown = new AsyncHost()
     thrown.useAsyncPipeline(async () => {
       throw undefined
@@ -143,7 +143,7 @@ describe('async host pipeline failure and closing baselines', () => {
     })
   })
 
-  it('AF-T24: double undefined failures produce a tagged AggregateError with two undefined slots', async () => {
+  it('double undefined failures produce a tagged AggregateError with two undefined slots', async () => {
     const host = new AsyncHost()
     host.useAsyncPipeline(async (_value, next) => {
       void next(2)

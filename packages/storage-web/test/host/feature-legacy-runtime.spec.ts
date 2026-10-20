@@ -27,15 +27,15 @@ type IRetainedEntryCase = (typeof RetainedEntryCase)[keyof typeof RetainedEntryC
 const entrySourceFor = (entryCase: IRetainedEntryCase): string => {
   const scenario = {
     [RetainedEntryCase.backendRegistration]: `
-const plugin = definePlugin('ys21-registration', (core) => ({
+const plugin = definePlugin('legacy-registration', (core) => ({
   install: () => { core.registerStore(memoryStorageHost()); return {} }
 }))
 const host = await createStorageHost({ plugins: [plugin] })
-if (host.backend('ys21-registration') === undefined) throw new Error('YS21 backend registration missing')
+if (host.backend('legacy-registration') === undefined) throw new Error('legacy runtime backend registration missing')
 await host.dispose()`,
     [RetainedEntryCase.reactiveMaterialization]: `
-const host = await createStorageHost({ plugins: [memoryReactive({ id: 'ys21-reactive' })] })
-if (!host.hasReactiveBackend('ys21-reactive')) throw new Error('YS21 reactive backend was not materialized')
+const host = await createStorageHost({ plugins: [memoryReactive({ id: 'legacy-reactive' })] })
+if (!host.hasReactiveBackend('legacy-reactive')) throw new Error('legacy runtime reactive backend was not materialized')
 await host.dispose()`,
     [RetainedEntryCase.partialInstallRollback]: `
 const firstStore = memoryStorageHost()
@@ -44,32 +44,32 @@ const disposeFirstStore = firstStore.dispose
 Object.defineProperty(firstStore, 'dispose', {
   value: async () => { firstDisposeCount += 1; return disposeFirstStore() }
 })
-const originalInstallFailure = new Error('YS21 intentional rollback')
-const first = definePlugin('ys21-rollback-first', (core) => ({
+const originalInstallFailure = new Error('legacy runtime intentional rollback')
+const first = definePlugin('legacy-rollback-first', (core) => ({
   install: () => { core.registerStore(firstStore); return {} }
 }))
-const failed = definePlugin('ys21-rollback-failed', () => ({
+const failed = definePlugin('legacy-rollback-failed', () => ({
   install: () => { throw originalInstallFailure }
 }))
 let rollbackFailure: unknown
 try { await createStorageHost({ plugins: [first, failed] }) } catch (error) { rollbackFailure = error }
-if (rollbackFailure === undefined) throw new Error('YS21 rollback unexpectedly installed')
+if (rollbackFailure === undefined) throw new Error('legacy runtime rollback unexpectedly installed')
 let cause: unknown = rollbackFailure
 let originalFailureReachable = false
 for (let depth = 0; depth < 8 && cause instanceof Error; depth += 1) {
   if (cause === originalInstallFailure) originalFailureReachable = true
   cause = cause.cause
 }
-if (!originalFailureReachable) throw new Error('YS21 rollback lost original failure')
-if (firstDisposeCount !== 1) throw new Error('YS21 rollback did not dispose first Store once')
+if (!originalFailureReachable) throw new Error('legacy runtime rollback lost original failure')
+if (firstDisposeCount !== 1) throw new Error('legacy runtime rollback did not dispose first Store once')
 `,
     [RetainedEntryCase.aliasedLegacyEntry]: `
 const aliasedDefinePlugin = definePlugin
-const plugin = aliasedDefinePlugin('ys21-alias', (core) => ({
+const plugin = aliasedDefinePlugin('legacy-alias', (core) => ({
   install: () => { core.registerStore(memoryStorageHost()); return {} }
 }))
 const host = await createStorageHost({ plugins: [plugin] })
-if (host.backend('ys21-alias') === undefined) throw new Error('YS21 aliased entry missing')
+if (host.backend('legacy-alias') === undefined) throw new Error('legacy runtime aliased entry missing')
 await host.dispose()`
   } as const satisfies Record<IRetainedEntryCase, string>
   return scenario[entryCase]
@@ -97,7 +97,7 @@ const runRetainedEntryCandidate = async (
     if (poisonLegacyBranch) {
       const source = readFileSync(hostPath, 'utf8')
       if (!source.includes(nativeDefinitionRead))
-        throw new Error('YS21 retained definition read moved')
+        throw new Error('legacy runtime retained definition read moved')
       writeFileSync(
         hostPath,
         source.replace(
@@ -175,8 +175,8 @@ const expectRetainedEntrySensitivity = async (entryCase: IRetainedEntryCase): Pr
   expect(restored, entryCase).toEqual({ status: 0, output: '' })
 }
 
-/** YS21 exercises retained public Host/backend wrappers against a poisoned removed-authority branch. */
-describe('YS21 retained Storage runtime authority', () => {
+/** Exercises retained public Host/backend wrappers against a poisoned removed-authority branch. */
+describe('retained Storage runtime authority', () => {
   it(
     'proves backend registration sensitivity',
     () => expectRetainedEntrySensitivity(RetainedEntryCase.backendRegistration),

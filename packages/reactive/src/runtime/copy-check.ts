@@ -140,7 +140,7 @@ export function assertNoForeignOwnershipBrand(value: object): void {
 
 /**
  * 待上报的多副本诊断。`noteRuntimeCopy` 可能发生在 Runtime 构造**之前**（`createRuntime` 先登记再 new）， 所以先记录状态，等 Runtime
- * 建立后经其 diagnostic 通道上报；不直接 `console.error`（AF-04）。
+ * 建立后经其 diagnostic 通道上报；不直接 `console.error`。
  */
 let pendingCopyWarning: string | undefined
 

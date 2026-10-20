@@ -10,7 +10,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 100; index++) await Promise.resolve()
 }
 
-describe('A11 prewarm handover', () => {
+describe('prewarm handover', () => {
   it('takes the exact idle handle and preserves its output and both records', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher()

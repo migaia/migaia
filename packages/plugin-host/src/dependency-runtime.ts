@@ -34,7 +34,7 @@ type IAdmittedDependencyMutationOptions = Readonly<{
   readonly dryRun: boolean
 }>
 
-/** Reads the breaking R3 dependency mutation option shape and applies its reject default. */
+/** Reads the dependency mutation option shape and applies its reject default. */
 export const admitDependencyMutationOptions = (
   value: unknown
 ): IAdmittedDependencyMutationOptions => {

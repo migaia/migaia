@@ -15,7 +15,7 @@ import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { runtimeSources, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../runtime-api/fixture.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 
-describe('probe logical observations A2', () => {
+describe('probe logical observations', () => {
   it('records request progress, provider errors, timeout, abort, notify, ping and admission refusal', async () => {
     /** Snapshot only at the test consumer boundary because the production view is reusable. */
     const caller: IRpcProbeEventView[] = [],

@@ -31,7 +31,7 @@ type IServiceFixtureOptions = IProcessSessionServiceOptions &
   }>
 
 describe('default process resilience wiring', () => {
-  it('[A3/A5] serves child request, one-way and generator context and removes its parent-loss guard on explicit close', async () => {
+  it('serves child request, one-way and generator context and removes its parent-loss guard on explicit close', async () => {
     /** Source-loaded child ingress supplements the actual Node child acceptance path. */
     const [parentRaw, childRaw] = nativeBytePair()
     const host = new PluginHost<Record<string, never>>({
@@ -162,7 +162,7 @@ describe('default process resilience wiring', () => {
     }
   })
   it.each(['shared', 'per-connection'] as const)(
-    '[A1/A2/A3/K215] serves %s real authenticated Unix sessions with isolated quotas',
+    'serves %s real authenticated Unix sessions with isolated quotas',
     async (instanceMode) => {
       /** Only this fixture's new socket is created; existing rendezvous files are untouched. */
       const directory = await mkdtemp(join(tmpdir(), 'rpc-resilience-'))
@@ -299,7 +299,7 @@ describe('default process resilience wiring', () => {
           })
         ).toBe('value')
         expect(execute).toHaveBeenCalledTimes(executed)
-        /** K215: only actual concurrent core refusals close the offending physical connection. */
+        /** Only actual concurrent core refusals close the offending physical connection. */
         const inFlight = Array.from({ length: 32 }, () =>
           clients[2]!.endpoint.send('server', 'p.f.request', ['hold']).then(
             (value) => value,

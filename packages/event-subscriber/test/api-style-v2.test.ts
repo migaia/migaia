@@ -23,7 +23,7 @@ const callUntrustedHub = (options: unknown): unknown =>
   (createEventHub as unknown as (options: unknown) => unknown)(options)
 
 describe('event API style projection', () => {
-  it('ES-T134 ESV2H-T01/T02: normalizes cancellation names for presets and custom styles', () => {
+  it('normalizes cancellation names for presets and custom styles', () => {
     expect(normalizeEventApiStyle(undefined)).toEqual({
       subscribe: 'subscribe',
       publish: 'publish',
@@ -62,7 +62,7 @@ describe('event API style projection', () => {
     )
   })
 
-  it('ES-T135 ESV2H-T03/T05/T09/T10: projects styled Channel aliases onto one callable handle', () => {
+  it('projects styled Channel aliases onto one callable handle', () => {
     const channel = createEventChannel<number>({ style: 'on-emit' })
     const seen: number[] = []
     const handle = channel
@@ -95,7 +95,7 @@ describe('event API style projection', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T136 ESV2H-T04/T08/T15: projects styled Hub aliases across finite key chains', () => {
+  it('projects styled Hub aliases across finite key chains', () => {
     const hub = createEventHub<{ ready: number; done: string }>({ style: 'on-emit' })
     const seen: string[] = []
     const handle = hub
@@ -116,7 +116,7 @@ describe('event API style projection', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T137 ESV2H-T15: closed styled handles reject before reading hostile arguments', () => {
+  it('closed styled handles reject before reading hostile arguments', () => {
     const hub = createEventHub<{ ready: number }>({ style: 'on-emit' })
     const handle = hub.on('ready', () => undefined)
     handle.off()
@@ -137,7 +137,7 @@ describe('event API style projection', () => {
     expect(reads).toBe(0)
   })
 
-  it('ES-T138 ESV2H-T16: rolls back first registration when handle projection fails', () => {
+  it('rolls back first registration when handle projection fails', () => {
     const first = vi.fn()
     const extend = vi.fn()
     const projectionOriginal = new Error('projection plan failed')
@@ -159,7 +159,7 @@ describe('event API style projection', () => {
     expect(extend).not.toHaveBeenCalled()
   })
 
-  it('ES-T139 ESV2H-T09/T10: projects custom and listen-fire cancellation identities', () => {
+  it('projects custom and listen-fire cancellation identities', () => {
     const customStyle = {
       subscribe: 'observe',
       publish: 'dispatch',
@@ -196,7 +196,7 @@ describe('event API style projection', () => {
     expect(listenChannel.size).toBe(0)
   })
 
-  it('ES-T140 ESV2H-T09/T11/T12: preserves mixed chain identity and default handle shape', () => {
+  it('preserves mixed chain identity and default handle shape', () => {
     const channel = createEventChannel<number>({ style: 'on-emit' })
     const seen: number[] = []
     const mixedFromCanonical = channel
@@ -231,7 +231,7 @@ describe('event API style projection', () => {
     defaultHandle()
   })
 
-  it('ES-T141 ESV2H-T09/T16: releases owner registrations in reverse order and preserves both rollback errors', () => {
+  it('releases owner registrations in reverse order and preserves both rollback errors', () => {
     const registered: string[] = []
     const released: string[] = []
     const owner = createRawSubscriptionOwner(
@@ -283,7 +283,7 @@ describe('event API style projection', () => {
     expect((rollbackError as AggregateError).errors).toEqual([projectionOriginal, rollbackOriginal])
   })
 
-  it('ES-T142 ESV2H-T17/T18: keeps helpers and filtered views canonical on styled channels', async () => {
+  it('keeps helpers and filtered views canonical on styled channels', async () => {
     const channel = createEventChannel<number>({ style: 'on-emit' })
     const onceListener = vi.fn((event: IEventContext<number>) => {
       void event.value
@@ -334,7 +334,7 @@ describe('event API style projection', () => {
     selectedStop()
   })
 
-  it('ES-T123 ESV2-T01/T02/T16: keeps the default surface unchanged', () => {
+  it('keeps the default surface unchanged', () => {
     const omitted = createEventChannel<number>()
     const explicit = createEventChannel<number>({ style: 'subscribe-publish' })
 
@@ -348,7 +348,7 @@ describe('event API style projection', () => {
     expect(EventApiStyle.onEmit).toBe('on-emit')
   })
 
-  it('ES-T124 ESV2-T03/T05/T10/T11: maps channel presets to canonical identities', () => {
+  it('maps channel presets to canonical identities', () => {
     const onEmit = createEventChannel<number>({ style: 'on-emit' })
     const onTrigger = createEventChannel<number>({ style: 'on-trigger' })
     const listenFire = createEventChannel<number>({ style: 'listen-fire' })
@@ -378,7 +378,7 @@ describe('event API style projection', () => {
     listenStop()
   })
 
-  it('ES-T125 ESV2-T05/T12/T13: maps Hub presets while preserving keyed payload routing', () => {
+  it('maps Hub presets while preserving keyed payload routing', () => {
     const hub = createEventHub<{ ready: number; warning: string }>({ style: 'on-emit' })
     const values: string[] = []
     const warningKey = 'warning' as const
@@ -419,7 +419,7 @@ describe('event API style projection', () => {
     expect(styledHub.size()).toBe(0)
   })
 
-  it('ES-T126 ESV2-T06/T07: preserves custom literals inline and with as const satisfies', () => {
+  it('preserves custom literals inline and with as const satisfies', () => {
     const inline = createEventChannel<
       number,
       void,
@@ -445,7 +445,7 @@ describe('event API style projection', () => {
     expect(observed).toEqual([1, 2])
   })
 
-  it('ES-T127 ESV2-T02/T09/T16: installs custom aliases as immutable non-enumerable data properties', () => {
+  it('installs custom aliases as immutable non-enumerable data properties', () => {
     const channel = createEventChannel<
       number,
       void,
@@ -474,7 +474,7 @@ describe('event API style projection', () => {
     expect({ ...channel }).not.toHaveProperty('observe')
   })
 
-  it('ES-T128 ESV2-T08/T18: rejects invalid styles before returning a projected surface', () => {
+  it('rejects invalid styles before returning a projected surface', () => {
     const invalidStyles: unknown[] = [
       { subscribe: '', publish: 'emit' },
       { subscribe: 'same', publish: 'same' },
@@ -520,7 +520,7 @@ describe('event API style projection', () => {
     }
   })
 
-  it('ES-T129 ESV2-T08/T18: reads style and custom names once and preserves getter cause', () => {
+  it('reads style and custom names once and preserves getter cause', () => {
     const sequence: string[] = []
     const original = new Error('style getter failed')
     const style = {
@@ -651,7 +651,7 @@ describe('event API style projection', () => {
     expect(hubProxyOriginal.stack).toBeTruthy()
   })
 
-  it('ES-T130 ESV2-T17: does not alter canonical helper behavior for styled channels', () => {
+  it('does not alter canonical helper behavior for styled channels', () => {
     const report = vi.fn()
     const channel = createEventChannel<number>({ style: 'on-emit', report })
     const handle = channel.on(() => undefined)
@@ -663,7 +663,7 @@ describe('event API style projection', () => {
   })
 })
 
-it('ES-T131 ESV2-T09/T21: rejects literal cross-semantic aliases at the options boundary', () => {
+it('rejects literal cross-semantic aliases at the options boundary', () => {
   expect(() => {
     // @ts-expect-error publish is reserved for the publish semantic.
     createEventChannel<number>({ style: { subscribe: 'publish', publish: 'emit' } })
@@ -674,7 +674,7 @@ it('ES-T131 ESV2-T09/T21: rejects literal cross-semantic aliases at the options 
   }).toThrowError(/event-subscriber options are invalid/)
 })
 
-it('ES-T132 ESV2-T19: preflights descriptor commit and leaks no partial alias surface', () => {
+it('preflights descriptor commit and leaks no partial alias surface', () => {
   const surface: {
     subscribe: () => undefined
     publish: () => undefined
@@ -711,7 +711,7 @@ it('ES-T132 ESV2-T19: preflights descriptor commit and leaks no partial alias su
   expect(Object.hasOwn(nonExtensibleSurface, 'dispatch')).toBe(false)
 })
 
-it('ES-T133 ESV2-T22: proves the default hot path is style-free and stays within the bundle bound', () => {
+it('proves the default hot path is style-free and stays within the bundle bound', () => {
   const packageRoot = resolve(import.meta.dirname, '..')
   const source = readFileSync(resolve(packageRoot, 'src/channel.ts'), 'utf8')
   const dispatchStart = source.indexOf('const dispatchValue')

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createStoreKeyedRangeError, StoreKeyedErrorCode, STORE_KEYED_SOURCE } from '../src/errors'
 
-describe('store-keyed error-code contract (E-T9)', () => {
+describe('store-keyed error-code contract', () => {
   it('declares 10 unique codes under the package source', () => {
     const codes = Object.values(StoreKeyedErrorCode)
     expect(codes).toHaveLength(10)

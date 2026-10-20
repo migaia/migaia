@@ -33,7 +33,7 @@ const artifacts: readonly IStorageV2ArtifactProvenance[] = [
   }
 ]
 
-/** Complete pnpm v9 fixture accepted by the strict C2-R4 profile. */
+/** Complete pnpm v9 fixture accepted by the strict lockfile profile. */
 const validLockfile = `lockfileVersion: '9.0'
 
 settings:
@@ -77,7 +77,7 @@ function replaceUnique(source: string, expected: string, replacement: string): s
   return source.replace(expected, replacement)
 }
 
-describe('SWV2-T58 root-owned strict lock provenance tool', () => {
+describe('root-owned strict lock provenance tool', () => {
   it('owns directly declared and independently locked parser dependencies', () => {
     const ownerManifest = JSON.parse(
       readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8')

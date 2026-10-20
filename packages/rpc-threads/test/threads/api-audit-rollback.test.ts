@@ -2,7 +2,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { expect, it } from 'vitest'
 import { createWebThreadLauncher } from '../../src/threads/index.js'
 
-it('[RT-D02] rolls back the actual acquired Worker when its first physical write fails', async () => {
+it('rolls back the actual acquired Worker when its first physical write fails', async () => {
   /** The native I/O failure must remain the same primary exception after rollback. */
   const original = new Error('audit initial Worker write failed')
   /** The public constructor publishes each actual acquired resource for final leak cleanup. */

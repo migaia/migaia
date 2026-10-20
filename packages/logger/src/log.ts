@@ -62,8 +62,7 @@ import {
 /**
  * Cross-realm-safe check for "awaitable", so a Promise constructed in another realm (an iframe, a
  * VM context) or a plain thenable object still gets tracked. `instanceof Promise` only matches the
- * current realm's Promise constructor — see LG-R3-2 in
- * docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+ * current realm's Promise constructor.
  */
 /** Resolves one immutable scheduler facade before PluginHost or logger code can observe it. */
 function resolveLoggerScheduler(value: unknown): IScheduler {
@@ -191,7 +190,7 @@ class LoggerCore {
   #shutdownPromise: Promise<IPluginHostDisposalResult> | undefined
   /** Extends() 注册的转发目标 */
   #extendTargets: ILoggerExtendsTarget<IMiddlewarePipelineMode>[] = []
-  /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
+  /** 单调时钟源；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
   #scheduler: IScheduler
   /** Captured host capability owner prevents global default changes from retargeting this logger. */
   #runtimeManager: ILoggerRuntimeManager
@@ -507,9 +506,9 @@ class LoggerCore {
 
   /**
    * `deadlineAt` defaults to a fresh 3s budget for a standalone `flush()` call, but shutdown()
-   * passes in the same absolute deadline it already used for the shutdown-handler loop — see
-   * LG-R5-1 — so a single shutdown() invocation spends at most one 3s budget total instead of
-   * handlers and flush each getting their own independent window.
+   * passes in the same absolute deadline it already used for the shutdown-handler loop — see — so a
+   * single shutdown() invocation spends at most one 3s budget total instead of handlers and flush
+   * each getting their own independent window.
    *
    * `deadlineAt` is an absolute deadline in this logger's monotonic `scheduler` clock (the same
    * clock `boundedWait` reads), not a Unix epoch; compute it with `scheduler.now() + budgetMs`.
@@ -602,13 +601,12 @@ class LoggerCore {
     })
     // One absolute deadline covers the entire shutdown sequence: shutdown handlers first, then the
     // flush phases they may have queued work for. #drain()/flusher/extends-target waits inside
-    // flush() were already bounded by a deadline (LG-R3-1, LG-R4-2/3); the handler loop itself was
+    // flush() were already bounded by a deadline; the handler loop itself was
     // still a raw, unbounded `await handler(reason)` with no protection at all — a handler shaped
     // like "flush a client, then resolve" that has a bug and never settles hung shutdown() forever.
     // Reusing this single budget for the subsequent flush() call (instead of a fresh 3s window)
     // also keeps total shutdown latency bounded to ~3s instead of handlers-plus-flush stacking two
-    // independent windows. See LG-R5-1 in
-    // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+    // independent windows.
     ;(async () => {
       /** Explicit presence retains even a thrown undefined as the primary shutdown failure. */
       let failed = false
@@ -903,8 +901,7 @@ class LoggerCore {
     // — a plain object spread copies symbol keys too). It must be read from that same location:
     // reading from the entry root (as an earlier version of this method did) always sees
     // undefined past the first hop, silently resetting the accumulated path and defeating the
-    // cycle guard on every hop after the first — see LG-R3-4 in
-    // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+    // cycle guard on every hop after the first.
     const internal = (
       entry.data as Record<PropertyKey, unknown> & { [loggerInternalState]?: ILoggerInternalState }
     )[loggerInternalState]

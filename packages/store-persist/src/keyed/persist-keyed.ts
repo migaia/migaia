@@ -48,9 +48,8 @@ function toPersistUnit<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>
 
 /**
  * Persists one keyed definition in an `AtomStore`. `AtomStore` and `familyDef` do not inventory
- * currently existing keys, so the persistence unit is one key rather than a whole family (SDD
- * §3.4). Each call creates an independent `persistUnit()` instance. Disposal affects only that
- * key.
+ * currently existing keys, so the persistence unit is one key rather than a whole family. Each call
+ * creates an independent `persistUnit()` instance. Disposal affects only that key.
  */
 export function persistKeyed<T>(
   atomStore: IAtomStore,

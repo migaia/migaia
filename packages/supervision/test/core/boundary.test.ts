@@ -20,7 +20,7 @@ function sources(directory: string): string[] {
   })
 }
 
-describe('A1 runtime-neutral boundary', () => {
+describe('runtime-neutral boundary', () => {
   it('keeps source imports and package dependencies inward', () => {
     const root = join(import.meta.dirname, '../..')
     const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
@@ -62,7 +62,7 @@ describe('A1 runtime-neutral boundary', () => {
             '@migaia/lifecycle/scheduler',
             '@migaia/utils/scheduler',
             '@migaia/utils/error',
-            // U24 D27 reuses the canonical runtime-neutral thenable observer for passive listeners.
+            // Reuses the canonical runtime-neutral thenable observer for passive listeners.
             '@migaia/utils/function',
             // Type-only: the structural abort signal is owned by utils.
             '@migaia/utils/promise'

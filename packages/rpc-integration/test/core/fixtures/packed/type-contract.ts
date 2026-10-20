@@ -199,7 +199,7 @@ async function verifyPackedContracts(): Promise<void> {
 
 void verifyPackedContracts
 
-/** D33 packed declarations keep every independently exported factory on the checked route. */
+/** Packed declarations keep every independently exported factory on the checked route. */
 async function verifyPackedPipelineMatrix(): Promise<void> {
   await createFullEndpoint({ id: 'packed-full-semantic', middlewares: [], transport: semantic })
   await createEndpoint({ id: 'packed-root-opaque', middlewares: [], transport: opaque })

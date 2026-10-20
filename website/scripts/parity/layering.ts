@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
-// P2: layering check
+// Layering check
 console.log('✓ layering check framework ready')

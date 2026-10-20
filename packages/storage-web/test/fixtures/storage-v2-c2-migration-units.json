@@ -6,42 +6,42 @@
     {
       "path": "Makefile",
       "owner": "repository-tooling",
-      "reason": "C2-R4 D18 release orchestration hardening created after the immutable C2-R1 capture; it is host/release acceptance evidence, not a B00 migration-unit semantic patch."
+      "reason": "Release orchestration hardening created after the immutable observation capture; it is host/release acceptance evidence, not a migration-unit semantic patch."
     },
     {
       "path": "packages/storage-web/test/fixtures/storage-v2-bounded-capability-catalog.json",
       "owner": "repository-tooling",
-      "reason": "C2-R2 bounded T44 catalog created after the immutable C2-R1 capture; it is architecture-gate evidence, not a migration-unit semantic patch."
+      "reason": "Bounded architecture catalog created after the immutable observation capture; it is architecture-gate evidence, not a migration-unit semantic patch."
     },
     {
-      "path": "packages/storage-web/test/fixtures/storage-v2-bounded-t44-hostile.json",
+      "path": "packages/storage-web/test/fixtures/storage-v2-bounded-hostile.json",
       "owner": "repository-tooling",
-      "reason": "C2-R2 bounded T44 hostile fixture created after the immutable C2-R1 capture; it is architecture-gate evidence, not a migration-unit semantic patch."
+      "reason": "Bounded hostile fixture created after the immutable observation capture; it is architecture-gate evidence, not a migration-unit semantic patch."
     },
     {
       "path": "packages/storage-web/test/fixtures/storage-v2-c2-migration-units.json",
       "owner": "repository-tooling",
-      "reason": "C2-R3 executable migration ledger created after the immutable C2-R1 capture and sealed by the T54 source contract."
+      "reason": "Executable migration ledger created after the immutable observation capture and sealed by the source contract."
     },
     {
       "path": "packages/storage-web/test/fixtures/storage-v2-c2-observation-snapshot.jsonl",
       "owner": "repository-tooling",
-      "reason": "The immutable C2-R1 snapshot excludes its own path by capture rule and is sealed independently by the snapshot validator."
+      "reason": "The immutable observation snapshot excludes its own path by capture rule and is sealed independently by the snapshot validator."
     },
     {
       "path": "packages/web-rpc/src/internal/composed-disposal-observer.ts",
       "owner": "@migaia/web-rpc",
-      "reason": "Concurrent user-owned direct-consumer work created after C2-R1; unrelated to storage-v2 C2-R3 and excluded from every migration numerator."
+      "reason": "Concurrent user-owned direct-consumer work created after the observation capture; unrelated to the storage-v2 migration and excluded from every migration numerator."
     },
     {
       "path": "packages/web-rpc/test/packed-d95-boundary.mjs",
       "owner": "@migaia/web-rpc",
-      "reason": "Concurrent WebRPC Cycle H D95/T222 packed source-dist-export and two-copy boundary work created after C2-R1; it is owned by the active WebRPC continuation SDD, unrelated to storage-v2 C2-R3, and excluded from every migration numerator."
+      "reason": "Concurrent WebRPC packed source-dist-export and two-copy boundary work created after the observation capture; it is owned by the WebRPC continuation, unrelated to the storage-v2 migration, and excluded from every migration numerator."
     },
     {
       "path": "packages/web-rpc/test/packed-provider-authority.mjs",
       "owner": "@migaia/web-rpc",
-      "reason": "Concurrent user-owned direct-consumer test work created after C2-R1; unrelated to storage-v2 C2-R3 and excluded from every migration numerator."
+      "reason": "Concurrent user-owned direct-consumer test work created after the observation capture; unrelated to the storage-v2 migration and excluded from every migration numerator."
     }
   ],
   "migrationUnits": [
@@ -51,12 +51,18 @@
       "canonicalOwners": ["@migaia/event-subscriber"],
       "provides": ["event.dispatch-policy"],
       "consumers": [
-        { "id": "storage.memory.queued-feed", "requires": ["event.dispatch-policy"] },
-        { "id": "storage.indexed-db.queued-feed", "requires": ["event.dispatch-policy"] }
+        {
+          "id": "storage.memory.queued-feed",
+          "requires": ["event.dispatch-policy"]
+        },
+        {
+          "id": "storage.indexed-db.queued-feed",
+          "requires": ["event.dispatch-policy"]
+        }
       ],
       "exports": ["@migaia/event-subscriber.EventDispatchPolicy"],
       "dependencies": [],
-      "tests": ["SWV2-T45", "SWV2-T46", "SWV2-T53"],
+      "tests": ["nested publish traces", "post-commit failure policy", "event trace migration"],
       "assets": [
         "event.dispatch-policy-contract",
         "event.queued-runtime",
@@ -80,8 +86,8 @@
         "manifest": ["packages/event-subscriber/package.json"],
         "lock": ["pnpm-lock.yaml"],
         "test": [
-          "packages/event-subscriber/test/storage-v2-b00-red.spec.ts",
-          "packages/store-light/test/storage-v2-t53-event-trace.test.ts",
+          "packages/event-subscriber/test/storage-v2-event-ownership.spec.ts",
+          "packages/store-light/test/storage-v2-event-trace.test.ts",
           "packages/web-rpc/test/storage-v2-t53-event-trace.test.ts"
         ],
         "docs": ["packages/event-subscriber/README.md"],
@@ -116,11 +122,14 @@
       "canonicalOwners": ["@migaia/utils"],
       "provides": ["utils.abort-timeout-signal"],
       "consumers": [
-        { "id": "storage.operation-signal-adapter", "requires": ["utils.abort-timeout-signal"] }
+        {
+          "id": "storage.operation-signal-adapter",
+          "requires": ["utils.abort-timeout-signal"]
+        }
       ],
       "exports": ["@migaia/utils.createAbortTimeoutSignal"],
       "dependencies": [],
-      "tests": ["SWV2-T47", "SWV2-T48", "SWV2-T49"],
+      "tests": ["abort signal migration", "abort timeout ownership", "abort timeout rollback"],
       "assets": [
         "utils.abort-timeout-signal-runtime",
         "storage.operation-signal-adapter",
@@ -173,7 +182,7 @@
       ],
       "exports": [],
       "dependencies": ["@migaia/storage-web -> @migaia/lifecycle"],
-      "tests": ["SWV2-T50"],
+      "tests": ["live-query ownership"],
       "assets": [
         "storage.lifecycle-dependency-edge",
         "storage.live-ownership-model",
@@ -194,10 +203,10 @@
         "assets": []
       },
       "emptyCategoryReasons": {
-        "adapter": "This B00-A unit is an ownership blueprint; the production adapter is forbidden before B06.",
-        "consumer": "No production live-query consumer is authorized before B06.",
-        "export": "No storage-web live-query export is authorized before B06.",
-        "docs": "Public live-query documentation is deferred to the authorized B06/B07 implementation.",
+        "adapter": "This unit is an ownership blueprint; the production adapter is forbidden before the live-query implementation.",
+        "consumer": "No production live-query consumer is authorized before the live-query implementation.",
+        "export": "No storage-web live-query export is authorized before the live-query implementation.",
+        "docs": "Public live-query documentation is deferred to the authorized live-query implementation.",
         "assets": "The ownership-model test is the only file asset and is classified as test."
       },
       "deletePoints": []
@@ -210,7 +219,12 @@
       "consumers": [],
       "exports": ["@migaia/utils.isUint8Array", "@migaia/utils.isArrayBuffer"],
       "dependencies": [],
-      "tests": ["SWV2-T55", "SWV2-T56", "SWV2-T57", "SWV2-T58"],
+      "tests": [
+        "byte-brand baseline",
+        "byte-brand contract",
+        "byte-brand web boundary",
+        "serialize byte boundaries"
+      ],
       "assets": ["utils.byte-brand-runtime", "storage-web.byte-brand-browser"],
       "categories": {
         "owner": ["packages/utils/src/bytes.ts"],

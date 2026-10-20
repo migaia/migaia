@@ -3,9 +3,9 @@ import type { IRpcEndpoint } from '@migaia/rpc-core'
 /**
  * Defines a managed RPC message handler for the worker side.
  *
- * Following `lifecycle-extraction.sdd.md` §4.1, `dispose()` is the only asynchronous disposal entry
- * point. It always returns `Promise<void>`; there is no `disposeAsync()`. `close()` synchronously
- * stops accepting work without running user cleanup.
+ * `dispose()` is the only asynchronous disposal entry point. It always returns `Promise<void>`;
+ * there is no `disposeAsync()`. `close()` synchronously stops accepting work without running user
+ * cleanup.
  */
 export type IManagedRpcHandler = {
   (message: unknown): Promise<void>

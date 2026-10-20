@@ -425,7 +425,7 @@ setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不
 
 依赖感知的 `disable`/`unUse` 接受 `{ policy?: 'reject' | 'cascade' | 'suspend'; dryRun?: boolean }`，默认 `reject`；`detail.blockedBy` 按级联处理顺序列出**全部**传递依赖者。`policy: 'cascade'` 连同依赖者一起处理；`policy: 'suspend'` 保留已激活依赖者的实例与资源，但句柄和已取出的 extension 抛 `PLUGIN_SUSPENDED`，stage 暂时离开 pipeline。`dryRun` 返回 `{ policy, order, steps, edges }`。旧 `{ cascade: true }` 被拒绝为 `INVALID_OPTION`。同一 provider 重新启用时直接恢复；同名新 provider 安装后按 capability `planResume` 对直接依赖者 rebind/restart，其余可满足的传递依赖者 resume。托管组合协议仍拒绝留下必需依赖者，并按依赖者优先顺序清理；`host.dispose()` 也按依赖者优先顺序释放，包括挂起注册。
 
-**卸载迁移（BC1–BC3）**：真实 `unUse` 的成功和清理失败结果现在都带冻结的 `affected: { policy, order, steps, edges }`，只记录已生效步骤；原先严格比较 `{ok:true}` 的读者改为检查 `ok` 并读取 `affected`。TypeScript 的 `unUse(name, {dryRun:true})` 返回计划，省略 `dryRun` 或传字面量 `false` 返回执行结果；宽 `boolean` 须先按值分支。插件定义可增加 `beforeRelease(context)`，在该代已安装注册撤销前运行一次；以前被当作普通元数据的同名非函数值现在于定义或准入时以原生 `TypeError`（`INVALID_OPTION`）拒绝。钩子 throw/reject 作为 `PLUGIN_DISPOSE_FAILED` 收集，原错误在 `cause`；超时内层为 `DISPOSE_STEP_TIMEOUT`，清理继续。
+**卸载迁移**：真实 `unUse` 的成功和清理失败结果现在都带冻结的 `affected: { policy, order, steps, edges }`，只记录已生效步骤；原先严格比较 `{ok:true}` 的读者改为检查 `ok` 并读取 `affected`。TypeScript 的 `unUse(name, {dryRun:true})` 返回计划，省略 `dryRun` 或传字面量 `false` 返回执行结果；宽 `boolean` 须先按值分支。插件定义可增加 `beforeRelease(context)`，在该代已安装注册撤销前运行一次；以前被当作普通元数据的同名非函数值现在于定义或准入时以原生 `TypeError`（`INVALID_OPTION`）拒绝。钩子 throw/reject 作为 `PLUGIN_DISPOSE_FAILED` 收集，原错误在 `cause`；超时内层为 `DISPOSE_STEP_TIMEOUT`，清理继续。
 
 ## 热替换与惰性激活
 

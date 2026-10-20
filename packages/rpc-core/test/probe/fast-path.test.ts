@@ -4,7 +4,7 @@ import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { defineProbe, probePlugin, type IRpcProbeDescriptor } from '../../dist/core/probe/index.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
 
-it('[closure A4] keeps the canonical fast endpoint proof and unchanged business/debug state', async () => {
+it('keeps the canonical fast endpoint proof and unchanged business/debug state', async () => {
   /** Baseline and observed endpoints exercise the same public middleware and carrier owners. */
   const snapshots: unknown[] = []
   for (const observed of [false, true]) {
@@ -54,7 +54,7 @@ it('[closure A4] keeps the canonical fast endpoint proof and unchanged business/
   expect(snapshots[1]).toEqual(snapshots[0])
 })
 
-it('[closure A4] describes plugin-only encryption from the authentication configuration owner', async () => {
+it('describes plugin-only encryption from the authentication configuration owner', async () => {
   /** Plugin-only installation must report the same mode as a Peer option installation. */
   const descriptors: IRpcProbeDescriptor[] = []
   /** This cold callback observes only the successfully activated endpoint configuration. */

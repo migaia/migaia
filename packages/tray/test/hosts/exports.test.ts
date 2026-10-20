@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { fixture } from './helper.js'
 
 describe('Tray public boundary and lifecycle events', () => {
-  it('[mesh A5] exports routing capabilities and registered mesh diagnostics', async () => {
+  it('exports routing capabilities and registered mesh diagnostics', async () => {
     /** The built package root is the public consumer boundary. */
     const api = await fixture()
     for (const name of ['defineRoutingPolicy', 'roundRobin', 'leastInFlight'])
@@ -17,7 +17,7 @@ describe('Tray public boundary and lifecycle events', () => {
     ])
       expect(Object.values(api.TrayErrorCode)).toContain(code)
   })
-  it('[A8] exposes the complete instances runtime API, coded messages and listed native child fixtures', async () => {
+  it('exposes the complete instances runtime API, coded messages and listed native child fixtures', async () => {
     /** Built root is the package boundary also used by Node fixtures. */
     const api = await fixture()
     for (const symbol of [
@@ -84,7 +84,7 @@ describe('Tray public boundary and lifecycle events', () => {
       expect(exceptions).toContain(`packages/tray/test/hosts/fixtures/${file}`)
   })
 
-  it('[A5 A8] freezes lifecycle records before listeners and watch, reports listener failure and preserves event order', async () => {
+  it('freezes lifecycle records before listeners and watch, reports listener failure and preserves event order', async () => {
     /** A lifecycle mutation attempt must not affect any later observer. */
     const reports: unknown[] = []
     /** Read-only API and child Feature use the same plain coroutine host. */

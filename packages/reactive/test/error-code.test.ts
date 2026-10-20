@@ -35,14 +35,14 @@ function collectSourceFiles(dir: string): string[] {
 
 /**
  * Strips comments before scanning for code literals. Doc comments legitimately quote code names
- * (that is the §3.5.1 JSDoc requirement); only real code is an "inline literal" violation.
+ * (that is JSDoc requirement); only real code is an "inline literal" violation.
  */
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
-// M-T36 正向：§3.7.1 的每个码都要有一个真实、可验证的触发点。
-describe('M-T36 (§3.7.1): every declared code has a real trigger', () => {
+// 正向： 的每个码都要有一个真实、可验证的触发点。
+describe('every declared code has a real trigger', () => {
   it('shared attachment preserves native Error identity, cause, and stack', () => {
     const cause = new Error('cause')
     const error = createReactiveError('TEST_CODE', 'message', { cause })
@@ -263,8 +263,8 @@ describe('M-T36 (§3.7.1): every declared code has a real trigger', () => {
   })
 })
 
-// M-T36 反向：不得有码之外的裸抛出，不得残留迁走的五条，(source, code) 必须唯一。
-describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does not overreach', () => {
+// 反向：不得有码之外的裸抛出，不得残留迁走的五条，(source, code) 必须唯一。
+describe('reverse direction: the table is exhaustive and does not overreach', () => {
   const srcFiles = collectSourceFiles(srcDir)
 
   it('scans a non-trivial number of source files (guards against a silently empty scan)', () => {
@@ -379,8 +379,8 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
   })
 })
 
-// M-T41：抛出物必须携带 (source, code)、stack 非空且未被重写、原始错误沿 cause 链可达。
-describe('M-T41 (§3.7.5): (source, code) tagging never damages stack or the cause chain', () => {
+// 抛出物必须携带 (source, code)、stack 非空且未被重写、原始错误沿 cause 链可达。
+describe('(source, code) tagging never damages stack or the cause chain', () => {
   it('a tagged error keeps a non-empty stack that points at its own throw site', () => {
     const clock = new VersionClock(1)
     clock.next()
@@ -423,13 +423,13 @@ describe('M-T41 (§3.7.5): (source, code) tagging never damages stack or the cau
     } catch (error) {
       caught = error
     }
-    // §3.2 cause 可达：AggregateError.errors 是合法可达路径，两个原始错误都按 identity 可达。
+    // cause 可达：AggregateError.errors 是合法可达路径，两个原始错误都按 identity 可达。
     const errors = (caught as { errors?: unknown[] }).errors
     expect(errors?.[0]).toBe(actionFailure)
     expect(errors?.[1]).toBeInstanceOf(Error)
   })
 
-  it('AF-T5: a frozen business Error is not mutated — both failures stay identity-reachable via AggregateError', () => {
+  it('a frozen business Error is not mutated — both failures stay identity-reachable via AggregateError', () => {
     const scheduler = new Scheduler()
     const frozen = Object.freeze(new Error('frozen action failure'))
     const flushError = new Error('flush also failed')

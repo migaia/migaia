@@ -237,7 +237,7 @@ async function collectChunks(
         chunkIndex,
         bytesConsumed,
         code: SerializeErrorCode.aborted,
-        // R-1/T-15：abort 带 reason 时必须经 cause 保持 `=== reason` 可达；缺失则不制造原因。
+        // Abort 带 reason 时必须经 cause 保持 `=== reason` 可达；缺失则不制造原因。
         cause: details.signal.reason
       })
     }
@@ -411,11 +411,11 @@ export type {
 } from './types.js'
 
 /**
- * 双 Promise 模型（runtime-neutrality.sdd.md R-3）：把 parserTask 与「composed signal 已 abort」赛跑，使调用方在
- * parser 阻塞（encode/decode 永不 settle、AsyncIterable 不再 yield）时仍能因 abort 及时 settle，而不是永久挂起。
+ * 双 Promise 模型：把 parserTask 与「composed signal 已 abort」赛跑，使调用方在 parser 阻塞（encode/decode 永不
+ * settle、AsyncIterable 不再 yield）时仍能因 abort 及时 settle，而不是永久挂起。
  *
  * ParserTask 仍独立运行（detached），其迟到结果/拒绝被观测但不改变已结算的 public promise；abort 的 reason 经 `cause` 保持 `===
- * reason` 可达（R-1/T-15）。`{ once: true }` + settle 后 `removeEventListener` 保证监听器不泄漏。
+ * reason` 可达。`{ once: true }` + settle 后 `removeEventListener` 保证监听器不泄漏。
  */
 function raceAbort<T>(
   task: Promise<T>,
@@ -941,7 +941,7 @@ export function createSerializeRegistry(
   }
 
   // composed signal：caller + closing，first-observed-wins；closing 已 aborted 才 closing reason 优先。
-  // 返回 `dispose` 供 operation settle 后移除两个 listener（R-3「settle 后移除两个 listener」，防长期 caller signal 上的监听器泄漏）。
+  // 返回 `dispose` 供 operation settle 后移除两个 listener（防长期 caller signal 上的监听器泄漏）。
   const composeSignal = (
     caller?: IAbortSignal
   ): { readonly signal: IAbortSignal; readonly dispose: () => void } =>
@@ -1013,10 +1013,10 @@ export function createSerializeRegistry(
           }
         })()
 
-        // 租约唯一释放点 + detached 迟到 rejection 出口（R-3 HIGH-1）：track 完整 collect/encode task，
+        // 租约唯一释放点 + detached 迟到 rejection 出口：track 完整 collect/encode task，
         // pending owns drain; raceAbort owns every rejection detached by public cancellation.
         track(parserTask)
-        // 双 Promise（R-3）：public promise = race(parserTask, composed abort)，abort 时及时 settle。
+        // 双 Promise：public promise = race(parserTask, composed abort)，abort 时及时 settle。
         return await raceAbort(
           parserTask,
           signal,

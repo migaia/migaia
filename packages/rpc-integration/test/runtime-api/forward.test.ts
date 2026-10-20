@@ -75,230 +75,225 @@ it.each([
   'group-retire',
   'group-business-cancel',
   'missing-order'
-] as const)(
-  '[A59][A66][A67][A74] managed native relay preserves %s final-owner semantics',
-  async (mode) => {
-    /** A-to-B uses genuine Host slots; B-to-C is the original managed Worker assembly. */
-    const owners = [owner(), owner()] as const
-    const carriers: ReturnType<typeof runtimeSources>[] = []
-    const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
-    const native = createNodeThreadLauncher()
-    /** The true native handle supplies retirement independently of any facade counter. */
-    let unit: Awaited<ReturnType<typeof native.launch>> | undefined
-    const capabilities = [
-      ...RUNTIME_API_CAPABILITIES,
-      RpcCapability.generation,
-      RpcCapability.group,
-      RpcCapability.order,
-      RpcCapability.cancelBeforeStart,
-      RpcCapability.outcome
-    ]
-    let holding: Promise<unknown> | undefined
-    let follower: Promise<unknown> | undefined
-    let iterator: AsyncIterableIterator<unknown> | undefined
-    try {
-      await owners[1].use(
-        createThreadPlugin({
-          name: 'c',
-          spawn: {
-            spec: {
-              entry: fileURLToPath(new URL('./fixtures/runtime-u25-worker.mjs', import.meta.url))
-            },
-            budget,
-            scheduler: systemScheduler,
-            launcher: {
-              ...native,
-              launch: async (spec, request) => {
-                unit = await (mode === 'missing-order'
-                  ? (() => {
-                      const context = readRuntimeLaunchContext(request)!
-                      return withRuntimeLaunchContext(
-                        request,
-                        {
-                          ...context,
-                          capabilities: context.capabilities.filter(
-                            (capability) => capability !== RpcCapability.order
-                          )
-                        },
-                        () => native.launch(spec, request)
-                      )
-                    })()
-                  : native.launch(spec, request))
-                return unit
-              }
-            },
-            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-            report: () => undefined
+] as const)('managed native relay preserves %s final-owner semantics', async (mode) => {
+  /** A-to-B uses genuine Host slots; B-to-C is the original managed Worker assembly. */
+  const owners = [owner(), owner()] as const
+  const carriers: ReturnType<typeof runtimeSources>[] = []
+  const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
+  const native = createNodeThreadLauncher()
+  /** The true native handle supplies retirement independently of any facade counter. */
+  let unit: Awaited<ReturnType<typeof native.launch>> | undefined
+  const capabilities = [
+    ...RUNTIME_API_CAPABILITIES,
+    RpcCapability.generation,
+    RpcCapability.group,
+    RpcCapability.order,
+    RpcCapability.cancelBeforeStart,
+    RpcCapability.outcome
+  ]
+  let holding: Promise<unknown> | undefined
+  let follower: Promise<unknown> | undefined
+  let iterator: AsyncIterableIterator<unknown> | undefined
+  try {
+    await owners[1].use(
+      createThreadPlugin({
+        name: 'c',
+        spawn: {
+          spec: {
+            entry: fileURLToPath(new URL('./fixtures/runtime-api-worker.mjs', import.meta.url))
           },
+          budget,
+          scheduler: systemScheduler,
+          launcher: {
+            ...native,
+            launch: async (spec, request) => {
+              unit = await (mode === 'missing-order'
+                ? (() => {
+                    const context = readRuntimeLaunchContext(request)!
+                    return withRuntimeLaunchContext(
+                      request,
+                      {
+                        ...context,
+                        capabilities: context.capabilities.filter(
+                          (capability) => capability !== RpcCapability.order
+                        )
+                      },
+                      () => native.launch(spec, request)
+                    )
+                  })()
+                : native.launch(spec, request))
+              return unit
+            }
+          },
+          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
           report: () => undefined
-        })
+        },
+        report: () => undefined
+      })
+    )
+    carriers.push(
+      await attach(
+        owners[0],
+        owners[1],
+        'b',
+        'a',
+        {},
+        { expose: ['c'] },
+        runtimeSources(capabilities, capabilities)
       )
-      carriers.push(
-        await attach(
-          owners[0],
-          owners[1],
-          'b',
-          'a',
-          {},
-          { expose: ['c'] },
-          runtimeSources(capabilities, capabilities)
-        )
+    )
+    const caller = owners[0].thread as unknown as IRuntimeOutlet
+    const direct = owners[1].thread as unknown as IRuntimeOutlet
+    assert.equal(await direct.request('c', 'count'), 0)
+    if (mode === 'missing-order') {
+      const result = await caller
+        .request('b', 'c.value', undefined, { orderKey: 'shared' })
+        .catch((error: unknown) => error)
+      assert.equal(
+        result && typeof result === 'object' && Reflect.get(result, 'code'),
+        RpcCoreErrorCode.capabilityUnsupported,
+        'a managed downstream cannot silently omit an unsupported order option'
       )
-      const caller = owners[0].thread as unknown as IRuntimeOutlet
-      const direct = owners[1].thread as unknown as IRuntimeOutlet
       assert.equal(await direct.request('c', 'count'), 0)
-      if (mode === 'missing-order') {
-        const result = await caller
-          .request('b', 'c.value', undefined, { orderKey: 'shared' })
-          .catch((error: unknown) => error)
-        assert.equal(
-          result && typeof result === 'object' && Reflect.get(result, 'code'),
-          RpcCoreErrorCode.capabilityUnsupported,
-          '[A74] a managed downstream cannot silently omit an unsupported order option'
+    } else if (mode === 'group-business-cancel') {
+      /** A live generation's business cancellation is not evidence of native retirement. */
+      const [result] = await caller.group('b', [{ method: 'c.cancelled' }])
+      assert.equal(result?.state, 'failure')
+      if (result?.state !== 'failure') assert.fail('retain the actual business failure')
+      assert.equal(result.error.code, RpcCoreErrorCode.cancelled)
+      assert.equal(result.error.cause?.code, RpcCoreErrorCode.capabilityUnsupported)
+      assert.equal(await direct.request('c', 'count'), 0)
+    } else if (mode === 'group-retire') {
+      /** One genuine downstream group is captured before its original native generation exits. */
+      holding = caller
+        .group('b', [{ method: 'c.hold' }, { method: 'c.value' }], { orderKey: 'shared' })
+        .catch((error: unknown) => error)
+      await vi.waitFor(async () => assert.equal(await direct.request('c', 'count'), 1))
+      const registration = readManagedRuntimeRegistration(
+        readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
+      )!
+      /** Observe the original leave reason, independently of the pending caller's rejection. */
+      const departed = new Promise<unknown>((resolve) => {
+        const unsubscribe = registration.events.onLeave(
+          registration.events.current().generation,
+          (reason) => {
+            unsubscribe()
+            resolve(reason)
+          }
         )
-        assert.equal(await direct.request('c', 'count'), 0)
-      } else if (mode === 'group-business-cancel') {
-        /** A live generation's business cancellation is not evidence of native retirement. */
-        const [result] = await caller.group('b', [{ method: 'c.cancelled' }])
-        assert.equal(result?.state, 'failure')
-        if (result?.state !== 'failure') assert.fail('[A65] retain the actual business failure')
-        assert.equal(result.error.code, RpcCoreErrorCode.cancelled)
-        assert.equal(result.error.cause?.code, RpcCoreErrorCode.capabilityUnsupported)
-        assert.equal(await direct.request('c', 'count'), 0)
-      } else if (mode === 'group-retire') {
-        /** One genuine downstream group is captured before its original native generation exits. */
-        holding = caller
-          .group('b', [{ method: 'c.hold' }, { method: 'c.value' }], { orderKey: 'shared' })
-          .catch((error: unknown) => error)
-        await vi.waitFor(async () => assert.equal(await direct.request('c', 'count'), 1))
+      })
+      unit!.terminate()
+      await unit!.exited
+      const reason = await departed
+      const failure = (await holding) as Error
+      assert.equal(
+        Reflect.get(failure, 'code'),
+        RpcCoreErrorCode.providerGenerationRetired,
+        'a forwarded group preserves captured native generation retirement'
+      )
+      const cause = Reflect.get(failure, 'cause') as Error
+      assert.ok(cause instanceof Error)
+      assert.equal(cause.message, (reason as Error).message)
+      assert.equal(cause.stack, (reason as Error).stack)
+    } else if (mode === 'stream' || mode === 'retire') {
+      iterator = caller.stream('b', 'c.values', undefined, {
+        orderKey: 'shared',
+        cancel: 'before-start',
+        idempotencyKey: 'managed-forward-stream'
+      })
+      const first = await iterator.next().catch((error: unknown) => error)
+      if (first instanceof Error)
+        assert.fail(
+          JSON.stringify({
+            source: Reflect.get(first, 'source'),
+            code: Reflect.get(first, 'code'),
+            name: first.name,
+            message: first.message
+          })
+        )
+      assert.equal(
+        first && typeof first === 'object' && Reflect.get(first, 'done'),
+        false,
+        'managed forwarding must retain the original runtime stream task'
+      )
+      if (mode === 'retire') {
+        /** OS exit and the original registration's retirement publication are distinct facts. */
         const registration = readManagedRuntimeRegistration(
           readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
         )!
-        /** Observe the original leave reason, independently of the pending caller's rejection. */
-        const departed = new Promise<unknown>((resolve) => {
+        const departed = new Promise<void>((resolve) => {
           const unsubscribe = registration.events.onLeave(
             registration.events.current().generation,
-            (reason) => {
+            () => {
               unsubscribe()
-              resolve(reason)
+              resolve()
             }
           )
         })
         unit!.terminate()
         await unit!.exited
-        const reason = await departed
-        const failure = (await holding) as Error
+        await departed
+        const failure = await iterator.next().catch((error: unknown) => error)
         assert.equal(
-          Reflect.get(failure, 'code'),
-          RpcCoreErrorCode.providerGenerationRetired,
-          '[A74] a forwarded group preserves captured native generation retirement'
-        )
-        const cause = Reflect.get(failure, 'cause') as Error
-        assert.ok(cause instanceof Error)
-        assert.equal(cause.message, (reason as Error).message)
-        assert.equal(cause.stack, (reason as Error).stack)
-      } else if (mode === 'stream' || mode === 'retire') {
-        iterator = caller.stream('b', 'c.values', undefined, {
-          orderKey: 'shared',
-          cancel: 'before-start',
-          idempotencyKey: 'managed-forward-stream'
-        })
-        const first = await iterator.next().catch((error: unknown) => error)
-        if (first instanceof Error)
-          assert.fail(
-            JSON.stringify({
-              source: Reflect.get(first, 'source'),
-              code: Reflect.get(first, 'code'),
-              name: first.name,
-              message: first.message
-            })
-          )
-        assert.equal(
-          first && typeof first === 'object' && Reflect.get(first, 'done'),
-          false,
-          '[A67] managed forwarding must retain the original runtime stream task'
-        )
-        if (mode === 'retire') {
-          /** OS exit and the original registration's retirement publication are distinct facts. */
-          const registration = readManagedRuntimeRegistration(
-            readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
-          )!
-          const departed = new Promise<void>((resolve) => {
-            const unsubscribe = registration.events.onLeave(
-              registration.events.current().generation,
-              () => {
-                unsubscribe()
-                resolve()
-              }
-            )
+          Reflect.get(failure as object, 'code'),
+          'PROVIDER_GENERATION_RETIRED',
+          JSON.stringify({
+            source: Reflect.get(failure as object, 'source'),
+            code: Reflect.get(failure as object, 'code'),
+            name: Reflect.get(failure as object, 'name'),
+            message: String(Reflect.get(failure as object, 'message')).slice(0, 160)
           })
-          unit!.terminate()
-          await unit!.exited
-          await departed
-          const failure = await iterator.next().catch((error: unknown) => error)
-          assert.equal(
-            Reflect.get(failure as object, 'code'),
-            'PROVIDER_GENERATION_RETIRED',
-            JSON.stringify({
-              source: Reflect.get(failure as object, 'source'),
-              code: Reflect.get(failure as object, 'code'),
-              name: Reflect.get(failure as object, 'name'),
-              message: String(Reflect.get(failure as object, 'message')).slice(0, 160)
-            })
-          )
-          assert.ok(Reflect.get(failure as object, 'cause') instanceof Error)
-        } else {
-          const terminal = await iterator.return!()
-          assert.equal(terminal.done, true)
-          assert.deepEqual({ ...(terminal.value as object) }, { final: 99, aborted: false })
-          const outcome = await caller.outcome('b', 'managed-forward-stream')
-          assert.equal(outcome.state, 'done')
-          if (outcome.state === 'done') assert.equal(outcome.outcome.mode, 'stream')
-        }
-      } else {
-        const options = {
-          orderKey: 'shared',
-          cancel: 'before-start' as const,
-          idempotencyKey: `managed-forward-${mode}`
-        }
-        if (mode === 'notify') await caller.notify('b', 'c.hold', undefined, options)
-        else
-          holding = caller
-            .request('b', 'c.hold', undefined, options)
-            .catch((error: unknown) => error)
-        await vi.waitFor(async () => assert.equal(await direct.request('c', 'count'), 1))
-        /** Same B caller/connection makes the final C key scope identical to the forwarded call. */
-        follower = direct
-          .request('c', 'value', undefined, { orderKey: 'shared' })
-          .catch((error: unknown) => error)
-        assert.equal(
-          await direct.request('c', 'count'),
-          1,
-          '[A59] C owns one FIFO across managed forwarded and direct calls from B'
         )
-        assert.equal(await direct.request('c', 'release'), 7)
-        if (holding) assert.equal(await holding, 42)
-        assert.equal(await follower, 2)
-        const outcome = await caller.outcome('b', `managed-forward-${mode}`)
+        assert.ok(Reflect.get(failure as object, 'cause') instanceof Error)
+      } else {
+        const terminal = await iterator.return!()
+        assert.equal(terminal.done, true)
+        assert.deepEqual({ ...(terminal.value as object) }, { final: 99, aborted: false })
+        const outcome = await caller.outcome('b', 'managed-forward-stream')
         assert.equal(outcome.state, 'done')
-        if (outcome.state === 'done') assert.equal(outcome.outcome.mode, mode)
+        if (outcome.state === 'done') assert.equal(outcome.outcome.mode, 'stream')
       }
-    } finally {
-      await Promise.resolve()
-        .then(() => owners[1].thread?.request('c', 'release'))
-        .catch(() => undefined)
-      await iterator?.return?.(undefined).catch(() => undefined)
-      for (const host of owners) await host.dispose()
-      for (const carrier of carriers) carrier.close()
-      await holding
-      await follower
+    } else {
+      const options = {
+        orderKey: 'shared',
+        cancel: 'before-start' as const,
+        idempotencyKey: `managed-forward-${mode}`
+      }
+      if (mode === 'notify') await caller.notify('b', 'c.hold', undefined, options)
+      else
+        holding = caller.request('b', 'c.hold', undefined, options).catch((error: unknown) => error)
+      await vi.waitFor(async () => assert.equal(await direct.request('c', 'count'), 1))
+      /** Same B caller/connection makes the final C key scope identical to the forwarded call. */
+      follower = direct
+        .request('c', 'value', undefined, { orderKey: 'shared' })
+        .catch((error: unknown) => error)
+      assert.equal(
+        await direct.request('c', 'count'),
+        1,
+        'C owns one FIFO across managed forwarded and direct calls from B'
+      )
+      assert.equal(await direct.request('c', 'release'), 7)
+      if (holding) assert.equal(await holding, 42)
+      assert.equal(await follower, 2)
+      const outcome = await caller.outcome('b', `managed-forward-${mode}`)
+      assert.equal(outcome.state, 'done')
+      if (outcome.state === 'done') assert.equal(outcome.outcome.mode, mode)
     }
-    assert.equal(budget.inUse, 0)
+  } finally {
+    await Promise.resolve()
+      .then(() => owners[1].thread?.request('c', 'release'))
+      .catch(() => undefined)
+    await iterator?.return?.(undefined).catch(() => undefined)
+    for (const host of owners) await host.dispose()
+    for (const carrier of carriers) carrier.close()
+    await holding
+    await follower
   }
-)
+  assert.equal(budget.inUse, 0)
+})
 
 it.each(['quota', 'drain'] as const)(
-  '[A60][A67][A114] original native %s owns a forwarded stream before C open',
+  'original native %s owns a forwarded stream before C open',
   async (policy) => {
     /** Genuine Host slots compile the relay; native policy wraps that same registered callback. */
     const owners = [owner(), owner(), owner()] as const
@@ -400,7 +395,7 @@ it.each(['quota', 'drain'] as const)(
         assert.equal(
           readEndpointOwner(endpoint.endpoint, 'provider-admission'),
           admission,
-          '[A67] custom endpoint retains genuine same Host quota'
+          'custom endpoint retains genuine same Host quota'
         )
         governor = createProcessProviderAdmission(
           channel as Parameters<typeof createProcessProviderAdmission>[0],
@@ -452,11 +447,7 @@ it.each(['quota', 'drain'] as const)(
       void pending.catch(() => undefined)
       if (policy === 'quota') {
         await assert.rejects(pending)
-        assert.equal(
-          constructed,
-          0,
-          '[A60] B quota refusal must precede actual C iterator construction'
-        )
+        assert.equal(constructed, 0, 'B quota refusal must precede actual C iterator construction')
       } else {
         await vi.waitFor(() => assert.equal(openSeen, true))
         assert.equal(constructed, 1)
@@ -468,7 +459,7 @@ it.each(['quota', 'drain'] as const)(
         assert.equal(
           drained,
           false,
-          '[A67] actual C preparation already occupies B original drain lifetime'
+          'actual C preparation already occupies B original drain lifetime'
         )
         releaseOpen()
         finish()
@@ -508,7 +499,7 @@ it.each(['quota', 'drain'] as const)(
 )
 
 it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
-  '[A62][A65][A69][A114] forwarded group namespace %s preserves one final provider and explicit query refusal',
+  'forwarded group namespace %s preserves one final provider and explicit query refusal',
   async (policy) => {
     /** Four original Hosts provide two distinct downstream targets and B's actual local route. */
     const owners = [owner(), owner(), owner(), owner()] as const
@@ -637,7 +628,7 @@ it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
           )
           assert.deepEqual(effects, ['first', 'fail'])
           if (result[1]!.state !== 'failure')
-            assert.fail('[A65] actual C failure must stay in complete group report')
+            assert.fail('actual C failure must stay in complete group report')
           assert.equal(result[1]!.error.code, RpcCoreErrorCode.capabilityUnsupported)
           assert.ok(result[1]!.error.stack)
           await vi.waitFor(() => {
@@ -648,7 +639,7 @@ it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
             assert.equal(
               replay.size,
               before[index]! + 2,
-              '[A62] both hops release the never-executed group suffix'
+              'both hops release the never-executed group suffix'
             )
           }
           assert.equal((await upstream.outcome('b', 'forward-group')).state, 'done')
@@ -690,7 +681,7 @@ it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
   }
 )
 
-it('[A59][A61][A114] forwarded order-only notify holds B original lease until C business completion', async () => {
+it('forwarded order-only notify holds B original lease until C business completion', async () => {
   /** Forwarding uses the actual three Host scopes and compiled provider callbacks. */
   const owners = [owner(), owner(), owner()] as const
   const carriers: ReturnType<typeof runtimeSources>[] = []
@@ -743,11 +734,7 @@ it('[A59][A61][A114] forwarded order-only notify holds B original lease until C 
     )!
     /** Allow original completed physical-send cleanup to run while C remains held. */
     await new Promise<void>((resolve) => setImmediate(resolve))
-    assert.equal(
-      admission.size,
-      1,
-      '[A61] physical notify completion cannot release B business lease'
-    )
+    assert.equal(admission.size, 1, 'physical notify completion cannot release B business lease')
     release()
     await vi.waitFor(() => assert.equal(admission.size, 0))
   } finally {
@@ -758,7 +745,7 @@ it('[A59][A61][A114] forwarded order-only notify holds B original lease until C 
 })
 
 it.each([4, 32])(
-  '[R14-A30] catalog %s admitted runtime relay uses captured slots without scanning the catalog',
+  'catalog %s admitted runtime relay uses captured slots without scanning the catalog',
   async (catalogSize) => {
     /** Actual Host-owned peers establish both independent hops before dispatch is observed. */
     const owners = [owner(), owner(), owner()] as const
@@ -789,17 +776,17 @@ it.each([4, 32])(
             decode: (value: unknown) => {
               const decoded = original.decode(value)
               const payload = (decoded as any)?.payload ?? (decoded as any)?.data?.payload
-              if (hop === 0 && side === 1 && payload?.marker === 'r14-relay')
+              if (hop === 0 && side === 1 && payload?.marker === 'fixture-relay')
                 incomingAt = normalization.mock.calls.length
               return decoded
             },
             encode: (value: unknown) => {
               const payload = (value as any)?.payload ?? (value as any)?.data?.payload
-              if (hop === 1 && side === 0 && payload?.marker === 'r14-relay') {
+              if (hop === 1 && side === 0 && payload?.marker === 'fixture-relay') {
                 const positions = normalization.mock.calls
                   .map(([input], index) => ({ input, index }))
                   .slice(incomingAt)
-                  .filter(({ input }) => (input as any)?.marker === 'r14-relay')
+                  .filter(({ input }) => (input as any)?.marker === 'fixture-relay')
                 const admitted = normalization.mock.results[positions[0]?.index ?? -1]?.value
                 relayed.push({ walks: positions.length - 1, reused: payload === admitted })
               }
@@ -859,11 +846,11 @@ it.each([4, 32])(
             await upstream.request(
               'b',
               'c.value',
-              { marker: 'r14-relay', nested: { value: index } },
+              { marker: 'fixture-relay', nested: { value: index } },
               { orderKey: 'same', timeoutMs: false }
             ),
             Object.assign(Object.create(null), {
-              marker: 'r14-relay',
+              marker: 'fixture-relay',
               nested: Object.assign(Object.create(null), { value: index })
             })
           )
@@ -880,11 +867,7 @@ it.each([4, 32])(
               entry.result?.kind === 'forward' &&
               typeof entry.result?.slot === 'function'
           )
-        assert.equal(
-          direct.length,
-          20,
-          '[R14-A30] each actual relay selects one compiled captured slot'
-        )
+        assert.equal(direct.length, 20, 'each actual relay selects one compiled captured slot')
         const catalogOwner = direct[0]!.owner
         assert.equal(
           direct.every((entry) => entry.owner === catalogOwner),
@@ -897,13 +880,13 @@ it.each([4, 32])(
             0
           ),
           0,
-          '[R14-A30] captured relay catalog is never enumerated during business'
+          'captured relay catalog is never enumerated during business'
         )
-        assert.equal(relayed.length, 20, '[R14-A30] actual B forwarding encoder observed all calls')
+        assert.equal(relayed.length, 20, 'actual B forwarding encoder observed all calls')
         assert.equal(
           relayed.every((entry) => entry.walks === 0 && entry.reused),
           true,
-          '[R14-A30] two-layer relay reuses admitted input with zero additional portable walk'
+          'two-layer relay reuses admitted input with zero additional portable walk'
         )
         const catalogScans = scans.mock.contexts.filter(
           (value: unknown) =>
@@ -919,7 +902,7 @@ it.each([4, 32])(
         assert.equal(
           catalogScans.length,
           0,
-          '[R15] the real relay cannot scan its compiled catalog per call'
+          'the real relay cannot scan its compiled catalog per call'
         )
       } finally {
         scans.mockRestore()
@@ -935,7 +918,7 @@ it.each([4, 32])(
 )
 
 it.each(['request', 'group', 'notify', 'stream'] as const)(
-  '[A66][A67][A69][A114] C %s start wins over forwarded cancellation and stream finish retains the true final result',
+  'C %s start wins over forwarded cancellation and stream finish retains the true final result',
   async (mode) => {
     /** Three independent Hosts exercise the actual forwarding registration and C's executor. */
     const owners = [owner(), owner(), owner()] as const
@@ -977,7 +960,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
                   assert.equal(
                     context.signal.aborted,
                     false,
-                    '[A66] cancellation cannot abort running C business'
+                    'cancellation cannot abort running C business'
                   )
                   return 42
                 },
@@ -989,14 +972,14 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
                     assert.equal(
                       context.signal.aborted,
                       false,
-                      '[A66] cancellation cannot abort running C generator'
+                      'cancellation cannot abort running C generator'
                     )
                     yield 1
                     yield 2
                     assert.equal(
                       context.signal.aborted,
                       false,
-                      '[A67] discard must complete the same C generator'
+                      'discard must complete the same C generator'
                     )
                     return 42
                   })()
@@ -1056,10 +1039,10 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
       assert.deepEqual(
         forwarded?.route.forwardRoute,
         [await nodeOf(owners[0], 'b'), await nodeOf(owners[1], 'c')],
-        '[A111] each new-profile mode retains the authenticated loop/hop route'
+        'each new-profile mode retains the authenticated loop/hop route'
       )
       cancel.abort()
-      assert.equal(signal!.aborted, false, '[A66] C owns the actual start decision')
+      assert.equal(signal!.aborted, false, 'C owns the actual start decision')
       assert.equal((await upstream.outcome('b', 'started-forward')).state, 'pending')
       if (mode === 'notify') assert.equal(await operation, undefined)
       release()
@@ -1094,7 +1077,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
 )
 
 it.each(['request', 'group', 'notify', 'stream'] as const)(
-  '[A66][A69][A114] forwarded %s cancellation is decided at C and outcome reads only C',
+  'forwarded %s cancellation is decided at C and outcome reads only C',
   async (mode) => {
     /** Original slots and lifetime scopes exist on three independent Hosts. */
     const owners = [owner(), owner(), owner()] as const
@@ -1197,7 +1180,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
       assert.deepEqual(
         await upstream.outcome('b', 'forward-key'),
         pending,
-        '[A69] B cannot substitute its own store or claim C work'
+        'B cannot substitute its own store or claim C work'
       )
       cancel.abort()
       await vi.waitFor(
@@ -1205,7 +1188,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
           assert.equal(
             (await downstream.outcome('c', 'forward-key')).state,
             'done',
-            '[A66] real C store observes final queued cancellation'
+            'real C store observes final queued cancellation'
           ),
         { timeout: 1000 }
       )
@@ -1231,7 +1214,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
   }
 )
 
-it('[A65][A114] the Host facade forwards one complete group and final provider refuses the whole group before any effect', async () => {
+it('the Host facade forwards one complete group and final provider refuses the whole group before any effect', async () => {
   /** Three real Hosts retain their original current slots, scopes and authenticated identity facts. */
   const owners = [owner(), owner(), owner()] as const
   const carriers: ReturnType<typeof runtimeSources>[] = []
@@ -1288,7 +1271,7 @@ it('[A65][A114] the Host facade forwards one complete group and final provider r
     assert.equal(
       typeof Reflect.get(outlet, 'group'),
       'function',
-      '[A114] group belongs to the original target-selection facade'
+      'group belongs to the original target-selection facade'
     )
     const endpoint = readRuntimePeerConnection(
       readRuntimeOutletConnection(owners[1].thread, 'c')!.peer
@@ -1303,7 +1286,7 @@ it('[A65][A114] the Host facade forwards one complete group and final provider r
             { method: 'c.service.two' }
           ]),
         { code: 'OVERLOADED' },
-        '[A114] C must reserve the whole group before executing its first step'
+        'C must reserve the whole group before executing its first step'
       )
       assert.deepEqual(effects, [])
       const groups = send.mock.calls
@@ -1312,11 +1295,7 @@ it('[A65][A114] the Host facade forwards one complete group and final provider r
             readRuntimeCarrier(args[0])?.frame as { kind?: string; steps?: unknown } | undefined
         )
         .filter((frame) => frame?.kind === 'runtime-group')
-      assert.equal(
-        groups.length,
-        1,
-        '[A65] B sends one group rather than scalar calls or JSON-RPC batch'
-      )
+      assert.equal(groups.length, 1, 'B sends one group rather than scalar calls or JSON-RPC batch')
       assert.deepEqual(groups[0]!.steps, [{ method: 'service.one' }, { method: 'service.two' }])
     } finally {
       send.mockRestore()
@@ -1424,7 +1403,7 @@ async function attach(
   }
 }
 
-it('[A104/A105] two forward Hosts preserve a notify-only terminal and await its completion', async () => {
+it('two forward Hosts preserve a notify-only terminal and await its completion', async () => {
   /** Four actual Hosts exercise two forward entries before the declared one-way provider. */
   const owners = [owner(), owner(), owner(), owner()] as const
   /** Original carriers remain alive until every Host has disposed its admitted work. */
@@ -1497,7 +1476,7 @@ it('[A104/A105] two forward Hosts preserve a notify-only terminal and await its 
 })
 
 for (const mode of ['tell', 'values'] as const) {
-  it(`[A108] forwarded native ${mode} retires once without replay and a fresh call uses replacement`, async () => {
+  it(`forwarded native ${mode} retires once without replay and a fresh call uses replacement`, async () => {
     /** A uses a real original carrier; B owns the actual supervised native Worker C. */
     const owners = [owner(), owner()] as const
     /** The original unit budget witnesses release of both native generations. */
@@ -1587,7 +1566,7 @@ for (const mode of ['tell', 'values'] as const) {
       const failure = mode === 'tell' ? failures[0] : await pending
       assert.equal(failure.code, 'PROVIDER_GENERATION_RETIRED')
       assert.equal(failure.source, '@migaia/rpc/core')
-      assert.ok(failure.cause instanceof Error, '[A108] native departure remains reachable')
+      assert.ok(failure.cause instanceof Error, 'native departure remains reachable')
       await vi.waitFor(
         () =>
           assert.notEqual(readRuntimeOutletConnection(owners[1].thread, 'c')!.instanceId, first),
@@ -1595,7 +1574,7 @@ for (const mode of ['tell', 'values'] as const) {
           timeout: 3000
         }
       )
-      assert.equal(calls.old, 1, '[A108] retired work is never replayed')
+      assert.equal(calls.old, 1, 'retired work is never replayed')
       if (mode === 'tell') {
         await owners[0].thread!.notify('b', 'c.service.data.tell', 'replacement')
         await vi.waitFor(() => assert.equal(calls.fresh, 1))
@@ -1618,7 +1597,7 @@ for (const mode of ['tell', 'values'] as const) {
   }, 15_000)
 }
 
-it('[A102/A104] one explicit connection method forwards through B with B as the direct caller', async () => {
+it('one explicit connection method forwards through B with B as the direct caller', async () => {
   /** Three independent Hosts distinguish the original caller from the forwarding authority. */
   const owners = [owner(), owner(), owner()] as const
   /** Successful carriers remain owned by this fixture until all registrations close. */
@@ -1668,25 +1647,21 @@ it('[A102/A104] one explicit connection method forwards through B with B as the 
       },
       (error: unknown) => error
     )
-    assert.equal(
-      installed,
-      true,
-      '[A102] explicit remote exposure configures the original connection'
-    )
+    assert.equal(installed, true, 'explicit remote exposure configures the original connection')
     assert.equal(await owners[0].thread!.request('b', 'c.math.add', 42), 42)
-    assert.deepEqual(calls, ['c-caller'], '[A102] C authorizes its direct B peer, rather than A')
+    assert.deepEqual(calls, ['c-caller'], 'C authorizes its direct B peer, rather than A')
     await assert.rejects(
       Promise.resolve().then(() => owners[0].thread!.request('b', 'c.math.sub')),
       { code: 'PROVIDER_NOT_FOUND' }
     )
-    assert.equal(calls.length, 1, '[A104] an unexposed remote method performs no business')
+    assert.equal(calls.length, 1, 'an unexposed remote method performs no business')
   } finally {
     for (const host of owners) await host.dispose()
     for (const carrier of carriers) carrier.close()
   }
 })
 
-it('[A103] an unexposed connection never forwards to its business provider', async () => {
+it('an unexposed connection never forwards to its business provider', async () => {
   /** The working B-to-C path is independent evidence that the final provider is available. */
   const owners = [owner(), owner(), owner()] as const
   /** Each acquired source closes after its original Host scope. */
@@ -1719,7 +1694,7 @@ it('[A103] an unexposed connection never forwards to its business provider', asy
   }
 })
 
-it('[A105] the original upstream abort reaches C and its remaining deadline never restarts', async () => {
+it('the original upstream abort reaches C and its remaining deadline never restarts', async () => {
   /** Each provider belongs to its actual Host scope. */
   const owners = [owner(), owner(), owner()] as const
   /** Acquired connections close after business cancellation settles. */
@@ -1786,7 +1761,7 @@ it('[A105] the original upstream abort reaches C and its remaining deadline neve
   }
 })
 
-it('[A106] forwarded stream pulls remain lazy and early return reaches C exactly once', async () => {
+it('forwarded stream pulls remain lazy and early return reaches C exactly once', async () => {
   /** Actual stream owners retain both provider and caller lifetimes at every hop. */
   const owners = [owner(), owner(), owner()] as const
   /** Each original source remains live through the stream's return handshake. */
@@ -1833,7 +1808,7 @@ it('[A106] forwarded stream pulls remain lazy and early return reaches C exactly
     carriers.push(await attach(owners[0], owners[1], 'b', 'a', {}, { expose: ['c.values'] }))
     /** The public stream operation is identical for a local method and a forwarded method. */
     const iterator = owners[0].thread!.stream('b', 'c.values')
-    assert.equal(pulls, 0, '[A106] upstream absence of credit performs no final next')
+    assert.equal(pulls, 0, 'upstream absence of credit performs no final next')
     assert.deepEqual(await iterator.next(), { done: false, value: 1 })
     await ready
     assert.equal(pulls, 1)
@@ -1846,7 +1821,7 @@ it('[A106] forwarded stream pulls remain lazy and early return reaches C exactly
   }
 })
 
-it('[A107/A116] C business identity, stack and cause cross both hops with forward metadata', async () => {
+it('C business identity, stack and cause cross both hops with forward metadata', async () => {
   /** Business errors originate only at the final genuine provider. */
   const owners = [owner(), owner(), owner()] as const
   /** Original sources preserve wire serialization and cleanup ownership. */
@@ -1901,7 +1876,7 @@ it('[A107/A116] C business identity, stack and cause cross both hops with forwar
   }
 })
 
-it('[A109] A forwarding through B back to the same Host is refused before final business', async () => {
+it('A forwarding through B back to the same Host is refused before final business', async () => {
   /** Two different physical connections still refer to the same two runtime Host identities. */
   const owners = [owner(), owner()] as const
   /** Each actual source retains original scope ownership. */
@@ -1963,8 +1938,8 @@ it('[A109] A forwarding through B back to the same Host is refused before final 
       typeof result === 'object' && result !== null ? Reflect.get(result, 'code') : result,
       'FORWARD_LOOP'
     )
-    assert.equal(calls, 0, '[A109] the rejected next hop never executes')
-    assert.equal(send.mock.calls.length, 0, '[A109] the refused hop sends no frame')
+    assert.equal(calls, 0, 'the rejected next hop never executes')
+    assert.equal(send.mock.calls.length, 0, 'the refused hop sends no frame')
     assert.deepEqual(Reflect.get(result as object, 'route'), [await nodeOf(owners[0], 'b')])
     release()
     await occupied
@@ -1976,7 +1951,7 @@ it('[A109] A forwarding through B back to the same Host is refused before final 
 })
 
 it.each([3, 4])(
-  '[A110] exactly three forwarding Hosts succeed; %i forwarding Hosts obey the fixed limit',
+  'exactly three forwarding Hosts succeed; %i forwarding Hosts obey the fixed limit',
   async (hops) => {
     /** Each forwarding layer owns an independent Host and one real downstream slot. */
     const owners = Array.from({ length: hops + 2 }, () => owner())
@@ -2023,7 +1998,7 @@ it.each([3, 4])(
         assert.equal(calls, 1)
         assert.ok(
           Array.isArray(route) && route.length === 4,
-          '[A111] origin plus three forward nodes are ordered'
+          'origin plus three forward nodes are ordered'
         )
         assert.equal(new Set(route).size, 4)
         assert.equal(Object.isFrozen(route), true)
@@ -2050,7 +2025,7 @@ it.each([3, 4])(
   }
 )
 
-it('[A109] A through B and C back to B is refused at C before its outbound send', async () => {
+it('A through B and C back to B is refused at C before its outbound send', async () => {
   /** Three Hosts exercise a repeated intermediate node, rather than only a repeated origin. */
   const owners = [owner(), owner(), owner()] as const
   /** Every connection still belongs to its actual Plugin scope. */
@@ -2107,7 +2082,7 @@ it('[A109] A through B and C back to B is refused at C before its outbound send'
   }
 })
 
-it('[A107] a forwarded iterator failure keeps C source, stack, cause and admitted route', async () => {
+it('a forwarded iterator failure keeps C source, stack, cause and admitted route', async () => {
   /** All iterator work crosses the actual stream owners at both hops. */
   const owners = [owner(), owner(), owner()] as const
   /** Scope cleanup remains independent of a failed pull. */
@@ -2152,7 +2127,7 @@ it('[A107] a forwarded iterator failure keeps C source, stack, cause and admitte
   }
 })
 
-it('[A105] forwarded notify holds B admission until the actual C provider completes', async () => {
+it('forwarded notify holds B admission until the actual C provider completes', async () => {
   /** B's provider limit is the resource under test; A's physical completion is independent. */
   const owners = [owner(), owner(), owner()] as const
   /** Both sources retain their ordinary provider and transport ownership. */
@@ -2215,7 +2190,7 @@ it('[A105] forwarded notify holds B admission until the actual C provider comple
   }
 })
 
-it('[A108] a forwarded native call retires once and a fresh call uses C replacement', async () => {
+it('a forwarded native call retires once and a fresh call uses C replacement', async () => {
   /** A-to-B uses an ordinary source while B owns a genuine supervised Worker connection. */
   const owners = [owner(), owner()] as const
   /** Cleanup covers A-to-B independently of the native execution budget. */
@@ -2299,7 +2274,7 @@ it('[A108] a forwarded native call retires once and a fresh call uses C replacem
     const failure = await pending
     assert.equal(failure.code, 'PROVIDER_GENERATION_RETIRED')
     assert.equal(failure.source, '@migaia/rpc/core')
-    assert.equal(retryCalls, 0, '[A108] an idempotent forward never enters custom retry')
+    assert.equal(retryCalls, 0, 'an idempotent forward never enters custom retry')
     /** The next logical call may target the genuine replacement; the old call cannot replay. */
     await vi.waitFor(
       async () => {
@@ -2322,7 +2297,7 @@ it('[A108] a forwarded native call retires once and a fresh call uses C replacem
   assert.equal(budget.inUse, 0)
 }, 15_000)
 
-it('[A108] unUse withdraws the forward slot and a same-name connection restores new calls', async () => {
+it('unUse withdraws the forward slot and a same-name connection restores new calls', async () => {
   /** A-to-B retains its compiled method table while B replaces only the downstream connection. */
   const owners = [owner(), owner(), owner()] as const
   /** Each real source closes after its original registration scope. */
@@ -2383,7 +2358,7 @@ it('[A108] unUse withdraws the forward slot and a same-name connection restores 
   }
 })
 
-it('[A116] closing B cancels its actual downstream provider before scope release completes', async () => {
+it('closing B cancels its actual downstream provider before scope release completes', async () => {
   /** C observes the original provider signal independently of the upstream Promise. */
   const owners = [owner(), owner(), owner()] as const
   /** Keep both actual physical sources live until all scope cleanup completes. */
@@ -2456,14 +2431,14 @@ it('[A116] closing B cancels its actual downstream provider before scope release
 })
 
 it.each(['process', 'thread'] as const)(
-  '[A111/A113] %s forwarding keeps one inbound normalization, native encoding and two signatures',
+  '%s forwarding keeps one inbound normalization, native encoding and two signatures',
   async (kind) => {
     /** The original Host and Plugin owners execute both authenticated hops. */
     const owners = [owner(), owner(), owner()] as const
     /** Raw carrier ownership is unchanged by counters around canonical codec methods. */
     const carriers: ReturnType<typeof runtimeSources>[] = []
     /** Only this exact fixture object marks business payloads in the normalization counter. */
-    const marker = 'a113-forward-payload'
+    const marker = 'forward-payload'
     /** Observing the existing export changes no normalization behavior. */
     const normalize = observePortableNormalization()
     /** Only whole business request JSON, excluding auth wrappers, counts as process encoding. */
@@ -2486,7 +2461,7 @@ it.each(['process', 'thread'] as const)(
     let admitted: unknown, outbound: unknown
     /** Each connection has a distinct public fixture key, proving independent hop authentication. */
     const signature = (hop: number, value: unknown) =>
-      createHmac('sha256', `a113-public-key-${hop}`).update(JSON.stringify(value)).digest('hex')
+      createHmac('sha256', `public-key-${hop}`).update(JSON.stringify(value)).digest('hex')
     /** Decode observation reads the actual protected semantic envelope without acting as a receiver. */
     const semantic = (value: unknown): any => {
       const bound = readAuthenticationEnvelope(value)
@@ -2531,7 +2506,7 @@ it.each(['process', 'thread'] as const)(
                   assert.equal(
                     frame.signature,
                     signature(hop, frame.value),
-                    '[A111] signed route cannot be changed'
+                    'signed route cannot be changed'
                   )
                   const request = semantic(frame.value)
                   if (counting && side === 1 && request.kind === 'request') verifies[hop]! += 1
@@ -2629,22 +2604,14 @@ it.each(['process', 'thread'] as const)(
       stringify.mockClear()
       counting = true
       assert.equal(await owners[0].thread!.request('b', 'c.echo', { marker }), 1)
-      assert.equal(
-        forwardedNormalizations,
-        0,
-        '[A113] B adds no normalization after inbound admission'
-      )
-      assert.equal(
-        outbound,
-        admitted,
-        '[A113] B outbound uses its original admitted payload reference'
-      )
+      assert.equal(forwardedNormalizations, 0, 'B adds no normalization after inbound admission')
+      assert.equal(outbound, admitted, 'B outbound uses its original admitted payload reference')
       assert.equal(
         stringify.mock.calls.filter(
           ([value]) => (value as any)?.kind === 'request' && (value as any)?.method === 'echo'
         ).length,
         kind === 'process' ? 1 : 0,
-        '[A113] only the process codec encodes the whole forwarded request'
+        'only the process codec encodes the whole forwarded request'
       )
       assert.deepEqual(signs, [1, 1])
       assert.deepEqual(verifies, [1, 1])
@@ -2673,12 +2640,8 @@ it.each(['process', 'thread'] as const)(
           1
         )
       )
-      assert.equal(calls, 1, '[A111] changed route is rejected before the final provider')
-      assert.deepEqual(
-        verifies,
-        [1, 1],
-        '[A111] the changed signature never reaches replay admission'
-      )
+      assert.equal(calls, 1, 'changed route is rejected before the final provider')
+      assert.deepEqual(verifies, [1, 1], 'the changed signature never reaches replay admission')
     } finally {
       counting = false
       for (const host of owners) await host.dispose()
@@ -2688,7 +2651,7 @@ it.each(['process', 'thread'] as const)(
   }
 )
 
-it('[A84][A105] forwarded binary notify releases B after real C business completion', async () => {
+it('forwarded binary notify releases B after real C business completion', async () => {
   const owners = [owner(), owner(), owner()] as const
   const carriers: ReturnType<typeof runtimeSources>[] = []
   /** The real new binary profile needs its complete original generation/admission capabilities. */
@@ -2745,11 +2708,11 @@ it('[A84][A105] forwarded binary notify releases B after real C business complet
     )!
     await owners[0].thread!.notify('b', 'c.hold', new Uint8Array([1]).buffer)
     await entered
-    assert.equal(bytes, true, '[A84] C receives actual binary through both canonical hops')
+    assert.equal(bytes, true, 'C receives actual binary through both canonical hops')
     assert.equal(admission.size, 1)
     release()
     await vi.waitFor(() =>
-      assert.equal(admission.size, 0, '[A105] completed C business releases the original B lease')
+      assert.equal(admission.size, 0, 'completed C business releases the original B lease')
     )
   } finally {
     release()

@@ -25,9 +25,9 @@ const asyncDisposeKey = (Symbol as typeof Symbol & { asyncDispose?: symbol }).as
 /**
  * One shared registry for every `LifecycleScope`. The held value is built without ever holding a
  * reference to `target` from _our_ side — it only closes over `descriptor.force` (the caller's own
- * function) and a throwaway `report` callback, matching §4.4's "held value 不得强引用被注册 target 或 包含
- * target 的 disposer closure". A caller whose own `force` closes over the resource defeats GC
- * collection on their end, which is outside what this package can enforce.
+ * function) and a throwaway `report` callback, matching "held value 不得强引用被注册 target 或 包含 target 的
+ * disposer closure". A caller whose own `force` closes over the resource defeats GC collection on
+ * their end, which is outside what this package can enforce.
  */
 const finalizationRegistry: FinalizationRegistry<() => void> | undefined =
   typeof FinalizationRegistry === 'function' ? new FinalizationRegistry((run) => run()) : undefined
@@ -40,12 +40,12 @@ export type ILifecycleScopeOptions = {
    * 'report'`.
    */
   readonly report?: (error: unknown) => void
-  /** Shared absolute deadline forwarded to every owned resource's release (L-T32). */
+  /** Shared absolute deadline forwarded to every owned resource's release. */
   readonly deadlineAt?: number
   /**
-   * Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to
-   * `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and
-   * mutation queues, such as those in `plugin-host`, in one clock domain.
+   * Supplies the clock domain for graceful timeouts and deadlines. Defaults to `systemScheduler`
+   * and forwards it to `DisposeTransaction`. This keeps injected teardown and mutation queues, such
+   * as those in `plugin-host`, in one clock domain.
    */
   readonly scheduler?: IScheduler
 }
@@ -54,10 +54,10 @@ export type ILifecycleScope = ILifecycleOwner & {
   readonly lifecycle: ILifecycleState
   /** Unregisters a resource without releasing it — the caller has already released it independently. */
   release(resource: unknown): boolean
-  /** Synchronous, idempotent, never calls user code (L-T27). */
+  /** Synchronous, idempotent, never calls user code. */
   close(): void
   /**
-   * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the
+   * Always asynchronous — there is no synchronous `dispose()` on this type. Resolves to the
    * collected errors for the `collect` policy (empty for the other three, which throw/report
    * internally instead).
    *
@@ -73,7 +73,7 @@ export type ILifecycleScope = ILifecycleOwner & {
 /**
  * The general-purpose, async-only scope. Ported from `@migaia/reactive`'s `LifecycleScopeImpl`
  * baseline (sync/async reentrancy guard, atomic splice+reverse teardown) with the sync path removed
- * per D-1 and error handling generalized to the four §4.5 policies.
+ * and error handling generalized to the four policies.
  */
 export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILifecycleScope {
   const errorPolicy = options.errorPolicy ?? 'throw'
@@ -81,13 +81,13 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   const scheduler = resolveSchedulerOption(options)
   const terminal = createTerminalController()
   const createController = captureAbortControllerFactory()
-  /** Closing signal source; created only when a release transaction actually reads it (LC-P3). */
+  /** Closing signal source; created only when a release transaction actually reads it. */
   const closingController = createLazyAbortController(createController)
   /** Whether `close()` already aborted the closing signal; avoids rebuilding the reason. */
   let closingAborted = false
   /** Immutable owner-bound capability shared by this scope's release callbacks. */
   const disposerContext = createDisposerContext()
-  /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
+  /** Live owned resources in registration order with O(1) release lookup. */
   const entries = createOwnedEntryList<{
     readonly resource: unknown
     readonly source: string
@@ -220,7 +220,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     const entry = entries.release(resource)
     if (entry === undefined) return false
     // The caller has already released this resource independently — the GC-fallback finalizer
-    // must not run `force` a second time (L-T19).
+    // must not run `force` a second time.
     unregisterGcFallback(entry.unregisterToken)
     return true
   }
@@ -236,8 +236,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const performDispose = async (): Promise<readonly ICollectedError[]> => {
     close()
-    // Atomic: nothing added between the snapshot and the loop, nothing skipped, nothing doubled
-    // (L-T33). LIFO order; `DisposeTransaction`'s order-mode stable sort preserves this for
+    // Atomic: nothing added between the snapshot and the loop, nothing skipped, nothing doubled.
+    // LIFO order; `DisposeTransaction`'s order-mode stable sort preserves this for
     // same-`order` items.
     const snapshot = entries.drain().reverse()
     // Every one of these is about to be explicitly released by the transaction below; the
@@ -275,7 +275,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
           LifecycleErrorText.scopeReentrantDispose
         )
       }
-      // Concurrent, non-reentrant call: reuse the one real disposal in flight (L-T29).
+      // Concurrent, non-reentrant call: reuse the one real disposal in flight.
       return disposePromise
     }
     if (terminal.lifecycle === LifecycleState.terminal) return Promise.resolve([])

@@ -20,7 +20,7 @@ const deferred = <T>() => {
   return { promise, resolve }
 }
 describe('tray', () => {
-  it('A5 exports the static graph separately from the host manager', () => {
+  it('exports the static graph separately from the host manager', () => {
     expect(trayRoot).toHaveProperty('createTray', expect.any(Function))
     expect(trayRoot.createTray).not.toBe(trayRoot.createTrayGraph)
     expect(() => trayRoot.createTray([] as never)).toThrow(
@@ -605,7 +605,7 @@ describe('tray', () => {
   })
 })
 
-it('TC-T01 reacquires a blocked provider snapshot without rereading other admitted metadata', async () => {
+it('reacquires a blocked provider snapshot without rereading other admitted metadata', async () => {
   /** Providers publish immutable facts; the entry getter obtains the current one. */
   let snapshot: IGraphReadinessSnapshot = Object.freeze({
     state: GraphReadinessState.blocked,
@@ -647,7 +647,7 @@ it('TC-T01 reacquires a blocked provider snapshot without rereading other admitt
   await tray.dispose()
 })
 
-it.each([false, true])('TC-T01 caches failed readiness after blocked=%s', async (blocked) => {
+it.each([false, true])('caches failed readiness after blocked=%s', async (blocked) => {
   /** A failed fact stays terminal even if its producer subsequently publishes ready. */
   const error = new Error('provider failed')
   /** Only blocked admits a later fact; failed keeps its first rejection identity. */
@@ -686,7 +686,7 @@ it.each([false, true])('TC-T01 caches failed readiness after blocked=%s', async 
 })
 
 it.each(['getter', 'shape'] as const)(
-  'TC-T01 retains refreshed %s failures without another retry',
+  'retains refreshed %s failures without another retry',
   async (mode) => {
     /** Original native getter failure stays reachable as the same object. */
     const error = new TypeError('provider getter failed')

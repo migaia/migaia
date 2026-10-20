@@ -163,9 +163,9 @@ export type ILoggerCore<
   /** Read-only context containers. See `ILoggerContext` for the mutability boundary. */
   readonly ctx: ILoggerContext
   /**
-   * The logger's monotonic clock source (R-9). `flush`, `shutdown`, batch deadlines, and
-   * `boundedWait` use this scheduler. Defaults to utils/scheduler `systemScheduler`. Plugins use it
-   * to share the host's clock domain.
+   * The logger's monotonic clock source. `flush`, `shutdown`, batch deadlines, and `boundedWait`
+   * use this scheduler. Defaults to utils/scheduler `systemScheduler`. Plugins use it to share the
+   * host's clock domain.
    */
   readonly scheduler: IScheduler
   /** Host capabilities captured by this logger; plugins share the same instance owner. */
@@ -364,7 +364,7 @@ export type ILoggerOptions<
   pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode }
   /**
    * Defaults to utils/scheduler `systemScheduler`. Flush, shutdown, and batch deadlines share its
-   * clock domain (R-9).
+   * clock domain.
    */
   scheduler?: IScheduler
 }

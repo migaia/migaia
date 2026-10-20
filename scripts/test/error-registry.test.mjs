@@ -71,7 +71,7 @@ test('accepts an absent ignored registry after validating declaration JSDoc', ()
   }
 })
 
-test('A5 uses a layer ERROR_SOURCE and falls back to the package name', () => {
+test('uses a layer ERROR_SOURCE and falls back to the package name', () => {
   const root = createFixture(
     "export const ExampleErrorCode = {\n  /** Raised when the root input is invalid. */\n  rootInvalid: 'ROOT_INVALID'\n} as const\n"
   )
@@ -95,21 +95,21 @@ test('A5 uses a layer ERROR_SOURCE and falls back to the package name', () => {
   }
 })
 
-test('A5 maps merged RPC codes and preserves capability graph ownership', () => {
+test('maps merged RPC codes and preserves capability graph ownership', () => {
   const frozen = JSON.parse(
     readFileSync(
       join(repositoryRoot, 'packages/rpc-integration/test/fixtures/legacy-error-codes.json'),
       'utf8'
     )
   )
-  /** Additive I3 codes stay separate from the frozen pre-migration registry fixture. */
+  /** Additive codes stay separate from the frozen pre-migration registry fixture. */
   const added = JSON.parse(
     readFileSync(
       join(repositoryRoot, 'packages/rpc-integration/test/fixtures/error-format-added-codes.json'),
       'utf8'
     )
   )
-  /** Additive I5 codes remain separate from both the frozen and I3 fixture sets. */
+  /** Later additive codes remain separate from both earlier fixture sets. */
   const controlAdded = JSON.parse(
     readFileSync(
       join(
@@ -119,7 +119,7 @@ test('A5 maps merged RPC codes and preserves capability graph ownership', () => 
       'utf8'
     )
   )
-  /** Core codes the successor rpc-layering BC1 deleted after this merge froze its code set. */
+  /** Core codes the successor rpc-layering change deleted after this merge froze its code set. */
   const retired = new Set(
     JSON.parse(
       readFileSync(
@@ -203,7 +203,7 @@ const headerSentence = (text) => {
   return (boundary < 0 ? flat : flat.slice(0, boundary + 1)).replaceAll('|', '\\|').trim()
 }
 
-test('A13 attributes each entry JSDoc to its own code, never to the file header', () => {
+test('attributes each entry JSDoc to its own code, never to the file header', () => {
   const root = createFixture(
     "/** Header sentence. */\nexport const ExampleErrorCode = {\n  /** Entry scenario. */\n  first: 'FIRST',\n  /** Second scenario. */\n  second: 'SECOND'\n} as const\n"
   )
@@ -220,7 +220,7 @@ test('A13 attributes each entry JSDoc to its own code, never to the file header'
   }
 })
 
-test('A13 rejects a first code without JSDoc even when a file header precedes it', () => {
+test('rejects a first code without JSDoc even when a file header precedes it', () => {
   const root = createFixture(
     "/** Header sentence. */\nexport const ExampleErrorCode = {\n  first: 'FIRST',\n  /** Second scenario. */\n  second: 'SECOND'\n} as const\n"
   )
@@ -231,7 +231,7 @@ test('A13 rejects a first code without JSDoc even when a file header precedes it
   }
 })
 
-test('A13 lists every utils code with its own scenario and regenerates a checkable registry', () => {
+test('lists every utils code with its own scenario and regenerates a checkable registry', () => {
   const rows = collectErrorRegistry()
   /** Declared utils code values, read from the canonical declaration file. */
   const utilsCodes = [

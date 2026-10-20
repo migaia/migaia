@@ -76,7 +76,7 @@ function fixture(pids = [11, 22]) {
   }
 }
 
-describe('I20 preparation only; no A-total or A10 performance PASS', () => {
+describe('preparation only; no aggregate performance PASS', () => {
   it('keeps exact conformance paths outside the default suite and preserves default exclusions', () => {
     expect(defaultConfig.test?.exclude).toEqual([
       ...configDefaults.exclude,
@@ -122,7 +122,7 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
     expect(result.rssAbsolutePeakSumBytes).toBe(900)
   })
   it('fails a missing absolute RSS reading instead of manufacturing a denominator', async () => {
-    /** A failed observer cannot yield a valid A10 side. */
+    /** A failed observer cannot yield a valid reference side. */
     const run = fixture()
     run.failRead()
     await expect(measurement.measureBare(run.options)).rejects.toThrow(
@@ -166,10 +166,21 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
       )
     )
     expect(inventory.supportUnitsFrozen).toBe(true)
-    expect(inventory.acceptance.map((row: { id: string }) => row.id)).toEqual(
-      Array.from({ length: 12 }, (_, index) => `A${index + 1}`)
-    )
-    expect(inventory.rootATotal).toHaveLength(6)
+    expect(inventory.acceptance.map((row: { id: string }) => row.id)).toEqual([
+      'peer-delivery',
+      'upstream-vectors',
+      'bridge-responder',
+      'health-failure',
+      'channel-limits',
+      'supervision-cleanup',
+      'connection-admission',
+      'trace-routing',
+      'platform-capabilities',
+      'measurement-preparation',
+      'toolchain-admission',
+      'receipt-delivery'
+    ])
+    expect(inventory.rootIntegration).toHaveLength(6)
     for (const row of inventory.acceptance) {
       expect(row.evidenceOwner).toBeTruthy()
       expect(row.supportUnits).toBeTruthy()
@@ -182,7 +193,7 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
     ).toHaveLength(93)
     expect(
       inventory.acceptance
-        .find((row: { id: string }) => row.id === 'A10')
+        .find((row: { id: string }) => row.id === 'measurement-preparation')
         .assertions.every((assertion: { status: string }) => assertion.status === 'implemented')
     ).toBe(true)
   })

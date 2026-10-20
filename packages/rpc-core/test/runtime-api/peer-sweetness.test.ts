@@ -4,7 +4,7 @@ import { createPeerPair } from '../../dist/testing/index.js'
 import { runtimeSources } from './fixture.js'
 
 describe('Runtime Peer convenience', () => {
-  it('[P5b] defaults self and report before genuine source preparation', async () => {
+  it('defaults self and report before genuine source preparation', async () => {
     /** Independent source offers observe the actual Core-generated addresses. */
     const channel = runtimeSources()
     /** Background notify failure must use console reporting when no reporter was configured. */
@@ -40,7 +40,7 @@ describe('Runtime Peer convenience', () => {
     }
   })
 
-  it('[P5b] asyncDispose is the original close function and Promise', async () => {
+  it('asyncDispose is the original close function and Promise', async () => {
     /** Typed testing Peers expose the actual Core facade, without a new cleanup owner. */
     const pair = await createPeerPair({ a: { provide: {} }, b: { provide: {} } })
     try {
@@ -54,7 +54,7 @@ describe('Runtime Peer convenience', () => {
     }
   })
 
-  it('[P5b] raw Peer subscriptions never fabricate initial ready or native exit', async () => {
+  it('raw Peer subscriptions never fabricate initial ready or native exit', async () => {
     /** Memory provides callable Peers, but has no native execution lifecycle to report. */
     const pair = await createPeerPair({ a: { provide: {} }, b: { provide: {} } })
     /** Factory resolution is initial readiness; a later listener must not receive a fake replay. */

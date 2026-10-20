@@ -109,12 +109,12 @@ describe('byte primitives', () => {
     expect(() => decodeUtf8(new Uint8Array([0xc0]), { fatal: true })).toThrow()
   })
 
-  it('I21 matches native UTF-8 lengths for 10000 random strings and scalar boundaries', () => {
+  it('matches native UTF-8 lengths for 10000 random strings and scalar boundaries', () => {
     for (const value of utf8Inputs)
       expect(utf8ByteLength(value)).toBe(nativeEncoder.encode(value).length)
   })
 
-  it('I21 counts replacement bytes without invoking an encoder or allocating a byte buffer', () => {
+  it('counts replacement bytes without invoking an encoder or allocating a byte buffer', () => {
     /** Tracks native encoding independently of the allocation-free count. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     /** Tracks explicitly allocated buffers without changing Uint8Array behavior. */
@@ -136,7 +136,7 @@ describe('byte primitives', () => {
     expect(allocatedSizes).toEqual([])
   })
 
-  it('I21 prefers the native UTF-8 encoder when available', () => {
+  it('prefers the native UTF-8 encoder when available', () => {
     /** Native method spy distinguishes the fast path from the previous generator encoder. */
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     expect(Array.from(encodeUtf8('é🙂\ud800'))).toEqual([
@@ -145,7 +145,7 @@ describe('byte primitives', () => {
     expect(encode).toHaveBeenCalledExactlyOnceWith('é🙂\ud800')
   })
 
-  it('I21 native and encoder-free fallback preserve every random string byte', () => {
+  it('native and encoder-free fallback preserve every random string byte', () => {
     for (const value of utf8Inputs) expect(encodeUtf8(value)).toEqual(nativeEncoder.encode(value))
     vi.stubGlobal('TextEncoder', undefined)
     for (const value of utf8Inputs) {
@@ -154,7 +154,7 @@ describe('byte primitives', () => {
     }
   })
 
-  it('I21 loop chunking preserves scalar boundaries and byte budgets without TextEncoder', () => {
+  it('loop chunking preserves scalar boundaries and byte budgets without TextEncoder', () => {
     vi.stubGlobal('TextEncoder', undefined)
     for (let index = 0; index < utf8Inputs.length; index++) {
       /** Fixture input and budget exercise every accepted width from 4 through 32 bytes. */
@@ -179,7 +179,7 @@ describe('byte primitives', () => {
     }
   })
 
-  it('SWV2-T55 uses intrinsic slots for cross-realm and hostile byte brands', () => {
+  it('uses intrinsic slots for cross-realm and hostile byte brands', () => {
     const foreignBytes = runInNewContext('new Uint8Array([1, 2])') as Uint8Array
     const foreignBuffer = runInNewContext('new ArrayBuffer(2)') as ArrayBuffer
     class ByteSubclass extends Uint8Array {}
@@ -221,7 +221,7 @@ describe('byte primitives', () => {
     expect(isArrayBuffer(new Proxy(new ArrayBuffer(1), {}))).toBe(false)
   })
 
-  it('SWV2-T55 preserves detached intrinsic brands while callers decide usability', () => {
+  it('preserves detached intrinsic brands while callers decide usability', () => {
     const bytes = new Uint8Array(4)
     const buffer = new ArrayBuffer(4)
     structuredClone(bytes, { transfer: [bytes.buffer] })
@@ -231,7 +231,7 @@ describe('byte primitives', () => {
     expect(isArrayBuffer(buffer)).toBe(true)
   })
 
-  it('SWV2-T55 remains fail-closed after the ambient Reflect.get is replaced', () => {
+  it('remains fail-closed after the ambient Reflect.get is replaced', () => {
     const originalReflectGet = Reflect.get
     let forgedBytesAccepted = true
     let forgedBufferAccepted = true

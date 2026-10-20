@@ -9,7 +9,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 20; index++) await Promise.resolve()
 }
 
-describe('A4 monitored usage', () => {
+describe('monitored usage', () => {
   it('forces a unit only after a sampled memory violation', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher({

@@ -95,7 +95,7 @@ describe('sync-started disposal ledger', () => {
     expect(outcome.cleanupErrors).toEqual([])
   })
 
-  it('PCC-T1 merges foreign promises, captured thenables and rejected branches without losing errors', async () => {
+  it('merges foreign promises, captured thenables and rejected branches without losing errors', async () => {
     /** Keep exact error identities across realm and physical continuation boundaries. */
     const first = new Error('foreign logical')
     const late = new Error('foreign physical')

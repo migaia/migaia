@@ -6,7 +6,7 @@ import {
   type IRetainedConsumer
 } from '../fixtures/tree-shaking/retained-inventory.js'
 
-/** Retained consumers whose runtime module sets are reviewed in S8. */
+/** Retained consumers whose runtime module sets are reviewed. */
 const consumers: readonly IRetainedConsumer[] = ['core', 'client', 'provider', 'full', 'custom']
 /** Package root used by the canonical Vite retained-graph measurement. */
 const packageRoot = resolve(import.meta.dirname, '../../..')
@@ -29,7 +29,7 @@ function unreviewedModules(reviewed: readonly string[], measured: readonly strin
   return measured.filter((module) => !reviewedSet.has(normalizeModule(module)))
 }
 
-describe('A12 retained inventory', () => {
+describe('retained inventory', () => {
   it('keeps every consumer within the reviewed module set plus a small allowance', () => {
     const run = spawnSync('node', ['test/core/tree-shaking-retained.mjs'], {
       cwd: packageRoot,

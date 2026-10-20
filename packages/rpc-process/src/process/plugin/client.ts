@@ -10,7 +10,7 @@ import { createRuntimePlugin } from '@migaia/rpc-core/remote'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import { NativeProcessRuntimeLoader } from '../runtime-loader.js'
 
-/** The original advanced declaration is retained only for the serial C7 consumer migration. */
+/** The original advanced declaration is retained only for the serial consumer migration. */
 export function createProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>
 ): IProcessPlugin

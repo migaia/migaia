@@ -14,7 +14,7 @@ import { createThreadPlugin } from '@migaia/rpc-threads'
 import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 
-/** U36 uses the independent new-baseline peers, including the handwritten TS oracle. */
+/** Uses the independent new-baseline peers, including the handwritten TS oracle. */
 for (const peer of [
   ...peers.filter((peer) => ['python', 'go', 'rust'].includes(peer.language)),
   {
@@ -24,7 +24,7 @@ for (const peer of [
     id: 'ts-peer'
   }
 ]) {
-  it(`[A32/A112] ${peer.language} uses v2/batch and receives a forwarded call without route`, async () => {
+  it(`${peer.language} uses v2/batch and receives a forwarded call without route`, async () => {
     /** B owns the real process connection; A only sees B's explicit transparent method. */
     const owners = [
       runtimeTestHost({
@@ -170,7 +170,7 @@ for (const peer of [
         await owners[0].thread!.request('b', 'c.echo', 'forward-terminal'),
         'forward-terminal'
       )
-      assert.equal(routedFrames, 0, '[A112] the foreign physical wire never carries route')
+      assert.equal(routedFrames, 0, 'the foreign physical wire never carries route')
       /** Foreign terminals omit wire extensions, but B must retain its already known prefix. */
       const knownRoute = [
         readRuntimePeerConnection(readRuntimeOutletConnection(owners[0].thread, 'b')!.peer)
@@ -189,10 +189,10 @@ for (const peer of [
         assert.equal(error.code, original.code)
         assert.equal(error.stack, original.stack)
         assert.equal(error.cause?.stack, original.cause?.stack)
-        assert.deepEqual(error.route, knownRoute, '[A107/A112] the known native prefix survives')
+        assert.deepEqual(error.route, knownRoute, 'the known native prefix survives')
         return true
       })
-      assert.equal(routedFrames, 0, '[A112] failing foreign frames also omit route')
+      assert.equal(routedFrames, 0, 'failing foreign frames also omit route')
       assert.equal(hiddenCalls, 0)
       assert.equal(methods.includes(RemoteMethodName.runtimeDescribe), true)
       assert.equal(methods.includes('migaia.remote.describe'), false)

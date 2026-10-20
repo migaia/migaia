@@ -209,7 +209,7 @@ async function buildConsumer(consumer, source) {
   }
 }
 
-/** Measures one emitted consumer's raw and gzip bytes for the immutable B00 ledger. */
+/** Measures one emitted consumer's raw and gzip bytes for the immutable baseline ledger. */
 function measureConsumer(consumer) {
   return {
     rawBytes: Buffer.byteLength(consumer.code),

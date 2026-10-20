@@ -4,7 +4,7 @@ import { createBroadcastChannelTransport } from '../../../src/browser/adapters/b
 import { createWebTransportDatagramTransport } from '../../../src/browser/adapters/web-transport.js'
 import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc-data-channel.js'
 
-it('[RB-D01] classifies the native BroadcastChannel clone failure without replacing it', () => {
+it('classifies the native BroadcastChannel clone failure without replacing it', () => {
   /** Native serialization supplies a genuine DOMException and its original stack. */
   const channel = new BroadcastChannel('rpc-browser-audit-clone')
   /** The public adapter owns classification while the caller retains channel ownership. */
@@ -22,7 +22,7 @@ it('[RB-D01] classifies the native BroadcastChannel clone failure without replac
   }
 })
 
-it('[RB-D01] classifies a native stream write rejection and preserves the original Error', async () => {
+it('classifies a native stream write rejection and preserves the original Error', async () => {
   /** The stream propagates this exact application exception through its native write Promise. */
   const original = new Error('audit datagram write failed')
   /** Real Web Streams exercise the public writer boundary without replacing private methods. */
@@ -42,7 +42,7 @@ it('[RB-D01] classifies a native stream write rejection and preserves the origin
   }
 })
 
-it('[RB-D01] classifies a native stream read rejection and preserves the original Error', async () => {
+it('classifies a native stream read rejection and preserves the original Error', async () => {
   /** A real stream controller terminates the adapter with this exact input failure. */
   const original = new Error('audit datagram read failed')
   /** Publish the native controller before subscribing starts the adapter's reader. */
@@ -70,7 +70,7 @@ it('[RB-D01] classifies a native stream read rejection and preserves the origina
   }
 })
 
-it('[RB-D02] retains the original RTC event error through the standard error chain', () => {
+it('retains the original RTC event error through the standard error chain', () => {
   /** Native EventTarget backs every operation required by the public structural channel. */
   const owner = new EventTarget()
   /** This complete public port needs no RTC signaling server to expose a local error event. */

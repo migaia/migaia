@@ -35,7 +35,7 @@ function endpointFor(channel: IRemoteChannel, id: string): Promise<IRemoteServeE
 }
 
 describe('native process plugin socket', () => {
-  it('[A2/A4/A8] authenticates two clients and isolates a rejected token', async () => {
+  it('authenticates two clients and isolates a rejected token', async () => {
     const address = join(tmpdir(), `rp-${randomUUID().slice(0, 8)}.sock`)
     const token = 'socket-plugin-secret'
     const serverHost = runtimeTestHost({

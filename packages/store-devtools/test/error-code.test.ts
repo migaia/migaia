@@ -5,7 +5,7 @@ import {
   STORE_DEVTOOLS_SOURCE
 } from '../src/errors'
 
-describe('store-devtools error-code contract (E-T9)', () => {
+describe('store-devtools error-code contract', () => {
   it('declares 5 unique codes under the package source', () => {
     const codes = Object.values(StoreDevtoolsErrorCode)
     expect(codes).toHaveLength(5)

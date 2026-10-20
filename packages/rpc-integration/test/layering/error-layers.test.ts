@@ -10,7 +10,7 @@ const sourceRoots = {
   core: join(import.meta.dirname, '../../../rpc-core/src'),
   browser: join(import.meta.dirname, '../../../rpc-browser/src')
 } as const
-/** The core codes removed by BC1 because no supported throw site emits them. */
+/** The core codes removed because no supported throw site emits them. */
 const retired = (
   JSON.parse(
     readFileSync(join(import.meta.dirname, '../fixtures/layering-retired-codes.json'), 'utf8')
@@ -86,7 +86,7 @@ const predicateOperators = new Set([
   'instanceof'
 ])
 
-/** Finds code references only inside the SDD's AST-defined throw sites. */
+/** Finds code references only inside the AST-defined throw sites. */
 function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
   const { program, nodes, parentOf, textOf } = parseSourceTree(filename, sourceText)
   const found: ICodeReference[] = []
@@ -186,7 +186,7 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
   return found
 }
 
-/** Aggregates the SDD-defined throw sites while retaining paths for failure reports. */
+/** Aggregates the defined throw sites while retaining paths for failure reports. */
 function layerThrows(
   layer: 'contract' | 'core' | 'browser'
 ): Array<ICodeReference & { file: string }> {
@@ -199,7 +199,7 @@ function layerThrows(
 }
 
 describe('layered error ownership', () => {
-  it('A1 recognizes only actual throw sites and enforces layer ownership', () => {
+  it('recognizes only actual throw sites and enforces layer ownership', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
     const contractThrows = layerThrows('contract')
@@ -267,11 +267,11 @@ describe('layered error ownership', () => {
     ).toEqual([{ table: 'RpcContractErrorCode', key: 'frameLimitExceeded' }])
   })
 
-  it('A2 removes every dead core code while retaining a throw site for each declared code', () => {
+  it('removes every dead core code while retaining a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
     expect(core.size).toBe(33)
-    /** Contract R5 declares this report code before probe-core installs its observation runtime. */
+    /** The contract declares this report code before probe-core installs its observation runtime. */
     expect(core.get('probeFailed')).toBe('PROBE_FAILED')
     for (const value of retired) expect([...core.values()]).not.toContain(value)
     const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))

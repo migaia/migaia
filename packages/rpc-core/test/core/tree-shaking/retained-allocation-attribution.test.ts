@@ -74,7 +74,7 @@ type IPostMigrationCandidate = {
 
 const workspaceRoot = resolve(import.meta.dirname, '../../../../..')
 
-/** Runs the reviewed root bundler probe used for the B11 size decision. */
+/** Runs the reviewed root bundler probe used for the retained-size decision. */
 function readLiveReport(): IRetainedReport {
   const script = resolve(import.meta.dirname, '../tree-shaking-baseline.mjs')
   return JSON.parse(
@@ -94,8 +94,8 @@ function normalizeModulePath(module: string): string {
       : relative
 }
 
-/** Verifies the B11 retained/allocation attribution against the approved live graph. */
-describe('WRC-C-B11 retained and allocation attribution', () => {
+/** Verifies the retained/allocation attribution against the approved live graph. */
+describe('retained and allocation attribution', () => {
   it('binds pending byte drift to the current and historical retained graphs', async () => {
     const historicalBaseline = (await import(
       '../fixtures/tree-shaking/pre-migration-tree-shaking-baseline.json',
@@ -229,7 +229,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const [coreTransport] = createMemoryTransportPair()
     const core = await createComposedEndpoint(
       {
-        id: 'b11-core-allocation',
+        id: 'core-allocation',
         transport: coreTransport,
         middlewares: [connect({ transport: coreTransport })]
       },
@@ -237,26 +237,26 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     )
     const [clientTransport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
-      id: 'b11-client-allocation',
+      id: 'client-allocation',
       transport: clientTransport,
       middlewares: [connect({ transport: clientTransport })]
     })
     const [providerTransport] = createMemoryTransportPair()
     const provider = await createProviderEndpoint({
-      id: 'b11-provider-allocation',
+      id: 'provider-allocation',
       transport: providerTransport,
       middlewares: [connect({ transport: providerTransport })]
     })
     const [fullTransport] = createMemoryTransportPair()
     const full = await createFullEndpoint({
-      id: 'b11-full-allocation',
+      id: 'full-allocation',
       transport: fullTransport,
       middlewares: [connect({ transport: fullTransport })]
     })
     const [customTransport] = createMemoryTransportPair()
     const custom = await createComposedEndpoint(
       {
-        id: 'b11-custom-allocation',
+        id: 'custom-allocation',
         transport: customTransport,
         middlewares: [connect({ transport: customTransport })]
       },
@@ -292,7 +292,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
   it('exercises composed discovery and chunk settlement through the shared kernel', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createFullEndpoint({
-      id: 'b11-chunk-server',
+      id: 'chunk-server',
       transport: serverTransport,
       codec: defineJsonCodec({ version: 1 }),
       framer: createStringFramer({ chunkBytes: 8 }),
@@ -300,8 +300,8 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       provider: { echo: (context) => context.success(context.data) }
     })
     const client = await createFullEndpoint({
-      id: 'b11-chunk-client',
-      targetIds: ['b11-chunk-server'],
+      id: 'chunk-client',
+      targetIds: ['chunk-server'],
       transport: clientTransport,
       codec: defineJsonCodec({ version: 1 }),
       framer: createStringFramer({ chunkBytes: 8 }),
@@ -310,7 +310,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
 
     try {
       await expect(
-        client.send('b11-chunk-server', 'echo', 'discovery-and-chunk'.repeat(8))
+        client.send('chunk-server', 'echo', 'discovery-and-chunk'.repeat(8))
       ).resolves.toBe('discovery-and-chunk'.repeat(8))
     } finally {
       await Promise.all([client.dispose(), server.dispose()])
@@ -355,7 +355,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       }
     })
     const server = await createFullEndpoint({
-      id: 'b11-unauthenticated-chunk-server',
+      id: 'unauthenticated-chunk-server',
       transport: serverTransport,
       codec: defineJsonCodec({ version: 1 }),
       framer: createStringFramer({
@@ -377,8 +377,8 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       }
     })
     const client = await createFullEndpoint({
-      id: 'b11-unauthenticated-chunk-client',
-      targetIds: ['b11-unauthenticated-chunk-server'],
+      id: 'unauthenticated-chunk-client',
+      targetIds: ['unauthenticated-chunk-server'],
       transport: forgedTransport,
       codec: defineJsonCodec({ version: 1 }),
       framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
@@ -387,7 +387,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
 
     try {
       await expect(
-        client.send('b11-unauthenticated-chunk-server', 'echo', 'fragmented', { timeoutMs: 20 })
+        client.send('unauthenticated-chunk-server', 'echo', 'fragmented', { timeoutMs: 20 })
       ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
       expect(assemblyTimers).toBe(0)
       expect(providerCalls).toBe(0)
@@ -407,7 +407,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
           )
       }
       const goodServer = await createFullEndpoint({
-        id: 'b11-unauthenticated-chunk-good-server',
+        id: 'unauthenticated-chunk-good-server',
         transport: goodServerTransport,
         codec: defineJsonCodec({ version: 1 }),
         framer: createStringFramer({
@@ -429,8 +429,8 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         }
       })
       const goodClient = await createFullEndpoint({
-        id: 'b11-unauthenticated-chunk-good-client',
-        targetIds: ['b11-unauthenticated-chunk-good-server'],
+        id: 'unauthenticated-chunk-good-client',
+        targetIds: ['unauthenticated-chunk-good-server'],
         transport: goodClientTransport,
         codec: defineJsonCodec({ version: 1 }),
         framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
@@ -438,7 +438,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       })
       try {
         await expect(
-          goodClient.send('b11-unauthenticated-chunk-good-server', 'echo', 'fragmented', {
+          goodClient.send('unauthenticated-chunk-good-server', 'echo', 'fragmented', {
             timeoutMs: 100
           })
         ).resolves.toBe('fragmented')
@@ -455,20 +455,20 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
   it('keeps multi-receiver fanout isolated and settles an aborted request once', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const first = await createFullEndpoint({
-      id: 'b11-multi-first',
+      id: 'multi-first',
       transport: serverTransport,
       middlewares: [connect({ transport: serverTransport })],
       provider: { echo: (context) => context.success('first') }
     })
     const second = await createFullEndpoint({
-      id: 'b11-multi-second',
+      id: 'multi-second',
       transport: serverTransport,
       middlewares: [connect({ transport: serverTransport })],
       provider: { echo: (context) => context.success('second') }
     })
     const client = await createFullEndpoint({
-      id: 'b11-multi-client',
-      targetIds: ['b11-multi-first', 'b11-multi-second'],
+      id: 'multi-client',
+      targetIds: ['multi-first', 'multi-second'],
       transport: clientTransport,
       middlewares: [connect({ transport: clientTransport })]
     })
@@ -484,7 +484,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
 
     const [abortClientTransport, abortServerTransport] = createMemoryTransportPair()
     const abortServer = await createFullEndpoint({
-      id: 'b11-abort-server',
+      id: 'abort-server',
       transport: abortServerTransport,
       middlewares: [connect({ transport: abortServerTransport }), abort()],
       provider: {
@@ -495,13 +495,13 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
       }
     })
     const abortClient = await createFullEndpoint({
-      id: 'b11-abort-client',
-      targetIds: ['b11-abort-server'],
+      id: 'abort-client',
+      targetIds: ['abort-server'],
       transport: abortClientTransport,
       middlewares: [connect({ transport: abortClientTransport }), abort()]
     })
     const controller = new AbortController()
-    const request = abortClient.send('b11-abort-server', 'echo', 'late', {
+    const request = abortClient.send('abort-server', 'echo', 'late', {
       signal: controller.signal
     })
     controller.abort()
@@ -522,7 +522,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     new RpcChunkAttachment(kernel, framer)
     expect(kernel.ownerKeys).toContain('chunk-assembler')
     await expect(kernel.dispatchRoute('chunk', {})).resolves.toBe(false)
-    const reason = new Error('B11 bridge close')
+    const reason = new Error('bridge close')
     kernel.beginClose(reason)
     expect(reasons).toHaveLength(1)
     expect(reasons[0]).toBe(reason)

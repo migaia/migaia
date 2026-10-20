@@ -14,7 +14,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 35; index++) await Promise.resolve()
 }
 
-describe('A9 disposal', () => {
+describe('disposal', () => {
   it('shares the bounded stop promise and distinguishes closing from terminal', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()

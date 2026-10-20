@@ -4,7 +4,7 @@ import { reclaimOrphanProcesses, type IProcessRecord } from '../../src/process/i
 import { memoryProcessLauncher } from './support/memory-process-launcher.js'
 import { memoryRegistry } from './support/memory-registry.js'
 
-describe('A8 prior-run orphan recovery', () => {
+describe('prior-run orphan recovery', () => {
   it('never terminates a reused pid and collects each failed record', async () => {
     const registry = memoryRegistry()
     const records: IProcessRecord[] = [

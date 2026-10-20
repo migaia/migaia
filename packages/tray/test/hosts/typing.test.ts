@@ -67,19 +67,19 @@ async function checkCalls(
     void number
   }
   await tray.spawn('typed', { id: 'typed-1', config: { language: 'en' } })
-  // @ts-expect-error A1: required validator output requires config at spawn.
+  // @ts-expect-error required validator output requires config at spawn.
   await tray.spawn('typed', { id: 'typed-1' })
-  // @ts-expect-error A1: empty methods cannot interpret second-slot objects as options.
+  // @ts-expect-error empty methods cannot interpret second-slot objects as options.
   await remote.request('node.svc.hello', { timeoutMs: 10 })
-  // @ts-expect-error A1: empty methods reject non-undefined payloads.
+  // @ts-expect-error empty methods reject non-undefined payloads.
   await remote.request('node.svc.hello', 'bad')
-  // @ts-expect-error A1: optional payload keeps its string domain.
+  // @ts-expect-error optional payload keeps its string domain.
   await remote.request('node.svc.optional', 1)
-  // @ts-expect-error A1: required payload remains required.
+  // @ts-expect-error required payload remains required.
   await remote.request('node.svc.echo')
-  // @ts-expect-error A1: call options accept no unowned retry mechanism.
+  // @ts-expect-error call options accept no unowned retry mechanism.
   await remote.request('node.svc.echo', 'value', { retries: 1 })
-  // @ts-expect-error A1: only the precise tray Feature exists on the per-init plugin.
+  // @ts-expect-error only the precise tray Feature exists on the per-init plugin.
   trayPlugin.getFeature('other')
   void policyName
   void hello
@@ -89,11 +89,11 @@ async function checkCalls(
 
 /** Runtime constraints are checked by TypeScript without executing invalid definitions. */
 function checkDefinitions() {
-  // @ts-expect-error A1: coroutine has no entry.
+  // @ts-expect-error coroutine has no entry.
   defineTrayHost({ name: 'co', entry: 'co.mjs', plugins: () => [service], exposes: ['node.svc'] })
-  // @ts-expect-error A1: thread must supply an entry.
+  // @ts-expect-error thread must supply an entry.
   defineTrayHost({ name: 'th', runtime: 'thread', plugins: () => [service], exposes: ['node.svc'] })
-  // @ts-expect-error A1: process has no heap limit.
+  // @ts-expect-error process has no heap limit.
   defineTrayHost({
     name: 'pr',
     runtime: 'process',
@@ -102,7 +102,7 @@ function checkDefinitions() {
     plugins: () => [service],
     exposes: ['node.svc']
   })
-  // @ts-expect-error A1: thread cannot carry a process sandbox.
+  // @ts-expect-error thread cannot carry a process sandbox.
   defineTrayHost({
     name: 'th',
     runtime: 'thread',
@@ -111,13 +111,13 @@ function checkDefinitions() {
     plugins: () => [service],
     exposes: ['node.svc']
   })
-  // @ts-expect-error A1: exposure must name a native PluginHost Feature.
+  // @ts-expect-error exposure must name a native PluginHost Feature.
   defineTrayHost({ name: 'bad', plugins: () => [service], exposes: ['node.missing'] })
 }
 void checkCalls
 void checkDefinitions
 
-describe('instances A1 typing', () => {
+describe('instance typing', () => {
   it('retains the routing tuple and literal exposure at runtime', () => {
     expect(host.routing).toEqual([aaa])
     expect(host.exposes).toEqual(['node.svc'])

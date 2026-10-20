@@ -12,7 +12,7 @@ import {
 
 describe('lazy activation', () => {
   it.each(['notification', 'update'] as const)(
-    'PHP-T2 preserves a cold %s signal through activation and removal',
+    'preserves a cold %s signal through activation and removal',
     async (entry) => {
       /** Cold enablement can observe lifetime before any core or install attempt exists. */
       const host = new PluginHost<Record<string, never>>({
@@ -55,7 +55,7 @@ describe('lazy activation', () => {
   )
 
   it.each(['setup', 'install'] as const)(
-    'PHA-T1 rejects synchronous %s activation reentry before sharing the pending request',
+    'rejects synchronous %s activation reentry before sharing the pending request',
     async (phase) => {
       /** Reentry targets the same public registration and pending activation. */
       const host = new PluginHost<Record<string, never>>({
@@ -85,7 +85,7 @@ describe('lazy activation', () => {
   )
 
   it.each([false, 20] as const)(
-    'PHA-T2 shares asynchronous activation callers with mutationTimeoutMs=%s',
+    'shares asynchronous activation callers with mutationTimeoutMs=%s',
     async (timeout) => {
       /** The operation deadline advances only when the test explicitly advances its clock. */
       const scheduler = createManualScheduler()
@@ -143,7 +143,7 @@ describe('lazy activation', () => {
     }
   )
 
-  it('PHL-T1 PH-B2 releases committed resources after shared publication fails on a non-extensible Host', async () => {
+  it('releases committed resources after shared publication fails on a non-extensible Host', async () => {
     /** Non-extensible Host instances already support public handle publication. */
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -193,7 +193,7 @@ describe('lazy activation', () => {
     expect(released).toHaveBeenCalledTimes(3)
   })
 
-  it('PHL-T2 A26 clears candidate stages and extension owners after failed activation', async () => {
+  it('clears candidate stages and extension owners after failed activation', async () => {
     /** Host exposes stage execution count after each activation attempt. */
     class LazyStageHost extends PluginHost<Record<string, never>, number> {
       run(): number {
@@ -252,7 +252,7 @@ describe('lazy activation', () => {
     await host.dispose()
   })
 
-  it('PHL-T3 activates explicitly once and transitively for required consumers', async () => {
+  it('activates explicitly once and transitively for required consumers', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

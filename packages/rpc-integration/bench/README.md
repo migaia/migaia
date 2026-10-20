@@ -1,13 +1,13 @@
-# IPC conformance and DA1 measurements
+# IPC conformance and RPC/bare budget measurements
 
-`cross-runtime/` runs the separate R23 directed matrix: 27 Node/Bun/Deno ↔
+`cross-runtime/` runs the separate directed matrix: 27 Node/Bun/Deno ↔
 Node/Bun/Deno/Rust/Go/Python pairs on two carriers. Its TS endpoints import the
 actual public RPC source entries. Node uses the minimal `.js` → `.ts` resolver;
 Bun and Deno execute TS directly. Existing dependency exports remain built.
 
 The owner first calls `node packages/rpc-integration/bench/cross-runtime/prepare.mjs <fresh-evidence-directory>`
 from the repository root context through the pinned environment wrapper. The
-prepared source records distinguish current base from the actual five-file BC14
+prepared source records distinguish current base from the actual five-file
 disposable responder candidate. Reverse candidate results are fixture evidence;
 they do not claim that the current production bridge already supports responders.
 Preparation and raw output directories must be new. Foreign launchers use the
@@ -45,7 +45,7 @@ PID user+system counter differences; RSS uses each PID's absolute sampled peak.
 A shared Worker PID is charged once. Startup RSS is not subtracted.
 
 Native bare peers parse and serialize the payload once, as required by the
-2026-10-02 A10 baseline. Foreign peers do the same work in Content-Length mode.
+2026-10-02 reference baseline. Foreign peers do the same work in Content-Length mode.
 Rust uses release `opt-level = 3`, Go its optimized build, and public TS peers
 execute emitted JavaScript. Build time is outside formal timing.
 
@@ -83,23 +83,23 @@ paired result. Without it, the command creates and reports a temporary raw
 directory. `--help` is not supported. Heavy runs require the owner's exclusive
 window; this benchmark does not grant a measurement lease.
 
-DA1 uses medians of all three RPC/bare ratios. Small cells (64 B and 1 KiB)
+The RPC/bare budget uses medians of all three RPC/bare ratios. Small cells (64 B and 1 KiB)
 require wall <=4, p99 <=5 and CPU <=5 for every independent PID role. Large
 cells (64 KiB and 1 MiB) require p99 <=3, throughput >=0.5, CPU <=3 and absolute
 RSS <=2 for every independent PID role. Aggregate CPU/RSS are descriptive and
-cannot hide a failing endpoint. U33 keeps the six concurrency 16/64
-`throughputFloor` values as tracking targets only. Missing a target reports
+cannot hide a failing endpoint. The six concurrency 16/64
+`throughputFloor` values remain tracking targets only. Missing a target reports
 `未达跟踪目标`; it does not replace a separate frozen regression verdict.
 Historical `IpcBenchThreshold` and
 `judgePairs` remain available for historical oracle checks; their aggregate
-budgets are not DA1.
+budgets are not the RPC/bare budget.
 
 Formal runs also report `regression`: the median of three paired RPC/bare p50
-ratios compared with `w3-baseline.json`. Its 68 historical values come from the
-original W3 raw data; the eight later DA1 cells use supplementary measurements
-of the same W3 production commit with the common measurement fixture. The
-unchanged DA1 budgets and this relative guard must both pass. `--noise` supplies
-the current exclusive window's W3/W3 A/A calibration: three baseline pairs for
+ratios compared with `frozen-baseline.json`. Its 68 historical values come from the
+original baseline raw data; the eight later budget cells use supplementary measurements
+of the same baseline production commit with the common measurement fixture. The
+unchanged RPC/bare budgets and this relative guard must both pass. `--noise` supplies
+the current exclusive window's baseline A/A calibration: three baseline pairs for
 each of four representatives, with both RPC and bare observations retained.
 Its `p50RatioNoiseBand` is the largest observed absolute change of the normalized
 ratio. A missing calibration is an error, never a no-regression verdict.
@@ -149,7 +149,7 @@ final-source A/A and SDK baseline receipts are installed.
 
 The six sustained >=400-second cells run separately with the replay fixture's
 full records and classifications. A native send/receive change requires fresh
-records from that code version. B0 is historical wall-budget tracking only.
+records from that code version. The historical throughput target is wall-budget tracking only.
 Summed isolated gains cannot replace an actual complete-stack reference pair.
 
 Supplemental runtime paths use `runtime-units.json` and the original side,
@@ -173,26 +173,26 @@ loop. Shared PID CPU is charged once; both isolate snapshots retain real
 thread IDs and loaded bytes. No parent round-trip clock stands in for the
 initiator's measurement.
 
-These cells retain RPC-only observations with status `unfrozen` until C7 freezes
-the final I28 source and installs their relative guards. No old bare denominator
-or historical W3 value is invented for a new topology. Relay own-thread CPU
+These cells retain RPC-only observations with status `unfrozen` until a later change freezes
+the final source and installs their relative guards. No old bare denominator
+or historical baseline value is invented for a new topology. Relay own-thread CPU
 between boundary snapshots includes diagnostic RPC work; three empty snapshot
 pairs are retained separately. It is not reported as exact business-only CPU.
 
-Final SDK guards use a separate `w3-sdk-baseline.json`. Its six U33 concurrency
+Final SDK guards use a separate `sdk-baseline.json`. Its six concurrency
 cells compare paired RPC/bare throughput; Deno compares paired p50/p95/p99 and
 throughput. Runtime supplemental cells use RPC-only values, with no fabricated
 bare denominator. Every frozen metric requires its own current-window A/A band
 in the noise receipt's `sdkCells`. Higher latency and lower throughput are
 regressions; any metric beyond its own noise keeps the verdict FAIL. Original
-pre-program p50 and absolute DA1 verdicts remain separate and unchanged.
+pre-program p50 and absolute RPC/bare budget verdicts remain separate and unchanged.
 
 Candidate collection uses `--freeze-sdk` explicitly. It records
 `unfrozen-candidate` for new paired cells and never claims a frozen relative
 PASS. Numeric/source/raw-SHA freezing happens after final-source qualification.
 Normal concurrency, Deno and runtime runs fail closed if the baseline or
 current-window SDK noise is missing. The same noise file also retains the
-original four representative W3 A/A controls.
+original four representative baseline A/A controls.
 
 ```bash
 node bench/ipc.mjs --scenario deno --prepare --output /absolute/fresh-deno-preparation

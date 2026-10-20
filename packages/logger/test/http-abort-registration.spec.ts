@@ -51,7 +51,7 @@ function installAbortHarness(
         aborted: mode === 'already-aborted' && controllers.length === 0,
         reason:
           mode === 'already-aborted' && controllers.length === 0
-            ? new Error('round25-already-aborted')
+            ? new Error('already-aborted')
             : undefined
       }
       this.#signalState = signalState
@@ -139,7 +139,7 @@ async function runScenario(
   const harness = installAbortHarness(mode, registrationError, removalError)
   const scheduler = createScheduler()
   const fetch = vi.fn(async () => {
-    if (rejectFetch) throw new Error('round25-backoff-transport')
+    if (rejectFetch) throw new Error('backoff-transport')
     return { ok: true, status: 200, headers: { get: () => null } }
   })
   const failures: unknown[] = []
@@ -148,7 +148,7 @@ async function runScenario(
     unhandled.push(reason)
   }
   const restoreRuntime = setLoggerRuntimeManager({
-    randomUUID: () => `round25-${mode}`,
+    randomUUID: () => `abort-${mode}`,
     defer: (task) => {
       task()
     },
@@ -168,7 +168,7 @@ async function runScenario(
       plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
     })
     logger.onFailure(({ error }) => failures.push(error))
-    logger.log('info', `round25-${mode}`)
+    logger.log('info', `abort-${mode}`)
     const flush = logger.flush()
     await expect(flush).resolves.toBeUndefined()
     const shutdown = logger.shutdown('manual')
@@ -185,9 +185,9 @@ async function runScenario(
   return { failures, fetch, harness, scheduler, unhandled }
 }
 
-describe('Round25 HTTP abort-listener partial registration', () => {
-  it('LG-T32 cleans a stored listener when registration throws before callback', async () => {
-    const registrationError = new Error('round25-stored-registration')
+describe('HTTP abort-listener partial registration', () => {
+  it('cleans a stored listener when registration throws before callback', async () => {
+    const registrationError = new Error('stored-registration')
     const result = await runScenario('stored-then-throw', registrationError)
 
     expect(result.fetch).not.toHaveBeenCalled()
@@ -203,8 +203,8 @@ describe('Round25 HTTP abort-listener partial registration', () => {
     expect(result.unhandled).toEqual([])
   })
 
-  it('LG-T33 preserves callback-then-throw registration failure and removes once', async () => {
-    const registrationError = new Error('round25-callback-registration')
+  it('preserves callback-then-throw registration failure and removes once', async () => {
+    const registrationError = new Error('callback-registration')
     const result = await runScenario('callback-then-throw', registrationError)
 
     expect(result.fetch).not.toHaveBeenCalled()
@@ -219,9 +219,9 @@ describe('Round25 HTTP abort-listener partial registration', () => {
     expect(result.unhandled).toEqual([])
   })
 
-  it('LG-T34 retains registration primary when listener removal throws', async () => {
-    const registrationError = new Error('round25-registration-primary')
-    const removalError = new Error('round25-removal-cleanup')
+  it('retains registration primary when listener removal throws', async () => {
+    const registrationError = new Error('registration-primary')
+    const removalError = new Error('removal-cleanup')
     const result = await runScenario('stored-then-throw', registrationError, removalError)
     const failure = result.failures[0] as AggregateError & { readonly code?: string }
 
@@ -233,8 +233,8 @@ describe('Round25 HTTP abort-listener partial registration', () => {
     expect(result.unhandled).toEqual([])
   })
 
-  it('LG-T35 aborts fresh request state when shutdown signal is already aborted', async () => {
-    const registrationError = new Error('unused-round25-registration-error')
+  it('aborts fresh request state when shutdown signal is already aborted', async () => {
+    const registrationError = new Error('unused-registration-error')
     const result = await runScenario('already-aborted', registrationError)
 
     expect(result.fetch).not.toHaveBeenCalled()
@@ -245,14 +245,14 @@ describe('Round25 HTTP abort-listener partial registration', () => {
     expect(result.unhandled).toEqual([])
   })
 
-  it('LG-T36 cleans every listener across repeat sends without retrying POST', async () => {
-    const registrationError = new Error('round25-repeat-registration')
+  it('cleans every listener across repeat sends without retrying POST', async () => {
+    const registrationError = new Error('repeat-registration')
     const harness = installAbortHarness('stored-then-throw', registrationError)
     const scheduler = createScheduler()
     const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }))
     const failures: unknown[] = []
     const restoreRuntime = setLoggerRuntimeManager({
-      randomUUID: () => 'round25-repeat',
+      randomUUID: () => 'repeat',
       defer: (task) => {
         task()
       },
@@ -267,8 +267,8 @@ describe('Round25 HTTP abort-listener partial registration', () => {
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
       logger.onFailure(({ error }) => failures.push(error))
-      logger.log('info', 'round25-repeat-one')
-      logger.log('info', 'round25-repeat-two')
+      logger.log('info', 'repeat-one')
+      logger.log('info', 'repeat-two')
       await expect(logger.flush()).resolves.toBeUndefined()
       await expect(logger.shutdown('manual')).resolves.toMatchObject({
         logicalTerminal: true,
@@ -286,8 +286,8 @@ describe('Round25 HTTP abort-listener partial registration', () => {
     expect(failures).toHaveLength(2)
   })
 
-  it('LG-T37 cleans a partially registered backoff listener before retry can continue', async () => {
-    const registrationError = new Error('round25-backoff-registration')
+  it('cleans a partially registered backoff listener before retry can continue', async () => {
+    const registrationError = new Error('backoff-registration')
     const result = await runScenario('wait-stored-then-throw', registrationError, undefined, true)
 
     expect(result.fetch).toHaveBeenCalledOnce()

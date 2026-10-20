@@ -2,8 +2,8 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { matrixFixture, matrixDependency, type IMatrixFeature } from './matrix-fixture.js'
 
-describe('I15 real process acceptance matrix', () => {
-  it('[A1/A5] delays real hello/describe, starts dependency only after verification, and aborts actual stream', async () => {
+describe('real process acceptance matrix', () => {
+  it('delays real hello/describe, starts dependency only after verification, and aborts actual stream', async () => {
     const test = await matrixFixture()
     const firstSpec = {
       ...test.spec,
@@ -59,7 +59,7 @@ describe('I15 real process acceptance matrix', () => {
     expect(test.budget.inUse).toBe(0)
   }, 20000)
 
-  it('[A1/A9] real prewarm keeps hello/describe once and transfers stderr identity across stop-first', async () => {
+  it('real prewarm keeps hello/describe once and transfers stderr identity across stop-first', async () => {
     const test = await matrixFixture({ warm: true })
     try {
       await vi.waitFor(() => expect(test.pool!.idle).toBe(1))
@@ -110,7 +110,7 @@ describe('I15 real process acceptance matrix', () => {
   }, 20000)
 
   it.each([1, 2])(
-    '[A9] real start-switch budget %i keeps old child until candidate ready or rollback',
+    'real start-switch budget %i keeps old child until candidate ready or rollback',
     async (maxUnits) => {
       const test = await matrixFixture({ maxUnits })
       try {
@@ -174,7 +174,7 @@ describe('I15 real process acceptance matrix', () => {
   )
 
   it.each([2, 3])(
-    '[A9] real pool budget %i retains retiring lease and refills original spec',
+    'real pool budget %i retains retiring lease and refills original spec',
     async (maxUnits) => {
       const test = await matrixFixture({ maxUnits, warm: true, holdIdle: true })
       try {
@@ -208,7 +208,7 @@ describe('I15 real process acceptance matrix', () => {
     20000
   )
 
-  it('[A9] stop-first preserves dependency identity and suspend/enable timeline before real describe', async () => {
+  it('stop-first preserves dependency identity and suspend/enable timeline before real describe', async () => {
     const test = await matrixFixture({ gated: true })
     const dependent = matrixDependency(test)
     try {
@@ -247,7 +247,7 @@ describe('I15 real process acceptance matrix', () => {
   }, 20000)
 
   it.each(['stop-then-start', 'start-then-switch'] as const)(
-    '[A9] release overlaps real %s candidate preparation',
+    'release overlaps real %s candidate preparation',
     async (strategy) => {
       const test = await matrixFixture({ maxUnits: strategy === 'start-then-switch' ? 2 : 1 })
       try {
@@ -285,7 +285,7 @@ describe('I15 real process acceptance matrix', () => {
     20000
   )
 
-  it('[A9] real stop-first and start-switch overlap on canonical owners', async () => {
+  it('real stop-first and start-switch overlap on canonical owners', async () => {
     const test = await matrixFixture({ maxUnits: 3 })
     try {
       await test.host.use(test.plugin)
@@ -321,7 +321,7 @@ describe('I15 real process acceptance matrix', () => {
     expect(test.budget.inUse).toBe(0)
   }, 20000)
 
-  it('[A9] release first rejects both replacement strategies without touching active processes', async () => {
+  it('release first rejects both replacement strategies without touching active processes', async () => {
     const test = await matrixFixture({ maxUnits: 2 })
     try {
       await test.host.use(test.plugin)

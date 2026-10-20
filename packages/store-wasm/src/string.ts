@@ -102,7 +102,7 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
             disposing = true
             disposed = true
             try {
-              // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
+              // 逆序释放：先摘子资源边，再 dealloc block。
               disposeWasmField(block, field, source === undefined ? [] : [source])
             } finally {
               disposing = false

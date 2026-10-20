@@ -8,7 +8,7 @@ import { RpcContractErrorCode } from '@migaia/rpc-contract'
 import { createBinaryFramer } from '@migaia/rpc-contract/framing'
 import { normalizePortable } from '@migaia/rpc-contract'
 
-/** Contract sources whose new dependency allowlist is enforced by A4. */
+/** Contract sources whose new dependency allowlist is enforced here. */
 const contractRoot = join(import.meta.dirname, '../../src/contract')
 
 /** Recursively gathers contract source files without generated declarations. */
@@ -31,7 +31,7 @@ function rejection(action: () => unknown): { ctor: Function; code: unknown } {
 }
 
 describe('contract utility ownership', () => {
-  it('A4 uses only serialize and canonical utils boundaries and preserves native error identity', () => {
+  it('uses only serialize and canonical utils boundaries and preserves native error identity', () => {
     const bare = new Set<string>()
     for (const path of sourceFiles(contractRoot)) {
       for (const statement of parseSync(path, readFileSync(path, 'utf8')).program.body) {
@@ -72,7 +72,7 @@ describe('contract utility ownership', () => {
     expect(normalizePortable(new B([1, 2]))).toMatchObject({ $rpc: 'bytes' })
   })
 
-  it('A4 rejects forged byte views on normalization and framing paths', () => {
+  it('rejects forged byte views on normalization and framing paths', () => {
     const ordinary = new DataView(new ArrayBuffer(2))
     const tagged = new DataView(new ArrayBuffer(2))
     Object.defineProperty(tagged, Symbol.toStringTag, { value: 'Uint8Array' })

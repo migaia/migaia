@@ -1,36 +1,36 @@
 /** Stable error codes exposed by the Tray admission and lookup boundary. */
 export const TrayErrorCode = {
-  /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */
+  /** The mesh has no ready host candidate; await a ready instance before calling again. */
   hostUnavailable: 'TRAY_HOST_UNAVAILABLE',
-  /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */
+  /** The routing policy is absent from registration or declaration; register its branded definition. */
   routingUnknown: 'TRAY_ROUTING_UNKNOWN',
-  /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */
+  /** The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. */
   topicInvalid: 'TRAY_TOPIC_INVALID',
-  /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */
+  /** Routing policy name or pick is invalid; provide a named synchronous policy. */
   routingInvalid: 'TRAY_ROUTING_INVALID',
-  /** Host definition violates instances R1; provide an admitted host DSL. */
+  /** Host definition is invalid; provide an admitted host DSL. */
   hostInvalid: 'TRAY_HOST_INVALID',
-  /** Spawn names an unregistered host in R3; register the host before spawning. */
+  /** Spawn names an unregistered host; register the host before spawning. */
   hostUnknown: 'TRAY_HOST_UNKNOWN',
-  /** Remote host differs from the admission in R6; select the record's host. */
+  /** Remote host differs from the admission; select the record's host. */
   hostMismatch: 'TRAY_HOST_MISMATCH',
-  /** Expose uses a reserved internal plugin in R1; rename the business plugin. */
+  /** Expose uses a reserved internal plugin; rename the business plugin. */
   reservedName: 'TRAY_RESERVED_NAME',
-  /** Config or payload violates R3/R6 portable data; remove unsupported values. */
+  /** Config or payload is not portable data; remove unsupported values. */
   valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE',
-  /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */
+  /** Spawn reuses an admitted id; choose a free id or remove the admission. */
   instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE',
-  /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */
+  /** Lookup or remote uses an ended admission; obtain a fresh remote. */
   instanceUnknown: 'TRAY_INSTANCE_UNKNOWN',
-  /** Call targets a non-ready instance in R6; await its ready transition. */
+  /** Call targets a non-ready instance; await its ready transition. */
   instanceNotReady: 'TRAY_INSTANCE_NOT_READY',
-  /** Install or generation init fails in R3/R5; inspect the preserved cause. */
+  /** Install or generation init fails; inspect the preserved cause. */
   instanceStartFailed: 'TRAY_INSTANCE_START_FAILED',
-  /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */
+  /** Dispatcher receives a path outside the exposure; use an exposed Feature method. */
   pathNotExposed: 'TRAY_PATH_NOT_EXPOSED',
-  /** Child init repeats or names another host in R2; init once per generation. */
+  /** Child init repeats or names another host; init once per generation. */
   childStateInvalid: 'TRAY_CHILD_STATE_INVALID',
-  /** Operation enters a closing registry in R3; create a new Tray. */
+  /** Operation enters a closing registry; create a new Tray. */
   disposed: 'TRAY_DISPOSED',
   /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */
   loaderContractInvalid: 'LOADER_CONTRACT_INVALID',

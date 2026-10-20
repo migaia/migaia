@@ -259,7 +259,7 @@ export class Runtime implements IRuntime {
       deferIdle
     })
     // 多副本警告发生在 Runtime 建立前（createRuntime 先 noteRuntimeCopy 再 new）——经 `reportError` 的
-    // containment 上报：reporter 同步抛/异步拒绝都不会破坏构造、不会产生 unhandled rejection（AF-18）。
+    // containment 上报：reporter 同步抛/异步拒绝都不会破坏构造、不会产生 unhandled rejection。
     const copyWarning = consumePendingCopyWarning()
     if (copyWarning !== undefined) {
       this.reportError(createReactiveError(ReactiveErrorCode.copyConflict, copyWarning), {

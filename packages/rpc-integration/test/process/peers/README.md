@@ -1,7 +1,7 @@
 # Process peer fixtures
 
 Python, Rust, Go and `ts-reference` are independent native protocol fixtures.
-Their U36 baseline requires protocol 1.1, `runtime-api@1` and `batch@1`.
+Their runtime baseline requires protocol 1.1, `runtime-api@1` and `batch@1`.
 `ts-reference` remains a handwritten oracle and is distinct from the public TS fixture. `ts` consumes only published `@migaia/rpc`
 package exports and executes production process, core and remote modules.
 These fixtures are not language SDKs and install no dependencies.
@@ -118,7 +118,7 @@ Runtime Peer over bridge, including actual simultaneous calls observed as a
 physical JSON-RPC batch. Its remote directory assertion reads the
 accepted connection receipt; `Peer.describe()` describes the local peer.
 
-## A10 bare baseline
+## Bare reference baseline
 
 The 2026-10-02 baseline includes one JSON parse and one JSON serialization of
 the business payload before each bare reply. Python, Rust and Go perform that

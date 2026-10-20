@@ -480,8 +480,8 @@ export type IFrameBudgetOptions = {
   readonly yieldTo?: () => Promise<void>
   readonly signal?: IAbortSignal
   /**
-   * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses
-   * host `setTimeout`, `performance`, or `Date.now`.
+   * Required runtime-neutral scheduler. Core has no default timer and never directly accesses host
+   * `setTimeout`, `performance`, or `Date.now`.
    */
   readonly scheduler: IScheduler
 }
@@ -973,7 +973,7 @@ export async function collectStream(
     // long stream (which otherwise turns collection into quadratic work).
     return ['text', collected.map((chunk) => chunk[1] as string).join('')]
   }
-  // core 无默认 Encoding adapter（R-4）：出现 bytes 需要合并时必须注入 encoder，不直接使用宿主 TextEncoder。
+  // core 无默认 Encoding adapter：出现 bytes 需要合并时必须注入 encoder，不直接使用宿主 TextEncoder。
   const enc = capturedEncoder
   if (enc === undefined) {
     throw createSerializeError(

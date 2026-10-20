@@ -1,5 +1,5 @@
 {
-  "source": "rpc-core-refactor r17 PD101 frozen surface-expectations.r17.json",
+  "source": "rpc-core-refactor frozen surface expectations",
   "manifestAdditions": [
     "@migaia/rpc/contract/spi",
     "@migaia/rpc/core/spi",

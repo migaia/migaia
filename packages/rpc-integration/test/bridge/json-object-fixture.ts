@@ -14,7 +14,7 @@ import type { IRpcFeature } from '@migaia/rpc-core'
 
 /** Unknown user middleware forces the original public pipeline without mutating a descriptor. */
 export const stringFallbackMiddleware: IRpcPlugin = Object.freeze({
-  name: 'i21-string-fallback',
+  name: 'string-fallback',
   metadata: {
     claims: {
       routes: [],

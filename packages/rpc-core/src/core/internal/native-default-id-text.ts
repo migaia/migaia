@@ -1,4 +1,4 @@
-/** Canonical private allocator text enforces replay-window r12 BC2 without new public codes. */
+/** Canonical private allocator text enforces the replay-window ID contract without new public codes. */
 export const NativeDefaultIdText = {
   /** Resource key names the endpoint's retirement callback, not another physical owner. */
   terminalSubscription: 'native replay terminal subscription',

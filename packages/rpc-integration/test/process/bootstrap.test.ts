@@ -58,7 +58,7 @@ function frames(...payloads: string[]): Uint8Array {
 }
 
 describe('process bootstrap decoder ownership', () => {
-  it('[A7] transfers a coalesced hello to the same decoder', async () => {
+  it('transfers a coalesced hello to the same decoder', async () => {
     const port = source()
     const opening = openBootstrapFrameChannel(port.channel, 'stdin')
     port.push(frames('secret-bootstrap', 'hello-control'))
@@ -71,13 +71,13 @@ describe('process bootstrap decoder ownership', () => {
     expect(port.closes).toBe(1)
   })
 
-  it('[A7] leaves an unbootstrapped channel unchanged when no bootstrap is required', async () => {
+  it('leaves an unbootstrapped channel unchanged when no bootstrap is required', async () => {
     const port = source()
     expect(await openBootstrapFrameChannel(port.channel, 'none')).toEqual({ channel: port.channel })
     expect(port.closes).toBe(0)
   })
 
-  it('[A7] rejects EOF and an invalid first frame before exposing a channel', async () => {
+  it('rejects EOF and an invalid first frame before exposing a channel', async () => {
     const eofPort = source()
     const eof = openBootstrapFrameChannel(eofPort.channel, 'stdin')
     eofPort.eof()
@@ -97,7 +97,7 @@ describe('process bootstrap decoder ownership', () => {
     expect(oversizedPort.closes).toBe(1)
   })
 
-  it('[A7] rejects two pre-ready control frames after one bootstrap', async () => {
+  it('rejects two pre-ready control frames after one bootstrap', async () => {
     const port = source()
     const opened = openBootstrapFrameChannel(port.channel, 'stdin')
     port.push(frames('bootstrap', 'hello-one', 'hello-two'))
@@ -105,7 +105,7 @@ describe('process bootstrap decoder ownership', () => {
     expect(port.closes).toBe(1)
   })
 
-  it('[D4] caps the transferred decoder after bootstrap and before handshake', async () => {
+  it('caps the transferred decoder after bootstrap and before handshake', async () => {
     const port = source()
     const opening = openBootstrapFrameChannel(port.channel, 'stdin')
     port.push(frames('bootstrap'))

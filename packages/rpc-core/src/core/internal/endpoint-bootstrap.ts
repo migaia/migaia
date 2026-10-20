@@ -333,8 +333,7 @@ export async function prepareEndpoint<
     // Snapshotted here with everything else, not read again later at endpoint-construction
     // time: reading it late (past middleware install) means a hostile `replay` getter would
     // surface its error only after side effects already ran, instead of being rejected
-    // upfront like every other config field — see WR-R3-2 in
-    // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+    // upfront like every other config field.
     factoryReplay = config.replay
     factoryProtocol = config.protocol
     factoryCodec = config.codec

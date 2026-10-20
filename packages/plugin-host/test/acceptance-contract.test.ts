@@ -21,8 +21,8 @@ const median = (values: readonly number[]): number => {
   return sorted[Math.floor(sorted.length / 2)]
 }
 
-describe('PHV3 acceptance contract', () => {
-  it('PHV3-T01: accepts short and full functional definitions', async () => {
+describe('acceptance contract', () => {
+  it('accepts short and full functional definitions', async () => {
     const short = definePlugin('short', () => ({ install: () => ({ short: true }) }))
     const full = definePlugin({ name: 'full', install: () => ({ full: true }) })
     const host = new AcceptanceHost(hostOptions)
@@ -31,14 +31,14 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('YS24: rejects a forged Feature batch before any descriptor factory runs', async () => {
+  it('rejects a forged Feature batch before any descriptor factory runs', async () => {
     let descriptorCalls = 0
-    const valid = definePlugin('ys24-valid', () => {
+    const valid = definePlugin('fixture-valid', () => {
       descriptorCalls += 1
       return { install: () => ({}) }
     })
     const forged = {
-      name: 'ys24-forged',
+      name: 'fixture-forged',
       features: { forged: {} },
       featureExpose: {},
       install: () => ({})
@@ -51,10 +51,10 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('YS26: rejects equal install and expose keys without publishing the candidate', async () => {
+  it('rejects equal install and expose keys without publishing the candidate', async () => {
     const host = new AcceptanceHost(hostOptions)
-    // @ts-expect-error YS26 forbids every overlapping Host extension key.
-    const collision = definePlugin('ys26-collision', () => ({
+    // @ts-expect-error forbids every overlapping Host extension key.
+    const collision = definePlugin('fixture-collision', () => ({
       install: () => ({ duplicate: 1 }),
       expose: () => ({ duplicate: 1 })
     }))
@@ -65,10 +65,10 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('YS26: rejects an awaitable descriptor factory result before it becomes an empty descriptor', async () => {
+  it('rejects an awaitable descriptor factory result before it becomes an empty descriptor', async () => {
     const host = new AcceptanceHost(hostOptions)
     const descriptor = definePlugin(
-      'ys26-thenable-descriptor',
+      'thenable-descriptor',
       () => Promise.resolve({ install: () => ({ shouldNotMount: true }) }) as never
     )
     await expect(host.use(descriptor)).rejects.toMatchObject({
@@ -80,7 +80,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('YS26: contains every late descriptor-hook rejection when diagnostics throw', async () => {
+  it('contains every late descriptor-hook rejection when diagnostics throw', async () => {
     for (const hook of ['descriptor', 'featureExpose', 'expose'] as const) {
       const original = new Error(`late-${hook}`)
       const rejected = Promise.reject(original)
@@ -131,7 +131,7 @@ describe('PHV3 acceptance contract', () => {
     }
   })
 
-  it('YS27: injects only featureExpose and declared dependencies into Feature factories', async () => {
+  it('injects only featureExpose and declared dependencies into Feature factories', async () => {
     /**
      * Captures the exact Feature core surface without masking assertion failures in Host lifecycle
      * wrapping.
@@ -149,7 +149,7 @@ describe('PHV3 acceptance contract', () => {
       return { read: () => core.featureExpose.read() }
     })
     const provider = definePlugin({
-      name: 'ys27-provider',
+      name: 'fixture-provider',
       features: { feature },
       featureExpose: { read: () => 7 },
       install: (core) => ({ read: core.features.feature.read() })
@@ -161,7 +161,7 @@ describe('PHV3 acceptance contract', () => {
       { provider: provider.getFeature('feature') }
     )
     const consumer = definePlugin({
-      name: 'ys27-consumer',
+      name: 'consumer-2',
       features: { dependentFeature },
       install: (core) => ({ observed: core.features.dependentFeature.observed })
     })
@@ -174,7 +174,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('PHV3-T03: snapshots hostile definition descriptors', async () => {
+  it('snapshots hostile definition descriptors', async () => {
     const counts = { name: 0, install: 0 }
     const source = Object.defineProperties(
       {},
@@ -189,7 +189,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('PHV3-T04: creates definitions without lifecycle calls', () => {
+  it('creates definitions without lifecycle calls', () => {
     const calls: string[] = []
     const plugin = definePlugin({
       name: 'pure',
@@ -205,7 +205,7 @@ describe('PHV3 acceptance contract', () => {
     expect(calls).toEqual([])
   })
 
-  it('PHV3-T05: uses structural fallback for clones', async () => {
+  it('uses structural fallback for clones', async () => {
     const trusted = definePlugin({ name: 'trusted', install: () => ({ trusted: true }) })
     const clone = { ...trusted }
     const host = new AcceptanceHost(hostOptions)
@@ -214,7 +214,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('PHV3-T05F: structural fallback initializes native Feature roots', async () => {
+  it('structural fallback initializes native Feature roots', async () => {
     let factoryCalls = 0
     const feature = defineFeature<
       { readonly read: () => number },
@@ -241,7 +241,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('PHV3-T06: preserves mixed admission order and duplicate atomicity', async () => {
+  it('preserves mixed admission order and duplicate atomicity', async () => {
     const first = definePlugin('first', () => ({ install: () => ({ first: true }) }))
     const host = new AcceptanceHost(hostOptions)
     const handles = await host.use(first, {
@@ -258,7 +258,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('PHV3-T07: keeps trusted and generic lifecycle behavior equivalent', async () => {
+  it('keeps trusted and generic lifecycle behavior equivalent', async () => {
     const events: string[] = []
     const trusted = definePlugin({
       name: 'trusted',
@@ -287,7 +287,7 @@ describe('PHV3 acceptance contract', () => {
     expect(events).toEqual(['install', 'install', 'dispose', 'dispose'])
   })
 
-  it('PHV3-T08: has one canonical Host runtime owner', () => {
+  it('has one canonical Host runtime owner', () => {
     const source = readFileSync(new URL('../src/host-runtime.ts', import.meta.url), 'utf8')
     expect((source.match(/export class PluginHost/g) ?? []).length).toBe(1)
     expect(readFileSync(new URL('../src/define-plugin.ts', import.meta.url), 'utf8')).toContain(
@@ -295,7 +295,7 @@ describe('PHV3 acceptance contract', () => {
     )
   })
 
-  it('PHV3-T09: records 15-sample trusted admission speed evidence', async () => {
+  it('records 15-sample trusted admission speed evidence', async () => {
     const genericSamples: number[] = []
     const coldTrustedSamples: number[] = []
     const warmTrustedSamples: number[] = []
@@ -332,13 +332,13 @@ describe('PHV3 acceptance contract', () => {
       warmTrusted: median(warmTrustedSamples)
     }
     console.info(
-      '[PHV3-T09]',
+      '[trusted admission samples]',
       JSON.stringify({ medians, genericSamples, coldTrustedSamples, warmTrustedSamples })
     )
     expect(coldTrustedSamples).toHaveLength(15)
   })
 
-  it('PHV3-T10: admits every trusted definition without reusing a receipt', async () => {
+  it('admits every trusted definition without reusing a receipt', async () => {
     for (const size of [1000, 2000, 4000, 8000]) {
       /** One host owns all opaque admissions at this declared comparison size. */
       const host = new AcceptanceHost(hostOptions)
@@ -360,7 +360,7 @@ describe('PHV3 acceptance contract', () => {
     }
   })
 
-  it('PHV3-T11: publishes root, declarations and packed dist entries', () => {
+  it('publishes root, declarations and packed dist entries', () => {
     const packageJson = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     ) as {
@@ -373,7 +373,7 @@ describe('PHV3 acceptance contract', () => {
     )
   })
 
-  it('PHV3-T12: leaves Tray as a structural consumer', () => {
+  it('leaves Tray as a structural consumer', () => {
     const source = readFileSync(
       new URL('../../tray/src/host/create-host.ts', import.meta.url),
       'utf8'
@@ -382,7 +382,7 @@ describe('PHV3 acceptance contract', () => {
     expect(source).not.toContain('definePlugin(')
   })
 
-  it('PHV3-T13: preserves source receiver identity', async () => {
+  it('preserves source receiver identity', async () => {
     let receiver: unknown
     const source = {
       name: 'receiver',
@@ -398,7 +398,7 @@ describe('PHV3 acceptance contract', () => {
     await host.dispose()
   })
 
-  it('PHV3-T15: converges entry imports on the V2 runtime', () => {
+  it('converges entry imports on the V2 runtime', () => {
     // 两个子路径删除后，根入口是唯一的会合点：函数式与结构式两种形态都从这里导出。
     const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
     expect(index).toContain("'./host-runtime.js'")
@@ -406,13 +406,13 @@ describe('PHV3 acceptance contract', () => {
     expect(index).toContain("'./define-plugin.js'")
   })
 
-  it('PHV3-T23: documents explicit cancellation ownership', () => {
+  it('documents explicit cancellation ownership', () => {
     const docs = readFileSync(new URL('../USEGUIDE.md', import.meta.url), 'utf8')
     expect(docs).toContain('signal')
     expect(docs).toContain('dispose')
   })
 
-  it('PHV3-T24: retains immutable enumerable metadata', () => {
+  it('retains immutable enumerable metadata', () => {
     const plugin = definePlugin({
       name: 'metadata',
       install: () => ({}),
@@ -422,14 +422,14 @@ describe('PHV3 acceptance contract', () => {
     expect(Object.isFrozen(plugin)).toBe(true)
   })
 
-  it('PHV3-T25: trusted storage stores definitions, not Host state', () => {
+  it('trusted storage stores definitions, not Host state', () => {
     const source = readFileSync(new URL('../src/define-plugin.ts', import.meta.url), 'utf8')
     expect(source).toContain('WeakMap<object, IStoredDefinition>')
     expect(source).not.toContain("from './host-runtime.js'")
     expect(source).not.toContain('HostRuntime')
   })
 
-  it('PHV3-T27: carries TValue through pipeline declarations', () => {
+  it('carries TValue through pipeline declarations', () => {
     // 函数式 Host 的 TValue 由句柄类型承载。
     const source = readFileSync(new URL('../src/typing.ts', import.meta.url), 'utf8')
     expect(source).toContain('IAsyncGeneratorMiddlewareStage<TValue>')

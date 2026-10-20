@@ -21,7 +21,7 @@ function request(payload: unknown = null): object {
   }
 }
 
-describe('control envelope validation (A3)', () => {
+describe('control envelope validation', () => {
   it('requires a route on every request', () => {
     expect(() =>
       normalizeRpcEnvelope({ kind: 'request', id: '1', method: 'm', data: null })

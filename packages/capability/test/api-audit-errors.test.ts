@@ -7,7 +7,7 @@ import { createTopologyIndex, buildCapabilityTopology } from '../src/graph/topol
 import { resolveInstallSet } from '../src/graph/dependency.js'
 
 describe('audited capability boundary contracts', () => {
-  it('D-03 preserves the standard readonly Map and Set forEach receiver', () => {
+  it('preserves the standard readonly Map and Set forEach receiver', () => {
     /** Pure topology retains collection semantics while denying mutation. */
     const index = createTopologyIndex({
       onCycle() {
@@ -32,7 +32,7 @@ describe('audited capability boundary contracts', () => {
   })
 
   it.each(['static', 'incremental'] as const)(
-    'D-04 retains %s topology getter failure when the adapter chooses its own error',
+    'retains %s topology getter failure when the adapter chooses its own error',
     (kind) => {
       /** Captured input failure must remain reachable even when the adapter throws another error. */
       const original = new Error('node getter')
@@ -81,7 +81,7 @@ describe('audited capability boundary contracts', () => {
     }
   )
 
-  it('D-05 annotates a native readiness getter error without replacing it', () => {
+  it('annotates a native readiness getter error without replacing it', () => {
     /** Readiness admission owns failures while taking its fixed one-time snapshot. */
     const original = new RangeError('readiness getter')
     expect(() =>
@@ -96,7 +96,7 @@ describe('audited capability boundary contracts', () => {
   })
 
   it.each(['host', 'static', 'dynamic'] as const)(
-    'D-06 reports a %s reporter failure without changing cleanup',
+    'reports a %s reporter failure without changing cleanup',
     async (kind) => {
       /** Terminal reports remain observable outside the owning business Promise. */
       const callbacks: (() => void)[] = []
@@ -168,7 +168,7 @@ describe('audited capability boundary contracts', () => {
     }
   )
 
-  it('D-07 reads registration ordinals from the canonical topology owner after removal', async () => {
+  it('reads registration ordinals from the canonical topology owner after removal', async () => {
     /** Batch composition is unrelated to the diagnostic ordering fact. */
     const graph = createDynamicCapabilityGraph({
       startBatch: (entries) => entries.map(() => ({ value: 1, release() {} })),

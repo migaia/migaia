@@ -342,4 +342,4 @@ Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现
 
 `createBrowserPeer({ probe })` 将原 handle 交给 Core。`IMessageAdapterPort.observe?` 转发既有 native browser carrier 的观察 slot；不另建 MessagePort 事件路径。支持的 carrier 同步在 send 内 emit，失败由原 listener/report channel 报告，业务与 source proof 保持原路径。
 
-Metadata 只读取已知 native backing/view 长度，字符串及容器为 -1；capture 默认关闭。直接且实际转移的 bytes 按 SC9(a) 保留，nested transferable 保持原容器引用，可能在 transfer 后分离，getter 不被捕获逻辑遍历。Detail 是复用引用，保留数值需显式消费或快照。
+Metadata 只读取已知 native backing/view 长度，字符串及容器为 -1；capture 默认关闭。直接且实际转移的 bytes 按字节保留，nested transferable 保持原容器引用，可能在 transfer 后分离，getter 不被捕获逻辑遍历。Detail 是复用引用，保留数值需显式消费或快照。

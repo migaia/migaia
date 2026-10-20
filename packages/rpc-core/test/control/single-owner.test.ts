@@ -29,7 +29,7 @@ function identifiers(root: string): Set<string> {
   return found
 }
 
-describe('one owner for wire routes and public control contracts (A11)', () => {
+describe('one owner for wire routes and public control contracts', () => {
   it('removes legacy core symbols while retaining public contract and core exports', () => {
     const src = join(import.meta.dirname, '../../src')
     /** Contract owns the sole route vocabulary after physical package separation. */

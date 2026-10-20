@@ -15,7 +15,7 @@ import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
 /** A genuine Worker replacement changes the installed method set and one actual route mode. */
 const entry = fileURLToPath(new URL('./fixtures/directory-worker.mjs', import.meta.url))
 
-it('[A82][A83] accepted native generations report added/removed/modeChanged without rejecting asymmetric directories', async () => {
+it('accepted native generations report added/removed/modeChanged without rejecting asymmetric directories', async () => {
   /** Native accounting and exits remain the original supervisor/launcher owners. */
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
   /** Wrapping records handles and business data without replacing native launch. */
@@ -50,7 +50,7 @@ it('[A82][A83] accepted native generations report added/removed/modeChanged with
   })
   try {
     assert.equal(await peer.request('service.data.stable'), 3)
-    assert.deepEqual(reports, [], '[A82] initial asymmetric directories are valid, not a TS diff')
+    assert.deepEqual(reports, [], 'initial asymmetric directories are valid, not a TS diff')
     /** The original accepted pointer distinguishes launch from actual directory readiness. */
     const first = readRuntimePeerConnection(peer).peerId
     handles[0]!.terminate()
@@ -66,11 +66,7 @@ it('[A82][A83] accepted native generations report added/removed/modeChanged with
     const values = peer.stream('service.data.changed')
     assert.deepEqual(await values.next(), { done: false, value: 5 })
     await values.return!(undefined)
-    assert.equal(
-      reports.length,
-      1,
-      '[A82] one accepted replacement reports its exact directory diff'
-    )
+    assert.equal(reports.length, 1, 'one accepted replacement reports its exact directory diff')
     /** Inspect a safe local report without importing an implementation that does not exist in RED. */
     const diff = reports[0] as {
       type: string
@@ -96,7 +92,7 @@ it('[A82][A83] accepted native generations report added/removed/modeChanged with
       timeout: 3000
     })
     assert.equal(await peer.request('service.data.stable'), 3)
-    assert.equal(reports.length, 1, '[A82] unchanged accepted routes produce no report')
+    assert.equal(reports.length, 1, 'unchanged accepted routes produce no report')
   } finally {
     await peer.close()
     for (const handle of handles) handle.terminate()

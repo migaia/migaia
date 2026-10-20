@@ -29,7 +29,7 @@ function host() {
   })
 }
 
-it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact target receipts without affecting a sibling', async () => {
+it('genuine connections revoke inbound modes and exact target receipts without affecting a sibling', async () => {
   /** This supported class entry also exercises static typing of its actual published slot. */
   const owner = new PluginHost<Record<string, never>, never, IRuntimeTestRegistry>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -136,15 +136,11 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
       assert.equal(
         calls.length,
         0,
-        '[A13] disabled/suspended connection executes no exposed business in any mode'
+        'disabled/suspended connection executes no exposed business in any mode'
       )
       assert.equal(await outlet.request('connection-1', 'service.read'), 44)
       assert.equal(await remote[1].thread!.request('connection-1', 'service.read'), 42)
-      assert.deepEqual(
-        calls,
-        ['remote-1', 'owner'],
-        '[A13] sibling registration retains both directions'
-      )
+      assert.deepEqual(calls, ['remote-1', 'owner'], 'sibling registration retains both directions')
       await disabled.token.enable()
       assert.equal(await remote[0].thread!.request('connection-0', 'service.read'), 42)
     }
@@ -164,7 +160,7 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
           name: 'connection-0',
           connect: async () => {
             sourceCalls += 1
-            assert.fail('[A13] duplicate candidate acquired a source')
+            assert.fail('duplicate candidate acquired a source')
           },
           report: (error) => reports.push(error)
         })
@@ -176,17 +172,13 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
     await owner.replace('service', service('replacement', 45))
     calls.length = 0
     assert.equal(await remote[0].thread!.request('connection-0', 'service.read'), 45)
-    assert.equal(
-      calls.length,
-      1,
-      '[A117] the original Host guard selects the current same-name Feature'
-    )
+    assert.equal(calls.length, 1, 'the original Host guard selects the current same-name Feature')
     await owner.unUse('connection-0')
-    assert.equal(owner.thread, outlet, '[A34] first removal retains the shared facade')
+    assert.equal(owner.thread, outlet, 'first removal retains the shared facade')
     assert.throws(() => outlet.request(first, 'service.read'), { code: 'TARGET_UNKNOWN' })
     assert.equal(await outlet.request('connection-1', 'service.read'), 44)
     await owner.unUse('connection-1')
-    assert.equal(owner.thread, undefined, '[A34] the final contribution retires publication')
+    assert.equal(owner.thread, undefined, 'the final contribution retires publication')
   } finally {
     await owner.dispose()
     for (const target of remote) await target.dispose()
@@ -194,7 +186,7 @@ it('[A12][A13][A34][A117] genuine connections revoke inbound modes and exact tar
   }
 })
 
-it('[A34][A118] a different same-name plugin follows the frozen whitelist without reviving captured authority', async () => {
+it('a different same-name plugin follows the frozen whitelist without reviving captured authority', async () => {
   /** Each real Host owns its original registrations; the carrier supplies only physical messages. */
   const owners = [host(), host()] as const
   /** The first directory remains frozen throughout unload and a different installation. */
@@ -243,7 +235,7 @@ it('[A34][A118] a different same-name plugin follows the frozen whitelist withou
         install: () => ({})
       })
     )
-    assert.equal(output.read(), 42, '[A34] captured output never invokes the successor')
+    assert.equal(output.read(), 42, 'captured output never invokes the successor')
     assert.equal(successorCalls, 0)
     assert.equal(await owners[1].thread!.request('connection', 'service.read'), 84)
     for (const method of ['service.removed', 'service.added'])
@@ -251,7 +243,7 @@ it('[A34][A118] a different same-name plugin follows the frozen whitelist withou
         Promise.resolve().then(() => owners[1].thread!.request('connection', method)),
         (error) => permission(error, RpcCoreErrorCode.providerNotFound, '@migaia/rpc/core')
       )
-    assert.equal(successorCalls, 1, '[A118] neither a removed key nor an unadvertised key executes')
+    assert.equal(successorCalls, 1, 'neither a removed key nor an unadvertised key executes')
     /**
      * Connection children retain the exact original contribution, unlike live by-name Feature
      * routing.
@@ -273,7 +265,7 @@ it('[A34][A118] a different same-name plugin follows the frozen whitelist withou
   }
 })
 
-it('[A18][A34] actual empty broadcast and closing admission use the original Host state', async () => {
+it('actual empty broadcast and closing admission use the original Host state', async () => {
   /** The source carrier belongs to this fixture and is closed after original Host cleanup. */
   const carrier = runtimeSources()
   /** Two real owners activate the same public symmetric plugin. */
@@ -308,11 +300,7 @@ it('[A18][A34] actual empty broadcast and closing admission use the original Hos
     /** The facade was genuinely published before the original Host started closing. */
     const outlet = owners[0].thread!
     await owners[0].unUse('remote')
-    assert.deepEqual(
-      await outlet.broadcast('hidden.read'),
-      [],
-      '[A18] no future target is notified'
-    )
+    assert.deepEqual(await outlet.broadcast('hidden.read'), [], 'no future target is notified')
     /** Original dispose closes Host admission synchronously even while resources still await drain. */
     const closing = owners[0].dispose()
     for (const mode of ['request', 'notify', 'stream'] as const)
@@ -326,7 +314,7 @@ it('[A18][A34] actual empty broadcast and closing admission use the original Hos
   }
 })
 
-it('[A18][A19] real broadcast snapshots three targets and reports a send failure and subsequent departure once', async () => {
+it('real broadcast snapshots three targets and reports a send failure and subsequent departure once', async () => {
   /** Actual independent Hosts and carriers keep every recipient in its own canonical endpoint. */
   const owner = host()
   /** The three target registrations use the same real public factory, never stubbed Peer methods. */
@@ -416,16 +404,12 @@ it('[A18][A19] real broadcast snapshots three targets and reports a send failure
         [ids[2], false]
       ]
     )
-    assert.deepEqual(
-      sent,
-      [1, 1, 0],
-      '[A19] departed target receives no frame and failures never retry'
-    )
+    assert.deepEqual(sent, [1, 1, 0], 'departed target receives no frame and failures never retry')
     await vi.waitFor(() => assert.deepEqual(invoked, [1, 0, 0]))
-    assert.equal(reports.length, 2, '[A19] each failed target reports once')
+    assert.equal(reports.length, 2, 'each failed target reports once')
     assert.ok(
       reports.some((error) => error instanceof Error && error.cause === failure),
-      '[A19] original native send cause remains reachable'
+      'original native send cause remains reachable'
     )
     assert.equal((results[1]!.error as { code?: string }).code, RpcCoreErrorCode.transport)
     assert.equal((results[2]!.error as { code?: string }).code, RpcCoreErrorCode.targetUnknown)

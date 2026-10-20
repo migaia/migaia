@@ -5,8 +5,8 @@ import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'
 
-/** A5 preserves delivered values and then a sticky restored failure graph. */
-describe('streaming A5 error graph', () => {
+/** Preserves delivered values and then a sticky restored failure graph. */
+describe('streaming error graph', () => {
   it('retains the producer cause and rejects later next with the same remote instance', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createComposedEndpoint(

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// P1: Extract API signatures from .d.ts files
+// Extract API signatures from .d.ts files
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -2178,7 +2178,7 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
   return records
 }
 
-/** Builds six ordered, source-backed-or-explicit symbol sections for C25/C26. */
+/** Builds six ordered, source-backed-or-explicit symbol sections. */
 function buildSymbolSections(
   record: Record<string, unknown>,
   packageName: string,
@@ -2607,7 +2607,7 @@ function buildLibraryEntries() {
           return {}
         }
       })()
-      /** P5 keeps native cross-package operations installed, outside the adapter-author reference. */
+      /** Keeps native cross-package operations installed, outside the adapter-author reference. */
       const exports = Object.keys(manifest.exports ?? {})
         .filter(
           (exportPath) => entry.name !== 'rpc-core' || exportPath !== './adapter/internal-advanced'

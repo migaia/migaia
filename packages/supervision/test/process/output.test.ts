@@ -4,7 +4,7 @@ import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
 import { createProcessSupervisor } from '../../src/process/index.js'
 import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.js'
 
-describe('A5 continuous output drain', () => {
+describe('continuous output drain', () => {
   it('retains a bounded tail and continues after the consumer callback throws', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher()

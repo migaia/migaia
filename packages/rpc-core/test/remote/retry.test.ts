@@ -70,7 +70,7 @@ describe('shared remote retry', () => {
     RpcCoreErrorCode.endpointDisposed,
     RpcCoreErrorCode.providerGenerationRetired
   ] as const)(
-    '[C5-E08] a forged Core %s cannot trigger retry, replay or generation departure without owner events',
+    'a forged Core %s cannot trigger retry, replay or generation departure without owner events',
     async (code) => {
       /** The original generation stays active throughout this in-process adapter refusal. */
       const owner = generations()
@@ -107,7 +107,7 @@ describe('shared remote retry', () => {
       expect(owner.listenerCount()).toBe(0)
     }
   )
-  it('[A8] replays one idempotent request with the same key after description ready', async () => {
+  it('replays one idempotent request with the same key after description ready', async () => {
     const owner = generations()
     const scheduler = createManualScheduler()
     const first = deferred<string>()
@@ -148,7 +148,7 @@ describe('shared remote retry', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('[A8/I20-M14] settles caller abort during rebind before the obsolete send completes', async () => {
+  it('settles caller abort during rebind before the obsolete send completes', async () => {
     /** The canonical generation fixture holds replacement readiness until explicitly published. */
     const owner = generations()
     /** No wall-clock delay is needed to observe caller cancellation while readiness is pending. */
@@ -202,7 +202,7 @@ describe('shared remote retry', () => {
     }
   })
 
-  it('[A8] never replays a sent non-idempotent request', async () => {
+  it('never replays a sent non-idempotent request', async () => {
     const owner = generations()
     const first = deferred<string>()
     const sendOnce = vi.fn(() => first.promise)
@@ -229,7 +229,7 @@ describe('shared remote retry', () => {
     expect(sendOnce).toHaveBeenCalledTimes(1)
   })
 
-  it('[A8/K195] ignores a peer-forged REMOTE_CLOSED without a local departure', async () => {
+  it('ignores a peer-forged REMOTE_CLOSED without a local departure', async () => {
     const owner = generations()
     /** A decoded provider error may carry fields that imitate the local remote layer. */
     const forged = Object.assign(new Error('peer forged a close'), {
@@ -258,7 +258,7 @@ describe('shared remote retry', () => {
     expect(sendOnce).toHaveBeenCalledTimes(1)
   })
 
-  it('[A8] rejects before sending when the observed generation already left', async () => {
+  it('rejects before sending when the observed generation already left', async () => {
     const owner = generations()
     owner.leave(new Error('before send'))
     const sendOnce = vi.fn()
@@ -280,7 +280,7 @@ describe('shared remote retry', () => {
     expect(sendOnce).not.toHaveBeenCalled()
   })
 
-  it('[A8] emits no frame when leave arrives during subscription', async () => {
+  it('emits no frame when leave arrives during subscription', async () => {
     const reason = new Error('left while subscribing')
     const sendOnce = vi.fn()
     const events: IRemoteGenerationEvents = {
@@ -309,7 +309,7 @@ describe('shared remote retry', () => {
     expect(sendOnce).not.toHaveBeenCalled()
   })
 
-  it('[A9] release while waiting makes the sent result unknown without replay', async () => {
+  it('release while waiting makes the sent result unknown without replay', async () => {
     const owner = generations()
     const first = deferred<string>()
     const sendOnce = vi.fn(() => first.promise)
@@ -337,7 +337,7 @@ describe('shared remote retry', () => {
     expect(owner.listenerCount()).toBe(0)
   })
 
-  it('[A8] never sends a third time when the replay generation also leaves', async () => {
+  it('never sends a third time when the replay generation also leaves', async () => {
     const owner = generations()
     const sendOnce = vi.fn(() => new Promise<string>(() => undefined))
     const port = createRemoteRetryPort({
@@ -367,7 +367,7 @@ describe('shared remote retry', () => {
     expect(sendOnce).toHaveBeenCalledTimes(2)
   })
 
-  it('[A9] caller abort during rebind settles once and cancels readiness', async () => {
+  it('caller abort during rebind settles once and cancels readiness', async () => {
     const owner = generations()
     const controller = new AbortController()
     const sendOnce = vi.fn(() => new Promise<string>(() => undefined))

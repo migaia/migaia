@@ -6,7 +6,7 @@ import {
   createStoreMiddlewareError
 } from '../src/errors'
 
-describe('store-middleware error-code contract (E-T9)', () => {
+describe('store-middleware error-code contract', () => {
   it('declares 9 unique codes under the package source', () => {
     const codes = Object.values(StoreMiddlewareErrorCode)
     expect(codes).toHaveLength(9)

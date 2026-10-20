@@ -47,7 +47,7 @@ const probe = defineProbe({
     counts.set(view.endpointId, count)
   }
 })
-/** Genuine provider methods are shared by A4 and the native side of A2. */
+/** Genuine provider methods are shared by the plugin probe and its native side. */
 await host.use(
   definePlugin({
     name: 'service',

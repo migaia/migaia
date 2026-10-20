@@ -67,7 +67,7 @@ describe('guarded property read convergence', () => {
     ]
     for (const path of targets) {
       const source = readFileSync(resolve(repositoryRoot, path), 'utf8')
-      // The multi-operation abort subscription policy owns this inline read (§2.2).
+      // The multi-operation abort subscription policy owns this inline read.
       const excludedRead =
         path === 'packages/resource/src/resource.class.ts' ? 'signal.aborted' : undefined
       expect(hasSingleReadTry(source, excludedRead), path).toBe(false)

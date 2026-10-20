@@ -32,8 +32,8 @@ function thrown(operation: () => unknown): unknown {
   throw new Error('fixture expected a failure')
 }
 
-describe('I21 C2 object port contracts', () => {
-  it('[EQ2] counts physical conversions and rejects internal roundtrips in default and fallback', async () => {
+describe('object port contracts', () => {
+  it('counts physical conversions and rejects internal roundtrips in default and fallback', async () => {
     for (const fallback of [false, true]) {
       /** Ready channels keep hello and control JSON outside the business counter window. */
       const fixture = bridgeFixture()
@@ -107,7 +107,7 @@ describe('I21 C2 object port contracts', () => {
     }
   })
 
-  it('[EQ1/EQ3] preserves materialization, getters, first error and original cause identity', () => {
+  it('preserves materialization, getters, first error and original cause identity', () => {
     /** Getter observation begins in the same outer source-codec admission stage on either path. */
     let reads = 0
     const cause = new AggregateError([new RangeError('original')], 'original aggregate')
@@ -159,7 +159,7 @@ describe('I21 C2 object port contracts', () => {
     expect(Object.getPrototypeOf(protoResult)).toBe(Object.prototype)
   })
 
-  it.each([false, true])('[EQ2/M08] preserves legitimate reads (Proxy=%s)', (proxy) => {
+  it.each([false, true])('preserves legitimate reads (Proxy=%s)', (proxy) => {
     /** Each codec gets a fresh input so observed values depend only on its own access order. */
     const observe = (encode: (value: unknown) => unknown) => {
       /** Changing legal return values expose extra reads even when every value stays portable. */
@@ -203,7 +203,7 @@ describe('I21 C2 object port contracts', () => {
     expect(candidate).toEqual(baseline)
   })
 
-  it('[EQ1/EQ6] materializes a raw incoming negative zero before canonical core normalization', async () => {
+  it('materializes a raw incoming negative zero before canonical core normalization', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     const endpoint = await objectFixtureEndpoint(channel)
@@ -223,7 +223,7 @@ describe('I21 C2 object port contracts', () => {
     }
   })
 
-  it('[EQ2/EQ6] keeps custom authentication, connect callbacks and unknown Features on string', async () => {
+  it('keeps custom authentication, connect callbacks and unknown Features on string', async () => {
     for (const mode of ['authentication', 'connect', 'feature'] as const) {
       const fixture = bridgeFixture()
       const channel = await fixture.open()
@@ -345,7 +345,7 @@ describe('I21 C2 object port contracts', () => {
     }
   })
 
-  it('[EQ2/EQ6] retains public send/subscribe, per-listener order and close capability release', async () => {
+  it('retains public send/subscribe, per-listener order and close capability release', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     const port = readJsonObjectPort(
@@ -399,7 +399,7 @@ describe('I21 C2 object port contracts', () => {
     expect(fixture.closes).toBe(1)
   })
 
-  it('[EQ2/EQ5] rejects super-limit portable depth at the same normalization owner before writing', async () => {
+  it('rejects super-limit portable depth at the same normalization owner before writing', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     const port = readJsonObjectPort(

@@ -11,7 +11,7 @@ import { connected } from './fixture.js'
 
 /** Source offers exercise each actual keyed mode without advertising unfinished production ports. */
 const capabilities = [
-  /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+  /** Default request/stream deadlines are genuinely offered by both source owners. */
   RpcCapability.deadline,
   ...RUNTIME_API_CAPABILITIES,
   RpcCapability.generation,
@@ -22,7 +22,7 @@ const capabilities = [
 ]
 
 it.each(['request', 'group', 'notify', 'stream'] as const)(
-  '[A68][A69] admitted queued %s is pending in the original store and seals cancellation before terminal',
+  'admitted queued %s is pending in the original store and seals cancellation before terminal',
   async (mode) => {
     /** Only actual business invocation contributes execution; queued construction must remain zero. */
     let effects = 0
@@ -93,7 +93,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
       assert.equal(
         (await fixture.peers[0].outcome('queued-key')).state,
         'pending',
-        '[A68] accepted waiting work cannot disappear from the key lifetime'
+        'accepted waiting work cannot disappear from the key lifetime'
       )
       cancel.abort()
       if (mode !== 'notify')
@@ -102,17 +102,17 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
         assert.equal(
           await operation,
           undefined,
-          '[A67] notification Promise remains physical-send completion'
+          'notification Promise remains physical-send completion'
         )
       await vi.waitFor(async () =>
         assert.equal((await fixture.peers[0].outcome('queued-key')).state, 'done')
       )
       /** Cancellation becomes a complete sealed fact before its real terminal is observed. */
       const outcome = await fixture.peers[0].outcome('queued-key')
-      if (outcome.state !== 'done') assert.fail('[A69] cancelled admitted key must be sealed')
+      if (outcome.state !== 'done') assert.fail('cancelled admitted key must be sealed')
       assert.equal(outcome.outcome.mode, mode)
       assert.equal(outcome.outcome.completion.ok, false)
-      if (outcome.outcome.completion.ok) assert.fail('[A69] cancellation cannot fabricate success')
+      if (outcome.outcome.completion.ok) assert.fail('cancellation cannot fabricate success')
       assert.equal(outcome.outcome.completion.error.code, RpcCoreErrorCode.cancelled)
       assert.equal(effects, 0)
       await vi.waitFor(() => assert.equal(admission.size, 1))

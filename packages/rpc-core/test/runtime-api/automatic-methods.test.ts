@@ -5,7 +5,7 @@ import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { registerRemoteMethods } from '../../dist/remote/serve-methods.js'
 import type { IRpcEndpoint } from '../../dist/core/typing.js'
 
-it('[A4][A8] the automatic nested doc.save route executes the explicitly provided parent method', async () => {
+it('the automatic nested doc.save route executes the explicitly provided parent method', async () => {
   /** Both physical sides and all imported owners are real, successfully constructed baseline code. */
   const [parentTransport, childTransport] = createMemoryTransportPair()
   /** Count actual execution independently from response settlement. */
@@ -46,9 +46,9 @@ it('[A4][A8] the automatic nested doc.save route executes the explicitly provide
     assert.deepEqual(
       actual,
       { status: 'fulfilled', value: 'saved' },
-      '[A4][A8] nested automatic route must invoke the explicit parent method'
+      'nested automatic route must invoke the explicit parent method'
     )
-    assert.equal(calls, 1, '[A8] parent business method executes exactly once')
+    assert.equal(calls, 1, 'parent business method executes exactly once')
   } finally {
     await automatic.close()
     await parent.dispose()
@@ -57,7 +57,7 @@ it('[A4][A8] the automatic nested doc.save route executes the explicitly provide
   }
 })
 
-it('[A6] a scalar request of a generator returns PAYLOAD_INVALID with the original normalization cause', async () => {
+it('a scalar request of a generator returns PAYLOAD_INVALID with the original normalization cause', async () => {
   /** The old scalar provider is deliberately exercised through its real request/result owner. */
   const [parentTransport, childTransport] = createMemoryTransportPair()
   /** Execution evidence distinguishes result rejection from a missing provider or setup error. */
@@ -104,15 +104,15 @@ it('[A6] a scalar request of a generator returns PAYLOAD_INVALID with the origin
     assert.equal(await child.send('parent', 'p.f.scalar', []), 'ready')
     /** Await a real provider result failure; only the business error-code assertion is RED. */
     const [result] = await Promise.allSettled([automatic.peers[1].request('p.f.values', [])])
-    assert.equal(generatorCalls, 1, '[A6] the existing business method actually executed')
-    assert.equal(result?.status, 'rejected', '[A6] a generator is not silently drained as a scalar')
+    assert.equal(generatorCalls, 1, 'the existing business method actually executed')
+    assert.equal(result?.status, 'rejected', 'a generator is not silently drained as a scalar')
     if (result?.status !== 'rejected') return
     assert.equal(
       result.reason.code,
       'PAYLOAD_INVALID',
-      '[A6] scalar normalization alone owns the payload failure code'
+      'scalar normalization alone owns the payload failure code'
     )
-    assert.ok(result.reason.cause, '[A6] the normalization error remains reachable')
+    assert.ok(result.reason.cause, 'the normalization error remains reachable')
   } finally {
     await automatic.close()
     await parent.dispose()

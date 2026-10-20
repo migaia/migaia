@@ -24,9 +24,8 @@ export type IMigrationContext = {
 export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>
 
 /**
- * Creates a new runtime at the public entry, with one reporter per operation. See
- * `docs/store-persist/storage-web-integration.sdd.md` §4.4 on separating public APIs from their
- * internal steps.
+ * Creates a new runtime at the public entry, with one reporter per operation. See The contract on
+ * separating public APIs from their internal steps.
  */
 export const runMigrations = async (
   value: unknown,

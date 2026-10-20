@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRpcUnknownFieldWarner } from '@migaia/rpc-contract'
 
-describe('unknown field warnings (A4)', () => {
+describe('unknown field warnings', () => {
   it('uses the protocol default of 256 keys and 1024 retained connections', () => {
     const warnings: Array<[string, string]> = []
     const warner = createRpcUnknownFieldWarner({

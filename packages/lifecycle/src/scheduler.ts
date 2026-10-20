@@ -1,5 +1,5 @@
 /**
- * Lifecycle scheduler admission layer（`docs/lifecycle/lifecycle-scheduler-convergence.sdd.md` LD3）。
+ * Lifecycle scheduler admission layer。
  *
  * The scheduler contract, the default host implementation and the manual implementation live in
  * `@migaia/utils/scheduler`. This module only admits caller-injected schedulers at lifecycle
@@ -262,9 +262,9 @@ export function resolveScheduler(value: unknown): IScheduler {
 }
 
 /**
- * The package default scheduler: the utils system scheduler admitted once at module load (LC-P2),
- * not re-snapshotted on every `boundedWait`, graceful race, generation controller and mutation
- * queue. Admission and per-call validation stay identical to an injected scheduler, so delay and
- * time errors keep their lifecycle `INVALID_OPTION` identity. Internal to the package.
+ * The package default scheduler: the utils system scheduler admitted once at module load, not
+ * re-snapshotted on every `boundedWait`, graceful race, generation controller and mutation queue.
+ * Admission and per-call validation stay identical to an injected scheduler, so delay and time
+ * errors keep their lifecycle `INVALID_OPTION` identity. Internal to the package.
  */
 export const defaultLifecycleScheduler: IScheduler = resolveScheduler(systemScheduler)

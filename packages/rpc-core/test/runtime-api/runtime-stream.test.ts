@@ -13,7 +13,7 @@ import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-at
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 
-it('[A67][A73] queued order-only stream rejects finish without turning it into a cancellation', async () => {
+it('queued order-only stream rejects finish without turning it into a cancellation', async () => {
   /** A genuine earlier key owner leaves the original stream task queued before iterator creation. */
   let started = false
   let constructed = 0
@@ -71,7 +71,7 @@ it('[A67][A73] queued order-only stream rejects finish without turning it into a
     assert.deepEqual(
       await opening,
       { done: false, value: 1 },
-      '[A67] forged finish cannot revoke an order-only queued stream'
+      'forged finish cannot revoke an order-only queued stream'
     )
     assert.equal(constructed, 1)
     assert.ok(
@@ -89,7 +89,7 @@ it('[A67][A73] queued order-only stream rejects finish without turning it into a
   }
 })
 
-it('[A67][A73] finish intent cannot enable discard on a stream that selected only ordering', async () => {
+it('finish intent cannot enable discard on a stream that selected only ordering', async () => {
   /** Each original next call advances a real finite producer; no consumer pull means no advance. */
   let pulls = 0
   const fixture = await connected(
@@ -129,7 +129,7 @@ it('[A67][A73] finish intent cannot enable discard on a stream that selected onl
       stream: { event: 'finish-without-items', seq: 1 }
     })
     assert.equal(await fixture.peers[0].request('baseline'), 9)
-    assert.equal(pulls, 1, '[A67] unselected finish must never drain the business iterator')
+    assert.equal(pulls, 1, 'unselected finish must never drain the business iterator')
     assert.ok(
       fixture.failures.some(
         (error) => Reflect.get(error as object, 'code') === RpcContractErrorCode.invalidStream
@@ -145,7 +145,7 @@ it('[A67][A73] finish intent cannot enable discard on a stream that selected onl
 
 /** The fixture explicitly opts into the profile while production offers remain unadvertised. */
 const capabilities = [
-  /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+  /** Default request/stream deadlines are genuinely offered by both source owners. */
   RpcCapability.deadline,
   ...RUNTIME_API_CAPABILITIES,
   RpcCapability.generation,
@@ -160,7 +160,7 @@ it.each([
   RpcCapability.cancelBeforeStart,
   RpcCapability.outcome
 ])(
-  '[A73] stream missing %s fails before send and leaves the original consumer registry empty',
+  'stream missing %s fails before send and leaves the original consumer registry empty',
   async (missing) => {
     /** The actual offer intersection removes only the selected required capability. */
     const selected = capabilities.filter((capability) => capability !== missing)
@@ -220,7 +220,7 @@ it.each([
   }
 )
 
-it('[A67] concurrent next/return shares one producer credit and returns the actual terminal after the start deadline', async () => {
+it('concurrent next/return shares one producer credit and returns the actual terminal after the start deadline', async () => {
   /** A custom supported async iterator exposes actual concurrent next calls without a second stream. */
   let active = 0
   /** Maximum belongs to the actual producer iterator, not caller in-flight promises. */
@@ -300,7 +300,7 @@ it('[A67] concurrent next/return shares one producer credit and returns the actu
 })
 
 it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-cancel'] as const)(
-  '[A66] %s intent overtakes a physically started stream write before final provider start',
+  '%s intent overtakes a physically started stream write before final provider start',
   async (intent) => {
     /** Only actual run construction counts execution, independent of transport send admission. */
     let constructed = 0
@@ -389,7 +389,7 @@ it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-ca
       await send.mock.results[0]!.value
       assert.equal(await fixture.peers[0].request('other'), 9)
       if (intent === 'forged-order-only') {
-        assert.equal(constructed, 1, '[A67] unselected early finish cannot cancel a valid stream')
+        assert.equal(constructed, 1, 'unselected early finish cannot cancel a valid stream')
         assert.deepEqual(await next, { done: false, value: 1 })
         assert.deepEqual(await iterator.next(), { done: true, value: 2 })
         assert.ok(
@@ -399,7 +399,7 @@ it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-ca
         )
         return
       }
-      assert.equal(constructed, 0, '[A66] early return must cancel before provider construction')
+      assert.equal(constructed, 0, 'early return must cancel before provider construction')
       /**
        * Preserve the full actual failure classification while distinguishing fixture transport
        * errors.
@@ -414,7 +414,7 @@ it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-ca
         assert.equal(
           Reflect.get(result as object, 'code'),
           RpcCoreErrorCode.cancelled,
-          `[A66] original result: ${String(result)}; cause: ${String(Reflect.get(result as object, 'cause'))}`
+          `original result: ${String(result)}; cause: ${String(Reflect.get(result as object, 'cause'))}`
         )
       if (returned) {
         /** Finish must settle on the actual cancellation before fixture close can clean anything up. */
@@ -440,7 +440,7 @@ it.each(['cancel', 'return', 'throw', 'forged-order-only', 'forged-order-only-ca
   }
 )
 
-it('[A59][A67] ordered stream keeps ordinary return cleanup and its key lease until cleanup finishes', async () => {
+it('ordered stream keeps ordinary return cleanup and its key lease until cleanup finishes', async () => {
   /** The original generator finally block owns its actual asynchronous cleanup. */
   const effects: string[] = []
   /** Fixture cleanup can pause without changing stream ownership or cancellation. */
@@ -489,7 +489,7 @@ it('[A59][A67] ordered stream keeps ordinary return cleanup and its key lease un
     assert.deepEqual(
       effects,
       ['cleanup-start'],
-      '[A59] cleanup remains part of the original stream lease'
+      'cleanup remains part of the original stream lease'
     )
     finish()
     assert.deepEqual(await returned, { value: { done: true, value: undefined } })
@@ -502,7 +502,7 @@ it('[A59][A67] ordered stream keeps ordinary return cleanup and its key lease un
   }
 })
 
-it('[A66][A67] started stream ignores start cancellation and return drains the same generator to its actual final value', async () => {
+it('started stream ignores start cancellation and return drains the same generator to its actual final value', async () => {
   /** The real provider exposes its actual context signal for start/cancel arbitration. */
   let signal: IAbortSignal | undefined
   /** Every executed yield is an observable business effect, including discarded yields. */
@@ -544,7 +544,7 @@ it('[A66][A67] started stream ignores start cancellation and return drains the s
     assert.deepEqual(await iterator.next(), { done: false, value: 1 })
     assert.ok(signal)
     cancel.abort()
-    assert.equal(signal.aborted, false, '[A66] start wins without aborting the producer')
+    assert.equal(signal.aborted, false, 'start wins without aborting the producer')
     /** Repeated return shares the original terminal settlement, never a second drain. */
     const returned = iterator.return!()
     const repeated = iterator.return!()
@@ -554,12 +554,12 @@ it('[A66][A67] started stream ignores start cancellation and return drains the s
     assert.deepEqual(
       effects,
       [1, 2, 3],
-      '[A67] return discards yields without generator.return interruption'
+      'return discards yields without generator.return interruption'
     )
     /** Only final generator completion is retained; yielded values do not become an outcome buffer. */
     const outcome = await fixture.peers[0].outcome('stream-completion')
     assert.equal(outcome.state, 'done')
-    if (outcome.state !== 'done') assert.fail('[A69] stream final result must be sealed')
+    if (outcome.state !== 'done') assert.fail('stream final result must be sealed')
     assert.deepEqual(outcome.outcome.completion, { ok: true, result: 42 })
     assert.equal(fixture.failures.length, 0)
   } finally {
@@ -568,7 +568,7 @@ it('[A66][A67] started stream ignores start cancellation and return drains the s
   }
 })
 
-it('[A59][A67] stream holds its original order lease until real producer terminal while another key progresses', async () => {
+it('stream holds its original order lease until real producer terminal while another key progresses', async () => {
   /** Effects distinguish actual provider start from stream-open send completion. */
   const effects: string[] = []
   /** The genuine same-key follower remains observable through its original request promise. */
@@ -599,11 +599,7 @@ it('[A59][A67] stream holds its original order lease until real producer termina
     follower = fixture.peers[0].request('after', undefined, { orderKey: 'same' })
     void follower.catch(() => undefined)
     assert.equal(await fixture.peers[0].request('other', undefined, { orderKey: 'other' }), 9)
-    assert.deepEqual(
-      effects,
-      ['stream'],
-      '[A59] stream-open completion cannot release its key lease'
-    )
+    assert.deepEqual(effects, ['stream'], 'stream-open completion cannot release its key lease')
     assert.deepEqual(await iterator.next(), { done: false, value: 2 })
     assert.deepEqual(await iterator.next(), { done: true, value: 42 })
     assert.equal(await follower, 7)
@@ -614,7 +610,7 @@ it('[A59][A67] stream holds its original order lease until real producer termina
   }
 })
 
-it('[A66] queued stream cancellation prevents even iterator construction at the final provider', async () => {
+it('queued stream cancellation prevents even iterator construction at the final provider', async () => {
   /** Constructor effects prove the final start point precedes calling the original run callback. */
   let constructed = 0
   /** A running genuine request owns the shared key before stream admission. */
@@ -662,7 +658,7 @@ it('[A66] queued stream cancellation prevents even iterator construction at the 
     /** Observing rejection immediately prevents an unhandled promise when cancellation wins. */
     const next = iterator.next().catch((error: unknown) => error)
     assert.equal(await fixture.peers[0].request('other'), 4)
-    assert.equal(constructed, 0, '[A66] queued stream has not called its run callback')
+    assert.equal(constructed, 0, 'queued stream has not called its run callback')
     cancel.abort()
     assert.equal(Reflect.get((await next) as object, 'code'), RpcCoreErrorCode.cancelled)
     assert.equal(constructed, 0)

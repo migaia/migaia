@@ -92,7 +92,7 @@ function managedBinaryBinding<THandle extends IThreadHandle>(
   }
 }
 
-it('[A86][A88] managed genuine Worker transfers through the original owner without entering keyed automatic retry', async () => {
+it('managed genuine Worker transfers through the original owner without entering keyed automatic retry', async () => {
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
   /** The custom endpoint's implemented profile enters actual launcher bootstrap, never static flags. */
   const native = createNodeThreadLauncher({
@@ -190,7 +190,7 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
   )
   try {
     assert.equal(await peer.request('service.data.echo', 'control'), 'control')
-    assert.equal(retries, 1, '[A88] ordinary keyed work keeps its original retry port')
+    assert.equal(retries, 1, 'ordinary keyed work keeps its original retry port')
     retries = 0
     const backing = new Uint8Array([1, 2]).buffer
     const result = await peer
@@ -202,7 +202,7 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
     assert.equal(
       backing.byteLength,
       0,
-      '[A86] managed facade must carry explicit transfer to the genuine Worker'
+      'managed facade must carry explicit transfer to the genuine Worker'
     )
     assert.ok(result instanceof ArrayBuffer)
     assert.deepEqual([...new Uint8Array(result)], [1, 2])
@@ -230,12 +230,12 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
     assert.deepEqual(
       { request: hiddenBacking.byteLength, stream: streamBacking.byteLength },
       { request: 0, stream: 0 },
-      '[A86][A88] managed explicit timeout preserves non-enumerable own transfer in both modes'
+      'managed explicit timeout preserves non-enumerable own transfer in both modes'
     )
     assert.equal(
       retries,
       0,
-      '[A88] even declared idempotent transfer work cannot enter the automatic retry port'
+      'even declared idempotent transfer work cannot enter the automatic retry port'
     )
     const first = readRuntimePeerConnection(peer).peerId
     const crashBuffer = new Uint8Array([3]).buffer
@@ -251,7 +251,7 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
       timeout: 3000
     })
     assert.equal(handles.length, 2)
-    assert.equal(starts, 1, '[A88] actual replacement never re-enters the detached operation')
+    assert.equal(starts, 1, 'actual replacement never re-enters the detached operation')
     assert.equal(retries, 0)
   } finally {
     await peer.close()
@@ -261,7 +261,7 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
   assert.equal(budget.inUse, 0)
 })
 
-it('[A84/F1] genuine managed binding rejects UInt8Array without bilateral binary before physical send', async () => {
+it('genuine managed binding rejects UInt8Array without bilateral binary before physical send', async () => {
   /** Both actual Worker channels negotiate the original scalar profile, omitting binary/transfer. */
   const scalarCapabilities = capabilities.filter(
     (value) =>

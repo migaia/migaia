@@ -5,7 +5,7 @@ import {
 } from '../contract/record.js'
 import { EventRing } from './ring.js'
 
-/** Stop converts numeric columns at the record boundary, preserving native errors/content (SC9b). */
+/** Stop converts numeric columns at the record boundary, preserving native errors/content. */
 export function finishRecord(
   ring: EventRing,
   exposeContent = true,

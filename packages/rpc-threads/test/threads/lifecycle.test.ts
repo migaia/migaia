@@ -12,7 +12,7 @@ async function flush(): Promise<void> {
 }
 
 describe('thread lifecycle ownership', () => {
-  it('[A6] endpoint construction failure preserves primary error and reaps the Worker', async () => {
+  it('endpoint construction failure preserves primary error and reaps the Worker', async () => {
     const primary = new Error('endpoint factory failure')
     const fixture = nativeFixture({
       endpointFactory: async () => {
@@ -31,7 +31,7 @@ describe('thread lifecycle ownership', () => {
       await fixture.close()
     }
   })
-  it('[A6] unsupported exit retains its budget after bootstrap cancellation and abandon timeout', async () => {
+  it('unsupported exit retains its budget after bootstrap cancellation and abandon timeout', async () => {
     const scheduler = createManualScheduler()
     const report = vi.fn()
     const terminate = vi.fn()

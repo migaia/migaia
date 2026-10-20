@@ -4,7 +4,7 @@ import { bridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC profile boundary', () => {
   it.each(vectors.inbound)(
-    '[A9] applies inbound vector $id without affecting a second connection',
+    'applies inbound vector $id without affecting a second connection',
     async (vector) => {
       const fixture = bridgeFixture()
       const other = bridgeFixture()
@@ -54,7 +54,7 @@ describe('JSON-RPC profile boundary', () => {
       await otherChannel.close()
     }
   )
-  it('[A10] rejects transfer through a Promise as native TypeError before any business byte', async () => {
+  it('rejects transfer through a Promise as native TypeError before any business byte', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     let sending: void | Promise<void> = undefined
@@ -70,7 +70,7 @@ describe('JSON-RPC profile boundary', () => {
     expect(fixture.messages).toHaveLength(1)
     await channel.close()
   })
-  it('[A10] rejects invalid args, streams and unmapped variation without writing business bytes', async () => {
+  it('rejects invalid args, streams and unmapped variation without writing business bytes', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     await expect(

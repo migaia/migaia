@@ -37,7 +37,7 @@ async function fixture() {
   return { peer, budget, started }
 }
 
-it('[A3][A9][R14] managed close immediately rejects all new public operations during native drain', async () => {
+it('managed close immediately rejects all new public operations during native drain', async () => {
   const active = await fixture()
   /** This actual admitted call holds the endpoint alive while the public admission must close. */
   const pending = active.peer.request('drainGroup', 'admitted')
@@ -56,7 +56,7 @@ it('[A3][A9][R14] managed close immediately rejects all new public operations du
       assert.throws(
         invoke,
         { code: 'REMOTE_CLOSED' },
-        '[R14] close admission is synchronous before drain'
+        'close admission is synchronous before drain'
       )
     assert.deepEqual(await outcome, [{ status: 'fulfilled', value: 'admitted' }])
     await closing
@@ -67,7 +67,7 @@ it('[A3][A9][R14] managed close immediately rejects all new public operations du
   }
 })
 
-it('[A3][A9][A68] native drain preserves an already-started whole group through its terminal result', async () => {
+it('native drain preserves an already-started whole group through its terminal result', async () => {
   const active = await fixture()
   /** A group goes through runtime outbound directly; no separately tracked parent request exists. */
   const pending = active.peer.group([{ method: 'drainGroup', payload: 'complete' }])
@@ -79,7 +79,7 @@ it('[A3][A9][A68] native drain preserves an already-started whole group through 
     assert.deepEqual(
       await outcome,
       [{ status: 'fulfilled', value: [{ state: 'success', result: 'complete' }] }],
-      '[A68] the original group result must settle before native execution is released'
+      'the original group result must settle before native execution is released'
     )
     await closing
     assert.equal(active.budget.inUse, 0)
@@ -90,7 +90,7 @@ it('[A3][A9][A68] native drain preserves an already-started whole group through 
 })
 
 for (const mode of ['default', 'ordered', 'before-start'] as const) {
-  it(`[A3][A9][A69] native drain retains started runtime stream lifetime (${mode})`, async () => {
+  it(`native drain retains started runtime stream lifetime (${mode})`, async () => {
     const active = await fixture()
     /**
      * All modes use the original iterator; default bilateral binary capability also selects runtime
@@ -116,7 +116,7 @@ for (const mode of ['default', 'ordered', 'before-start'] as const) {
       assert.deepEqual(
         pending,
         [{ status: 'fulfilled', value: { done: false, value: 'second' } }],
-        '[A69] native shutdown must preserve the admitted next item within the original drain budget'
+        'native shutdown must preserve the admitted next item within the original drain budget'
       )
       assert.deepEqual(await iterator.next(), { done: true, value: 'terminal' })
       await closing

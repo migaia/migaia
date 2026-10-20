@@ -12,7 +12,7 @@ import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
 /** The original native fixture observer exposes termination without a production diagnostic port. */
 const entry = fileURLToPath(new URL('./fixtures/worker-faults.mjs', import.meta.url))
 for (const mode of ['bad-ack', 'overflow', 'exit', 'abort'] as const) {
-  it(`[A3] genuine Worker ${mode} reclaims only its original incomplete candidate`, async () => {
+  it(`genuine Worker ${mode} reclaims only its original incomplete candidate`, async () => {
     /** Actual launch cancellation and source preparation share the same native signal. */
     const controller = new AbortController()
     /** This real native reason must survive cancellation without a replacement bootstrap wrapper. */
@@ -38,23 +38,22 @@ for (const mode of ['bad-ack', 'overflow', 'exit', 'abort'] as const) {
       /** A native actual exit is mandatory even when the private capability ACK never completed. */
       const failure = await opening
       if (mode === 'abort')
-        assert.equal(failure, reason, '[A3] cancellation keeps the exact native reason')
+        assert.equal(failure, reason, 'cancellation keeps the exact native reason')
       else
         assert.equal(
           (failure as { code?: string }).code,
           'INVALID_CONFIG',
-          '[A3] failed private preparation never publishes a channel'
+          'failed private preparation never publishes a channel'
         )
       const status = await handle.exited
-      if (mode === 'exit')
-        assert.equal(status.code, 0, '[A3] actual voluntary exit code is retained')
+      if (mode === 'exit') assert.equal(status.code, 0, 'actual voluntary exit code is retained')
       assert.equal(
         terminate.mock.calls.length,
         1,
-        '[A3] the original native candidate is reclaimed once'
+        'the original native candidate is reclaimed once'
       )
       handle.terminate()
-      assert.equal(terminate.mock.calls.length, 1, '[A3] repeated cleanup cannot terminate twice')
+      assert.equal(terminate.mock.calls.length, 1, 'repeated cleanup cannot terminate twice')
     } finally {
       handle.terminate()
       await handle.exited

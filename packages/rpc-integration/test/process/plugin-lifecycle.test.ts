@@ -27,7 +27,7 @@ function controlledProcess(fingerprint: string) {
 }
 
 describe('process plugin generation lifetime', () => {
-  it('[A5] revokes on child exit and rebinds the same feature after a new describe', async () => {
+  it('revokes on child exit and rebinds the same feature after a new describe', async () => {
     const fixture = remoteHarness()
     /** Preserve this existing clock identity shared by the channel and binding. */
     const scheduler = fixture.binding.scheduler

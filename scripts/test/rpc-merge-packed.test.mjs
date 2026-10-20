@@ -6,7 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
 
-/** Public surface and retained packed checks frozen by rpc-merge A11. */
+/** Public surface and retained packed checks frozen by the rpc merge. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 /** The reviewed current baseline owns exact names; export-mapping preserves historic deltas. */
 const baseline = JSON.parse(
@@ -63,7 +63,7 @@ function obsoleteProbe(script) {
   assert.fail('obsoleteSubpaths literal probe is missing')
 }
 
-test('A11 packed consumer runs every preserved check against the current five owners', () => {
+test('packed consumer runs every preserved check against the current five owners', () => {
   const script = readFileSync(
     join(root, 'packages/rpc-integration/test/core/packed-export-smoke.mjs'),
     'utf8'

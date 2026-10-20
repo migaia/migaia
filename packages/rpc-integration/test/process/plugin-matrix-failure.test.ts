@@ -42,9 +42,9 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-describe('I15 real failure and rollback matrix', () => {
+describe('real failure and rollback matrix', () => {
   it.each(['launch', 'establish'] as const)(
-    '[A6] owned real %s failure frees child and budget; cleanup retains primary',
+    'owned real %s failure frees child and budget; cleanup retains primary',
     async (phase) => {
       const test = await matrixFixture()
       if (test.options.deployment.kind !== 'spawn') throw new Error('spawn required')
@@ -95,7 +95,7 @@ describe('I15 real failure and rollback matrix', () => {
   )
 
   it.each(['bootstrap', 'verifier'] as const)(
-    '[A6] child real byte ingress rejects %s before handshake and closes raw once',
+    'child real byte ingress rejects %s before handshake and closes raw once',
     async (phase) => {
       /** The physical raw channel is provided by the production Node launcher. */
       const test = await matrixFixture()
@@ -164,7 +164,7 @@ describe('I15 real failure and rollback matrix', () => {
   )
 
   it.each(['dial', 'auth'] as const)(
-    '[A6] borrowed real %s failure preserves external PID and another socket',
+    'borrowed real %s failure preserves external PID and another socket',
     async (phase) => {
       const test = await matrixFixture({ borrowed: true })
       if (test.options.deployment.kind !== 'connect') throw new Error('connect required')
@@ -218,7 +218,7 @@ describe('I15 real failure and rollback matrix', () => {
   )
 
   it.each(['accept', 'endpoint', 'endpoint-dispose', 'reject'] as const)(
-    '[A6] real socket late %s plus cleanup failure reports each original once',
+    'real socket late %s plus cleanup failure reports each original once',
     async (phase) => {
       const test = await matrixFixture({ borrowed: true })
       const host = new PluginHost<Record<string, never>>({

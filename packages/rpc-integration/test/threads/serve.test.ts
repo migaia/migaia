@@ -9,7 +9,7 @@ import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
 const capabilities = [RpcCapability.runtimeApi, RpcCapability.batch]
 
 describe('thread serve teardown ownership', () => {
-  it('[A6] closes the remote service before its channel and retains close Promise identity', async () => {
+  it('closes the remote service before its channel and retains close Promise identity', async () => {
     /** This log distinguishes ownership order at the existing remote/channel boundaries. */
     const order: string[] = []
     /** Both public factories own real endpoints over the existing reference memory carrier. */
@@ -66,7 +66,7 @@ describe('thread serve teardown ownership', () => {
     }
   })
 
-  it('[A6] reports rollback cleanup failure without replacing the primary setup error', async () => {
+  it('reports rollback cleanup failure without replacing the primary setup error', async () => {
     /** Caller identity must remain reachable without a cleanup error taking precedence. */
     const primary = new Error('thread endpoint primary failure')
     /** The secondary channel error belongs exclusively to local reporting. */

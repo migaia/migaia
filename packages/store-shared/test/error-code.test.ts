@@ -5,7 +5,7 @@ import {
   STORE_SHARED_SOURCE
 } from '../src/errors'
 
-describe('store-shared error-code contract (E-T9)', () => {
+describe('store-shared error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {
     const codes = Object.values(StoreSharedErrorCode)
     expect(codes).toHaveLength(8)

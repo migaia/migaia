@@ -3,7 +3,7 @@ import { serializeRpcError, deserializeRpcError, reachRpcError } from '@migaia/r
 import { StorageError, StorageErrorCode } from '../../src/types/errors.js'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 
-describe('storage 错误家族经 web-rpc serializer 往返（T-5）', () => {
+describe('storage 错误家族经 web-rpc serializer 往返', () => {
   it('StorageError（web）往返后 (source, code, name, message, cause) 一致', () => {
     const cause = new Error('root cause')
     const error = new StorageError(StorageErrorCode.quotaExceeded, { cause })

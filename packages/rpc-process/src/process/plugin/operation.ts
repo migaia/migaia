@@ -84,7 +84,7 @@ function staleDefinition(): never {
   })
 }
 
-/** The original advanced declaration is retained only for the serial C7 consumer migration. */
+/** The original advanced declaration is retained only for the serial consumer migration. */
 export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
   options: IProcessPluginOptions<THandle>,
   runtime: IAdapterProcessRuntimeLoader

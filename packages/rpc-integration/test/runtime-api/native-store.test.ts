@@ -22,7 +22,7 @@ import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } fro
 
 /** Actual native handshake offers exercise the new store port independently of unfinished defaults. */
 const capabilities = [
-  /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+  /** Default request/stream deadlines are genuinely offered by both source owners. */
   RpcCapability.deadline,
   ...RUNTIME_API_CAPABILITIES,
   RpcCapability.generation,
@@ -30,7 +30,7 @@ const capabilities = [
   RpcCapability.outcome
 ]
 
-it('[A68][A70] authenticated reconnect retains the service store and replacement reads the same external namespace without sharing principals', async () => {
+it('authenticated reconnect retains the service store and replacement reads the same external namespace without sharing principals', async () => {
   /** The fixture external owner persists outside both independently created listener lifetimes. */
   const retained = createRpcIdempotencyStore()
   /** Its epoch denotes this actual shared owner; no listener is allowed to invent another one. */
@@ -130,7 +130,7 @@ it('[A68][A70] authenticated reconnect retains the service store and replacement
     assert.deepEqual(
       await client.outcome('key'),
       first,
-      '[A70] reconnect does not replace the execution store'
+      'reconnect does not replace the execution store'
     )
     await client.close()
     await service.close()
@@ -139,7 +139,7 @@ it('[A68][A70] authenticated reconnect retains the service store and replacement
     assert.deepEqual(
       await client.outcome('key'),
       first,
-      '[A70] an external result uses the stable provider namespace and authenticated principal'
+      'an external result uses the stable provider namespace and authenticated principal'
     )
     assert.equal(
       await client.request('value', undefined, { orderKey: 'same', idempotencyKey: 'key' }),
@@ -151,7 +151,7 @@ it('[A68][A70] authenticated reconnect retains the service store and replacement
     assert.equal(
       (await client.outcome('key')).state,
       'unknown',
-      '[A68] another authenticated principal cannot observe result existence'
+      'another authenticated principal cannot observe result existence'
     )
     assert.equal(
       await client.request('value', undefined, { orderKey: 'same', idempotencyKey: 'key' }),

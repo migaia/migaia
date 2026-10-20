@@ -4,8 +4,8 @@ export const CAPABILITY_SOURCE = '@migaia/capability'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /**
- * Shared error contract from `docs/contracts/error-codes.md` §2. `source` and `code` are attached
- * as properties without replacing the error. Checks such as `instanceof TypeError` and `instanceof
+ * Shared error contract from `docs/contracts/error-codes.md`. `source` and `code` are attached as
+ * properties without replacing the error. Checks such as `instanceof TypeError` and `instanceof
  * RangeError` keep their meaning.
  */
 export type ICapabilityError = Error & {

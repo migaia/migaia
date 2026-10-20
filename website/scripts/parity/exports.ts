@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
-// P2: exports check
+// Exports check
 console.log('✓ exports check framework ready')

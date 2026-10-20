@@ -195,8 +195,8 @@ async function stats(active: Pick<Awaited<ReturnType<typeof client>>, 'feature'>
   return (await active.feature.request(['stats'])) as IStats
 }
 
-describe('[A7] real process session and principal isolation', () => {
-  it('[A7.1] no-token reverse native registration never resolves permission, constructs endpoint or installs plugin', async () => {
+describe('real process session and principal isolation', () => {
+  it('no-token reverse native registration never resolves permission, constructs endpoint or installs plugin', async () => {
     /** The reverse-registration socket is owned by the original authenticated listener. */
     const directory = await mkdtemp(join(tmpdir(), 'rpc-hi-reverse-'))
     /** The target Host begins empty; an actual use observer detects any unauthorized installation. */
@@ -290,7 +290,7 @@ describe('[A7] real process session and principal isolation', () => {
       await rm(directory, { recursive: true, force: true })
     }
   })
-  it('[A7.1] rejects actual over-capacity socket flood and returns every rejected descriptor', async () => {
+  it('rejects actual over-capacity socket flood and returns every rejected descriptor', async () => {
     /** Two admitted physical connections fill the real production governor configured capacity. */
     const peer = await listener('flood')
     /** The provider's descriptor baseline includes two established sockets. */
@@ -352,7 +352,7 @@ describe('[A7] real process session and principal isolation', () => {
     }
   })
 
-  it('[A7.2] malformed hello and secret-bearing verifier failure redact native cause, report and reject', async () => {
+  it('malformed hello and secret-bearing verifier failure redact native cause, report and reject', async () => {
     /** A real public responder receives adversarial framed hello messages in its actual child PID. */
     const peer = await listener('redaction')
     /** Each invalid candidate has its own unique credential sentinel. */
@@ -433,7 +433,7 @@ describe('[A7] real process session and principal isolation', () => {
     }
   })
 
-  it('[A7.4] equal inbound msgid replay is connection-local while repeated same-session frames do not execute twice', async () => {
+  it('equal inbound msgid replay is connection-local while repeated same-session frames do not execute twice', async () => {
     /** Same route sender on two authenticated sockets exposes an accidental global replay ledger. */
     const peer = await listener('replay')
     /** Both proxies have caller route identity but different physical session identities. */
@@ -475,7 +475,7 @@ describe('[A7] real process session and principal isolation', () => {
     }
   })
 
-  it('[A7.3] bootstrap peer splits stderr token into three-character writes; IPC keeps only identity and fixed text', async () => {
+  it('bootstrap peer splits stderr token into three-character writes; IPC keeps only identity and fixed text', async () => {
     /** The secret is delivered only through the actual production stdin bootstrap. */
     const token = randomUUID()
     /** The stdio business facade owns its child and drains stderr through production binding. */
@@ -560,7 +560,7 @@ describe('[A7] real process session and principal isolation', () => {
       writeFileSync(join(evidence, 'isolation-stderr.stdout.bin'), Buffer.concat(fixture.stdout))
     }
   })
-  it('[A7.4/A7.5/A7.6] shares stable principal results across sessions while isolating abort and context', async () => {
+  it('shares stable principal results across sessions while isolating abort and context', async () => {
     /** Three real sockets share one actual provider PID and its canonical process governor. */
     const peer = await listener('shared')
     /** Proxy installation uses existing production business facade helpers. */
@@ -632,7 +632,7 @@ describe('[A7] real process session and principal isolation', () => {
   })
 
   it.each(['shared', 'per-connection'] as const)(
-    '[A7.7/A7.8] %s consecutive request timeouts close only the offending borrowed socket',
+    '%s consecutive request timeouts close only the offending borrowed socket',
     async (mode) => {
       /** One real child contains either one shared Host or one Host per physical connection. */
       const peer = await listener(mode)
@@ -721,7 +721,7 @@ describe('[A7] real process session and principal isolation', () => {
     }
   )
   it.each(['shared', 'per-connection'] as const)(
-    '[A7.7/A7.8] %s explicit health replaces only its owned instance in the same PID',
+    '%s explicit health replaces only its owned instance in the same PID',
     async (mode) => {
       /** Explicit health has no dependency on the consecutive-timeout policy under test above. */
       const peer = await listener(mode)

@@ -8,10 +8,10 @@ type ITaggedError = Error & {
   readonly source?: string
 }
 
-describe('Round28 logger cleanup wrapper stack contract', () => {
-  it('LG-T51 / LG-R34 keeps wrapper construction stack and nested aggregate order', () => {
+describe('logger cleanup wrapper stack contract', () => {
+  it('keeps wrapper construction stack and nested aggregate order', () => {
     /** Frozen native error that forces metadata tagging onto a wrapper. */
-    const original = Object.freeze(new TypeError('round28-original'))
+    const original = Object.freeze(new TypeError('original'))
     /** Original stack captured before wrapper construction. */
     const originalStack = original.stack
     /** Wrapper produced when the frozen error rejects metadata attachment. */
@@ -35,9 +35,9 @@ describe('Round28 logger cleanup wrapper stack contract', () => {
     expect(original.stack).toBe(originalStack)
 
     /** Ordered cleanup errors retained by the frozen nested aggregate. */
-    const nestedEntries = [new Error('round28-primary'), new RangeError('round28-cleanup')] as const
+    const nestedEntries = [new Error('primary'), new RangeError('cleanup')] as const
     /** Frozen aggregate whose errors array must remain ordered and reachable. */
-    const nested = Object.freeze(new AggregateError(nestedEntries, 'round28-nested'))
+    const nested = Object.freeze(new AggregateError(nestedEntries, 'nested'))
     /** Original aggregate errors array retained for exact wrapper reachability checks. */
     const nestedErrors = nested.errors
     /** Original nested aggregate stack captured before wrapper construction. */

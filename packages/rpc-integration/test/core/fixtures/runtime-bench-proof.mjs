@@ -12,7 +12,7 @@ if (unit.carrier === 'browser-worker') {
   const receipt = await runBrowserSide({ ...unit, payloadBytes: 64 }, 'rpc', { check: true })
   console.log(JSON.stringify({ echoes: receipt.echoes, ...receipt.facadeProof }))
 } else {
-  /** Physical payload and sampling policy match the existing DA1 preparation side. */
+  /** Physical payload and sampling policy match the existing budget preparation side. */
   const session = await createIpcSession({ ...unit, side: 'rpc', payload: 'x'.repeat(64) })
   try {
     await session.ready()

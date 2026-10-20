@@ -19,7 +19,7 @@ import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.
 import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
 import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
 
-it('[closure A1] reads frozen host stages and releases one notification per change', () => {
+it('reads frozen host stages and releases one notification per change', () => {
   /** Host-form public fields remain initial while the canonical state tracks active stages. */
   const probe = defineProbe({ stages: ['message'], emit: () => undefined }, {})
   /** Cold notifications must fire only for actual changes and stop after release. */
@@ -38,7 +38,7 @@ it('[closure A1] reads frozen host stages and releases one notification per chan
   expect(changed).toHaveBeenCalledTimes(1)
 })
 
-it('[closure A1] provides the actual serving endpoint identity', async () => {
+it('provides the actual serving endpoint identity', async () => {
   /** Existing memory transport exercises the provider context through the public endpoint. */
   const [left, right] = createMemoryTransportPair()
   /** Provider identity comes from its executor rather than the request sender. */
@@ -61,7 +61,7 @@ it('[closure A1] provides the actual serving endpoint identity', async () => {
   }
 })
 
-it('[closure A1 revision 2] preserves variation identity through both real Peer directions and method filtering', async () => {
+it('preserves variation identity through both real Peer directions and method filtering', async () => {
   /** Snapshots retain only the explicit test consumer's view copies from the two original emitters. */
   const observations: IRpcProbeEventView[][] = [[], []]
   /** Every stage is observed to detect a variation leaking into a later reused view. */

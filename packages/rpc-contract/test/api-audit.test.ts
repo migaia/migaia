@@ -14,7 +14,7 @@ import * as framing from '../src/contract/framing/index.js'
 const context = { source: 'audit', messageId: 'one' }
 
 describe('audited RPC contract framing', () => {
-  it('C01–C03 publishes named V1 operations and canonical guarded framing only', () => {
+  it('publishes named V1 operations and canonical guarded framing only', () => {
     expect('default' in v1).toBe(false)
     expect('createReassembler' in framing).toBe(false)
     expect('processStringFramer' in framing).toBe(false)
@@ -22,7 +22,7 @@ describe('audited RPC contract framing', () => {
     expect(typeof framing.remoteProcessStringFramer.accept).toBe('function')
   })
   it.each(['carrier', 'steps'] as const)(
-    'D04 classifies %s reflection failure and retains its cause',
+    'classifies %s reflection failure and retains its cause',
     (kind) => {
       /** The hostile descriptor trap fails before any business field can be read. */
       const original = new Error('reflection failed')
@@ -58,7 +58,7 @@ describe('audited RPC contract framing', () => {
   )
 
   it.each(['warning', 'schedule'] as const)(
-    'D04 annotates an unclassified native %s callback error in place',
+    'annotates an unclassified native %s callback error in place',
     (kind) => {
       /** Semantic identity must not replace this supported native callback failure. */
       const original = new RangeError('callback failed')
@@ -89,7 +89,7 @@ describe('audited RPC contract framing', () => {
     }
   )
 
-  it('D05 sends cleanup failure to the existing host queue when reportError is absent', () => {
+  it('sends cleanup failure to the existing host queue when reportError is absent', () => {
     /** The exact cleanup callback failure is retained at the terminal host observation. */
     const original = new Error('cancel failed')
     /** Capture the host queue without running an uncaught exception through the test runner. */
@@ -118,7 +118,7 @@ describe('audited RPC contract framing', () => {
     }
   })
 
-  it('D06 preserves the real fatal UTF-8 decoder error through handshake failure cause', () => {
+  it('preserves the real fatal UTF-8 decoder error through handshake failure cause', () => {
     /** Native decode semantics remain unchanged while recording the actual original exception. */
     const NativeDecoder = globalThis.TextDecoder
     /** Only the real decoding failure, not a manufactured fixture error, can satisfy this assertion. */
@@ -145,31 +145,28 @@ describe('audited RPC contract framing', () => {
     receiver.close(failure)
   })
 
-  it.each(['string', 'binary'] as const)(
-    'D01 bounds a complete %s carrier before delivery',
-    (kind) => {
-      /** Both profiles use the same admitted message budget. */
-      const framer =
-        kind === 'string'
-          ? createStringFramer({ chunkBytes: 2, maxMessageBytes: 4, maxBufferedBytes: 4 })
-          : createBinaryFramer({ chunkBytes: 2, maxMessageBytes: 4, maxBufferedBytes: 4 })
-      try {
-        expect(
-          framer.accept(kind === 'string' ? '12345' : new Uint8Array(5), context)
-        ).toMatchObject({
+  it.each(['string', 'binary'] as const)('bounds a complete %s carrier before delivery', (kind) => {
+    /** Both profiles use the same admitted message budget. */
+    const framer =
+      kind === 'string'
+        ? createStringFramer({ chunkBytes: 2, maxMessageBytes: 4, maxBufferedBytes: 4 })
+        : createBinaryFramer({ chunkBytes: 2, maxMessageBytes: 4, maxBufferedBytes: 4 })
+    try {
+      expect(framer.accept(kind === 'string' ? '12345' : new Uint8Array(5), context)).toMatchObject(
+        {
           status: 'rejected',
           error: { source: '@migaia/rpc/contract', code: 'FRAME_LIMIT_EXCEEDED' }
-        })
-        expect(framer.accept(kind === 'string' ? '1234' : new Uint8Array(4), context).status).toBe(
-          'complete'
-        )
-      } finally {
-        framer.close()
-      }
+        }
+      )
+      expect(framer.accept(kind === 'string' ? '1234' : new Uint8Array(4), context).status).toBe(
+        'complete'
+      )
+    } finally {
+      framer.close()
     }
-  )
+  })
 
-  it('D02 stops the current chunk when its first delivery closes the decoder', () => {
+  it('stops the current chunk when its first delivery closes the decoder', () => {
     /** Deliveries are recorded independently from frame parsing. */
     const delivered: number[] = []
     /** Intentional close is terminal without reporting a malformed frame. */
@@ -197,7 +194,7 @@ describe('audited RPC contract framing', () => {
     expect(errors).toEqual([])
   })
 
-  it('D03 unlinks one assembly before cancel can reenter close', () => {
+  it('unlinks one assembly before cancel can reenter close', () => {
     /** Counts actual invocations on the one scheduler-owned timer handle. */
     let cancellations = 0
     /** One synchronous reentry reproduces the supported cleanup callback race. */

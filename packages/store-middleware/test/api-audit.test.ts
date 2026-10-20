@@ -15,7 +15,7 @@ import {
 
 describe('store-middleware audit regressions', () => {
   it.each(['host', 'binding'] as const)(
-    'SM-D01 preserves the canonical managed %s and its fluent/live surface',
+    'preserves the canonical managed %s and its fluent/live surface',
     async (mode) => {
       /** Both public factories use the same real Runtime and Store state. */
       const runtime = createRuntime({ onError: () => {} })
@@ -52,7 +52,7 @@ describe('store-middleware audit regressions', () => {
       }
     }
   )
-  it('SM-D02 executes binding disposal registered after close instead of abandoning it', async () => {
+  it('executes binding disposal registered after close instead of abandoning it', async () => {
     /** Disposal uses the real canonical Host. */
     const host = createStoreMiddlewareHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
@@ -72,7 +72,7 @@ describe('store-middleware audit regressions', () => {
   })
 
   it.each(['unsupported', 'missing-native'] as const)(
-    'SM-D04 retains the caught Utils error for %s cloning',
+    'retains the caught Utils error for %s cloning',
     (mode) => {
       if (mode === 'missing-native') vi.stubGlobal('structuredClone', undefined)
       try {
@@ -99,7 +99,7 @@ describe('store-middleware audit regressions', () => {
   )
 
   it.each(['policy', 'host'] as const)(
-    'SM-D05 identifies a fresh native %s action callback failure',
+    'identifies a fresh native %s action callback failure',
     async (mode) => {
       /** This error has never passed through another pipeline or Runtime callback. */
       const primary = new TypeError('fresh action failed')
@@ -133,7 +133,7 @@ describe('store-middleware audit regressions', () => {
     }
   )
 
-  it('SM-D06 reports malformed Redux JSON and still accepts a later valid command', () => {
+  it('reports malformed Redux JSON and still accepts a later valid command', () => {
     /** Runtime reporting is observed through its public callback. */
     const reports: unknown[] = []
     /** The adapter must report to the requested real Runtime instead of swallowing parse errors. */
@@ -181,7 +181,7 @@ describe('store-middleware audit regressions', () => {
       stop()
     }
   })
-  it('SM-B13 reads the public pipeline option getter once', async () => {
+  it('reads the public pipeline option getter once', async () => {
     /** Count the supported stable getter on a complete actual host configuration. */
     let reads = 0
     /** Domain creation must reuse the captured option in canonical host admission. */
@@ -202,7 +202,7 @@ describe('store-middleware audit regressions', () => {
   })
 
   it.each(['root', 'nested', 'map-key', 'set-member'] as const)(
-    'SM-D03 rejects a class at %s without flattening its behavior',
+    'rejects a class at %s without flattening its behavior',
     (location) => {
       /** Prototype behavior is part of the input type and cannot survive native data projection. */
       class BusinessState {
@@ -227,7 +227,7 @@ describe('store-middleware audit regressions', () => {
     }
   )
 
-  it('SM-D03 rejects an accessor before executing it', () => {
+  it('rejects an accessor before executing it', () => {
     /** Strict data admission must not execute a getter once for validation and again for cloning. */
     let reads = 0
     expect(() =>
@@ -243,7 +243,7 @@ describe('store-middleware audit regressions', () => {
     expect(reads).toBe(0)
   })
 
-  it('SM-D03 keeps canonical cloning of supported built-ins, cycles and shared graph identity', () => {
+  it('keeps canonical cloning of supported built-ins, cycles and shared graph identity', () => {
     /** Shared identity must survive across ordinary fields and collection entries. */
     const shared = { count: 1 }
     /** Native copy remains the sole clone implementation. */

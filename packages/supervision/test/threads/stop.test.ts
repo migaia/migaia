@@ -4,7 +4,7 @@ import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
 import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.js'
 import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
 
-describe('A7 bounded thread stop', () => {
+describe('bounded thread stop', () => {
   it('drains before one termination and observes the actual exit', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryThreadLauncher()

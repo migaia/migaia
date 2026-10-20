@@ -124,7 +124,7 @@ function variationFrame(id: string, variation: string) {
 
 describe('IPC send queue contract', () => {
   it.each(['terminal', 'item', 'end', 'fail'] as const)(
-    '[A84][A93] sixteen runtime %s replies retain data capacity and leave cancellation control available',
+    'sixteen runtime %s replies retain data capacity and leave cancellation control available',
     async (kind) => {
       const queue = await queueModule()
       expect(queue).not.toBeNull()
@@ -184,9 +184,9 @@ describe('IPC send queue contract', () => {
     }
   )
 
-  it('[A1] bounds whole envelopes before encoding and preserves FIFO through a wrapped endpoint', async () => {
+  it('bounds whole envelopes before encoding and preserves FIFO through a wrapped endpoint', async () => {
     const queue = await queueModule()
-    expect(queue, '[A1] send-queue entry must exist').not.toBeNull()
+    expect(queue, 'send-queue entry must exist').not.toBeNull()
     if (!queue) return
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a1', maxPendingData: 3 })
     const first = deferredWrite()
@@ -198,10 +198,10 @@ describe('IPC send queue contract', () => {
       })
     const accepted = [run('one'), run('two'), run('three')]
     await expect(run('four')).rejects.toMatchObject({ code: 'OVERLOADED' })
-    expect(order, '[A1] only the first admitted envelope may write').toEqual(['one'])
+    expect(order, 'only the first admitted envelope may write').toEqual(['one'])
     first.release()
     await Promise.all(accepted)
-    expect(order, '[A1] admitted envelopes keep their order').toEqual(['one', 'two', 'three'])
+    expect(order, 'admitted envelopes keep their order').toEqual(['one', 'two', 'three'])
 
     const [physical] = createMemoryTransportPair()
     const blockedPhysical = deferredWrite()
@@ -214,7 +214,7 @@ describe('IPC send queue contract', () => {
       }
     }
     const endpointInstallation = queue.createIpcSendQueueFeature({
-      connectionId: 'a1-endpoint',
+      connectionId: 'fixture-endpoint',
       maxPendingData: 3
     })
     const wrapped = queue.createIpcSendQueueTransport(slow, endpointInstallation.gate)
@@ -233,11 +233,11 @@ describe('IPC send queue contract', () => {
       )
       await expect(
         calls[3],
-        '[A1] fourth public call rejects before physical work'
+        'fourth public call rejects before physical work'
       ).resolves.toMatchObject({
         code: 'OVERLOADED'
       })
-      expect(physicalIds, '[A1] one physical write remains unresolved').toHaveLength(1)
+      expect(physicalIds, 'one physical write remains unresolved').toHaveLength(1)
       blockedPhysical.release()
       await vi.waitFor(() => expect(physicalIds).toHaveLength(3))
       expect(new Set(physicalIds).size).toBe(3)
@@ -258,12 +258,12 @@ describe('IPC send queue contract', () => {
       createFirstPartyRoots(new Set(['first-party-outbound']))
     )
     await ordinary.dispose()
-    expect(touched, '[A1] core reads only the wrapper WeakMap brand').toBe(0)
+    expect(touched, 'core reads only the wrapper WeakMap brand').toBe(0)
   })
 
-  it('[A2] waits for physical writability and emits one high/low threshold crossing', async () => {
+  it('waits for physical writability and emits one high/low threshold crossing', async () => {
     const queue = await queueModule()
-    expect(queue, '[A2] send-queue entry must exist').not.toBeNull()
+    expect(queue, 'send-queue entry must exist').not.toBeNull()
     if (!queue) return
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a2', maxPendingData: 4 })
     const blocked = deferredWrite()
@@ -277,7 +277,7 @@ describe('IPC send queue contract', () => {
       })
     )
     await Promise.resolve()
-    expect(writes, '[A2] unresolved send must hold the next write').toEqual(['one'])
+    expect(writes, 'unresolved send must hold the next write').toEqual(['one'])
     expect(events.filter((name) => name === 'ipc.backlog.high')).toHaveLength(1)
     blocked.release()
     await Promise.all(tasks)
@@ -295,7 +295,7 @@ describe('IPC send queue contract', () => {
       },
       subscribe: () => () => undefined
     }
-    const frameGate = queue.createIpcSendQueueFeature({ connectionId: 'a2-frames' }).gate
+    const frameGate = queue.createIpcSendQueueFeature({ connectionId: 'fixture-frames' }).gate
     const frameSender = new RpcOutboundSender(
       frameTransport,
       'client',
@@ -327,15 +327,15 @@ describe('IPC send queue contract', () => {
     await vi.waitFor(() => expect(frames).toEqual(['frame-1']))
     physical.release()
     await frameSend
-    expect(frames, '[A2] drain must separate physical frames of one envelope').toEqual([
+    expect(frames, 'drain must separate physical frames of one envelope').toEqual([
       'frame-1',
       'frame-2'
     ])
   })
 
-  it('[A3] drops a cancelled queued request, reclaims capacity, and keeps its deadline budget', async () => {
+  it('drops a cancelled queued request, reclaims capacity, and keeps its deadline budget', async () => {
     const queue = await queueModule()
-    expect(queue, '[A3] send-queue entry must exist').not.toBeNull()
+    expect(queue, 'send-queue entry must exist').not.toBeNull()
     if (!queue) return
     const scheduler = createManualScheduler()
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a3', maxPendingData: 2 })
@@ -364,9 +364,7 @@ describe('IPC send queue contract', () => {
     })
     blocked.release()
     await Promise.all([first, replacement])
-    expect(written, '[A3] cancelled queued work must never reach physical send').toEqual([
-      'replacement'
-    ])
+    expect(written, 'cancelled queued work must never reach physical send').toEqual(['replacement'])
     expect(scheduler.now()).toBe(300)
 
     const [wire] = createMemoryTransportPair()
@@ -380,7 +378,7 @@ describe('IPC send queue contract', () => {
       }
     }
     const endpointGate = queue.createIpcSendQueueFeature({
-      connectionId: 'a3-budget',
+      connectionId: 'fixture-budget',
       maxPendingData: 2
     })
     const wrapped = queue.createIpcSendQueueTransport(slow, endpointGate.gate)
@@ -410,7 +408,7 @@ describe('IPC send queue contract', () => {
       if (restamped.kind === 'request')
         expect(
           restamped.data.route.timeoutMs,
-          '[A3] queued time reduces the wire deadline'
+          'queued time reduces the wire deadline'
         ).toBeLessThanOrEqual(700)
       scheduler.advance(700)
       await expect(queued).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
@@ -430,7 +428,7 @@ describe('IPC send queue contract', () => {
       subscribe: () => () => undefined
     }
     const streamGate = queue.createIpcSendQueueFeature({
-      connectionId: 'a3-stream',
+      connectionId: 'fixture-stream',
       maxPendingData: 2
     })
     const streamTransport = queue.createIpcSendQueueTransport(streamWire, streamGate.gate)
@@ -472,9 +470,7 @@ describe('IPC send queue contract', () => {
       streamScheduler.advance(300)
       queuedHead.release()
       await Promise.all([headFrame, streamOpen])
-      expect(streamFrames, '[A3] stream-open writes one frame after queue admission').toHaveLength(
-        1
-      )
+      expect(streamFrames, 'stream-open writes one frame after queue admission').toHaveLength(1)
       const streamRequest = normalizeRpcEnvelope(streamFrames[0])
       expect(streamRequest.kind).toBe('request')
       if (streamRequest.kind === 'request')
@@ -502,26 +498,24 @@ describe('IPC send queue contract', () => {
           })
           pending.catch(() => undefined)
           await vi.waitFor(() =>
-            expect(occupancy, `[A3] ${mode} enters the real IPC queue`).toContain(2)
+            expect(occupancy, `${mode} enters the real IPC queue`).toContain(2)
           )
           if (mode === 'abort') controller.abort(reason)
           else streamScheduler.advance(500)
           head.release()
           await active
           if (mode === 'abort')
-            await expect(
-              pending,
-              '[A3] stream-open retains the original abort reason'
-            ).rejects.toBe(reason)
+            await expect(pending, 'stream-open retains the original abort reason').rejects.toBe(
+              reason
+            )
           else
-            await expect(
-              pending,
-              '[A3] stream-open retains its deadline code'
-            ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+            await expect(pending, 'stream-open retains its deadline code').rejects.toMatchObject({
+              code: 'DEADLINE_EXCEEDED'
+            })
           await streamGate.gate.whenIdle()
           expect(
             streamFrames,
-            `[A3] queued stream-open ${mode} emits no request, abort, or cancel frame`
+            `queued stream-open ${mode} emits no request, abort, or cancel frame`
           ).toHaveLength(1)
           await streamGate.gate.run(request(`replacement-${mode}`), () => undefined)
         } finally {
@@ -535,7 +529,7 @@ describe('IPC send queue contract', () => {
     }
   })
 
-  it('[A3] blocks same-tick abort and deadline after queue release', async () => {
+  it('blocks same-tick abort and deadline after queue release', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
@@ -559,18 +553,18 @@ describe('IPC send queue contract', () => {
       else expired = true
       head.release()
       await first
-      await expect(next, `[A3] ${mode} keeps its primary error`).rejects.toBe(reason)
-      expect(sent, `[A3] ${mode} cannot send after queue release`).not.toHaveBeenCalled()
+      await expect(next, `${mode} keeps its primary error`).rejects.toBe(reason)
+      expect(sent, `${mode} cannot send after queue release`).not.toHaveBeenCalled()
       await gate.whenIdle()
       await gate.run(request('replacement'), () => undefined)
     }
   })
 
-  it('[A3] aborts during protection before first frame but commits all frames after first send', async () => {
+  it('aborts during protection before first frame but commits all frames after first send', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
-    const gate = queue.createIpcSendQueueFeature({ connectionId: 'a3-protect' }).gate
+    const gate = queue.createIpcSendQueueFeature({ connectionId: 'fixture-protect' }).gate
     const protection = deferredWrite()
     const protectedValues: unknown[] = []
     const frames: unknown[] = []
@@ -629,10 +623,12 @@ describe('IPC send queue contract', () => {
     controller.abort(reason)
     protection.release()
     await expect(pending).rejects.toBe(reason)
-    expect(frames, '[A3] pre-send abort must leave zero physical frames').toHaveLength(0)
+    expect(frames, 'pre-send abort must leave zero physical frames').toHaveLength(0)
     await gate.whenIdle()
 
-    const committedGate = queue.createIpcSendQueueFeature({ connectionId: 'a3-committed' }).gate
+    const committedGate = queue.createIpcSendQueueFeature({
+      connectionId: 'fixture-committed'
+    }).gate
     const committedFrames: unknown[] = []
     const committedController = new AbortController()
     const committedReason = new Error('after first')
@@ -658,14 +654,14 @@ describe('IPC send queue contract', () => {
         if (committedController.signal.aborted) throw committedReason
       }
     })
-    expect(committedFrames, '[A3] first frame commits the whole envelope').toEqual([
+    expect(committedFrames, 'first frame commits the whole envelope').toEqual([
       'one',
       'two',
       'three'
     ])
   })
 
-  it('[A3] never sends remote abort for a queued request with no first frame', async () => {
+  it('never sends remote abort for a queued request with no first frame', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
@@ -679,11 +675,11 @@ describe('IPC send queue contract', () => {
         return frames.length === 1 ? blocked.promise : undefined
       }
     }
-    const installed = queue.createIpcSendQueueFeature({ connectionId: 'a3-no-remote-abort' })
+    const installed = queue.createIpcSendQueueFeature({ connectionId: 'no-remote-abort' })
     const wrapper = queue.createIpcSendQueueTransport(slow, installed.gate)
     const endpoint = await createComposedEndpoint(
       {
-        id: 'a3-no-remote-abort',
+        id: 'no-remote-abort',
         transport: wrapper,
         middlewares: [connect({ transport: wrapper }), abort()],
         features: [installed.feature] as const
@@ -704,19 +700,16 @@ describe('IPC send queue contract', () => {
       await expect(queued).rejects.toBeDefined()
       blocked.release()
       await installed.gate.whenIdle()
-      expect(
-        frames,
-        '[A3] a queued abort emits neither request nor remote abort frame'
-      ).toHaveLength(1)
+      expect(frames, 'a queued abort emits neither request nor remote abort frame').toHaveLength(1)
     } finally {
       blocked.release()
       await endpoint.dispose()
     }
   })
 
-  it('[A4] reserves control capacity and refuses a second control envelope without partial frames', async () => {
+  it('reserves control capacity and refuses a second control envelope without partial frames', async () => {
     const queue = await queueModule()
-    expect(queue, '[A4] send-queue entry must exist').not.toBeNull()
+    expect(queue, 'send-queue entry must exist').not.toBeNull()
     if (!queue) return
     const installed = queue.createIpcSendQueueFeature({
       connectionId: 'a4',
@@ -754,18 +747,18 @@ describe('IPC send queue contract', () => {
     ).rejects.toMatchObject({
       code: 'OVERLOADED'
     })
-    expect(order, '[A4] control cannot interleave the in-flight envelope').toEqual(['data'])
+    expect(order, 'control cannot interleave the in-flight envelope').toEqual(['data'])
     blocked.release()
     await Promise.all([data, control])
     expect(order).toEqual(['data', 'pull'])
   })
 
-  it('[A4] classifies stream item/open as data and pull/cancel as control', async () => {
+  it('classifies stream item/open as data and pull/cancel as control', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
     const gate = queue.createIpcSendQueueFeature({
-      connectionId: 'a4-classes',
+      connectionId: 'fixture-classes',
       maxPendingData: 1,
       maxPendingControl: 1
     }).gate
@@ -774,19 +767,19 @@ describe('IPC send queue contract', () => {
     for (const event of [RpcStreamEvent.item, RpcStreamEvent.open] as const) {
       await expect(
         gate.run(streamFrame(event, event), () => undefined),
-        `[A4] ${event} consumes the full data lane`
+        `${event} consumes the full data lane`
       ).rejects.toMatchObject({ code: 'OVERLOADED' })
     }
     const pull = gate.run(streamFrame('pull', RpcStreamEvent.pull), () => undefined)
     await expect(
       gate.run(streamFrame('cancel', RpcStreamEvent.cancel), () => undefined),
-      '[A4] the next control envelope refuses capacity'
+      'the next control envelope refuses capacity'
     ).rejects.toMatchObject({ code: 'OVERLOADED' })
     blocked.release()
     await Promise.all([active, pull])
   })
 
-  it('[A4] reserves control for protocol variations and leaves other frames in data', async () => {
+  it('reserves control for protocol variations and leaves other frames in data', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
@@ -802,17 +795,15 @@ describe('IPC send queue contract', () => {
       const control = gate.run(variationFrame(variation, variation), sent)
       await expect(
         gate.run(variationFrame(`second-${variation}`, variation), () => undefined),
-        `[A4] ${variation} consumes the control slot`
+        `${variation} consumes the control slot`
       ).rejects.toMatchObject({ code: 'OVERLOADED' })
       head.release()
       await Promise.all([active, control])
-      expect(sent, `[A4] ${variation} sends after the active data envelope`).toHaveBeenCalledTimes(
-        1
-      )
+      expect(sent, `${variation} sends after the active data envelope`).toHaveBeenCalledTimes(1)
     }
     for (const event of [RpcStreamEvent.end, RpcStreamEvent.fail] as const) {
       const gate = queue.createIpcSendQueueFeature({
-        connectionId: `a4-data-${event}`,
+        connectionId: `data-${event}`,
         maxPendingData: 1,
         maxPendingControl: 1
       }).gate
@@ -820,13 +811,13 @@ describe('IPC send queue contract', () => {
       const active = gate.run(request('head'), () => head.promise)
       await expect(
         gate.run(streamFrame(event, event), () => undefined),
-        `[A4] ${event} cannot borrow a control slot`
+        `${event} cannot borrow a control slot`
       ).rejects.toMatchObject({ code: 'OVERLOADED' })
       head.release()
       await active
     }
     const unknownGate = queue.createIpcSendQueueFeature({
-      connectionId: 'a4-unknown',
+      connectionId: 'fixture-unknown',
       maxPendingData: 1,
       maxPendingControl: 1
     }).gate
@@ -834,19 +825,19 @@ describe('IPC send queue contract', () => {
     const unknownActive = unknownGate.run(request('head'), () => unknownHead.promise)
     await expect(
       unknownGate.run(variationFrame('unknown', 'extension'), () => undefined),
-      '[A4] unknown variation cannot borrow control capacity'
+      'unknown variation cannot borrow control capacity'
     ).rejects.toMatchObject({ code: 'OVERLOADED' })
     unknownHead.release()
     await unknownActive
   })
 
-  it('[A4] removes stale pull/item and preserves four selected terminal notifications', async () => {
+  it('removes stale pull/item and preserves four selected terminal notifications', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
     for (const event of [RpcStreamEvent.pull, RpcStreamEvent.item] as const) {
       const gate = queue.createIpcSendQueueFeature({
-        connectionId: `a4-stale-${event}`,
+        connectionId: `stale-${event}`,
         maxPendingData: 2,
         maxPendingControl: 2
       }).gate
@@ -863,11 +854,11 @@ describe('IPC send queue contract', () => {
       })
       stale.catch(() => undefined)
       controller.abort()
-      await expect(stale, `[A4] old ${event} settles on stream termination`).rejects.toBeDefined()
+      await expect(stale, `old ${event} settles on stream termination`).rejects.toBeDefined()
       const fresh = gate.run(streamFrame('fresh', event), () => undefined)
       head.release()
       await Promise.all([active, fresh])
-      expect(sent, `[A4] old ${event} never reaches sendNow`).not.toHaveBeenCalled()
+      expect(sent, `old ${event} never reaches sendNow`).not.toHaveBeenCalled()
       await gate.whenIdle()
     }
     for (const event of [
@@ -877,7 +868,7 @@ describe('IPC send queue contract', () => {
       RpcStreamEvent.cancelled
     ] as const) {
       const gate = queue.createIpcSendQueueFeature({
-        connectionId: `a4-terminal-${event}`,
+        connectionId: `terminal-${event}`,
         maxPendingData: 2,
         maxPendingControl: 2
       }).gate
@@ -894,16 +885,14 @@ describe('IPC send queue contract', () => {
       controller.abort()
       head.release()
       await Promise.all([active, terminal])
-      expect(sent, `[A4] selected ${event} survives its own terminal state`).toHaveBeenCalledTimes(
-        1
-      )
+      expect(sent, `selected ${event} survives its own terminal state`).toHaveBeenCalledTimes(1)
     }
   })
 
-  it('[A5] reports backlog and stderr with identity while containing reporter failures', async () => {
+  it('reports backlog and stderr with identity while containing reporter failures', async () => {
     const queue = await queueModule()
     const log = await logModule()
-    expect(queue && log, '[A5] send-queue and log entries must exist').toBeTruthy()
+    expect(queue && log, 'send-queue and log entries must exist').toBeTruthy()
     if (!queue || !log) return
     const installed = queue.createIpcSendQueueFeature({
       connectionId: 'a5',
@@ -924,7 +913,7 @@ describe('IPC send queue contract', () => {
         reportErrors.push(error)
       }
     })
-    expect(logging.feature, '[A5] log must be a native feature').toBeDefined()
+    expect(logging.feature, 'log must be a native feature').toBeDefined()
     const [wire] = createMemoryTransportPair()
     const wrapped = queue.createIpcSendQueueTransport(wire, installed.gate)
     const endpoint = await createComposedEndpoint(
@@ -951,7 +940,7 @@ describe('IPC send queue contract', () => {
     const rejected = installed.gate.run(request('rejected', 't1'), () => undefined)
     await expect(
       rejected,
-      '[A5] reporter failure must not rewrite capacity error'
+      'reporter failure must not rewrite capacity error'
     ).rejects.toMatchObject({
       code: 'OVERLOADED'
     })
@@ -980,10 +969,7 @@ describe('IPC send queue contract', () => {
     ).rejects.toBeDefined()
     await vi.waitFor(() => expect(reportErrors).toHaveLength(2))
     await endpoint.dispose()
-    expect(
-      records,
-      '[A5] stderr must retain connection/session without invented trace'
-    ).toContainEqual({
+    expect(records, 'stderr must retain connection/session without invented trace').toContainEqual({
       name: 'ipc.stderr',
       connectionId: 'a5',
       sessionId: 'session',
@@ -991,7 +977,7 @@ describe('IPC send queue contract', () => {
     })
   })
 
-  it('[A5] sends a rejected error reporter to the host terminal reporter', async () => {
+  it('sends a rejected error reporter to the host terminal reporter', async () => {
     const queue = await queueModule()
     const log = await logModule()
     expect(queue && log).toBeTruthy()
@@ -1024,7 +1010,7 @@ describe('IPC send queue contract', () => {
           text: 'stderr'
         })
         await vi.waitFor(() =>
-          expect(observed, `[A5] final reporter observes ${mode} failure`).toContain(terminalError)
+          expect(observed, `final reporter observes ${mode} failure`).toContain(terminalError)
         )
       }
     } finally {
@@ -1032,7 +1018,7 @@ describe('IPC send queue contract', () => {
     }
   })
 
-  it('[A5] removes the log Feature subscription on endpoint disposal', async () => {
+  it('removes the log Feature subscription on endpoint disposal', async () => {
     const log = await logModule()
     expect(log).not.toBeNull()
     if (!log) return
@@ -1048,7 +1034,7 @@ describe('IPC send queue contract', () => {
     const [transport] = createMemoryTransportPair()
     const endpoint = await createComposedEndpoint(
       {
-        id: 'a5-disposal',
+        id: 'fixture-disposal',
         transport,
         middlewares: [connect({ transport })],
         features: [logging.feature] as const
@@ -1057,16 +1043,16 @@ describe('IPC send queue contract', () => {
     )
     expect(gate.onEvent).toHaveBeenCalledTimes(1)
     await endpoint.dispose()
-    expect(unsubscribe, '[A5] log Feature releases its gate listener').toHaveBeenCalledTimes(1)
+    expect(unsubscribe, 'log Feature releases its gate listener').toHaveBeenCalledTimes(1)
   })
 
-  it('[A6] contains reporter reentry without stealing capacity or changing the original error', async () => {
+  it('contains reporter reentry without stealing capacity or changing the original error', async () => {
     const queue = await queueModule()
     const log = await logModule()
     expect(queue && log).toBeTruthy()
     if (!queue || !log) return
     const installation = queue.createIpcSendQueueFeature({
-      connectionId: 'a6-reentry',
+      connectionId: 'fixture-reentry',
       maxPendingData: 1
     })
     const reentrantErrors: unknown[] = []
@@ -1083,7 +1069,7 @@ describe('IPC send queue contract', () => {
     const [physical] = createMemoryTransportPair()
     const wrapper = queue.createIpcSendQueueTransport(physical, installation.gate)
     const endpoint = await createClientEndpoint({
-      id: 'a6-reentry',
+      id: 'fixture-reentry',
       transport: wrapper,
       middlewares: [connect({ transport: wrapper })],
       features: [installation.feature, logging.feature] as const
@@ -1092,9 +1078,9 @@ describe('IPC send queue contract', () => {
       const blocked = deferredWrite()
       const active = installation.gate.run(request('active'), () => blocked.promise)
       await vi.waitFor(() =>
-        expect(reentrantErrors, '[A6] reporter reentry rejects at the same capacity bound').toEqual(
-          [expect.objectContaining({ code: 'OVERLOADED' })]
-        )
+        expect(reentrantErrors, 'reporter reentry rejects at the same capacity bound').toEqual([
+          expect.objectContaining({ code: 'OVERLOADED' })
+        ])
       )
       blocked.release()
       await active
@@ -1104,7 +1090,7 @@ describe('IPC send queue contract', () => {
     }
   })
 
-  it('[A5] reports remote-abort and dispatch capacity refusal as OVERLOADED', async () => {
+  it('reports remote-abort and dispatch capacity refusal as OVERLOADED', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
@@ -1119,13 +1105,13 @@ describe('IPC send queue contract', () => {
       }
     }
     const installed = queue.createIpcSendQueueFeature({
-      connectionId: 'a5-capacity',
+      connectionId: 'fixture-capacity',
       maxPendingData: 1,
       maxPendingControl: 1
     })
     const wrapper = queue.createIpcSendQueueTransport(slow, installed.gate)
     const endpoint = await createClientEndpoint({
-      id: 'a5-capacity',
+      id: 'fixture-capacity',
       transport: wrapper,
       middlewares: [connect({ transport: wrapper }), abort()],
       features: [installed.feature] as const
@@ -1154,7 +1140,7 @@ describe('IPC send queue contract', () => {
               (event as { readonly error?: { readonly code?: unknown } }).error?.code ===
                 'OVERLOADED'
           ),
-          '[A5] dispatch and remote abort retain capacity code in diagnostics'
+          'dispatch and remote abort retain capacity code in diagnostics'
         ).toHaveLength(2)
       )
       blocked.release()
@@ -1165,16 +1151,16 @@ describe('IPC send queue contract', () => {
     }
   })
 
-  it('[A6] rejects unmatched gate and feature construction before sending', async () => {
+  it('rejects unmatched gate and feature construction before sending', async () => {
     const queue = await queueModule()
-    expect(queue, '[A6] send-queue entry must exist').not.toBeNull()
+    expect(queue, 'send-queue entry must exist').not.toBeNull()
     if (!queue) return
     const [transport] = createMemoryTransportPair()
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a6' })
     const wrapped = queue.createIpcSendQueueTransport(transport, installed.gate)
     expect(
       () => queue.createIpcSendQueueTransport(transport, installed.gate),
-      '[A6] one physical connection cannot be wrapped twice'
+      'one physical connection cannot be wrapped twice'
     ).toThrowError(TypeError)
     const missingFeature = createComposedEndpoint(
       { id: 'a6', transport: wrapped, middlewares: [connect({ transport: wrapped })] },
@@ -1186,7 +1172,7 @@ describe('IPC send queue contract', () => {
     await expect(
       createComposedEndpoint(
         {
-          id: 'a6-bare',
+          id: 'fixture-bare',
           transport: plain,
           middlewares: [connect({ transport: plain })],
           features: [installed.feature] as const
@@ -1194,11 +1180,11 @@ describe('IPC send queue contract', () => {
         createFirstPartyRoots(new Set(['first-party-outbound']))
       )
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    const other = queue.createIpcSendQueueFeature({ connectionId: 'a6-other' })
+    const other = queue.createIpcSendQueueFeature({ connectionId: 'fixture-other' })
     await expect(
       createComposedEndpoint(
         {
-          id: 'a6-mismatch',
+          id: 'fixture-mismatch',
           transport: wrapped,
           middlewares: [connect({ transport: wrapped })],
           features: [other.feature] as const
@@ -1208,7 +1194,7 @@ describe('IPC send queue contract', () => {
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     const recovered = await createComposedEndpoint(
       {
-        id: 'a6-recovered',
+        id: 'fixture-recovered',
         transport: wrapped,
         middlewares: [connect({ transport: wrapped })],
         features: [installed.feature] as const
@@ -1218,12 +1204,12 @@ describe('IPC send queue contract', () => {
     await recovered.dispose()
 
     const [secondPhysical] = createMemoryTransportPair()
-    const reusable = queue.createIpcSendQueueFeature({ connectionId: 'a6-physical' })
+    const reusable = queue.createIpcSendQueueFeature({ connectionId: 'fixture-physical' })
     const firstWrapper = queue.createIpcSendQueueTransport(secondPhysical, reusable.gate)
     await expect(
       createComposedEndpoint(
         {
-          id: 'a6-physical-failed',
+          id: 'physical-failed',
           transport: firstWrapper,
           middlewares: [connect({ transport: firstWrapper })]
         },
@@ -1231,30 +1217,30 @@ describe('IPC send queue contract', () => {
       )
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     const replacement = queue.createIpcSendQueueTransport(secondPhysical, reusable.gate)
-    expect(replacement, '[A6] failed construction releases the physical claim').toBeDefined()
+    expect(replacement, 'failed construction releases the physical claim').toBeDefined()
     expect(
       () => queue.createIpcSendQueueTransport(replacement, reusable.gate),
-      '[A6] a gated wrapper cannot be wrapped again'
+      'a gated wrapper cannot be wrapped again'
     ).toThrowError(TypeError)
 
     const [earlyPhysical] = createMemoryTransportPair()
-    const early = queue.createIpcSendQueueFeature({ connectionId: 'a6-early' })
+    const early = queue.createIpcSendQueueFeature({ connectionId: 'fixture-early' })
     const earlyWrapper = queue.createIpcSendQueueTransport(earlyPhysical, early.gate)
     await expect(
       createComposedEndpoint(
         {
-          id: 'a6-early-failed',
+          id: 'early-failed',
           transport: earlyWrapper,
           middlewares: [connect({ transport: earlyWrapper })],
           features: [{} as never] as const
         },
         createFirstPartyRoots(new Set(['first-party-outbound']))
       ),
-      '[A6] preflight failure must not retain the wrapper claim'
+      'preflight failure must not retain the wrapper claim'
     ).rejects.toBeDefined()
     const afterPreflight = await createComposedEndpoint(
       {
-        id: 'a6-after-preflight',
+        id: 'after-preflight',
         transport: earlyWrapper,
         middlewares: [connect({ transport: earlyWrapper })],
         features: [early.feature] as const
@@ -1264,11 +1250,11 @@ describe('IPC send queue contract', () => {
     await afterPreflight.dispose()
   })
 
-  it('[A6] rejects duplicate registry writes and keeps wrapper close idempotent', async () => {
+  it('rejects duplicate registry writes and keeps wrapper close idempotent', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
-    const gate = queue.createIpcSendQueueFeature({ connectionId: 'a6-duplicate' }).gate
+    const gate = queue.createIpcSendQueueFeature({ connectionId: 'fixture-duplicate' }).gate
     const brand = {}
     const claim = { restore() {}, rollback() {} }
     registerOutboundGate(brand, gate, claim)
@@ -1298,32 +1284,30 @@ describe('IPC send queue contract', () => {
       idle = true
     })
     await Promise.resolve()
-    expect(idle, '[A6] whenIdle waits for the admitted physical send').toBe(false)
+    expect(idle, 'whenIdle waits for the admitted physical send').toBe(false)
     blocked.release()
     await Promise.all([send, whenIdle])
     expect(idle).toBe(true)
     wrapper.close?.()
     wrapper.close?.()
-    expect(close, '[A6] wrapper closes its claimed physical connection once').toHaveBeenCalledTimes(
-      1
-    )
+    expect(close, 'wrapper closes its claimed physical connection once').toHaveBeenCalledTimes(1)
     expect(wrapper.closed).toBe(true)
     expect(
       () => queue.createIpcSendQueueTransport(physical, gate),
-      '[A6] close retires physical occupancy rather than recycling a closed connection'
+      'close retires physical occupancy rather than recycling a closed connection'
     ).toThrowError(TypeError)
   })
 
-  it('[A6] closes an installed gate when a borrowed endpoint disposes', async () => {
+  it('closes an installed gate when a borrowed endpoint disposes', async () => {
     const queue = await queueModule()
     expect(queue).not.toBeNull()
     if (!queue) return
     const [physical] = createMemoryTransportPair()
-    const installation = queue.createIpcSendQueueFeature({ connectionId: 'a6-gate-close' })
+    const installation = queue.createIpcSendQueueFeature({ connectionId: 'gate-close' })
     const wrapper = queue.createIpcSendQueueTransport(physical, installation.gate)
     const endpoint = await createComposedEndpoint(
       {
-        id: 'a6-gate-close',
+        id: 'gate-close',
         transport: wrapper,
         middlewares: [connect({ transport: wrapper })],
         features: [installation.feature] as const
@@ -1333,11 +1317,11 @@ describe('IPC send queue contract', () => {
     await endpoint.dispose()
     await expect(
       installation.gate.run(request('after-dispose'), () => undefined),
-      '[A6] Feature resource closes gate even when kernel borrows the wrapper'
+      'Feature resource closes gate even when kernel borrows the wrapper'
     ).rejects.toMatchObject({ code: 'ENDPOINT_DISPOSED' })
   })
 
-  it('[A6] rolls back first and second Feature installation failures without a frame', async () => {
+  it('rolls back first and second Feature installation failures without a frame', async () => {
     const queue = await queueModule()
     const log = await logModule()
     expect(queue && log).toBeTruthy()
@@ -1346,20 +1330,20 @@ describe('IPC send queue contract', () => {
     const [firstPhysical] = createMemoryTransportPair()
     const firstSend = vi.fn()
     const firstTransport: IRpcTransport = { ...firstPhysical, send: firstSend }
-    const first = queue.createIpcSendQueueFeature({ connectionId: 'a6-first' })
+    const first = queue.createIpcSendQueueFeature({ connectionId: 'first-1' })
     const firstWrapper = queue.createIpcSendQueueTransport(firstTransport, first.gate)
     installOutboundGate(firstWrapper, first.gate)
     await expect(
       createComposedEndpoint(
         {
-          id: 'a6-first',
+          id: 'first-1',
           transport: firstWrapper,
           middlewares: [connect({ transport: firstWrapper })],
           features: [first.feature] as const
         },
         roots
       ),
-      '[A6] first Feature installation failure preserves INVALID_CONFIG'
+      'first Feature installation failure preserves INVALID_CONFIG'
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     expect(firstSend).not.toHaveBeenCalled()
     expect(queue.createIpcSendQueueTransport(firstTransport, first.gate)).toBeDefined()
@@ -1367,7 +1351,7 @@ describe('IPC send queue contract', () => {
     const [secondPhysical] = createMemoryTransportPair()
     const secondSend = vi.fn()
     const secondTransport: IRpcTransport = { ...secondPhysical, send: secondSend }
-    const second = queue.createIpcSendQueueFeature({ connectionId: 'a6-second' })
+    const second = queue.createIpcSendQueueFeature({ connectionId: 'second-1' })
     const secondWrapper = queue.createIpcSendQueueTransport(secondTransport, second.gate)
     const failure = new Error('log install failed')
     const brokenLog = log.createIpcLogFeature({
@@ -1382,14 +1366,14 @@ describe('IPC send queue contract', () => {
     await expect(
       createComposedEndpoint(
         {
-          id: 'a6-second',
+          id: 'second-1',
           transport: secondWrapper,
           middlewares: [connect({ transport: secondWrapper })],
           features: [second.feature, brokenLog.feature] as const
         },
         roots
       ),
-      '[A6] second Feature installation failure keeps its original cause'
+      'second Feature installation failure keeps its original cause'
     ).rejects.toBe(failure)
     expect(secondSend).not.toHaveBeenCalled()
     await expect(second.gate.run(request('after-second'), () => undefined)).rejects.toMatchObject({
@@ -1400,7 +1384,7 @@ describe('IPC send queue contract', () => {
     const [cleanupPhysical] = createMemoryTransportPair()
     const cleanupSend = vi.fn()
     const cleanupTransport: IRpcTransport = { ...cleanupPhysical, send: cleanupSend }
-    const cleanupQueue = queue.createIpcSendQueueFeature({ connectionId: 'a6-cleanup' })
+    const cleanupQueue = queue.createIpcSendQueueFeature({ connectionId: 'cleanup-1' })
     const cleanupWrapper = queue.createIpcSendQueueTransport(cleanupTransport, cleanupQueue.gate)
     const cleanupFailure = new Error('log unsubscribe failed')
     const cleanupLog = log.createIpcLogFeature({
@@ -1417,7 +1401,7 @@ describe('IPC send queue contract', () => {
     installOutboundGate(cleanupWrapper, cleanupQueue.gate)
     const failed = await createComposedEndpoint(
       {
-        id: 'a6-cleanup',
+        id: 'cleanup-1',
         transport: cleanupWrapper,
         middlewares: [connect({ transport: cleanupWrapper })],
         features: [cleanupLog.feature, cleanupQueue.feature] as const
@@ -1427,21 +1411,21 @@ describe('IPC send queue contract', () => {
       () => undefined,
       (error: unknown) => error
     )
-    expect(failed, '[A6] original install failure stays reachable').toMatchObject({
+    expect(failed, 'original install failure stays reachable').toMatchObject({
       code: 'INVALID_CONFIG'
     })
     expect(
       (failed as { readonly cleanupErrors?: readonly { readonly error: unknown }[] })
         .cleanupErrors?.[0]?.error,
-      '[A6] cleanup failure remains reachable by identity beside the original cause'
+      'cleanup failure remains reachable by identity beside the original cause'
     ).toBe(cleanupFailure)
-    expect(cleanupSend, '[A6] failing batch sends no physical frame').not.toHaveBeenCalled()
+    expect(cleanupSend, 'failing batch sends no physical frame').not.toHaveBeenCalled()
     expect(queue.createIpcSendQueueTransport(cleanupTransport, cleanupQueue.gate)).toBeDefined()
   })
 
-  it('[A7] preserves synchronous ungated sender failure and async gated public rejection', async () => {
+  it('preserves synchronous ungated sender failure and async gated public rejection', async () => {
     const queue = await queueModule()
-    expect(queue, '[A7] send-queue entry must exist').not.toBeNull()
+    expect(queue, 'send-queue entry must exist').not.toBeNull()
     if (!queue) return
     const failure = new Error('encode')
     const transport: IRpcTransport = {
@@ -1472,10 +1456,7 @@ describe('IPC send queue contract', () => {
       ingressPrepare: () => undefined,
       shadowed: []
     } as never)
-    expect(
-      () => pipeline.send(request('x')),
-      '[A7] ungated sender must throw synchronously'
-    ).toThrow()
+    expect(() => pipeline.send(request('x')), 'ungated sender must throw synchronously').toThrow()
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'a7' })
     const gatedPipeline = new RpcOutboundSender(
       transport,
@@ -1486,7 +1467,7 @@ describe('IPC send queue contract', () => {
       installed.gate
     )
     const result = gatedPipeline.send(request('x'))
-    await expect(result, '[A7] gated send must reject asynchronously').rejects.toMatchObject({
+    await expect(result, 'gated send must reject asynchronously').rejects.toMatchObject({
       cause: failure
     })
     expect(transport.send).not.toHaveBeenCalled()

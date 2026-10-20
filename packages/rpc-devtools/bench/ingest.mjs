@@ -1,5 +1,5 @@
 /**
- * A5 measures the public collector using one reusable metadata view and a warmed bounded ring. Run
+ * Measures the public collector using one reusable metadata view and a warmed bounded ring. Run
  * on Node 24 with --expose-gc inside the repository's shared measurement window. Heap samples
  * measure retained memory, not all transient allocations; source evidence is saved separately, and
  * a missing source audit must not be presented as a zero-allocation proof.
@@ -19,7 +19,7 @@ import {
   RpcProbeOutcome
 } from '@migaia/rpc-core/probe'
 
-/** A5's fixed count is also the minimum meaningful retained-heap sample span. */
+/** 's fixed count is also the minimum meaningful retained-heap sample span. */
 const eventsPerCell = 10_000_000
 /** Warm both name lookup, message-id reuse and the per-method statistics slot. */
 const warmupEvents = 1_000_000
@@ -48,8 +48,8 @@ const packageDirectory = fileURLToPath(new URL('..', import.meta.url))
 /** Configuration errors are benchmark failures; no business event is emitted on an invalid host. */
 const configurationFailures = []
 if (Number(process.versions.node.split('.')[0]) !== 24)
-  configurationFailures.push('Node 24 is required by A5')
-if (typeof globalThis.gc !== 'function') configurationFailures.push('--expose-gc is required by A5')
+  configurationFailures.push('Node 24 is required by the ingest benchmark')
+if (typeof globalThis.gc !== 'function') configurationFailures.push('--expose-gc is required by the ingest benchmark')
 
 /**
  * Read built JavaScript deterministically without running a second code path.
@@ -149,7 +149,7 @@ function report(error) {
 }
 
 if (configurationFailures.length === 0) {
-  /** No capture, recording or watcher is active; this is precisely A5 metadata ingestion. */
+  /** No capture, recording or watcher is active; this is precisely metadata ingestion. */
   const devtools = createRpcDevtools({ stages: ['message'], maxEvents, onError: report })
   try {
     for (let index = 0; index < warmupEvents; index += 1) {
@@ -212,7 +212,7 @@ if (configurationFailures.length === 0) {
 
 /** Sorted A/A cells report their median as well as the worst observed throughput. */
 const rates = cells.map((cell) => cell.eventsPerSecond).sort((left, right) => left - right)
-/** A5 source audit is external evidence, not a fabricated dynamic allocation counter. */
+/** Source audit is external evidence, not a fabricated dynamic allocation counter. */
 const staticAuditPath = process.env.RPC_DEVTOOLS_INGEST_AUDIT
 /** The audit must identify the same dist SHA and declare metadata-path counts after source review. */
 const staticAudit = staticAuditPath ? JSON.parse(readFileSync(staticAuditPath, 'utf8')) : null
@@ -231,7 +231,7 @@ const sourceAuditPass =
   staticAudit?.metadataNormalizePortableCallsPerEvent === 0 &&
   typeof staticAudit?.evidence === 'string' &&
   staticAudit.evidence.length > 0
-/** No target relaxation: all three measured cells must reach the fixed A5 minimum. */
+/** No target relaxation: all three measured cells must reach the fixed ingest minimum. */
 const pass =
   configurationFailures.length === 0 &&
   failures.length === 0 &&
@@ -245,7 +245,7 @@ const pass =
   sourceAuditPass
 /** Raw JSON is the authoritative result; stdout adds only the explicit oracle marker. */
 const result = {
-  acceptance: 'A5',
+  acceptance: 'ingest',
   pass,
   date: new Date().toISOString(),
   machine: {
@@ -306,7 +306,7 @@ const result = {
 mkdirSync(dirname(outputPath), { recursive: true })
 writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`)
 console.log(
-  JSON.stringify({ acceptance: 'A5', pass, outputPath, distSha, sameWindowAA: result.sameWindowAA })
+  JSON.stringify({ acceptance: 'ingest', pass, outputPath, distSha, sameWindowAA: result.sameWindowAA })
 )
-console.log(pass ? 'A5 PASS' : 'A5 FAIL')
+console.log(pass ? 'ingest PASS' : 'ingest FAIL')
 if (!pass) process.exitCode = 1

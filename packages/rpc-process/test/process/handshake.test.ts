@@ -86,7 +86,7 @@ function createMessageControlFixture(reply?: unknown, holdSend = false) {
 
 describe('native process handshake', () => {
   it.each(['minor', 'runtime', 'batch'] as const)(
-    '[A31][U36] runtime network handshake rejects retired %s baseline before activation',
+    'runtime network handshake rejects retired %s baseline before activation',
     async (missing) => {
       const [initiator, responder] = createBytePair()
       /** A declared runtime endpoint requires the same v2/batch baseline as its semantic Peer. */
@@ -148,7 +148,7 @@ describe('native process handshake', () => {
     }
   )
 
-  it('[H5] rejects a local byte offer without JSON before touching the wire', async () => {
+  it('rejects a local byte offer without JSON before touching the wire', async () => {
     const [initiator, , writes] = createBytePair()
     const offer = createNativeProcessOffer({ peer: { id: 'node-a', runtime: 'node' } })
     await expect(
@@ -163,7 +163,7 @@ describe('native process handshake', () => {
     expect(writes).toEqual([])
   })
 
-  it('[H6] rejects a negotiated non-JSON codec before activation', async () => {
+  it('rejects a negotiated non-JSON codec before activation', async () => {
     const [initiator, responder] = createBytePair()
     const offerA = createNativeProcessOffer({ peer: { id: 'node-a', runtime: 'node' } })
     const offerB = createNativeProcessOffer({ peer: { id: 'node-b', runtime: 'node' } })
@@ -188,7 +188,7 @@ describe('native process handshake', () => {
     expect(results[0]).toMatchObject({ reason: { code: 'INVALID_CONFIG' } })
   })
 
-  it('[H7] requires an explicit responder authentication policy before reading', async () => {
+  it('requires an explicit responder authentication policy before reading', async () => {
     const [responder, , writes] = createBytePair()
     await expect(
       createProcessTransport(responder, {
@@ -203,7 +203,7 @@ describe('native process handshake', () => {
   })
 
   it.each(['one chunk', 'consecutive writes'] as const)(
-    '[D3] queues business after accept before initiator activation (%s)',
+    'queues business after accept before initiator activation (%s)',
     async (mode) => {
       /** The scripted peer replies during the initiator's physical hello write. */
       let onData: ((chunk: Uint8Array) => void) | undefined
@@ -259,7 +259,7 @@ describe('native process handshake', () => {
     }
   )
 
-  it('[A5] builds one frozen native offer from the canonical protocol and capabilities', () => {
+  it('builds one frozen native offer from the canonical protocol and capabilities', () => {
     const peer = { id: 'node-1', runtime: 'node' }
     const basic = createNativeProcessOffer({ peer })
     expect(basic.versions).toEqual([{ major: RpcProtocol.major, minor: RpcProtocol.minor }])
@@ -280,7 +280,7 @@ describe('native process handshake', () => {
     ).toEqual([RpcCapability.ping, RpcCapability.close, RpcCapability.batch, RpcCapability.stream])
   })
 
-  it('[A5] completes byte hello/accept on one injected scheduler', async () => {
+  it('completes byte hello/accept on one injected scheduler', async () => {
     const [initiator, responder, writes] = createBytePair()
     const scheduler = createManualScheduler()
     const offerA = createNativeProcessOffer({ peer: { id: 'node-a', runtime: 'node' } })
@@ -321,7 +321,7 @@ describe('native process handshake', () => {
     await right.close()
   })
 
-  it('[A5/A13] rejects verifier failure with fixed wire error and no token in diagnostics', async () => {
+  it('rejects verifier failure with fixed wire error and no token in diagnostics', async () => {
     const [initiator, responder, writes] = createBytePair()
     const token = 'secret-token-only-in-hello'
     const reports: unknown[] = []
@@ -368,7 +368,7 @@ describe('native process handshake', () => {
   })
 
   it.each(['kind', 'step', 'unknown-field'] as const)(
-    '[A13] keeps hostile %s out of the local cause and wire report',
+    'keeps hostile %s out of the local cause and wire report',
     async (position) => {
       const [attacker, responder] = createBytePair()
       const token = 'hostile-field-token'
@@ -413,7 +413,7 @@ describe('native process handshake', () => {
     }
   )
 
-  it('[A5/A6] uses the manual scheduler deadline and closes a silent byte peer', async () => {
+  it('uses the manual scheduler deadline and closes a silent byte peer', async () => {
     /** The silent peer never resolves a handshake read. */
     let closes = 0
     const channel: IProcessByteChannel = {
@@ -443,7 +443,7 @@ describe('native process handshake', () => {
     expect(closes).toBe(1)
   })
 
-  it('[A5] projects equal static message agreements without a handshake', async () => {
+  it('projects equal static message agreements without a handshake', async () => {
     let sends = 0
     const channel: IProcessMessageChannel = {
       kind: 'message',
@@ -486,7 +486,7 @@ describe('native process handshake', () => {
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
-  it('[APS7] expands process messages only from the actual ACK while retaining fixed capabilities', async () => {
+  it('expands process messages only from the actual ACK while retaining fixed capabilities', async () => {
     const offer = [RpcCapability.ping, RpcCapability.runtimeApi, RpcCapability.batch]
     const fixture = createMessageControlFixture(
       rpcMessageCapabilityControl.acknowledgement([RpcCapability.runtimeApi])
@@ -506,7 +506,7 @@ describe('native process handshake', () => {
     await remote.close()
   })
 
-  it('[APS7] falls back to the fixed process profile when ACK and physical drain stay absent', async () => {
+  it('falls back to the fixed process profile when ACK and physical drain stay absent', async () => {
     const scheduler = createManualScheduler()
     const offer = [RpcCapability.ping, RpcCapability.runtimeApi, RpcCapability.batch]
     const fixture = createMessageControlFixture(undefined, true)
@@ -531,7 +531,7 @@ describe('native process handshake', () => {
     await remote.close()
   })
 
-  it('[APS7] rejects a forged process ACK carrying a claimed ownership field', async () => {
+  it('rejects a forged process ACK carrying a claimed ownership field', async () => {
     const offer = [RpcCapability.ping, RpcCapability.runtimeApi]
     const fixture = createMessageControlFixture({
       ...rpcMessageCapabilityControl.acknowledgement(offer),
@@ -553,7 +553,7 @@ describe('native process handshake', () => {
     })
   })
 
-  it('[APS7] equal expanded declarations and public trust claims cannot bypass raw ACK reception', async () => {
+  it('equal expanded declarations and public trust claims cannot bypass raw ACK reception', async () => {
     const scheduler = createManualScheduler()
     const offer = [RpcCapability.ping, RpcCapability.runtimeApi]
     const fixture = createMessageControlFixture()

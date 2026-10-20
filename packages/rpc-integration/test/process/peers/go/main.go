@@ -579,7 +579,7 @@ func responder(reader io.Reader, writer io.Writer) error {
 	}
 }
 
-// initiator requires the U36 baseline, validates v2 identity, sends batch echo, then closes the session.
+// initiator requires the runtime baseline, validates v2 identity, sends batch echo, then closes the session.
 func initiator(reader io.Reader, writer io.Writer) error {
 	local := localOffer()
 	if err := send(writer, helloRecord(local)); err != nil {

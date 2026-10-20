@@ -14,7 +14,7 @@ import { hooks } from '../../dist/core/middleware/hooks.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
-describe('abort control envelope and remote reason (A1)', () => {
+describe('abort control envelope and remote reason', () => {
   it('reports malformed remote reasons while still aborting the running provider', async () => {
     /** Each malformed payload crosses the variation envelope before owner-specific decoding. */
     let deep: Record<string, unknown> = {

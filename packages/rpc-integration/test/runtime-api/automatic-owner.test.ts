@@ -12,7 +12,7 @@ import { createAutomaticProcessPeer } from '../../../rpc-process/dist/process/au
 import type { IThreadWebPort } from '@migaia/rpc-threads'
 import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-process/dist/process/constants.js'
 
-it('[A2][A3][A17] automatic EventTarget handoff preserves real business and original parent identity', async () => {
+it('automatic EventTarget handoff preserves real business and original parent identity', async () => {
   /**
    * Native ports deliver the bootstrap and all later business frames through real EventTarget
    * callbacks.
@@ -70,7 +70,7 @@ it('[A2][A3][A17] automatic EventTarget handoff preserves real business and orig
   }
 })
 
-it('[A1][A3] automatic Web source rejects explicit sources and malformed bootstrap without publication', async () => {
+it('automatic Web source rejects explicit sources and malformed bootstrap without publication', async () => {
   const ports = new MessageChannel()
   let calls = 0
   try {
@@ -102,7 +102,7 @@ it('[A1][A3] automatic Web source rejects explicit sources and malformed bootstr
   }
 })
 
-it('[A1][A3] automatic process failure closes its original channel and reports cleanup once', async () => {
+it('automatic process failure closes its original channel and reports cleanup once', async () => {
   let opens = 0
   let closes = 0
   const cleanup = new RangeError('automatic-process cleanup fixture')
@@ -149,5 +149,5 @@ it('[A1][A3] automatic process failure closes its original channel and reports c
     ),
     { code: 'INVALID_CONFIG' }
   )
-  assert.equal(opens, 1, '[A3] failed bootstrap never permits a second process reader')
+  assert.equal(opens, 1, 'failed bootstrap never permits a second process reader')
 })

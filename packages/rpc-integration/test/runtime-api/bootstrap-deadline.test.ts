@@ -10,7 +10,7 @@ vi.mock('@migaia/utils/promise', async (original) => ({
   hostRethrowReporter: vi.fn()
 }))
 
-it('[A3] original bootstrap deadline survives failed physical cleanup and reports that cleanup', async () => {
+it('original bootstrap deadline survives failed physical cleanup and reports that cleanup', async () => {
   /** The existing scheduler owns the only startup deadline; no native timer is introduced. */
   const scheduler = createManualScheduler()
   /** This precise native failure must remain independently reported rather than replacing timeout. */
@@ -38,12 +38,12 @@ it('[A3] original bootstrap deadline survives failed physical cleanup and report
   assert.equal(
     (failure as { code?: string }).code,
     'PROCESS_HANDSHAKE_TIMEOUT',
-    '[A3] cleanup must not replace the real startup failure'
+    'cleanup must not replace the real startup failure'
   )
-  assert.equal(closes, 1, '[A3] timeout requests exactly one physical teardown')
+  assert.equal(closes, 1, 'timeout requests exactly one physical teardown')
   assert.equal(
     vi.mocked(hostRethrowReporter).mock.calls.filter(([error]) => error === cleanup).length,
     1,
-    '[A3] the original cleanup error is reported once'
+    'the original cleanup error is reported once'
   )
 })

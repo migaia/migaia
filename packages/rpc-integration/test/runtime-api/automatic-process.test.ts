@@ -11,7 +11,7 @@ import { createProcessPeer } from '@migaia/rpc-process'
 /** A genuine child loads built public owners independently from the source parent. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-process.mjs', import.meta.url))
 
-it('[A2][A17] framed bootstrap supplies child identity and parent route before automatic business', async () => {
+it('framed bootstrap supplies child identity and parent route before automatic business', async () => {
   /** A one-off fixture token stays in bootstrap/auth, never in returned business metadata. */
   const token = 'c3-fixture-only-token'
   /** Actual exit and termination remain owned by the real launcher handle. */
@@ -89,33 +89,29 @@ it('[A2][A17] framed bootstrap supplies child identity and parent route before a
     assert.equal(
       result.self?.name,
       'named-process-child',
-      '[A17] automatic identity comes from the trusted launcher'
+      'automatic identity comes from the trusted launcher'
     )
     assert.equal(
       result.parent,
       'automatic-process-parent',
-      '[A2] parent route comes from authenticated bootstrap'
+      'parent route comes from authenticated bootstrap'
     )
     assert.equal(
       reverseCalls,
       1,
-      '[A2] a genuine reverse request reached only the exposed parent provider'
+      'a genuine reverse request reached only the exposed parent provider'
     )
     assert.equal(
       result.self?.instanceId,
       childInstanceId,
-      '[A17] the child retained the exact launcher bootstrap identity'
+      'the child retained the exact launcher bootstrap identity'
     )
     assert.notEqual(
       result.self?.instanceId,
       String(handle!.identity.pid),
-      '[A17] PID never becomes route authority'
+      'PID never becomes route authority'
     )
-    assert.equal(
-      JSON.stringify(result).includes(token),
-      false,
-      '[A2] bootstrap token stays private'
-    )
+    assert.equal(JSON.stringify(result).includes(token), false, 'bootstrap token stays private')
     /** Sixteen real bidirectional calls must use data reply capacity on both framed endpoints. */
     const replies = await Promise.all(
       Array.from({ length: 16 }, (_, index) => parent!.request('probe', index, { timeoutMs: 2000 }))
@@ -123,9 +119,9 @@ it('[A2][A17] framed bootstrap supplies child identity and parent route before a
     assert.deepEqual(
       replies.map((reply) => (reply as { value: number }).value),
       Array.from({ length: 16 }, (_, index) => index),
-      '[A84][A93] concurrent process runtime replies must not be shed as control traffic'
+      'concurrent process runtime replies must not be shed as control traffic'
     )
-    assert.equal(reverseCalls, 17, '[A93] all sixteen reverse providers really executed')
+    assert.equal(reverseCalls, 17, 'all sixteen reverse providers really executed')
   } finally {
     try {
       await parent?.close()

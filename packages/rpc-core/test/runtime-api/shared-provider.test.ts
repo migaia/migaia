@@ -19,7 +19,7 @@ import {
 import { runtimeSources } from './fixture.js'
 import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
 
-it('[A73] a custom endpoint cannot advertise shared ordering while returning a different admission owner', async () => {
+it('a custom endpoint cannot advertise shared ordering while returning a different admission owner', async () => {
   const capabilities = [
     RpcCapability.runtimeApi,
     RpcCapability.batch,
@@ -61,12 +61,12 @@ it('[A73] a custom endpoint cannot advertise shared ordering while returning a d
         admissionScope
       ),
       { code: 'CAPABILITY_UNSUPPORTED' },
-      '[A73] a declared capability cannot stand in for the actual original shared owner'
+      'a declared capability cannot stand in for the actual original shared owner'
     )
     assert.notEqual(
       owner.kernel.state,
       'active',
-      '[A73] rejected construction disposes the acquired endpoint'
+      'rejected construction disposes the acquired endpoint'
     )
     assert.equal(scope.size, 0)
   } finally {
@@ -89,7 +89,7 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
   )
   /** Both source offers exercise real authenticated-generation and ordering ports. */
   const capabilities = [
-    /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+    /** Default request/stream deadlines are genuinely offered by both source owners. */
     RpcCapability.deadline,
     RpcCapability.runtimeApi,
     RpcCapability.batch,
@@ -150,7 +150,7 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
   }
 }
 
-it('[A59][A60] separate real caller sessions share final provider ordering across methods while other keys run', async () => {
+it('separate real caller sessions share final provider ordering across methods while other keys run', async () => {
   /** Holding the first business completion makes premature second execution observable. */
   let finish!: () => void
   const held = new Promise<void>((resolve) => {
@@ -186,16 +186,12 @@ it('[A59][A60] separate real caller sessions share final provider ordering acros
     assert.deepEqual(
       effects,
       ['first', 'independent'],
-      '[A59] caller/method/connection cannot split the final provider key FIFO'
+      'caller/method/connection cannot split the final provider key FIFO'
     )
     assert.equal(fixture.admissions[0], fixture.scope)
     assert.equal(fixture.admissions[1], fixture.scope)
     await vi.waitFor(() =>
-      assert.equal(
-        fixture.scope.size,
-        2,
-        '[A60] waiting and running retain one original lease each'
-      )
+      assert.equal(fixture.scope.size, 2, 'waiting and running retain one original lease each')
     )
     finish()
     assert.equal(await first, 1)
@@ -209,7 +205,7 @@ it('[A59][A60] separate real caller sessions share final provider ordering acros
   }
 })
 
-it('[A75] calls without U25 options keep the original per-endpoint quota and do not enter the shared opt-in scope', async () => {
+it('calls without options keep the original per-endpoint quota and do not enter the shared opt-in scope', async () => {
   let finish!: () => void
   const held = new Promise<void>((resolve) => {
     finish = resolve
@@ -229,7 +225,7 @@ it('[A75] calls without U25 options keep the original per-endpoint quota and do 
       assert.equal(
         started,
         9,
-        '[A75] opt-in shared limits cannot replace the original ordinary-call quota'
+        'opt-in shared limits cannot replace the original ordinary-call quota'
       )
     )
     assert.equal(fixture.scope.size, 0)
@@ -243,7 +239,7 @@ it('[A75] calls without U25 options keep the original per-endpoint quota and do 
 })
 
 it.each([false, true])(
-  '[A60][A61] closing one connection releases only its member after prior cancel=%s and cannot clear another connection queue',
+  'closing one connection releases only its member after prior cancel=%s and cannot clear another connection queue',
   async (cancelFirst) => {
     let finish!: () => void
     const held = new Promise<void>((resolve) => {
@@ -295,7 +291,7 @@ it.each([false, true])(
       assert.equal(
         await queued,
         2,
-        '[A61] retirement removes the exact head and starts the next actual session'
+        'retirement removes the exact head and starts the next actual session'
       )
       assert.equal(fixture.scope.size, 0)
       assert.deepEqual(effects, ['hold', 'queued'])

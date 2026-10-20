@@ -72,7 +72,7 @@ async function fixture(maxCallsPerMinute: number) {
 
 describe('process session provider admission', () => {
   it.each(['constructor', 'tag', 'decode', 'public-helper'] as const)(
-    '[C5-E12] %s forged timeout diagnostics cannot close the session through the live consecutive-deadline policy',
+    '%s forged timeout diagnostics cannot close the session through the live consecutive-deadline policy',
     async (kind) => {
       /** The existing provider wrapper supplies the actual policy and its original close owner. */
       const test = await fixture(100)
@@ -117,7 +117,7 @@ describe('process session provider admission', () => {
       }
     }
   )
-  it('[A3] rejects excess calls before the provider and closes after a second violation', async () => {
+  it('rejects excess calls before the provider and closes after a second violation', async () => {
     const test = await fixture(1)
     expect(await test.provider()(test.context)).toMatchObject({ ok: true })
     const first = () => test.provider()(test.context)
@@ -131,7 +131,7 @@ describe('process session provider admission', () => {
     expect(test.scheduler.pendingCount).toBe(0)
   })
 
-  it('[A3] resets the idle timer on inbound frames and keeps it cancelled after close', async () => {
+  it('resets the idle timer on inbound frames and keeps it cancelled after close', async () => {
     const test = await fixture(2)
     test.scheduler.advance(90)
     test.frame()
@@ -143,7 +143,7 @@ describe('process session provider admission', () => {
     test.admission.close()
     expect(test.scheduler.pendingCount).toBe(0)
   })
-  it('[A5/K225] three real native request deadlines close a provider that ignores abort', async () => {
+  it('three real native request deadlines close a provider that ignores abort', async () => {
     /** Both endpoints use the same monotonic deadline source. */
     const scheduler = createManualScheduler()
     /** A real byte handshake and real core provider preserve actual cancellation semantics. */

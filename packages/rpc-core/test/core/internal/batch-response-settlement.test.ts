@@ -10,7 +10,7 @@ import { RpcCapability, RpcBatchPhysical } from '@migaia/rpc-contract'
 import type { IRpcEnvelope } from '@migaia/rpc-contract'
 
 for (const customCodec of [false, true]) {
-  it(`[R8-A1] one physical response batch settles two pending core requests (customCodec=${customCodec})`, async () => {
+  it(`one physical response batch settles two pending core requests (customCodec=${customCodec})`, async () => {
     /** Independent endpoint identities share the existing memory carrier and negotiated batch owner. */
     const [left, right] = createMemoryTransportPair()
     registerBatchAgreement(left, [RpcCapability.batch])
@@ -65,7 +65,10 @@ for (const customCodec of [false, true]) {
     const remove = caller.hooks.on((event) => {
       if (event.name === 'failure') failures.push(event.error)
     })
-    /** Keep pending rejections observed during RED cleanup without making them successful results. */
+    /**
+     * Keep pending rejections observed during failure cleanup without making them successful
+     * results.
+     */
     const values = new Map<string, unknown>()
     /** Cleanup observes rejected requests while preserving failed results as failures. */
     const errors: unknown[] = []
@@ -86,9 +89,10 @@ for (const customCodec of [false, true]) {
       expect(new Set(replies.map((reply) => reply.id)).size).toBe(2)
       // Observation alone waits for the receiver; no request is retried and no RPC deadline is changed.
       await vi.waitFor(() =>
-        expect(Object.fromEntries(values), '[R8-A1] both batched response IDs must settle').toEqual(
-          { first: 'first', second: 'second' }
-        )
+        expect(Object.fromEntries(values), 'both batched response IDs must settle').toEqual({
+          first: 'first',
+          second: 'second'
+        })
       )
       await Promise.all(calls)
       expect(getEndpointDebugSnapshotReader(caller)!().pending).toBe(0)

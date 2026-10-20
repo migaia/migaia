@@ -1,8 +1,7 @@
 /**
  * Observes operation cleanup failures within storage-web. Stays outside storage-contract and the
- * public package API, with no global singleton. Enforces
- * `docs/store-persist/storage-web-integration.sdd.md` §4.4: `removeEventListener` cleanup failures
- * do not throw or alter the primary operation result. A reporter observes them, as required by the
+ * public package API, with no global singleton. Enforces `removeEventListener` cleanup failures do
+ * not throw or alter the primary operation result. A reporter observes them, as required by the
  * AGENTS.md rule for catches that do not rethrow.
  */
 export type IStorageOperationReporter = (error: unknown) => void | PromiseLike<void>

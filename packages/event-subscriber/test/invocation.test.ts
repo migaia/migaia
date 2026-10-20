@@ -7,7 +7,7 @@ import {
 } from '../src/index.js'
 
 describe('public invocation helpers', () => {
-  it('ES-T163 closes each snapshot invocation after one use or completion', () => {
+  it('closes each snapshot invocation after one use or completion', () => {
     const channel = createEventChannel<number, string>()
     channel.subscribe((event) => `first:${event.value}`)
     channel.subscribe((event) => `second:${event.value}`)
@@ -26,7 +26,7 @@ describe('public invocation helpers', () => {
     )
   })
 
-  it('ES-T164 keeps live invocation visitation append-visible and releases on visitor failure', () => {
+  it('keeps live invocation visitation append-visible and releases on visitor failure', () => {
     const channel = createEventChannel<number, string>()
     const seen: string[] = []
     const first = vi.fn(() => {
@@ -49,7 +49,7 @@ describe('public invocation helpers', () => {
     expect(first).toHaveBeenCalledTimes(1)
   })
 
-  it('ES-T165 closes a live entry after invoke and after visitor cleanup', () => {
+  it('closes a live entry after invoke and after visitor cleanup', () => {
     const channel = createEventChannel<number, string>()
     channel.subscribe(() => 'value')
     let captured: { invoke(): string | PromiseLike<string> } | undefined
@@ -74,7 +74,7 @@ describe('public invocation helpers', () => {
     )
   })
 
-  it('ES-T166 preserves off/add epoch boundaries while retaining already-appended entries', () => {
+  it('preserves off/add epoch boundaries while retaining already-appended entries', () => {
     const channel = createEventChannel<number, string>()
     const seen: string[] = []
     let releaseInitial!: () => void
@@ -100,7 +100,7 @@ describe('public invocation helpers', () => {
     expect(seen).toEqual(['initial', 'first', 'appended'])
   })
 
-  it('ES-T167 keeps clear from revisiting removed registrations in later passes', () => {
+  it('keeps clear from revisiting removed registrations in later passes', () => {
     const channel = createEventChannel<number, string>()
     const seen: string[] = []
     channel.subscribe(() => 'first')
@@ -118,7 +118,7 @@ describe('public invocation helpers', () => {
     expect(seen).toEqual(['outer:first', 'outer:second'])
   })
 
-  it('ES-T171 keeps nested live passes independently ordered', () => {
+  it('keeps nested live passes independently ordered', () => {
     const channel = createEventChannel<number, string>()
     const seen: string[] = []
     channel.subscribe(() => 'first')
@@ -131,7 +131,7 @@ describe('public invocation helpers', () => {
     expect(seen).toEqual(['outer:first', 'nested:first'])
   })
 
-  it('ES-T173 MRC-C-T03 reports one failed projection after snapshot completion', () => {
+  it('reports one failed projection after snapshot completion', () => {
     const report = vi.fn()
     const seen: unknown[] = []
     const channel = createEventChannel<
@@ -154,7 +154,7 @@ describe('public invocation helpers', () => {
     })
   })
 
-  it('ES-T174 MRC-C-T04 isolates default handles and keeps release idempotent', () => {
+  it('isolates default handles and keeps release idempotent', () => {
     const channel = createEventChannel<number>()
     const listener = vi.fn()
     const firstRelease = channel.subscribe(listener)
@@ -172,7 +172,7 @@ describe('public invocation helpers', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T175 MRC-C-T03 exposes a nested addition to both active live passes', () => {
+  it('exposes a nested addition to both active live passes', () => {
     const channel = createEventChannel<number, string>()
     const seen: string[] = []
     let added = false
@@ -191,7 +191,7 @@ describe('public invocation helpers', () => {
     expect(seen).toEqual(['outer:first', 'nested:first', 'nested:added', 'outer:added'])
   })
 
-  it('ES-T178 keeps native recursion through 256 and spills synchronously at 257', () => {
+  it('keeps native recursion through 256 and spills synchronously at 257', () => {
     for (const target of [255, 256, 257]) {
       const channel = createEventChannel<number>()
       const seen: number[] = []
@@ -211,7 +211,7 @@ describe('public invocation helpers', () => {
     }
   })
 
-  it('ES-T179 preserves child call order and full descendant subtrees before the next listener', () => {
+  it('preserves child call order and full descendant subtrees before the next listener', () => {
     const channel = createEventChannel<number>()
     const seen: string[] = []
     channel.subscribe((event) => {
@@ -241,7 +241,7 @@ describe('public invocation helpers', () => {
     ])
   })
 
-  it('ES-T180 applies one exact budget to self-loop and two-node cycles at 100, 10000, and 100000', () => {
+  it('applies one exact budget to self-loop and two-node cycles at 100, 10000, and 100000', () => {
     for (const publishBudget of [100, 10_000, 100_000]) {
       const channel = createEventChannel<number>({ publishBudget })
       channel.subscribe((event) => channel.publish(event.value))
@@ -268,7 +268,7 @@ describe('public invocation helpers', () => {
     )
   })
 
-  it('ES-T181 retains failure identity with exhaustion and resets the next root transaction', () => {
+  it('retains failure identity with exhaustion and resets the next root transaction', () => {
     const channel = createEventChannel<number>({ publishBudget: 1 })
     const failure = new Error('listener failed')
     channel.subscribe(() => {
@@ -297,7 +297,7 @@ describe('public invocation helpers', () => {
     expect(() => channel.publish(2)).not.toThrow()
   })
 
-  it('ES-T168 filters live entries by task selector', () => {
+  it('filters live entries by task selector', () => {
     const channel = createEventChannel<number, string>()
     const seen: string[] = []
     channel.subscribe(() => 'selected', { taskId: 'selected' })
@@ -308,7 +308,7 @@ describe('public invocation helpers', () => {
     expect(seen).toEqual(['selected'])
   })
 
-  it('ES-T169 reports one projection diagnostic for a completed snapshot batch', () => {
+  it('reports one projection diagnostic for a completed snapshot batch', () => {
     let reads = 0
     const report = vi.fn()
     const channel = createEventChannel<
@@ -335,7 +335,7 @@ describe('public invocation helpers', () => {
     expect(report).not.toHaveBeenCalled()
   })
 
-  it('ES-T170 applies listener-all identity removal without exposing channel ownership', () => {
+  it('applies listener-all identity removal without exposing channel ownership', () => {
     const channel = createEventChannel<number, void>({ removalPolicy: 'listener-all' })
     const listener = vi.fn()
     const release = channel.subscribe(listener)
@@ -345,7 +345,7 @@ describe('public invocation helpers', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('ES-T176 bounds recursive cycles with one synchronous partial-delivery error', () => {
+  it('bounds recursive cycles with one synchronous partial-delivery error', () => {
     const channel = createEventChannel<number>({ publishBudget: 3 })
     let calls = 0
     channel.subscribe((event) => {
@@ -362,7 +362,7 @@ describe('public invocation helpers', () => {
     expect(calls).toBe(3)
   })
 
-  it('ES-T177 bounds queued cycles and clears transaction state for the next publish', () => {
+  it('bounds queued cycles and clears transaction state for the next publish', () => {
     const channel = createEventChannel<number>({ dispatchPolicy: 'queued', publishBudget: 2 })
     channel.subscribe((event) => channel.publish(event.value))
 

@@ -77,7 +77,7 @@ async function settle(): Promise<void> {
 }
 
 describe('process plugin service ingress', () => {
-  it('[A5] closes the unhealthy shared session and replaces its real Host target', async () => {
+  it('closes the unhealthy shared session and replaces its real Host target', async () => {
     const { host, targetHandle } = await targetHost()
     const physical = await acceptedChannel('first')
     const second = await acceptedChannel('second')
@@ -182,7 +182,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A5] reports a narrow Host before accepting and exposes its unrecoverable fuse', async () => {
+  it('reports a narrow Host before accepting and exposes its unrecoverable fuse', async () => {
     const { host } = await targetHost()
     /** This caller implements exactly the formerly documented service Host port. */
     const narrow = { use: host.use, unUse: host.unUse, plugin: host.plugin }
@@ -244,7 +244,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A2] rejects missing recovery factories before listener binding', async () => {
+  it('rejects missing recovery factories before listener binding', async () => {
     const { host } = await targetHost()
     const listen = vi.fn()
     try {
@@ -262,7 +262,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A2] creates one target Host per authenticated connection', async () => {
+  it('creates one target Host per authenticated connection', async () => {
     const { host: fallback } = await targetHost()
     const first = await acceptedChannel('first')
     const second = await acceptedChannel('second')
@@ -349,7 +349,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A4] rejects a listener without a verifier before binding', async () => {
+  it('rejects a listener without a verifier before binding', async () => {
     const { host } = await targetHost()
     const listen = vi.fn()
     const endpointFactory = vi.fn()
@@ -400,7 +400,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A4] closes byte ingress without a verifier before establishing a responder', async () => {
+  it('closes byte ingress without a verifier before establishing a responder', async () => {
     const { host } = await targetHost()
     const rawClose = vi.fn(async () => undefined)
     const establish = vi.fn()
@@ -464,7 +464,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A4] gives accepted sessions distinct endpoints and closes only the departed session', async () => {
+  it('gives accepted sessions distinct endpoints and closes only the departed session', async () => {
     const { host, targetHandle } = await targetHost()
     const first = await acceptedChannel('first')
     const second = await acceptedChannel('second')
@@ -598,7 +598,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A6] closes a channel that authenticates after the serve handle starts closing', async () => {
+  it('closes a channel that authenticates after the serve handle starts closing', async () => {
     const { host, targetHandle } = await targetHost()
     const accepted = await acceptedChannel('late')
     /** The pending accept controls the precise close/handshake ordering. */
@@ -676,7 +676,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A6] disposes an endpoint returned after listener close without publishing it', async () => {
+  it('disposes an endpoint returned after listener close without publishing it', async () => {
     const { host } = await targetHost()
     const accepted = await acceptedChannel('late-endpoint')
     /** The endpoint becomes available only after the handle has begun closing. */
@@ -752,7 +752,7 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('[A6] retains listener, endpoint, and channel cleanup failures in order', async () => {
+  it('retains listener, endpoint, and channel cleanup failures in order', async () => {
     const { host } = await targetHost()
     const listenerError = new Error('listener cleanup failed')
     const endpointError = new Error('endpoint cleanup failed')

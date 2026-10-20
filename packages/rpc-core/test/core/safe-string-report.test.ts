@@ -12,7 +12,7 @@ import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
 import { ProviderRegistry } from '../../dist/core/internal/provider.js'
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 
-describe('[A11] safeString failure reporting', () => {
+describe('safeString failure reporting', () => {
   it('passes strings through and converts a normal object once', () => {
     let conversions = 0
     expect(safeString('ready')).toBe('ready')

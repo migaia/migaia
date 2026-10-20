@@ -28,7 +28,7 @@ const plugin = (type: string, parser: ISerializeParser = textParser(type)): ISer
   parser
 })
 
-describe('T-21 构造 fail-fast + close/dispose', () => {
+describe('构造 fail-fast + close/dispose', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -721,7 +721,7 @@ describe('collectChunks：多段/异步产出的收敛规则', () => {
     )
   })
 
-  it('abort 带 reason 时 ABORTED 错误经 cause 保持 `=== reason` 可达（R-1/T-15）', async () => {
+  it('abort 带 reason 时 ABORTED 错误经 cause 保持 `=== reason` 可达', async () => {
     const controller = new AbortController()
     const reason = new Error('user cancelled')
     const registry = createSerializeRegistry([
@@ -744,7 +744,7 @@ describe('collectChunks：多段/异步产出的收敛规则', () => {
     )
   })
 
-  it('caller abort 及时结算一个永不 settle 的 parser（R-3 双 Promise / T-2/T-4）', async () => {
+  it('caller abort 及时结算一个永不 settle 的 parser（双 Promise）', async () => {
     const controller = new AbortController()
     const registry = createSerializeRegistry([
       plugin('a', {
@@ -960,7 +960,7 @@ describe('dispose：释放语义', () => {
     await expect(registry.dispose()).resolves.toBeUndefined()
   })
 
-  it('deadlineAt 为 NaN/Infinity 时拒绝（MEDIUM-2 输入门禁）', async () => {
+  it('deadlineAt 为 NaN/Infinity 时拒绝（输入门禁）', async () => {
     for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       const registry = createSerializeRegistry([plugin('a')])
       await expect(registry.dispose({ deadlineAt: bad })).rejects.toMatchObject({
@@ -1048,7 +1048,7 @@ describe('dispose：释放语义', () => {
   })
 })
 
-describe('Round18：deadline failure never skips parser cleanup', () => {
+describe('deadline failure never skips parser cleanup', () => {
   it('scheduler.now getter failure is wrapped at admission and owns no parser yet', () => {
     const getterFailure = new Error('now getter failure')
     let parserDisposeCalls = 0
@@ -1336,7 +1336,7 @@ describe('Round18：deadline failure never skips parser cleanup', () => {
   })
 })
 
-describe('SR-2：encode() 里同步抛错的 parser 必须走 SerializeCodecError 包装，不能是裸错误', () => {
+describe('encode() 里同步抛错的 parser 必须走 SerializeCodecError 包装，不能是裸错误', () => {
   it('parser.encode 同步抛错时，registry.encode 拒绝的是 SerializeCodecError（而不是原始错误类型）', async () => {
     // 复现：encode() 里 `parser.encode(value, context)` 是作为 collectChunks 的实参被求值的——
     // 同步抛错发生在这次求值上，早于 collectChunks 内部任何 try/catch，此前会把裸错误原样
@@ -1482,7 +1482,7 @@ describe('SR-2：encode() 里同步抛错的 parser 必须走 SerializeCodecErro
   })
 })
 
-describe('R-3c：dispose 等待在途 encode/decode 结算后才释放 parser', () => {
+describe('dispose 等待在途 encode/decode 结算后才释放 parser', () => {
   it('dispose() 等待在途 encode 完成后才释放 parser（不再并发释放正在用的资源）', async () => {
     let releaseInFlight: (() => void) | undefined
     let disposeCalled = false
@@ -1516,7 +1516,7 @@ describe('R-3c：dispose 等待在途 encode/decode 结算后才释放 parser', 
   })
 })
 
-describe('T-14/T-22 cleanup 判别联合 + detached sink', () => {
+describe('cleanup 判别联合 + detached sink', () => {
   it('cleanup report 策略：dispose 最终 resolve，reporter 收到 cleanup error', async () => {
     const boom = new Error('boom')
     const reported: unknown[] = []
@@ -1576,7 +1576,7 @@ describe('T-14/T-22 cleanup 判别联合 + detached sink', () => {
   })
 })
 
-describe('T-17 iterator.return 错误专项', () => {
+describe('iterator.return 错误专项', () => {
   it('return() 失败和 detached abort 均 report，不覆盖 public abort', async () => {
     const reported: unknown[] = []
     const controller = createAbortController()
@@ -1618,7 +1618,7 @@ describe('T-17 iterator.return 错误专项', () => {
   })
 })
 
-describe('T-19 abort → return() 悬挂 → deadline 竞态', () => {
+describe('abort → return() 悬挂 → deadline 竞态', () => {
   it('deadline 到达后 dispose 不等 return()；迟到 return rejection 被观测，cleanup 已执行', async () => {
     const manual = createManualScheduler()
     const controller = createAbortController()
@@ -1686,7 +1686,7 @@ describe('T-19 abort → return() 悬挂 → deadline 竞态', () => {
   })
 })
 
-describe('T-22 detached 迟到错误经 report 通道', () => {
+describe('detached 迟到错误经 report 通道', () => {
   it('report 自身失败交宿主异常通路，迟到 rejection 被观察且不改变 terminal', async () => {
     const manual = createManualScheduler()
     let rejectGate: ((reason: unknown) => void) | undefined
@@ -1769,7 +1769,7 @@ describe('T-22 detached 迟到错误经 report 通道', () => {
   })
 })
 
-describe('A10 single scheduler export surface consumed by serialize', () => {
+describe('single scheduler export surface consumed by serialize', () => {
   it('exposes runtime schedulers through utils and reserves manual scheduling for testing', () => {
     expect(utilsRoot.systemScheduler).toBe(utilsScheduler.systemScheduler)
     expect('createManualScheduler' in utilsRoot).toBe(false)

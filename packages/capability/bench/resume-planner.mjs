@@ -44,11 +44,11 @@ function measure(length) {
   return samples.sort((left, right) => left - right)[1]
 }
 
-/** Median time for the A17 100-node reference chain. */
+/** Median time for the 100-node reference chain. */
 const small = measure(100)
-/** Median time for the A17 2000-node chain under the same 1000-call workload. */
+/** Median time for the 2000-node chain under the same 1000-call workload. */
 const large = measure(2_000)
 console.log(JSON.stringify({ smallMs: small, largeMs: large, ratio: large / small }))
-/** A17 keeps resume planning independent of the length of an active descendant chain. */
+/** Keeps resume planning independent of the length of an active descendant chain. */
 const MAX_RESUME_RATIO = 2
-assert.ok(large <= small * MAX_RESUME_RATIO, 'A17 resume planner exceeded the 2x scaling limit')
+assert.ok(large <= small * MAX_RESUME_RATIO, 'resume planner exceeded the 2x scaling limit')

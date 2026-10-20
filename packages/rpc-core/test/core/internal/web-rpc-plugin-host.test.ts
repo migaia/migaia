@@ -35,7 +35,7 @@ const installHostSyncForTest = (
   plugins: readonly IRpcPluginConstraint[]
 ): unknown => host.useSync(...(plugins as never))
 
-describe('B12a WebRPC PluginHost shell', () => {
+describe('WebRPC PluginHost shell', () => {
   it('uses typed shared symbols and one host rollback transaction', async () => {
     let disposed = 0
     let observed: IRpcProtocolPort | undefined

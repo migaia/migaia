@@ -183,7 +183,7 @@ async function serve(channel: IRemoteChannel): Promise<void> {
         report
       })
     : await serveRemotePlugin({ host, contract, endpoint: runtime, report })
-  /** Publish all providers before releasing the canonical U36 native receive queue. */
+  /** Publish all providers before releasing the canonical native receive queue. */
   ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
   /** Observation delegates the exact public close promise; it does not replace its ownership. */
   const cleanup = { calls: 0, settled: 0, providerAborts: 0 }

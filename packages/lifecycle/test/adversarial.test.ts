@@ -11,7 +11,7 @@ import type { ILifecycleOwner } from '../src/types'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
-describe('AF-T1 ProvisionalScope partial commit (fire-and-forget → awaited compensation)', () => {
+describe('ProvisionalScope partial commit (fire-and-forget → awaited compensation)', () => {
   it('awaits suffix cleanup, keeps the parent error primary, and exposes cleanup failure via a frozen errors array', async () => {
     const transferredToParent: string[] = []
     const released: string[] = []
@@ -77,7 +77,7 @@ describe('AF-T1 ProvisionalScope partial commit (fire-and-forget → awaited com
   })
 })
 
-describe('AF-T2 LifecycleUnit thenable single probe', () => {
+describe('LifecycleUnit thenable single probe', () => {
   it('reads a hostile then getter exactly once and applies the captured then', async () => {
     let reads = 0
     const unit = createLifecycleUnit<number>()
@@ -112,7 +112,7 @@ describe('AF-T2 LifecycleUnit thenable single probe', () => {
   })
 })
 
-describe('AF-T3 scheduler input validation', () => {
+describe('scheduler input validation', () => {
   it('utils systemScheduler.schedule rejects NaN/Infinity/negative delay with a utils-tagged RangeError', () => {
     for (const delay of [NaN, Infinity, -Infinity, -1]) {
       let thrown: unknown
@@ -145,7 +145,7 @@ describe('AF-T3 scheduler input validation', () => {
   })
 })
 
-describe('AF-T13 SyncLifecycleScope hostile then getter', () => {
+describe('SyncLifecycleScope hostile then getter', () => {
   it('getter failure is attributed to the item and later resources still release', () => {
     const scope = createSyncLifecycleScope({ errorPolicy: 'collect' })
     const released: string[] = []
@@ -171,7 +171,7 @@ describe('AF-T13 SyncLifecycleScope hostile then getter', () => {
   })
 })
 
-describe('AF-T14/AF-T15 generation timeout/parent abort invalidates token', () => {
+describe('generation timeout/parent abort invalidates token', () => {
   it('timeout aborts the signal and invalidates the token so adopt() releases', () => {
     const scheduler = createManualScheduler()
     const controller = createGenerationController({ scheduler })
@@ -200,8 +200,8 @@ describe('AF-T14/AF-T15 generation timeout/parent abort invalidates token', () =
   })
 })
 
-describe('AF-T16/AF-T17 ProvisionalScope shared settle + listener cleanup', () => {
-  it('AF-T16: concurrent rollback() settles with the same release (released once)', async () => {
+describe('ProvisionalScope shared settle + listener cleanup', () => {
+  it('concurrent rollback() settles with the same release (released once)', async () => {
     const provisional = createProvisionalScope()
     let releases = 0
     let resolveRelease!: () => void
@@ -226,7 +226,7 @@ describe('AF-T16/AF-T17 ProvisionalScope shared settle + listener cleanup', () =
     expect(releases).toBe(1)
   })
 
-  it('AF-T17: parent abort listener is removed after rollback settle', async () => {
+  it('parent abort listener is removed after rollback settle', async () => {
     const parent = new AbortController()
     const removeSpy = vi.spyOn(parent.signal, 'removeEventListener')
     const provisional = createProvisionalScope({ parentSignal: parent.signal })
@@ -237,7 +237,7 @@ describe('AF-T16/AF-T17 ProvisionalScope shared settle + listener cleanup', () =
   })
 })
 
-describe('AF-T23 manual scheduler recursive due flush', () => {
+describe('manual scheduler recursive due flush', () => {
   it('a callback scheduling a zero-delay task is flushed in the same advance', () => {
     const scheduler = createManualScheduler()
     const order: string[] = []
@@ -250,13 +250,13 @@ describe('AF-T23 manual scheduler recursive due flush', () => {
   })
 })
 
-describe('AF-T26/AF-T27 lifecycle canonical probe + rollback identity', () => {
-  it('AF-T26: isThenable is no longer a public export', async () => {
+describe('lifecycle canonical probe + rollback identity', () => {
+  it('isThenable is no longer a public export', async () => {
     const publicApi = (await import('../src/index.js')) as Record<string, unknown>
     expect(publicApi.isThenable).toBeUndefined()
   })
 
-  it('AF-T27: concurrent rollback() returns the same Promise object', async () => {
+  it('concurrent rollback() returns the same Promise object', async () => {
     const provisional = createProvisionalScope()
     let resolveRelease!: () => void
     provisional.own('a', {
@@ -272,7 +272,7 @@ describe('AF-T26/AF-T27 lifecycle canonical probe + rollback identity', () => {
   })
 })
 
-describe('AF-T34 reflective receiver-binding boundary (assimilateCapturedThen)', () => {
+describe('reflective receiver-binding boundary (assimilateCapturedThen)', () => {
   it('invokes the captured then with the thenable as receiver (Promise/A+)', async () => {
     const thenable = {
       get then() {

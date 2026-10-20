@@ -1,17 +1,7 @@
 {
-  "schema": "RPCC-D18-f004-intended-cost-custody-v3",
+  "schema": "intended-cost-custody-v3",
   "owner": "@migaia/rpc test/evidence custody",
-  "revision": "RPCC-SDD-v12",
-  "currentLineage": {
-    "proposal": "EVT-000655",
-    "challenge": "EVT-000649",
-    "resolution": "EVT-000656"
-  },
-  "historicalLineage": {
-    "proposal": "EVT-000603",
-    "challenge": "EVT-000597",
-    "resolution": "EVT-000604"
-  },
+  "revision": "v12",
   "canonicalInputs": {
     "entry": "packages/rpc/test/core/fixtures/tree-shaking/root-entry.ts",
     "builder": "packages/rpc/test/core/tree-shaking-canonical-build.mjs",
@@ -667,27 +657,27 @@
   ],
   "causalRows": [
     {
-      "id": "F006-PASS-B01-ROOT-D18",
+      "id": "pass-root-ledger",
       "status": "PASS",
       "evidence": "successor graph and exact predecessor tuple are bound to the persisted ledger"
     },
     {
-      "id": "F006-PASS-B11-D18",
+      "id": "pass-dual-hashes",
       "status": "PASS",
       "evidence": "all 119 module identities carry dual content hashes"
     },
     {
-      "id": "F006-PASS-B11F-D18",
+      "id": "pass-counterfactual-rebuild",
       "status": "PASS",
       "evidence": "exact one-file counterfactual and successor rebuild are independently validated"
     },
     {
-      "id": "F006-PASS-B01-CHUNK",
+      "id": "pass-root-omits-chunk",
       "status": "PASS",
       "evidence": "default root omits chunk-assembler and explicit canonicalChunk owns exactly one"
     },
     {
-      "id": "F006-PASS-B11-CHUNK",
+      "id": "pass-chunk-attribution",
       "status": "PASS",
       "evidence": "selected canonicalChunk attribution is unique and historical topology remains separate"
     }
@@ -695,38 +685,37 @@
   "postRouteMatrix": {
     "causalPassCount": 5,
     "residualCount": 8,
-    "source": "EVT-000655/EVT-000656",
     "rows": [
       {
-        "id": "F006-RED-CONTINUATION-SDD",
-        "signature": "same stale-locator set: WRC-C-T120, WRC-C-T138, WRC-C-T12, WRC-C-T17, WRC-C-T24, WRC-C-T38"
+        "id": "residual-stale-locators",
+        "signature": "same stale-locator set across six continuation tests"
       },
       {
-        "id": "F006-RED-ENDPOINT-OBSERVER",
+        "id": "residual-endpoint-observer",
         "signature": "same owner-list signature: expected chunk-assembler owner, current owner list omits chunk-assembler"
       },
       {
-        "id": "F006-RED-PROVIDER-T275",
+        "id": "residual-provider-source",
         "signature": "same source assertion signature: chunk source lacks WebRpcSharedKey.inboundIdentity"
       },
       {
-        "id": "F006-RED-B12B03",
+        "id": "residual-worker-abort",
         "signature": "same source assertion signature: worker source does not match abort()"
       },
       {
-        "id": "F006-RED-B12B04",
+        "id": "residual-chunk-plugin-type",
         "signature": "same source assertion signature: chunk source does not contain IWebRpcPlugin"
       },
       {
-        "id": "F006-RED-CONTINUATION-B01",
+        "id": "residual-continuation-count",
         "signature": "same count signature: expected moduleCount 108, current 109"
       },
       {
-        "id": "F006-RED-CORE-CAUSAL",
+        "id": "residual-core-causal",
         "signature": "same module-set signature: current adds internal/canonical-envelope.js and semantic-constants.js, omits wire.js, and resolves event-subscriber channel bundle"
       },
       {
-        "id": "F006-RED-PROVENANCE",
+        "id": "residual-provenance-digest",
         "signature": "same digest mismatch signature: expected 4e5d5ed27fc9d63018e59f7cb2ba5f66d040d2cd0c54d937a286a399166d7516, current 575e903a0048f2f28002e5e0285015ac47cd959d6966c91c36705c38b78272b6"
       }
     ]

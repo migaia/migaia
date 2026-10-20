@@ -99,7 +99,7 @@ const cases: readonly [
   ]
 ]
 
-describe('A1 Thread channels inherit canonical physical observation', () => {
+describe('Thread channels inherit canonical physical observation', () => {
   it.each(cases)(
     '%s retains capture, error isolation, replacement and close',
     async (_name, open) => {

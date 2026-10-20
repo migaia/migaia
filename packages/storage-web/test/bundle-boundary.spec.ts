@@ -83,7 +83,7 @@ const configuredPnpmStoreDirectory = execFileSync('pnpm', ['store', 'path'], {
 }).trim()
 /** Pnpm default persisted in the fresh consumer's `.modules.yaml`. */
 const pnpmVirtualStoreDirMaxLength = storageV2VirtualStoreDirMaxLength
-/** D18 foundation order and source-manifest identities authorized for the C2-R4 rehearsal. */
+/** Foundation order and source-manifest identities authorized for the lockfile rehearsal. */
 const releasePackages: readonly IPackageDefinition[] = [
   packageDefinition('utils', '@migaia/utils'),
   packageDefinition('event-subscriber', '@migaia/event-subscriber'),
@@ -215,8 +215,8 @@ function normalizeSemanticRetainedGraph(
   }
   return normalizeOwnedSemanticModules(records, owners)
 }
-describe('SWV2-T58 C2-R4 host and release boundary', () => {
-  it('pins D18 order, private manifests, exact exports, lock edges, and fail-closed capabilities', () => {
+describe('host and release boundary', () => {
+  it('pins order, private manifests, exact exports, lock edges, and fail-closed capabilities', () => {
     const makefile = readFileSync(resolve(repositoryRoot, 'Makefile'), 'utf8')
     const releaseLine = makefile.match(/^RELEASE_PACKAGES := (.+)$/m)?.[1]
     expect(releaseLine).toBeDefined()
@@ -439,7 +439,7 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
     }
   }, 120_000)
 
-  it('YS20 rejects a restored old alias and a restored StorageHostFacade factory in isolated packed consumers', () => {
+  it('rejects a restored old alias and a restored StorageHostFacade factory in isolated packed consumers', () => {
     const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-storage-ys20-sensitivity-'))
     try {
       const artifacts = packReleaseArtifacts(smokeDirectory)

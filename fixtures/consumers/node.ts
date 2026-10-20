@@ -1,6 +1,6 @@
 // @migaia/storage-web 主入口是 web-only（localStorageHost/sessionStorageHost/document.cookie/
 // IndexedDB 全是浏览器 API），Node 主线程没有这些全局对象——见
-// docs/storage-web/web-storage-foundation.sdd.md §12.6。但 `memoryStorageHost` 是纯内存后端
+// 但 `memoryStorageHost` 是纯内存后端
 // （Map 实现、SSR/Node/testing 降级目标），经 DOM-free 子路径 `@migaia/storage-web/memory`
 // 单独引入，不把 IDB/WebStorage 的 DOM 类型带进来。
 import { MessageChannel } from 'node:worker_threads'

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as root from '../../src/index.js'
 import * as processEntry from '../../src/process/index.js'
 
-describe('A12 process subpath exports', () => {
+describe('process subpath exports', () => {
   it('keeps the exact runtime surface out of the root entry', () => {
     const expected = [
       'BootstrapVia',

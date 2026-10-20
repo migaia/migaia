@@ -15,7 +15,7 @@ import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { runtimeSources } from '../runtime-api/fixture.js'
 import type { IRpcProbeEventView } from '../../dist/core/probe/types.js'
 
-it('[A4] Peer probe observes handshake, ready and close without changing calls', async () => {
+it('Peer probe observes handshake, ready and close without changing calls', async () => {
   /** Events are copied explicitly because the source view is reused synchronously. */
   const seen: Readonly<IRpcProbeEventView>[] = []
   /** Descriptors are delivered exactly once at successful activation. */
@@ -68,7 +68,7 @@ it('[A4] Peer probe observes handshake, ready and close without changing calls',
   }
 })
 
-it('[A4] construction failure rolls back the observer before descriptor publication', async () => {
+it('construction failure rolls back the observer before descriptor publication', async () => {
   /** One original construction error is returned unchanged. */
   const original = new Error('endpoint construction fixture')
   /** A rejected custom endpoint owns no active descriptor. */
@@ -113,7 +113,7 @@ it('[A4] construction failure rolls back the observer before descriptor publicat
   }
 })
 
-it('[A4] collects observer cleanup after the critical close failure and reports its original cause', async () => {
+it('collects observer cleanup after the critical close failure and reports its original cause', async () => {
   /** Critical transport failure must remain first in the canonical resource collection. */
   const primary = new Error('primary close fixture')
   /** Observer cleanup is a secondary failure with independently reportable identity. */

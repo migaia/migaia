@@ -4,7 +4,7 @@ import { Resource, type IResourceFetchContext } from '../src/index.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 
 describe('audited resource request ownership', () => {
-  it('RESOURCE-D01 keeps the newest public request Promise after synchronous refetch reentrancy', async () => {
+  it('keeps the newest public request Promise after synchronous refetch reentrancy', async () => {
     /** Fetcher may synchronously replace its own request through the public API. */
     let resource: Resource<number>
     /** Nested request must remain the canonical current Promise. */
@@ -30,7 +30,7 @@ describe('audited resource request ownership', () => {
     resource.dispose()
   })
 
-  it('RESOURCE-D02 revalidates a changed suspended dependency even when ttl is zero', async () => {
+  it('revalidates a changed suspended dependency even when ttl is zero', async () => {
     /** Manual idle execution isolates suspension from elapsed-time expiration. */
     const idle: (() => void)[] = []
     /** One runtime owns both the resource observer and its signal. */
@@ -60,7 +60,7 @@ describe('audited resource request ownership', () => {
     input.dispose()
   })
 
-  it('RESOURCE-D03 transfers remaining lifetime between unrelated scheduler origins', async () => {
+  it('transfers remaining lifetime between unrelated scheduler origins', async () => {
     /** Sender and receiver use independent monotonic origins without any shared wall clock. */
     let senderNow = 10_000
     let receiverNow = 100
@@ -91,7 +91,7 @@ describe('audited resource request ownership', () => {
   })
 
   it.each(['retry', 'retryDelay'] as const)(
-    'RESOURCE-D04 preserves fetch failure when %s throws',
+    'preserves fetch failure when %s throws',
     async (option) => {
       /** Retry policies add context without erasing the request failure that invoked them. */
       const fetchFailure = new Error('fetch failed')
@@ -121,7 +121,7 @@ describe('audited resource request ownership', () => {
   )
 
   it.each(['cancel', 'reset', 'refetch', 'dispose'] as const)(
-    'RESOURCE-D05 retains the signal reason after %s',
+    'retains the signal reason after %s',
     async (operation) => {
       /** The first request exposes the same cancellation channel used by a real transport. */
       let context!: IResourceFetchContext
@@ -145,7 +145,7 @@ describe('audited resource request ownership', () => {
     }
   )
 
-  it('RESOURCE-D06 identifies an async fetch rejection without replacing its native error', async () => {
+  it('identifies an async fetch rejection without replacing its native error', async () => {
     /** Async failures bypass the reactive synchronous callback boundary. */
     const original = new RangeError('async fetch failed')
     const resource = new Resource(() => Promise.reject(original), createRuntime())
@@ -156,7 +156,7 @@ describe('audited resource request ownership', () => {
     resource.dispose()
   })
 
-  it('RESOURCE-D06 retains immutable fetch failures and preserves an existing foreign identity', async () => {
+  it('retains immutable fetch failures and preserves an existing foreign identity', async () => {
     /** Frozen native errors need a package-owned shell whose cause retains the original stack. */
     const frozen = Object.freeze(new Error('immutable fetch failed'))
     const immutable = new Resource(() => Promise.reject(frozen), createRuntime())

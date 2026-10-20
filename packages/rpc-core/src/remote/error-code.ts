@@ -9,7 +9,7 @@ export const RpcRemoteLayerErrorCode = {
   contractInvalid: 'REMOTE_CONTRACT_INVALID',
   /**
    * HostUnUse, including dryRun, lacks this connection's live adoption of the same remotely
-   * installed definition. Enforces rpc-remote R4/K203; complete hostUse before removing it.
+   * installed definition. Complete hostUse before removing it.
    */
   hostNotAdopted: 'REMOTE_HOST_NOT_ADOPTED',
   /** A supervisor cannot provide a ready unit or a channel cannot open; inspect the cause. */

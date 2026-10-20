@@ -3,7 +3,7 @@ import { IpcW3Reference } from './text.mjs'
 /**
  * Bare-side measurement core for the conformance IPC driver. Channel launch, codec, peer, isolation
  * and PID observer belong to the caller. This module does not freeze support units or claim
- * completed A10 measurements.
+ * completed reference measurements.
  */
 
 /**
@@ -31,33 +31,38 @@ import { IpcW3Reference } from './text.mjs'
 /** The immutable acceptance thresholds are the user's four relative targets. */
 export const IpcBenchThreshold = Object.freeze({ p99: 3, throughput: 0.5, cpu: 3, rss: 2 })
 
-/** DA1 supersedes the historical aggregate CPU/RSS verdict for the final registered matrix. */
+/** Supersedes the historical aggregate CPU/RSS verdict for the final registered matrix. */
 export const Da1BenchThreshold = Object.freeze({
   small: Object.freeze({ wall: 4, p99: 5, cpuByPid: 5 }),
   large: Object.freeze({ p99: 3, throughput: 0.5, cpuByPid: 3, rssByPid: 2 })
 })
 
-/** U33 keeps the historical B0 concurrency floors descriptive, separate from regression gates. */
+/** Keeps the historical concurrency floors descriptive, separate from regression gates. */
 export const Da1ConcurrencyTrackingStatus = Object.freeze({
   /** The complete implementation reaches the historical minimal-path comparison target. */
   met: '达到跟踪目标',
-  /** The old B0 target is missed; this label alone must never block DA1 or W3. */
+  /**
+   * The old throughput target is missed; this label alone must never block the budget or baseline
+   * guard.
+   */
   below: '未达跟踪目标'
 })
 
 /**
- * Judge DA1 from every retained alternating pair and match independently launched PIDs by role. A
- * shared Worker process is charged once; missing endpoint observations never yield PASS.
+ * Judge the RPC/bare budget from every retained alternating pair and match independently launched
+ * PIDs by role. A shared Worker process is charged once; missing endpoint observations never yield
+ * PASS.
  *
  * @param {{ order: string[]; bare: object; rpc: object }[]} rounds Complete original receipts.
  * @param {'small' | 'large' | 'concurrency'} scenario Registered budget domain.
- * @param {number} floor Historical B0 throughput tracking target for concurrency only.
+ * @param {number} floor Historical throughput tracking target for concurrency only.
  * @param {{ baseline?: object; noiseBand?: number; sdk?: { baseline: object; noise: object } }} *
- *   [guard] Original W3 p50 and independently frozen final SDK metrics with same-window A/A noise.
+ *   [guard] Original baseline p50 and independently frozen final SDK metrics with same-window A/A
+ *   noise.
  * @returns {object} Median ratios, every round and exact threshold disposition.
  * @throws {Error} Incomplete measurements or absent PID denominators.
  */
-export function judgeDa1Pairs(rounds, scenario, floor, guard) {
+export function judgeBudgetPairs(rounds, scenario, floor, guard) {
   /** Existing oracle preserves configuration, sample, attribution and alternating-order guards. */
   const original = judgePairs(rounds)
   /** Role matching compares equivalent processes, never unrelated numeric PID identities. */
@@ -117,7 +122,10 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
     cpuByPid: mediansByRole('cpuByPid'),
     rssByPid: mediansByRole('rssByPid')
   }
-  /** U33 retires B0 concurrency floors as gates; existing small/large budgets remain unchanged. */
+  /**
+   * Retires the historical concurrency floors as gates; existing small/large budgets remain
+   * unchanged.
+   */
   const thresholds = scenario === 'concurrency' ? {} : Da1BenchThreshold[scenario]
   if (!thresholds || (scenario === 'concurrency' && !(floor > 0)))
     throw new Error(IpcBenchErrorText.paired)
@@ -131,9 +139,9 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
     if (thresholds[key] !== undefined)
       for (const [role, ratio] of Object.entries(ratios[key]))
         if (ratio > thresholds[key]) failedMetrics.push(key + '.' + role)
-  /** Relative p50 regression is judged separately from the unchanged absolute DA1 budgets. */
+  /** Relative p50 regression is judged separately from the unchanged absolute RPC/bare budgets. */
   const regression = guard?.baseline
-    ? judgeW3Regression(rounds, guard.baseline, guard.noiseBand)
+    ? judgeBaselineRegression(rounds, guard.baseline, guard.noiseBand)
     : undefined
   if (regression?.status === 'fail') failedMetrics.push('w3.p50')
   /** Final SDK concurrency/Deno guards coexist with the immutable pre-program p50 comparison. */
@@ -155,7 +163,7 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
         }
       : undefined
   return {
-    type: 'da1-ratio',
+    type: 'fixture-ratio',
     status: failedMetrics.length ? 'fail' : 'pass',
     scenario,
     ratios,
@@ -174,12 +182,12 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
  * Compare every retained pair's RPC/bare p50 with the frozen pre-program implementation.
  *
  * @param {object[]} rounds Three complete alternating bare/RPC pairs.
- * @param {object} baseline Frozen W3 ratio and original raw-data provenance.
+ * @param {object} baseline Frozen baseline ratio and original raw-data provenance.
  * @param {number} noiseBand Maximum measured A/A change of the same normalized metric.
  * @returns {object} Original pair ratios, median and independent no-regression verdict.
  * @throws {Error} Missing baseline, noise or nonpositive latency denominator.
  */
-export function judgeW3Regression(rounds, baseline, noiseBand) {
+export function judgeBaselineRegression(rounds, baseline, noiseBand) {
   if (!(baseline?.p50Ratio > 0) || !Number.isFinite(noiseBand) || noiseBand < 0)
     throw new Error(IpcBenchErrorText.paired)
   /** Nearest rank is recomputed from full samples, including original browser clock observations. */
@@ -192,7 +200,7 @@ export function judgeW3Regression(rounds, baseline, noiseBand) {
   })
   /** Three original pairs determine the median without selecting a favorable launch. */
   const candidateRatio = [...ratiosByRound].sort((a, b) => a - b)[1]
-  /** A positive change means worse normalized RPC latency than the original frozen W3 data. */
+  /** A positive change means worse normalized RPC latency than the original frozen baseline data. */
   const relativeChange = candidateRatio / baseline.p50Ratio - 1
   return {
     status: relativeChange > noiseBand ? 'fail' : 'pass',
@@ -214,10 +222,11 @@ export function judgeW3Regression(rounds, baseline, noiseBand) {
  *   explicitly selected historical or final public reference, including original provenance.
  * @param {{ sourceCommit: string; representatives: object[]; p50RatioNoiseBand: number }} noise
  *   Fresh same-window reference calibration, retaining all four original representative cells.
- * @returns {{ baseline: object; noiseBand: number }} Existing W3 judge inputs without new budgets.
+ * @returns {{ baseline: object; noiseBand: number }} Existing baseline judge inputs without new
+ *   budgets.
  * @throws {Error} Missing cell, incomplete calibration or different reference source.
  */
-export function resolveW3Guard(unitId, baseline, noise) {
+export function resolveBaselineGuard(unitId, baseline, noise) {
   /** The original selected cell keeps its frozen value and retained raw provenance together. */
   const cell = baseline?.cells?.[unitId]
   if (
@@ -276,7 +285,10 @@ export function judgeSdkRegression(rounds, baseline, noise) {
           ? read(round.rpc, metric) / read(round.bare, metric)
           : read(round, metric)
       )
-      /** The same three-round median as original W3 never selects a replacement measurement. */
+      /**
+       * The same three-round median as the original baseline never selects a replacement
+       * measurement.
+       */
       const candidate = [...valuesByRound].sort((a, b) => a - b)[1]
       /** Lower throughput is worse; latency has the opposite direction. */
       const relativeChange =
@@ -306,8 +318,8 @@ export function judgeSdkRegression(rounds, baseline, noise) {
 }
 
 /**
- * Judge the user's D5 exclusive window using its two one-minute load observations. Raw measurements
- * remain available when environmental admission fails; no ratio verdict is inferred.
+ * Judge the exclusive window using its two one-minute load observations. Raw measurements remain
+ * available when environmental admission fails; no ratio verdict is inferred.
  *
  * @param {number} startLoad One-minute load at window admission.
  * @param {number} endLoad One-minute load after the complete window.
@@ -623,7 +635,7 @@ async function pairedMain() {
   let selectedId
   /** Complete raw sides are saved before their summaries, never discarded after failure. */
   let output
-  /** The serial window supplies its own W3/W3 calibration; historical noise is never substituted. */
+  /** The serial window supplies its own baseline calibration; historical noise is never substituted. */
   let noisePath
   /** Candidate collection precedes the one final SDK freeze; it never claims a relative PASS. */
   let freezeSdk = false
@@ -675,14 +687,14 @@ async function pairedMain() {
     ? undefined
     : JSON.parse(
         await readFile(
-          new URL(freezeSdk ? './w3-baseline.json' : './w3-public-baseline.json', import.meta.url)
+          new URL(freezeSdk ? './frozen-baseline.json' : './public-baseline.json', import.meta.url)
         )
       )
   /** New final-source values live separately from the immutable 76-cell pre-program baseline. */
   const needsSdk = scenario === 'concurrency' || scenario === 'deno'
   const sdkBaseline =
     needsSdk && !prepare && !freezeSdk
-      ? JSON.parse(await readFile(new URL('./w3-sdk-baseline.json', import.meta.url)))
+      ? JSON.parse(await readFile(new URL('./sdk-baseline.json', import.meta.url)))
       : undefined
   /** A missing current-window calibration cannot yield a no-regression claim. */
   const noise = prepare ? undefined : noisePath ? JSON.parse(await readFile(noisePath)) : undefined
@@ -698,7 +710,7 @@ async function pairedMain() {
   )
     throw new Error(IpcBenchErrorText.paired)
   if (!prepare && scenario !== 'deno')
-    for (const unit of units) resolveW3Guard(unit.id, baseline, noise)
+    for (const unit of units) resolveBaselineGuard(unit.id, baseline, noise)
   if (
     !prepare &&
     (!inventory.frozen || units.some((unit) => unit.status !== 'supported' || !unit.evidence))
@@ -776,10 +788,10 @@ async function pairedMain() {
             )
         }
       }
-      /** Browser and native observations use the same DA1 judge with actual per-PID attribution. */
+      /** Browser and native observations use the same budget judge with actual per-PID attribution. */
       const judged = prepare
         ? { status: 'prepared' }
-        : judgeDa1Pairs(
+        : judgeBudgetPairs(
             rounds,
             scenario === 'concurrency'
               ? 'concurrency'
@@ -791,7 +803,7 @@ async function pairedMain() {
               ...(scenario === 'deno'
                 ? {}
                 : {
-                    ...resolveW3Guard(unit.id, baseline, noise)
+                    ...resolveBaselineGuard(unit.id, baseline, noise)
                   }),
               ...(sdkBaseline
                 ? {

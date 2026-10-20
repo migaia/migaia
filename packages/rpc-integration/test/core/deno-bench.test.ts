@@ -8,7 +8,7 @@ import { it } from 'vitest'
 /** Deno runs independently of Vitest's Node loader and records its actual native fields. */
 const execute = promisify(execFile)
 
-it('[A37] Deno observations do not claim compatibility zeroes as native measurements', async () => {
+it('Deno observations do not claim compatibility zeroes as native measurements', async () => {
   const result = await execute('deno', [
     'run',
     '-A',
@@ -20,7 +20,7 @@ it('[A37] Deno observations do not claim compatibility zeroes as native measurem
 })
 
 for (const carrier of ['stdio-framed', 'worker'] as const) {
-  it(`[A37][A38] Deno ${carrier} uses actual public Peer and native isolate observations`, async () => {
+  it(`Deno ${carrier} uses actual public Peer and native isolate observations`, async () => {
     const result = await execute(
       'deno',
       [
@@ -54,7 +54,7 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
     assert.equal(
       receipt.parentSnapshot.pid === receipt.peerSnapshot.pid,
       carrier === 'worker',
-      '[A38] only an actual native Worker shares the parent PID'
+      'only an actual native Worker shares the parent PID'
     )
     assert.ok(receipt.peerSnapshot.loaded.length > 0)
     assert.ok(

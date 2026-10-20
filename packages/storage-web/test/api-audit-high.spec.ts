@@ -3,7 +3,7 @@ import { memoryStorageHost } from '../src/memory.js'
 import { defineEntity } from '../src/entity.js'
 
 describe('storage-web audit high severity regressions', () => {
-  it('SW-D01 notifies replacement observers only after the destination exists', async () => {
+  it('notifies replacement observers only after the destination exists', async () => {
     /** Real memory storage owns both channels and post-commit notifications. */
     const store = memoryStorageHost()
     await store.putRecord({ before: true }, 'key')
@@ -33,7 +33,7 @@ describe('storage-web audit high severity regressions', () => {
     }
   })
 
-  it('SW-D05 migration preserves an update committed after the scan', async () => {
+  it('migration preserves an update committed after the scan', async () => {
     /** Real repositories share one transaction-capable backend. */
     const store = memoryStorageHost()
     /** Gate only the first scanned old value through the supported asynchronous schema. */
@@ -90,7 +90,7 @@ describe('storage-web audit high severity regressions', () => {
     }
   })
 
-  it('SW-D06 fallback rejects a second owner of a unique index value', async () => {
+  it('fallback rejects a second owner of a unique index value', async () => {
     /** A backend without a native sidecar still has declared entity write constraints. */
     const store = memoryStorageHost()
     try {

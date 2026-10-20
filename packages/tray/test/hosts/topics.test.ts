@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fixture, until, marker, lines, chainHas, assembled } from './helper.js'
 
 describe('Tray business topics', () => {
-  it('[A3] validates topic and portable payload before delivery', async () => {
+  it('validates topic and portable payload before delivery', async () => {
     /** Public topic admission belongs to Tray rather than EventSubscriber's local key grammar. */
     const api = await fixture()
     /** No instances are necessary to establish the parent entry contract. */
@@ -41,7 +41,7 @@ describe('Tray business topics', () => {
     }
   })
 
-  it('[A4] authenticates process publisher and fans out once across all runtimes', async () => {
+  it('authenticates process publisher and fans out once across all runtimes', async () => {
     /** Fixture declarations reach genuine coroutine, Worker and child-process dispatchers. */
     const api = await fixture()
     /** Parent listener records the same business event as every child subscriber. */
@@ -90,7 +90,7 @@ describe('Tray business topics', () => {
     }
   }, 30000)
 
-  it('[A4] keeps business topics separate and contains parent listener failures', async () => {
+  it('keeps business topics separate and contains parent listener failures', async () => {
     /** Lifecycle and business topic publications use different canonical hub owners. */
     const api = await fixture()
     /** Original user errors remain reachable at the parent reporter. */
@@ -127,7 +127,7 @@ describe('Tray business topics', () => {
     }
   })
 
-  it('[A4] first concurrent child listeners share registration and last off is idempotent', async () => {
+  it('first concurrent child listeners share registration and last off is idempotent', async () => {
     /** Internal child owner uses the same outlet request boundary as genuine native fixtures. */
     const ownerUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
     /**
@@ -183,7 +183,7 @@ describe('Tray business topics', () => {
     topics.close()
   })
 
-  it('[A4] failed relay subscribe rolls back listeners and retains the original failure', async () => {
+  it('failed relay subscribe rolls back listeners and retains the original failure', async () => {
     /** The required relay rejection is injected at the existing consumed outlet boundary. */
     const ownerUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
     /** Fixture errors retain native identity for the failed-subscribe contract. */
@@ -215,7 +215,7 @@ describe('Tray business topics', () => {
     topics.close()
   })
 
-  it('[A4] thread last off, active restart, crash restart and process removal isolate memberships', async () => {
+  it('thread last off, active restart, crash restart and process removal isolate memberships', async () => {
     /** Existing thread child entry serves the same host name with this parent supervision policy. */
     const api = await fixture()
     /** Native crash replacement is configured through the canonical supervisor option. */
@@ -316,8 +316,8 @@ describe('Tray business topics', () => {
     }
   }, 30000)
 
-  it('[A4] contains delivery send rejection on parent and handler failure on genuine child', async () => {
-    /** Existing outlet selector permits the SDD's transport failure injection without a new seam. */
+  it('contains delivery send rejection on parent and handler failure on genuine child', async () => {
+    /** Existing outlet selector permits transport failure injection without a new seam. */
     const runtimeUrl = new URL('../../dist/hosts/runtime.js', import.meta.url).href
     /** Existing child topic factory supplies the deliver handler used by the genuine dispatcher. */
     const childUrl = new URL('../../dist/hosts/child/topics.js', import.meta.url).href
@@ -412,7 +412,7 @@ describe('Tray business topics', () => {
     }
   }, 30000)
 
-  it('[A4] init subscriptions miss starting publications and child user failures stay contained', async () => {
+  it('init subscriptions miss starting publications and child user failures stay contained', async () => {
     /** Marker comes from genuine plugin install after its first subscription has been accepted. */
     const api = await fixture()
     /** Child target report marker is separate from parent send-failure reporting. */

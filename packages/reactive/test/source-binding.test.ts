@@ -30,7 +30,7 @@ class CustomSource implements IObservable {
 }
 
 describe('controlled custom source binding', () => {
-  it('REX-T2 keeps versions, readonly edges, ownership and duplicate-registration isolation', () => {
+  it('keeps versions, readonly edges, ownership and duplicate-registration isolation', () => {
     /** One isolated runtime supplies the version clock and dependency frame. */
     const runtime = createRuntime()
     /** Graph node identity remains the custom class instance. */

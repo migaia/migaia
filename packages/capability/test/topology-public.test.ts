@@ -11,7 +11,7 @@ import {
 const id = (value: string): string => value
 
 describe('public capability topology primitive', () => {
-  it('WRC-C-T69 exposes the same pure builder used by CapabilityGraph', () => {
+  it('exposes the same pure builder used by CapabilityGraph', () => {
     const nodes: ITopologyNode[] = [
       {
         id: id('consumer'),
@@ -38,7 +38,7 @@ describe('public capability topology primitive', () => {
     expect(topology.ordinal.get('consumer')).toBe(0)
   })
 
-  it('WRC-C-T70 rejects missing providers and cycles without lifecycle side effects', () => {
+  it('rejects missing providers and cycles without lifecycle side effects', () => {
     let started = 0
     const nodes: ITopologyNode[] = [
       { id: id('a'), dependencies: [{ provider: id('b'), required: true }], ordinal: 0 },
@@ -81,7 +81,7 @@ describe('public capability topology primitive', () => {
     expect(started).toBe(0)
   })
 
-  it('WRC-C-T69 snapshots inputs, uses ordinal order, and rejects duplicate facts', () => {
+  it('snapshots inputs, uses ordinal order, and rejects duplicate facts', () => {
     const dependencies: ITopologyNode['dependencies'] = [{ provider: 'provider', required: true }]
     const consumer: ITopologyNode = { id: 'consumer', dependencies, ordinal: 3 }
     const provider: ITopologyNode = { id: 'provider', dependencies: [], ordinal: 2 }
@@ -151,7 +151,7 @@ describe('public capability topology primitive', () => {
     ).toThrow(TopologyInvalidReason.duplicateOrdinal)
   })
 
-  it('WRC-C-T69 routes hostile runtime facts through one invalid adapter read', () => {
+  it('routes hostile runtime facts through one invalid adapter read', () => {
     const invalid = (reason: string, nodeId?: string): never => {
       throw new Error(`${reason}:${nodeId ?? ''}`)
     }
@@ -213,7 +213,7 @@ describe('public capability topology primitive', () => {
     expect(proxyReads).toBe(3)
   })
 
-  it('WRC-C-T69 uses linear ordinal placement with one read per node and edge', () => {
+  it('uses linear ordinal placement with one read per node and edge', () => {
     const counts = { id: 0, ordinal: 0, dependencies: 0, provider: 0, required: 0 }
     const nodeCount = 64
     const nodes = Array.from({ length: nodeCount }, (_, index) => {
@@ -269,7 +269,7 @@ describe('public capability topology primitive', () => {
     })
   })
 
-  it('WRC-C-T69 declares the exact public topology export', () => {
+  it('declares the exact public topology export', () => {
     const manifest = JSON.parse(
       readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')
     ) as { exports?: Record<string, unknown> }

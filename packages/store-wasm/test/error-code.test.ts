@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createStoreWasmAggregateError, StoreWasmErrorCode, STORE_WASM_SOURCE } from '../src/errors'
 
-describe('store-wasm error-code contract (E-T9)', () => {
+describe('store-wasm error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {
     const codes = Object.values(StoreWasmErrorCode)
     expect(codes).toHaveLength(8)

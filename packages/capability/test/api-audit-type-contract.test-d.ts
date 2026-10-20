@@ -1,8 +1,8 @@
-// @ts-expect-error C-01 use the canonical ICapabilityState name.
+// @ts-expect-error use the canonical ICapabilityState name.
 import type { ICapabilityStateValue } from '../src/index.js'
-// @ts-expect-error C-01 use GraphReadinessState's value/type namespace.
+// @ts-expect-error use GraphReadinessState's value/type namespace.
 import type { IGraphReadinessState } from '../src/index.js'
-// @ts-expect-error C-01 use GraphBindingReleaseReason's value/type namespace.
+// @ts-expect-error use GraphBindingReleaseReason's value/type namespace.
 import type { IGraphBindingReleaseReason } from '../src/graph/dynamic.js'
 import type { ICapabilityState, GraphReadinessState } from '../src/index.js'
 import type { GraphBindingReleaseReason } from '../src/graph/dynamic.js'

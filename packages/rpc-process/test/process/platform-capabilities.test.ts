@@ -16,7 +16,7 @@ const capabilityKeys = [
 ].sort()
 
 describe('unverified platform launchers', () => {
-  it('[A9] Electron cannot claim tree termination or secret bootstrap', () => {
+  it('Electron cannot claim tree termination or secret bootstrap', () => {
     const capabilities = createElectronUtilityProcessLauncher().capabilities
     expect(Object.keys(capabilities).sort()).toEqual(capabilityKeys)
     expect(capabilities[StandardCapability.termination]).toBe(CapabilityLevel.unsupported)
@@ -25,7 +25,7 @@ describe('unverified platform launchers', () => {
     expect(capabilities[ProcessCapability.bootstrapFd]).toBe(CapabilityLevel.unsupported)
   })
 
-  it('[A9] Windows Job remains entirely unsupported without a native fixture', () => {
+  it('Windows Job remains entirely unsupported without a native fixture', () => {
     const capabilities = createWindowsJobProcessLauncher().capabilities
     expect(Object.keys(capabilities).sort()).toEqual(capabilityKeys)
     expect(Object.values(capabilities)).toEqual(

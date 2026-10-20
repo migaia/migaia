@@ -10,7 +10,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 35; index++) await Promise.resolve()
 }
 
-describe('A4 restart policy', () => {
+describe('restart policy', () => {
   it('caps exponential delay and enters terminal once after the window limit', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()
@@ -109,7 +109,7 @@ describe('A4 restart policy', () => {
   })
 })
 
-describe('SV-B3/B4 public policy admission', () => {
+describe('public policy admission', () => {
   it.each([
     ['restart.mode', { restart: { mode: 'typo' } }, TypeError],
     ['terminalPolicy.mode', { terminalPolicy: { mode: 'typo' } }, TypeError],

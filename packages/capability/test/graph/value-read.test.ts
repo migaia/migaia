@@ -5,7 +5,7 @@ import {
   type IGraphNodeId
 } from '@migaia/capability/graph'
 
-it('TC-T03 reads the canonical value without changing frozen diagnostic snapshots or disposal visibility', async () => {
+it('reads the canonical value without changing frozen diagnostic snapshots or disposal visibility', async () => {
   /** Data identity belongs to the actual started node, never a Tray mirror. */
   const value = { count: 1 }
   /** One static node has no resource other than its original release callback. */
@@ -40,7 +40,7 @@ it('TC-T03 reads the canonical value without changing frozen diagnostic snapshot
   expect(releases).toBe(1)
 })
 
-it('TC-T03 permits a real undefined value and keeps failed graphs unavailable', async () => {
+it('permits a real undefined value and keeps failed graphs unavailable', async () => {
   /** Undefined is a valid payload; graph readiness, not a sentinel, indicates availability. */
   const id = 'undefined' as IGraphNodeId
   /** This independent graph proves no undefined payload sentinel is introduced. */
@@ -76,7 +76,7 @@ it('TC-T03 permits a real undefined value and keeps failed graphs unavailable', 
   await failed.dispose()
 })
 
-it('TC-T03 preserves the existing unknown-node error contract for direct value reads', () => {
+it('preserves the existing unknown-node error contract for direct value reads', () => {
   /** Lookup fails before any registration and retains the canonical native error surface. */
   const graph = createCapabilityGraph()
   expect(() => graph.readValue('missing' as IGraphNodeId)).toThrow(

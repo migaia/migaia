@@ -8,7 +8,10 @@ const packageRoots = {
   contract: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-contract'),
   core: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
 } as const
-/** Files the core type proof must include after the S3 move, spelled as `tsc --showConfig` lists them. */
+/**
+ * Files the core type proof must include after the source move, spelled as `tsc --showConfig` lists
+ * them.
+ */
 const coreFiles = [
   '../utils/types/host-globals.d.ts',
   './src/core/composed.ts',
@@ -31,7 +34,7 @@ function tsc(layer: keyof typeof packageRoots, args: string[]) {
   })
 }
 
-describe('A3 platform-neutral type boundaries', () => {
+describe('platform-neutral type boundaries', () => {
   it.each(['contract', 'core'] as const)(
     'typechecks %s without DOM or ambient host types',
     (layer) => {

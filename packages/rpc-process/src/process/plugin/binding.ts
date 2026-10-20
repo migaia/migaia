@@ -434,7 +434,10 @@ function createConnectionHandle(raw: IProcessByteChannel): IProcessConnectionHan
 /** Borrowed socket and adopted channel units share the same local close-only supervision profile. */
 export type IProcessConnectionUnit = Pick<IProcessConnectionHandle, 'identity' | 'exited' | 'close'>
 
-/** Reuse PP2 supervision without dialing or inventing another borrowed lifecycle state machine. */
+/**
+ * Reuse process plugin supervision without dialing or inventing another borrowed lifecycle state
+ * machine.
+ */
 export function createProcessConnectionSupervisor<THandle extends IProcessConnectionUnit>(
   address: string,
   scheduler: IScheduler,

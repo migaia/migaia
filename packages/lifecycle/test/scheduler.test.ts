@@ -19,7 +19,7 @@ function captureThrow(run: () => unknown): unknown {
   throw new Error('expected a throw')
 }
 
-describe('T-16 lifecycle scheduler', () => {
+describe('lifecycle scheduler', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -44,7 +44,7 @@ describe('T-16 lifecycle scheduler', () => {
   })
 })
 
-describe('AF-T62 scheduler/task admission snapshot', () => {
+describe('scheduler/task admission snapshot', () => {
   it('captures each scheduler accessor and each task cancel receiver exactly once', () => {
     let nowReads = 0
     let scheduleReads = 0
@@ -143,7 +143,7 @@ describe('AF-T62 scheduler/task admission snapshot', () => {
   })
 })
 
-describe('A5 injected task unref forwarding, rollback and lifecycle defaults', () => {
+describe('injected task unref forwarding, rollback and lifecycle defaults', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
@@ -241,7 +241,7 @@ describe('A5 injected task unref forwarding, rollback and lifecycle defaults', (
   })
 
   it('lifecycle factories default to the system scheduler admitted once at load', async () => {
-    // The default is snapshotted once at module load (LC-P2), so later patches to the utils
+    // The default is snapshotted once at module load, so later patches to the utils
     // systemScheduler object are not observed; the default must still drive real timers.
     const controller = createGenerationController()
     const { signal } = controller.begin({ timeoutMs: 5 })
@@ -272,7 +272,7 @@ describe('A5 injected task unref forwarding, rollback and lifecycle defaults', (
   })
 })
 
-describe('A11 default scheduler identity versus lifecycle admission identity', () => {
+describe('default scheduler identity versus lifecycle admission identity', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
@@ -331,7 +331,7 @@ describe('A11 default scheduler identity versus lifecycle admission identity', (
   })
 })
 
-describe('A5 admission boundaries that replace the removed lifecycle implementation', () => {
+describe('admission boundaries that replace the removed lifecycle implementation', () => {
   it('rejects overflowing admission arithmetic and non-scheduler values with lifecycle identity', () => {
     expect(
       captureThrow(() => addSchedulerTime(Number.MAX_VALUE, Number.MAX_VALUE, 'deadline'))

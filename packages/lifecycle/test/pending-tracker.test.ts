@@ -9,7 +9,7 @@ const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => 
   return { promise, resolve }
 }
 
-describe('L-T10 PendingTracker: drain() during new pending production', () => {
+describe('PendingTracker: drain() during new pending production', () => {
   it('drain() resolves immediately when nothing is tracked', async () => {
     const tracker = createPendingTracker()
     await tracker.drain()
@@ -33,7 +33,7 @@ describe('L-T10 PendingTracker: drain() during new pending production', () => {
     expect(drained).toBe(true)
   })
 
-  it('a new pending item started during drain() is not missed (L-T10 core case)', async () => {
+  it('a new pending item started during drain() is not missed (core case)', async () => {
     const tracker = createPendingTracker()
     const first = deferred<void>()
     tracker.track(first.promise)

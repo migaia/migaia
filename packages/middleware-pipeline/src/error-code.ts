@@ -9,9 +9,9 @@ export const MiddlewarePipelineErrorCode = {
   /**
    * Reports failure in both the current stage and its started downstream when no error combiner is
    * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner
-   * failures while preserving native identity and every original error. Enforces
-   * `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in `AggregateError.errors`,
-   * or provide `combineStageAndDownstreamError` for domain errors.
+   * failures while preserving native identity and every original error. Enforces Inspect both
+   * original failures in `AggregateError.errors`, or provide `combineStageAndDownstreamError` for
+   * domain errors.
    */
   executionFailed: 'EXECUTION_FAILED',
   /**

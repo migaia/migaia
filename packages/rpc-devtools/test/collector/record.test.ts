@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '@migaia/rpc-devtools'
 import { CollectorFixture, collectorView } from './fixture.js'
 
-describe('collector A3 recording', () => {
+describe('collector recording', () => {
   it('records three events independently of the main ring and round-trips through the frozen codec', () => {
     /** Main-ring eviction must not evict the active recording's own slots. */
     const devtools = createRpcDevtools({ maxEvents: 1 })

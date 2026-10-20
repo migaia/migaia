@@ -11,7 +11,7 @@ export const MAX_FRAME = 16_777_216
 /** Bound unmatched abort IDs retained for duplicate control diagnostics. */
 const MAX_EARLY_ABORT_IDS = 1_024
 
-/** These two capabilities define the sole supported U36 application baseline. */
+/** These two capabilities define the sole supported application baseline. */
 const REQUIRED_CAPABILITIES = ['runtime-api@1', 'batch@1'] as const
 
 /** Independent fixture dispatch and its directory use these exact public method names. */
@@ -32,7 +32,10 @@ const ReferenceMethod = {
   finish: 'peer.finish'
 } as const
 
-/** Only actual scalar routes enter the static directory; stream and optional U25 routes are absent. */
+/**
+ * Only actual scalar routes enter the static directory; stream and optional runtime-api routes are
+ * absent.
+ */
 const REFERENCE_DESCRIPTION = {
   schemaVersion: 2,
   self: { name: 'ts-reference', instanceId: 'ts-peer' },
@@ -335,7 +338,10 @@ function route(
   }
 }
 
-/** Network sessions require U36 while pure negotiation remains usable by current wire vectors. */
+/**
+ * Network sessions require the runtime baseline while pure negotiation remains usable by current
+ * wire vectors.
+ */
 function supportsBaseline(agreement: IRecord): boolean {
   /** Capture the accepted list once before the baseline membership callback. */
   const capabilities = agreement.capabilities

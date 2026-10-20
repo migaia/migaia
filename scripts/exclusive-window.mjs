@@ -94,7 +94,7 @@ export const WindowPriority = { high: 'high', normal: 'normal', low: 'low' }
  * End-load policies. `report` (default) records an end-load breach in history and the log but keeps
  * the command's exit code: heavy builds and test gates raise the load themselves. `enforce` turns a
  * breach after a successful command into the `load` exit code; measurement windows (bench, soak,
- * DA1/W3) use it because their timing is not trustworthy above the ceiling.
+ * performance ratios) use it because their timing is not trustworthy above the ceiling.
  */
 export const EndLoadPolicy = { report: 'report', enforce: 'enforce' }
 

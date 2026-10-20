@@ -22,14 +22,14 @@ function hangUntilAborted(context: IRpcContext): Promise<IRpcProviderResult> {
 }
 
 /**
- * Regression gate for `SOL-CB-R9-P1-001`: a caller that settles a `send()` early (local abort
- * signal, or local `timeoutMs` expiry) must notify the remote provider to cancel its active
- * controller — exactly like legacy `notifyRemoteAbort()` — and the deferred outbound `send()` must
- * re-check settlement before actually transmitting the request, exactly like legacy's `if
- * (settlement.isSettled()) return` guard before `this.#send(...)`. Without both fixes, a
- * chunked/slow request that the caller already abandoned can still reach the remote provider. The
- * fixture handles an already-aborted signal at entry, as a provider must, while the endpoint
- * assertions still require the local deadline and remote controller cleanup to converge.
+ * Regression gate: a caller that settles a `send()` early (local abort signal, or local `timeoutMs`
+ * expiry) must notify the remote provider to cancel its active controller — exactly like legacy
+ * `notifyRemoteAbort()` — and the deferred outbound `send()` must re-check settlement before
+ * actually transmitting the request, exactly like legacy's `if (settlement.isSettled()) return`
+ * guard before `this.#send(...)`. Without both fixes, a chunked/slow request that the caller
+ * already abandoned can still reach the remote provider. The fixture handles an already-aborted
+ * signal at entry, as a provider must, while the endpoint assertions still require the local
+ * deadline and remote controller cleanup to converge.
  */
 describe('composed remote cancellation on caller-side settlement', () => {
   it('notifies the remote and leaves zero active controllers after a local timeoutMs expiry', async () => {

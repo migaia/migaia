@@ -36,7 +36,7 @@ const createHost = (timeout: number | false = false, diagnostic?: (...args: any[
 }
 
 describe('async setup definition admission', () => {
-  it('A8 captures setup as a known function field and rejects invalid definitions', async () => {
+  it('captures setup as a known function field and rejects invalid definitions', async () => {
     expect(() => definePlugin({ name: 'invalid', setup: 1, install: () => ({}) } as never)).toThrow(
       expect.objectContaining({ code: PluginHostErrorCode.invalidOption })
     )
@@ -65,7 +65,7 @@ describe('async setup definition admission', () => {
 })
 
 describe('async setup installation', () => {
-  it('A3 rejects eager setup before synchronous hooks and permits lazy registration', async () => {
+  it('rejects eager setup before synchronous hooks and permits lazy registration', async () => {
     /** Exposes the constructor and later synchronous installation paths. */
     class SyncHost extends PluginHost<Record<string, never>> {
       constructor(plugins: readonly unknown[] = []) {
@@ -105,7 +105,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A1 queues behind a lease drain, then times out a mutation waiting behind setup', async () => {
+  it('queues behind a lease drain, then times out a mutation waiting behind setup', async () => {
     /** Exposes a long-running async pipeline that retains a plugin-owned lease. */
     class LeaseHost extends PluginHost<Record<string, never>, number> {
       run(): Promise<void> {
@@ -165,7 +165,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A1 completes provider setup before constructing either dependent feature', async () => {
+  it('completes provider setup before constructing either dependent feature', async () => {
     const { host } = createHost()
     const gate = deferred<{ value: number }>()
     const events: string[] = []
@@ -233,7 +233,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A1 delays features and install, forwards the same output, and guards host mutation', async () => {
+  it('delays features and install, forwards the same output, and guards host mutation', async () => {
     const { host, scheduler } = createHost()
     const gate = deferred<{ n: number }>()
     const setupOutput = { n: 1 }
@@ -318,7 +318,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A2 rolls setup resources back in reverse order and retains the primary cause', async () => {
+  it('rolls setup resources back in reverse order and retains the primary cause', async () => {
     const { host } = createHost()
     const events: string[] = []
     const primary = new Error('setup failed')
@@ -356,7 +356,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A2 reports rollback failures without replacing the setup rejection', async () => {
+  it('reports rollback failures without replacing the setup rejection', async () => {
     const reports: Array<{ code: unknown; error: unknown }> = []
     const { host } = createHost(false, (_message, code, error) => reports.push({ code, error }))
     const gate = deferred<never>()
@@ -392,7 +392,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A2 releases setup resources after install resources if install fails', async () => {
+  it('releases setup resources after install resources if install fails', async () => {
     const { host } = createHost()
     const order: string[] = []
     const primary = new Error('install failure')
@@ -419,7 +419,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A2 releases a committed setup resource when a later batch member fails', async () => {
+  it('releases a committed setup resource when a later batch member fails', async () => {
     const { host } = createHost()
     const primary = new Error('dependent failed')
     const release = vi.fn()
@@ -449,7 +449,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A4 aborts a timed-out attempt, drops late success, and reports late rejection', async () => {
+  it('aborts a timed-out attempt, drops late success, and reports late rejection', async () => {
     const reports: unknown[] = []
     const { host, scheduler } = createHost(50, (_message, _code, error) => reports.push(error))
     const gate = deferred<unknown>()
@@ -501,7 +501,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A4 disposes a host without waiting for a setup that never settles', async () => {
+  it('disposes a host without waiting for a setup that never settles', async () => {
     const { host } = createHost()
     /** Captured context exposes the attempt-level signal after host disposal. */
     let context!: IPluginSetupContext
@@ -524,7 +524,7 @@ describe('async setup installation', () => {
     expect(context.operation.signal.aborted).toBe(true)
   })
 
-  it('A4 discards late success and reports a rejection after host disposal', async () => {
+  it('discards late success and reports a rejection after host disposal', async () => {
     const reports: unknown[] = []
     const { host, scheduler } = createHost(50, (_message, _code, error) => reports.push(error))
     const successGate = deferred<{ value: number }>()
@@ -563,7 +563,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A4 suppresses cancellation echoes and preserves an in-time coded rejection', async () => {
+  it('suppresses cancellation echoes and preserves an in-time coded rejection', async () => {
     const reports: unknown[] = []
     const { host, scheduler } = createHost(50, (_message, _code, error) => reports.push(error))
     /** A setup that rejects with its own abort reason when the deadline expires. */
@@ -605,7 +605,7 @@ describe('async setup installation', () => {
     await host.dispose()
   })
 
-  it('A10 closes an expired lazy attempt before rollback and isolates its retry', async () => {
+  it('closes an expired lazy attempt before rollback and isolates its retry', async () => {
     const { host, scheduler } = createHost(50)
     const firstGate = deferred<void>()
     const cleanupGate = deferred<void>()

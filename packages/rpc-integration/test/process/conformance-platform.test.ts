@@ -24,13 +24,13 @@ const { default: defaultConfig } = await import(
 /** Repository root is resolved from this tracked test, never from workspace-local documentation. */
 const repository = fileURLToPath(new URL('../../../..', import.meta.url))
 
-/** Produce exact D1 version output without launching, installing or downloading a tool. */
+/** Produce exact tool version output without launching, installing or downloading a tool. */
 function atMinimum(tool: string) {
   return { path: `/installed/${tool}`, output: admission.ConformanceToolchainMinimum[tool] }
 }
 
 describe('conformance toolchain and platform evidence boundaries', () => {
-  it('[A11] admits every exact minimum and a higher patch, retaining executable and raw version', () => {
+  it('admits every exact minimum and a higher patch, retaining executable and raw version', () => {
     /** The injected inspector has the same boundary as the real read-only probe. */
     const inspect = vi.fn(atMinimum)
     /** Equality is supported; lower-tool compatibility is never assumed. */
@@ -58,7 +58,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
   })
 
   it.each(Object.keys(admission.ConformanceToolchainMinimum))(
-    '[A11] rejects lower or missing %s before launch with no install or download recovery',
+    'rejects lower or missing %s before launch with no install or download recovery',
     (target) => {
       /** A failed admission must prevent the subsequent real-runner launch branch. */
       const launch = vi.fn()
@@ -84,7 +84,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     }
   )
 
-  it('[A11] probes only executable paths and versions, with no install or download commands', () => {
+  it('probes only executable paths and versions, with no install or download commands', () => {
     /** Trace the real inspector rather than unused synthetic recovery callbacks. */
     const commands: { command: string; args: string[] }[] = []
     for (const tool of Object.keys(admission.ConformanceToolchainMinimum)) {
@@ -108,7 +108,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     ).toBe(false)
   })
 
-  it('[A11] records actual installed versions and paths without compilation or installation', () => {
+  it('records actual installed versions and paths without compilation or installation', () => {
     /** This receipt comes from installed executables, not the synthetic minimum-version fixture. */
     const actual = admission.admitConformanceToolchains()
     expect(actual.accepted, JSON.stringify(actual)).toBe(true)
@@ -120,7 +120,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     }
   })
 
-  it('[A11] preserves offline builds, standard-library peers and default conformance exclusion', () => {
+  it('preserves offline builds, standard-library peers and default conformance exclusion', () => {
     /** Rust builds through the maintained runner into a system temporary target directory. */
     const rust = readFileSync(new URL('./peers/rust/run.sh', import.meta.url), 'utf8')
     expect(rust).toContain('cargo build --release --offline --locked')
@@ -158,7 +158,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       'test/bridge/conformance-faults.test.ts',
       'test/merge/suite-parity.test.ts'
     ])
-    /** The original package inventory stays frozen; C3 replaces only its declared RPC owners. */
+    /** The original package inventory stays frozen; the merge replaces only its declared RPC owners. */
     const packages = execFileSync('git', ['ls-tree', '-r', '--name-only', 'be19788', 'packages'], {
       cwd: repository,
       encoding: 'utf8'
@@ -189,7 +189,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       'packages/store-persist/package.json': {
         dependencies: { '@migaia/lifecycle': 'workspace:^' }
       },
-      // store-react uses React 19 `use`; the old >=18 range never loaded on React 18 (D06).
+      // store-react uses React 19 `use`; the old >=18 range never loaded on React 18.
       'packages/store-react/package.json': {
         peerDependencies: { react: '>=19', 'react-dom': '>=19' }
       },
@@ -284,7 +284,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     }
   })
 
-  it('[A9] preserves actual capability admission without upgrading unrun platform guarantees', () => {
+  it('preserves actual capability admission without upgrading unrun platform guarantees', () => {
     for (const launcher of [createNodeProcessLauncher(), createBunProcessLauncher()])
       expect(launcher.capabilities).toMatchObject({
         termination: 'unsupported',

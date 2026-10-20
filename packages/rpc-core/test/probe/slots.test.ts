@@ -7,7 +7,7 @@ import type { IRpcTransport } from '../../dist/core/transport.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { runtimeSources } from '../runtime-api/fixture.js'
 
-describe('activated probe slots A4', () => {
+describe('activated probe slots', () => {
   it.each(['absent', 'single', 'array'] as const)(
     'preserves real Peer results with %s probe options',
     async (mode) => {

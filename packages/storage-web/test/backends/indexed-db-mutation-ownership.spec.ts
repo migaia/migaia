@@ -121,7 +121,7 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
   }
 }
 
-describe('SWV4-R05 IndexedDB preparation and mutation ownership', () => {
+describe('IndexedDB preparation and mutation ownership', () => {
   it('ignores public schema and index strings as backend authority', async () => {
     const store = createStore('r05-public-forge')
     await store.get('probe')

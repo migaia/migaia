@@ -252,7 +252,7 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 				if err != nil {
 					return err
 				}
-				// A10 charges one payload parse and serialization to the bare peer too.
+				// The reference baseline charges one payload parse and serialization to the bare peer too.
 				var payload any
 				decoder := json.NewDecoder(bytes.NewReader(body))
 				decoder.UseNumber()
@@ -393,7 +393,7 @@ func bridgeBody(reader io.Reader) ([]byte, error) {
 	return body, nil
 }
 
-// bridgeWriteBody retains only the physical bare carrier used by the existing A10 payload baseline.
+// bridgeWriteBody retains only the physical bare carrier used by the existing reference payload baseline.
 func bridgeWriteBody(writer io.Writer, body []byte) error {
 	if _, err := fmt.Fprintf(writer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
 		return err

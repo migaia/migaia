@@ -12,7 +12,7 @@ import {
 import { normalizeStreamPayload } from '@migaia/rpc-contract'
 
 /** Protocol 1.1 admits stream through the existing field tables. */
-describe('streaming A10 envelope extension', () => {
+describe('streaming envelope extension', () => {
   it('accepts a portable stream frame without changing frozen 1.0 bytes', () => {
     expect(RpcProtocol.minor).toBe(1)
     expect(RpcEnvelopeKind.stream).toBe('stream')

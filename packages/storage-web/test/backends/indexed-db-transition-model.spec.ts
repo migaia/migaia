@@ -66,7 +66,7 @@ type ITransitionResult =
   | { readonly accepted: true; readonly state: IModelState; readonly writes: readonly string[] }
   | { readonly accepted: false; readonly state: IModelState; readonly writes: readonly [] }
 
-/** Reads the B00 model independently from production IndexedDB implementation state. */
+/** Reads the transition model independently from production IndexedDB implementation state. */
 const readFixture = (): ITransitionFixture =>
   JSON.parse(
     readFileSync(
@@ -164,7 +164,7 @@ const applyTransition = (
     : { accepted: true, state: transition.to, writes: transition.writes }
 }
 
-describe('SWV2-T51 IndexedDB five-invariant transition model', () => {
+describe('IndexedDB five-invariant transition model', () => {
   it('enumerates every legal transition with explicit atomic read/write ownership', () => {
     const fixture = readFixture()
     validateFixture(fixture)

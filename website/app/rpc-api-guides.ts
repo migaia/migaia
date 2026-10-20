@@ -1626,7 +1626,7 @@ export function reportReceivedFailure(received: unknown) {
   })
 }
 
-/** Explains one B6 family predicate as cross-realm diagnosis rather than local owner identity. */
+/** Explains one error-family predicate as cross-realm diagnosis rather than local owner identity. */
 function errorFamilyGuide(input: {
   readonly name: string
   readonly purposeEn: string
@@ -3647,12 +3647,12 @@ probe.setStages([]) // Private active mask changes; host.stageMask keeps its ini
 probe.setStages(['message', 'frame'])`,
     useEn: [
       'Attach the Probe to an existing extensible, non-frozen object while preserving its members and identity.',
-      'Use explicit capture and redaction; detail, error and untransferred content retain references under SC9.',
+      'Use explicit capture and redaction; detail, error and untransferred content retain references.',
       'Read IRpcProbeEventView.variation on message/envelope controls: abort keeps kind cancel, other variations use control, and request/response or other stages leave it undefined.'
     ],
     useZh: [
       '把 Probe 附到可扩展且未冻结的已有对象，保留原有成员与对象身份。',
-      '显式配置 capture/redact；detail、error 与未转移的 content 按 SC9 保留引用。',
+      '显式配置 capture/redact；detail、error 与未转移的 content 保留引用。',
       '从 message/envelope 的 IRpcProbeEventView.variation 读取 control subtype；abort 的 kind 为 cancel，其余 variation 为 control，request/response 与其它阶段为 undefined。'
     ],
     avoidEn: [
@@ -3666,9 +3666,9 @@ probe.setStages(['message', 'frame'])`,
   }),
   'rpc-core:probe:snapshotProbeEvent': guide({
     purposeEn:
-      'Explicitly copies reusable Probe metadata under SC9c so top-level fields, including variation, survive emit. Detail, error and content keep their original references; later caller mutation remains visible until a real codec boundary converts them.',
+      'Explicitly copies reusable Probe metadata so top-level fields, including variation, survive emit. Detail, error and content keep their original references; later caller mutation remains visible until a real codec boundary converts them.',
     purposeZh:
-      '按 SC9c 显式复制复用 Probe 的顶层元数据，包括 variation，使字段在 emit 返回后有效；detail、error、content 保留原引用，调用方后续修改仍可见，直到真实 codec 边界转换表示。',
+      '显式复制复用 Probe 的顶层元数据，包括 variation，使字段在 emit 返回后有效；detail、error、content 保留原引用，调用方后续修改仍可见，直到真实 codec 边界转换表示。',
     quickStart: `import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
 
 /** Retained snapshots belong to this diagnostic consumer. */
@@ -3677,7 +3677,7 @@ const saved: Readonly<IRpcProbeEventView>[] = []
 const probe = defineProbe({
   stages: ['message'],
   emit(view) {
-    // SC9(c): explicitly retain top-level metadata, preserving nested references.
+    // Explicitly retain top-level metadata, preserving nested references.
     saved.push(snapshotProbeEvent(view))
   }
 })

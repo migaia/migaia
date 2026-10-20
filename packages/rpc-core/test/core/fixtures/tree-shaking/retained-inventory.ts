@@ -17,10 +17,11 @@ const reviewClosureModules = reviewed(
 )
 
 /**
- * Reviewed retained module sets as of main 9cd4497a (counts 137/195/202/207/206). The A12 check
- * allows a small number of unreviewed additions per consumer, so ordinary merges do not require a
- * re-pin; refresh this list when a consumer approaches that allowance. The review-closure owners
- * above were inspected and measured on 2026-10-15; byte caps and the allowance are unchanged.
+ * Reviewed retained module sets as of main 9cd4497a (counts 137/195/202/207/206). The retained
+ * check allows a small number of unreviewed additions per consumer, so ordinary merges do not
+ * require a re-pin; refresh this list when a consumer approaches that allowance. The review-closure
+ * owners above were inspected and measured on 2026-10-15; byte caps and the allowance are
+ * unchanged.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// P1: Extract error codes from packages
+// Extract error codes from packages
 
 import { resolve } from 'node:path'
 import { writeFileSync, mkdirSync } from 'node:fs'

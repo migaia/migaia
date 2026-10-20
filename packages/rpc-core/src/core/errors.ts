@@ -76,7 +76,7 @@ export class RpcError extends Error implements IRpcError {
  * Attaches `(source, code)` to an existing error such as `TypeError` or `RangeError`. Preserves
  * `message`, `name`, `stack`, and other fields supplied by the constructor. Use it for argument
  * validation that must preserve the native error type for `instanceof TypeError` checks. See
- * `docs/contracts/error-codes.md` §2.2.
+ * `docs/contracts/error-codes.md`.
  */
 export function tagRpcError<E extends Error>(
   error: E,
@@ -212,7 +212,7 @@ export class RpcAbortError extends RpcError {
     cause?: unknown
   ) {
     super(RpcCoreErrorCode.cancelled, message, cause)
-    // 按 web-rpc.sdd.md §5.5：name 用标准 `AbortError`，供调用方与跨 realm 复原按 `name` 判定取消语义。
+    // 按：name 用标准 `AbortError`，供调用方与跨 realm 复原按 `name` 判定取消语义。
     this.name = RpcErrorFamily.abort
     this.cleanupPromise = cleanupPromise
   }
@@ -224,7 +224,7 @@ export class RpcTimeoutError extends RpcError {
     cleanupPromise?: Promise<readonly IRpcCleanupError[]>
   ) {
     super(RpcCoreErrorCode.deadlineExceeded, message)
-    // 按 web-rpc.sdd.md §5.5：name 用标准 `TimeoutError`，供调用方与跨 realm 复原按 `name` 判定超时语义。
+    // 按：name 用标准 `TimeoutError`，供调用方与跨 realm 复原按 `name` 判定超时语义。
     this.name = RpcErrorFamily.timeout
     this.cleanupPromise = cleanupPromise
   }

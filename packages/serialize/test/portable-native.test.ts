@@ -31,7 +31,7 @@ const nativeParents = new WeakSet<object>()
 /** One module-level native specialization shares the same sole portable traversal. */
 const walkNative = createPortableWalker(nativeStrategy)
 
-it('SPB-T01 borrows native leaf identity without freezing or allocating a descriptor result', () => {
+it('borrows native leaf identity without freezing or allocating a descriptor result', () => {
   /** Exact view/backing identity is the native strategy result, rather than an inline wire tag. */
   const view = new Uint8Array([1, 2])
   const backing = new ArrayBuffer(3)
@@ -45,7 +45,7 @@ it('SPB-T01 borrows native leaf identity without freezing or allocating a descri
   }
 })
 
-it('SPB-T02 propagates native presence once while inline tags do not mint native-parent proof', () => {
+it('propagates native presence once while inline tags do not mint native-parent proof', () => {
   /** Mixed native and inline nodes separate generic binary presence from native ownership proof. */
   const view = new Uint8Array([4])
   const output = walkNative({ child: [view], inline: { $rpc: 'bytes', base64url: 'AA' } })
@@ -59,7 +59,7 @@ it('SPB-T02 propagates native presence once while inline tags do not mint native
   expect(Object.isFrozen(record.child)).toBe(true)
 })
 
-it('SPB-T03 keeps invocation depth and native-input guard at the caller boundary', () => {
+it('keeps invocation depth and native-input guard at the caller boundary', () => {
   /** The fixture uses the existing 64 limit and callback to reject only native input. */
   const original = new Error('native input guard')
   expect(() => walkNative(null, undefined, 65)).toThrowError(
@@ -86,7 +86,7 @@ it('SPB-T03 keeps invocation depth and native-input guard at the caller boundary
   expect(guards).toBe(1)
 })
 
-it('SPB-T04 restores fused accounting after a getter reenters the same owner', () => {
+it('restores fused accounting after a getter reenters the same owner', () => {
   /** The nested call must not replace the outer binary marker, byte bound or active path. */
   const view = new Uint8Array([1])
   const input = {
@@ -103,7 +103,7 @@ it('SPB-T04 restores fused accounting after a getter reenters the same owner', (
   expect(nativeParents.has(output.value as object)).toBe(true)
 })
 
-it('SPB-T05 value-only map/species output performs no length read', () => {
+it('value-only map/species output performs no length read', () => {
   /** A legal species returns an object whose length accessor must remain untouched by freeze. */
   let reads = 0
   /** Exact failure would expose an added output-length observation. */
@@ -139,7 +139,7 @@ it('SPB-T05 value-only map/species output performs no length read', () => {
   expect(reads).toBe(0)
 })
 
-it('SPB-T06 preserves caller ancestor Set failures at root and enclosing-container boundaries', () => {
+it('preserves caller ancestor Set failures at root and enclosing-container boundaries', () => {
   for (const operation of ['has', 'add', 'delete']) {
     /** Public Set subclasses may raise the original native failure during ancestor ownership. */
     const original = new RangeError('caller ancestor failure')
@@ -172,7 +172,7 @@ it('SPB-T06 preserves caller ancestor Set failures at root and enclosing-contain
   }
 })
 
-it('SPB-T07 raw array policy retains lexical depth and ancestors across map callback reuse', () => {
+it('raw array policy retains lexical depth and ancestors across map callback reuse', () => {
   /** Wire callbacks own these lexical values even while another array or invocation is active. */
   const owner = createPortableWalker({
     ...rpcPortableStrategy,

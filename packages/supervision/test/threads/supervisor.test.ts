@@ -4,7 +4,7 @@ import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '../.
 import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.js'
 import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
 
-describe('A3 thread supervision and A4 exit classification', () => {
+describe('thread supervision and exit classification', () => {
   it('restarts on the core backoff schedule and keeps a coded cause chain', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryThreadLauncher()

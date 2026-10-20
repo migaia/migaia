@@ -4,9 +4,9 @@ import { createRuntime } from '@migaia/reactive'
 import { atomDef, atomDefFactory, createAtomStore, previewSafeAtomDefFactory } from '../src'
 
 /**
- * SDD §3.5: atomDef/atomDefFactory must reject thenable return values at runtime instead of
- * silently storing an unresolved Promise as the atom's value. These cases previously passed
- * typecheck and ran without error.
+ * AtomDef/atomDefFactory must reject thenable return values at runtime instead of silently storing
+ * an unresolved Promise as the atom's value. These cases previously passed typecheck and ran
+ * without error.
  */
 describe('thenable guard', () => {
   describe('atomDef', () => {

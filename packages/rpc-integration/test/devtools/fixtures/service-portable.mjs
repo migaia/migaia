@@ -17,9 +17,9 @@ import {
   SUPERVISION_SOURCE
 } from '@migaia/supervision'
 
-/** Shared argv, provider routes and receipt identity belong to this standalone A5 fixture. */
+/** Shared argv, provider routes and receipt identity belong to this standalone portability fixture. */
 export const ServicePortableFixture = {
-  acceptance: 'A5 real-process service portability',
+  acceptance: 'real-process service portability',
   modes: { metadata: 'metadata', exposed: 'exposed' },
   methods: {
     describe: 'devtools.describe',
@@ -337,7 +337,7 @@ async function serve(exposed) {
 }
 
 /**
- * Exercise every A5 boundary through the genuine standalone spawn:true process exchange.
+ * Exercise every portability boundary through the genuine standalone spawn:true process exchange.
  *
  * @param {boolean} exposed Remote content mode for this actual child instance.
  * @returns {Promise<void>} Writes one passing receipt only after assertions and native cleanup.
@@ -428,7 +428,7 @@ async function run(exposed) {
     assert.equal(report.classification, ServicePortableFixture.reportClassification.warning)
   for (const report of reports)
     assert.equal(report.classification, ServicePortableFixture.reportClassification.warning)
-  // SC9(b): JSON is the standalone receipt boundary, never an adaptation of service results.
+  // JSON is the standalone receipt boundary, never an adaptation of service results.
   console.log(JSON.stringify({ ...receipt, reports: [...childReports, ...reports] }))
 }
 

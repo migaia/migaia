@@ -24,7 +24,7 @@ const initiatorOffer = createNativeProcessOffer({
 })
 
 describe('process reverse registration', () => {
-  it('[A4] rejects over-capacity before accept and ignores a late adoption', async () => {
+  it('rejects over-capacity before accept and ignores a late adoption', async () => {
     const reports: unknown[] = []
     let reportLimit: (error: unknown) => void = () => undefined
     const limitReported = new Promise<unknown>((resolve) => {
@@ -97,7 +97,7 @@ describe('process reverse registration', () => {
     }
   })
 
-  it('[A4] cancels an in-flight handshake on listener close without publishing a candidate', async () => {
+  it('cancels an in-flight handshake on listener close without publishing a candidate', async () => {
     const reports: unknown[] = []
     let reportOne: (error: unknown) => void = () => undefined
     const reported = new Promise<unknown>((resolve) => {
@@ -150,7 +150,7 @@ describe('process reverse registration', () => {
     }
   })
 
-  it('[A4] adopts one authenticated channel without closing it with the listener', async () => {
+  it('adopts one authenticated channel without closing it with the listener', async () => {
     const report: unknown[] = []
     const manager = createProcessSessionManager({
       scheduler: createManualScheduler(),

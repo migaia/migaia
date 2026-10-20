@@ -2,7 +2,7 @@
  * Models the asymmetric read and write behavior of `document.cookie`. The getter joins all visible
  * cookies into one string. Each setter assignment writes or deletes only the cookie selected by its
  * `name=` field. Does not model browser enforcement of `Secure`, `SameSite`, or `domain`. Those
- * rules require end-to-end verification in a real browser; see SDD §12.4.
+ * rules require end-to-end verification in a real browser;.
  */
 export const fakeCookieDocument = (): { cookie: string } => {
   const jar = new Map<string, string>()

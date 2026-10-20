@@ -170,7 +170,7 @@ describe('pipeline internal cleanup', () => {
     }
   )
 
-  it('A1 preserves invalid-option text, native type, and own cause for seven admissions', () => {
+  it('preserves invalid-option text, native type, and own cause for seven admissions', () => {
     const invalidMode = 'middleware pipeline mode is invalid'
     const invalidSignal = 'middleware pipeline signal option is invalid'
     const unsupportedLift = 'middleware pipeline stage cannot be lifted to the target mode'
@@ -217,7 +217,7 @@ describe('pipeline internal cleanup', () => {
     )
   })
 
-  it('A2 preserves control admission and cancellation timing across four modes', async () => {
+  it('preserves control admission and cancellation timing across four modes', async () => {
     const modes = Object.values(MiddlewarePipelineMode)
     const invalidControls = [null, 1, [], Object.assign(() => {}, { signal: undefined })]
     for (const mode of modes) {
@@ -251,7 +251,7 @@ describe('pipeline internal cleanup', () => {
     }
   })
 
-  it('A3 has one error factory, one control admission, and ordered runtime imports', () => {
+  it('has one error factory, one control admission, and ordered runtime imports', () => {
     const files = readdirSync(sourceDirectory).filter((name) => name.endsWith('.ts'))
     const source = files.map(
       (name) => [name, readFileSync(`${sourceDirectory}/${name}`, 'utf8')] as const
@@ -271,7 +271,7 @@ describe('pipeline internal cleanup', () => {
     )
   })
 
-  it('A4 wraps primitive reason getter failures in all modes and preserves cleanup order', async () => {
+  it('wraps primitive reason getter failures in all modes and preserves cleanup order', async () => {
     for (const mode of Object.values(MiddlewarePipelineMode)) {
       for (const duringStage of [false, true]) {
         const fixture = throwingReasonSignal('boom', !duringStage)
@@ -332,7 +332,7 @@ describe('pipeline internal cleanup', () => {
     expect((failure as AggregateError).errors[1]).toBe(cleanup)
   })
 
-  it('A5 retains an Error thrown by reason getters across modes and timing', async () => {
+  it('retains an Error thrown by reason getters across modes and timing', async () => {
     const original = new Error('reason failure')
     for (const mode of Object.values(MiddlewarePipelineMode)) {
       for (const duringStage of [false, true]) {
@@ -347,7 +347,7 @@ describe('pipeline internal cleanup', () => {
       }
     }
   })
-  it('A6 uses guarded reason reads and documents every invalid-option scenario', () => {
+  it('uses guarded reason reads and documents every invalid-option scenario', () => {
     const files = readdirSync(sourceDirectory).filter((name) => name.endsWith('.ts'))
     const source = files
       .map((name) => readFileSync(`${sourceDirectory}/${name}`, 'utf8'))

@@ -79,7 +79,7 @@ const createPair = (
   }
 }
 
-describe('A11 no-setup installation preservation', () => {
+describe('no-setup installation preservation', () => {
   it('keeps hook arity, order, and microtask turns on every installation path', async () => {
     const options = {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

@@ -7,7 +7,7 @@ const pairs = [0, 1, 2].flatMap((caller) => [0, 1, 2].map((target) => [caller, t
 
 describe('Tray receipt-bound relay', () => {
   it.each(pairs)(
-    '[A6] caller %i target %i relays request, ordered stream, target errors and one-way delivery',
+    'caller %i target %i relays request, ordered stream, target errors and one-way delivery',
     async (callerIndex, targetIndex) => {
       /** All nine combinations use the same Feature dependency and parent relay. */
       const api = await fixture()
@@ -72,7 +72,7 @@ describe('Tray receipt-bound relay', () => {
   )
 
   it.each(pairs)(
-    '[A6] caller %i target %i propagates parent abort and timeout through both relay hops',
+    'caller %i target %i propagates parent abort and timeout through both relay hops',
     async (callerIndex, targetIndex) => {
       /** Cancellation reports are observed on the genuine caller connection. */
       const reports: unknown[] = []
@@ -123,7 +123,7 @@ describe('Tray receipt-bound relay', () => {
   )
 
   it.each([0, 1, 2])(
-    '[A6] runtime %i preserves native Uint8Array payloads at top level and nested',
+    'runtime %i preserves native Uint8Array payloads at top level and nested',
     async (index) => {
       /** Built portability and native RPC codecs are both part of this assertion. */
       const api = await fixture()
@@ -143,7 +143,7 @@ describe('Tray receipt-bound relay', () => {
     30000
   )
 
-  it('[A6] binds parent and child remotes to one admission and rejects missing and mismatched hosts', async () => {
+  it('binds parent and child remotes to one admission and rejects missing and mismatched hosts', async () => {
     /** Shared host definitions let the child request genuine branded remotes. */
     const api = await fixture()
     /** Parent owns target admission receipts across removal and same-id re-admission. */

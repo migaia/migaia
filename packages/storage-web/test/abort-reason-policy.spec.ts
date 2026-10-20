@@ -4,7 +4,7 @@ import { readAbortReason } from '../src/core/operation.js'
 import { createStorageHost } from '../src/host/index.js'
 import { memoryReactive } from '../src/plugins/reactive/memory.js'
 
-describe('A7 storage operation abort reason policy', () => {
+describe('storage operation abort reason policy', () => {
   it('returns undefined, the original reason, or the original getter failure', () => {
     const reason = { cancelled: true }
     const cause = new Error('reason getter')
@@ -24,7 +24,7 @@ describe('A7 storage operation abort reason policy', () => {
   })
 })
 
-describe('A8 reactive query abort reason policy', () => {
+describe('reactive query abort reason policy', () => {
   it('wraps a pre-aborted getter failure once at admission', async () => {
     const host = await createStorageHost({
       plugins: [memoryReactive({ id: 'reason-pre' })] as const

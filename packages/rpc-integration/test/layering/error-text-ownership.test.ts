@@ -159,7 +159,7 @@ function violations(path: string, text: string): string[] {
 }
 
 describe('error text ownership', () => {
-  it('[A1] rejects four representative literal forms', () => {
+  it('rejects four representative literal forms', () => {
     const fixture = [
       "new Error('x')",
       'tagRpcError(new TypeError(`y ${z}`), c)',
@@ -169,7 +169,7 @@ describe('error text ownership', () => {
     expect(violations('fixture.ts', fixture)).toHaveLength(4)
   })
 
-  it('[A1] rejects nested error arguments and local text factory fragments', () => {
+  it('rejects nested error arguments and local text factory fragments', () => {
     const fixture = [
       "new Error(flag ? 'left' : 'right')",
       'function roleAdmissionMessage() { return `role=${role}` }',
@@ -179,7 +179,7 @@ describe('error text ownership', () => {
     expect(violations('fixture.ts', fixture)).toHaveLength(5)
   })
 
-  it('[A1] keeps all error text in package-owned contracts', () => {
+  it('keeps all error text in package-owned contracts', () => {
     const found = packageRoots.flatMap((root) =>
       sourceFiles(root).flatMap((path) =>
         violations(sourceLabel(root, path), readFileSync(path, 'utf8'))
@@ -188,7 +188,7 @@ describe('error text ownership', () => {
     expect(found).toEqual([])
   })
 
-  it('[A1] distinguishes canonical thread events from error messages', () => {
+  it('distinguishes canonical thread events from error messages', () => {
     expect(
       violations('threads/constants.ts', "const ThreadEvent = { message: 'message' } as const")
     ).toEqual([])
@@ -201,7 +201,7 @@ describe('error text ownership', () => {
     )
   })
 
-  it('[A8] resolves abort reasons through one guarded owner', () => {
+  it('resolves abort reasons through one guarded owner', () => {
     const files = packageRoots.flatMap((root) =>
       sourceFiles(root).map(
         (path) => [sourceLabel(root, path), readFileSync(path, 'utf8')] as const

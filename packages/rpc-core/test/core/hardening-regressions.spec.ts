@@ -35,7 +35,7 @@ describe('#2 ReplayWindow 出站 id 账本满了之后不再记录', () => {
   })
 })
 
-describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍序列化但不再声称 opaque，见类注释）', () => {
+describe('#4 VerifiedPeerRegistry token 与 origin 容量（修复后：仍序列化但不再声称 opaque，见类注释）', () => {
   it('token 保留可观测的自增序列号（随机后缀只增加熵，不隐藏计数）', () => {
     const registry = new VerifiedPeerRegistry(() => Date.now())
     const first = registry.register('sender-1', 'peer', 'https://a.example')
@@ -57,7 +57,7 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
     expect(registry.register('s3', '', 'https://x.example')).toBe(false)
   })
 
-  it('WR5 修复验证：origin 容量最终会被 hard lifetime 强制释放，不是永久自锁', () => {
+  it('修复验证：origin 容量最终会被 hard lifetime 强制释放，不是永久自锁', () => {
     vi.useFakeTimers()
     try {
       const registry = new VerifiedPeerRegistry(() => Date.now(), 1024, 2, 1) // maxBindingLifetimeMs = 1*100 = 100ms
@@ -74,7 +74,7 @@ describe('#4 VerifiedPeerRegistry token 与 origin 容量（WR4 修复后：仍�
     }
   })
 
-  it('WR-R3-1 修复：retain() 自身在命中 token 后也会检查 hard lifetime，不再需要先调 has() 才能触发回收', () => {
+  it('修复：retain() 自身在命中 token 后也会检查 hard lifetime，不再需要先调 has() 才能触发回收', () => {
     vi.useFakeTimers()
     try {
       const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 2, 10) // maxBindingLifetimeMs = 10*100 = 1000ms
@@ -210,8 +210,8 @@ describe('#6 归一化只冻结表头，payload 仍是活引用', () => {
   })
 })
 
-describe('second adversarial pass (R3, fixed)', () => {
-  it('WR-R3-1 fixed: retain() enforces the hard binding lifetime even when called directly (not only via has())', () => {
+describe('second adversarial pass (fixed)', () => {
+  it('fixed: retain() enforces the hard binding lifetime even when called directly (not only via has())', () => {
     vi.useFakeTimers()
     try {
       const registry = new VerifiedPeerRegistry(() => Date.now(), 10, 10, 10)
@@ -225,7 +225,7 @@ describe('second adversarial pass (R3, fixed)', () => {
     }
   })
 
-  it('WR-R3-2 fixed: factory reads replay config in the upfront snapshot, before any middleware side effects', async () => {
+  it('fixed: factory reads replay config in the upfront snapshot, before any middleware side effects', async () => {
     const transport: IRpcTransport = {
       platform: 'Memory',
       send() {},

@@ -311,7 +311,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   const pause = (): void => {
     assertOpen()
     if (paused) return
-    /** Stage names are reconstructed only at this cold lifecycle boundary (SC9b). */
+    /** Stage names are reconstructed only at this cold lifecycle boundary. */
     const current = readProbeStages(devtools)
     pausedStages = []
     for (let i = 0; i < RpcProbeStageName.length; i++)

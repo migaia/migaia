@@ -13,7 +13,7 @@ import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 const capabilities = [...RUNTIME_API_CAPABILITIES, 'portable-binary@1']
 
 for (const cancellation of ['signal', 'deadline'] as const) {
-  it(`[A84][A66][A68] ${cancellation} during binary fingerprint seals cancellation before its terminal`, async () => {
+  it(`${cancellation} during binary fingerprint seals cancellation before its terminal`, async () => {
     /** Any business entry would contradict the original before-start cancellation winner. */
     let calls = 0
     const fixture = await connected({}, { echo: () => ++calls }, capabilities, capabilities)
@@ -55,7 +55,7 @@ for (const cancellation of ['signal', 'deadline'] as const) {
       assert.equal(
         (await fixture.peers[0].outcome(key)).state,
         'unknown',
-        '[A68] pre-claim preparation is not pending'
+        'pre-claim preparation is not pending'
       )
       if (cancellation === 'signal') controller.abort(reason)
       await vi.waitFor(() =>
@@ -81,7 +81,7 @@ for (const cancellation of ['signal', 'deadline'] as const) {
       assert.equal(
         outcome.state,
         'done',
-        '[A68] a completed cancellation cannot remain permanently unknown'
+        'a completed cancellation cannot remain permanently unknown'
       )
       if (outcome.state === 'done') {
         assert.equal(outcome.outcome.completion.ok, false)
@@ -99,7 +99,7 @@ for (const cancellation of ['signal', 'deadline'] as const) {
 }
 
 it.each(['buffer', 'uint8array'] as const)(
-  '[A84] inline %s preserves its real bytes and Uint8Array view boundary',
+  'inline %s preserves its real bytes and Uint8Array view boundary',
   async (kind) => {
     /** Inline view restoration must not disclose prefix or suffix bytes from the caller's backing. */
     const backing = new Uint8Array([9, 8, 7, 6]).buffer
@@ -116,26 +116,26 @@ it.each(['buffer', 'uint8array'] as const)(
       if (kind === 'buffer') {
         assert.ok(
           result instanceof ArrayBuffer,
-          '[A84] ArrayBuffer cannot be rejected or converted to a descriptor'
+          'ArrayBuffer cannot be rejected or converted to a descriptor'
         )
         assert.deepEqual([...new Uint8Array(result)], [9, 8, 7, 6])
       } else {
         assert.ok(
           result instanceof Uint8Array,
-          '[A84] the typed result must contain bytes, not a legacy descriptor'
+          'the typed result must contain bytes, not a legacy descriptor'
         )
         assert.equal(result.byteOffset, 1)
         assert.deepEqual([...result], [8, 7])
         assert.deepEqual([...new Uint8Array(result.buffer)], [0, 8, 7])
       }
-      assert.notEqual(result, input, '[A84] inline restoration materializes its own business value')
+      assert.notEqual(result, input, 'inline restoration materializes its own business value')
     } finally {
       await fixture.close()
     }
   }
 )
 
-it('[A84] a binary result needs no binary request payload, and tag-shaped business data stays ordinary', async () => {
+it('a binary result needs no binary request payload, and tag-shaped business data stays ordinary', async () => {
   const fixture = await connected(
     {},
     {
@@ -147,7 +147,7 @@ it('[A84] a binary result needs no binary request payload, and tag-shaped busine
   )
   try {
     const result = await fixture.peers[0].request('bytes')
-    assert.ok(result instanceof Uint8Array, '[A84] result restoration cannot depend on input bytes')
+    assert.ok(result instanceof Uint8Array, 'result restoration cannot depend on input bytes')
     assert.deepEqual([...result], [1, 2])
     /** These shapes are business values, never an untagged manifest or native reference. */
     const collision = {
@@ -168,7 +168,7 @@ it('[A84] a binary result needs no binary request payload, and tag-shaped busine
   }
 })
 
-it('[A84] notify, stream, group and sealed outcome restore bytes through their original owners', async () => {
+it('notify, stream, group and sealed outcome restore bytes through their original owners', async () => {
   /** Original provider invocation supplies an independent receiver-side observation. */
   const received: unknown[] = []
   const fixture = await connected(
@@ -190,11 +190,11 @@ it('[A84] notify, stream, group and sealed outcome restore bytes through their o
     await vi.waitFor(() => assert.equal(received.length, 1))
     assert.ok(
       received[0] instanceof Uint8Array,
-      '[A84] a physical-only notify still restores provider bytes'
+      'a physical-only notify still restores provider bytes'
     )
     const stream = fixture.peers[0].stream('values')
     const item = await stream.next()
-    assert.ok(item.value instanceof Uint8Array, '[A84] stream items retain their real binary type')
+    assert.ok(item.value instanceof Uint8Array, 'stream items retain their real binary type')
     assert.deepEqual([...item.value], [5, 6])
     await stream.return!(undefined)
     const group = await fixture.peers[0].group([{ method: 'bytes' }], {
@@ -212,7 +212,7 @@ it('[A84] notify, stream, group and sealed outcome restore bytes through their o
       }[]
       assert.ok(
         results[0]!.result instanceof Uint8Array,
-        '[A84] stored outcomes are restored once, not double-tagged'
+        'stored outcomes are restored once, not double-tagged'
       )
     }
   } finally {
@@ -220,7 +220,7 @@ it('[A84] notify, stream, group and sealed outcome restore bytes through their o
   }
 })
 
-it('[A84][A74] missing bilateral portable-binary rejects native input before send or provider', async () => {
+it('missing bilateral portable-binary rejects native input before send or provider', async () => {
   let effects = 0
   const fixture = await connected(
     {},
@@ -236,7 +236,7 @@ it('[A84][A74] missing bilateral portable-binary rejects native input before sen
     assert.equal(
       (result as { code?: string })?.code,
       RpcCoreErrorCode.capabilityUnsupported,
-      '[A84] do not silently send a bytes descriptor to a foreign peer'
+      'do not silently send a bytes descriptor to a foreign peer'
     )
     assert.equal(send.mock.calls.length, 0)
     assert.equal(effects, 0)
@@ -247,7 +247,7 @@ it('[A84][A74] missing bilateral portable-binary rejects native input before sen
 })
 
 it.each(['request', 'notify', 'stream', 'group'] as const)(
-  '[A87] %s explicit empty transfer cannot be ignored when the native profile is absent',
+  '%s explicit empty transfer cannot be ignored when the native profile is absent',
   async (mode) => {
     let effects = 0
     const fixture = await connected(
@@ -287,7 +287,7 @@ it.each(['request', 'notify', 'stream', 'group'] as const)(
 )
 
 it.each(['buffer-bytes', 'view-offset'] as const)(
-  '[A84][A68] keyed %s differences cannot replay a previous binary operation',
+  'keyed %s differences cannot replay a previous binary operation',
   async (kind) => {
     /** Distinct binary semantics must conflict before a second provider invocation. */
     let effects = 0
@@ -319,7 +319,7 @@ it.each(['buffer-bytes', 'view-offset'] as const)(
       assert.equal(
         (result as { code?: string })?.code,
         RpcCoreErrorCode.contractInvalid,
-        '[A68] native bytes/type/view metadata belong to the original operation fingerprint'
+        'native bytes/type/view metadata belong to the original operation fingerprint'
       )
       assert.equal(effects, 1)
     } finally {
@@ -328,7 +328,7 @@ it.each(['buffer-bytes', 'view-offset'] as const)(
   }
 )
 
-it('[A84][A68] a sealed binary completion keeps its own bytes after the provider mutates its returned value', async () => {
+it('a sealed binary completion keeps its own bytes after the provider mutates its returned value', async () => {
   /** The real provider deliberately retains its business buffer after successful completion. */
   const bytes = new Uint8Array([1, 2])
   const fixture = await connected({}, { bytes: () => bytes }, capabilities, capabilities)
@@ -346,7 +346,7 @@ it('[A84][A68] a sealed binary completion keeps its own bytes after the provider
       assert.deepEqual(
         [...stored],
         [1, 2],
-        '[A68] a completed provider cannot mutate the original sealed outcome'
+        'a completed provider cannot mutate the original sealed outcome'
       )
     }
   } finally {
@@ -354,7 +354,7 @@ it('[A84][A68] a sealed binary completion keeps its own bytes after the provider
   }
 })
 
-it('[A84][A68] native ArrayBuffer bytes cannot evade the original memory outcome retention budget', async () => {
+it('native ArrayBuffer bytes cannot evade the original memory outcome retention budget', async () => {
   /**
    * This valid scalar result is below the physical limit but above the existing 1 MiB cache
    * ceiling.
@@ -371,7 +371,7 @@ it('[A84][A68] native ArrayBuffer bytes cannot evade the original memory outcome
     assert.equal(
       outcome.state,
       'unknown',
-      '[A68] an over-budget native result is not silently retained as a zero-byte object'
+      'an over-budget native result is not silently retained as a zero-byte object'
     )
     assert.equal(outcome.store.kind, 'memory')
   } finally {
@@ -379,7 +379,7 @@ it('[A84][A68] native ArrayBuffer bytes cannot evade the original memory outcome
   }
 })
 
-it('[A84][A93] the canonical runtime source offer carries portable binary without a custom capability switch', async () => {
+it('the canonical runtime source offer carries portable binary without a custom capability switch', async () => {
   /** Both original source offers use the exact capabilities supplied by the canonical assembly. */
   const fixture = await connected(
     {},
@@ -390,17 +390,14 @@ it('[A84][A93] the canonical runtime source offer carries portable binary withou
   try {
     const backing = new Uint8Array([1, 2]).buffer
     const result = await fixture.peers[0].request('echo', backing).catch((error: unknown) => error)
-    assert.ok(
-      result instanceof ArrayBuffer,
-      '[A84] default negotiated peers expose actual binary bytes'
-    )
+    assert.ok(result instanceof ArrayBuffer, 'default negotiated peers expose actual binary bytes')
     assert.deepEqual([...new Uint8Array(result)], [1, 2])
   } finally {
     await fixture.close()
   }
 })
 
-it('[A84][A59] async binary fingerprint preparation keeps its admitted FIFO place', async () => {
+it('async binary fingerprint preparation keeps its admitted FIFO place', async () => {
   /** Both requests use the same original order owner; only the first needs an actual backing hash. */
   const executions: string[] = []
   const fixture = await connected(
@@ -447,7 +444,7 @@ it('[A84][A59] async binary fingerprint preparation keeps its admitted FIFO plac
     assert.deepEqual(
       executions,
       ['first', 'second'],
-      '[A59] a later request cannot pass binary preparation'
+      'a later request cannot pass binary preparation'
     )
   } finally {
     release()

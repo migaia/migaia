@@ -16,7 +16,7 @@ beforeAll(async () => {
 })
 
 describe('store-wasm audit regressions', () => {
-  it('SW-D01 resolves the native array view after entering its actual Source commit', async () => {
+  it('resolves the native array view after entering its actual Source commit', async () => {
     /** All graph and allocation ownership stays with the real Store/Runtime. */
     const runtime = createRuntime()
     /** Extend the public synchronous builder, forwarding every context/Source capability. */
@@ -79,7 +79,7 @@ describe('store-wasm audit regressions', () => {
   })
 
   it.each(['length', 'item'] as const)(
-    'SW-D02 codes a real ArrayLike %s getter without partial writes',
+    'codes a real ArrayLike %s getter without partial writes',
     async (part) => {
       /** Native field state remains intact when application input cannot be read. */
       const store = createStore({ values: array(2) })
@@ -117,7 +117,7 @@ describe('store-wasm audit regressions', () => {
     { name: 'string', builder: string() },
     { name: 'array', builder: array(2) },
     { name: 'record', builder: record({ x: number() }) }
-  ])('SW-D03 retains the real native abort reason in the $name builder', ({ builder }) => {
+  ])('retains the real native abort reason in the $name builder', ({ builder }) => {
     /** All union members implement the same canonical Store field construction protocol. */
     const original: IFieldBuilder<IDisposable> = builder
     if (original.mode !== 'sync') throw new Error('expected synchronous field builder')

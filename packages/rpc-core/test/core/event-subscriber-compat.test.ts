@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { HookRegistry } from '../../dist/core/internal/hooks.js'
 
 describe('event-subscriber compatibility', () => {
-  it('ES-T117 preserves HookRegistry Set dedupe, snapshot delivery, and idempotent disposer', () => {
+  it('preserves HookRegistry Set dedupe, snapshot delivery, and idempotent disposer', () => {
     const registry = new HookRegistry()
     const hook = vi.fn()
     const first = registry.add(hook)
@@ -16,7 +16,7 @@ describe('event-subscriber compatibility', () => {
     expect(registry.size).toBe(0)
   })
 
-  it('ES-T117 isolates synchronous hook failure and preserves snapshot call order', () => {
+  it('isolates synchronous hook failure and preserves snapshot call order', () => {
     const registry = new HookRegistry()
     const calls: string[] = []
     registry.add(() => {
@@ -30,7 +30,7 @@ describe('event-subscriber compatibility', () => {
     expect(calls).toEqual(['first', 'second'])
   })
 
-  it('ES-T118 preserves clear isolation and re-add identity', () => {
+  it('preserves clear isolation and re-add identity', () => {
     const registry = new HookRegistry()
     const calls: string[] = []
     const first = registry.add(() => {

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('carriers A1: real SharedWorker observe preserves physical capture and disposal', async ({
+test('carriers: real SharedWorker observe preserves physical capture and disposal', async ({
   page
 }) => {
   await page.goto('/browser-peer/observe.html')

@@ -4,8 +4,7 @@
  * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
  * `source` is always `'@migaia/logger'`. Throw sites use these constants instead of inline values.
  *
- * Code values are public API. Renaming a code is a breaking change. See
- * `docs/contracts/error-code-rollout.sdd.md` §1.2.
+ * Code values are public API. Renaming a code is a breaking change.
  */
 export const LoggerErrorCode = {
   /**
@@ -23,8 +22,8 @@ export const LoggerErrorCode = {
 
   /**
    * Process plugin/logger installation is attempted while runtime shutdown is already in progress.
-   * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller
-   * must wait for shutdown to settle or install the logger without the process plugin.
+   * Enforces terminal shutdown: shutdown admission is terminal for that runtime. The caller must
+   * wait for shutdown to settle or install the logger without the process plugin.
    */
   runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN',
 
@@ -51,45 +50,44 @@ export const LoggerErrorCode = {
 
   /**
    * HTTP delivery receives a non-success response or exhausts retryable transport attempts.
-   * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport
-   * and apply their own delivery remediation while logger failure policy contains the sink
-   * failure.
+   * Enforces transport delivery reporting; callers must inspect the endpoint/transport and apply
+   * their own delivery remediation while logger failure policy contains the sink failure.
    */
   deliveryFailed: 'DELIVERY_FAILED',
 
   /**
    * HTTP plugin construction receives a retry count that is not a finite non-negative integer.
-   * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before
+   * Enforces plugin configuration admission; callers must correct the plugin configuration before
    * constructing or installing the logger.
    */
   invalidRetryCount: 'INVALID_RETRY_COUNT',
 
   /**
    * A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished.
-   * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and
-   * inspect the reported pending work instead of assuming every entry was delivered.
+   * Enforces bounded delivery; callers must treat delivery as degraded and inspect the reported
+   * pending work instead of assuming every entry was delivered.
    */
   lifecycleDeadline: 'LIFECYCLE_DEADLINE',
 
   /**
    * Process plugin installation fails and listener rollback reports one or more additional errors.
-   * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix
-   * the primary installation failure, and verify runtime listeners before retrying installation.
+   * Enforces aggregated shutdown reporting; callers must inspect `AggregateError.errors`, fix the
+   * primary installation failure, and verify runtime listeners before retrying installation.
    */
   processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED',
 
   /**
    * Logger plugin final uninstall cleanup attempted every registered action but one or more actions
-   * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or
-   * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A
-   * batcher whose final drain left entries undelivered reports this code with `detail.dropped`.
+   * failed. Enforces cleanup containment; callers must inspect the cause or `AggregateError.errors`
+   * and may create a fresh plugin instance after runtime state resets. A batcher whose final drain
+   * left entries undelivered reports this code with `detail.dropped`.
    */
   pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED',
 
   /**
    * Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit
-   * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors
-   * before deciding whether the process can continue.
+   * path. Enforces cleanup containment; callers must inspect the primary and cleanup errors before
+   * deciding whether the process can continue.
    */
   pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED',
 
@@ -125,7 +123,8 @@ export const LoggerErrorCode = {
   batchOverflow: 'BATCH_OVERFLOW',
   /**
    * File plugin installation found neither an injected file-system capability nor the supported
-   * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition.
+   * Node default. Enforces explicit host injection; callers must inject `fs` or use the Node
+   * condition.
    */
   fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'
 } as const

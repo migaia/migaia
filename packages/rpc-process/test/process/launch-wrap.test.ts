@@ -28,7 +28,7 @@ import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/public-host.
 
 /** An absolute TypeScript entry works with Node's native type stripping and no fixture loader. */
 const entry = fileURLToPath(new URL('./fixtures/launch-wrap-child.ts', import.meta.url))
-/** The external macOS tool is optional; the skip reason is part of A3's deciding evidence. */
+/** The external macOS tool is optional; the skip reason is part of the sandbox case evidence. */
 const sandboxAvailable = process.platform === 'darwin' && existsSync('/usr/bin/sandbox-exec')
 /** The public Host install wrapper stays visible instead of asserting only a nested code. */
 const hostFailure = { source: '@migaia/plugin-host', code: 'PLUGIN_INSTALL_FAILED' }
@@ -62,7 +62,7 @@ function layer(error: unknown, source: string, code: string): IObservedError {
   return found!
 }
 
-/** A2 diagnostics record every native and package layer with redacted fixture message text. */
+/** Diagnostics record every native and package layer with redacted fixture message text. */
 function diagnostic(error: unknown) {
   return causes(error).map((item) => ({
     name: item.name,
@@ -132,7 +132,7 @@ class RecordingLauncher implements IProcessLauncher<INodeProcessHandle> {
   readonly capabilities = this.#native.capabilities
   /** The observed receiver distinguishes delegation from an unbound method copy. */
   readonly receivers: RecordingLauncher[] = []
-  /** Original launch fields let A1 compare the protected values after callback projection. */
+  /** Original launch fields let the test compare the protected values after callback projection. */
   readonly specifications: IProcessSpec[] = []
 
   /** Launch through the original Node owner, recording this exact class instance. */
@@ -155,7 +155,7 @@ class RecordingLauncher implements IProcessLauncher<INodeProcessHandle> {
 }
 
 describe('launch-wrap revision 5', () => {
-  it('[A1][R1][R1a] wraps start, restart and replacement without replacing channel or bootstrap', async () => {
+  it('wraps start, restart and replacement without replacing channel or bootstrap', async () => {
     /** The Host owns all three real child generations. */
     const host = createHost()
     /** A per-launch count distinguishes runtime wrapping from assembly-only wrapping. */
@@ -190,7 +190,7 @@ describe('launch-wrap revision 5', () => {
     }
   })
 
-  it('[A1][R1] leaves the wrapper variable absent without wrap', async () => {
+  it('leaves the wrapper variable absent without wrap', async () => {
     /** Child environment inherits PATH only, independently of the test runner's ambient env. */
     const host = createHost()
     try {
@@ -201,7 +201,7 @@ describe('launch-wrap revision 5', () => {
     }
   })
 
-  it('[A1][R1a] preserves class launcher receivers, capabilities and prototype recovery operations', async () => {
+  it('preserves class launcher receivers, capabilities and prototype recovery operations', async () => {
     /** Public supervision factory is the existing seam exposing the launcher's prepared operations. */
     const original = processSupervision.createProcessSupervisor
     /** Only the already-public supervisor call is observed; no production test seam is added. */
@@ -266,7 +266,7 @@ describe('launch-wrap revision 5', () => {
     }
   })
 
-  it('[A1][R1a] does not fabricate optional launcher operations', async () => {
+  it('does not fabricate optional launcher operations', async () => {
     /** Capture the prepared public supervisor input without changing construction semantics. */
     const original = processSupervision.createProcessSupervisor
     /** A default Node launcher has neither recovery operation. */
@@ -290,7 +290,7 @@ describe('launch-wrap revision 5', () => {
     }
   })
 
-  it('[A2][R2] rejects non-function wrap before launching', async () => {
+  it('rejects non-function wrap before launching', async () => {
     /** Launch counting proves preparation rejects before creating a native process. */
     const launcher = new RecordingLauncher()
     /** Invalid user input is deliberately outside the static option type. */
@@ -312,7 +312,7 @@ describe('launch-wrap revision 5', () => {
   })
 
   it.each(['command', 'args', 'env'] as const)(
-    '[A1][R1a] rejects inherited required command field %s',
+    'rejects inherited required command field %s',
     async (field) => {
       /** A required field on the prototype must not become native launch authority. */
       const error = await installFailure({
@@ -335,7 +335,7 @@ describe('launch-wrap revision 5', () => {
   )
 
   it.each(['command', 'args', 'cwd', 'env'] as const)(
-    '[A1][R1a] rejects command field %s accessors without executing the getter',
+    'rejects command field %s accessors without executing the getter',
     async (field) => {
       /** A property getter must never run while native launch authority is projected. */
       let reads = 0
@@ -375,7 +375,7 @@ describe('launch-wrap revision 5', () => {
       })
     ]
   ] as const)(
-    '[A2][R2] reports invalid wrap.%s under Host and launch failure layers',
+    'reports invalid wrap.%s under Host and launch failure layers',
     async (field, wrap) => {
       /** Invalid callback results intentionally bypass the static return type. */
       const error = await installFailure({ wrap: wrap as unknown as IProcessShortSpawn['wrap'] })
@@ -395,7 +395,7 @@ describe('launch-wrap revision 5', () => {
     }
   )
 
-  it('[A2][R2] retains thrown identity and reports SUPERVISION_EXHAUSTED when restart is never', async () => {
+  it('retains thrown identity and reports SUPERVISION_EXHAUSTED when restart is never', async () => {
     /** The plain thrown object must remain the identical reachable native cause. */
     const original = { fixture: 'wrap-thrown' }
     /** The ordinary supervision reporter observes terminal restart-policy exhaustion. */
@@ -432,7 +432,7 @@ describe('launch-wrap revision 5', () => {
     expect(layer(exhausted, '@migaia/supervision', 'LAUNCH_FAILED').cause).toBe(invalid)
   })
 
-  it('[A2][R2] preserves missing-command ENOENT below channel and launch failure layers', async () => {
+  it('preserves missing-command ENOENT below channel and launch failure layers', async () => {
     /** An absolute nonexistent command prevents PATH or shell behavior from changing this case. */
     const error = await installFailure({
       wrap: (command) => ({ ...command, command: '/migaia-launch-wrap-command-does-not-exist' })
@@ -446,7 +446,7 @@ describe('launch-wrap revision 5', () => {
     })
   })
 
-  it('[A2][R2] classifies a bootstrap-completed exit-3 child as crashed', async () => {
+  it('classifies a bootstrap-completed exit-3 child as crashed', async () => {
     /** The Host owns the real launched handle until the child exits after its first reply. */
     const host = createHost()
     try {
@@ -480,7 +480,7 @@ describe('launch-wrap revision 5', () => {
     }
   })
 
-  it('[A2][R2] records the immediately exiting wrapper phase without fixing a timing-dependent code', async () => {
+  it('records the immediately exiting wrapper phase without fixing a timing-dependent code', async () => {
     /** A healthy connection publishes the Host outlet before the failing source is installed. */
     const host = createHost()
     /** All original error layers remain available for the observed phase record. */
@@ -512,7 +512,7 @@ describe('launch-wrap revision 5', () => {
           (error: unknown) => ({ installed: false as const, error })
         )
       console.info(
-        '[A2 immediate wrapper observed]',
+        '[immediate wrapper observed]',
         JSON.stringify({
           installed: outcome.installed,
           chain: outcome.installed ? [] : diagnostic(outcome.error),
@@ -530,7 +530,7 @@ describe('launch-wrap revision 5', () => {
           error: { source: '@migaia/supervision', code: 'EXIT_UNEXPECTED' }
         })
         console.info(
-          '[A2 immediate wrapper]',
+          '[immediate wrapper]',
           JSON.stringify({ phase: 'EXIT_UNEXPECTED', event, reports: reports.map(diagnostic) })
         )
       } else {
@@ -546,7 +546,7 @@ describe('launch-wrap revision 5', () => {
             cause: expect.any(Error)
           })
           console.info(
-            '[A2 immediate wrapper]',
+            '[immediate wrapper]',
             JSON.stringify({
               phase: 'LAUNCH_FAILED',
               chain: diagnostic(outcome.error),
@@ -566,7 +566,7 @@ describe('launch-wrap revision 5', () => {
           })
           expect(exits).toEqual([])
           console.info(
-            '[A2 immediate wrapper]',
+            '[immediate wrapper]',
             JSON.stringify({
               phase: 'PROCESS_CHANNEL_CLOSED',
               chain: diagnostic(outcome.error),
@@ -580,7 +580,7 @@ describe('launch-wrap revision 5', () => {
     }
   })
 
-  it('[A2][R2] records a failed second launch without emitting a native exit', async () => {
+  it('records a failed second launch without emitting a native exit', async () => {
     /** First launch establishes the Host outlet; second launch fails inside the same supervisor. */
     const host = createHost()
     /** Invocation count selects the actual restart rather than initial preparation. */
@@ -631,7 +631,7 @@ describe('launch-wrap revision 5', () => {
         )
       ).toEqual([])
       console.info(
-        '[A2 restart wrapper observed]',
+        '[restart wrapper observed]',
         JSON.stringify({
           outcome,
           calls,
@@ -647,7 +647,7 @@ describe('launch-wrap revision 5', () => {
   })
 
   it.skipIf(!sandboxAvailable)(
-    `[A3][R1] external sandbox denies a child write while calls succeed${sandboxAvailable ? '' : ' (skipped: /usr/bin/sandbox-exec unavailable on this platform)'}`,
+    `external sandbox denies a child write while calls succeed${sandboxAvailable ? '' : ' (skipped: /usr/bin/sandbox-exec unavailable on this platform)'}`,
     async () => {
       /** This test owns its temporary target and deletes only its own fixture directory. */
       const directory = await mkdtemp(join(tmpdir(), 'migaia-launch-wrap-'))

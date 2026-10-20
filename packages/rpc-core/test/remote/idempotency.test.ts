@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { remoteHarness } from './fixture.js'
 
-describe('A6 logical idempotency key', () => {
+describe('logical idempotency key', () => {
   it('keeps an explicit key through retry dispatch and core send', async () => {
     let factoryCalls = 0
     const observed: { key?: string; idempotent: boolean; generation: number }[] = []

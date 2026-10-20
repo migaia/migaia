@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
 
-/** Keep the I5 envelope extension point available for the stream kind in S2. */
-describe('streaming S1 inventory', () => {
+/** Keep the envelope extension point available for the stream kind. */
+describe('streaming inventory', () => {
   it('uses the per-kind field table without a stream-specific normalizer branch', () => {
     /** The normalizer is the control-owned extension point frozen before this leaf. */
     const source = readFileSync(

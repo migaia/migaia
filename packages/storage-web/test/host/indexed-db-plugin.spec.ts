@@ -5,7 +5,7 @@ import { createStorageHost, definePlugin } from '../../src/host/index.js'
 import type { IKeyValueStore } from '../../src/types/storage.js'
 import { indexedDbBackendPlugin } from '../../src/plugins/indexed-db.js'
 
-describe('SWV4-R07 IndexedDB backend plugin', () => {
+describe('IndexedDB backend plugin', () => {
   it('prepares the canonical layout before publishing the exact store', async () => {
     const host = await createStorageHost({
       plugins: [

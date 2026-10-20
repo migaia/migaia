@@ -111,7 +111,7 @@ function readProjectedSend(endpoint: object): IRpcEndpoint['send'] {
   return send as IRpcEndpoint['send']
 }
 
-/** Builds the canonical first-party role-admission message expected by the RED contract. */
+/** Builds the canonical first-party role-admission message expected by the admission contract. */
 function roleAdmissionMessage(role: string, slot: string, key: PropertyKey | undefined): string {
   return `${RpcCoreErrorText.endpointModuleInvalid}; role=${role}; slot=${slot}; key=${
     key === undefined ? 'unavailable' : stablePropertyKeyDescription(key)
@@ -149,7 +149,7 @@ function composedConfig(
   transport: IRpcCoreConfig['transport'],
   middlewares: readonly IRpcPlugin[]
 ): IRpcCoreConfig {
-  return { id: `b12a-atomic-${Math.random()}`, transport, middlewares }
+  return { id: `atomic-${Math.random()}`, transport, middlewares }
 }
 
 type IProductionBatch = {
@@ -328,7 +328,7 @@ async function createProductionBatch(
     }
   }
   const config: IRpcCoreConfig = {
-    id: `b12a-production-${productionBatchId++}`,
+    id: `production-${productionBatchId++}`,
     transport,
     provider: options.providers,
     construction: options.construction,
@@ -598,7 +598,7 @@ async function createProductionBatch(
   }
 }
 
-/** Captures only public Host/lifecycle dimensions used by no-mutation RED rows. */
+/** Captures only public Host/lifecycle dimensions used by no-mutation failure rows. */
 function productionHostSnapshot(batch: IProductionBatch): Readonly<{
   readonly hostKeys: readonly PropertyKey[]
   readonly ports: readonly unknown[]
@@ -832,7 +832,7 @@ async function expectRuntimeParityFailure(
   expect(sharedAfterFailure.every((value) => value === undefined)).toBe(true)
 }
 
-describe('B12a atomic middleware and claim contracts', () => {
+describe('atomic middleware and claim contracts', () => {
   it.each([
     ['null', null],
     ['primitive', 0]
@@ -862,17 +862,17 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('YS31 publishes dynamic native middleware keys before activation', async () => {
+  it('publishes dynamic native middleware keys before activation', async () => {
     const [transport] = createMemoryTransportPair()
     let descriptors = 0
-    const middleware = defineMiddleware('ys31-native', () => {
+    const middleware = defineMiddleware('native-2', () => {
       descriptors += 1
       return {
         expose: () => ({ nativeMiddleware: () => 'ready' })
       }
     })
     const endpoint = await createEndpoint({
-      id: 'ys31-native',
+      id: 'native-2',
       transport,
       middlewares: [connect({ transport }), middleware] as const
     })
@@ -881,10 +881,10 @@ describe('B12a atomic middleware and claim contracts', () => {
     await endpoint.dispose()
   })
 
-  it('YS31 retains WebRPC owned-resource cleanup for native Middleware', async () => {
+  it('retains WebRPC owned-resource cleanup for native Middleware', async () => {
     const [transport] = createMemoryTransportPair()
     let releases = 0
-    const middleware = defineMiddleware('ys31-owned-resource', (core) => ({
+    const middleware = defineMiddleware('fixture-owned-resource', (core) => ({
       install: () => {
         core.own({}, () => {
           releases += 1
@@ -894,7 +894,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       expose: () => ({ ownedMiddleware: () => 'ready' })
     }))
     const endpoint = await createEndpoint({
-      id: 'ys31-owned-resource',
+      id: 'fixture-owned-resource',
       transport,
       middlewares: [connect({ transport }), middleware] as const
     })
@@ -904,11 +904,11 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(releases).toBe(1)
   })
 
-  it('YS31 normalizes object middleware through the native installation path', async () => {
+  it('normalizes object middleware through the native installation path', async () => {
     const [transport] = createMemoryTransportPair()
     let installs = 0
     const middleware = defineMiddleware({
-      name: 'ys31-object-native',
+      name: 'object-native',
       metadata: {
         claims: {
           ...emptyClaims,
@@ -923,7 +923,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
     })
     const endpoint = await createEndpoint({
-      id: 'ys31-object-native',
+      id: 'object-native',
       transport,
       middlewares: [connect({ transport }), middleware] as const
     })
@@ -934,28 +934,28 @@ describe('B12a atomic middleware and claim contracts', () => {
     await endpoint.dispose()
   })
 
-  it('YS31 selects an object middleware transport without a factory transport', async () => {
+  it('selects an object middleware transport without a factory transport', async () => {
     const [transport] = createMemoryTransportPair()
     const legacyConnect = connect({ transport })
     const middleware = defineMiddleware({
       ...legacyConnect,
-      name: 'ys31-object-transport',
+      name: 'object-transport',
       transport
     })
     const endpoint = await createEndpoint({
-      id: 'ys31-object-transport',
+      id: 'object-transport',
       middlewares: [middleware] as const
     })
     expect(endpoint).toBeDefined()
     await endpoint.dispose()
   })
 
-  it('YS31 captures object middleware install and metadata at definition time', async () => {
+  it('captures object middleware install and metadata at definition time', async () => {
     const [transport] = createMemoryTransportPair()
     let capturedInstalls = 0
     let mutatedInstalls = 0
     const definition = {
-      name: 'ys31-object-capture',
+      name: 'object-capture',
       metadata: { claims: emptyClaims },
       install: () => {
         capturedInstalls += 1
@@ -971,7 +971,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       claims: { ...emptyClaims, publicKeys: ['mutated'], exposedKeys: ['mutated'] }
     }
     const endpoint = await createEndpoint({
-      id: 'ys31-object-capture',
+      id: 'object-capture',
       transport,
       middlewares: [connect({ transport }), middleware] as const
     })
@@ -980,7 +980,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await endpoint.dispose()
   })
 
-  it('YS31 rejects explicit empty object publicKeys with a nonempty extension', async () => {
+  it('rejects explicit empty object publicKeys with a nonempty extension', async () => {
     const [baseTransport] = createMemoryTransportPair()
     const stats = { subscribeCalls: 0 }
     const transport = {
@@ -992,7 +992,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
     let releases = 0
     const middleware = defineMiddleware({
-      name: 'ys31-object-empty-public',
+      name: 'object-empty-public',
       metadata: { claims: emptyClaims },
       install: (scope) => {
         scope.own({}, () => {
@@ -1003,7 +1003,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     await expect(
       createEndpoint({
-        id: 'ys31-object-empty-public',
+        id: 'object-empty-public',
         transport,
         middlewares: [connect({ transport }), middleware] as const
       })
@@ -1012,7 +1012,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(releases).toBe(1)
   })
 
-  it('YS31 rejects explicit empty object sharedProvides before ingress', async () => {
+  it('rejects explicit empty object sharedProvides before ingress', async () => {
     const [baseTransport] = createMemoryTransportPair()
     const stats = { subscribeCalls: 0 }
     const transport = {
@@ -1024,7 +1024,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
     let releases = 0
     const middleware = defineMiddleware({
-      name: 'ys31-object-empty-shared',
+      name: 'object-empty-shared',
       metadata: { claims: emptyClaims, sharedProvides: [] },
       install: (scope) => {
         scope.own({}, () => {
@@ -1035,7 +1035,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     await expect(
       createEndpoint({
-        id: 'ys31-object-empty-shared',
+        id: 'object-empty-shared',
         transport,
         middlewares: [connect({ transport }), middleware] as const
       })
@@ -1044,26 +1044,26 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(releases).toBe(1)
   })
 
-  it('YS31 keeps dynamic native middleware keys isolated across concurrent Hosts', async () => {
+  it('keeps dynamic native middleware keys isolated across concurrent Hosts', async () => {
     const [firstTransport] = createMemoryTransportPair()
     const [secondTransport] = createMemoryTransportPair()
     const middleware = defineMiddleware<{
       readonly firstNativeMiddleware?: () => string
       readonly secondNativeMiddleware?: () => string
-    }>('ys31-isolation', (core) => ({
+    }>('fixture-isolation', (core) => ({
       expose: () =>
-        core.id === 'ys31-first'
+        core.id === 'first-4'
           ? { firstNativeMiddleware: () => 'first' }
           : { secondNativeMiddleware: () => 'second' }
     }))
     const [first, second] = await Promise.all([
       createEndpoint({
-        id: 'ys31-first',
+        id: 'first-4',
         transport: firstTransport,
         middlewares: [connect({ transport: firstTransport }), middleware] as const
       }),
       createEndpoint({
-        id: 'ys31-second',
+        id: 'second-3',
         transport: secondTransport,
         middlewares: [connect({ transport: secondTransport }), middleware] as const
       })
@@ -1179,7 +1179,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['kernel', 'middleware:connect', 'feature:outbound', 'activation'] as const)(
-    'preserves PH01 primary and rollback identities when %s fails',
+    'preserves primary and rollback identities when %s fails',
     async (failedRole) => {
       const roles = ['kernel', 'middleware:connect', 'feature:outbound', 'activation'] as const
       const failureIndex = roles.indexOf(failedRole)
@@ -1233,7 +1233,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('drives every production role through one injected batch with PH01 identities and no residue', async () => {
+  it('drives every production role through one injected batch with identities and no residue', async () => {
     const baseline = await createProductionBatch()
     const roles = baseline.inventory.map(({ role }) => role)
     await baseline.host.dispose()
@@ -1758,7 +1758,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['protocol', 'contract'] as const)(
-    'rejects admitted %s runtime shared omission before activation with PH01 identity',
+    'rejects admitted %s runtime shared omission before activation with identity',
     async (missingRole) => {
       const primary = new Error(`${missingRole} shared publication mismatch`)
       const rollback = new Error(`${missingRole} shared rollback`)
@@ -1827,7 +1827,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['contract', 'sync'],
     ['contract', 'async']
   ] as const)(
-    'preserves native %s install %s PH01 identity and rollback residue',
+    'preserves native %s install %s identity and rollback residue',
     async (failedRole, mode) => {
       const primary = new Error(`${failedRole} ${mode} primary`)
       const rollback = new Error(`protocol ${mode} rollback`)
@@ -2031,7 +2031,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await endpointDispose
   })
 
-  it('B12b02 RED: publishes authentication and connect through typed Host shared ports', async () => {
+  it('publishes authentication and connect through typed Host shared ports', async () => {
     const encrypted = (value: unknown): unknown => `encrypted:${String(value)}`
     const decrypted = (value: unknown): unknown => String(value).slice('encrypted:'.length)
     const identified = async (): Promise<boolean> => true
@@ -2091,7 +2091,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b02 RED: declares required connect and optional authentication shared consumption', async () => {
+  it('declares required connect and optional authentication shared consumption', async () => {
     const batch = await createProductionBatch()
     try {
       const authenticationEntry = batch.inventory.find(
@@ -2110,7 +2110,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b02 RED: accepts absent optional authentication and rejects absent required connect', async () => {
+  it('accepts absent optional authentication and rejects absent required connect', async () => {
     const withoutAuthentication = await createProductionBatch({ omitAuthentication: true })
     try {
       await withoutAuthentication.host.installBatch(
@@ -2143,7 +2143,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['authentication', 'async'],
     ['connect', 'sync'],
     ['connect', 'async']
-  ] as const)('B12b02 RED: preserves native %s %s failure identity', async (failedRole, mode) => {
+  ] as const)('preserves native %s %s failure identity', async (failedRole, mode) => {
     const primary = new Error(`${failedRole}-${mode}-primary`)
     const batch = await createProductionBatch({
       injectInstall: (role, install) => {
@@ -2176,7 +2176,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.stats.closeCalls).toBe(1)
   })
 
-  it('B12b02 RED: preserves one transport close owner through the canonical factory', async () => {
+  it('preserves one transport close owner through the canonical factory', async () => {
     let closeCalls = 0
     const authenticationMiddleware = authentication({
       encrypt: (value) => value,
@@ -2204,7 +2204,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(closeCalls).toBe(1)
   })
 
-  it('B12b02 RED: runs production authentication encrypt-sign and verify-decrypt with exact published identity', async () => {
+  it('runs production authentication encrypt-sign and verify-decrypt with exact published identity', async () => {
     const calls: Array<{
       readonly name: string
       readonly value: unknown
@@ -2263,7 +2263,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b02 RED: executes production connect discovery, selection, fixed unique target, and identity', async () => {
+  it('executes production connect discovery, selection, fixed unique target, and identity', async () => {
     const selectorCalls: Array<{
       readonly servers: readonly unknown[]
       readonly context: unknown
@@ -2306,7 +2306,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b02 RED: invokes async uniqueTargetId factory during production finalization and preserves result', async () => {
+  it('invokes async uniqueTargetId factory during production finalization and preserves result', async () => {
     const events: string[] = []
     const contexts: unknown[] = []
     const identifier = async (): Promise<boolean> => true
@@ -2371,7 +2371,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b02 RED: preserves hostile async uniqueTargetId factory primary and cause through finalizer', async () => {
+  it('preserves hostile async uniqueTargetId factory primary and cause through finalizer', async () => {
     const hostile = new Error('hostile async unique target factory')
     const connectMiddleware = connect({
       useBaseIdVerifyOnly: false,
@@ -2404,7 +2404,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.host.dispose()).toBe(firstDispose)
   })
 
-  it('B12b02 RED: records unified successful and rollback teardown order with stable repeated disposal', async () => {
+  it('records unified successful and rollback teardown order with stable repeated disposal', async () => {
     const successTrace: IProductionLifecycleTraceEntry[] = []
     const successResources = new Map<string, object>()
     const success = await createProductionBatch({
@@ -2507,7 +2507,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b02 R7: owns provider feature disposal once on success and rollback', async () => {
+  it('owns provider feature disposal once on success and rollback', async () => {
     let successOwner:
       | { readonly debugSnapshot: () => { readonly providers: number; readonly events: number } }
       | undefined
@@ -2574,7 +2574,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await rollback.host.dispose()
   })
 
-  it('B12b02 RED: repeats legacy endpoint disposal without a second transport release', async () => {
+  it('repeats legacy endpoint disposal without a second transport release', async () => {
     const [baseTransport] = createMemoryTransportPair()
     let closeCalls = 0
     const transport = {
@@ -2586,7 +2586,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
     }
     const endpoint = await createEndpoint({
-      id: 'b12b02-round4-endpoint',
+      id: 'b12b02-endpoint',
       transport,
       middlewares: [
         authentication({
@@ -2605,7 +2605,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(closeCalls).toBe(1)
   })
 
-  it('B12b02 RED: snapshots authentication at install and connect at factory with one read and receiver semantics', async () => {
+  it('snapshots authentication at install and connect at factory with one read and receiver semantics', async () => {
     const authenticationReads: string[] = []
     let encrypt = (value: unknown): unknown => `auth:${String(value)}`
     let decrypt = (value: unknown): unknown => `plain:${String(value)}`
@@ -2672,7 +2672,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       String(
         await authenticationCapability?.protect('x', {
           direction: 'outbound',
-          endpointId: 'b12a-production-1',
+          endpointId: 'production-1',
           platform: 'Memory'
         })
       ).startsWith('auth:' + RpcAuthenticationEnvelope.prefix)
@@ -2685,7 +2685,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['authentication', 'connect'] as const)(
-    'B12b02 RED: admits exactly one %s provider, rejects forged keys, and isolates removal',
+    'admits exactly one %s provider, rejects forged keys, and isolates removal',
     async (role) => {
       const key = RpcPortName[role]
       const first = await createProductionBatch()
@@ -2718,7 +2718,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['authentication', 'connect'] as const)(
-    'B12b02 RED: rejects admitted-but-unpublished %s runtime output before activation',
+    'rejects admitted-but-unpublished %s runtime output before activation',
     async (missingRole) => {
       let batch!: IProductionBatch
       let activationStarted = false
@@ -2767,7 +2767,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b02 RED: closes owned success once, borrowed success zero, and repeats Host dispose Promise', async () => {
+  it('closes owned success once, borrowed success zero, and repeats Host dispose Promise', async () => {
     const owned = await createProductionBatch({ transportOwnership: 'owned' })
     await owned.host.installBatch(owned.translated.map(({ definition }) => definition))
     const ownedDispose = owned.host.dispose()
@@ -2784,7 +2784,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['authentication', 'connect'] as const)(
-    'B12b02 RED: preserves hostile %s config getter primary and cause identity',
+    'preserves hostile %s config getter primary and cause identity',
     async (failedRole) => {
       const hostile = new Error(`${failedRole} hostile config getter`)
       const config = new Proxy(
@@ -2830,7 +2830,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['protect', 'unprotect'] as const)(
-    'B12b02 RED: preserves authentication %s transform primary and cause identity',
+    'preserves authentication %s transform primary and cause identity',
     async (operation) => {
       const hostile = new Error(`authentication ${operation} hostile transform`)
       const batch = await createProductionBatch({
@@ -2872,7 +2872,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b02 RED: preserves install primary and exact AggregateError rollback identities/order', async () => {
+  it('preserves install primary and exact AggregateError rollback identities/order', async () => {
     const primary = new Error('authentication-connect install primary')
     const authenticationCleanup = new AggregateError(
       [new Error('authentication cleanup one'), new Error('authentication cleanup two')],
@@ -2926,7 +2926,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['authentication', 'connect'] as const)(
-    'B12b02 RED: preserves each hostile %s cleanup AggregateError children and outer order',
+    'preserves each hostile %s cleanup AggregateError children and outer order',
     async (hostileRole) => {
       const primary = new Error(`${hostileRole} aggregate primary`)
       const hostileChildren = [
@@ -2996,7 +2996,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b02 RED: releases authentication/connect resources in exact reverse order once', async () => {
+  it('releases authentication/connect resources in exact reverse order once', async () => {
     const released: string[] = []
     const primary = new Error('activation rollback primary')
     const batch = await createProductionBatch({
@@ -3033,7 +3033,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['authentication', 'connect'] as const)(
-    'B12b02 RED: closes owned transport once and leaves borrowed %s partial failure closed',
+    'closes owned transport once and leaves borrowed %s partial failure closed',
     async (failedRole) => {
       const owned = await createProductionBatch({
         transportOwnership: 'owned',
@@ -3073,7 +3073,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b02 RED: preserves transport close failure cause and repeated Host dispose Promise identity', async () => {
+  it('preserves transport close failure cause and repeated Host dispose Promise identity', async () => {
     const closeFailure = new Error('transport close failure')
     const batch = await createProductionBatch({
       transportOwnership: 'owned',
@@ -3092,7 +3092,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.stats.closeCalls).toBe(1)
   })
 
-  it('B12b02 RED: keeps activation primary while ordered owned close cleanup remains reachable', async () => {
+  it('keeps activation primary while ordered owned close cleanup remains reachable', async () => {
     const primary = new Error('activation install primary')
     const closeFailure = new Error('owned transport close cleanup failure')
     const batch = await createProductionBatch({
@@ -3132,7 +3132,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.stats.closeCalls).toBe(1)
   })
 
-  it('B12b02 RED: leaves no activation, shared, extension, registry, kernel, or projection residue', async () => {
+  it('leaves no activation, shared, extension, registry, kernel, or projection residue', async () => {
     const primary = new Error('connect residue primary')
     const batch = await createProductionBatch({
       injectInstall: (role, install) =>
@@ -3159,7 +3159,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b02 rejects a second composed close owner after legacy cleanup deletion', () => {
+  it('rejects a second composed close owner after legacy cleanup deletion', () => {
     const source = (relativePath: string): string =>
       readFileSync(new URL(relativePath, import.meta.url), 'utf8')
     const bootstrapSource = source('../../src/core/internal/endpoint-bootstrap.ts')
@@ -3175,7 +3175,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(hostCleanupBranch).not.toMatch(/transport\.close/)
   })
 
-  it('B12b03 RED: timeout and abort factories expose native Host plugins', () => {
+  it('timeout and abort factories expose native Host plugins', () => {
     const timeoutMiddleware = timeout()
     const abortMiddleware = abort()
     expect(Object.isFrozen(timeoutMiddleware)).toBe(true)
@@ -3184,7 +3184,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(typeof abortMiddleware.install).toBe('function')
   })
 
-  it('B12b03 RED: timeout and abort publish typed shared ports in one Host batch', async () => {
+  it('timeout and abort publish typed shared ports in one Host batch', async () => {
     const batch = await createProductionBatch()
     const timeoutDescriptor = batch.inventory.find(
       (entry) => entry.role.kind === 'middleware' && entry.role.name === 'timeout'
@@ -3212,7 +3212,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03 RED: finalize declares timeout and abort as explicit optional consumers', async () => {
+  it('finalize declares timeout and abort as explicit optional consumers', async () => {
     const observed: unknown[] = []
     const batch = await createProductionBatch({
       injectInstall: (role, install) =>
@@ -3241,7 +3241,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03: outbound consumes the finalized prepared abort boolean, not the shared enablement port', () => {
+  it('outbound consumes the finalized prepared abort boolean, not the shared enablement port', () => {
     const source = readFileSync(
       new URL('../../src/core/internal/outbound-attachment.ts', import.meta.url),
       'utf8'
@@ -3250,12 +3250,12 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(source).toMatch(/prepared\.options\.features\?\.abort/)
   })
 
-  it('B12b03: abort reuses the authorized provider-cancellation shared key', () => {
+  it('abort reuses the authorized provider-cancellation shared key', () => {
     expect(RpcPortName.providerCancellation).toBe(abortTransportKey)
     expect(plannedAbortEnablementKey).not.toBe(abortTransportKey)
   })
 
-  it('B12b03: composed Host installs receive the canonical construction control', async () => {
+  it('composed Host installs receive the canonical construction control', async () => {
     let observedSignal: IAbortSignal | undefined
     const batch = await createProductionBatch({
       injectInstall: (role, install) => {
@@ -3271,7 +3271,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03: legacy non-deferred construction controller remains an isolated compatibility branch', () => {
+  it('legacy non-deferred construction controller remains an isolated compatibility branch', () => {
     const source = (relativePath: string): string =>
       readFileSync(new URL(relativePath, import.meta.url), 'utf8')
     const bootstrapSource = source('../../src/core/internal/endpoint-bootstrap.ts')
@@ -3279,7 +3279,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(bootstrapSource).not.toContain('middlewareDisposers')
   })
 
-  it('B12b03 RED: timeout and abort middleware do not write the legacy capability registry', () => {
+  it('timeout and abort middleware do not write the legacy capability registry', () => {
     const source = (relativePath: string): string =>
       readFileSync(new URL(relativePath, import.meta.url), 'utf8')
     const timeoutSource = source('../../src/core/middleware/timeout.ts')
@@ -3288,7 +3288,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(abortSource).not.toMatch(/capabilities\.set/)
   })
 
-  it('B12b03: timeout config getter is read once and legacy middleware remains callable', async () => {
+  it('timeout config getter is read once and legacy middleware remains callable', async () => {
     const [transport] = createMemoryTransportPair()
     let reads = 0
     const config = {
@@ -3308,7 +3308,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await endpoint.dispose()
   })
 
-  it('B12b03: native timeout install snapshots only after factory creation', async () => {
+  it('native timeout install snapshots only after factory creation', async () => {
     let reads = 0
     const config = {
       get timeoutMs(): number {
@@ -3333,7 +3333,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     transport.close?.()
   })
 
-  it('B12b03: timeout snapshots its configuration in receiver-free order', async () => {
+  it('timeout snapshots its configuration in receiver-free order', async () => {
     const [transport] = createMemoryTransportPair()
     const reads: string[] = []
     let timeoutReceiver = false
@@ -3356,7 +3356,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await endpoint.dispose()
   })
 
-  it('B12b03: abort no-config factory is receiver-free, frozen, and endpoint-local', () => {
+  it('abort no-config factory is receiver-free, frozen, and endpoint-local', () => {
     const first = abort()
     const second = abort()
     expect(Object.isFrozen(first)).toBe(true)
@@ -3366,7 +3366,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(second.name).toBe('middleware:abort')
   })
 
-  it('B12b03 RED: actual timeout publication is present and isolated per endpoint', async () => {
+  it('actual timeout publication is present and isolated per endpoint', async () => {
     const left = await createProductionBatch()
     const right = await createProductionBatch()
     try {
@@ -3384,7 +3384,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['timeout', 'abort'] as const)(
-    'B12b03: injected %s native-role failure preserves PH01 identity and residue',
+    'injected %s native-role failure preserves identity and residue',
     async (failedName) => {
       const primary = new Error(`${failedName} install primary`)
       const batch = await createProductionBatch({
@@ -3413,7 +3413,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b03: injected timeout async rejection preserves PH01 primary and full rollback residue', async () => {
+  it('injected timeout async rejection preserves primary and full rollback residue', async () => {
     const primary = new Error('timeout async install primary')
     const batch = await createProductionBatch({
       injectInstall: (role, install) =>
@@ -3438,7 +3438,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03 RED: hostile timeout config keeps the original getter cause and native config error', async () => {
+  it('hostile timeout config keeps the original getter cause and native config error', async () => {
     const [transport] = createMemoryTransportPair()
     const hostile = new Error('timeout config getter')
     let reads = 0
@@ -3460,7 +3460,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(reads).toBe(1)
   })
 
-  it('B12b03 RED: pre-aborted composed construction preserves exact reason identity', async () => {
+  it('pre-aborted composed construction preserves exact reason identity', async () => {
     const preController = new AbortController()
     const preReason = new DOMException('pre-abort', 'AbortError')
     preController.abort(preReason)
@@ -3474,7 +3474,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await pre.host.dispose()
   })
 
-  it('B12b03: during-install abort is terminal and post-success abort is inert', async () => {
+  it('during-install abort is terminal and post-success abort is inert', async () => {
     const duringController = new AbortController()
     let releaseInstall!: () => void
     const during = await createProductionBatch({
@@ -3507,7 +3507,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await after.host.dispose()
   })
 
-  it('B12b03: zero and already-expired fake deadlines create no timer and clean once', async () => {
+  it('zero and already-expired fake deadlines create no timer and clean once', async () => {
     let timerCalls = 0
     let clearCalls = 0
     const time = {
@@ -3545,7 +3545,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     control.close()
   })
 
-  it('B12b03: same-tick zero deadline and caller abort have one terminal outcome and no residue', async () => {
+  it('same-tick zero deadline and caller abort have one terminal outcome and no residue', async () => {
     const controller = new AbortController()
     const reason = new DOMException('same-tick construction abort', 'AbortError')
     controller.abort(reason)
@@ -3563,7 +3563,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(batch.kernel.state).toBe('disposed')
   })
 
-  it('B12b03 RED: composed operation abort preserves exact caller reason and terminal residue', async () => {
+  it('composed operation abort preserves exact caller reason and terminal residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createComposedEndpoint(
       {
@@ -3598,7 +3598,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await server.dispose()
   })
 
-  it('B12b03: construction control keeps one absolute fake-time deadline and idempotent close', () => {
+  it('construction control keeps one absolute fake-time deadline and idempotent close', () => {
     let disposed = 0
     let now = 100
     const time = {
@@ -3625,7 +3625,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(disposed).toBe(0)
   })
 
-  it('B12b03 RED: construction cancellation preserves the caller reason identity', () => {
+  it('construction cancellation preserves the caller reason identity', () => {
     const controller = new AbortController()
     const control = createConstructionControl({
       time: createEndpointTimePort(systemScheduler),
@@ -3637,7 +3637,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     control.close()
   })
 
-  it('B12b03: operation owner remains singular while late cancellation is observed', () => {
+  it('operation owner remains singular while late cancellation is observed', () => {
     expect(() =>
       readFileSync(new URL('../../src/core/endpoint.ts', import.meta.url), 'utf8')
     ).toThrow()
@@ -3647,7 +3647,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['timeout', RpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
-    'B12b03 RED: admitted native %s key publishes to downstream and removes exactly once',
+    'admitted native %s key publishes to downstream and removes exactly once',
     async (role, key) => {
       const events: string[] = []
       const observed: unknown[] = []
@@ -3683,7 +3683,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b03: generic PluginHost accepts an arbitrary feature outside first-party role schema', async () => {
+  it('generic PluginHost accepts an arbitrary feature outside first-party role schema', async () => {
     const arbitraryKey = 'generic-plugin-key'
     const arbitraryValue = { marker: 'generic' }
     const generic = definePlugin({
@@ -3702,7 +3702,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03: real inventory admits a non-reserved native plugin with an arbitrary feature', async () => {
+  it('real inventory admits a non-reserved native plugin with an arbitrary feature', async () => {
     const arbitraryKey = 'custom-native-key'
     const arbitraryValue = Object.freeze({ marker: 'custom-native' })
     const custom = definePlugin({
@@ -3725,7 +3725,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['timeout', 'string', 'forged-timeout', RpcPortName.timeout],
     ['abort', 'symbol', Symbol('forged-abort'), plannedAbortEnablementKey]
   ] as const)(
-    'B12b03: real inventory rejects reserved middleware:%s spoof before Host mutation',
+    'real inventory rejects reserved middleware:%s spoof before Host mutation',
     async (role, _kind, forgedKey, _admittedKey) => {
       let installCalls = 0
       const spoof = definePlugin({
@@ -3779,7 +3779,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   it.each([
     ['timeout', RpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
-  ] as const)('B12b03: optional absent %s key stays absent without residue', async (_role, key) => {
+  ] as const)('optional absent %s key stays absent without residue', async (_role, key) => {
     const batch = await createProductionBatch(
       key === RpcPortName.timeout ? { omitTimeout: true } : { omitAbort: true }
     )
@@ -3792,7 +3792,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['timeout', RpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
-    'B12b03: admitted %s publication is endpoint-local and rollback-removable',
+    'admitted %s publication is endpoint-local and rollback-removable',
     async (role, key) => {
       const create = (failConnect = false) =>
         createProductionBatch({
@@ -3829,7 +3829,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['timeout', 'string', 'web-rpc.forged-timeout', RpcPortName.timeout],
     ['abort', 'symbol', Symbol('web-rpc.forged-abort'), plannedAbortEnablementKey]
   ] as const)(
-    'B12b03 RED: rejects a forged %s %s cancellation shared claim',
+    'rejects a forged %s %s cancellation shared claim',
     async (role, _label, forgedKey, _plannedKey) => {
       let installCalls = 0
       const forged = definePlugin({
@@ -3889,7 +3889,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b03 RED: hostile first-party metadata preserves the thrown Error as cause', async () => {
+  it('hostile first-party metadata preserves the thrown Error as cause', async () => {
     const hostile = new Error('abort role metadata getter')
     let installCalls = 0
     const batch = await createProductionBatch({
@@ -3959,7 +3959,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['timeout', RpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
   ] as const)(
-    'B12b03 RED: admitted-but-unpublished %s output fails downstream claim parity',
+    'admitted-but-unpublished %s output fails downstream claim parity',
     async (role, key) => {
       const batch = await createProductionBatch({
         injectInstall: (candidate, install) =>
@@ -3988,34 +3988,31 @@ describe('B12a atomic middleware and claim contracts', () => {
   it.each([
     ['timeout', RpcPortName.timeout],
     ['abort', plannedAbortEnablementKey]
-  ] as const)(
-    'B12b03 RED: duplicate %s providers are rejected before Host mutation',
-    async (role, key) => {
-      let installCalls = 0
-      const batch = await createProductionBatch({
-        injectInstall: (_role, install) => async (scope) => {
-          installCalls += 1
-          return install(scope)
-        }
-      })
-      const before = productionHostSnapshot(batch)
-      const duplicate: IRpcClaimAdmission = {
-        name: `middleware:${role}-duplicate`,
-        claims: emptyClaims,
-        sharedProvides: [key]
+  ] as const)('duplicate %s providers are rejected before Host mutation', async (role, key) => {
+    let installCalls = 0
+    const batch = await createProductionBatch({
+      injectInstall: (_role, install) => async (scope) => {
+        installCalls += 1
+        return install(scope)
       }
-      expect(() => preflightFeatureClaims([...batch.admissions, duplicate])).toThrow(
-        RpcConfigurationError
-      )
-      expect(productionHostSnapshot(batch)).toEqual(before)
-      expect(installCalls).toBe(0)
-      expect(batch.stats.subscribeCalls).toBe(0)
-      expect(batch.stats.activeSubscriptions).toBe(0)
-      await batch.host.dispose()
+    })
+    const before = productionHostSnapshot(batch)
+    const duplicate: IRpcClaimAdmission = {
+      name: `middleware:${role}-duplicate`,
+      claims: emptyClaims,
+      sharedProvides: [key]
     }
-  )
+    expect(() => preflightFeatureClaims([...batch.admissions, duplicate])).toThrow(
+      RpcConfigurationError
+    )
+    expect(productionHostSnapshot(batch)).toEqual(before)
+    expect(installCalls).toBe(0)
+    expect(batch.stats.subscribeCalls).toBe(0)
+    expect(batch.stats.activeSubscriptions).toBe(0)
+    await batch.host.dispose()
+  })
 
-  it('B12b03: native timeout snapshot survives post-install mutation', async () => {
+  it('native timeout snapshot survives post-install mutation', async () => {
     const reads: string[] = []
     let timeoutMs = 7
     const config = {
@@ -4038,7 +4035,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03 RED: production root cleanup owns same-tick cancellation terminality', async () => {
+  it('production root cleanup owns same-tick cancellation terminality', async () => {
     const controller = new AbortController()
     const reason = new DOMException('same-tick construction abort', 'AbortError')
     controller.abort(reason)
@@ -4058,7 +4055,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['timeout', 'abort'] as const)(
-    'B12b03: real admitted native %s late resolve disposes its result once without diagnostic requirement',
+    'real admitted native %s late resolve disposes its result once without diagnostic requirement',
     async (role) => {
       const controller = new AbortController()
       const reason = new DOMException(`${role} during install`, 'AbortError')
@@ -4100,7 +4097,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['timeout', 'abort'] as const)(
-    'B12b03 RED: real admitted native %s late reject reports distinct primary while caller reason remains terminal',
+    'real admitted native %s late reject reports distinct primary while caller reason remains terminal',
     async (role) => {
       const controller = new AbortController()
       const reason = new DOMException(`${role} late-reject abort`, 'AbortError')
@@ -4141,7 +4138,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b03 RED: native abort async hostile install preserves PH01 and zero residue', async () => {
+  it('native abort async hostile install preserves the primary and zero residue', async () => {
     const primary = new Error('native abort hostile install')
     const batch = await createProductionBatch({
       injectInstall: (candidate, install) =>
@@ -4167,7 +4164,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  it('B12b03 RED: operation abort-first barrier chooses one terminal identity and clears late provider state', async () => {
+  it('operation abort-first barrier chooses one terminal identity and clears late provider state', async () => {
     vi.useFakeTimers()
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let lateResolve!: () => void
@@ -4177,7 +4174,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     const server = await createComposedEndpoint(
       {
-        id: 'b12b03-round10-server',
+        id: 'b12b03-server',
         transport: serverTransport,
         provider: {
           hang: async () =>
@@ -4192,8 +4189,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     const client = await createComposedEndpoint(
       {
-        id: 'b12b03-round10-client',
-        targetIds: ['b12b03-round10-server'],
+        id: 'b12b03-client',
+        targetIds: ['b12b03-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
@@ -4201,7 +4198,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     const controller = new AbortController()
     const reason = new DOMException('timeout race caller abort', 'AbortError')
-    const pending = readProjectedSend(client)('b12b03-round10-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-server', 'hang', null, {
       signal: controller.signal as IAbortSignal,
       timeoutMs: 1
     })
@@ -4222,7 +4219,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b03 RED: operation timeout-first barrier remains terminal after a late caller abort', async () => {
+  it('operation timeout-first barrier remains terminal after a late caller abort', async () => {
     vi.useFakeTimers()
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let lateResolve!: () => void
@@ -4232,7 +4229,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     })
     const server = await createComposedEndpoint(
       {
-        id: 'b12b03-round11-timeout-server',
+        id: 'b12b03-timeout-server',
         transport: serverTransport,
         provider: {
           hang: async () =>
@@ -4247,8 +4244,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     const client = await createComposedEndpoint(
       {
-        id: 'b12b03-round11-timeout-client',
-        targetIds: ['b12b03-round11-timeout-server'],
+        id: 'b12b03-timeout-client',
+        targetIds: ['b12b03-timeout-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
@@ -4256,7 +4253,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     const controller = new AbortController()
     const reason = new DOMException('late caller abort', 'AbortError')
-    const pending = readProjectedSend(client)('b12b03-round11-timeout-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-timeout-server', 'hang', null, {
       signal: controller.signal as IAbortSignal,
       timeoutMs: 1
     })
@@ -4279,7 +4276,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b03 RED: real abort-first operation reports a late provider rejection and drains residue', async () => {
+  it('real abort-first operation reports a late provider rejection and drains residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const reports: unknown[] = []
     const latePrimary = new Error('late provider rejection after caller abort')
@@ -4291,7 +4288,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     let releaseReject!: () => void
     const server = await createComposedEndpoint(
       {
-        id: 'b12b03-round13-late-reject-server',
+        id: 'b12b03-late-reject-server',
         transport: serverTransport,
         provider: {
           hang: async () => {
@@ -4314,8 +4311,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     const client = await createComposedEndpoint(
       {
-        id: 'b12b03-round13-late-reject-client',
-        targetIds: ['b12b03-round13-late-reject-server'],
+        id: 'b12b03-late-reject-client',
+        targetIds: ['b12b03-late-reject-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
@@ -4328,7 +4325,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const idleServerSnapshot = idleServer!
     expect(idleServerSnapshot.providers).toBe(1)
     const controller = new AbortController()
-    const pending = readProjectedSend(client)('b12b03-round13-late-reject-server', 'hang', null, {
+    const pending = readProjectedSend(client)('b12b03-late-reject-server', 'hang', null, {
       signal: controller.signal as IAbortSignal,
       timeoutMs: false
     })
@@ -4381,7 +4378,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b03: Store Worker direct consumers retain both cancellation middleware factories', () => {
+  it('Store Worker direct consumers retain both cancellation middleware factories', () => {
     const workerSource = readFileSync(
       new URL('../../../store-worker/src/worker-contract.ts', import.meta.url),
       'utf8'
@@ -4396,7 +4393,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: production inventory exposes the exact %s role schema',
+    'production inventory exposes the exact %s role schema',
     async (role) => {
       const batch = await createProductionBatch()
       try {
@@ -4419,7 +4416,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b04 RED: production finalizer exposes the exact nine-key optional schema', async () => {
+  it('production finalizer exposes the exact nine-key optional schema', async () => {
     const batch = await createProductionBatch()
     try {
       const finalizer = batch.inventory.find(
@@ -4440,7 +4437,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   })
 
-  it('B12b04: package role schema and ping port shape are frozen exact contracts', () => {
+  it('package role schema and ping port shape are frozen exact contracts', () => {
     expect(Object.isFrozen(RpcFirstPartyRoleSchema)).toBe(true)
     for (const role of ['hooks', 'ping', 'uuid', 'middleware-finalize'] as const) {
       const schema = RpcFirstPartyRoleSchema[role]
@@ -4470,7 +4467,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: owning %s file has no legacy registry write and is a native plugin',
+    'owning %s file has no legacy registry write and is a native plugin',
     (role) => {
       const source = readFileSync(
         new URL(`../../src/core/middleware/${role}.ts`, import.meta.url),
@@ -4481,7 +4478,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12d: no owning middleware file retains the removed compatibility installer', () => {
+  it('no owning middleware file retains the removed compatibility installer', () => {
     const source = readFileSync(
       new URL('../../src/core/internal/endpoint-bootstrap.ts', import.meta.url),
       'utf8'
@@ -4490,7 +4487,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   // Legacy chunk middleware assertions were removed with that API; framing belongs to rpc-contract.
-  it('B12b04: real production builder snapshots hook/uuid factories at install', async () => {
+  it('real production builder snapshots hook/uuid factories at install', async () => {
     const reads: string[] = []
     let currentGenerate = () => 'initial-id'
     let currentListeners: readonly (() => void)[] = [() => undefined]
@@ -4534,8 +4531,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.dispose()
   })
 
-  // D34/D37 retire middleware chunk configuration; rpc-contract owns framer limits and cleanup.
-  it('B12b04: selected framers remain endpoint-local across concurrent production batches', async () => {
+  // Retire middleware chunk configuration; rpc-contract owns framer limits and cleanup.
+  it('selected framers remain endpoint-local across concurrent production batches', async () => {
     const leftFramer = createStringFramer({ chunkBytes: 4 })
     const rightFramer = createStringFramer({ chunkBytes: 8 })
     const [left, right] = await Promise.all([
@@ -4577,7 +4574,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     rightFramer.close()
   })
 
-  it('B12b04 RED: hooks and UUID snapshots preserve receiver, retry freshness, and async install barrier', async () => {
+  it('hooks and UUID snapshots preserve receiver, retry freshness, and async install barrier', async () => {
     const reads: string[] = []
     const receivers: unknown[] = []
     const listener = (): void => undefined
@@ -4663,7 +4660,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['hooks', 'uuid'] as const)(
-    'B12b04 T87: independent %s trace proves failed retry, async barrier, and mutation isolation',
+    'independent %s trace proves failed retry, async barrier, and mutation isolation',
     async (role) => {
       const reads: string[] = []
       const receivers: unknown[] = []
@@ -4763,7 +4760,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     ['hooks', 'onHookError'],
     ['uuid', 'generate']
   ] as const)(
-    'B12b04 T87: hostile %s snapshot getter %s preserves exact cutoff and residue',
+    'hostile %s snapshot getter %s preserves exact cutoff and residue',
     async (role, field) => {
       const primary = new Error(`${role}-${field}-getter`)
       const reads: string[] = []
@@ -4848,7 +4845,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b04 RED: real ping factory has no config reads and publishes one frozen endpoint-local enablement', async () => {
+  it('real ping factory has no config reads and publishes one frozen endpoint-local enablement', async () => {
     const middleware = ping()
     const left = await createProductionBatch({ pingMiddleware: middleware })
     const right = await createProductionBatch({ pingMiddleware: middleware })
@@ -4869,7 +4866,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: native %s publication is endpoint-local and removed on rollback/dispose',
+    'native %s publication is endpoint-local and removed on rollback/dispose',
     async (role) => {
       const batch = await createProductionBatch()
       const key = plannedB12b04Keys[role]
@@ -4882,7 +4879,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b04: conditional ping enablement and heartbeat cleanup remain legacy-equivalent', async () => {
+  it('conditional ping enablement and heartbeat cleanup remain legacy-equivalent', async () => {
     const enabled = await createProductionBatch()
     const disabled = await createProductionBatch({ omitPing: true })
     await enabled.host.installBatch(enabled.translated.map(({ definition }) => definition))
@@ -4899,7 +4896,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: native %s publication is endpoint-local and terminal removal is exact',
+    'native %s publication is endpoint-local and terminal removal is exact',
     async (role) => {
       const left = await createProductionBatch()
       const right = await createProductionBatch()
@@ -4923,7 +4920,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: native %s duplicate provider is rejected before Host mutation',
+    'native %s duplicate provider is rejected before Host mutation',
     async (role) => {
       const batch = await createProductionBatch()
       const entry = batch.inventory.find(
@@ -4942,7 +4939,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: native %s forged string key is rejected before Host mutation',
+    'native %s forged string key is rejected before Host mutation',
     async (role) => {
       const batch = await createProductionBatch()
       const entry = batch.inventory.find(
@@ -4962,7 +4959,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 RED: native %s forged package symbol is rejected before Host mutation',
+    'native %s forged package symbol is rejected before Host mutation',
     async (role) => {
       const batch = await createProductionBatch()
       const entry = batch.inventory.find(
@@ -4986,7 +4983,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       (['sync', 'async'] as const).map((mode) => ({ role, mode }))
     )
   )(
-    'B12b04: native $role $mode install failure preserves PH01 primary and zero residue',
+    'native $role $mode install failure preserves primary and zero residue',
     async ({ role, mode }) => {
       const primary = new Error(`${role}-${mode}-primary`)
       const batch = await createProductionBatch({
@@ -5023,7 +5020,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 baseline: legacy %s partial rollback is reverse-once with exact cleanup children',
+    'baseline: legacy %s partial rollback is reverse-once with exact cleanup children',
     async (role) => {
       const primary = new Error(`${role}-partial-primary`)
       const firstCleanup = new Error(`${role}-cleanup-first`)
@@ -5085,7 +5082,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(['hooks', 'ping', 'uuid'] as const)(
-    'B12b04 T89: native-shaped %s publication and endpoint disposal share one composed transaction',
+    'native-shaped %s publication and endpoint disposal share one composed transaction',
     async (role) => {
       const key = plannedB12b04Keys[role]
       const port =
@@ -5127,7 +5124,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         }
       })
       const consumerPlugin: IRpcPlugin = Object.freeze({
-        name: `t89-consumer:${role}`,
+        name: `consumer-1:${role}`,
         metadata: Object.freeze({
           claims: emptyClaims,
           sharedConsumes: Object.freeze([key])
@@ -5242,7 +5239,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b04: production framer seam retains boundary and cleanup ownership', async () => {
+  it('production framer seam retains boundary and cleanup ownership', async () => {
     const framer = createStringFramer({ chunkBytes: 4 })
     const batch = await createProductionBatch({
       framer: framer as unknown as IRpcCoreConfig['framer']
@@ -5260,7 +5257,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it.each(['hooks', 'uuid'] as const)(
-    'B12b04: hostile %s configuration preserves primary/cause and leaves zero activation residue',
+    'hostile %s configuration preserves primary/cause and leaves zero activation residue',
     async (role) => {
       const hostile = new Error(`${role} hostile getter`)
       const middleware =
@@ -5294,7 +5291,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 })
 
-describe('B12c01 outbound feature production-seam matrix', () => {
+describe('outbound feature production-seam matrix', () => {
   /** Asserts the exact frozen own-key contract for a typed shared port. */
   function expectFrozenPort(value: unknown, keys: readonly string[]): void {
     expect(value).toBeDefined()
@@ -5324,7 +5321,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     for (let index = 0; index < 12; index += 1) await Promise.resolve()
   }
 
-  it('T90 B12c01 RED: outbound inventory claims exact narrow shared ports', async () => {
+  it('outbound inventory claims exact narrow shared ports', async () => {
     const batch = await createProductionBatch()
     try {
       const entry = findCapabilitiesEntry(batch)
@@ -5348,7 +5345,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T91 B12c01 RED: outbound result uses Host-owned disposal without legacy blanket escape', async () => {
+  it('outbound result uses Host-owned disposal without legacy blanket escape', async () => {
     const batch = await createProductionBatch()
     try {
       const entry = findCapabilitiesEntry(batch)
@@ -5358,7 +5355,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T92 B12c01 RED: outbound publishes typed operations and identity ports in one Host batch', async () => {
+  it('outbound publishes typed operations and identity ports in one Host batch', async () => {
     const batch = await createProductionBatch()
     try {
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
@@ -5377,7 +5374,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T93 B12c01: outbound install does not subscribe or activate before final activation', async () => {
+  it('outbound install does not subscribe or activate before final activation', async () => {
     let release!: () => void
     let entered = false
     let settled = false
@@ -5429,7 +5426,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T93 B12c01: the untransformed native capability Feature activates one receiver', async () => {
+  it('the untransformed native capability Feature activates one receiver', async () => {
     const batch = await createProductionBatch()
     try {
       await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
@@ -5441,7 +5438,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T94 B12c01 RED: outbound typed ports are endpoint-local and never shared by identity', async () => {
+  it('outbound typed ports are endpoint-local and never shared by identity', async () => {
     const left = await createProductionBatch()
     const right = await createProductionBatch()
     try {
@@ -5471,7 +5468,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T95 B12c01 supporting baseline: endpoint construction owns target snapshot before outbound activation', async () => {
+  it('supporting baseline: endpoint construction owns target snapshot before outbound activation', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const sourceTargetIds = ['snapshot-server']
     let targetReads = 0
@@ -5500,7 +5497,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T96 B12c01: hostile outbound target getter fails before activation with original cause', async () => {
+  it('hostile outbound target getter fails before activation with original cause', async () => {
     const [transport] = createMemoryTransportPair()
     const hostile = new Error('outbound target getter')
     let reads = 0
@@ -5524,7 +5521,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(reads).toBe(1)
   })
 
-  it('WP2: native framed output needs an opaque sink or concrete authentication before subscribe', async () => {
+  it('native framed output needs an opaque sink or concrete authentication before subscribe', async () => {
     const [baseTransport] = createMemoryTransportPair()
     let subscribeCalls = 0
     const transport = {
@@ -5570,7 +5567,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('WP2: directed unknown producers reject concrete string sinks before subscribe', async () => {
+  it('directed unknown producers reject concrete string sinks before subscribe', async () => {
     const [base] = createMemoryTransportPair()
     let subscriptions = 0
     const transport = {
@@ -5629,7 +5626,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('WP2: top-level transport shadows one plugin transport before subscription', async () => {
+  it('top-level transport shadows one plugin transport before subscription', async () => {
     const [winnerBase] = createMemoryTransportPair()
     const [shadowedBase] = createMemoryTransportPair()
     let winnerSubscriptions = 0
@@ -5682,7 +5679,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('WP2: selected descriptor getters run once without framing during construction', async () => {
+  it('selected descriptor getters run once without framing during construction', async () => {
     const [transport] = createMemoryTransportPair()
     const events: IRpcHookEvent[] = []
     const protocolReads = new Map<string, number>()
@@ -5866,7 +5863,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
   ]
 
   it.each(descriptorCases)(
-    'WP2: rejects invalid selected %s before subscribe',
+    'rejects invalid selected %s before subscribe',
     async (_name, component, descriptor, cause) => {
       const [baseTransport] = createMemoryTransportPair()
       let subscriptions = 0
@@ -5891,7 +5888,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   )
 
-  it('WP2: selected transport getters run once when top-level transport shadows a plugin', async () => {
+  it('selected transport getters run once when top-level transport shadows a plugin', async () => {
     const [baseTransport] = createMemoryTransportPair()
     const reads = new Map<string, number>()
     let subscriptions = 0
@@ -5922,7 +5919,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('WP2: selected class transport retains its private method receiver', async () => {
+  it('selected class transport retains its private method receiver', async () => {
     class PrivateReceiverTransport {
       #subscriptions = 0
       readonly platform = 'Memory' as const
@@ -5955,7 +5952,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('WP2: rejects duplicate plugin transports before either transport subscribes', async () => {
+  it('rejects duplicate plugin transports before either transport subscribes', async () => {
     const [firstBase] = createMemoryTransportPair()
     const [secondBase] = createMemoryTransportPair()
     let firstSubscriptions = 0
@@ -5986,7 +5983,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(secondSubscriptions).toBe(0)
   })
 
-  it('WP2: rejects a missing transport before Host construction', async () => {
+  it('rejects a missing transport before Host construction', async () => {
     const failure = await createClientEndpoint({
       id: 'wp2-missing-transport',
       middlewares: [connect()]
@@ -5994,7 +5991,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(failure).toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
   })
 
-  it('T97 B12c01: real outbound send and RPC fanout preserve canonical results', async () => {
+  it('real outbound send and RPC fanout preserve canonical results', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createProviderEndpoint({
       id: 'rpc-server',
@@ -6018,7 +6015,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T98 B12c01: outbound dispose is host-owned, idempotent, and rejects later sends canonically', async () => {
+  it('outbound dispose is host-owned, idempotent, and rejects later sends canonically', async () => {
     const [transport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
       id: 'dispose-client',
@@ -6034,7 +6031,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     })
   })
 
-  it('T99 B12c01: later activation failure rolls back outbound publication and leaves zero subscription residue', async () => {
+  it('later activation failure rolls back outbound publication and leaves zero subscription residue', async () => {
     const primary = new Error('activation participant failed')
     const batch = await createProductionBatch({
       injectInstall: (role, install) => {
@@ -6061,7 +6058,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T100 B12c01 RED: outbound cleanup proves exact order, failure identity, and terminal idempotence', async () => {
+  it('outbound cleanup proves exact order, failure identity, and terminal idempotence', async () => {
     const successTrace: IProductionLifecycleTraceEntry[] = []
     const successResources = new Map<string, object>()
     let successOutboundDisposeCalls = 0
@@ -6257,7 +6254,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     })
   })
 
-  it('B12c01 supporting endpoint seam: send/RPC retains endpoint and disposal Promise identity', async () => {
+  it('supporting endpoint seam: send/RPC retains endpoint and disposal Promise identity', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createProviderEndpoint({
       id: 'store-worker-rpc-server',
@@ -6283,7 +6280,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T102 B12c01: caller cancellation preserves native cause and clears outbound pending state', async () => {
+  it('caller cancellation preserves native cause and clears outbound pending state', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const server = await createProviderEndpoint({
       id: 'cancel-rpc-server',
@@ -6324,7 +6321,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T103 B12c01: real outbound order is encode then encrypt then sign then transport send', async () => {
+  it('real outbound order is encode then encrypt then sign then transport send', async () => {
     const [baseTransport] = createMemoryTransportPair()
     const events: string[] = []
     const transport = {
@@ -6369,7 +6366,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     }
   })
 
-  it('T104 B12c01: hostile outbound authentication preserves native source/code/cause identity', async () => {
+  it('hostile outbound authentication preserves native source/code/cause identity', async () => {
     const [transport] = createMemoryTransportPair()
     const hostile = new Error('outbound encrypt failed')
     const client = await createClientEndpoint({
@@ -6401,7 +6398,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
   })
 
   /** Frozen title retained; the approved group/outcome operations expand the asserted current keys. */
-  it('T105 B12c01: descriptor four-key claims remain distinct from seven-key final projection', async () => {
+  it('descriptor four-key claims remain distinct from seven-key final projection', async () => {
     const [transport] = createMemoryTransportPair()
     const client = await createClientEndpoint({
       id: 'projection-client',
@@ -6467,19 +6464,19 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(batch.host.dispose()).toBe(dispose)
   }
 
-  it('T152 primitive native Feature installation reaches terminal cleanup', async () => {
+  it('primitive native Feature installation reaches terminal cleanup', async () => {
     await runNativeInstallationBranch('native-observation-primitive')
   })
 
-  it('T153 undefined native Feature installation reaches terminal cleanup', async () => {
+  it('undefined native Feature installation reaches terminal cleanup', async () => {
     await runNativeInstallationBranch('native-observation-undefined')
   })
 
-  it('T154 no-disposer native Feature installation has one terminal Host Promise', async () => {
+  it('no-disposer native Feature installation has one terminal Host Promise', async () => {
     await runNativeInstallationBranch('native-observation-no-disposer')
   })
 
-  it('T155 native Feature result disposer runs once at terminal cleanup', async () => {
+  it('native Feature result disposer runs once at terminal cleanup', async () => {
     let disposeCalls = 0
     const batch = await createProductionBatch({
       additionalNativeFeatures: [
@@ -6498,7 +6495,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(batch.host.dispose()).toBe(dispose)
   })
 
-  it('T156 native Feature install failure rolls back without retaining Host residue', async () => {
+  it('native Feature install failure rolls back without retaining Host residue', async () => {
     const primary = new Error('native observation install failure')
     const batch = await createProductionBatch({
       additionalNativeFeatures: [
@@ -6524,7 +6521,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     })
   })
 
-  it('T157 native result cleanup failure preserves identity and terminal Promise identity', async () => {
+  it('native result cleanup failure preserves identity and terminal Promise identity', async () => {
     const cleanup = new Error('native observation result cleanup failure')
     let disposeCalls = 0
     const batch = await createProductionBatch({
@@ -6552,7 +6549,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     await expect(dispose).rejects.toBe(failure)
   })
 
-  it('T166 throwing cleanup observer is diagnostic-only and cannot alter disposal', async () => {
+  it('throwing cleanup observer is diagnostic-only and cannot alter disposal', async () => {
     const cleanup = new Error('native observer cleanup failure')
     const observerFailure = new Error('native observer failure')
     const runNativeBranch = async (observe: boolean, failCleanup: boolean) => {
@@ -6614,7 +6611,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(observedSuccess.reports).toEqual([observerFailure])
   })
 
-  it('T158 later native failure rolls back earlier owned resources in reverse order', async () => {
+  it('later native failure rolls back earlier owned resources in reverse order', async () => {
     const rollback = new Error('observation later rollback')
     const releases: string[] = []
     const firstCleanup = new Error('observation first cleanup')
@@ -6662,8 +6659,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
   })
 })
 
-describe('Cycle L discovery Host transactions', () => {
-  it('T248 publishes and removes the real discovery resolver in one Host transaction', async () => {
+describe('discovery Host transactions', () => {
+  it('publishes and removes the real discovery resolver in one Host transaction', async () => {
     const batch = await createProductionBatch({})
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     const resolver = batch.host.getPort(RpcPortName.discoveryResolver) as
@@ -6684,7 +6681,7 @@ describe('Cycle L discovery Host transactions', () => {
     expectTerminalResidue(productionResidueSnapshot(batch))
   })
 
-  it('T249 rolls back a published discovery resolver when a later real Host participant fails', async () => {
+  it('rolls back a published discovery resolver when a later real Host participant fails', async () => {
     const primary = new Error('cycle-l later participant failed')
     const lateName = 'cycle-l-later-participant'
     let published: unknown
@@ -6724,7 +6721,7 @@ describe('Cycle L discovery Host transactions', () => {
     expectTerminalResidue(productionResidueSnapshot(batch))
   })
 
-  it('T249 preserves the real discovery cleanup error identity and terminal residue', async () => {
+  it('preserves the real discovery cleanup error identity and terminal residue', async () => {
     const cleanup = new Error('cycle-l discovery attachment cleanup failed')
     const observerFailure = new Error('cycle-l discovery disposal observer failed')
     let discoveryDisposeCalls = 0
@@ -6766,7 +6763,7 @@ describe('Cycle L discovery Host transactions', () => {
     expectTerminalResidue(productionResidueSnapshot(batch))
   })
 
-  it('T249 preserves the shared canonical Host and endpoint disposal Promise on cleanup failure', async () => {
+  it('preserves the shared canonical Host and endpoint disposal Promise on cleanup failure', async () => {
     const cleanup = new Error('cycle-l discovery cleanup failed')
     const middleware: IRpcPlugin = {
       name: 'cycle-l-cleanup-observer',
@@ -6832,7 +6829,7 @@ describe('Cycle L discovery Host transactions', () => {
     })
   })
 
-  it('T249 preserves ordered route, replay, and registry cleanup leaves from one composed endpoint', async () => {
+  it('preserves ordered route, replay, and registry cleanup leaves from one composed endpoint', async () => {
     const routeFirst = new Error('discovery route cleanup failed')
     const routeSecond = new Error('discovery response route cleanup failed')
     const replayError = new Error('discovery replay cleanup failed')

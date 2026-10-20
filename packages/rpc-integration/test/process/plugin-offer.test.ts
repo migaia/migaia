@@ -38,10 +38,10 @@ function bytePair(): readonly [IProcessByteChannel, IProcessByteChannel] {
 }
 
 describe('process plugin deployment offer', () => {
-  it('[K207] passes the declared object to establish and negotiates its capabilities', async () => {
+  it('passes the declared object to establish and negotiates its capabilities', async () => {
     const [initiator, responder] = bytePair()
     const scheduler = createManualScheduler()
-    const token = 'k207-token'
+    const token = 'fixture-token'
     /** The extra capability distinguishes the declared proposal from the native default. */
     const offer = createNativeProcessOffer({
       peer: { id: 'declared-client', runtime: 'node' },

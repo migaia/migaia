@@ -1035,7 +1035,7 @@ fn project_jsonrpc(input: &Value) -> Value {
     Value::Object(fields)
 }
 
-/// Exercise the U36 baseline through the actual native readers and both provider loops.
+/// Exercise the runtime baseline through the actual native readers and both provider loops.
 fn check_runtime_baseline(counts: &mut Counts) {
     use crate::json::{number, object, string};
     /** Both new capabilities are explicitly offered by the authenticated test session. */

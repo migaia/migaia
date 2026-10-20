@@ -19,7 +19,10 @@ import type { IRpcLogProbeOptions, IRpcLogSink } from './types.js'
 /** A selected sink retains the logger receiver through a construction-time arrow closure. */
 type ILogMethod = (message: string, fields: object) => unknown
 
-/** Fields form the SC9(b) logger boundary; error and captured content remain original references. */
+/**
+ * Fields form the logger representation boundary; error and captured content remain original
+ * references.
+ */
 type ILogFields = {
   method: string | undefined
   messageId: string | undefined
@@ -164,7 +167,7 @@ export function createRpcLogProbe(
       /** The compiled negative sink index implements the documented off policy. */
       const level = levels[category]!
       if (level === RpcLogLevel.off) return
-      // SC9(b): one synchronous logger-boundary object extracts scalars from the reusable view.
+      // One synchronous logger-boundary object extracts scalars from the reusable view.
       /** Only logger-visible qualified events create this object; nested values retain ownership. */
       const fields: ILogFields = {
         method: view.method,

@@ -5,7 +5,7 @@ import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createThreadPlugin } from '@migaia/rpc-threads'
 import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
 
-it('[A11][A33] one genuine Host batch exposes the real Feature prepared before its connection', async () => {
+it('one genuine Host batch exposes the real Feature prepared before its connection', async () => {
   /** Both managed Hosts keep original batch visibility and commit semantics. */
   const hosts = [
     runtimeTestHost({
@@ -51,7 +51,7 @@ it('[A11][A33] one genuine Host batch exposes the real Feature prepared before i
     assert.deepEqual(
       results.filter((result) => result.status === 'rejected'),
       [],
-      '[A11] same-batch actual Feature exposure must prepare and commit'
+      'same-batch actual Feature exposure must prepare and commit'
     )
     for (const host of hosts) assert.equal(await host.thread!.request('remote', 'service.read'), 42)
   } finally {

@@ -16,7 +16,7 @@ describe('process plugin connect binding', () => {
     [undefined, 'ping'],
     ['native', 'ping'],
     ['jsonrpc', 'none']
-  ] as const)('[K231/A2] selects connect wire health (%s => %s)', async (wire, health) => {
+  ] as const)('selects connect wire health (%s => %s)', async (wire, health) => {
     /** The same local supervisor and socket lifetime back every selector. */
     const fixture = remoteHarness()
     /** Selector construction must remain lazy until explicit start. */
@@ -53,7 +53,7 @@ describe('process plugin connect binding', () => {
     expect(fixture.binding.scheduler.pendingCount).toBe(0)
   })
 
-  it('[K231/A2] rejects unsupported connect wire before dialing', () => {
+  it('rejects unsupported connect wire before dialing', () => {
     /** Invalid selectors never acquire a socket or bypass native health admission. */
     const dial = vi.fn()
     expect(() =>
@@ -77,7 +77,7 @@ describe('process plugin connect binding', () => {
     expect(dial).not.toHaveBeenCalled()
   })
 
-  it('[K231/A2] preserves explicit custom connect health on JSON-RPC', async () => {
+  it('preserves explicit custom connect health on JSON-RPC', async () => {
     /** Custom health remains the caller's existing policy instead of being suppressed by wire. */
     const fixture = remoteHarness()
     const check = vi.fn(async () => undefined)
@@ -107,7 +107,7 @@ describe('process plugin connect binding', () => {
     await binding.supervisor.dispose()
   })
 
-  it('[A2] installs through the borrowed connection and leaves the external target owned elsewhere', async () => {
+  it('installs through the borrowed connection and leaves the external target owned elsewhere', async () => {
     const fixture = remoteHarness()
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -167,7 +167,7 @@ describe('process plugin connect binding', () => {
     }
     expect(rawClose).toHaveBeenCalledTimes(1)
   })
-  it('[A2] gives each dial a new session and closes only the owned socket', async () => {
+  it('gives each dial a new session and closes only the owned socket', async () => {
     const scheduler = createManualScheduler()
     const close = vi.fn(async () => undefined)
     /** Each channel emits physical close only when its own close operation completes. */
@@ -233,7 +233,7 @@ describe('process plugin connect binding', () => {
     expect(close).toHaveBeenCalledTimes(2)
   })
 
-  it('[A2] rejects a missing token before dialing', () => {
+  it('rejects a missing token before dialing', () => {
     const dial = vi.fn(async () => {
       throw new Error('unreachable')
     })
@@ -259,7 +259,7 @@ describe('process plugin connect binding', () => {
     expect(dial).not.toHaveBeenCalled()
   })
 
-  it('[A6] closes a borrowed socket when its adapter rejects authentication', async () => {
+  it('closes a borrowed socket when its adapter rejects authentication', async () => {
     const denied = new Error('peer rejected authentication')
     const close = vi.fn(async () => undefined)
     const raw: IProcessByteChannel = {

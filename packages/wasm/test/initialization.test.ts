@@ -4,7 +4,7 @@ import test from 'node:test'
 import init, { alloc_bytes, byte_len_of, dealloc_bytes } from '@migaia/wasm'
 
 /** The public glue and both initialization results must share one published arena. */
-test('D02 concurrent first initialization retains one exports and memory identity', async () => {
+test('concurrent first initialization retains one exports and memory identity', async () => {
   /** Real local WASM bytes exercise the package entry without fetch or a native adapter. */
   const bytes = new Uint8Array(
     await readFile(new URL('../src/wasm_provider_bg.wasm', import.meta.url))

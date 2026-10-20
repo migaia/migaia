@@ -6,7 +6,7 @@ export const RpcRemoteLayerErrorText = {
   invalidPathSegment: '<invalid-key>',
   /** Used for invalid descriptions and reserved control payloads. */
   contractInvalid: 'Remote contract is invalid',
-  /** Removal admission requires a live connection-owned remote Host adoption (R4/K203). */
+  /** Removal admission requires a live connection-owned remote Host adoption. */
   hostNotAdopted: 'Remote Host plugin is not adopted by this connection',
   /** Used when unit startup or channel acquisition cannot complete. */
   startFailed: 'Remote unit could not start',

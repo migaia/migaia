@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createProcessPeer, createProcessPlugin } from '../../src/process/index.js'
 
 describe('process Host public root', () => {
-  it('[A8] exposes factories and types through process without adding a Host deep path', async () => {
+  it('exposes factories and types through process without adding a Host deep path', async () => {
     /** The built module is the same process entry consumed by the packed 40-path check. */
     const built = await import('@migaia/rpc-process')
     expect(built.createProcessPeer).toBeTypeOf('function')

@@ -83,7 +83,7 @@ describe('能力闸门', () => {
     expect({ reads, original, hijacked }).toEqual({ reads: 1, original: 1, hijacked: 0 })
   })
 
-  it('Round24 C-T01: classifies a throwing handle disposer getter and converges disable/dispose', async () => {
+  it('classifies a throwing handle disposer getter and converges disable/dispose', async () => {
     const getterError = new Error('dispose getter failed')
     let reads = 0
     const handle = {
@@ -122,7 +122,7 @@ describe('能力闸门', () => {
     expect(host.handle('hostile')).toBeUndefined()
   })
 
-  it('Round26 C-T02: rejects delayed disposer-origin dispose and reports once', async () => {
+  it('rejects delayed disposer-origin dispose and reports once', async () => {
     let host!: ReturnType<typeof createCapabilityHost<undefined>>
     let selfError: unknown
     const reported: unknown[] = []
@@ -169,7 +169,7 @@ describe('能力闸门', () => {
     expect(disposer).toHaveBeenCalledOnce()
   })
 
-  it('Round26 C-T03: rejects external in-progress dispose and reuses completed canonical Promise', async () => {
+  it('rejects external in-progress dispose and reuses completed canonical Promise', async () => {
     const cleanup = deferred<void>()
     const disposer = vi.fn(() => cleanup.promise)
     const host = enabledHost(undefined, 'worker')

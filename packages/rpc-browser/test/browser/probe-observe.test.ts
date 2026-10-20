@@ -62,7 +62,7 @@ function fixture(carrier: (typeof carriers)[number], detach = false): IFixture {
       originOrTransfer?: unknown,
       windowTransfer?: readonly Transferable[]
     ) {
-      /** SC9b: this fixture models native structured-clone wire delivery and real detachment. */
+      /** This fixture models native structured-clone wire delivery and real detachment. */
       const transfer =
         typeof originOrTransfer === 'string'
           ? windowTransfer
@@ -155,7 +155,7 @@ function probe(events: IEvent[], capturing = false): IRpcCarrierProbe {
   }
 }
 
-describe('carriers A1: browser observe', () => {
+describe('carriers: browser observe', () => {
   /** Each public carrier runs the same physical metadata, capture, failure and disposer contracts. */
   for (const carrier of carriers) {
     it(`${carrier}: one physical send and receive reuse detail, with metadata only`, async () => {
@@ -327,7 +327,7 @@ describe('carriers A1: browser observe', () => {
       /** Captured send content outlives the original detached buffer. */
       const events: IEvent[] = []
       native.transport.observe!(probe(events, true))
-      /** Byte content is eligible for SC9a only because its buffer is transferred. */
+      /** Byte content is eligible for byte preservation only because its buffer is transferred. */
       const bytes = new Uint8Array([4, 5, 6])
       await native.transport.send(bytes, { transfer: [bytes.buffer] })
       expect(bytes.byteLength).toBe(0)
@@ -416,7 +416,10 @@ describe('carriers A1: browser observe', () => {
     /** Retaining content reveals native detachment after the synchronous probe returns. */
     const events: IEvent[] = []
     native.transport.observe!(probe(events, true))
-    /** Only the byte buffer detaches; unrelated payload must keep its identity under SC9. */
+    /**
+     * Only the byte buffer detaches; unrelated payload must keep its identity under the
+     * reference-retention rule.
+     */
     const untouched = { value: 'reference-only' }
     /** The byte descendant is supported by native postMessage's structured-clone boundary. */
     const bytes = new Uint8Array([4, 5, 6])

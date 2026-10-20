@@ -22,7 +22,7 @@ import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
 
 for (const mode of ['peer', 'plugin'] as const) {
-  it(`[A17][A35] owned ${mode} prepares the real replacement and permanently retires its old identity`, async () => {
+  it(`owned ${mode} prepares the real replacement and permanently retires its old identity`, async () => {
     /** The original one-unit budget independently proves native resource liquidation. */
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
     /** Recording preserves the exact native launcher and supervisor launch request. */
@@ -112,7 +112,7 @@ for (const mode of ['peer', 'plugin'] as const) {
         assert.equal(
           ((await request('current-output')) as { parent: number }).parent,
           84,
-          '[A117] an already prepared connection follows the current same-name Feature'
+          'an already prepared connection follows the current same-name Feature'
         )
       }
       /** Genuine native departure is the sole authorization for the original supervisor restart. */
@@ -131,16 +131,12 @@ for (const mode of ['peer', 'plugin'] as const) {
         },
         { timeout: 3000 }
       )
-      assert.equal(
-        opens,
-        2,
-        '[A17] the original current-generation owner opens the real replacement'
-      )
+      assert.equal(opens, 2, 'the original current-generation owner opens the real replacement')
       const second = (await request('replacement').catch((error: unknown) => error)) as typeof first
       assert.equal(
         second.parent,
         mode === 'plugin' ? 84 : 42,
-        '[A117] a genuine replacement generation compiles the current original Feature output'
+        'a genuine replacement generation compiles the current original Feature output'
       )
       assert.equal(second.value, 'replacement')
       assert.notEqual(second.self.instanceId, first.self.instanceId)
@@ -148,7 +144,7 @@ for (const mode of ['peer', 'plugin'] as const) {
         assert.throws(
           () => host.thread!.request(first.self.instanceId, 'probe'),
           { code: 'TARGET_UNKNOWN' },
-          '[A35] old physical identity cannot select a ready successor'
+          'old physical identity cannot select a ready successor'
         )
     } finally {
       await peer?.close()
@@ -160,7 +156,7 @@ for (const mode of ['peer', 'plugin'] as const) {
   })
 }
 
-it('[A3][A34] Host startup cancellation reaches the original owned source before publication', async () => {
+it('Host startup cancellation reaches the original owned source before publication', async () => {
   /** The original Host operation timeout supplies the actual cancellation reason. */
   const host = runtimeTestHost({
     host: { execution: { mutationTimeoutMs: 1000, pipelineDrainTimeoutMs: false } }
@@ -234,14 +230,10 @@ it('[A3][A34] Host startup cancellation reaches the original owned source before
     assert.equal(
       openingSignal?.aborted,
       true,
-      '[A3] source preparation consumes the original Host operation signal'
+      'source preparation consumes the original Host operation signal'
     )
     await vi.waitFor(() => assert.equal(budget.inUse, 0), { timeout: 3000 })
-    assert.equal(
-      host.thread,
-      undefined,
-      '[A34] aborted preparation publishes no connection or facade'
-    )
+    assert.equal(host.thread, undefined, 'aborted preparation publishes no connection or facade')
   } finally {
     releaseOpen?.()
     await host.dispose()
@@ -252,7 +244,7 @@ it('[A3][A34] Host startup cancellation reaches the original owned source before
 
 for (const catalogSize of [4, 32])
   for (const idempotent of [false, true]) {
-    it(`[R14-A30][A35][A36] catalog ${catalogSize} original retry owner settles a sent ${idempotent ? 'idempotent' : 'non-idempotent'} native request`, async () => {
+    it(`catalog ${catalogSize} original retry owner settles a sent ${idempotent ? 'idempotent' : 'non-idempotent'} native request`, async () => {
       /** Count only the two-level business root on the actual parent admission owner. */
       const normalize = observePortableNormalization()
       /** Ready-directory and parent control traffic cannot satisfy this private-input count. */
@@ -261,7 +253,7 @@ for (const catalogSize of [4, 32])
           ([value]) =>
             typeof value === 'object' &&
             value !== null &&
-            Reflect.get(value, 'marker') === 'r14-retry'
+            Reflect.get(value, 'marker') === 'fixture-retry'
         ).length
       /** Actual one-unit admission proves that replay never spawns a parallel owned execution. */
       const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
@@ -330,21 +322,21 @@ for (const catalogSize of [4, 32])
               (method) => method.name === 'service.data.read'
             )!.idempotent,
             true,
-            '[A36] optional advanced declaration retains the original idempotency authorization'
+            'optional advanced declaration retains the original idempotency authorization'
           )
         assert.equal(
           readRuntimePeerConnection(peer).description!.methods.filter((entry) =>
             entry.name.startsWith('service.data.')
           ).length,
           idempotent ? catalogSize : catalogSize + 2,
-          '[R14-A30] actual accepted catalog dimension'
+          'actual accepted catalog dimension'
         )
         normalize.mockClear()
         const method = idempotent ? 'service.data.read' : 'hold'
         const result = peer
           .request(
             method,
-            { marker: 'r14-retry', nested: { value: catalogSize } },
+            { marker: 'fixture-retry', nested: { value: catalogSize } },
             { timeoutMs: 3000 }
           )
           .catch((error: unknown) => error)
@@ -355,16 +347,16 @@ for (const catalogSize of [4, 32])
         assert.equal(
           walks(),
           idempotent ? 2 : 1,
-          '[R14-A30] genuine native retry reuses original private input without another portable walk'
+          'genuine native retry reuses original private input without another portable walk'
         )
         if (idempotent) {
           assert.deepEqual(
             outcome,
             Object.assign(Object.create(null), {
-              marker: 'r14-retry',
+              marker: 'fixture-retry',
               nested: Object.assign(Object.create(null), { value: catalogSize })
             }),
-            '[A36] one original logical dispatch replays on the actual ready replacement'
+            'one original logical dispatch replays on the actual ready replacement'
           )
           const sends = frames
             .filter((frame) => {
@@ -388,7 +380,7 @@ for (const catalogSize of [4, 32])
           assert.equal(
             (outcome as { code?: string }).code,
             'REMOTE_RESULT_UNKNOWN',
-            '[A35] sent non-idempotent work is never silently retargeted'
+            'sent non-idempotent work is never silently retargeted'
           )
           assert.equal(
             frames.filter((frame) => {

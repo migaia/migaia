@@ -23,7 +23,10 @@ import { IpcBenchDiagnostic } from './text.mjs'
  * @throws {Error} Ready, observer, echo and cleanup failures retain their first cause.
  */
 export async function runIpcSide(unit, side, options = {}) {
-  /** A diagnostic is deliberately limited to the two Node physical carriers requested by P3. */
+  /**
+   * A diagnostic is deliberately limited to the two Node physical carriers requested by the
+   * diagnostic lane.
+   */
   const diagnosticMode = options.diagnostic
   if (
     diagnosticMode &&
@@ -143,7 +146,8 @@ export async function runIpcSide(unit, side, options = {}) {
             peerAfter,
             classification: session.classification(),
             samplingMaxReplayEntriesPerPeer: 1200,
-            providerConcurrency: 'NOT_INSTRUMENTED_FORMAL; separate I26 diagnostics',
+            providerConcurrency:
+              'NOT_INSTRUMENTED_FORMAL; separate provider concurrency diagnostics',
             gcStatus: 'NOT_COLLECTED_FORMAL_TIMING',
             timingStatus: IpcBenchDiagnostic.timingStatus,
             diagnosticMode
@@ -173,7 +177,8 @@ export async function runIpcSide(unit, side, options = {}) {
             peerAfter: await session.peerSnapshot(),
             classification: session.classification(),
             samplingMaxReplayEntriesPerPeer: 1200,
-            providerConcurrency: 'NOT_INSTRUMENTED_FORMAL; separate I26 diagnostics',
+            providerConcurrency:
+              'NOT_INSTRUMENTED_FORMAL; separate provider concurrency diagnostics',
             gcStatus: 'NOT_COLLECTED_FORMAL_TIMING',
             ...(relayControlPairs.length
               ? {

@@ -31,7 +31,7 @@ const labels = new Set([
 ])
 
 describe('platform constant ownership', () => {
-  it('A8 keeps all seven platform literals in transport-constants alone', () => {
+  it('keeps all seven platform literals in transport-constants alone', () => {
     const owners = new Map<string, Set<string>>()
     for (const path of sources(coreRoot)) {
       new Visitor({
@@ -54,7 +54,7 @@ describe('platform constant ownership', () => {
     }
   })
 
-  it('A8 accepts every declared platform and rejects an undeclared one', async () => {
+  it('accepts every declared platform and rejects an undeclared one', async () => {
     for (const platform of Object.values(RpcPlatform)) {
       const transport: IRpcTransport = {
         platform,

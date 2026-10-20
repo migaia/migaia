@@ -53,7 +53,7 @@ const assimilateThenable = (
   }
 }
 
-/** A synchronous result, or a Promise of it once a release callback returned a thenable (LC-P4). */
+/** A synchronous result, or a Promise of it once a release callback returned a thenable. */
 type IMaybePromise<T> = T | Promise<T>
 
 /** Shared successful callback outcome; outcomes are read-only, so one instance serves every call. */
@@ -104,8 +104,8 @@ type IGracefulOutcome =
   | { readonly ok: false; readonly timedOut: true }
 
 /**
- * Runs `graceful` against its budget. A synchronous graceful settles synchronously (LC-P4); a
- * thenable result continues in `awaitGraceful` with the clock sample taken before user code ran.
+ * Runs `graceful` against its budget. A synchronous graceful settles synchronously; a thenable
+ * result continues in `awaitGraceful` with the clock sample taken before user code ran.
  */
 function raceGraceful(
   graceful: (context: IReleaseContext) => void | PromiseLike<void>,
@@ -190,11 +190,10 @@ const noReleaseErrors: readonly unknown[] = Object.freeze([])
  *
  * Returns every error raised along the way (empty on full success) instead of throwing, so the
  * caller can attribute them to the right item and fold them into whatever error policy is active.
- * `graceful` throwing (not timing out) does not stop `force` from running (L-T24); a `graceful`
- * timeout abandons waiting without cancelling it and silently proceeds to `force` (L-T23). The
- * result is synchronous while every callback returns synchronously (LC-P4). `context` must already
- * be admitted: the transaction builds its own, and `executeReleaseDescriptor` normalizes a public
- * one.
+ * `graceful` throwing (not timing out) does not stop `force` from running; a `graceful` timeout
+ * abandons waiting without cancelling it and silently proceeds to `force`. The result is
+ * synchronous while every callback returns synchronously. `context` must already be admitted: the
+ * transaction builds its own, and `executeReleaseDescriptor` normalizes a public one.
  */
 function executeAdmittedReleaseDescriptor(
   descriptor: IReleaseDescriptor,
@@ -344,7 +343,7 @@ export type IAdmissionBatch = {
  *
  * `plan` (strong): items run in exactly the given sequence; `descriptor.order` is never read.
  *
- * §4.6: a single transaction instance never mixes the two.
+ * A single transaction instance never mixes the two.
  */
 export type IDisposeTransactionMode =
   | { readonly kind: typeof DisposeTransactionKind.order }
@@ -358,10 +357,10 @@ export type IDisposeTransactionOptions = {
    * 'report'`.
    */
   readonly report?: (error: unknown) => void
-  /** Absolute deadline shared, unchanged, across every item in this run (L-T32). */
+  /** Absolute deadline shared, unchanged, across every item in this run. */
   readonly deadlineAt?: number
   /**
-   * Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract.
+   * Uses the scheduler whose `now()` produces `deadlineAt` under the shared clock-domain contract.
    * Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the
    * graceful-phase `boundedWait`.
    */
@@ -524,7 +523,7 @@ export function createDisposeTransaction(
         primaryRecorded = true
         collector.add(source, error)
       }
-      // Mirrors `options.signal` into a signal every item's context can observe (L-T26). With no
+      // Mirrors `options.signal` into a signal every item's context can observe. With no
       // `options.signal` given, `controller.signal` simply never aborts — a scope that wants items
       // to see "we're closing" passes its own close()-tied signal in.
       const controller = signalOption === undefined ? undefined : createController()
@@ -546,7 +545,7 @@ export function createDisposeTransaction(
       try {
         const admission = admitItems(items, mode)
         for (const item of admission.rejected) record(item.source, item.error)
-        // Every context field is per-run, so one admitted context serves all items (LC-P4).
+        // Every context field is per-run, so one admitted context serves all items.
         const context: IReleaseContext = {
           signal: controller?.signal ?? inertReleaseSignal,
           deadlineAt,

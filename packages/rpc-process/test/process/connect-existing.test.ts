@@ -32,7 +32,7 @@ function ipc(id: string) {
 
 describe('Node rendezvous sockets', () => {
   it.skipIf(process.platform === 'win32')(
-    '[A4/A10] reclaims only the same service and inode after a crashed listener',
+    'reclaims only the same service and inode after a crashed listener',
     async () => {
       const directory = await mkdtemp(join(tmpdir(), 'owner-'))
       const path = join(directory, 's')
@@ -96,7 +96,7 @@ describe('Node rendezvous sockets', () => {
     }
   )
 
-  it('[A4/A10] records a private Unix socket owner and refuses a foreign path', async () => {
+  it('records a private Unix socket owner and refuses a foreign path', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'owner-'))
     const path = join(directory, 's')
     try {
@@ -142,7 +142,7 @@ describe('Node rendezvous sockets', () => {
     }
   })
 
-  it('[L7] rejects a held pending accept after listener close', async () => {
+  it('rejects a held pending accept after listener close', async () => {
     let capture: (pending: IProcessPendingByteConnection) => void = () => undefined
     const held = new Promise<IProcessPendingByteConnection>((resolve) => {
       capture = resolve
@@ -183,7 +183,7 @@ describe('Node rendezvous sockets', () => {
     }
   })
 
-  it('[L1b] aborts an in-flight accept when the listener closes', async () => {
+  it('aborts an in-flight accept when the listener closes', async () => {
     let capture: (value: { outcome: Promise<unknown> }) => void = () => undefined
     const started = new Promise<{ outcome: Promise<unknown> }>((resolve) => {
       capture = resolve
@@ -227,7 +227,7 @@ describe('Node rendezvous sockets', () => {
     }
   })
 
-  it('[D4] rejects a 16 MiB header before verifier admission', async () => {
+  it('rejects a 16 MiB header before verifier admission', async () => {
     let verifierCalls = 0
     /** The server's rejected accept is the observable pre-auth boundary. */
     let settle: (error: unknown) => void = () => undefined
@@ -270,7 +270,7 @@ describe('Node rendezvous sockets', () => {
     }
   })
 
-  it('[A10] accepts only a verified pending connection and keeps it after listener close', async () => {
+  it('accepts only a verified pending connection and keeps it after listener close', async () => {
     /** Responder fulfillment proves the socket reached the authenticated ready state. */
     let resolveAccepted: (value: IAuthenticatedProcessChannel) => void = () => undefined
     const accepted = new Promise<IAuthenticatedProcessChannel>((resolve) => {
@@ -332,7 +332,7 @@ describe('Node rendezvous sockets', () => {
     await ready.channel.close()
   })
 
-  it('[A10] rejects absent verifier and non-loopback addresses before bind or dial', async () => {
+  it('rejects absent verifier and non-loopback addresses before bind or dial', async () => {
     await expect(
       listenProcessByteChannel({
         address: 'tcp://127.0.0.1:0',
@@ -354,7 +354,7 @@ describe('Node rendezvous sockets', () => {
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
-  it('[A10] binds a Unix socket, removes only its own path, and preserves an occupied path', async () => {
+  it('binds a Unix socket, removes only its own path, and preserves an occupied path', async () => {
     const folder = fileURLToPath(new URL('./', import.meta.url))
     /** A short temporary name stays below Darwin's Unix-domain path limit. */
     const path = join(tmpdir(), `r-${randomUUID().slice(0, 8)}.sock`)
@@ -385,7 +385,7 @@ describe('Node rendezvous sockets', () => {
     expect((await lstat(occupied)).isFile()).toBe(true)
   })
 
-  it('[A10] closes both held and handshaking pending sockets without invoking the verifier', async () => {
+  it('closes both held and handshaking pending sockets without invoking the verifier', async () => {
     /** The callback remains open so a held pending is not auto-closed on return. */
     let finishCallback: () => void = () => undefined
     const callbackLifetime = new Promise<void>((resolve) => {

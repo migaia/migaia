@@ -22,7 +22,7 @@ function createSourceOverridePlugin(sourceOverrides) {
     [...sourceOverrides].map(([path, bytes]) => [resolve(path), Buffer.from(bytes)])
   )
   return {
-    name: 'rpcc-canonical-source-override',
+    name: 'canonical-source-override',
     enforce: 'pre',
     load(id) {
       const target = resolve(id.split('?')[0])

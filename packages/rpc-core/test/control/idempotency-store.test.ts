@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRpcIdempotencyStore } from '../../dist/core/index.js'
 
-describe('idempotency store (A7)', () => {
+describe('idempotency store', () => {
   it('counts nested portable bytes before retaining a result', () => {
     const store = createRpcIdempotencyStore({ maxOutcomeBytes: 19 })
     const retained = store.claim('peer', 'count:bytes', 0)

@@ -11,7 +11,7 @@ import {
 
 describe('audited reactive boundary contracts', () => {
   it.each(['native', 'getter'] as const)(
-    'D-05 preserves a thrown %s Suspense object without probing its then getter',
+    'preserves a thrown %s Suspense object without probing its then getter',
     (kind) => {
       /** Suspense objects are control values whose consuming owner performs thenable admission. */
       const wakeup = Promise.resolve()
@@ -63,7 +63,7 @@ describe('audited reactive boundary contracts', () => {
       expect(reads).toBe(0)
     }
   )
-  it('D-02 gives duplicate callback registrations independent removal ownership', () => {
+  it('gives duplicate callback registrations independent removal ownership', () => {
     /** Function identity does not identify the caller that owns a hook registration. */
     const hook = vi.fn()
     /** Ordinary observation transitions drive both hook directions. */
@@ -85,7 +85,7 @@ describe('audited reactive boundary contracts', () => {
     signal.dispose()
   })
 
-  it('D-03 reports deferred custom-observer task failure through canonical cleanup', () => {
+  it('reports deferred custom-observer task failure through canonical cleanup', () => {
     /** Schedule first and execute later, so catching only registration cannot pass. */
     const idle: (() => void)[] = []
     /** Existing runtime reporter owns the task failure. */
@@ -125,7 +125,7 @@ describe('audited reactive boundary contracts', () => {
     binding.clear()
   })
 
-  it('D-04 never republishes an older reserved source version after a reentrant notify', () => {
+  it('never republishes an older reserved source version after a reentrant notify', () => {
     /** Public controlled sources share the same canonical publication owner. */
     const runtime = createRuntime()
     /** Controlled source metadata is supplied by the canonical extension binding. */
@@ -164,7 +164,7 @@ describe('audited reactive boundary contracts', () => {
   })
 
   it.each(['batch', 'untracked', 'action', 'computed'] as const)(
-    'D-05 codes %s callback failure without replacing native identity',
+    'codes %s callback failure without replacing native identity',
     (kind) => {
       /** All four public entry points retain the same native failure and stack. */
       const failure = new RangeError('callback failed')
@@ -189,7 +189,7 @@ describe('audited reactive boundary contracts', () => {
   )
 
   it.each(['sync', 'async'] as const)(
-    'D-06 reports %s reporter failure through the shared host queue',
+    'reports %s reporter failure through the shared host queue',
     async (kind) => {
       /** Terminal callbacks stay outside the graph operation and remain observable. */
       const callbacks: (() => void)[] = []
@@ -219,7 +219,7 @@ describe('audited reactive boundary contracts', () => {
     }
   )
 
-  it('D-07 brands normal nodes for a foreign copy ownership check', () => {
+  it('brands normal nodes for a foreign copy ownership check', () => {
     /** Canonical node construction is the cross-copy diagnostic brand's owning entry. */
     const signal = createRuntime().signal(1)
     expect(

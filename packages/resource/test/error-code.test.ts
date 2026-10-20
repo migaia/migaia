@@ -24,15 +24,15 @@ function collectSourceFiles(dir: string): string[] {
 
 /**
  * Strips comments before scanning for code literals. Doc comments legitimately quote code names
- * (that is the §3.5.1 JSDoc requirement); only real code is an "inline literal" violation.
+ * (that is JSDoc requirement); only real code is an "inline literal" violation.
  */
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
-// M-T37（§3.7.2）：码表生效，且 REQUEST_ABORTED/REQUEST_CANCELLED 仍是 name === 'AbortError' 的
+// ：码表生效，且 REQUEST_ABORTED/REQUEST_CANCELLED 仍是 name === 'AbortError' 的
 // DOMException —— 码只是附加字段，不替换类型（store-react 的 suspension 判定依赖这一点）。
-describe('M-T37 (§3.7.2): every declared code has a real trigger', () => {
+describe('every declared code has a real trigger', () => {
   it('shared attachment preserves native Error identity, cause, and stack', () => {
     const cause = new Error('cause')
     const error = createResourceError('TEST_CODE', 'message', { cause })
@@ -123,8 +123,8 @@ describe('M-T37 (§3.7.2): every declared code has a real trigger', () => {
   })
 })
 
-// M-T37 反向 + M-T41（§3.7.5）：码表穷尽、无内联字面量、stack 未被重写、原始错误按 identity 可达。
-describe('M-T41 (§3.7.5): the table is exhaustive and tagging is non-destructive', () => {
+// 反向：码表穷尽、无内联字面量、stack 未被重写、原始错误按 identity 可达。
+describe('the table is exhaustive and tagging is non-destructive', () => {
   const srcFiles = collectSourceFiles(srcDir)
 
   it('scans a non-trivial number of source files (guards against a silently empty scan)', () => {
@@ -181,7 +181,7 @@ describe('M-T41 (§3.7.5): the table is exhaustive and tagging is non-destructiv
   it('code values are unique within this source, so (source, code) is unique by construction', () => {
     const declared = Object.values(ResourceErrorCode)
     expect(new Set(declared).size).toBe(declared.length)
-    expect(declared).toHaveLength(9) // FETCH_FAILED + §3.7.2 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED
+    expect(declared).toHaveLength(9) // FETCH_FAILED + 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED
   })
 
   it('a tagged error carries source === "@migaia/resource" and a non-empty stack', () => {

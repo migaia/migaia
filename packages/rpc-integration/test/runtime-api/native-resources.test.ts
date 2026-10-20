@@ -11,7 +11,7 @@ import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-chi
 import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
 import { nativeWorkerFor } from '../../../rpc-threads/test/threads/fixture.js'
 
-it('[A44] each actual child PID supplies current RSS and cumulative user/system CPU', async () => {
+it('each actual child PID supplies current RSS and cumulative user/system CPU', async () => {
   /** Both processes remain alive while local cold sampling reads their distinct native PIDs. */
   const launcher = createNodeProcessLauncher()
   /** Different allocations make copying one aggregate parent sample observable. */
@@ -34,7 +34,7 @@ it('[A44] each actual child PID supplies current RSS and cumulative user/system 
   try {
     expect(handles[0]!.identity.pid).not.toBe(handles[1]!.identity.pid)
     for (const handle of handles) {
-      expect(typeof handle.sampleUsage, '[A44] native owner has a local sampler').toBe('function')
+      expect(typeof handle.sampleUsage, 'native owner has a local sampler').toBe('function')
       /** The values are real readings, so legitimate zero cumulative CPU remains valid. */
       const sample = await handle.sampleUsage!()
       expect(sample.rssBytes).toBeGreaterThan(0)
@@ -48,7 +48,7 @@ it('[A44] each actual child PID supplies current RSS and cumulative user/system 
   }
 })
 
-it('[A45] a genuine Node Worker samples its isolate and native thread CPU without RSS', async () => {
+it('a genuine Node Worker samples its isolate and native thread CPU without RSS', async () => {
   /** The existing Worker fixture owns its own isolate independently of the test process heap. */
   const entry = fileURLToPath(
     new URL('../../../rpc-threads/test/threads/fixtures/lifecycle-worker.mjs', import.meta.url)
@@ -62,7 +62,7 @@ it('[A45] a genuine Node Worker samples its isolate and native thread CPU withou
     /** Native capability detection establishes which values this runtime can actually supply. */
     const native = nativeWorkerFor(handle)
     await new Promise<void>((resolve) => native.once('online', resolve))
-    expect(typeof handle.sampleUsage, '[A45] isolate sampler belongs to the native handle').toBe(
+    expect(typeof handle.sampleUsage, 'isolate sampler belongs to the native handle').toBe(
       'function'
     )
     /** Querying is local; no application or hidden management message is sent. */
@@ -83,7 +83,7 @@ it('[A45] a genuine Node Worker samples its isolate and native thread CPU withou
   }
 })
 
-it('[A44][A45] an asynchronous query retains its selected native generation across replacement', async () => {
+it('an asynchronous query retains its selected native generation across replacement', async () => {
   /** Sampling pauses only after the original native handle has supplied its own isolate values. */
   let sampled!: () => void
   /** The original query cannot settle until the fixture observes a real replacement. */
@@ -154,7 +154,7 @@ it('[A44][A45] an asynchronous query retains its selected native generation acro
       status: 'unavailable',
       reason: RuntimeQueryReason.retired
     })
-    expect(samples, '[A45] a retired read never resamples its successor').toBe(1)
+    expect(samples, 'a retired read never resamples its successor').toBe(1)
     const current = await host.thread!.get('sampled')
     expect(current.identity).not.toMatchObject({ instanceId: oldId })
     expect(current.resources).toMatchObject({ scope: 'thread' })

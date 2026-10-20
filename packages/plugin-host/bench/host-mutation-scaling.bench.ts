@@ -23,7 +23,7 @@ const createHost = async (size: number): Promise<PluginHost<Record<string, never
 /** Measures one 10,000-read sample after a short JIT warmup. */
 const measureConfigGet = (host: PluginHost<Record<string, never>>): number => {
   for (let index = 0; index < 1000; index += 1) host.config.get('config-0.value' as never)
-  /** Monotonic clock around the exact A27 operation count. */
+  /** Monotonic clock around the exact operation count. */
   const started = performance.now()
   /** Final observed value prevents timing an unused result. */
   let value: unknown
@@ -120,7 +120,7 @@ type IOperation =
   | 'suspend'
   | 'rollback'
 
-/** Exercises one R17 mutation category against an installed dependency chain. */
+/** Exercises one mutation category against an installed dependency chain. */
 const measureMutation = async (size: number, operation: IOperation): Promise<number> => {
   const host = await createChainHost(size)
   try {
@@ -281,7 +281,7 @@ const measureAlternatingRun = async (size: number): Promise<number> => {
 }
 
 describe('host mutation scaling', () => {
-  it('A18 bounds non-view mutation costs by the affected registrations', async () => {
+  it('bounds non-view mutation costs by the affected registrations', async () => {
     const operations: IOperation[] = [
       'use',
       'batchUse',
@@ -299,41 +299,41 @@ describe('host mutation scaling', () => {
         small.push(await measureMutation(500, operation))
         large.push(await measureMutation(4000, operation))
       }
-      console.info('A18 mutation timing (ms/op)', JSON.stringify({ operation, small, large }))
+      console.info('mutation timing (ms/op)', JSON.stringify({ operation, small, large }))
       expect(median(large), operation).toBeLessThanOrEqual(3 * median(small))
     }
   }, 120000)
 
-  it('A18 bounds constructor useSync and records the E-c alternating sequence', async () => {
+  it('bounds constructor useSync and records the E-c alternating sequence', async () => {
     const small = []
     const large = []
     for (let sample = 0; sample < 5; sample += 1) {
       small.push(await measureUseSync(500))
       large.push(await measureUseSync(4000))
     }
-    console.info('A18 useSync timing (ms/call)', JSON.stringify({ small, large }))
+    console.info('useSync timing (ms/call)', JSON.stringify({ small, large }))
     expect(Math.min(...large)).toBeLessThanOrEqual(3 * Math.min(...small))
     const alternating = {
       small: await measureAlternatingRun(500),
       large: await measureAlternatingRun(4000)
     }
-    console.info('A18 alternating use/run timing (ms/pair)', JSON.stringify(alternating))
+    console.info('alternating use/run timing (ms/pair)', JSON.stringify(alternating))
   }, 120000)
 
-  it('A18 bounds receipt preparation and records the E-a commit and view costs', async () => {
+  it('bounds receipt preparation and records the E-a commit and view costs', async () => {
     const small = []
     const large = []
     for (let sample = 0; sample < 5; sample += 1) {
       small.push(await measureReceiptRemoval(500))
       large.push(await measureReceiptRemoval(4000))
     }
-    console.info('A18 receipt raw timing (ms/op)', JSON.stringify({ small, large }))
+    console.info('receipt raw timing (ms/op)', JSON.stringify({ small, large }))
     expect(Math.min(...large.map((entry) => entry.prepare))).toBeLessThanOrEqual(
       3 * Math.min(...small.map((entry) => entry.prepare))
     )
   }, 120000)
 
-  it('A18 keeps dependency-chain mutations independent of the chain length', async () => {
+  it('keeps dependency-chain mutations independent of the chain length', async () => {
     /** Builds a required chain and returns the host plus the tail feature reference. */
     const chainWithTail = async (size: number) => {
       const host = new PluginHost<Record<string, never>>({
@@ -398,7 +398,7 @@ describe('host mutation scaling', () => {
         await host.dispose()
       }
     }
-    /** Builds the chain one `use` at a time, the procedure of the pre-fix X5 table, per member. */
+    /** Builds the chain one `use` at a time, the pre-fix procedure, per member. */
     const sequentialBuild = async (size: number) => {
       const host = new PluginHost<Record<string, never>>({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -434,17 +434,17 @@ describe('host mutation scaling', () => {
       small.push({ ...(await sample(500)), sequential: await sequentialBuild(500) })
       large.push({ ...(await sample(4000)), sequential: await sequentialBuild(4000) })
     }
-    console.info('A18 chain-dependent timing (ms/op)', JSON.stringify({ small, large }))
+    console.info('chain-dependent timing (ms/op)', JSON.stringify({ small, large }))
     for (const key of Object.keys(small[0]!))
       expect(median(large.map((entry) => entry[key]!)), key).toBeLessThanOrEqual(
         3 * median(small.map((entry) => entry[key]!))
       )
   }, 300000)
 
-  it('A27 keeps config.get independent of unrelated registration count', async () => {
-    /** Lower comparison scale from R19(d). */
+  it('keeps config.get independent of unrelated registration count', async () => {
+    /** Lower comparison scale. */
     const small = await createHost(500)
-    /** Higher comparison scale from R19(d). */
+    /** Higher comparison scale. */
     const large = await createHost(4000)
     try {
       /** Alternating samples exclude one JIT or collection pause from the 10,000-read ratio. */

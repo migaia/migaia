@@ -260,7 +260,7 @@ export const createStorageReactiveService = (
       }
     }
 
-    /** Performs one synchronous source subscription admission required by D79. */
+    /** Performs one synchronous source subscription admission. */
     const startSource = (): void => {
       if (adapterScope.lifecycle !== 'open') return
       let result: unknown
@@ -398,7 +398,7 @@ export const createStorageReactiveService = (
       return lease
     }
 
-    /** Source gets the highest release order, enforcing D81 source-before-query same-tick order. */
+    /** Source gets the highest release order, enforcing source-before-query same-tick order. */
     adapterScope.own(sourceRecord, {
       syncSafe: true,
       order: Number.MAX_SAFE_INTEGER,

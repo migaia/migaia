@@ -20,7 +20,7 @@ const rootCap = {
   gzipBytes: 265677
 } as const
 
-describe('A9 root tree-shaking cost', () => {
+describe('root tree-shaking cost', () => {
   it('keeps module count and both byte costs within the reviewed caps', () => {
     const run = spawnSync('node', ['test/core/tree-shaking-baseline.mjs'], {
       cwd: packageRoot,

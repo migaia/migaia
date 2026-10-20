@@ -14,8 +14,8 @@ import { RuntimeApiMode } from './runtime-api/constants.js'
 import { runtimeModeForDeclaration } from './runtime-api/catalog.js'
 
 /**
- * The advanced declaration still supplies the installed legacy facade providers until C7 removes
- * those APIs. Its wire directory uses the same v2 baseline as every Runtime Peer.
+ * The advanced declaration still supplies the installed legacy facade providers until a later
+ * release removes those APIs. Its wire directory uses the same v2 baseline as every Runtime Peer.
  */
 export function describeRemoteMethods(
   contracts: readonly IRemoteContract[],

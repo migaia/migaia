@@ -9,8 +9,8 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 40; index++) await Promise.resolve()
 }
 
-describe('A7 periodic health', () => {
-  it('[A52] cold inspection exposes actual checks without launching another check', async () => {
+describe('periodic health', () => {
+  it('cold inspection exposes actual checks without launching another check', async () => {
     /** The original monitor remains the only clock and check owner. */
     const scheduler = createManualScheduler()
     /** Completion separates a pending check from an observed healthy result. */
@@ -37,7 +37,7 @@ describe('A7 periodic health', () => {
     })
     try {
       await supervisor.start()
-      expect(supervisor.inspect().health, '[A52] unobserved health is explicit').toEqual({
+      expect(supervisor.inspect().health, 'unobserved health is explicit').toEqual({
         state: 'pending',
         failures: 0
       })
@@ -61,7 +61,7 @@ describe('A7 periodic health', () => {
     }
   })
   it.each(['stop', 'dispose'] as const)(
-    '[K247] clears timers when %s precedes a queued health failure continuation',
+    'clears timers when %s precedes a queued health failure continuation',
     async (operation) => {
       /** Manual time exposes any timer armed after the synchronous close fence. */
       const scheduler = createManualScheduler()

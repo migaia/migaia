@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
-it('SD-T01 uses the injected clock when the host has no microtask queue', () => {
+it('uses the injected clock when the host has no microtask queue', () => {
   /** This scheduler exercises only the external method/error contract under test. */
   const scheduler = createManualScheduler()
   vi.stubGlobal('queueMicrotask', undefined)
@@ -22,7 +22,7 @@ it('SD-T01 uses the injected clock when the host has no microtask queue', () => 
   }
 })
 
-it('SD-T01 keeps default delivery before a later Promise reaction', async () => {
+it('keeps default delivery before a later Promise reaction', async () => {
   const [sender, receiver] = createMemoryTransportPair()
   /** Observed callback order distinguishes microtasks, clock jobs and timer callbacks. */
   const trace: unknown[] = []

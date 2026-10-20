@@ -12,8 +12,7 @@ export const StorageContractErrorCode = Object.freeze({
    * A public argument or descriptor fails contract shape validation. Applies to codec descriptors,
    * capability descriptors, key domains, transaction options, and operation contexts.
    *
-   * Enforces runtime public argument and contract shape validation in
-   * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration
+   * Enforces runtime public argument and contract shape validation. Adapter-specific configuration
    * validation uses the web `INVALID_CONFIG` code instead.
    *
    * The caller corrects the argument before retrying. The failure persists until the argument
@@ -25,7 +24,7 @@ export const StorageContractErrorCode = Object.freeze({
    * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count
    * or binary bytes, a cycle, or an empty array.
    *
-   * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2.
+   * Enforces contract key validation.
    *
    * The caller corrects the key rather than retrying the same invalid key.
    */
@@ -35,8 +34,7 @@ export const StorageContractErrorCode = Object.freeze({
    * An operation requires a capability that the current backend does not provide. Examples include
    * failed `asRecordStore` narrowing and a structured codec on a text-only backend.
    *
-   * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md`
-   * §4.2.
+   * Enforces contract capability narrowing.
    *
    * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required
    * capability. The operation does not silently fall back.
@@ -46,8 +44,7 @@ export const StorageContractErrorCode = Object.freeze({
   /**
    * A storage operation runs after the store is disposed, violating the lifecycle contract.
    *
-   * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md`
-   * §4.2.
+   * Enforces contract lifecycle semantics.
    *
    * The caller creates a new store instead of reusing the closed instance.
    */
@@ -56,8 +53,7 @@ export const StorageContractErrorCode = Object.freeze({
   /**
    * `IOperationContext.signal` cancels an operation or `timeoutMs` expires.
    *
-   * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md`
-   * §4.2.
+   * Enforces contract cancellation semantics.
    *
    * The caller handles the result as cancellation. A write that has entered atomic commit reports
    * the actual commit result rather than claiming rollback.

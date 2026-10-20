@@ -13,11 +13,11 @@ import { resolveAbortReason } from './async-control.js'
  * Owns one public operation's deadline and cancellation signal.
  *
  * The per-operation `AbortSignal` and its parent closing-signal linkage are owned by
- * `@migaia/lifecycle`'s `GenerationController` (migration.sdd.md §3.2: the "generation + deadline +
- * parent closing signal" invariant belongs to the core). The remaining-budget computation and the
- * endpoint's external receive-generation check stay here — they are web-rpc domain concerns the
- * controller does not model (the controller's own generation is an internal supersession counter,
- * not the endpoint's monotonic receive generation).
+ * `@migaia/lifecycle`'s `GenerationController` (: the "generation + deadline + parent closing
+ * signal" invariant belongs to the core). The remaining-budget computation and the endpoint's
+ * external receive-generation check stay here — they are web-rpc domain concerns the controller
+ * does not model (the controller's own generation is an internal supersession counter, not the
+ * endpoint's monotonic receive generation).
  */
 export class OperationScope {
   /** Owns the operation's AbortSignal and parent closing-signal linkage. */

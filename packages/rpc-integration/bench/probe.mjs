@@ -26,7 +26,7 @@ const ProbeBench = {
   /** Compact diagnostic summaries reference full original launch receipts without timing verdicts. */
   diagnosticSummary: 'diagnostic-summary.json',
   collectorEnabled: '1',
-  coreAcceptance: 'A5',
+  coreAcceptance: 'core-probe',
   rootAcceptance: 'A-perf',
   collectorRingPath: 'packages/rpc-devtools/dist/collector/ring.js',
   sourceCommit: 'f607fe6a93c20799521ac1aacc019dde810f5d95',
@@ -110,7 +110,7 @@ function counterSnapshot() {
     counters.collectorCalls = 0
     for (const row of collector.stats().methods) counters.collectorCalls += row.calls
   }
-  // SC9(b): an OOB diagnostic receipt converts local counters to a wire representation.
+  // An OOB diagnostic receipt converts local counters to a wire representation.
   return {
     ...counters,
     loaded: loaded.slice(),
@@ -233,7 +233,7 @@ if (arm !== undefined) {
         if (collectorEventCounter?.source === url)
           collectorEventCounter.executedSha256 = provenance.executedSha256
       }
-      // SC9(b): the Node loader boundary needs a result carrying the selected source representation.
+      // The Node loader boundary needs a result carrying the selected source representation.
       return { ...result, source }
     }
   })
@@ -390,7 +390,7 @@ export function countDelta(receipt) {
  * @throws {Error} Child failure remains classified and retained before propagation.
  */
 async function launch(cell, selectedArm, lane, options, stem) {
-  /** SC9(b): process launch projects inherited environment into the actual native boundary. */
+  /** Process launch projects inherited environment into the actual native boundary. */
   const env = {
     ...process.env,
     PROBE_BENCH_ARM: selectedArm,
@@ -474,7 +474,10 @@ async function launch(cell, selectedArm, lane, options, stem) {
           throw new Error(IpcBenchErrorText.configuration)
       }
     }
-    /** The installed collector must ingest real calls; Core-only A5 retains its emitted-event proof. */
+    /**
+     * The installed collector must ingest real calls; Core-only acceptance retains its
+     * emitted-event proof.
+     */
     const observations = countDelta(receipt)
     if (
       !(options.collector ? observations.total.collectorCalls > 0 : observations.total.events > 0)
@@ -497,7 +500,8 @@ async function launch(cell, selectedArm, lane, options, stem) {
  * @param {object[]} rounds Each round contains baseA, baseB, absent and installed receipts.
  * @param {object} guard Separate exact-counter receipts for the three arms.
  * @param {boolean} largePayload True for the 1 MiB cell's fixed symmetric five-percent budget.
- * @param {boolean} [collector] Root D2 mode selects 5%; ordinary Core A5 remains fixed at 3%.
+ * @param {boolean} [collector] Root collector mode selects 5%; ordinary Core acceptance remains
+ *   fixed at 3%.
  * @param {object} [collectorAudit] Current source/compiled hashes covering the collector allocation
  *   site.
  * @param {string} [selectedStageMode] Explicit all-stage small cells are report-only; omitted mode
@@ -512,7 +516,7 @@ export function judgeProbe(
   collectorAudit,
   selectedStageMode = IpcProbeBenchStages.legacy
 ) {
-  /** SC9(b): analysis restores sorted scalar report data without changing the original raw series. */
+  /** Analysis restores sorted scalar report data without changing the original raw series. */
   const median = (values) => {
     const sorted = values.toSorted((a, b) => a - b)
     return sorted[Math.floor(sorted.length / 2)]
@@ -586,7 +590,10 @@ export function judgeProbe(
       : 'Core emitted-view identities after warmup',
     observations: guard
   }
-  /** Root D2 and Core A5 are distinct fixed budgets; neither derives a looser limit from noise. */
+  /**
+   * Root collector and Core acceptance are distinct fixed budgets; neither derives a looser limit
+   * from noise.
+   */
   const budget = collector ? 0.05 : 0.03
   /** Revision 2 relaxes only installed small-cell reporting when all stages are explicitly selected. */
   const reportOnly = selectedStageMode === IpcProbeBenchStages.all && !largePayload
@@ -627,7 +634,7 @@ export function judgeProbe(
     counterGuard,
     collector: collector
       ? 'ENABLED: genuine selected-stage metadata collector; guard-only same-mask Core view probe and audited collector event-literal counter'
-      : 'DISABLED: Core-only A5'
+      : 'DISABLED: Core-only acceptance'
   }
 }
 
@@ -642,7 +649,7 @@ export function judgeProbe(
 async function main() {
   /** Explicit cell selection lets the caller keep each exclusive window below its 45-minute cap. */
   const args = process.argv.slice(2)
-  /** Explicit root mode changes only the installed arm and its frozen D2 acceptance label/budget. */
+  /** Explicit root mode changes only the installed arm and its frozen acceptance label/budget. */
   const rootMode = args.includes('--collector')
   /** Read options once before starting any actual peer or measurement. */
   const value = (name, fallback) => {
@@ -780,7 +787,7 @@ async function main() {
       acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
       collector: rootMode
         ? 'ENABLED: selected-stage metadata, captureMask=0'
-        : 'DISABLED: Core-only A5'
+        : 'DISABLED: Core-only acceptance'
     })
   )
   /** The exclusive runner owns admission/end-load enforcement; this receipt also records raw loads. */

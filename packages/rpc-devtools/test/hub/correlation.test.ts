@@ -76,8 +76,8 @@ function hops(): ReadonlyMap<string, readonly IRpcDevtoolsWireEvent[]> {
   ])
 }
 
-describe('hub A2 correlation and timeline', () => {
-  it('[closure A3] joins deferred inbound physical events once within their own target and releases indexes', async () => {
+describe('hub correlation and timeline', () => {
+  it('joins deferred inbound physical events once within their own target and releases indexes', async () => {
     /** Decrypt cannot identify the carrier until its later admitted envelope has routing identity. */
     const events = [
       event(1, 1, { stage: 'carrier', direction: 'inbound' }),
@@ -343,7 +343,7 @@ describe('hub A2 correlation and timeline', () => {
     await hub.close()
   })
 
-  it('[closure A6] preserves observed maxima when summing open terminal histograms', async () => {
+  it('preserves observed maxima when summing open terminal histograms', async () => {
     /** Two real contract rows share a method and each has one observed 300-second sample. */
     const stats: IRpcDevtoolsStats = {
       since: 0,

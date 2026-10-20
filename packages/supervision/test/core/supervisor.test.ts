@@ -14,7 +14,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 20; index++) await Promise.resolve()
 }
 
-describe('A3 supervisor startup', () => {
+describe('supervisor startup', () => {
   it('moves from queued through starting to ready after the ready hook', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()

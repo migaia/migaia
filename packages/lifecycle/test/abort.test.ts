@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createAbortController, observeAbortSubscription } from '../src/abort.js'
 
-describe('T-15 reason 行为', () => {
+describe('reason 行为', () => {
   it('abort(reason) 后 reason 经 signal.reason 保持 === 身份可达', () => {
     const controller = createAbortController()
     const reason = { code: 'CANCELLED' }
@@ -80,7 +80,7 @@ describe('T-15 reason 行为', () => {
   })
 })
 
-describe('T-20 signal 双向结构兼容', () => {
+describe('signal 双向结构兼容', () => {
   it('createAbortController().signal 满足 @migaia/utils 的 IAbortSignal（compile-time）', () => {
     // lifecycle 与 serialize 不再各自声明 signal 结构，统一使用 utils 的 IAbortSignal。
     const signal: IAbortSignal = createAbortController().signal

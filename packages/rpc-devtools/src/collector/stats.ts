@@ -108,7 +108,7 @@ export class CollectorStats {
     return 0
   }
 
-  /** Materialize statistics only at this public representation boundary (SC9b). */
+  /** Materialize statistics only at this public representation boundary. */
   snapshot(excluded?: ReadonlySet<string>): IRpcDevtoolsStats {
     /** Cold identity collisions retain the prior numeric-key semantics, including overflow id zero. */
     const slots = new Map<number, Map<number, number>>()

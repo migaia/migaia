@@ -21,7 +21,7 @@ import { coroutineFailure, coroutineService, coroutineTestHost } from './fixture
 const entry = fileURLToPath(new URL('./fixtures/terminal-worker.ts', import.meta.url))
 
 for (const family of ['thread', 'coroutine'] as const) {
-  it(`[A7] ${family} emits terminal after a crash and failed second launch`, async () => {
+  it(`${family} emits terminal after a crash and failed second launch`, async () => {
     /** Host retains the registered unit after its physical generation becomes unavailable. */
     const host = coroutineTestHost()
     /** Reports preserve native supervision failures separately from projected safe events. */
@@ -120,26 +120,18 @@ for (const family of ['thread', 'coroutine'] as const) {
           ),
         { timeout: 5000 }
       )
-      assert.equal(
-        launches,
-        2,
-        '[A7] the original supervisor actually attempted the failed relaunch'
-      )
+      assert.equal(launches, 2, 'the original supervisor actually attempted the failed relaunch')
       assert.equal(
         subscriptionFailure,
         undefined,
-        `[A7] terminal subscription is public: ${JSON.stringify(coroutineFailure(subscriptionFailure))}`
+        `terminal subscription is public: ${JSON.stringify(coroutineFailure(subscriptionFailure))}`
       )
       /**
        * Terminal is one safe observation after the real crash, even when a failed Worker also
        * exits.
        */
       const terminal = events.filter((event) => event.type === ('terminal' as RuntimeEventName))
-      assert.equal(
-        terminal.length,
-        1,
-        `[A7] missing terminal after exit: ${JSON.stringify(events)}`
-      )
+      assert.equal(terminal.length, 1, `missing terminal after exit: ${JSON.stringify(events)}`)
       assert.equal(terminal[0]!.name, 'terminal-unit')
       assert.deepEqual(terminal[0]!.error, {
         source: '@migaia/supervision',
@@ -148,22 +140,19 @@ for (const family of ['thread', 'coroutine'] as const) {
       assert.equal(
         terminal[0]!.generation,
         2,
-        '[A7] terminal names the last attempted generation, not the retired ready generation'
+        'terminal names the last attempted generation, not the retired ready generation'
       )
       assert.deepEqual(
         terminal[0]!.instanceId,
         { status: 'unavailable', reason: RuntimeQueryReason.owner },
-        '[A7] an unconnected failed attempt cannot inherit an old RPC identity'
+        'an unconnected failed attempt cannot inherit an old RPC identity'
       )
       assert.deepEqual(terminal[0]!.timestamp, {
         status: 'unavailable',
         reason: RuntimeQueryReason.owner
       })
       assert.equal(terminal[0]!.clock, RuntimeQueryClock.scheduler)
-      assert.ok(
-        Object.isFrozen(terminal[0]!),
-        '[A7] terminal projection is an immutable public record'
-      )
+      assert.ok(Object.isFrozen(terminal[0]!), 'terminal projection is an immutable public record')
       /** Failed preparation emits no successful restart event between crash and terminal. */
       const crashIndex = events.findIndex(
         (event) => event.type === 'exit' && event.reason === 'crashed'

@@ -9,7 +9,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 30; index++) await Promise.resolve()
 }
 
-describe('A14 in-memory exposed port', () => {
+describe('in-memory exposed port', () => {
   it('keeps the old port available until the switched event', async () => {
     const scheduler = createManualScheduler()
     const secondReady = deferred<void>()

@@ -1,4 +1,4 @@
-/** The package-owned discriminator cases run in the same Node oracle as A10. */
+/** The package-owned discriminator cases run in the same Node oracle as the reference coverage. */
 import '../../packages/rpc-integration/test/merge/frozen-coverage-guard.test.js'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -17,7 +17,7 @@ const baseline = JSON.parse(readFileSync(join(root, 'coverage-baseline.json'), '
 /** Package counts and capability custody remain unchanged checks. */
 const current = comparableCoveragePackages(baseline.packages)
 
-test('A10 merged RPC coverage preserves covered counts and combined percentages', () => {
+test('merged RPC coverage preserves covered counts and combined percentages', () => {
   assert.ok(current['rpc-family'], 'rpc-family coverage unit is required')
   assert.equal(Object.hasOwn(current, 'rpc'), false)
   assert.equal(Object.hasOwn(current, 'rpc-contract'), false)

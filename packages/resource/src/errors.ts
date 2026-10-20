@@ -5,9 +5,9 @@
 export const RESOURCE_SOURCE = '@migaia/resource'
 
 /**
- * Defines the workspace structural error contract (`docs/contracts/error-codes.md` §2). `source`
- * and `code` attach as properties without replacing the error. Callers retain native type checks
- * such as `instanceof DOMException` and `instanceof RangeError`.
+ * Defines the workspace structural error contract. `source` and `code` attach as properties without
+ * replacing the error. Callers retain native type checks such as `instanceof DOMException` and
+ * `instanceof RangeError`.
  */
 export type IResourceError = Error & {
   readonly source: string

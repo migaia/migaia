@@ -65,7 +65,7 @@ const testTime = {
 }
 
 describe('provider event listener handles', () => {
-  it('A1: repeated disposer calls leave the other identical registration active', async () => {
+  it('repeated disposer calls leave the other identical registration active', async () => {
     const { client, server } = await makeEndpoints()
     const calls: unknown[] = []
     const listener = (context: { data: unknown }): void => {
@@ -89,7 +89,7 @@ describe('provider event listener handles', () => {
     }
   })
 
-  it('A2: a stale disposer cannot withdraw a later identical registration', async () => {
+  it('a stale disposer cannot withdraw a later identical registration', async () => {
     const { client, server } = await makeEndpoints()
     const calls: unknown[] = []
     const listener = (context: { data: unknown }): void => {
@@ -110,7 +110,7 @@ describe('provider event listener handles', () => {
     }
   })
 
-  it('A2: clear prevents an old handle from withdrawing a new registration', () => {
+  it('clear prevents an old handle from withdrawing a new registration', () => {
     const registry = new ProviderRegistry()
     const listener = () => undefined
     const stale = registry.listen('event', listener)
@@ -122,7 +122,7 @@ describe('provider event listener handles', () => {
   })
 
   it.each(['throw', 'reject'] as const)(
-    'A3: serial dispatch stops on the first %s and reports its identity',
+    'serial dispatch stops on the first %s and reports its identity',
     async (mode) => {
       const registry = new ProviderRegistry()
       const calls: string[] = []
@@ -163,7 +163,7 @@ describe('provider event listener handles', () => {
     }
   )
 
-  it('A4: dispatch snapshots order before listener mutation', async () => {
+  it('dispatch snapshots order before listener mutation', async () => {
     const { client, server } = await makeEndpoints()
     const calls: number[] = []
     let withdrawSecond: () => void = () => undefined
@@ -196,7 +196,7 @@ describe('provider event listener handles', () => {
     }
   })
 
-  it('A4: duplicate registrations count separately while request calls its provider', async () => {
+  it('duplicate registrations count separately while request calls its provider', async () => {
     const registry = new ProviderRegistry()
     const listeners: string[] = []
     const sent: unknown[] = []

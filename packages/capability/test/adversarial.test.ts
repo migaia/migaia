@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createCapabilityHost, CapabilityErrorCode } from '../src/index'
 
-describe('AF-T22 capability terminal read-only query ruling', () => {
+describe('capability terminal read-only query ruling', () => {
   it('read-only queries remain available after dispose; mutations throw HOST_DISPOSED first', async () => {
     const host = createCapabilityHost<unknown>({}, { flags: { worker: true } })
     host.register({ name: 'worker', activate: () => ({ dispose: () => undefined }) })

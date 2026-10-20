@@ -40,7 +40,7 @@ function sizeRequest(payload: unknown) {
 }
 
 for (const size of [64 * 1024, 1024 * 1024]) {
-  it(`[A61][A21] Worker ${size} runtime data reuses one owned bound and preserves frame identity`, async () => {
+  it(`Worker ${size} runtime data reuses one owned bound and preserves frame identity`, async () => {
     /** The real runtime union receives the same canonical first-user portable admission. */
     const message = createRuntimeOutboundEnvelope({
       ...vectors.valid[0],
@@ -85,7 +85,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       assert.equal(serializations, 1)
       serializations = 0
       await sender.sendRuntime(message, RUNTIME_API_CAPABILITIES)
-      assert.equal(serializations, 0, '[A61] both runtime size gates reuse owned facts')
+      assert.equal(serializations, 0, 'both runtime size gates reuse owned facts')
       assert.equal(frames.length, 1)
       assert.equal((frames[0] as { frame: unknown }).frame, message)
       assert.ok(readOwnedJsonSnapshot(message))
@@ -177,29 +177,21 @@ async function verifyOwnedSingleton(queued: boolean) {
     await Promise.all([first, sent])
     assert.equal(frames.length, queued ? 2 : 1)
     assert.equal(frames[queued ? 1 : 0], message)
-    assert.equal(
-      characterReads,
-      0,
-      '[A27-FIX1] admitted 1 MiB payload has no JavaScript byte-counting pass'
-    )
-    assert.equal(
-      serializations,
-      0,
-      '[A27-FIX1] identity carrier does not JSON-encode an admitted singleton'
-    )
+    assert.equal(characterReads, 0, 'admitted 1 MiB payload has no JavaScript byte-counting pass')
+    assert.equal(serializations, 0, 'identity carrier does not JSON-encode an admitted singleton')
   } finally {
     Object.defineProperty(String.prototype, 'codePointAt', characterDescriptor)
     Object.defineProperty(JSON, 'stringify', jsonDescriptor)
   }
 }
 
-it('[A27-FIX1] owned 1 MiB singleton keeps its size guard without scanning or serializing its payload', () =>
+it('owned 1 MiB singleton keeps its size guard without scanning or serializing its payload', () =>
   verifyOwnedSingleton(false))
 
-it('[A27-FIX4] queued owned 1 MiB singleton keeps FIFO and its size guard without a payload scan', () =>
+it('queued owned 1 MiB singleton keeps FIFO and its size guard without a payload scan', () =>
   verifyOwnedSingleton(true))
 
-it('[A27-FIX3] the owned upper bound includes JSON null slots preserved by portable normalization', () => {
+it('the owned upper bound includes JSON null slots preserved by portable normalization', () => {
   /** Array.map retains holes; JSON represents every absent slot as null. */
   const payload: unknown[] = []
   payload.length = 4096
@@ -207,11 +199,11 @@ it('[A27-FIX3] the owned upper bound includes JSON null slots preserved by porta
   const message = sizeRequest(payload)
   assert.ok(
     outboundJsonByteUpperBound(message)! >= measureRpcPhysicalFrame(message),
-    '[A27-FIX3] an admitted sparse array cannot bypass exact physical sizing with an unsafe bound'
+    'an admitted sparse array cannot bypass exact physical sizing with an unsafe bound'
   )
 })
 
-it('[A27-FIX5] queued opaque sizing failures keep the serialization category and native cause', async () => {
+it('queued opaque sizing failures keep the serialization category and native cause', async () => {
   /** The supported variation contract preserves opaque payload identity, including cycles. */
   const payload: { cycle?: unknown } = {}
   payload.cycle = payload

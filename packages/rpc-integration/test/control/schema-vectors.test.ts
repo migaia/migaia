@@ -38,7 +38,7 @@ function envelopeFailure(value: unknown): {
   throw new Error('expected an invalid vector')
 }
 
-describe('current protocol schemas and baseline vectors (A9)', () => {
+describe('current protocol schemas and baseline vectors', () => {
   it('keeps the schema field rows, route keys, validation order and wire limits aligned', () => {
     const schema = readJson(join(schemaRoot, 'envelope.schema.json'))
     expect(schema['x-migaia-limits']).toEqual(RpcWireLimit)

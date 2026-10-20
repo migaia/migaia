@@ -85,7 +85,7 @@ const restartChain = (lateFailure?: Error, lazy = false) => {
 }
 
 describe('async setup entry paths', () => {
-  it('A5(a) retries lazy setup after exact failure and activates required providers first', async () => {
+  it('retries lazy setup after exact failure and activates required providers first', async () => {
     const host = createHost()
     const failure = new Error('first activation failed')
     const events: string[] = []
@@ -148,7 +148,7 @@ describe('async setup entry paths', () => {
     await nextHost.dispose()
   })
 
-  it('A5(b) keeps the prior provider usable while a failed replacement setup rolls back', async () => {
+  it('keeps the prior provider usable while a failed replacement setup rolls back', async () => {
     const host = createHost()
     const [handle] = await host.use(provider(1))
     const gate = deferred<number>()
@@ -175,7 +175,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(c) reruns dependent setup when replacement restarts its closure', async () => {
+  it('reruns dependent setup when replacement restarts its closure', async () => {
     const host = createHost()
     const first = provider(1)
     let setups = 0
@@ -193,7 +193,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(i) rebinds a dependent with a hook without rerunning setup', async () => {
+  it('rebinds a dependent with a hook without rerunning setup', async () => {
     const host = createHost()
     const first = provider(1)
     const setup = vi.fn(() => 1)
@@ -214,7 +214,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(j) restarts a transitive setup only after its provider dependency commits', async () => {
+  it('restarts a transitive setup only after its provider dependency commits', async () => {
     const host = createHost()
     const chain = restartChain()
     await host.use(chain.first, chain.dependent, chain.tail)
@@ -226,7 +226,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(k) reports eager tail setup failure after publishing replacement', async () => {
+  it('reports eager tail setup failure after publishing replacement', async () => {
     const host = createHost()
     const failure = new Error('tail restart setup failed')
     const chain = restartChain(failure)
@@ -247,7 +247,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(l) retains a failed lazy restart as a retryable unactivated registration', async () => {
+  it('retains a failed lazy restart as a retryable unactivated registration', async () => {
     const host = createHost()
     const inner = new Error('inner cause')
     const failure = new Error('lazy tail setup failed', { cause: inner })
@@ -268,7 +268,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(d,e) waits for returning provider setup, rebinds hooks, and restarts no-hook dependents', async () => {
+  it('(d,e) waits for returning provider setup, rebinds hooks, and restarts no-hook dependents', async () => {
     const host = createHost()
     const releaseFirst = vi.fn()
     const first = definePlugin({
@@ -334,7 +334,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(h) restarts a stale suspended dependent when its provider is re-enabled', async () => {
+  it('restarts a stale suspended dependent when its provider is re-enabled', async () => {
     const host = createHost()
     const first = provider(1)
     const setupS = vi.fn(() => 1)
@@ -364,7 +364,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(m) preserves the lazy setup error identity through resume diagnostics', async () => {
+  it('preserves the lazy setup error identity through resume diagnostics', async () => {
     const reports: Array<{ code: unknown; error: unknown }> = []
     const host = createHost((_message, code, error) => reports.push({ code, error }))
     const first = provider(1)
@@ -397,7 +397,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(f) does not rerun setup on enablement or config update', async () => {
+  it('does not rerun setup on enablement or config update', async () => {
     const host = createHost()
     const setup = vi.fn(() => 1)
     await host.use(
@@ -416,7 +416,7 @@ describe('async setup entry paths', () => {
     await host.dispose()
   })
 
-  it('A5(g) runs setup during composition preparation and releases it on discard', async () => {
+  it('runs setup during composition preparation and releases it on discard', async () => {
     const host = createHost()
     const composition = openComposition(host)
     const release = vi.fn()

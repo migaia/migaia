@@ -70,7 +70,7 @@ class SyncHost extends PluginHost<Record<string, never>> {
   }
 }
 
-describe('A7 unUse seams unchanged behavior', () => {
+describe('unUse seams unchanged behavior', () => {
   it('keeps reject, dry-run shape, and dependent-first cascade disposal', async () => {
     const { host, events } = await createChain()
     await expect(host.unUse('provider')).rejects.toMatchObject({

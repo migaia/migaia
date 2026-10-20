@@ -113,7 +113,7 @@ async function ordinaryNativeSocket(checkIdentity = false): Promise<void> {
           assert.equal(
             serverChannel.peerId,
             'baseline-client',
-            '[A2] runtime listener identity comes from the authenticated hello rather than a pre-authentication placeholder'
+            'runtime listener identity comes from the authenticated hello rather than a pre-authentication placeholder'
           )
         ready(
           await baselineEndpoint(serverChannel, 'baseline-server', {
@@ -158,12 +158,12 @@ async function ordinaryNativeSocket(checkIdentity = false): Promise<void> {
   }
 }
 
-it('[A2][A16] runtime byte identity is the actual authenticated peer before ready publication', async () => {
+it('runtime byte identity is the actual authenticated peer before ready publication', async () => {
   await ordinaryNativeSocket()
   await ordinaryNativeSocket(true)
 })
 
-it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual sessions through the original shared slot', async () => {
+it('full authenticated listener publishes its actual sessions through the original shared slot', async () => {
   await ordinaryNativeSocket()
   /** Real Host Feature authority is established before the public listener assertion. */
   const host = runtimeTestHost({
@@ -255,11 +255,11 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
     assert.equal(
       installed,
       true,
-      '[A2] full native listener grammar installs after ordinary authenticated socket business'
+      'full native listener grammar installs after ordinary authenticated socket business'
     )
     /** No accepted session exists yet; the actual listener still owns one committed cold record. */
     const empty = await host.process!.list({ filter: { kind: 'listen', direction: 'listen' } })
-    assert.equal(empty.connections.length, 1, '[A41] a zero-session listener remains queryable')
+    assert.equal(empty.connections.length, 1, 'a zero-session listener remains queryable')
     assert.equal((await host.process!.get('listener')).kind, 'listen')
     await assert.rejects(host.process!.get('client-1'), { code: 'TARGET_UNKNOWN' })
     for (const command of ['stop', 'kill', 'restart', 'replace'] as const)
@@ -300,7 +300,7 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
       clients.push(peer)
       assert.equal(await peer.request('parent.echo'), 42)
       await vi.waitFor(async () => {
-        assert.deepEqual(failures, [], '[A2] accepted native sessions have no preparation failure')
+        assert.deepEqual(failures, [], 'accepted native sessions have no preparation failure')
         assert.equal(await host.process!.request(`client-${index + 1}`, 'child.echo'), index + 1)
       })
     }
@@ -309,7 +309,7 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
     assert.equal(
       overview.connections.length,
       2,
-      '[A24] listener overview contains both real accepted sessions'
+      'listener overview contains both real accepted sessions'
     )
     assert.deepEqual(
       overview.connections.map((connection) => [connection.kind, connection.direction]),
@@ -330,7 +330,7 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
     assert.equal(
       (await host.process!.broadcast('child.note')).length,
       2,
-      '[A18] ambiguous logical name does not remove actual ready instances from broadcast'
+      'ambiguous logical name does not remove actual ready instances from broadcast'
     )
     await vi.waitFor(() => assert.deepEqual(notifications, [1, 1]))
     calls.push(
@@ -350,13 +350,9 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
     assert.equal(
       started,
       1,
-      '[A9] full listener retains the selected provider limit before admitting a second call'
+      'full listener retains the selected provider limit before admitting a second call'
     )
-    assert.equal(
-      rejected,
-      1,
-      '[A9] canonical concurrency reason reaches the selected observer once'
-    )
+    assert.equal(rejected, 1, 'canonical concurrency reason reaches the selected observer once')
     release()
     /** Only the actual refused second native call carries OVERLOADED. */
     const second = (await calls[1]!) as { error: { code: string } }
@@ -385,7 +381,7 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
   }
 })
 
-it('[A9][A33] full owned Worker source uses the caller-selected original endpoint factory before registering runtime routes', async () => {
+it('full owned Worker source uses the caller-selected original endpoint factory before registering runtime routes', async () => {
   /** The child is a real dedicated Worker that executes forward and reverse business. */
   const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
   /** Original unit admission limits the fixture to one owned native execution. */
@@ -445,11 +441,11 @@ it('[A9][A33] full owned Worker source uses the caller-selected original endpoin
     assert.equal(
       constructed,
       1,
-      '[A9] native business cannot silently discard an explicit original endpoint factory'
+      'native business cannot silently discard an explicit original endpoint factory'
     )
     assert.ok(
       registered.includes('parent.echo'),
-      '[A33] actual runtime providers are registered through the selected endpoint view'
+      'actual runtime providers are registered through the selected endpoint view'
     )
   } finally {
     await peer?.close()

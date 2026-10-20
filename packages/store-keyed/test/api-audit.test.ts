@@ -12,33 +12,30 @@ import {
 import { readOpticPath, writeOpticPath } from '../src/atom/optics-path.js'
 
 describe('store-keyed audit regressions', () => {
-  it.each([-0, +0])(
-    'SK-D01 uses the cache key relation when a signed-zero source is replaced',
-    (key) => {
-      /** The source always contains exactly one supported numeric key. */
-      const source = atomDef<readonly { key: number; text: string }[]>([{ key, text: 'old' }])
-      /** Map-backed token reuse must agree with lookup, write and removal. */
-      const split = splitDef(source, (item) => item.key)
-      /** A registered real Runtime owns the complete graph. */
-      const store = createAtomStore(createRuntime())
-      try {
-        /** Keep the original token across the normal source replacement. */
-        const token = split.of(key)
-        expect(store.get(token).text).toBe('old')
-        store.set(source, [{ key: -key, text: 'new' }])
-        expect(split.of(-key)).toBe(token)
-        expect(store.get(token).text).toBe('new')
-        store.set(token, (value) => ({ ...value, text: 'written' }))
-        expect(store.get(source)[0].text).toBe('written')
-        expect(split.remove(store, key)).toBe(true)
-        expect(store.get(source)).toEqual([])
-      } finally {
-        store.dispose()
-      }
+  it.each([-0, +0])('uses the cache key relation when a signed-zero source is replaced', (key) => {
+    /** The source always contains exactly one supported numeric key. */
+    const source = atomDef<readonly { key: number; text: string }[]>([{ key, text: 'old' }])
+    /** Map-backed token reuse must agree with lookup, write and removal. */
+    const split = splitDef(source, (item) => item.key)
+    /** A registered real Runtime owns the complete graph. */
+    const store = createAtomStore(createRuntime())
+    try {
+      /** Keep the original token across the normal source replacement. */
+      const token = split.of(key)
+      expect(store.get(token).text).toBe('old')
+      store.set(source, [{ key: -key, text: 'new' }])
+      expect(split.of(-key)).toBe(token)
+      expect(store.get(token).text).toBe('new')
+      store.set(token, (value) => ({ ...value, text: 'written' }))
+      expect(store.get(source)[0].text).toBe('written')
+      expect(split.remove(store, key)).toBe(true)
+      expect(store.get(source)).toEqual([])
+    } finally {
+      store.dispose()
     }
-  )
+  })
 
-  it('SK-D02 reuses the hoisted focus definition from the maintained example', () => {
+  it('reuses the hoisted focus definition from the maintained example', () => {
     /** Define tokens once, outside all reevaluating read callbacks. */
     const source = atomDef({ todos: [{ done: false }] })
     /** A stable focus belongs to this blueprint rather than each evaluation. */
@@ -59,7 +56,7 @@ describe('store-keyed audit regressions', () => {
     }
   })
 
-  it.each([false, true])('SK-D03 retains the original getter failure with frozen=%s', (frozen) => {
+  it.each([false, true])('retains the original getter failure with frozen=%s', (frozen) => {
     /** Native mutable failures retain identity; frozen failures must remain on the cause chain. */
     const primary = new TypeError('application getter failed')
     if (frozen) Object.freeze(primary)
@@ -90,14 +87,14 @@ describe('store-keyed audit regressions', () => {
     }
   })
 
-  it('SK-D03 rejects an unreadable unknown definition brand without throwing', () => {
+  it('rejects an unreadable unknown definition brand without throwing', () => {
     /** Revocation is a supported unknown input, with no fabricated private brand. */
     const revoked = Proxy.revocable({}, {})
     revoked.revoke()
     expect(isAtomDefinition(revoked.proxy)).toBe(false)
   })
   it.each(['read', 'write'] as const)(
-    'SK-D03 classifies direct public optic %s access failures',
+    'classifies direct public optic %s access failures',
     (operation) => {
       /** This native error crosses the pure helper directly, without Reactive's callback boundary. */
       const primary = new Error('direct getter failed')

@@ -5,10 +5,10 @@
  * `source` is always `'@migaia/reactive'`. Throw sites use these constants instead of inline
  * values.
  *
- * The migration in `docs/lifecycle/migration.sdd.md` §3.7.1 assigns codes to previously untagged
- * errors. `SCOPE_CLOSED`, `SCOPE_REENTRANT_DISPOSE`, `SCOPE_SYNC_VIOLATION`, `GENERATION_DISPOSED`,
- * and `SCOPE_DISPOSAL_FAILED` move with `lifecycle-primitives.ts` and `generation-controller.ts`.
- * Those five codes belong to `@migaia/lifecycle` and do not appear here.
+ * The migration assigns codes to previously untagged errors. `SCOPE_CLOSED`,
+ * `SCOPE_REENTRANT_DISPOSE`, `SCOPE_SYNC_VIOLATION`, `GENERATION_DISPOSED`, and
+ * `SCOPE_DISPOSAL_FAILED` move with `lifecycle-primitives.ts` and `generation-controller.ts`. Those
+ * five codes belong to `@migaia/lifecycle` and do not appear here.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

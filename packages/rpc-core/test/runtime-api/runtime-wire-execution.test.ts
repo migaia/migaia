@@ -22,7 +22,7 @@ const capabilities = [
   RpcCapability.group
 ]
 
-it('[A64][A68] oversized complete group result fails PAYLOAD_INVALID and seals that failure instead of hanging', async () => {
+it('oversized complete group result fails PAYLOAD_INVALID and seals that failure instead of hanging', async () => {
   /** The group is tiny on input; only the actual provider result exceeds the physical frame ceiling. */
   let effects = 0
   const selected = [...capabilities, RpcCapability.outcome, RpcCapability.deadline]
@@ -44,13 +44,13 @@ it('[A64][A68] oversized complete group result fails PAYLOAD_INVALID and seals t
         idempotencyKey: 'large-result'
       }),
       { code: 'PAYLOAD_INVALID' },
-      '[A64] exact terminal failure must arrive before the caller deadline'
+      'exact terminal failure must arrive before the caller deadline'
     )
-    assert.equal(effects, 1, '[A64] executed business is never rolled back or retried')
+    assert.equal(effects, 1, 'executed business is never rolled back or retried')
     const outcome = await fixture.peers[0].outcome('large-result')
     assert.equal(outcome.state, 'done')
     if (outcome.state !== 'done' || outcome.outcome.completion.ok)
-      assert.fail('[A68] actual failed group completion must be retained')
+      assert.fail('actual failed group completion must be retained')
     assert.equal(outcome.outcome.completion.error.code, 'PAYLOAD_INVALID')
     assert.ok(outcome.outcome.completion.error.stack)
   } finally {
@@ -59,7 +59,7 @@ it('[A64][A68] oversized complete group result fails PAYLOAD_INVALID and seals t
 })
 
 it.each(['options', 'target', 'mode', 'empty', 'getter', 'revoked'] as const)(
-  '[A62][A73] local group %s is INVALID_CONFIG before any physical send or provider effect',
+  'local group %s is INVALID_CONFIG before any physical send or provider effect',
   async (shape) => {
     /** Malformed local steps cannot reach the sole original physical sender. */
     let calls = 0
@@ -113,7 +113,7 @@ it.each(['options', 'target', 'mode', 'empty', 'getter', 'revoked'] as const)(
   }
 )
 
-it('[A72] a legacy response cannot settle a new task that requires the full authenticated generation tuple', async () => {
+it('a legacy response cannot settle a new task that requires the full authenticated generation tuple', async () => {
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
     complete = resolve
@@ -183,7 +183,7 @@ it('[A72] a legacy response cannot settle a new task that requires the full auth
     assert.equal(
       settled,
       false,
-      '[A72] authenticated legacy method/id matching lacks the required generation association'
+      'authenticated legacy method/id matching lacks the required generation association'
     )
     complete()
     assert.equal(await running, 42)
@@ -196,7 +196,7 @@ it('[A72] a legacy response cannot settle a new task that requires the full auth
   }
 })
 
-it('[A67][A69] notify send completion precedes business completion while its before-start receipt and keyed outcome stay live', async () => {
+it('notify send completion precedes business completion while its before-start receipt and keyed outcome stay live', async () => {
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
     complete = resolve
@@ -233,14 +233,14 @@ it('[A67][A69] notify send completion precedes business completion while its bef
     assert.equal(
       (await peer.outcome('notify-key')).state,
       'pending',
-      '[A67] public notify Promise cannot pretend that business already finished'
+      'public notify Promise cannot pretend that business already finished'
     )
     control.abort(new Error('started notification intent'))
     assert.equal(signal!.aborted, false)
     complete()
     await vi.waitFor(async () => assert.equal((await peer.outcome('notify-key')).state, 'done'))
     const done = await peer.outcome('notify-key')
-    if (done.state !== 'done') assert.fail('[A69] actual notification completion must be retained')
+    if (done.state !== 'done') assert.fail('actual notification completion must be retained')
     assert.equal(done.outcome.completion.ok, true)
     assert.equal(fixture.failures.length, 0)
   } finally {
@@ -249,7 +249,7 @@ it('[A67][A69] notify send completion precedes business completion while its bef
   }
 })
 
-it('[A67] before-start notify rejects a failed physical write after send admission instead of leaving its public Promise pending', async () => {
+it('before-start notify rejects a failed physical write after send admission instead of leaving its public Promise pending', async () => {
   const selected = [...capabilities, RpcCapability.cancelBeforeStart]
   let effects = 0
   const fixture = await connected(
@@ -285,7 +285,7 @@ it('[A67] before-start notify rejects a failed physical write after send admissi
       assert.equal(
         settlement,
         'rejected',
-        '[A67] failed physical completion rejects the original send Promise'
+        'failed physical completion rejects the original send Promise'
       )
     )
     assert.equal(Reflect.get(rejection as object, 'code'), 'TRANSPORT')
@@ -297,7 +297,7 @@ it('[A67] before-start notify rejects a failed physical write after send admissi
   }
 })
 
-it('[A71] genuine bilateral describe binds each peer generation before business dispatch', async () => {
+it('genuine bilateral describe binds each peer generation before business dispatch', async () => {
   const fixture = await connected({}, { value: () => 42 }, capabilities, capabilities)
   try {
     const remote = readRuntimePeerConnection(fixture.peers[0]).description
@@ -308,7 +308,7 @@ it('[A71] genuine bilateral describe binds each peer generation before business 
         value: 0,
         providerId: 'child-1'
       },
-      '[A71] the accepted identity contains the actual first connection generation'
+      'the accepted identity contains the actual first connection generation'
     )
     assert.equal(await fixture.peers[0].request('value'), 42)
   } finally {
@@ -316,7 +316,7 @@ it('[A71] genuine bilateral describe binds each peer generation before business 
   }
 })
 
-it('[A62][A76] a real Peer group executes through the original provider and returns fail-stop outcomes', async () => {
+it('a real Peer group executes through the original provider and returns fail-stop outcomes', async () => {
   const effects: string[] = []
   const fixture = await connected(
     {},
@@ -338,7 +338,7 @@ it('[A62][A76] a real Peer group executes through the original provider and retu
   )
   try {
     const group = Reflect.get(fixture.peers[0], 'group')
-    assert.equal(typeof group, 'function', '[A62] the genuine prepared Peer exposes group')
+    assert.equal(typeof group, 'function', 'the genuine prepared Peer exposes group')
     const result = await group([{ method: 'first' }, { method: 'fail' }, { method: 'last' }])
     assert.deepEqual(
       result.map((step: { state: string }) => step.state),
@@ -357,7 +357,7 @@ it('[A62][A76] a real Peer group executes through the original provider and retu
   }
 })
 
-it('[A59][A66] real ordered requests share provider leases; queued cancel wins and started cancel cannot abort business', async () => {
+it('real ordered requests share provider leases; queued cancel wins and started cancel cannot abort business', async () => {
   const selected = [...capabilities, RpcCapability.order, RpcCapability.cancelBeforeStart]
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
@@ -421,20 +421,12 @@ it('[A59][A66] real ordered requests share provider leases; queued cancel wins a
       EndpointOwnerKey.providerAdmission
     )!
     await vi.waitFor(() => assert.equal(admission.size, 2))
-    assert.deepEqual(
-      effects,
-      ['hold', 'other'],
-      '[A59] same key remains queued; another key executes'
-    )
+    assert.deepEqual(effects, ['hold', 'other'], 'same key remains queued; another key executes')
     queuedControl.abort(new Error('queued fixture intent'))
     await rejected
     firstControl.abort(new Error('started fixture intent'))
     await vi.waitFor(() => assert.equal(admission.size, 1))
-    assert.equal(
-      signal!.aborted,
-      false,
-      '[A66] the final original provider start defeats caller abort'
-    )
+    assert.equal(signal!.aborted, false, 'the final original provider start defeats caller abort')
     complete()
     assert.equal(await first, 42)
     await vi.waitFor(() => assert.equal(admission.size, 0))
@@ -445,7 +437,7 @@ it('[A59][A66] real ordered requests share provider leases; queued cancel wins a
   }
 })
 
-it('[A68][A69] real outcome lookup observes the original pending claim and complete sealed group without executing business', async () => {
+it('real outcome lookup observes the original pending claim and complete sealed group without executing business', async () => {
   const selected = [...capabilities, RpcCapability.outcome]
   let complete!: () => void
   const blocked = new Promise<void>((resolve) => {
@@ -469,7 +461,7 @@ it('[A68][A69] real outcome lookup observes the original pending claim and compl
     assert.equal(
       typeof Reflect.get(peer, 'outcome'),
       'function',
-      '[A68] prepared Peer exposes the read-only query'
+      'prepared Peer exposes the read-only query'
     )
     const lookup = Reflect.get(peer, 'outcome')
     const unknown = await lookup('absent')
@@ -481,11 +473,7 @@ it('[A68][A69] real outcome lookup observes the original pending claim and compl
     void running.catch(() => undefined)
     await vi.waitFor(() => assert.equal(effects, 1))
     assert.equal((await lookup('key')).state, 'pending')
-    assert.equal(
-      effects,
-      1,
-      '[A68] querying an existing pending claim cannot execute or join business'
-    )
+    assert.equal(effects, 1, 'querying an existing pending claim cannot execute or join business')
     complete()
     await running
     const done = await lookup('key')

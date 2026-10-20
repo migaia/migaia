@@ -9,9 +9,9 @@ import {
 } from '../../dist/core/index.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
-describe('A2 remote generation proxy', () => {
+describe('remote generation proxy', () => {
   it.each(['class', 'constructor', 'tag'] as const)(
-    '[C5-E09] %s forged Core retirement/close cannot revoke the captured generation or prevent its next request',
+    '%s forged Core retirement/close cannot revoke the captured generation or prevent its next request',
     async (kind) => {
       /** The real registration captures an actual active generation and its installed description. */
       const fixture = remoteHarness()
@@ -56,7 +56,7 @@ describe('A2 remote generation proxy', () => {
       }
     }
   )
-  it('[A8] uses the default retry port for a sent idempotent request', async () => {
+  it('uses the default retry port for a sent idempotent request', async () => {
     const fixture = remoteHarness()
     const originalSend = fixture.served.endpoint.send
     /** The first generation leaves while its provider result remains unsettled. */
@@ -81,7 +81,7 @@ describe('A2 remote generation proxy', () => {
     await fixture.registration.release()
   })
 
-  it('[A9] settles a sent request when release leaves its active generation', async () => {
+  it('settles a sent request when release leaves its active generation', async () => {
     const fixture = remoteHarness()
     const send = fixture.served.endpoint.send
     fixture.served.endpoint.send = async (peer, method, params, options) =>

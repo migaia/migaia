@@ -6,7 +6,7 @@ import {
   LIFECYCLE_SOURCE
 } from '../src/errors'
 
-describe('L-T17 containAsyncRejection: non-Promise thenable', () => {
+describe('containAsyncRejection: non-Promise thenable', () => {
   it('reads `then` exactly once and observes the eventual rejection', async () => {
     let readCount = 0
     const thenable = {
@@ -71,7 +71,7 @@ describe('L-T17 containAsyncRejection: non-Promise thenable', () => {
   })
 })
 
-describe('L-T18 error policies: throw / collect / report / firstError', () => {
+describe('error policies: throw / collect / report / firstError', () => {
   it('throw: single error is thrown as-is', () => {
     const sink = createErrorCollector('throw', undefined)
     const original = new Error('single')
@@ -157,7 +157,7 @@ describe('L-T18 error policies: throw / collect / report / firstError', () => {
   })
 })
 
-describe('L-T35 report: secondary failures reach host diagnostics', () => {
+describe('report: secondary failures reach host diagnostics', () => {
   it.each([false, true])(
     'reports secondary failure without altering policy outcome, async=%s',
     async (asynchronous) => {
@@ -187,7 +187,7 @@ describe('L-T35 report: secondary failures reach host diagnostics', () => {
   )
 })
 
-describe('L-T38 firstError: subsequent errors are fully observed', () => {
+describe('firstError: subsequent errors are fully observed', () => {
   it('records every subsequent error even though only the first is thrown', () => {
     const sink = createErrorCollector('firstError', vi.fn())
     sink.add('a', new Error('first'))
@@ -226,7 +226,7 @@ describe('L-T38 firstError: subsequent errors are fully observed', () => {
   })
 })
 
-describe('L-T40 error code structural contract', () => {
+describe('error code structural contract', () => {
   it('every created error carries source and code', () => {
     const error = createLifecycleError('SOME_CODE', 'message')
     expect(error.source).toBe(LIFECYCLE_SOURCE)

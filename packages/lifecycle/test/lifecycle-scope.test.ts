@@ -13,7 +13,7 @@ const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => 
   return { promise, resolve }
 }
 
-describe('L-T2 LifecycleScope: own/release/dispose', () => {
+describe('LifecycleScope: own/release/dispose', () => {
   it('release() unregisters a resource without releasing it', async () => {
     const force = vi.fn()
     const scope = createLifecycleScope()
@@ -70,7 +70,7 @@ describe('L-T2 LifecycleScope: own/release/dispose', () => {
   })
 })
 
-describe('L-T56 Round18 LifecycleScope descriptor admission boundary', () => {
+describe('LifecycleScope descriptor admission boundary', () => {
   it.each(['throw', 'collect', 'report', 'firstError'] as const)(
     'reads one hostile force getter and keeps later LIFO/order releases under %s policy',
     async (errorPolicy) => {
@@ -120,7 +120,7 @@ describe('L-T56 Round18 LifecycleScope descriptor admission boundary', () => {
   )
 })
 
-describe('L-T3 LifecycleScope: sync/async reentrancy', () => {
+describe('LifecycleScope: sync/async reentrancy', () => {
   it('a synchronous disposer that reentrantly calls dispose() is rejected, error attributed to it, rest continues', async () => {
     const calls: string[] = []
     const scope = createLifecycleScope({ errorPolicy: 'collect' })
@@ -208,7 +208,7 @@ describe('L-T3 LifecycleScope: sync/async reentrancy', () => {
     expect(joined).toBe(first)
   })
 
-  it('own() from within a disposer is rejected the same way (L-T37 shares this mechanism)', async () => {
+  it('own() from within a disposer is rejected the same way (shared admission mechanism)', async () => {
     const scope = createLifecycleScope({ errorPolicy: 'collect' })
     scope.own(
       'x',
@@ -225,7 +225,7 @@ describe('L-T3 LifecycleScope: sync/async reentrancy', () => {
   })
 })
 
-describe('L-T19 GC fallback', () => {
+describe('GC fallback', () => {
   it('explicit release() unregisters so the finalizer never runs afterward', async () => {
     if (typeof FinalizationRegistry === 'undefined') return // environment without GC hooks
     const force = vi.fn()
@@ -268,7 +268,7 @@ describe('L-T19 GC fallback', () => {
   })
 })
 
-describe('L-T27 close() never calls user code', () => {
+describe('close() never calls user code', () => {
   it('close() does not invoke any disposer, graceful, force, or custom callback', () => {
     const force = vi.fn()
     const graceful = vi.fn()
@@ -303,7 +303,7 @@ describe('L-T27 close() never calls user code', () => {
   })
 })
 
-describe('L-T28 dispose() implies close() first', () => {
+describe('dispose() implies close() first', () => {
   it('dispose() moves through closing before any user code runs, never open -> terminal directly', async () => {
     const observedStates: string[] = []
     const scope = createLifecycleScope()
@@ -323,7 +323,7 @@ describe('L-T28 dispose() implies close() first', () => {
   })
 })
 
-describe('L-T29 dispose() promise identity', () => {
+describe('dispose() promise identity', () => {
   it('concurrent, non-reentrant dispose() calls on an idle (empty) scope reuse the same promise', () => {
     // With nothing owned, the teardown loop never runs, so `currentlyReleasing` never becomes
     // true — this is the unambiguous case where two calls are provably not reentrant with respect
@@ -394,7 +394,7 @@ describe('L-T29 dispose() promise identity', () => {
   })
 })
 
-describe('L-T33 LifecycleScope: atomic splice-then-reverse teardown', () => {
+describe('LifecycleScope: atomic splice-then-reverse teardown', () => {
   it('every registered resource is released exactly once, in LIFO order', async () => {
     const calls: string[] = []
     const scope = createLifecycleScope()
@@ -444,7 +444,7 @@ describe('L-T33 LifecycleScope: atomic splice-then-reverse teardown', () => {
   })
 })
 
-describe('L-T34 (LifecycleScope aspect): failed release does not stop remaining resources', () => {
+describe('(LifecycleScope aspect): failed release does not stop remaining resources', () => {
   it('a force() throw for one resource does not prevent the rest from releasing', async () => {
     const calls: string[] = []
     const scope = createLifecycleScope({ errorPolicy: 'collect' })
@@ -473,7 +473,7 @@ describe('L-T34 (LifecycleScope aspect): failed release does not stop remaining 
   })
 })
 
-describe('L-T36 dispose() calling close() has no effect and does not throw', () => {
+describe('dispose() calling close() has no effect and does not throw', () => {
   it('close() invoked from within a disposer during dispose() is a harmless no-op', async () => {
     const scope = createLifecycleScope()
     let closeThrew = false
@@ -513,7 +513,7 @@ describe('L-T36 dispose() calling close() has no effect and does not throw', () 
   })
 })
 
-describe('L-T37 own() inside a disposer throws immediately, rest still releases', () => {
+describe('own() inside a disposer throws immediately, rest still releases', () => {
   it('the own()-caller’s error is attributed to that disposer under collect policy', async () => {
     const calls: string[] = []
     const scope = createLifecycleScope({ errorPolicy: 'collect' })

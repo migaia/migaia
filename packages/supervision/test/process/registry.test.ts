@@ -10,7 +10,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 100; index++) await Promise.resolve()
 }
 
-describe('A7 durable unit registration', () => {
+describe('durable unit registration', () => {
   it('registers before ready and removes after disappearance', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher()

@@ -8,7 +8,7 @@ import * as serialize from '../../src/index.js'
 function emit(value: unknown, format: 'json' | 'yaml' | 'toml'): string {
   /** Only the owning package's public emitter participates in these output contracts. */
   const output = (serialize as unknown as Record<string, unknown>).emitOutput
-  assert.equal(typeof output, 'function', '[A28] serialize must provide portable text output')
+  assert.equal(typeof output, 'function', 'serialize must provide portable text output')
   return (output as (value: unknown, format: string) => string)(value, format)
 }
 
@@ -18,7 +18,7 @@ function toml(value: string): unknown {
   const python = ['python3', 'python3.14', 'python3.13', 'python3.12', 'python3.11'].find(
     (command) => spawnSync(command, ['-c', 'import tomllib'], { encoding: 'utf8' }).status === 0
   )
-  assert.ok(python, '[A28] independent TOML checks require an installed Python with tomllib')
+  assert.ok(python, 'independent TOML checks require an installed Python with tomllib')
   /** Python consumes output bytes on stdin; no fixture file or production parser is introduced. */
   const parsed = spawnSync(
     python,
@@ -28,12 +28,12 @@ function toml(value: string): unknown {
   assert.equal(
     parsed.status,
     0,
-    `[A28] independent TOML parser must accept the complete output: ${parsed.stderr}`
+    `independent TOML parser must accept the complete output: ${parsed.stderr}`
   )
   return JSON.parse(parsed.stdout)
 }
 
-it('[A28] quoted keys, control characters and nested collections retain their values in all formats', () => {
+it('quoted keys, control characters and nested collections retain their values in all formats', () => {
   /** The same clean object reaches all formats; keys exercise quoting and dotted-key ownership. */
   const value = {
     '': {},
@@ -47,7 +47,7 @@ it('[A28] quoted keys, control characters and nested collections retain their va
   assert.deepEqual(toml(emit(value, 'toml')), value)
 })
 
-it('[A28] JSON delegates to the existing json parser after safe data admission', () => {
+it('JSON delegates to the existing json parser after safe data admission', () => {
   /** Native JSON semantics are preserved on already admitted portable data. */
   const value = { text: 'safe', nested: [null, { enabled: true }], number: 3.25 }
   assert.equal(
@@ -62,21 +62,21 @@ it('[A28] JSON delegates to the existing json parser after safe data admission',
   assert.deepEqual(parseYaml(emit(value, 'yaml')), value)
 })
 
-it('[A30] TOML rejects a root array and null at every depth with the existing native coded error', () => {
+it('TOML rejects a root array and null at every depth with the existing native coded error', () => {
   for (const value of [[], null, { absent: null }, { nested: [{ absent: null }] }]) {
     assert.throws(
       () => emit(value, 'toml'),
       { name: 'TypeError', source: '@migaia/serialize', code: 'INVALID_OPTION' },
-      '[A30] TOML must reject rather than omit an unrepresentable value'
+      'TOML must reject rather than omit an unrepresentable value'
     )
   }
   assert.equal(emit(null, 'json'), 'null')
   assert.equal(parseYaml(emit(null, 'yaml')), null)
 })
 
-it('[A30] cycles, accessors and nonportable values reject without reading getters or revealing data', () => {
+it('cycles, accessors and nonportable values reject without reading getters or revealing data', () => {
   /** This marker may occur in fixture inputs, but never in the emitter diagnostic. */
-  const secret = 'a30-private-output-marker'
+  const secret = 'private-output-marker'
   /** A cycle exercises whole-input admission before any text can be returned. */
   const cycle: Record<string, unknown> = { secret }
   cycle.self = cycle
@@ -114,5 +114,5 @@ it('[A30] cycles, accessors and nonportable values reject without reading getter
       )
     }
   }
-  assert.equal(reads, 0, '[A30] admission must never evaluate an enumerable getter')
+  assert.equal(reads, 0, 'admission must never evaluate an enumerable getter')
 })

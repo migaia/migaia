@@ -5,7 +5,7 @@ import { isAlias, isNode, parseAllDocuments, visit } from 'yaml'
 /** Pnpm default virtual-store filename limit required from the fresh consumer. */
 export const storageV2VirtualStoreDirMaxLength = 120
 
-/** Allowed top-level keys for the fresh pnpm lockfile profile owned by C2-R4. */
+/** Allowed top-level keys for the fresh pnpm lockfile profile owned by this check. */
 const topLevelKeys = new Set([
   'lockfileVersion',
   'settings',

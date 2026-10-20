@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import * as core from '@migaia/rpc-core'
 import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'
 
-/** Runtime-facing symbol table, including exports whose names change in BC2. */
+/** Runtime-facing symbol table, including exports whose names changed in the layering rename. */
 const surface = core as Record<string, unknown>
 
 describe('Rpc naming boundary', () => {
-  it('A3 publishes Rpc names and wire names without WebRpc aliases', () => {
+  it('publishes Rpc names and wire names without WebRpc aliases', () => {
     for (const name of [
       'RpcLifecycleError',
       'isRpcError',

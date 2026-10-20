@@ -2,7 +2,7 @@ import type { ILifecycleState } from './types.js'
 import { LifecycleState } from './state-constants.js'
 
 /**
- * Owns the `open → closing → terminal` axis (§4.2, axis 1). Ported near-verbatim from
+ * Owns the `open → closing → terminal` axis (, axis 1). Ported near-verbatim from
  * `@migaia/reactive`'s `TerminalControllerImpl` — the state machine itself was already correct;
  * only the domain-specific naming is gone.
  */

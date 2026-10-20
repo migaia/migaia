@@ -10,7 +10,7 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 100; index++) await Promise.resolve()
 }
 
-describe('A10 bounded idle unit pool', () => {
+describe('bounded idle unit pool', () => {
   it('registers and budgets idle units without crash-driven respawn', async () => {
     const scheduler = createManualScheduler()
     const launcher = memoryProcessLauncher()
@@ -196,7 +196,7 @@ describe('A10 bounded idle unit pool', () => {
   })
 })
 
-describe('SV-B4 prewarm scheduler admission', () => {
+describe('prewarm scheduler admission', () => {
   it('rejects an unreadable scheduler before acquiring or launching a unit', () => {
     /** Existing launcher and budget expose whether invalid construction caused side effects. */
     const launcher = memoryProcessLauncher()

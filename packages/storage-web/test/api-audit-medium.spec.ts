@@ -20,7 +20,7 @@ const reaches = (error: unknown, original: unknown, seen = new Set<unknown>()): 
 }
 
 describe('storage-web audit medium severity regressions', () => {
-  it('SW-D02 retains an extension StorageError itself and its custom message', async () => {
+  it('retains an extension StorageError itself and its custom message', async () => {
     /** The primary already owns a deeper cause; preserving only this leaf is insufficient. */
     const leaf = new Error('leaf')
     /** StorageError is frozen, so missing operation metadata requires a traceable wrapper. */
@@ -63,23 +63,20 @@ describe('storage-web audit medium severity regressions', () => {
     }
   })
 
-  it.each([undefined, {}])(
-    'SW-D03 rejects a missing complete v2 migration graph: %s',
-    (migrations) => {
-      expect(() =>
-        defineEntity<{ id: string }>({
-          name: 'audit-graph',
-          key: 'id',
-          version: 2,
-          ...(migrations === undefined ? {} : { migrations })
-        })
-      ).toThrowError(
-        expect.objectContaining({ source: '@migaia/storage-web', code: 'INVALID_CONFIG' })
-      )
-    }
-  )
+  it.each([undefined, {}])('rejects a missing complete v2 migration graph: %s', (migrations) => {
+    expect(() =>
+      defineEntity<{ id: string }>({
+        name: 'audit-graph',
+        key: 'id',
+        version: 2,
+        ...(migrations === undefined ? {} : { migrations })
+      })
+    ).toThrowError(
+      expect.objectContaining({ source: '@migaia/storage-web', code: 'INVALID_CONFIG' })
+    )
+  })
 
-  it('SW-D04 classifies an asynchronous Standard Schema rejection and preserves its cause', async () => {
+  it('classifies an asynchronous Standard Schema rejection and preserves its cause', async () => {
     /** A complete Standard Schema port is allowed to reject instead of returning issues. */
     const primary = new Error('validator rejected')
     /** The public adapter alone owns validation classification. */
@@ -99,7 +96,7 @@ describe('storage-web audit medium severity regressions', () => {
     })
   })
 
-  it('SW-D07 skips malformed foreign physical keys while enumerating its own namespace', async () => {
+  it('skips malformed foreign physical keys while enumerating its own namespace', async () => {
     expect(lengthPrefixedNamespaceCodec.decode('app', 'sw1:3:%GG:foreign')).toBeUndefined()
     /** Reuse the existing complete RAM Storage port; no user persistence is touched. */
     const storage = fakeWebStorage()

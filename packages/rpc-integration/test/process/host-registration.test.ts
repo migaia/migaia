@@ -87,7 +87,7 @@ function reversePeer(address: string, token = nativeHostToken, badDescription = 
 }
 
 describe('process Host reverse native registration', () => {
-  it('[A7] aborts a delayed description before target installation and closes its registration without a tombstone', async () => {
+  it('aborts a delayed description before target installation and closes its registration without a tombstone', async () => {
     const fixture = remoteHarness()
     const target = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -164,7 +164,7 @@ describe('process Host reverse native registration', () => {
       await withinRegistration(target.dispose())
     }
   })
-  it('[A7] installs only the verified principal, suspends on EOF and adopts a new connection', async () => {
+  it('installs only the verified principal, suspends on EOF and adopts a new connection', async () => {
     const directory = await withinRegistration(mkdtemp('/tmp/rpc-adopt-'))
     const address = join(directory, 'r')
     const target = new PluginHost<Record<string, never>>({

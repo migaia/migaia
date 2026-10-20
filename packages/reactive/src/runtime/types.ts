@@ -166,7 +166,7 @@ export type IRuntimeErrorReportContext = {
 }
 
 /**
- * Host capability injection boundary (`docs/contracts/runtime-neutrality.sdd.md` R-9).
+ * Host capability injection boundary.
  *
  * As in `@migaia/utils/scheduler`, `now()` is monotonic and measures durations
  * (`IScheduler.now()`). `timestamp()` supplies epoch event time (`IWallClock.timestamp()`). Do not

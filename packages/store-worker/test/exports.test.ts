@@ -83,7 +83,7 @@ function installLinkedSerializeWorkerHandler(
 const mockEndpoint = (dispose: () => Promise<void>): IRpcEndpoint<'worker', 'automatic', false> =>
   ({ dispose }) as unknown as IRpcEndpoint<'worker', 'automatic', false>
 
-describe('A8/A9 store-worker exports', () => {
+describe('store-worker exports', () => {
   it('exports only the canonical byte ownership vocabulary', () => {
     expect(storeWorker.WorkerByteOwnership).toEqual({ copy: 'copy', transfer: 'transfer' })
     expect('Worker' + 'Ownership' in storeWorker).toBe(false)
@@ -97,7 +97,7 @@ describe('A8/A9 store-worker exports', () => {
     await adapter.dispose()
   })
 
-  it('T101 B12c01 real WorkerAdapter RPC fanout preserves result order and remote error contract', async () => {
+  it('real WorkerAdapter RPC fanout preserves result order and remote error contract', async () => {
     const port = createLinkedWorkerPort()
     const providerFailure = new Error('worker provider failure')
     installLinkedWorkerHandler(port, async (payload) => {

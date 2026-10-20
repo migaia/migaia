@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
-describe('[A11] safeString failure reporting', () => {
+describe('safeString failure reporting', () => {
   it('reports Worker conversion and message getter failures before primary errors', () => {
     const listeners = new Map<string, (event: Event) => void>()
     const transport = createWebWorkerTransport({

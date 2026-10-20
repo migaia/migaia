@@ -2,7 +2,7 @@ import { PassThrough, type Readable, type Writable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 
 describe('canonical child stdio replay registration', () => {
-  it('[A6/A7] binds the opened byte channel and preserves physical data and write ownership', async () => {
+  it('binds the opened byte channel and preserves physical data and write ownership', async () => {
     /** Real isolated streams replace the host stdio pair so this test cannot close the test runner. */
     const readable = new PassThrough()
     /** Owns isolated outbound bytes instead of the test runner's stdout. */

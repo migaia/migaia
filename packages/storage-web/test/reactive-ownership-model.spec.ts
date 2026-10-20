@@ -144,9 +144,9 @@ const createOwnershipModel = (): IOwnershipModel => {
   }
 }
 
-describe('SWV2-T50 live-query ownership model', () => {
+describe('live-query ownership model', () => {
   it('requires the three canonical owners and keeps the production entry free of parallel state', () => {
-    /** Storage manifest must declare every runtime owner it will compose in B06. */
+    /** Storage manifest must declare every runtime owner it will compose. */
     const manifest = JSON.parse(
       readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8')
     ) as { readonly dependencies?: Readonly<Record<string, string>> }

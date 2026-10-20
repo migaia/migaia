@@ -28,7 +28,7 @@ function localClient(collector: IRpcDevtools, afterQuery?: () => void): IRpcDevt
   }
 }
 
-it('[RD-D01] aligns events actually emitted by the public Core Endpoint with the same monotonic clock', async () => {
+it('aligns events actually emitted by the public Core Endpoint with the same monotonic clock', async () => {
   /** The same public built Core creates both the genuine Probe registration and Endpoint. */
   const collector = createRpcDevtools({ onError: () => undefined })
   /** This Hub samples only real Collector responses, without an invented remote timestamp. */
@@ -64,7 +64,7 @@ it('[RD-D01] aligns events actually emitted by the public Core Endpoint with the
   }
 })
 
-it('[RD-D02] globally sorts valid nonmonotonic records before applying a timeline limit', async () => {
+it('globally sorts valid nonmonotonic records before applying a timeline limit', async () => {
   /** Public record grammar permits arbitrary finite at values in sequence/file order. */
   const event = (seq: number, at: number) => ({
     seq,
@@ -94,7 +94,7 @@ it('[RD-D02] globally sorts valid nonmonotonic records before applying a timelin
   }
 })
 
-it('[RD-D03] retains a real Collector event arriving after the historical query snapshot', async () => {
+it('retains a real Collector event arriving after the historical query snapshot', async () => {
   /** All events and service pages belong to the same actual Collector. */
   const collector = createRpcDevtools({ onError: () => undefined })
   /** A one-time concurrent emit lands in the historical/future handoff window. */
@@ -119,7 +119,7 @@ it('[RD-D03] retains a real Collector event arriving after the historical query 
   }
 })
 
-it('[RD-D04] iterator return completes a pending local watch next without closing its Collector', async () => {
+it('iterator return completes a pending local watch next without closing its Collector', async () => {
   /** The Collector remains open while its consumer relinquishes just this one iterator. */
   const collector = createRpcDevtools()
   /** The first read activates the actual native async generator and waits for a future event. */
@@ -142,7 +142,7 @@ it('[RD-D04] iterator return completes a pending local watch next without closin
   }
 })
 
-it('[RD-D04] Hub close releases its own local watch before the Collector closes', async () => {
+it('Hub close releases its own local watch before the Collector closes', async () => {
   /** Reports must not mistake an intentional consumer return for Collector CLOSED. */
   const reports: unknown[] = []
   /** The Hub and Collector have distinct public ownership and lifetimes. */
@@ -174,7 +174,7 @@ it('[RD-D04] Hub close releases its own local watch before the Collector closes'
   }
 })
 
-it('[RD-D06] classifies its owned native cleanup AggregateError while retaining the application cause', async () => {
+it('classifies its owned native cleanup AggregateError while retaining the application cause', async () => {
   /** Original application errors keep their own identity and are not relabeled as Devtools errors. */
   const original = new TypeError('audit target return failed')
   /** Public requests still return genuine Collector service results. */

@@ -10,7 +10,7 @@ import {
 
 /** Named-pipe grammar is valid only for the Node Windows adapter. */
 describe('process socket address policy', () => {
-  it('[D7] rejects pipe syntax on POSIX and in Deno on every platform', async () => {
+  it('rejects pipe syntax on POSIX and in Deno on every platform', async () => {
     const address = '\\\\.\\pipe\\rpc-test'
     if (process.platform !== 'win32') {
       await expect(dialProcessByteChannel({ address })).rejects.toMatchObject({

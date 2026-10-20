@@ -4,7 +4,7 @@ import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
 import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.js'
 import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
 
-describe('A2 thread budget', () => {
+describe('thread budget', () => {
   it('rejects wrong budget kinds at both type and runtime boundaries', () => {
     const scheduler = createManualScheduler()
     const launcher = memoryThreadLauncher()

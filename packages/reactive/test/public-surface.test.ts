@@ -4,7 +4,7 @@ import * as publicApi from '../src/index.js'
 import type { IRuntime } from '../src/index.js'
 
 describe('public-surface convergence', () => {
-  it('REX-T1 A1 exposes only application and controlled extension entries', async () => {
+  it('exposes only application and controlled extension entries', async () => {
     /** Published entry names form the supported import boundary. */
     const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
     expect(Object.keys(manifest.exports)).toEqual(['.', './extension'])
@@ -46,7 +46,7 @@ describe('public-surface convergence', () => {
     }
   })
 
-  it('A2 keeps versions and observation hooks while hiding graph methods', () => {
+  it('keeps versions and observation hooks while hiding graph methods', () => {
     /** Isolated runtime owns every node exercised by this public contract. */
     const runtime = publicApi.createRuntime()
     /** Public source records writable state without exposing graph bookkeeping. */
@@ -78,7 +78,7 @@ describe('public-surface convergence', () => {
     removeHooks()
   })
 
-  it('A3 returns an effect object with idempotent disposal', () => {
+  it('returns an effect object with idempotent disposal', () => {
     /** Effect cleanup proves repeated disposal consumes the callback once. */
     const cleanup = vi.fn()
     /** Isolated runtime keeps cleanup state local to this case. */
@@ -93,7 +93,7 @@ describe('public-surface convergence', () => {
     expect(cleanup).toHaveBeenCalledTimes(1)
   })
 
-  it('A4 admits scheduling at construction and reads versions through extension', async () => {
+  it('admits scheduling at construction and reads versions through extension', async () => {
     /** Captured flush permits assertions before and after the selected strategy runs work. */
     let flush: (() => void) | undefined
     /** Strategy records constructor-selected scheduling without flushing immediately. */

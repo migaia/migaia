@@ -27,11 +27,11 @@ import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js
 import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
 
 it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
-  '[A62][A63][A66] real native group %s preserves exact original quota ownership',
+  'real native group %s preserves exact original quota ownership',
   async (policy) => {
     /** Fixture offers only the profile under test, independently of production default offers. */
     const capabilities = [
-      /** D40 default request/stream deadlines are genuinely offered by both source owners. */
+      /** Default request/stream deadlines are genuinely offered by both source owners. */
       RpcCapability.deadline,
       ...RUNTIME_API_CAPABILITIES,
       RpcCapability.generation,
@@ -171,7 +171,7 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
         cancel.abort()
         assert.equal(Reflect.get((await queued) as object, 'code'), RpcCoreErrorCode.cancelled)
         await vi.waitFor(() => assert.equal(admission.size, 1))
-        assert.deepEqual(effects, ['hold'], '[A66] cancelled members never enter native providers')
+        assert.deepEqual(effects, ['hold'], 'cancelled members never enter native providers')
         for (let index = 0; index < (policy === 'rollover' ? 3 : 2); index += 1)
           assert.equal(await client.request('baseline'), 42)
         if (policy === 'rollover')
@@ -201,11 +201,7 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
         )
         assert.deepEqual(effects, ['first', 'second'])
         await vi.waitFor(() => assert.equal(admission.size, 0))
-        assert.equal(
-          await client.request('baseline'),
-          42,
-          '[A63] unexecuted member credit is refunded'
-        )
+        assert.equal(await client.request('baseline'), 42, 'unexecuted member credit is refunded')
         return
       }
       /** Rate has one remaining slot; payload has a valid first member and oversized second. */
@@ -218,15 +214,15 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
           (result) => ({ result }),
           (error: unknown) => ({ error })
         )
-      assert.deepEqual(effects, [], '[A62] refusal must precede every native provider side effect')
-      assert.ok('error' in outcome, '[A62] whole-group admission failure rejects the group')
+      assert.deepEqual(effects, [], 'refusal must precede every native provider side effect')
+      assert.ok('error' in outcome, 'whole-group admission failure rejects the group')
       assert.equal(
         Reflect.get(outcome.error as object, 'code'),
         RpcProcessErrorCode.connectionLimit
       )
       assert.equal(Reflect.get(outcome.error as object, 'source'), '@migaia/rpc/process')
       await vi.waitFor(() => assert.equal(admission.size, 0))
-      assert.equal(await client.request('baseline'), 42, '[A63] rejected group consumes zero quota')
+      assert.equal(await client.request('baseline'), 42, 'rejected group consumes zero quota')
     } finally {
       finish()
       await client?.close()

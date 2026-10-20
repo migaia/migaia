@@ -148,7 +148,7 @@ export type IPluginHostInstalledPlugins<THost extends PluginHost<any, any, any>>
   THost[typeof installedPluginsBrand]
 
 /**
- * 默认诊断 sink：无副作用 no-op（runtime-neutrality.sdd.md R-7 第 3 条「`defaultDiagnostic = () => {}`」）。
+ * 默认诊断 sink：无副作用 no-op（`defaultDiagnostic = () => {}`）。
  *
  * Plugin-host 是 runtime-neutral 核心，不直接依赖宿主 `console`；需要观测非枚举扩展跳过、回滚失败等诊断的调用方必须显式注入
  * `diagnostic`。`message` 仅用于保持与注入版相同的签名。
@@ -309,7 +309,7 @@ export class PluginHost<
       mode: this.#pipelineMode,
       onViolation: this.#onPipelineViolation,
       assertActive: () => this.#assertActive(),
-      // BC5: every mode observes the lifecycle abort signal, so in-flight stages of any mode can
+      // Every mode observes the lifecycle abort signal, so in-flight stages of any mode can
       // stop through `context.signal` when the host closes.
       signal: this.#liveSignal,
       combineStageAndDownstreamError: (stageError, downstreamError) =>
@@ -334,14 +334,14 @@ export class PluginHost<
       },
       pending: this.#pending
     }
-    // 时间策略统一走 lifecycle scheduler / 可配置阈值（AF-10）。负数/NaN/Infinity 立即 INVALID_OPTION。
+    // 时间策略统一走 lifecycle scheduler / 可配置阈值。负数/NaN/Infinity 立即 INVALID_OPTION。
     for (const [label, value] of [
       ['queueAdmissionTimeoutMs', options.queueAdmissionTimeoutMs],
       ['queueAdmissionDiagnosticMs', options.queueAdmissionDiagnosticMs],
       ['disposeStepTimeoutMs', options.disposeStepTimeoutMs]
     ] as const)
       assertTimeoutOption(value, label)
-    // 只读取一次 scheduler 快照（AF-31）：校验、保存、传给 queue/dispose scope 都用这个局部快照。
+    // 只读取一次 scheduler 快照：校验、保存、传给 queue/dispose scope 都用这个局部快照。
     const schedulerOption = options.scheduler
     let schedulerSnapshot: IScheduler | undefined
     if (schedulerOption !== undefined) {
@@ -744,7 +744,7 @@ export class PluginHost<
   /**
    * `terminal` (used only by `dispose()`) passes `queueAdmissionTimeoutMs: false` for this one
    * task, exempting it from the queue SLA — mirrors the original `#mutationQueue`'s "terminal
-   * mutations are never evicted" rule (R4-1).
+   * mutations are never evicted" rule.
    */
   #enqueue<T>(task: () => Promise<T>, terminal = false): Promise<T> {
     return this.#queue

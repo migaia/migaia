@@ -156,7 +156,7 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
-  it('PHD-T1 keeps explicitly unbounded cleanup waiting for leases and every disposer', async () => {
+  it('keeps explicitly unbounded cleanup waiting for leases and every disposer', async () => {
     /** One clock distinguishes the caller's observation budget from physical disposal. */
     const scheduler = createManualScheduler()
     const host = new ManagedStageHost({
@@ -252,7 +252,7 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
-  it('PCC-T4 bounds managed cleanup even when normal step timeouts are disabled', async () => {
+  it('bounds managed cleanup even when normal step timeouts are disabled', async () => {
     /** The managed drain budget, rather than a normal step timeout, drives degradation. */
     const scheduler = createManualScheduler()
     const host = new ManagedStageHost({
@@ -338,7 +338,7 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
-  it('PHC-T1 keeps token callables stable while retaining each publication liveness policy', async () => {
+  it('keeps token callables stable while retaining each publication liveness policy', async () => {
     /** Full Host views and token views deliberately have different enablement boundaries. */
     const host = new ManagedStageHost(hostOptions)
     const composition = openComposition(host)
@@ -479,7 +479,7 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
-  it('TPD-T52 rejects prepared revision drift and rolls the candidate back exactly once', async () => {
+  it('rejects prepared revision drift and rolls the candidate back exactly once', async () => {
     let disposed = 0
     const host = new ManagedStageHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -506,7 +506,7 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
-  it('TPD-T53 retires exact data-order lanes without allowing a live duplicate', async () => {
+  it('retires exact data-order lanes without allowing a live duplicate', async () => {
     const host = new ManagedStageHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

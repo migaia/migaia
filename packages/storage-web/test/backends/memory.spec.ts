@@ -335,14 +335,14 @@ describe('memoryStorageHost', () => {
   })
 })
 
-describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
-  it('SWV2-R05 declares changeFeed:true and is recognized by the storage-contract guard', () => {
+describe('memoryStorageHost change feed', () => {
+  it('declares changeFeed:true and is recognized by the storage-contract guard', () => {
     const store = memoryStorageHost()
     expect(store.capabilities.changeFeed).toBe(true)
     expect(isChangeFeedStore(store)).toBe(true)
   })
 
-  it('SWV2-I05 fires one put event per channel with the correct kind/channel/keys, and one remove event', async () => {
+  it('fires one put event per channel with the correct kind/channel/keys, and one remove event', async () => {
     const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -365,7 +365,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(new Set(changes.map((change) => change.origin)).size).toBe(1)
   })
 
-  it('SOL-SWV2-045 a record-channel event derives scope from a canonical entity key; value/bytes events never carry one', async () => {
+  it('a record-channel event derives scope from a canonical entity key; value/bytes events never carry one', async () => {
     const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -386,7 +386,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     ])
   })
 
-  it('SOL-SWV2-045 a batch touching two scopes has no single scope to report', async () => {
+  it('a batch touching two scopes has no single scope to report', async () => {
     const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -400,7 +400,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(changes[0]).toMatchObject({ kind: 'batch', scope: undefined })
   })
 
-  it('SOL-SWV2-045 omits keys above 128 (consumer must fall back to scope) but keeps them at exactly 128', async () => {
+  it('omits keys above 128 (consumer must fall back to scope) but keeps them at exactly 128', async () => {
     const store = memoryStorageHost()
 
     const atCap = memoryStorageHost()
@@ -422,12 +422,12 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     })
     expect(overChanges).toHaveLength(1)
     expect(overChanges[0]!.keys).toBeUndefined()
-    // The cap must not defeat the whole point of §4.6: scope survives so the consumer still has
+    // The cap must not defeat the whole point: scope survives so the consumer still has
     // something to invalidate against.
     expect(overChanges[0]!.scope).toBe('users')
   })
 
-  it('SOL-SWV2-046 a listener that subscribes during fanout does not receive the event already in flight', async () => {
+  it('a listener that subscribes during fanout does not receive the event already in flight', async () => {
     const store = memoryStorageHost()
     const lateListenerEvents: IStorageChange[] = []
     store.subscribeChanges(() => {
@@ -441,7 +441,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(lateListenerEvents).toHaveLength(1)
   })
 
-  it('SOL-SWV2-046 a listener unsubscribing during fanout does not affect delivery to the rest of that same event', async () => {
+  it('a listener unsubscribing during fanout does not affect delivery to the rest of that same event', async () => {
     const store = memoryStorageHost()
     const order: string[] = []
     let unsubscribeSelf: (() => void) | undefined
@@ -459,7 +459,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(order).toEqual(['A', 'B', 'B'])
   })
 
-  it('SOL-SWV2-046 a listener that mutates the store during delivery is queued, not dispatched recursively: every listener sees event N before anyone sees event N+1', async () => {
+  it('a listener that mutates the store during delivery is queued, not dispatched recursively: every listener sees event N before anyone sees event N+1', async () => {
     const store = memoryStorageHost()
     const order: string[] = []
     let reentered = false
@@ -478,7 +478,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(order).toEqual(['A:1', 'B:1', 'A:2', 'B:2'])
   })
 
-  it('SOL-SWV2-046 a listener that always mutates on every event terminates via a bounded loop, not unbounded recursion', async () => {
+  it('a listener that always mutates on every event terminates via a bounded loop, not unbounded recursion', async () => {
     const store = memoryStorageHost()
     let calls = 0
     const limit = 50
@@ -491,10 +491,10 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(calls).toBe(limit)
   })
 
-  it('SWV2-B05 clearValues/clearBytes/clearRecords/clearAll each fire exactly one clear event on the right channel, when there is something to clear', async () => {
+  it('clearValues/clearBytes/clearRecords/clearAll each fire exactly one clear event on the right channel, when there is something to clear', async () => {
     const store = memoryStorageHost()
     // Each channel must hold something before its clear, or the clear is a no-op per
-    // SOL-SWV2-047 and must not publish (covered separately below).
+    // And must not publish (covered separately below).
     await store.set('k', 'v')
     await store.setBytes('b', new Uint8Array([1]))
     await store.putRecord({ x: 1 }, 'r')
@@ -519,7 +519,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     ])
   })
 
-  it('SOL-SWV2-047: clearing an already-empty channel, removing an absent value key, and deleting an absent record all publish nothing', async () => {
+  it('clearing an already-empty channel, removing an absent value key, and deleting an absent record all publish nothing', async () => {
     const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -534,7 +534,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(changes).toHaveLength(0)
   })
 
-  it('SWV2-E04/rollback-no-event: a write that fails (cross-channel conflict) must not publish a change', async () => {
+  it('/rollback-no-event: a write that fails (cross-channel conflict) must not publish a change', async () => {
     const store = memoryStorageHost()
     await store.set('shared', 'value')
     const changes: IStorageChange[] = []
@@ -580,7 +580,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     await expect(store.getRecord('shared')).resolves.toEqual({ x: 1 })
   })
 
-  it('SWV2-B05 batch one-event: a transaction publishes exactly one batch event for all its writes, and a rolled-back transaction publishes none', async () => {
+  it('batch one-event: a transaction publishes exactly one batch event for all its writes, and a rolled-back transaction publishes none', async () => {
     const store = memoryStorageHost()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -613,7 +613,7 @@ describe('memoryStorageHost change feed (SWV2-B05/R05/R16)', () => {
     expect(changes).toHaveLength(1)
   })
 
-  it('SWV2-E08 one listener throwing does not stop delivery to other listeners or break the write', async () => {
+  it('one listener throwing does not stop delivery to other listeners or break the write', async () => {
     const store = memoryStorageHost()
     const originalConsoleError = console.error
     const reported: unknown[] = []

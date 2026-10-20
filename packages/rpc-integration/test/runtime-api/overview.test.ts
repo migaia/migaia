@@ -21,7 +21,7 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../../../rpc-core/test/runtime-api/fixture.js'
 
 it.each([true, false])(
-  '[A71][A72] Peer detail reports the accepted remote generation or explicit unavailability (%s)',
+  'Peer detail reports the accepted remote generation or explicit unavailability (%s)',
   async (negotiated) => {
     /** Only the actual intersection decides whether the peer has a generation identity. */
     const capabilities = [
@@ -39,12 +39,12 @@ it.each([true, false])(
         assert.deepEqual(
           generation,
           accepted,
-          '[A71] local detail must retain the exact authenticated restart/session identity'
+          'local detail must retain the exact authenticated restart/session identity'
         )
       } else
         assert.ok(
           generation && Reflect.get(generation, 'status') === 'unavailable',
-          '[A72] missing generation proof is explicit, never omitted or inferred from unit attempts'
+          'missing generation proof is explicit, never omitted or inferred from unit attempts'
         )
     } finally {
       await fixture.close()
@@ -52,7 +52,7 @@ it.each([true, false])(
   }
 )
 
-it('[A24] describe projects local identity and connection facts without another request', async () => {
+it('describe projects local identity and connection facts without another request', async () => {
   /** Existing business works before the missing management projection is asserted. */
   const fixture = await connected({ alpha: () => 'alpha' }, { beta: () => 'beta' })
   try {
@@ -69,28 +69,20 @@ it('[A24] describe projects local identity and connection facts without another 
     }
     /** Query shape is asserted after the real original owner has fulfilled the call. */
     const detail = (await fixture.peers[0].describe()) as unknown as Record<string, unknown>
-    assert.deepEqual(
-      detail.identity,
-      fixture.peers[0].self,
-      '[A24] describe is a local safe detail'
-    )
-    assert.equal(sends, 0, '[A24] cold describe cannot send a hidden request')
+    assert.deepEqual(detail.identity, fixture.peers[0].self, 'describe is a local safe detail')
+    assert.equal(sends, 0, 'cold describe cannot send a hidden request')
     assert.deepEqual(
       (detail.connections as { identity: unknown }[])[0]!.identity,
       fixture.peers[1].self
     )
     assert.deepEqual(detail.provide, ['alpha'])
-    assert.deepEqual(
-      detail.methods,
-      ['alpha'],
-      '[A24][D17] local methods are names, not wire summaries'
-    )
+    assert.deepEqual(detail.methods, ['alpha'], 'local methods are names, not wire summaries')
   } finally {
     await fixture.close()
   }
 })
 
-it('[A27] genuine native departures retain only 100 safe records and never pollute another registration', async () => {
+it('genuine native departures retain only 100 safe records and never pollute another registration', async () => {
   /** The existing automatic fixture exercises the real Worker and native generation owners. */
   const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
   /** Each registration has its own execution budget and native resources. */
@@ -133,7 +125,7 @@ it('[A27] genuine native departures retain only 100 safe records and never pollu
     const initial = (await peers[0]!.describe()) as unknown as { recent: unknown[] }
     assert.ok(
       Array.isArray(initial.recent),
-      '[A27] describe must project the original bounded lifecycle history'
+      'describe must project the original bounded lifecycle history'
     )
     for (let index = 0; index < 105; index++) {
       /** The accepted channel id distinguishes actual endpoint preparation from launch completion. */
@@ -163,7 +155,7 @@ it('[A27] genuine native departures retain only 100 safe records and never pollu
     assert.equal(
       first.health.status,
       'unavailable',
-      '[A27] missing native health proof cannot become healthy'
+      'missing native health proof cannot become healthy'
     )
     /** Sampling timestamps may differ; the canonical state and stored lifecycle facts may not. */
     const repeated = (await peers[0]!.describe()) as unknown as typeof first
@@ -189,7 +181,7 @@ it('[A27] genuine native departures retain only 100 safe records and never pollu
   }
 }, 90_000)
 
-it('[A24] a real shared Host outlet lists two direct connections and its original safe identity', async () => {
+it('a real shared Host outlet lists two direct connections and its original safe identity', async () => {
   /** Three original Hosts retain their own lifecycle and exact shared-slot contributions. */
   const hosts = Array.from({ length: 3 }, () =>
     runtimeTestHost({
@@ -223,7 +215,7 @@ it('[A24] a real shared Host outlet lists two direct connections and its origina
     assert.equal(await hosts[0]!.thread!.request('connection-0', 'echo', 'ready'), 'ready')
     /** This business assertion runs after two real accepted connection receipts exist. */
     const list = (hosts[0]!.thread as unknown as Record<string, unknown>).list
-    assert.equal(typeof list, 'function', '[A24] the shared outlet must expose a local overview')
+    assert.equal(typeof list, 'function', 'the shared outlet must expose a local overview')
     /** No erased surface type or application-shaped Host participates in the query. */
     const overview = await (
       list as () => Promise<{ self: unknown; connections: { identity: unknown }[] }>
@@ -245,9 +237,9 @@ it('[A24] a real shared Host outlet lists two direct connections and its origina
   }
 })
 
-it('[A26] owner configuration and business failure secrets never enter any detail representation', async () => {
+it('owner configuration and business failure secrets never enter any detail representation', async () => {
   /** One marker covers source configuration and the actual native business error/cause. */
-  const marker = 'a26-private-owner-marker'
+  const marker = 'private-owner-marker'
   /** Custom supported channel sources may retain metadata that is not public runtime detail. */
   const channels = runtimeSources()
   /** The original local report keeps the full error, independently from safe query projection. */
@@ -286,7 +278,7 @@ it('[A26] owner configuration and business failure secrets never enter any detai
       assert.equal(
         typeof detail,
         format ? 'string' : 'object',
-        '[A26] formatting follows safe projection'
+        'formatting follows safe projection'
       )
       assert.equal(JSON.stringify(detail).includes(marker), false)
       assert.equal(JSON.stringify(detail).includes('"auth"'), false)

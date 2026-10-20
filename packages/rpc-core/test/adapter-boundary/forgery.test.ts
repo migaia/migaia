@@ -79,7 +79,7 @@ function foreignTransport(owned: IRpcTransport): IRpcTransport {
   } as IRpcTransport
 }
 
-describe('C3 public adapter resource boundaries', () => {
+describe('public adapter resource boundaries', () => {
   it('[C3-B1-registerBatchAgreement] constructs a qualified channel without qualifying its public copy', async () => {
     expectPrivateWriter('registerBatchAgreement')
     await withHeldChannel(async (channel) => {

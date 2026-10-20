@@ -5,8 +5,8 @@ import { getBackendReactiveController } from '../../src/backends/reactive-contro
 import { memoryStorageHost } from '../../src/backends/memory.js'
 import { safeJsonPayloadByteLength } from '../../src/utils/json.js'
 
-/** B04R causal probes for the shared lifecycle and JSON-domain owners. */
-describe('SWV4-B04R owner convergence', () => {
+/** Causal probes for the shared lifecycle and JSON-domain owners. */
+describe('owner convergence', () => {
   it('keeps one controller lease across publication until disposal drains', async () => {
     const store = memoryStorageHost()
     const controller = getBackendReactiveController(store)!

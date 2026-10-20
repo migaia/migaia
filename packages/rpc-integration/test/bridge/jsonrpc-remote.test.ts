@@ -36,7 +36,7 @@ function responder(description: unknown) {
 }
 
 describe('JSON-RPC remote assembly', () => {
-  it('[A3] rejects a missing describe extension through real Host preparation', async () => {
+  it('rejects a missing describe extension through real Host preparation', async () => {
     const fixture = bridgeFixture({
       responder: (message) =>
         message.method === 'migaia.describe'
@@ -76,7 +76,7 @@ describe('JSON-RPC remote assembly', () => {
     ])
     expect(fixture.closes).toBe(1)
   })
-  it('[A5] carries Host controls and their results through the real remote facade', async () => {
+  it('carries Host controls and their results through the real remote facade', async () => {
     const description = remoteDescription([BRIDGE_CONTRACT], 'peer', true)
     const entry = { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
     const fixture = bridgeFixture({
@@ -126,7 +126,7 @@ describe('JSON-RPC remote assembly', () => {
       await remote.release()
     }
   })
-  it('[A2/A5] gates real PluginHost preparation on one describe and carries the automatic key', async () => {
+  it('gates real PluginHost preparation on one describe and carries the automatic key', async () => {
     const fixture = bridgeFixture({ responder: responder(remoteDescription([BRIDGE_CONTRACT])) })
     const neutral = remoteHarness()
     const host = new PluginHost<Record<string, never>>({
@@ -193,7 +193,7 @@ describe('JSON-RPC remote assembly', () => {
     }
     expect(fixture.closes).toBe(1)
   })
-  it('[A2] does not settle hello or publish a channel before physical drain', async () => {
+  it('does not settle hello or publish a channel before physical drain', async () => {
     let drain!: () => void
     const draining = new Promise<void>((resolve) => {
       drain = resolve
@@ -231,7 +231,7 @@ describe('JSON-RPC remote assembly', () => {
       'JSONRPC_UNSUPPORTED_MODE'
     ]
   ])(
-    '[A3] rolls back real PluginHost before publishing a %s description',
+    'rolls back real PluginHost before publishing a %s description',
     async (_kind, description, code) => {
       const fixture = bridgeFixture({
         responder: responder(remoteDescription([description as typeof BRIDGE_CONTRACT]))
@@ -289,7 +289,7 @@ describe('JSON-RPC remote assembly', () => {
       ),
       'JSONRPC_UNSUPPORTED_MODE'
     ]
-  ])('[A3] validates the Host v2 directory: %s', async (_kind, description, code) => {
+  ])('validates the Host v2 directory: %s', async (_kind, description, code) => {
     const fixture = bridgeFixture({ responder: responder(description) })
     const neutral = remoteHarness()
     const remote = createRemoteHost({

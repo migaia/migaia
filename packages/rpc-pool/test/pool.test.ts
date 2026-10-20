@@ -133,7 +133,7 @@ beforeEach(() => {
 })
 
 describe('public pool scheduling', () => {
-  it('[POOL-T01] dispatches least-in-flight FIFO with rotating ties and lazy stream slots', async () => {
+  it('dispatches least-in-flight FIFO with rotating ties and lazy stream slots', async () => {
     /** All business completion points remain with the mocked public Peers. */
     const fixture = installFactory()
     /** Two distinct factory results provide exactly two client scheduling slots. */
@@ -195,7 +195,7 @@ describe('public pool scheduling', () => {
     await pool.close()
   })
 
-  it('[POOL-T03] drains accepted request/notify/stream and retires only resize/idle differences', async () => {
+  it('drains accepted request/notify/stream and retires only resize/idle differences', async () => {
     /** Separate sends and iterators make close's three completion boundaries observable. */
     const fixture = installFactory()
     const pool = await createThreadPool<IFixtureApi>({ spawn, size: 2 })
@@ -329,7 +329,7 @@ describe('public pool scheduling', () => {
     expect((failure as AggregateError).errors).toEqual(failures)
   })
 
-  it('[POOL-T04] rejects overflow/new closed work and validates before native acquisition', async () => {
+  it('rejects overflow/new closed work and validates before native acquisition', async () => {
     const fixture = installFactory()
     const pool = await createThreadPool<IFixtureApi>({ spawn, size: 1, maxQueue: 1 })
     const active = pool.request('hold', 1)
@@ -394,7 +394,7 @@ describe('public pool scheduling', () => {
     }
   })
 
-  it('[POOL-T05] removes queued cancellation and passes active options/errors to the Peer unchanged', async () => {
+  it('removes queued cancellation and passes active options/errors to the Peer unchanged', async () => {
     const fixture = installFactory()
     const pool = await createThreadPool<IFixtureApi>({ spawn, size: 1, maxQueue: 2 })
     const activeController = new AbortController()
@@ -479,7 +479,7 @@ describe('public pool scheduling', () => {
   })
 })
 
-describe('SD-T03 pool scheduler ownership', () => {
+describe('pool scheduler ownership', () => {
   it('captures the idle clock once, unrefs its tasks and cancels them on reserve/close', async () => {
     /** The existing public factory port keeps native Peer ownership observable. */
     const { members } = installFactory()

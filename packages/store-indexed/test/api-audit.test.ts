@@ -4,7 +4,7 @@ import { createRuntime } from '@migaia/reactive'
 import { ObservableMap, ObservableSet, ObservableArray, ObservableObject } from '../src/index.js'
 
 describe('store-indexed audit regressions', () => {
-  it('SI-D01 invalidates all Map iteration views when insertion order changes', () => {
+  it('invalidates all Map iteration views when insertion order changes', () => {
     /** Actual graph nodes derive every public insertion-order view. */
     const runtime = createRuntime()
     /** Same keys and values, different order, is a supported replace. */
@@ -49,7 +49,7 @@ describe('store-indexed audit regressions', () => {
     map.dispose()
   })
 
-  it('SI-D01 invalidates Set iteration and snapshot views when insertion order changes', () => {
+  it('invalidates Set iteration and snapshot views when insertion order changes', () => {
     /** A real Runtime owns both the collection and tracked readers. */
     const runtime = createRuntime()
     /** Native Set iteration order is part of both public projections. */
@@ -68,7 +68,7 @@ describe('store-indexed audit regressions', () => {
     values.dispose()
     set.dispose()
   })
-  it('SI-D02 rejects the same invalid JavaScript Map entry at construction and replacement', () => {
+  it('rejects the same invalid JavaScript Map entry at construction and replacement', () => {
     /** Native Map entry admission must run before collection ownership is established. */
     expect(() => Reflect.construct(ObservableMap, [['ab']])).toThrow(
       expect.objectContaining({ source: '@migaia/store-indexed', code: 'INVALID_OPTION' })
@@ -83,7 +83,7 @@ describe('store-indexed audit regressions', () => {
   })
 
   it.each(['guard', 'updater'] as const)(
-    'SI-D03 identifies native %s failure without committing the outer mutation',
+    'identifies native %s failure without committing the outer mutation',
     (kind) => {
       /** The callback owns its original native TypeError, message and stack. */
       const primary = new TypeError('application callback failed')
@@ -115,7 +115,7 @@ describe('store-indexed audit regressions', () => {
     }
   )
 
-  it('SI-D04 publishes array cells and revision as one synchronous batch', () => {
+  it('publishes array cells and revision as one synchronous batch', () => {
     /** The documented scheduler can flush effects synchronously. */
     const runtime = createRuntime({ schedulerStrategy: (flush) => flush() })
     /** Both public views must describe the same committed array. */
@@ -136,7 +136,7 @@ describe('store-indexed audit regressions', () => {
     effect.dispose()
     array.dispose()
   })
-  it('SI-D03 preserves an already coded foreign guard failure', () => {
+  it('preserves an already coded foreign guard failure', () => {
     /** Use the dependency's public native cancellation error, not a fabricated identity. */
     const primary = new UtilsAbortError('application cancellation')
     /** The collection must not relabel its guard's actual owner. */
@@ -153,7 +153,7 @@ describe('store-indexed audit regressions', () => {
     object.dispose()
   })
 
-  it('SI-D03 retains a frozen native updater failure on the coded cause', () => {
+  it('retains a frozen native updater failure on the coded cause', () => {
     /** Frozen native errors cannot accept identity properties. */
     const primary = Object.freeze(new TypeError('frozen updater failed'))
     /** Failure precedes the collection's commit boundary. */

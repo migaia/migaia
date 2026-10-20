@@ -90,7 +90,7 @@ function hostPort(result: IPluginRemoval | Error) {
 }
 
 describe('process resilience committed liquidation', () => {
-  it('[A7] uses only the committed affected plan and starts one dependent diagnostic', async () => {
+  it('uses only the committed affected plan and starts one dependent diagnostic', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const source = terminalSource((error) => reports.push(error))
@@ -127,7 +127,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] treats post-removal errors as committed and retains each cleanup failure', async () => {
+  it('treats post-removal errors as committed and retains each cleanup failure', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const source = terminalSource((error) => reports.push(error))
@@ -162,7 +162,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] leaves pre-commit rejection terminal without a tombstone or retry mutation', async () => {
+  it('leaves pre-commit rejection terminal without a tombstone or retry mutation', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const source = terminalSource((error) => reports.push(error))
@@ -190,7 +190,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] standalone release never reads a Host plan and fails without a tombstone', async () => {
+  it('standalone release never reads a Host plan and fails without a tombstone', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const source = terminalSource((error) => reports.push(error))
@@ -215,7 +215,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] cascade releases actual dependants without starting diagnostic timers', async () => {
+  it('cascade releases actual dependants without starting diagnostic timers', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []
     const source = terminalSource((error) => reports.push(error))
@@ -242,7 +242,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] autonomously retains only the newest 100 committed tombstones', async () => {
+  it('autonomously retains only the newest 100 committed tombstones', async () => {
     const scheduler = createManualScheduler()
     const resilience = createProcessResilience({
       scheduler,
@@ -268,7 +268,7 @@ describe('process resilience committed liquidation', () => {
     await resilience.close()
   })
 
-  it('[A7] a liquidated handle cannot remove a replacement registration', async () => {
+  it('a liquidated handle cannot remove a replacement registration', async () => {
     /** Both generations use the governor's original monotonic report schedule. */
     const scheduler = createManualScheduler()
     /** Automatic retirement leaves only a bounded diagnostic entry in the owner. */

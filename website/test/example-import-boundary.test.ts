@@ -93,7 +93,7 @@ function namedRootImports(code: string): readonly {
   }))
 }
 
-test('SITE-T-EXAMPLE-IMPORTS uses the narrowest public subpath for documented symbols', () => {
+test('uses the narrowest public subpath for documented symbols', () => {
   const manifest = exampleImportManifest as IManifest
 
   const violations: string[] = []
@@ -108,7 +108,7 @@ test('SITE-T-EXAMPLE-IMPORTS uses the narrowest public subpath for documented sy
   assert.deepEqual(violations, [])
 })
 
-test('SITE-T-EXAMPLE-IMPORTS splits mixed root imports and resolves public entries', () => {
+test('splits mixed root imports and resolves public entries', () => {
   const lifecycle = normalizeExampleImports(
     "import { createLifecycleScope, createGenerationController, boundedWait } from '@migaia/lifecycle'"
   )

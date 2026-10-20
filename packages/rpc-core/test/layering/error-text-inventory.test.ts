@@ -6,7 +6,7 @@ import { RpcCoreErrorText } from '../../dist/core/error-text.js'
 import { RpcAbortError, RpcTimeoutError } from '../../dist/core/errors.js'
 
 describe('error text inventory', () => {
-  it('[A2] preserves every core error text from the pre-migration inventory', () => {
+  it('preserves every core error text from the pre-migration inventory', () => {
     expect(RpcAdapterErrorText.rpcMemoryTransportIsClosed, 'rpcMemoryTransportIsClosed').toBe(
       '[rpc] memory transport is closed'
     )
@@ -347,7 +347,7 @@ describe('error text inventory', () => {
     )
     expect(RpcAdapterErrorText.workerFailure('x', 'x'), 'workerFailure').toBe('[rpc] worker x: x')
   })
-  it('[A2] keeps native cancellation and timeout default messages unchanged', () => {
+  it('keeps native cancellation and timeout default messages unchanged', () => {
     expect(new RpcAbortError().message).toBe('Web RPC request cancelled')
     expect(new RpcTimeoutError().message).toBe('Web RPC request deadline exceeded')
   })

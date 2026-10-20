@@ -21,7 +21,7 @@ const capabilities = [
 ]
 
 it.each(['signal', 'deadline'] as const)(
-  '[A56][A59] order-only stream %s settles locally before outstanding provider cleanup',
+  'order-only stream %s settles locally before outstanding provider cleanup',
   async (control) => {
     /** A real async generator keeps its outstanding next and return queued on business work. */
     let release!: () => void
@@ -86,7 +86,7 @@ it.each(['signal', 'deadline'] as const)(
       await vi.waitFor(() => assert.deepEqual(effects, ['started']), { interval: 5 })
       if (control === 'signal') controller.abort(reason)
       await vi.waitFor(
-        () => assert.equal(settled, true, '[A56] cancellation cannot wait for business cleanup'),
+        () => assert.equal(settled, true, 'cancellation cannot wait for business cleanup'),
         { timeout: 250, interval: 5 }
       )
       const terminal = await next
@@ -99,7 +99,7 @@ it.each(['signal', 'deadline'] as const)(
         )
       assert.equal(consumers.size, 0)
       await vi.waitFor(() => assert.equal(providerSignal!.aborted, true), { interval: 5 })
-      assert.equal(providers.size, 1, '[A59] local cancellation cannot release remote cleanup')
+      assert.equal(providers.size, 1, 'local cancellation cannot release remote cleanup')
       follower = fixture.peers[0].request('after', undefined, { orderKey: 'held-cleanup' })
       void follower.catch(() => undefined)
       assert.deepEqual(effects, ['started'])

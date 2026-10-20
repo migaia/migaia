@@ -10,7 +10,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 30; index++) await Promise.resolve()
 }
 
-describe('A12 coroutine profile', () => {
+describe('coroutine profile', () => {
   it('classifies fulfilled and rejected task settlement', async () => {
     const scheduler = createManualScheduler()
     const done = deferred<void>()

@@ -35,7 +35,7 @@ export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKe
   readonly onChange: (change?: IStorageChange) => void
 }
 
-/** Reactive consistency and optional D79 source hook retained in private feature metadata. */
+/** Reactive consistency and optional source hook retained in private feature metadata. */
 export type IStorageReactiveVisibility =
   | 'instance'
   | 'document-eventual'
@@ -43,7 +43,7 @@ export type IStorageReactiveVisibility =
   | 'origin-js-visible-eventual'
   | 'origin-eventual'
 
-/** Reactive consistency and optional D79 source hook retained in private feature metadata. */
+/** Reactive consistency and optional source hook retained in private feature metadata. */
 export type IStorageReactiveFeatureMetadata<TStore extends IKeyValueStore = IKeyValueStore> = {
   readonly mode: 'push' | 'hybrid' | 'polling'
   readonly visibility: IStorageReactiveVisibility

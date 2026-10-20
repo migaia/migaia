@@ -31,7 +31,7 @@ export type ISyncLifecycleScope = {
   own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T
   release(resource: unknown): boolean
   close(): void
-  /** Always synchronous — this is the whole reason this type exists (D-6). */
+  /** Always synchronous — this is the whole reason this type exists. */
   dispose(): readonly ICollectedError[]
   /** Releases the scope synchronously for `using`, discarding the collected-error result. */
   [Symbol.dispose](): void
@@ -40,7 +40,7 @@ export type ISyncLifecycleScope = {
 /**
  * The `syncSafe`-only scope. Exists so a scope that owns nothing but reactive-graph-style nodes can
  * offer a real, deterministic `[Symbol.dispose]` instead of the general `LifecycleScope`'s
- * always-async `[Symbol.asyncDispose]` (D-6).
+ * always-async `[Symbol.asyncDispose]`.
  */
 export function createSyncLifecycleScope(
   options: ISyncLifecycleScopeOptions = {}
@@ -49,7 +49,7 @@ export function createSyncLifecycleScope(
   const errorPolicy = options.errorPolicy ?? 'throw'
   assertErrorPolicyReporter(errorPolicy, options.report)
   const terminal = createTerminalController()
-  /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
+  /** Live owned resources in registration order with O(1) release lookup. */
   const entries = createOwnedEntryList<{
     readonly resource: unknown
     readonly source: string

@@ -87,7 +87,7 @@ class TestBroadcastChannel {
 }
 
 describe('indexedDbHost backend', () => {
-  it('SWV2-T43 record mutations advance global epoch and invalidate open transactions', async () => {
+  it('record mutations advance global epoch and invalidate open transactions', async () => {
     const store = freshDb()
     await store.putRecord({ value: 'first' }, 'first')
     const pending = store.transaction(async (tx) => {
@@ -100,7 +100,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T39 inventories every public mutation route before native enablement', async () => {
+  it('inventories every public mutation route before native enablement', async () => {
     const store = freshDb()
     const requiredRoutes = [
       'putRecord',
@@ -176,7 +176,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R06 resumes from canonical phase into bounded legacy phase', async () => {
+  it('resumes from canonical phase into bounded legacy phase', async () => {
     const store = freshDb()
     await store.putRecord({ value: 1 }, composeRepositoryKey('phased', 'canonical'))
     await store.putRecord({ value: 2 }, ['phased', 'legacy'])
@@ -239,7 +239,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T34 rejects foreign owners and refuses forged completion checkpoints', async () => {
+  it('rejects foreign owners and refuses forged completion checkpoints', async () => {
     const store = freshDb()
     await store.putRecord({ value: 1 }, 'record-1')
     const handle = await store.ensureRecordIndexes('users', [
@@ -281,7 +281,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T34 validates lease options and completes an issued empty batch', async () => {
+  it('validates lease options and completes an issued empty batch', async () => {
     const store = freshDb()
     const handle = await store.ensureRecordIndexes('empty', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
@@ -328,7 +328,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-063 preserves one exact nonterminal retry and rejects successor or altered replays', async () => {
+  it('preserves one exact nonterminal retry and rejects successor or altered replays', async () => {
     const store = freshDb()
     await store.putRecord({ value: 1 }, 'record-1')
     await store.putRecord({ value: 2 }, 'record-2')
@@ -375,7 +375,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-064 classifies terminal reopen as stale rather than fallback contention', async () => {
+  it('classifies terminal reopen as stale rather than fallback contention', async () => {
     const store = freshDb()
     const handle = await store.ensureRecordIndexes('terminal-reopen', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
@@ -402,7 +402,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-062 keeps takeover observations local to one IndexedDB context', async () => {
+  it('keeps takeover observations local to one IndexedDB context', async () => {
     const factory = new IDBFactory()
     const dbName = `restart-lease-${Math.random().toString(36).slice(2)}`
     const ownerStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
@@ -495,7 +495,7 @@ describe('indexedDbHost backend', () => {
     }
   })
 
-  it('SWV4-R07-004 keeps hostile scopes out of private generation tokens', async () => {
+  it('keeps hostile scopes out of private generation tokens', async () => {
     const factory = freshFactory()
     const dbName = 'indexed-generation-hostile-scope'
     const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
@@ -539,7 +539,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-R07-004 rotates malformed persisted generations once and rejects old handles', async () => {
+  it('rotates malformed persisted generations once and rejects old handles', async () => {
     const factory = freshFactory()
     const dbName = 'indexed-generation-recovery'
     const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
@@ -833,7 +833,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it.each(['clearRecords', 'clearAll'] as const)(
-    'SWV2-D27 %s atomically wipes the sidecar and every scope index handle, so an old complete handle becomes stale',
+    '%s atomically wipes the sidecar and every scope index handle, so an old complete handle becomes stale',
     async (operation) => {
       const store = freshDb()
       const indexed = store as unknown as {
@@ -924,7 +924,7 @@ describe('indexedDbHost backend', () => {
     iterateRecordIndex: (query: unknown) => AsyncIterableIterator<[IStorageKey, { value: number }]>
   }
 
-  it('SWV4-R28 rejects nested undefined in the raw backfill budget before sidecar writes', async () => {
+  it('rejects nested undefined in the raw backfill budget before sidecar writes', async () => {
     const store = freshDb()
     const scope = 'raw-nested-undefined'
     await store.putRecord({ payload: { nested: undefined } }, composeRepositoryKey(scope, 'id-0'))
@@ -955,8 +955,8 @@ describe('indexedDbHost backend', () => {
    * Registers scope's `value` index and drives it to `complete` over seed records written at the
    * scope's own canonical entity key shape (`composeRepositoryKey`) — the physical format entity
    * repository records actually use. Seeding through plain/foreign-shaped keys would itself be an
-   * "unclassifiable" raw write under SWV2-D27 and would conservatively downgrade every
-   * already-registered scope while building the next one.
+   * "unclassifiable" raw write and would conservatively downgrade every already-registered scope
+   * while building the next one.
    */
   const buildCompleteIndex = async (
     store: ReturnType<typeof freshDb>,
@@ -1003,7 +1003,7 @@ describe('indexedDbHost backend', () => {
     }
   }
 
-  it('SOL-SWV2-061 resumes from a durable checkpoint on the next immediate query', async () => {
+  it('resumes from a durable checkpoint on the next immediate query', async () => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord({ value: 1 }, composeRepositoryKey('resume', 'id-0'))
@@ -1061,7 +1061,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-061 enforces the decoded backfill page cap and rejects late release writes', async () => {
+  it('enforces the decoded backfill page cap and rejects late release writes', async () => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord(
@@ -1087,7 +1087,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-E28 rejects two-item aggregate decoded overflow before issuing a partial page', async () => {
+  it('rejects two-item aggregate decoded overflow before issuing a partial page', async () => {
     const store = freshDb()
     const scope = 'decoded-aggregate-cap'
     await store.putRecord({ value: 1 }, composeRepositoryKey(scope, 'id-0'))
@@ -1119,7 +1119,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV4-E28 accounts the exact persisted tuple and accepts its byte boundary', async () => {
+  it('accounts the exact persisted tuple and accepts its byte boundary', async () => {
     const store = freshDb()
     const scope = 's'.repeat(120)
     const indexName = 'i'.repeat(120)
@@ -1178,7 +1178,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-061 rejects a preparation that settles after session release', async () => {
+  it('rejects a preparation that settles after session release', async () => {
     const store = freshDb()
     await store.putRecord({ value: 'pending' }, composeRepositoryKey('late-release', 'id-0'))
     const handle = await store.ensureRecordIndexes('late-release', [
@@ -1211,7 +1211,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-061 reports abort and expired lease-renew failures without metadata completion', async () => {
+  it('reports abort and expired lease-renew failures without metadata completion', async () => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord({ value: 1 }, composeRepositoryKey('failure', 'id-0'))
@@ -1251,7 +1251,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it.each(['putRecord', 'deleteRecord'] as const)(
-    'SWV2-D27 raw %s on a canonical entity key downgrades only that scope’s index, not other scopes',
+    'raw %s on a canonical entity key downgrades only that scope’s index, not other scopes',
     async (operation) => {
       const store = freshDb()
       const usersHandle = await buildCompleteIndex(store, 'users', [
@@ -1272,8 +1272,8 @@ describe('indexedDbHost backend', () => {
         await store.deleteRecord(canonicalKey)
       }
 
-      // The scope the raw key structurally belongs to must fail closed (D27's "为该 scope 创建新
-      // pending generation"); an unrelated scope must be left alone (D27 does not license a
+      // The scope the raw key structurally belongs to must fail closed ("为该 scope 创建新
+      // pending generation"); an unrelated scope must be left alone (the rule does not license a
       // conservative full-store rotation when the mutation is classifiable).
       await expect(isIndexQueryable(store, usersHandle)).resolves.toBe(false)
       await expect(isIndexQueryable(store, postsHandle)).resolves.toBe(true)
@@ -1294,7 +1294,7 @@ describe('indexedDbHost backend', () => {
   )
 
   it.each(['putRecord', 'deleteRecord'] as const)(
-    'SWV2-D27 raw %s on a legacy-shaped key conservatively invalidates every scope',
+    'raw %s on a legacy-shaped key conservatively invalidates every scope',
     async (operation) => {
       const store = freshDb()
       const usersHandle = await buildCompleteIndex(store, 'users', [
@@ -1321,7 +1321,7 @@ describe('indexedDbHost backend', () => {
     ['date', new Date('2024-01-01T00:00:00.000Z')] as const,
     ['binary', new Uint8Array([1, 2, 3]).buffer] as const,
     ['compound', ['legacy-scope', 'legacy-id'] as const]
-  ])('SOL-SWV2-060/061 rotates all non-canonical raw key domains (%s)', async (_label, rawKey) => {
+  ])('/061 rotates all non-canonical raw key domains (%s)', async (_label, rawKey) => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     const oldHandle = await buildCompleteIndex(store, 'raw-domain', [['seed', 1]])
@@ -1350,7 +1350,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-061 aborts a raw mutation transaction without rotating the complete generation', async () => {
+  it('aborts a raw mutation transaction without rotating the complete generation', async () => {
     const store = freshDb()
     const oldHandle = await buildCompleteIndex(store, 'rollback', [['seed', 1]])
     const failure = new Error('transaction rollback')
@@ -1364,7 +1364,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-040 a raw canonical write to an already-scanned key mid-backfill must never let the index report complete', async () => {
+  it('a raw canonical write to an already-scanned key mid-backfill must never let the index report complete', async () => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord({ value: 1 }, composeRepositoryKey('users', 'id-0'))
@@ -1380,7 +1380,7 @@ describe('indexedDbHost backend', () => {
     expect(batch.candidates).toHaveLength(3)
 
     // The raw write lands on an already-scanned canonical key, after `readBatch` already
-    // captured id-0's old revision/value — the exact SOL-SWV2-040 scenario.
+    // captured id-0's old revision/value — the exact stale-revision scenario.
     await store.putRecord({ value: 999 }, composeRepositoryKey('users', 'id-0'))
 
     await expect(
@@ -1398,7 +1398,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-040 a raw canonical write landing between two batch commits (on an already-committed key) must also block completion', async () => {
+  it('a raw canonical write landing between two batch commits (on an already-committed key) must also block completion', async () => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord({ value: 1 }, composeRepositoryKey('users', 'id-0'))
@@ -1444,7 +1444,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SOL-SWV2-042 after a stale-skipped scan reaches its natural end, a later fresh full re-scan with no further raw writes can still reach complete', async () => {
+  it('after a stale-skipped scan reaches its natural end, a later fresh full re-scan with no further raw writes can still reach complete', async () => {
     const store = freshDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord({ value: 1 }, composeRepositoryKey('recover', 'id-0'))
@@ -1456,7 +1456,7 @@ describe('indexedDbHost backend', () => {
     const scopeRange = { range: repositoryEntityRange('recover'), allowComplete: true }
 
     // First attempt: a raw write interleaves, so this scan must not reach `complete` (same
-    // mechanism as the other SOL-SWV2-040 fixtures above).
+    // mechanism as the other stale-revision fixtures above).
     const staleLeaseMs = 5_000
     const firstSession = await capability.openBackfillSession(handle, {
       ...scopeRange,
@@ -1696,7 +1696,7 @@ describe('indexedDbHost backend', () => {
     database.close()
   })
 
-  it('SWV2-T07 schema v3 creates one fixed sidecar store with lookup and record indexes', async () => {
+  it('schema v3 creates one fixed sidecar store with lookup and record indexes', async () => {
     const factory = freshFactory()
     const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName: 'sidecar-schema-v3' })
     await store.get('probe')
@@ -1721,7 +1721,7 @@ describe('indexedDbHost backend', () => {
     database.close()
   })
 
-  it('SWV2-T07 upgrades v2 stores once and preserves authoritative record/bytes values', async () => {
+  it('upgrades v2 stores once and preserves authoritative record/bytes values', async () => {
     const factory = freshFactory()
     const dbName = 'sidecar-v2-upgrade'
     const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -1760,7 +1760,7 @@ describe('indexedDbHost backend', () => {
     upgraded.close()
   })
 
-  it('SWV2-T07 logical index definitions do not trigger another database upgrade', async () => {
+  it('logical index definitions do not trigger another database upgrade', async () => {
     const factory = freshFactory()
     const dbName = 'logical-index-no-upgrade'
     const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
@@ -1781,7 +1781,7 @@ describe('indexedDbHost backend', () => {
     database.close()
   })
 
-  it('SWV2-T09 indexed put atomically replaces sidecar projection and increments revision', async () => {
+  it('indexed put atomically replaces sidecar projection and increments revision', async () => {
     const factory = freshFactory()
     const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName: 'indexed-put' })
     const indexed = store as unknown as {
@@ -1831,7 +1831,7 @@ describe('indexedDbHost backend', () => {
     database.close()
   })
 
-  it('SWV2-T09/T11 indexed planner rolls back unique conflicts and atomically deletes rows', async () => {
+  it('indexed planner rolls back unique conflicts and atomically deletes rows', async () => {
     const store = freshDb()
     const handle = await store.ensureRecordIndexes('unique-users', [
       { name: 'email', unique: true, multiEntry: false, revision: 1 }
@@ -1872,7 +1872,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T18 reports orphan sidecar rows and excludes them from results', async () => {
+  it('reports orphan sidecar rows and excludes them from results', async () => {
     const factory = freshFactory()
     const dbName = 'indexed-orphan-report'
     const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
@@ -1938,7 +1938,7 @@ describe('indexedDbHost backend', () => {
     }
   })
 
-  it('SWV2-T42 pages a native index in bounded transactions across both directions', async () => {
+  it('pages a native index in bounded transactions across both directions', async () => {
     const store = freshDb()
     const total = 70
     for (let index = 0; index < total; index += 1)
@@ -2001,7 +2001,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T42 pages a non-unique index whose duplicate group straddles the page boundary in both directions without loss or duplication', async () => {
+  it('pages a non-unique index whose duplicate group straddles the page boundary in both directions without loss or duplication', async () => {
     const store = freshDb()
     /**
      * 50 unique-low + 20 tied (value 50) + 50 unique-high records. Forward order consumes 50 low +
@@ -2088,7 +2088,7 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('SWV2-T42 pages a tie group larger than the page size with O(pageSize) cursor steps, not a quadratic re-walk', async () => {
+  it('pages a tie group larger than the page size with O(pageSize) cursor steps, not a quadratic re-walk', async () => {
     const store = freshDb()
     // Exceeds `INDEX_QUERY_PAGE_SIZE` (64, so the group spans multiple pages) while staying under
     // the backfill session's own default batch cap (128), so a single `readBatch` covers it.
@@ -2201,7 +2201,7 @@ describe('indexedDbHost backend', () => {
     database.close()
   })
 
-  it('SOL-SWV2-035 clearRecords 不得清除 legacy migration checkpoint，reopen 后已清除的 legacy record 不得复活', async () => {
+  it('clearRecords 不得清除 legacy migration checkpoint，reopen 后已清除的 legacy record 不得复活', async () => {
     const factory = freshFactory()
     const dbName = 'documents-clear-no-resurrection'
     const legacyDb = await new Promise<IDBDatabase>((resolve) => {
@@ -2246,7 +2246,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it.each(['clearRecords', 'clearAll'] as const)(
-    'SOL-SWV2-036/037 %s 保留 public metadata，清空 per-record revisions 但保留 global epoch',
+    '%s 保留 public metadata，清空 per-record revisions 但保留 global epoch',
     async (operation) => {
       const factory = freshFactory()
       const dbName = `clear-scope-${operation}`
@@ -2262,7 +2262,7 @@ describe('indexedDbHost backend', () => {
       await expect(store.getRecord('record-1')).resolves.toBeUndefined()
       await store.dispose()
 
-      // §4.4 requires per-record/per-scope revisions to be cleared, not just the record itself —
+      // Per-record/per-scope revisions to be cleared, not just the record itself —
       // only the global epoch counter may survive.
       const database = await new Promise<IDBDatabase>((resolve) => {
         const request = factory.open(dbName)
@@ -3478,8 +3478,8 @@ describe('indexedDbHost backend', () => {
   })
 })
 
-describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll only)', () => {
-  it('SWV2-I05 putRecord/deleteRecord/clearRecords/clearAll each fire exactly one correctly-typed post-commit event', async () => {
+describe('indexedDbHost backend change feed (record channel + clearAll only)', () => {
+  it('putRecord/deleteRecord/clearRecords/clearAll each fire exactly one correctly-typed post-commit event', async () => {
     const store = freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3511,7 +3511,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('SOL-SWV2-047 a no-op deleteRecord/clearRecords/clearAll (nothing to remove/clear) publishes nothing', async () => {
+  it('a no-op deleteRecord/clearRecords/clearAll (nothing to remove/clear) publishes nothing', async () => {
     const store = freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3606,7 +3606,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await second.dispose()
   })
 
-  it('SOL-SWV2-050 a conflictPolicy:"replace" write that silently evicts an existing record publishes that record\'s own remove event, matching the memory backend', async () => {
+  it('a conflictPolicy:"replace" write that silently evicts an existing record publishes that record\'s own remove event, matching the memory backend', async () => {
     const store = freshDb()
     await store.putRecord({ x: 1 }, 'shared')
     const changes: IStorageChange[] = []
@@ -3624,7 +3624,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('SOL-SWV2-050 transaction() publishes exactly one batch event for the records it actually commits, and none for a rolled-back or read-only transaction', async () => {
+  it('transaction() publishes exactly one batch event for the records it actually commits, and none for a rolled-back or read-only transaction', async () => {
     const store = freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3656,7 +3656,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('SOL-SWV2-053 the legacy documents→records migration publishes a batch event for the records it actually copies', async () => {
+  it('the legacy documents→records migration publishes a batch event for the records it actually copies', async () => {
     const factory = freshFactory()
     const dbName = 'change-feed-legacy-migration'
     const legacyDb = await new Promise<IDBDatabase>((resolve) => {
@@ -3686,7 +3686,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('SOL-SWV2-053 a database with no legacy documents store publishes no migration event', async () => {
+  it('a database with no legacy documents store publishes no migration event', async () => {
     const store = freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3696,7 +3696,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('SOL-SWV2-050 (planner) transactionIndexed/putIndexedRecord publish exactly one batch event for the records they actually commit, and none on unique-conflict rollback', async () => {
+  it('(planner) transactionIndexed/putIndexedRecord publish exactly one batch event for the records they actually commit, and none on unique-conflict rollback', async () => {
     const store = freshDb()
     const handle = await store.ensureRecordIndexes('idx-users', [
       { name: 'email', unique: true, multiEntry: false, revision: 1 }
@@ -3738,7 +3738,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('SOL-SWV2-055 the local feed publishes value/bytes routes reached through the writeTo helper (remove/clearValues/clearBytes), not just literal object-store calls — capability flag is asserted separately by SOL-SWV2-056', async () => {
+  it('the local feed publishes value/bytes routes reached through the writeTo helper (remove/clearValues/clearBytes), not just literal object-store calls — capability flag is asserted separately', async () => {
     const store = freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3749,13 +3749,13 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     // remove(): reached via `writeTo(kvStoreName, (store) => store.delete(key), ...)` — the exact
     // helper-routed shape a `objectStore(kvStoreName).delete(...)` grep cannot see.
     await store.remove('k')
-    // SOL-SWV2-047: a no-op remove (key already gone) must not publish.
+    // A no-op remove (key already gone) must not publish.
     await store.remove('k')
     await store.set('k2', 'v2')
     // clearValues()/clearBytes(): also reached via the same `writeTo` helper.
     await store.clearValues()
     await store.clearBytes()
-    // SOL-SWV2-047: a no-op clear (store already empty) must not publish.
+    // A no-op clear (store already empty) must not publish.
     await store.clearValues()
 
     expect(changes.map((c) => `${c.channel}:${c.kind}`)).toEqual([
@@ -3769,7 +3769,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it("SOL-SWV2-055 a `replace`-policy write evicts the other channel and publishes that channel's own remove, not just the attempted channel's put", async () => {
+  it("a `replace`-policy write evicts the other channel and publishes that channel's own remove, not just the attempted channel's put", async () => {
     const store = freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3789,7 +3789,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it("SOL-SWV2-055 `transaction()` evicting a value/bytes entry stays silent on its own, matching the memory backend's emitEvent:false parity — the eviction is not double-reported outside the batch event", async () => {
+  it("`transaction()` evicting a value/bytes entry stays silent on its own, matching the memory backend's emitEvent:false parity — the eviction is not double-reported outside the batch event", async () => {
     const store = freshDb()
     await store.set('shared', 'v1')
     const changes: IStorageChange[] = []
@@ -3806,7 +3806,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await store.dispose()
   })
 
-  it('R09 injected factories keep public changeFeed false while same-page handles retain private coordination', async () => {
+  it('injected factories keep public changeFeed false while same-page handles retain private coordination', async () => {
     const factory = freshFactory()
     const dbName = `shared-${Math.random().toString(36).slice(2)}`
     const writer = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
@@ -3831,7 +3831,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     await reader.dispose()
   })
 
-  it('R09 admits realm-default BroadcastChannel coordination with metadata-only validation and refcount cleanup', async () => {
+  it('admits realm-default BroadcastChannel coordination with metadata-only validation and refcount cleanup', async () => {
     const factory = freshFactory()
     const dbName = `r09-wire-${Math.random().toString(36).slice(2)}`
     const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
@@ -3960,7 +3960,7 @@ describe('indexedDbHost backend change feed (SWV2-B05, record channel + clearAll
     }
   })
 
-  it('R09 snapshots platform getters once, opens no database, and fails closed without transport', async () => {
+  it('snapshots platform getters once, opens no database, and fails closed without transport', async () => {
     const factory = freshFactory()
     const dbName = `r09-admission-${Math.random().toString(36).slice(2)}`
     const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')

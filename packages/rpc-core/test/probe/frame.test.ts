@@ -90,7 +90,7 @@ function observedSender(options: {
   readonly capture?: readonly IRpcProbeStageName[]
   readonly redact?: (stage: RpcProbeStage, content: unknown) => unknown
 }) {
-  /** Explicit snapshotProbeEvent is SC9(c), required when retaining the reusable view in a test. */
+  /** Explicit snapshotProbeEvent is required when retaining the reusable view in a test. */
   const probe = defineProbe({
     stages: ['envelope', 'encoded', 'frame', 'protected'],
     capture: options.capture,
@@ -123,8 +123,8 @@ function observedSender(options: {
   }
 }
 
-describe('probe-core A3 outbound frames', () => {
-  it('[closure A7] keeps every string size unknown while intrinsic byte extents stay exact', async () => {
+describe('probe-core outbound frames', () => {
+  it('keeps every string size unknown while intrinsic byte extents stay exact', async () => {
     expect(carrierSizeBytes('ascii')).toBe(-1)
     expect(carrierSizeBytes('é😀\ud800')).toBe(-1)
     /** Byte views retain their exact selected span independently of string wire representation. */
@@ -403,7 +403,7 @@ describe('probe-core A3 outbound frames', () => {
     bytes.set([4, 5, 6])
     /** Retained snapshots must survive the real detachment performed by the physical writer. */
     const events: IRpcProbeEventView[] = []
-    /** SC9(a) applies only to the actual transfer list consumed by this writer. */
+    /** Applies only to the actual transfer list consumed by this writer. */
     const send = vi.fn((value: unknown, options?: { transfer?: readonly unknown[] }) => {
       structuredClone(value, { transfer: options?.transfer as Transferable[] })
     })

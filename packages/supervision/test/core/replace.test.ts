@@ -9,7 +9,7 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 25; index++) await Promise.resolve()
 }
 
-describe('A8 replacement', () => {
+describe('replacement', () => {
   it('keeps the old unit serving until the new unit becomes ready', async () => {
     const scheduler = createManualScheduler()
     const launcher = createMemoryLauncher()

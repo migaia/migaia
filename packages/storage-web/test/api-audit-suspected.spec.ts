@@ -36,7 +36,7 @@ class DelayedFactory extends IDBFactory {
 }
 
 describe('storage-web confirmed audit suspicions', () => {
-  it('SW-D08 identifies the owned backfill aggregate and retains both original failures', async () => {
+  it('identifies the owned backfill aggregate and retains both original failures', async () => {
     /** Real simulation owns all transactions and backend admission. */
     const store = indexedDbHost({
       factory: new IDBFactory(),
@@ -94,7 +94,7 @@ describe('storage-web confirmed audit suspicions', () => {
     }
   })
 
-  it('SW-D09 ensureRecordIndexes obeys the requested deadline during a slow open', async () => {
+  it('ensureRecordIndexes obeys the requested deadline during a slow open', async () => {
     /** Opening crosses 2ms while preserving the real factory/database implementation. */
     const factory = new DelayedFactory()
     /** Preparation remains owned by the backend after the caller stops waiting. */
@@ -117,7 +117,7 @@ describe('storage-web confirmed audit suspicions', () => {
     }
   })
 
-  it('SW-D09 index iteration applies one deadline across buffered yields', async () => {
+  it('index iteration applies one deadline across buffered yields', async () => {
     /** Real IDB transactions and backfill create the sidecar rows consumed by the public iterator. */
     const store = indexedDbHost({
       factory: new IDBFactory(),
@@ -153,7 +153,7 @@ describe('storage-web confirmed audit suspicions', () => {
     }
   })
 
-  it('SW-D10 coarse push invalidation refreshes scoped queries without fabricating a change', async () => {
+  it('coarse push invalidation refreshes scoped queries without fabricating a change', async () => {
     /** The installed public feature supplies exactly one source callback. */
     let invalidate!: () => void
     /** The application source can detect a change without knowing a storage payload. */

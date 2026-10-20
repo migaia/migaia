@@ -24,7 +24,7 @@ function fixture(capabilities: readonly string[]) {
 }
 
 describe('process client drain', () => {
-  it('[A3] announces once and shares the same Promise while Host budget tightens the timer', async () => {
+  it('announces once and shares the same Promise while Host budget tightens the timer', async () => {
     const scheduler = createManualScheduler()
     const source = fixture(['close@1'])
     const report = vi.fn()
@@ -47,7 +47,7 @@ describe('process client drain', () => {
     expect(report).not.toHaveBeenCalled()
   })
 
-  it('[A3] waits for an in-flight request, but emits no close when the peer lacks close@1', async () => {
+  it('waits for an in-flight request, but emits no close when the peer lacks close@1', async () => {
     const scheduler = createManualScheduler()
     const source = fixture([])
     const drain = createRemoteBindingDrain(scheduler, vi.fn())
@@ -68,7 +68,7 @@ describe('process client drain', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('[A3] reports a rejected announcement and still completes the drain', async () => {
+  it('reports a rejected announcement and still completes the drain', async () => {
     const scheduler = createManualScheduler()
     const source = fixture(['close@1'])
     const failure = new Error('close failed')
@@ -82,7 +82,7 @@ describe('process client drain', () => {
   })
 })
 
-it('[A46] per-call drain budget is exact while the original Host budget keeps its eighty-percent shrink', async () => {
+it('per-call drain budget is exact while the original Host budget keeps its eighty-percent shrink', async () => {
   /** The original manual clock makes the exact announcement and deadline independently observable. */
   const scheduler = createManualScheduler()
   /** A genuinely pending original send keeps drain active until its configured deadline. */

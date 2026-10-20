@@ -19,7 +19,7 @@ function processSources(directory: string): string[] {
   })
 }
 
-describe('A1 process profile boundary', () => {
+describe('process profile boundary', () => {
   it('keeps the process subentry inward and separate from the root entry', () => {
     const root = join(import.meta.dirname, '../..')
     const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {

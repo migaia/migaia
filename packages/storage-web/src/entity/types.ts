@@ -82,10 +82,10 @@ export type IEntityOptions<
   /** Defaults to `passthrough`, which returns values without validation. */
   readonly schema?: ISchemaAdapter<TDomain, TStored>
   /**
-   * Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured
-   * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory
-   * default to `structuredCodec`, preserving objects through native structured cloning.
-   * Key-value-only backends default to `jsonCodec`.
+   * Applies on every backend through `selectCodec` using `store.capabilities`. Structured backends
+   * do not bypass an explicitly configured codec. When omitted, IndexedDB and memory default to
+   * `structuredCodec`, preserving objects through native structured cloning. Key-value-only
+   * backends default to `jsonCodec`.
    */
   readonly codec?: ICodec<unknown, unknown>
   readonly version?: number

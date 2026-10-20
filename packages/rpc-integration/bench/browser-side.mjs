@@ -7,7 +7,7 @@ import { join, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createMacPidObserver } from './bare-node.mjs'
 import { nearestRank } from './ipc.mjs'
-import { BrowserBenchText as text } from '../test/core/fixtures/da1-browser/text.mjs'
+import { BrowserBenchText as text } from '../test/core/fixtures/budget-browser/text.mjs'
 
 /**
  * Measure one real Chromium page/Worker pair, excluding the Node driver and trace from timing.
@@ -29,7 +29,10 @@ export async function runBrowserSide(unit, side, options) {
     ['page', 'worker'].map((role) => [
       role + '-' + side,
       fileURLToPath(
-        new URL('../test/core/fixtures/da1-browser/' + role + '-' + side + '.mjs', import.meta.url)
+        new URL(
+          '../test/core/fixtures/budget-browser/' + role + '-' + side + '.mjs',
+          import.meta.url
+        )
       )
     ])
   )
@@ -153,8 +156,8 @@ export async function runBrowserSide(unit, side, options) {
     /** The fixture mark selects its actual PID and thread without guessing. */
     const mark = (name) => events.find((event) => event.name === name)
     /** Page and Worker marks may share one renderer PID. */
-    const parent = mark('da1-page-target'),
-      peer = mark('da1-worker-target')
+    const parent = mark('page-target'),
+      peer = mark('worker-target')
     if (!parent?.pid || !peer?.pid) throw new Error(text.missing)
     /** All Chromium process counters remain explicit, including auxiliary processes. */
     const processInfoBefore = await root.send('SystemInfo.getProcessInfo')

@@ -7,7 +7,7 @@ import {
 import { createDynamicCapabilityGraph } from '../src/graph/dynamic.js'
 
 describe('audited capability cleanup ownership', () => {
-  it('D-01 releases a valid late primary even when auxiliary rollback fails', async () => {
+  it('releases a valid late primary even when auxiliary rollback fails', async () => {
     /** Startup completes after the graph already lost commit authority. */
     let finish!: () => void
     /** Controlled local start promise avoids a real external resource. */
@@ -60,7 +60,7 @@ describe('audited capability cleanup ownership', () => {
     expect(reports.length).toBeGreaterThan(0)
   })
 
-  it('D-02 waits for admitted predecessor and completes final disposal beyond the mutation budget', async () => {
+  it('waits for admitted predecessor and completes final disposal beyond the mutation budget', async () => {
     /** Registration holds the FIFO owner while final disposal is queued. */
     let finish!: (instances: IGraphNodeInstance<unknown>[]) => void
     /** A finite admission budget applies to ordinary mutations. */

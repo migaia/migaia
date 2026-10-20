@@ -290,7 +290,7 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
     throw new Error('Packed legacy chunk fixture digest drifted')
   /**
    * Digest-pinned retired owner with its pre-layering import names bound to the renamed core
-   * exports (rpc-layering BC2), so the perturbation still loads against the current packed dist.
+   * exports, so the perturbation still loads against the current packed dist.
    */
   const legacyChunkSource = fixture.source
     .replace(
@@ -991,11 +991,11 @@ try {
 const processExports = await import('@migaia/rpc-process');
 const threadExports = await import('@migaia/rpc-threads');
 for (const name of ['createProcessPeer', 'createProcessPlugin'])
-  assert.equal(typeof processExports[name], 'function', '[R14-A10] packed process factory');
+  assert.equal(typeof processExports[name], 'function', 'packed process factory');
 for (const name of ['createThreadPeer', 'createThreadPlugin'])
-  assert.equal(typeof threadExports[name], 'function', '[R14-A10] packed thread factory');
+  assert.equal(typeof threadExports[name], 'function', 'packed thread factory');
 for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeProcessPlugin', 'createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
-  assert.equal(name in processExports || name in threadExports, false, '[R14-A10] retired factory absent: ' + name);
+  assert.equal(name in processExports || name in threadExports, false, 'retired factory absent: ' + name);
 const root = await import('@migaia/rpc-core');
 const clientPreset = await import('@migaia/rpc-core/client');
 const providerPreset = await import('@migaia/rpc-core/provider');

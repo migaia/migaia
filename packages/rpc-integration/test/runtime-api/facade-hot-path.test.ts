@@ -28,7 +28,7 @@ const execute = promisify(execFile)
 const entry = fileURLToPath(new URL('./fixtures/facade-hot-path-counters.mjs', import.meta.url))
 
 for (const carrier of ['stdio-framed', 'worker'] as const) {
-  it(`[A37][R15][D19] ${carrier} request adds no facade payload traversal or closure`, async () => {
+  it(`${carrier} request adds no facade payload traversal or closure`, async () => {
     const result = await execute(process.execPath, [entry, carrier], {
       env: { ...process.env, IPC_BENCH_STEM: `/tmp/rpc-facade-contract-${randomUUID()}` }
     })
@@ -38,27 +38,19 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
       requestClosure: number
       runtimeInput: number
     }
-    assert.equal(observed.requests, 20, '[A37] the genuine public Peer completed every request')
-    assert.equal(
-      observed.runtimeInput,
-      20,
-      '[BC11] Core captures each logical request exactly once'
-    )
+    assert.equal(observed.requests, 20, 'the genuine public Peer completed every request')
+    assert.equal(observed.runtimeInput, 20, 'Core captures each logical request exactly once')
     assert.equal(
       observed.payloadValue,
       0,
-      '[D19] canonical dispatch owns payload normalization; the facade cannot add another traversal'
+      'canonical dispatch owns payload normalization; the facade cannot add another traversal'
     )
-    assert.equal(
-      observed.requestClosure,
-      0,
-      '[R15] the request facade cannot allocate a new closure'
-    )
+    assert.equal(observed.requestClosure, 0, 'the request facade cannot allocate a new closure')
   })
 }
 
 for (const carrier of ['stdio-framed', 'worker'] as const) {
-  it(`[A37][D19] Deno ${carrier} keeps scalar dispatch outside binary and materialization work`, async () => {
+  it(`Deno ${carrier} keeps scalar dispatch outside binary and materialization work`, async () => {
     const result = await execute('deno', ['run', '-A', entry, carrier], {
       env: { ...process.env, IPC_BENCH_STEM: `/tmp/rpc-deno-facade-${randomUUID()}` }
     })
@@ -79,31 +71,20 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
       }[]
     }
     assert.equal(observed.requests, 20)
-    assert.equal(observed.payloadValue, 0, '[D19] Deno does not add facade payload walks')
-    assert.equal(observed.requestClosure, 0, '[R15] Deno uses the original cold dispatcher')
-    assert.equal(
-      observed.runtimeInput,
-      20,
-      '[BC11] Core captures each logical request exactly once'
-    )
-    /**
-     * H1 removes owned outbound re-normalization, reducing union admissions per request from 2 to
-     * 1.
-     */
-    assert.equal(observed.runtimeEnvelope, 20, '[D19] only untrusted incoming union admission')
-    assert.equal(observed.binaryPrepare, 0, '[K272] scalar calls do not prepare binary manifests')
-    assert.equal(
-      observed.materialize,
-      0,
-      '[K273] scalar runtime calls do not materialize JSON again'
-    )
+    assert.equal(observed.payloadValue, 0, 'Deno does not add facade payload walks')
+    assert.equal(observed.requestClosure, 0, 'Deno uses the original cold dispatcher')
+    assert.equal(observed.runtimeInput, 20, 'Core captures each logical request exactly once')
+    /** Removes owned outbound re-normalization, reducing union admissions per request from 2 to 1. */
+    assert.equal(observed.runtimeEnvelope, 20, 'only untrusted incoming union admission')
+    assert.equal(observed.binaryPrepare, 0, 'scalar calls do not prepare binary manifests')
+    assert.equal(observed.materialize, 0, 'scalar runtime calls do not materialize JSON again')
     for (const suffix of [
       '/contract/runtime-api/normalize-envelope.js',
       '/contract/runtime-api/binary-capture.js',
       '/core/internal/outbound-envelope.js'
     ]) {
       const witness = observed.loaded.find((row) => row.url.endsWith(suffix))
-      assert.ok(witness, `[D19] actual loader witness required for ${suffix}`)
+      assert.ok(witness, `actual loader witness required for ${suffix}`)
       assert.equal(witness.diagnosticOverlay, true)
       assert.notEqual(witness.loadedSHA256, witness.diskSHA256)
     }
@@ -112,42 +93,42 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
     )
     for (const suffix of ['/remote/runtime-api/peer.js', '/remote/internal/runtime-call.js']) {
       const witness = observed.loaded.find((row) => row.url.endsWith(suffix))
-      assert.ok(witness, `[BC11] actual moved owner or raw facade must load for ${suffix}`)
+      assert.ok(witness, `actual moved owner or raw facade must load for ${suffix}`)
       assert.equal(witness.diagnosticOverlay, false)
       assert.equal(witness.loadedSHA256, witness.diskSHA256)
     }
     assert.equal(
       observed.loaded.some((row) => row.url.endsWith('/contract/runtime-api/binary.js')),
       false,
-      '[A27] scalar dispatch does not load the heavy binary codec'
+      'scalar dispatch does not load the heavy binary codec'
     )
   })
 }
 
-it('[A37][R15] managed request retains native drain without a per-call facade closure', async () => {
+it('managed request retains native drain without a per-call facade closure', async () => {
   const result = await execute(process.execPath, [entry, 'worker'], {
     env: { ...process.env, IPC_BENCH_STEM: `/tmp/rpc-facade-closure-${randomUUID()}` }
   })
   const observed = JSON.parse(result.stdout) as { requests: number; requestClosure: number }
   assert.equal(observed.requests, 20)
-  assert.equal(observed.requestClosure, 0, '[R15] native drain must use the cold dispatcher')
+  assert.equal(observed.requestClosure, 0, 'native drain must use the cold dispatcher')
 })
 
-it('[A37][D19] canonical runtime sender does not normalize its owned envelope again', async () => {
+it('canonical runtime sender does not normalize its owned envelope again', async () => {
   const result = await execute(process.execPath, [entry, 'stdio-framed'], {
     env: { ...process.env, IPC_BENCH_STEM: `/tmp/rpc-runtime-owned-${randomUUID()}` }
   })
   const observed = JSON.parse(result.stdout) as { requests: number; runtimeEnvelope: number }
   assert.equal(observed.requests, 20)
-  /** H1 removes owned outbound re-normalization, reducing union admissions per request from 2 to 1. */
+  /** Removes owned outbound re-normalization, reducing union admissions per request from 2 to 1. */
   assert.equal(
     observed.runtimeEnvelope,
     20,
-    '[D19] each request has one untrusted inbound admission after owned header construction'
+    'each request has one untrusted inbound admission after owned header construction'
   )
 })
 
-it('[A37][R15][D47] a synchronous business provider has no asynchronous facade adapter', async () => {
+it('a synchronous business provider has no asynchronous facade adapter', async () => {
   const fixture = await connected({}, { echo: (value) => value })
   try {
     for (let index = 0; index < 20; index++)
@@ -158,17 +139,13 @@ it('[A37][R15][D47] a synchronous business provider has no asynchronous facade a
       EndpointOwnerKey.providerRegistry
     )
     const provider = registry!.providers.get('echo')!
-    assert.equal(
-      provider.constructor.name,
-      'Function',
-      '[R15] scalar adapter cannot create a Promise'
-    )
+    assert.equal(provider.constructor.name, 'Function', 'scalar adapter cannot create a Promise')
   } finally {
     await fixture.close()
   }
 })
 
-it('[D47] result prototype failure retains payload classification and its local original cause', async () => {
+it('result prototype failure retains payload classification and its local original cause', async () => {
   /** This supported failure occurs during portable result admission, after business returns. */
   const original = new RangeError('result prototype failure')
   const value = new Proxy(
@@ -196,7 +173,7 @@ it('[D47] result prototype failure retains payload classification and its local 
   }
 })
 
-it('[A37][D19] non-binary public request performs one outbound payload admission', async () => {
+it('non-binary public request performs one outbound payload admission', async () => {
   const fixture = await connected({}, { accepted: () => 42 })
   /** Only the exact business marker is counted; ready-directory and result work are excluded. */
   const normalize = observePortableNormalization()
@@ -208,18 +185,14 @@ it('[A37][D19] non-binary public request performs one outbound payload admission
         value !== null &&
         Reflect.get(value, 'marker') === 'logical-input'
     )
-    assert.equal(
-      walks.length,
-      2,
-      '[D19] one outgoing admission and one untrusted receiver admission'
-    )
+    assert.equal(walks.length, 2, 'one outgoing admission and one untrusted receiver admission')
   } finally {
     normalize.mockRestore()
     await fixture.close()
   }
 })
 
-it('[D47] foreign thenable resolves before portable result admission and reads then once', async () => {
+it('foreign thenable resolves before portable result admission and reads then once', async () => {
   /** A business thenable is assimilated, so its own prototype is never a portable result. */
   let reads = 0
   const value = new Proxy(
@@ -244,7 +217,7 @@ it('[D47] foreign thenable resolves before portable result admission and reads t
   }
 })
 
-it('[D19] immutable outbound proof admits only the exact original logical input', () => {
+it('immutable outbound proof admits only the exact original logical input', () => {
   const header = vectors.valid[0]!
   assert.equal(header.kind, 'runtime-call')
   const method = Reflect.get(header, 'task').method as string

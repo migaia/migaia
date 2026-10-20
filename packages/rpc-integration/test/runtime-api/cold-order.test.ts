@@ -63,7 +63,7 @@ for (const order of [
   'parent-before-child',
   'accept-before-drain'
 ] as const) {
-  it(`[A2][A3] actual directory and reverse business survive ${order}`, async () => {
+  it(`actual directory and reverse business survive ${order}`, async () => {
     /** Each test owns an independent pair and physical accept-drain barrier. */
     const pair = bytePair(order === 'accept-before-drain')
     /** A delayed source returns only after the fast endpoint really sent business. */
@@ -137,23 +137,23 @@ for (const order of [
       assert.deepEqual(
         published,
         [false, false],
-        '[A2] directory write alone does not publish an unprepared endpoint'
+        'directory write alone does not publish an unprepared endpoint'
       )
-      assert.deepEqual(calls, [0, 0], '[A3] no application dispatch runs during cold receive')
+      assert.deepEqual(calls, [0, 0], 'no application dispatch runs during cold receive')
       releaseSource()
       pair.release()
       const [parent, child] = await Promise.all(pending)
       assert.equal(
         await parent!.request('echo', 'forward'),
         'forward',
-        '[A2] genuine forward business survives handoff'
+        'genuine forward business survives handoff'
       )
       assert.equal(
         await child!.request('echo', 'reverse'),
         'reverse',
-        '[A2] genuine reverse business survives handoff'
+        'genuine reverse business survives handoff'
       )
-      assert.deepEqual(calls, [1, 1], '[A3] each application request executes once')
+      assert.deepEqual(calls, [1, 1], 'each application request executes once')
     } finally {
       releaseSource()
       pair.release()

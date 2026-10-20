@@ -18,7 +18,7 @@ const fixture = resolve(
 )
 
 describe('Node child endpoint channel', () => {
-  it('[A1/A2] serves a 128 KiB request across real stdio and the channel pipeline', async () => {
+  it('serves a 128 KiB request across real stdio and the channel pipeline', async () => {
     const token = 'child-endpoint-token'
     const launcher = createNodeProcessLauncher()
     /** Retain only a short diagnostic tail for a failing child fixture. */
@@ -111,7 +111,7 @@ describe('Node child endpoint channel', () => {
     }
   })
 
-  it('[A2] serializes two concurrent sends on one real child pipe', async () => {
+  it('serializes two concurrent sends on one real child pipe', async () => {
     const token = 'concurrent-send-token'
     const handle = await createNodeProcessLauncher().launch(
       {

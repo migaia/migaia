@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { EventSubscriberErrorCode } from '../src/error-code.js'
 
-describe('A6 event subscriber reason capture', () => {
-  it('ES-T196 caches a getter failure by identity and still releases the subscription', () => {
+describe('event subscriber reason capture', () => {
+  it('caches a getter failure by identity and still releases the subscription', () => {
     const cause = new Error('reason getter')
     let abortListener!: () => void
     let reads = 0

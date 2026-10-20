@@ -2452,8 +2452,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
    * fanout) is rethrown rather than folded into the per-target result, exactly like legacy
    * `sendAll`/`pingAll` and this class's own `pingAll`. Per-receiver keys are not produced here:
    * this composed `sendAll` fans out over the statically configured target list, not a
-   * discovery-resolved receiver set (see the discovery-driven receiver resolution gap disclosed in
-   * Achievement Review Round 8/9 for `ping`, which the same architecture applies to).
+   * discovery-resolved receiver set (the same discovery-driven receiver resolution gap applies to
+   * `ping`).
    */
   async sendAll<T>(
     method: string,

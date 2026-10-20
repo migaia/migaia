@@ -44,7 +44,7 @@ export function assertFdFixtureImports(source, body) {
 }
 
 /**
- * Load the existing caller FD launcher unchanged through offline type erasure (K249/D-b).
+ * Load the existing caller FD launcher unchanged through offline type erasure.
  *
  * @returns {Promise<import('@migaia/supervision/process').IProcessLauncher>} Original fixture
  *   factory result.
@@ -61,7 +61,7 @@ export async function loadFdLauncher() {
 /**
  * Load the canonical public endpoint fixture after offline type erasure in a separate PID.
  *
- * @returns {Promise<typeof import('../core/a10-p2-f-runtime.ts')>} Unchanged fixture exports.
+ * @returns {Promise<typeof import('../core/qualification-runtime.ts')>} Unchanged fixture exports.
  * @throws {Error} Original preparation, file or module loading failure.
  */
 export async function loadEndpointFixture() {
@@ -123,7 +123,7 @@ function writePrepared(fixture, contents, filename) {
 /** Erase the entire canonical endpoint module without altering its runtime imports or graph. */
 async function prepareEndpoint() {
   const { stripTypeScriptTypes } = await import('node:module')
-  const fixture = new URL('../../../rpc-core/test/core/a10-p2-f-runtime.ts', import.meta.url)
+  const fixture = new URL('../../../rpc-core/test/core/qualification-runtime.ts', import.meta.url)
   return writePrepared(fixture, stripTypeScriptTypes(readFileSync(fixture, 'utf8')), 'endpoint.mjs')
 }
 

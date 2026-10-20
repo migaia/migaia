@@ -15,7 +15,7 @@ import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
 
 it.each([undefined, 80])(
-  '[A79][A80] real managed Worker applies cap %s without restoring the core request default',
+  'real managed Worker applies cap %s without restoring the core request default',
   async (cap) => {
     /** The real scheduler records registrations while retaining its original clock and callbacks. */
     const delays: number[] = []
@@ -52,12 +52,12 @@ it.each([undefined, 80])(
         assert.equal(
           delays.some((delay) => delay > 900 && delay <= 1000),
           false,
-          '[A79] false cannot silently restore the advanced core 1000ms timer'
+          'false cannot silently restore the advanced core 1000ms timer'
         )
       } else await assert.rejects(request, { code: RpcCoreErrorCode.deadlineExceeded })
       delays.length = 0
       const stream = peer.stream('delayedValues', 120, { timeoutMs: false })
-      assert.deepEqual(delays, [], '[A80] creating a managed stream starts no deadline')
+      assert.deepEqual(delays, [], 'creating a managed stream starts no deadline')
       if (cap === undefined) {
         assert.deepEqual(await stream.next(), { done: false, value: 7 })
         await stream.return!(undefined)

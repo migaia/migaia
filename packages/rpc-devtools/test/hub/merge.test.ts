@@ -9,15 +9,18 @@ import {
 import { createHubTarget, retainTargetEvent } from '../../src/hub/targets.js'
 import { event, fakeTarget, type ITestClock } from './helpers.js'
 
-describe('hub A3 merge complexity and bounded retention', () => {
+describe('hub merge complexity and bounded retention', () => {
   it('merges three 100,000-event targets within the n ceil(log2 k) + n comparator bound', async () => {
-    /** Exactly three retained sequences are the A3 workload; maxEvents avoids this cell's eviction. */
+    /**
+     * Exactly three retained sequences are the merge workload; maxEvents avoids this cell's
+     * eviction.
+     */
     const count = 100_000
     /** Known clock removes local timing jitter from the comparison workload. */
     const clock: ITestClock = { now: 0 }
     /** Both alignment endpoints observe the same fixed monotonic time. */
     const now = vi.spyOn(performance, 'now').mockImplementation(() => clock.now)
-    /** Each target has enough retention for the complete A3 event set. */
+    /** Each target has enough retention for the complete merge event set. */
     const hub = createRpcDevtoolsHub({ maxEvents: count })
     /** Internal sequence inputs use the same production merger and count only comparator operations. */
     const sources: IHubTimelineSource[] = []
@@ -50,7 +53,7 @@ describe('hub A3 merge complexity and bounded retention', () => {
       )
       console.info(
         JSON.stringify({
-          acceptance: 'A3',
+          acceptance: 'merge',
           targets: 3,
           events: merged.length,
           comparisons,

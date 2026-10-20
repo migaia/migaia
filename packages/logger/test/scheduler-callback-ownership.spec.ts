@@ -61,7 +61,7 @@ async function runHttp(
 ) {
   const failures: unknown[] = []
   const restore = setLoggerRuntimeManager({
-    randomUUID: () => 'round26-http',
+    randomUUID: () => 'http',
     defer: (task) => task(),
     write: () => undefined,
     fetch
@@ -73,7 +73,7 @@ async function runHttp(
       plugins: [http({ url: 'https://example.test/logs', retries })]
     })
     logger.onFailure(({ error }) => failures.push(error))
-    logger.log('info', 'round26')
+    logger.log('info', 'scheduled')
     if (flushFailure) {
       /** The same hostile scheduler also rejects the lifecycle flush budget admission. */
       const failure = await logger.flush().catch((error: unknown) => error)
@@ -85,8 +85,8 @@ async function runHttp(
   }
 }
 
-describe('Round26 HTTP scheduler callback ownership', () => {
-  it('LG-T38 retains and cancels a synchronous request-timeout task after callback return', async () => {
+describe('HTTP scheduler callback ownership', () => {
+  it('retains and cancels a synchronous request-timeout task after callback return', async () => {
     const scheduler = createSyncScheduler({ onSchedule: (callback) => callback() })
     const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }))
 
@@ -101,7 +101,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
   })
 
-  it('LG-T39 retains and cancels a synchronous retry-backoff task while allowing the next POST', async () => {
+  it('retains and cancels a synchronous retry-backoff task while allowing the next POST', async () => {
     const scheduler = createSyncScheduler({
       onSchedule: (callback, delayMs) => {
         if (delayMs !== 10000) callback()
@@ -109,7 +109,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
     const fetch = vi
       .fn()
-      .mockRejectedValueOnce(new Error('round26-transport'))
+      .mockRejectedValueOnce(new Error('transport'))
       .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null } })
 
     const result = await runHttp(scheduler, fetch as IHttpFetch, 1)
@@ -122,8 +122,8 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     expect(result.failures).toEqual([])
   })
 
-  it('LG-T40 keeps request callback failure primary and still cancels the returned task once', async () => {
-    const callbackFailure = new Error('round26-abort-callback')
+  it('keeps request callback failure primary and still cancels the returned task once', async () => {
+    const callbackFailure = new Error('abort-callback')
     const originalAbortController = globalThis.AbortController
     class CallbackFailureAbortController {
       readonly signal = {
@@ -155,8 +155,8 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
   })
 
-  it('LG-T41 keeps backoff cancel failure observable and prevents a second POST', async () => {
-    const cancelFailure = new Error('round26-backoff-cancel')
+  it('keeps backoff cancel failure observable and prevents a second POST', async () => {
+    const cancelFailure = new Error('backoff-cancel')
     const scheduler = createSyncScheduler({
       onSchedule: (callback, delayMs) => {
         if (delayMs !== 10000) callback()
@@ -170,7 +170,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
             }
           : { cancel: () => undefined }
     })
-    const fetch = vi.fn().mockRejectedValue(new Error('round26-transport'))
+    const fetch = vi.fn().mockRejectedValue(new Error('transport'))
 
     const result = await runHttp(scheduler, fetch as IHttpFetch, 1)
 
@@ -190,8 +190,8 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
   })
 
-  it('LG-T42 keeps schedule throw primary when callback already ran and no handle was returned', async () => {
-    const callbackScheduleFailure = new Error('round26-schedule-after-callback')
+  it('keeps schedule throw primary when callback already ran and no handle was returned', async () => {
+    const callbackScheduleFailure = new Error('schedule-after-callback')
     const scheduler = createSyncScheduler({
       onSchedule: (callback) => {
         callback()
@@ -212,8 +212,8 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
   })
 
-  it('LG-T43 contains a task cancel getter failure without leaving the delivery pending', async () => {
-    const getterFailure = new Error('round26-cancel-getter')
+  it('contains a task cancel getter failure without leaving the delivery pending', async () => {
+    const getterFailure = new Error('cancel-getter')
     const task = {
       get cancel(): never {
         throw getterFailure
@@ -235,8 +235,8 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     })
   })
 
-  it('LG-T44 rolls back a ProcessPlugin listener stored before runtimeProcess.on throws', async () => {
-    const primary = new Error('round26-process-on')
+  it('rolls back a ProcessPlugin listener stored before runtimeProcess.on throws', async () => {
+    const primary = new Error('process-on')
     const listeners = new Map<string, Set<(...args: any[]) => void>>()
     let failBeforeExit = true
     const runtimeProcess = {
@@ -258,7 +258,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round26-process',
+      randomUUID: () => 'process',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -287,9 +287,9 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
   })
 
-  it('LG-T45 preserves ProcessPlugin install primary plus rollback failure and resets for reinstall', async () => {
-    const primary = new Error('round26-process-primary')
-    const rollback = new Error('round26-process-rollback')
+  it('preserves ProcessPlugin install primary plus rollback failure and resets for reinstall', async () => {
+    const primary = new Error('process-primary')
+    const rollback = new Error('process-rollback')
     const listeners = new Map<string, Set<(...args: any[]) => void>>()
     let failBeforeExit = true
     let failRollback = true
@@ -316,7 +316,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round26-process-aggregate',
+      randomUUID: () => 'process-aggregate',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -350,7 +350,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
   })
 
-  it('LG-T46 cancels a synchronous ProcessPlugin timeout handle after callback return', async () => {
+  it('cancels a synchronous ProcessPlugin timeout handle after callback return', async () => {
     const scheduler = createSyncScheduler({ onSchedule: (callback) => callback() })
     const listeners = new Map<string, (...args: any[]) => void>()
     const runtimeProcess = {
@@ -366,7 +366,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
-      randomUUID: () => 'round26-process-timer',
+      randomUUID: () => 'process-timer',
       defer: (task) => task(),
       write: () => undefined
     })
@@ -388,7 +388,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     }
   })
 
-  it('LG-T47 cancels a synchronous BatchPlugin debounce handle after callback return', async () => {
+  it('cancels a synchronous BatchPlugin debounce handle after callback return', async () => {
     const scheduler = createSyncScheduler({ onSchedule: (callback) => callback() })
     const batches: string[][] = []
     const logger: any = new Logger({
@@ -402,10 +402,10 @@ describe('Round26 HTTP scheduler callback ownership', () => {
         batches.push(items)
       })
 
-    batcher.push('round26-batch')
+    batcher.push('batch')
     await logger.flush()
 
-    expect(batches).toEqual([['round26-batch']])
+    expect(batches).toEqual([['batch']])
     const debounceTask = scheduler.schedules.find(({ delayMs }) => delayMs === 5)?.task
     expect(debounceTask?.cancel).toHaveBeenCalledOnce()
     await logger.shutdown('manual')

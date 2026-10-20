@@ -21,7 +21,7 @@ import {
   RUNTIME_API_FIXTURE_BASE_CAPABILITIES
 } from './fixture.js'
 
-it('[A68][A69] a genuine response signing failure retains the completed keyed group', async () => {
+it('a genuine response signing failure retains the completed keyed group', async () => {
   /** Both peers negotiate the actual group, result store and caller deadline owners. */
   const capabilities = [
     ...RUNTIME_API_FIXTURE_BASE_CAPABILITIES,
@@ -125,11 +125,11 @@ it('[A68][A69] a genuine response signing failure retains the completed keyed gr
             Reflect.get(error, 'code') === RpcCoreErrorCode.authenticationFailed &&
             Reflect.get(error, 'cause') === signFailure
         ),
-        '[A69] the original authentication owner rejected response preparation'
+        'the original authentication owner rejected response preparation'
       )
     )
     const outcome = await peers[0]!.outcome('completed-without-reply')
-    assert.equal(outcome.state, 'done', '[A68] failed response preparation cannot delete done')
+    assert.equal(outcome.state, 'done', 'failed response preparation cannot delete done')
     const repeated = await peers[0]!.group([{ method: 'value' }, { method: 'value' }], {
       idempotencyKey: 'completed-without-reply'
     })
@@ -137,7 +137,7 @@ it('[A68][A69] a genuine response signing failure retains the completed keyed gr
       repeated.map((step) => step.state),
       ['success', 'success']
     )
-    assert.equal(effects, 2, '[A68] the same business key must never execute again')
+    assert.equal(effects, 2, 'the same business key must never execute again')
   } finally {
     for (const peer of peers) await peer.close()
     carrier.close()

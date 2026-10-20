@@ -18,7 +18,7 @@ const end = source.indexOf('\n/**', start)
 /** Type erasure removes imports that exist only in the compile-time contract. */
 const body = stripTypeScriptTypes(source.slice(start, end))
 
-describe('K249 canonical FD preparation imports', () => {
+describe('canonical FD preparation imports', () => {
   it('accepts the maintained factory and rejects a moved runtime dependency', () => {
     expect(() => assertFdFixtureImports(source, body)).not.toThrow()
     expect(() =>

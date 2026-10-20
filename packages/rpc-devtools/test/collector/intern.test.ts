@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRpcDevtools } from '@migaia/rpc-devtools'
 import { collectorView } from './fixture.js'
 
-describe('collector A6 bounded interning', () => {
+describe('collector bounded interning', () => {
   it('records twenty methods with overflow id 0 while retaining earlier interned names', () => {
     /** The shared string table is deliberately smaller than the method input vocabulary. */
     const devtools = createRpcDevtools({ maxInterned: 8, maxEvents: 20 })

@@ -120,7 +120,7 @@ export class BrowserCarrierObservation {
           const buffer = isArrayBuffer(message) ? message : message.buffer
           for (let i = 0; i < transfer.length; i++) {
             if (transfer[i] !== buffer) continue
-            // SC9a: preserve bytes before this send detaches the explicitly transferred buffer.
+            // Preserve bytes before this send detaches the explicitly transferred buffer.
             content = isArrayBuffer(message)
               ? message.slice(0)
               : isUint8Array(message)

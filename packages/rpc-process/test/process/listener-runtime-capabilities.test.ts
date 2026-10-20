@@ -16,7 +16,7 @@ const token = 'listener-capability-fixture'
 
 describe('Process listener runtime capabilities', () => {
   it.each([false, true])(
-    '[DX1] derives runtime capabilities for a plain native listener offer (stream=%s)',
+    'derives runtime capabilities for a plain native listener offer (stream=%s)',
     async (stream) => {
       /** The actual bound address is acquired through the public listener adapter. */
       let listener: IProcessByteListener | undefined
@@ -95,7 +95,7 @@ describe('Process listener runtime capabilities', () => {
     }
   )
 
-  it('[DX1] keeps an explicitly narrow listener offer narrow', async () => {
+  it('keeps an explicitly narrow listener offer narrow', async () => {
     /** Capture the real bound address without opening another listener owner. */
     let listener: IProcessByteListener | undefined
     /** A caller-specified empty extension list is an explicit control-only proposal. */

@@ -16,7 +16,7 @@ import { attachEventErrorCode, codeExistingError } from '../src/errors.js'
 import { createSystemTerminalRuntime } from '../src/internal/terminal-runtime.js'
 
 describe('event-subscriber contract hardening', () => {
-  it('ES-T35 rejects malformed public boundaries before registration', () => {
+  it('rejects malformed public boundaries before registration', () => {
     expect(() => createEventChannel({ report: true } as never)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.invalidReporter })
     )
@@ -28,7 +28,7 @@ describe('event-subscriber contract hardening', () => {
     )
   })
 
-  it('ES-T46 preserves a hostile option getter as the primary coded error', () => {
+  it('preserves a hostile option getter as the primary coded error', () => {
     const failure = new Error('option getter')
     const options = {
       get taskId() {
@@ -44,7 +44,7 @@ describe('event-subscriber contract hardening', () => {
     }
   })
 
-  it('ES-T50 preserves class private state and subscriber receiver identity', () => {
+  it('preserves class private state and subscriber receiver identity', () => {
     const channel = createEventChannel<number, number>()
     class Subscriber {
       #multiplier = 3
@@ -65,7 +65,7 @@ describe('event-subscriber contract hardening', () => {
     expect(subscriber.receiver()).toBe(subscriber)
   })
 
-  it('ES-T79 uses direct structural method lookup without cached method identity', () => {
+  it('uses direct structural method lookup without cached method identity', () => {
     const release = vi.fn()
     let reads = 0
     const channel = {
@@ -86,7 +86,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T23 runs serial listeners after prior settlement and continues after failure', async () => {
+  it('runs serial listeners after prior settlement and continues after failure', async () => {
     const channel = createEventChannel<number, number>()
     const calls: string[] = []
     channel.subscribe(() => {
@@ -104,7 +104,7 @@ describe('event-subscriber contract hardening', () => {
     expect(results[1]).toMatchObject({ status: 'fulfilled', value: 2 })
   })
 
-  it('ES-T49 throwing async helpers expose coded aggregate errors without reporter calls', async () => {
+  it('throwing async helpers expose coded aggregate errors without reporter calls', async () => {
     const report = vi.fn()
     const channel = createEventChannel<number>({ report })
     const original = new Error('failure')
@@ -121,7 +121,7 @@ describe('event-subscriber contract hardening', () => {
     expect(report).not.toHaveBeenCalled()
   })
 
-  it('ES-T43 returns successful parallel and serial values in registration order', async () => {
+  it('returns successful parallel and serial values in registration order', async () => {
     const channel = createEventChannel<number, number>()
     channel.subscribe(async (event) => event.value + 1)
     channel.subscribe((event) => event.value + 2)
@@ -130,7 +130,7 @@ describe('event-subscriber contract hardening', () => {
     await expect(invokeSerial(channel, 10)).resolves.toEqual([11, 12])
   })
 
-  it('ES-T37 keeps task selection on the immutable snapshot while allowing live retagging', async () => {
+  it('keeps task selection on the immutable snapshot while allowing live retagging', async () => {
     const channel = createEventChannel<number>()
     const calls: string[] = []
     channel.subscribe(
@@ -152,7 +152,7 @@ describe('event-subscriber contract hardening', () => {
     expect(calls).toEqual(['outer:old', 'stable:stable', 'outer:new'])
   })
 
-  it('ES-T40 does not invoke listeners or reporter when task selection is invalid', () => {
+  it('does not invoke listeners or reporter when task selection is invalid', () => {
     const report = vi.fn()
     const listener = vi.fn()
     const channel = createEventChannel<number>({ report })
@@ -177,7 +177,7 @@ describe('event-subscriber contract hardening', () => {
     expect(report).not.toHaveBeenCalled()
   })
 
-  it('ES-T41 returns rejected task results without routing listener failure to reporter', async () => {
+  it('returns rejected task results without routing listener failure to reporter', async () => {
     const report = vi.fn()
     const failure = new Error('task failure')
     const channel = createEventChannel<number>({ report })
@@ -190,7 +190,7 @@ describe('event-subscriber contract hardening', () => {
     expect(report).not.toHaveBeenCalled()
   })
 
-  it('ES-T26 wraps a unique task listener failure as publish failure', async () => {
+  it('wraps a unique task listener failure as publish failure', async () => {
     const failure = new Error('task listener failure')
     const channel = createEventChannel<number>({ report: vi.fn() })
     channel.subscribe(() => Promise.reject(failure), { taskId: 'unique' })
@@ -201,7 +201,7 @@ describe('event-subscriber contract hardening', () => {
     })
   })
 
-  it('ES-T30 keeps hub key routing and size accounting exact', () => {
+  it('keeps hub key routing and size accounting exact', () => {
     const hub = createEventHub<{ alpha: number; beta: string }>()
     const alpha = vi.fn()
     const beta = vi.fn()
@@ -220,7 +220,7 @@ describe('event-subscriber contract hardening', () => {
     expect(hub.size()).toBe(0)
   })
 
-  it('ES-T68 validates hub listeners before lazy channel creation and releases channel state', async () => {
+  it('validates hub listeners before lazy channel creation and releases channel state', async () => {
     const report = vi.fn()
     const hub = createEventHub<{ alpha: number }>({ report })
     expect(() => hub.subscribe('alpha', null as never)).toThrowError(
@@ -239,7 +239,7 @@ describe('event-subscriber contract hardening', () => {
     currentStop()
   })
 
-  it('ES-T69 codes revoked hub options proxies and preserves the proxy failure', () => {
+  it('codes revoked hub options proxies and preserves the proxy failure', () => {
     const revocable = Proxy.revocable({}, {})
     revocable.revoke()
     expect(() => createEventHub(revocable.proxy as never)).toThrowError(
@@ -250,7 +250,7 @@ describe('event-subscriber contract hardening', () => {
     )
   })
 
-  it('ES-T70 uses requested code text when coding frozen or non-error failures', () => {
+  it('uses requested code text when coding frozen or non-error failures', () => {
     const frozen = Object.freeze(new TypeError('frozen signal'))
     const codedFrozen = attachEventErrorCode(frozen, EventSubscriberErrorCode.invalidSignal)
     expect(codedFrozen).toMatchObject({
@@ -270,7 +270,7 @@ describe('event-subscriber contract hardening', () => {
     })
   })
 
-  it('ES-T71 contains hostile queueMicrotask access and invocation failures', () => {
+  it('contains hostile queueMicrotask access and invocation failures', () => {
     const diagnostic = new Error('supplied diagnostic')
     const getterFailure = new Error('queue getter')
     const getterHost = {
@@ -301,7 +301,7 @@ describe('event-subscriber contract hardening', () => {
     )
   })
 
-  it('ES-T14 does not invoke user cleanup from clear and makes unsubscribe idempotent', () => {
+  it('does not invoke user cleanup from clear and makes unsubscribe idempotent', () => {
     const channel = createEventChannel<number>()
     const listener = vi.fn()
     const stop = channel.subscribe(listener)
@@ -313,7 +313,7 @@ describe('event-subscriber contract hardening', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T56 keeps event abort state live through synchronous reentry', () => {
+  it('keeps event abort state live through synchronous reentry', () => {
     const channel = createEventChannel<number>()
     const calls: string[] = []
     channel.subscribe((event) => {
@@ -327,7 +327,7 @@ describe('event-subscriber contract hardening', () => {
     expect(channel.size).toBe(0)
   })
 
-  it('ES-T36 ignores task retagging after a registration becomes inactive', async () => {
+  it('ignores task retagging after a registration becomes inactive', async () => {
     const channel = createEventChannel<number>()
     let release!: () => void
     const calls: string[] = []
@@ -343,7 +343,7 @@ describe('event-subscriber contract hardening', () => {
     expect(calls).toEqual([])
   })
 
-  it('ES-T99 removes a signal-linked registration on manual unsubscribe', () => {
+  it('removes a signal-linked registration on manual unsubscribe', () => {
     const remove = vi.fn()
     const signal = {
       aborted: false,
@@ -375,7 +375,7 @@ describe('event-subscriber contract hardening', () => {
     expect(listeners.size).toBe(0)
   })
 
-  it('ES-T09 does not register against an already-aborted signal', () => {
+  it('does not register against an already-aborted signal', () => {
     const subscribe = vi.fn(() => () => undefined)
     const signal = {
       aborted: true,
@@ -386,7 +386,7 @@ describe('event-subscriber contract hardening', () => {
     expect(subscribe).not.toHaveBeenCalled()
   })
 
-  it('ES-T72 rechecks aborted after listener installation and releases the registration', () => {
+  it('rechecks aborted after listener installation and releases the registration', () => {
     const release = vi.fn()
     let reads = 0
     const signal = {
@@ -403,7 +403,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T81 preserves second-check reason as primary over remove and release failures', () => {
+  it('preserves second-check reason as primary over remove and release failures', () => {
     let abortedReads = 0
     const reasonFailure = new Error('second-check reason')
     const removeFailure = new Error('second-check remove')
@@ -440,7 +440,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T82 invokes signal methods directly with the original receiver', () => {
+  it('invokes signal methods directly with the original receiver', () => {
     const signal = {
       marker: 11,
       aborted: false,
@@ -459,7 +459,7 @@ describe('event-subscriber contract hardening', () => {
     stop()
   })
 
-  it('ES-T44 reports remove failure after releasing a manually unsubscribed registration', () => {
+  it('reports remove failure after releasing a manually unsubscribed registration', () => {
     const release = vi.fn()
     const signal = {
       aborted: false,
@@ -475,7 +475,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T21 makes structural subscribeOnce atomic when subscribe invokes synchronously', () => {
+  it('makes structural subscribeOnce atomic when subscribe invokes synchronously', () => {
     let callback!: (event: { value: number }) => void
     let active = true
     const channel = {
@@ -498,7 +498,7 @@ describe('event-subscriber contract hardening', () => {
     expect(active).toBe(false)
   })
 
-  it('ES-T60 rejects structurally illegal synchronous once callbacks and rolls back', () => {
+  it('rejects structurally illegal synchronous once callbacks and rolls back', () => {
     const release = vi.fn()
     const listener = vi.fn()
     const channel = {
@@ -516,7 +516,7 @@ describe('event-subscriber contract hardening', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('ES-T61 suppresses structural once callbacks when disposer validation fails', () => {
+  it('suppresses structural once callbacks when disposer validation fails', () => {
     const listener = vi.fn()
     expect(() =>
       subscribeOnce(
@@ -533,7 +533,7 @@ describe('event-subscriber contract hardening', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('ES-T62 suppresses structural until callbacks when disposer validation fails', () => {
+  it('suppresses structural until callbacks when disposer validation fails', () => {
     const listener = vi.fn()
     expect(() =>
       subscribeUntil(
@@ -550,7 +550,7 @@ describe('event-subscriber contract hardening', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it('ES-T63 installs abort observation before structural source subscription and rolls back sync delivery', () => {
+  it('installs abort observation before structural source subscription and rolls back sync delivery', () => {
     let observed = false
     const add = vi.fn(() => {
       observed = true
@@ -574,7 +574,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T64 rejects source events when abort races source installation and rolls back', () => {
+  it('rejects source events when abort races source installation and rolls back', () => {
     let abortListener!: () => void
     const release = vi.fn()
     const listener = vi.fn()
@@ -600,7 +600,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T65 cleans up when addEventListener stores then throws', () => {
+  it('cleans up when addEventListener stores then throws', () => {
     const addFailure = new Error('add failed')
     const remove = vi.fn()
     let storedCallback!: () => void
@@ -619,7 +619,7 @@ describe('event-subscriber contract hardening', () => {
     expect(remove).toHaveBeenCalledOnce()
   })
 
-  it('ES-T66 marks abort before a hostile reason getter and preserves cleanup errors after it', () => {
+  it('marks abort before a hostile reason getter and preserves cleanup errors after it', () => {
     let abortListener!: () => void
     let observedEvent!: { readonly aborted: boolean }
     const reasonFailure = new Error('reason getter')
@@ -663,7 +663,7 @@ describe('event-subscriber contract hardening', () => {
     expect(() => stop()).not.toThrow()
   })
 
-  it('ES-T67 makes cleanup idempotent and preserves both cleanup failures', () => {
+  it('makes cleanup idempotent and preserves both cleanup failures', () => {
     const removeFailure = new Error('remove failed')
     const releaseFailure = new Error('release failed')
     const remove = vi.fn(() => {
@@ -689,7 +689,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T74 makes once cleanup helper-owned and idempotent', () => {
+  it('makes once cleanup helper-owned and idempotent', () => {
     const release = vi.fn()
     const stop = subscribeOnce({ subscribe: () => release } as never, () => undefined)
     stop()
@@ -697,7 +697,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T75 validates helper options even when a structural source ignores them', () => {
+  it('validates helper options even when a structural source ignores them', () => {
     const source = { subscribe: () => () => undefined }
     expect(() =>
       subscribeOnce(source as never, () => undefined, { taskId: 1 } as never)
@@ -712,7 +712,7 @@ describe('event-subscriber contract hardening', () => {
     ).toThrowError(expect.objectContaining({ code: EventSubscriberErrorCode.invalidTaskId }))
   })
 
-  it('ES-T76 rejects a hostile synchronous source storm during helper installation', () => {
+  it('rejects a hostile synchronous source storm during helper installation', () => {
     const listener = vi.fn()
     const release = vi.fn()
     expect(() =>
@@ -731,7 +731,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T77 preserves a business listener failure after structural installation', () => {
+  it('preserves a business listener failure after structural installation', () => {
     let emit!: (event: { value: number }) => void
     const failure = new Error('business failure')
     subscribeUntil(
@@ -750,7 +750,7 @@ describe('event-subscriber contract hardening', () => {
     expect(failure).not.toMatchObject({ code: EventSubscriberErrorCode.invalidSignal })
   })
 
-  it('ES-T78 codes revoked structural channel and signal boundaries', () => {
+  it('codes revoked structural channel and signal boundaries', () => {
     const channel = Proxy.revocable({ subscribe: () => () => undefined }, {})
     channel.revoke()
     expect(() => subscribeOnce(channel.proxy as never, () => undefined)).toThrowError(
@@ -767,7 +767,7 @@ describe('event-subscriber contract hardening', () => {
     ).toThrowError(expect.objectContaining({ code: EventSubscriberErrorCode.invalidSignal }))
   })
 
-  it('ES-T83 codes revoked thrown boundary values while preserving the original cause', () => {
+  it('codes revoked thrown boundary values while preserving the original cause', () => {
     const revoked = Proxy.revocable({}, {})
     revoked.revoke()
     const options = {
@@ -785,7 +785,7 @@ describe('event-subscriber contract hardening', () => {
     expect((thrown as { readonly cause?: unknown }).cause).toBe(revoked.proxy)
   })
 
-  it('ES-T84 suppresses once and until callbacks re-entered by release', () => {
+  it('suppresses once and until callbacks re-entered by release', () => {
     let onceCallback!: (event: { value: number }) => void
     let untilCallback!: (event: { value: number }) => void
     const onceRelease = vi.fn(() => onceCallback({ value: 1 }))
@@ -815,7 +815,7 @@ describe('event-subscriber contract hardening', () => {
     expect(untilListener).not.toHaveBeenCalled()
   })
 
-  it('ES-T85 validates subscriber disposers and codes disposer failures', () => {
+  it('validates subscriber disposers and codes disposer failures', () => {
     expect(() =>
       subscribeSubscriber({ subscribe: () => null } as never, { handle: () => undefined })
     ).toThrowError(expect.objectContaining({ code: EventSubscriberErrorCode.invalidChannel }))
@@ -835,7 +835,7 @@ describe('event-subscriber contract hardening', () => {
     expect(() => stop()).not.toThrow()
   })
 
-  it('ES-T86 codes once disposer failures during manual stop and rollback', () => {
+  it('codes once disposer failures during manual stop and rollback', () => {
     const manualFailure = new Error('once manual release')
     const manualStop = subscribeOnce(
       {
@@ -870,7 +870,7 @@ describe('event-subscriber contract hardening', () => {
     )
   })
 
-  it('ES-T87 validates signal methods before accepting an already-aborted signal', () => {
+  it('validates signal methods before accepting an already-aborted signal', () => {
     expect(() =>
       subscribeUntil(
         { subscribe: () => () => undefined } as never,
@@ -880,7 +880,7 @@ describe('event-subscriber contract hardening', () => {
     ).toThrowError(expect.objectContaining({ code: EventSubscriberErrorCode.invalidSignal }))
   })
 
-  it('ES-T88 ignores a stale abort callback after manual stop without reading reason', () => {
+  it('ignores a stale abort callback after manual stop without reading reason', () => {
     let abortCallback!: () => void
     let reasonReads = 0
     const signal = {
@@ -904,7 +904,7 @@ describe('event-subscriber contract hardening', () => {
     expect(reasonReads).toBe(0)
   })
 
-  it('ES-T89 invokes terminal queueMicrotask with its original receiver', () => {
+  it('invokes terminal queueMicrotask with its original receiver', () => {
     const callbacks: (() => void)[] = []
     class Host {
       #calls = 0
@@ -924,7 +924,7 @@ describe('event-subscriber contract hardening', () => {
     expect(callbacks).toHaveLength(1)
   })
 
-  it('ES-T52 routes reporter and terminal thenable failures to the system sink', async () => {
+  it('routes reporter and terminal thenable failures to the system sink', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const channel = createEventChannel<number>({
       report: () => {
@@ -942,7 +942,7 @@ describe('event-subscriber contract hardening', () => {
     consoleError.mockRestore()
   })
 
-  it('ES-T55 continues terminal fallback after a hostile then getter', async () => {
+  it('continues terminal fallback after a hostile then getter', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const terminalFailure = new Error('terminal then getter')
     const terminalReport = () => {
@@ -967,7 +967,7 @@ describe('event-subscriber contract hardening', () => {
     consoleError.mockRestore()
   })
 
-  it('ES-T42 continues terminal fallback after a synchronous terminal throw', async () => {
+  it('continues terminal fallback after a synchronous terminal throw', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const terminalFailure = new Error('terminal throw')
     const channel = createEventChannel<number>({
@@ -983,7 +983,7 @@ describe('event-subscriber contract hardening', () => {
     consoleError.mockRestore()
   })
 
-  it('ES-T90 routes an asynchronous reporter rejection to terminal fallback', async () => {
+  it('routes an asynchronous reporter rejection to terminal fallback', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const listenerFailure = new Error('listener failure')
     const reporterFailure = new Error('async reporter failure')
@@ -1000,7 +1000,7 @@ describe('event-subscriber contract hardening', () => {
     consoleError.mockRestore()
   })
 
-  it('ES-T91 synchronously throws when queueMicrotask is missing or non-callable', () => {
+  it('synchronously throws when queueMicrotask is missing or non-callable', () => {
     const diagnostic = new Error('terminal diagnostic')
     const hosts: readonly object[] = [
       {},
@@ -1019,7 +1019,7 @@ describe('event-subscriber contract hardening', () => {
     }
   })
 
-  it('ES-T92 preserves hostile structural boundary failures as coded causes', () => {
+  it('preserves hostile structural boundary failures as coded causes', () => {
     const revoked = Proxy.revocable({}, {})
     revoked.revoke()
     const channel = createEventChannel()
@@ -1058,7 +1058,7 @@ describe('event-subscriber contract hardening', () => {
     )
   })
 
-  it('ES-T93 wraps non-Error thrown values and hostile Error probes safely', () => {
+  it('wraps non-Error thrown values and hostile Error probes safely', () => {
     const values: readonly unknown[] = [{ reason: 'object' }, () => undefined, 'string']
     for (const value of values) {
       const coded = codeExistingError(value, EventSubscriberErrorCode.invalidChannel) as Error & {
@@ -1080,7 +1080,7 @@ describe('event-subscriber contract hardening', () => {
     expect(codedRevoked.cause).toBe(revoked.proxy)
   })
 
-  it('ES-T94 rolls back subscriber installation exactly once on synchronous delivery', () => {
+  it('rolls back subscriber installation exactly once on synchronous delivery', () => {
     let callback!: (event: { value: number }) => void
     const release = vi.fn()
     const handle = vi.fn()
@@ -1101,7 +1101,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T95 makes subscriber release suppress reentrant and stale callbacks', () => {
+  it('makes subscriber release suppress reentrant and stale callbacks', () => {
     let callback!: (event: { value: number }) => void
     const handle = vi.fn()
     const release = vi.fn(() => callback({ value: 1 }))
@@ -1121,7 +1121,7 @@ describe('event-subscriber contract hardening', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('ES-T96 removes a listener retained after synchronous abort during installation', () => {
+  it('removes a listener retained after synchronous abort during installation', () => {
     const retained = new Set<() => void>()
     const remove = vi.fn((_: string, callback: () => void) => {
       retained.delete(callback)
@@ -1154,7 +1154,7 @@ describe('event-subscriber contract hardening', () => {
     expect(remove).toHaveBeenCalledOnce()
   })
 
-  it('ES-T97 preserves a genuine cross-realm Error while coding it', () => {
+  it('preserves a genuine cross-realm Error while coding it', () => {
     const foreignError = vm.runInNewContext('new TypeError("foreign")') as Error
     const coded = codeExistingError(
       foreignError,
@@ -1168,7 +1168,7 @@ describe('event-subscriber contract hardening', () => {
     expect(coded.code).toBe(EventSubscriberErrorCode.invalidChannel)
   })
 
-  it('ES-T98 reads queueMicrotask once and preserves its receiver', () => {
+  it('reads queueMicrotask once and preserves its receiver', () => {
     const callbacks: (() => void)[] = []
     let reads = 0
     class Host {
@@ -1200,7 +1200,7 @@ describe('event-subscriber contract hardening', () => {
   // its native type, and a wrapper carrying it on `cause` keeps neither. The shared validator
   // captures that throw instead of letting it escape, so only the call site can preserve the
   // identity — and both admission reads can lose it independently, so both are asserted here.
-  it('ES-T188 preserves the thrown identity of a hostile aborted getter at both admission reads', () => {
+  it('preserves the thrown identity of a hostile aborted getter at both admission reads', () => {
     class HostileAbortedError extends RangeError {}
 
     const entryFailure = new HostileAbortedError('aborted getter failed at entry')

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { HookRegistry } from '../../../dist/core/internal/hooks.js'
 
 describe('HookRegistry', () => {
-  it('ES-T47 preserves Set dedupe and stale disposer identity', () => {
+  it('preserves Set dedupe and stale disposer identity', () => {
     const registry = new HookRegistry()
     const calls: string[] = []
     const hook = (event: { name: string }) => {
@@ -19,7 +19,7 @@ describe('HookRegistry', () => {
     expect(registry.size).toBe(0)
   })
 
-  it('ES-T18 isolates thenable and diagnostic failures', async () => {
+  it('isolates thenable and diagnostic failures', async () => {
     const diagnostics: unknown[] = []
     let thenCalls = 0
     const thenable = {

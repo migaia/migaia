@@ -12,7 +12,7 @@ function hostFixture(overrides: Partial<IFixtureOptions> = {}) {
 }
 
 describe('thread Host facade', () => {
-  it('[A5] Host forwards callWallTimeMs as the total request deadline', async () => {
+  it('Host forwards callWallTimeMs as the total request deadline', async () => {
     /** The clock is advanced only after a real Worker has received the logical call. */
     const scheduler = createManualScheduler()
     /** Host requests use the same remote deadline owner as Plugin requests. */
@@ -51,7 +51,7 @@ describe('thread Host facade', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 
-  it('[A2] uses two independent Worker Hosts and closes only one connection', async () => {
+  it('uses two independent Worker Hosts and closes only one connection', async () => {
     const first = hostFixture()
     const second = hostFixture()
     try {
@@ -81,7 +81,7 @@ describe('thread Host facade', () => {
       await second.close()
     }
   })
-  it('[A2] rejects absent local resolver before endpoint publication', async () => {
+  it('rejects absent local resolver before endpoint publication', async () => {
     let endpoints = 0
     const host = runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }

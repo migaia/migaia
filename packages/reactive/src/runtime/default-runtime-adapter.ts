@@ -1,8 +1,7 @@
 import type { IReactiveRuntimeAdapter } from './types.js'
 
 /**
- * Default runtime adapter and the sole host API boundary
- * (`docs/contracts/runtime-neutrality.sdd.md` R-9).
+ * Default runtime adapter and the sole host API boundary .
  *
  * Core algorithms do not access `queueMicrotask`, `performance`, `Date`, or `console` directly.
  * This adapter owns those host accesses. Pass `createRuntime({ adapter })` to replace its

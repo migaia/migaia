@@ -4,7 +4,7 @@ import { bridgeEndpoint, bridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC envelope mapping', () => {
   it.each(['response-first', 'abort-first'])(
-    '[A6] retains core settlement for %s same-tick response/abort delivery',
+    'retains core settlement for %s same-tick response/abort delivery',
     async (order) => {
       const fixture = bridgeFixture()
       const channel = await fixture.open()
@@ -43,7 +43,7 @@ describe('JSON-RPC envelope mapping', () => {
       }
     }
   )
-  it('[A5] preserves ids, reverses routes, handles null and projects exact metadata', async () => {
+  it('preserves ids, reverses routes, handles null and projects exact metadata', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     const responses: unknown[] = []
@@ -118,7 +118,7 @@ describe('JSON-RPC envelope mapping', () => {
     expect(fixture.reports).toHaveLength(2)
     await channel.close()
   })
-  it('[A5] preserves Host control method names and args through invoke', async () => {
+  it('preserves Host control method names and args through invoke', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open({
       target: {
@@ -144,7 +144,7 @@ describe('JSON-RPC envelope mapping', () => {
     ])
     await channel.close()
   })
-  it('[A6] sends one cancel after invoke, reports late response once, and keeps the next call usable', async () => {
+  it('sends one cancel after invoke, reports late response once, and keeps the next call usable', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     const responses: unknown[] = []
@@ -187,7 +187,7 @@ describe('JSON-RPC envelope mapping', () => {
     expect(fixture.closes).toBe(0)
     await channel.close()
   })
-  it('[A5/A6] core gate preserves one-way ids and caller abort/deadline settlement', async () => {
+  it('core gate preserves one-way ids and caller abort/deadline settlement', async () => {
     const fixture = bridgeFixture()
     const channel = await fixture.open()
     const endpoint = await bridgeEndpoint(channel)

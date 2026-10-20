@@ -21,7 +21,7 @@ function streams(closePhysical: () => void | Promise<void> = () => undefined) {
 }
 
 describe('Web byte stream adapter', () => {
-  it('[A8] reads and writes without adding a second frame queue', async () => {
+  it('reads and writes without adding a second frame queue', async () => {
     const port = streams()
     const seen = new Promise<Uint8Array>((resolve) => {
       port.channel.onData((chunk) => resolve(chunk))
@@ -43,7 +43,7 @@ describe('Web byte stream adapter', () => {
     expect(late).toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
   })
 
-  it('[A8] turns physical EOF into one terminal channel event', async () => {
+  it('turns physical EOF into one terminal channel event', async () => {
     /** The physical close callback runs only after the stream reaches EOF. */
     let physicalCloses = 0
     const port = streams(() => {
@@ -59,7 +59,7 @@ describe('Web byte stream adapter', () => {
     expect(physicalCloses).toBe(1)
   })
 
-  it('[A8] retains original physical cleanup failure through native AggregateError cause/errors', async () => {
+  it('retains original physical cleanup failure through native AggregateError cause/errors', async () => {
     const failure = new Error('physical close failed')
     const port = streams(() => {
       throw failure
@@ -74,7 +74,7 @@ describe('Web byte stream adapter', () => {
     })
   })
 
-  it('[A8] closes after a native reader failure', async () => {
+  it('closes after a native reader failure', async () => {
     const port = streams()
     const failure = new Error('reader failed')
     const closed = new Promise<unknown>((resolve) => {

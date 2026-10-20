@@ -46,7 +46,7 @@ export const FixtureTrace = {
   processKind: 'process',
   warning: 'existing platform warning',
   failure: 'unexpected failure',
-  acceptance: 'A-total actual three-host T1'
+  acceptance: 'actual three-host trace'
 }
 
 /**

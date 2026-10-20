@@ -9,7 +9,7 @@ import {
 const replacement = definePlugin({ name: 'p', install: () => ({}) })
 
 describe('process instance fallback', () => {
-  it('[A5] closes every shared session before one target replacement', async () => {
+  it('closes every shared session before one target replacement', async () => {
     let emit: (event: IProcessInstanceFault) => void = () => undefined
     const order: string[] = []
     const replace = vi.fn(async (_name: string, _candidate: unknown) => {
@@ -53,7 +53,7 @@ describe('process instance fallback', () => {
     await fallback.close()
   })
 
-  it('[A5] keeps a failed shared target fenced and reports its original failure', async () => {
+  it('keeps a failed shared target fenced and reports its original failure', async () => {
     let emit: (event: IProcessInstanceFault) => void = () => undefined
     const failure = new Error('candidate failed')
     const report = vi.fn()
@@ -76,7 +76,7 @@ describe('process instance fallback', () => {
     await fallback.close()
   })
 
-  it('[A5] closes only the affected per-connection session', async () => {
+  it('closes only the affected per-connection session', async () => {
     let emit: (event: IProcessInstanceFault) => void = () => undefined
     const first = vi.fn(async () => undefined)
     const second = vi.fn(async () => undefined)
@@ -101,7 +101,7 @@ describe('process instance fallback', () => {
     await fallback.close()
   })
 
-  it('[A5] replaces a real Host target without changing the process owner', async () => {
+  it('replaces a real Host target without changing the process owner', async () => {
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

@@ -13,7 +13,7 @@ import * as fast from '../../dist/core/internal/fast-path.js'
 const remoteProcessJsonCodec = createRuntimeBytePipeline('json-codec-fixture').codec
 
 it.each(['json', 'json-custom-framer', 'live', 'copied-json'] as const)(
-  '[H1-D5] the receive owner derives %s metadata admission from original decoder identity',
+  'the receive owner derives %s metadata admission from original decoder identity',
   async (source) => {
     /**
      * Memory carries live data; only the canonical JSON decoder can supply decoded-record
@@ -70,7 +70,7 @@ it.each(['json', 'json-custom-framer', 'live', 'copied-json'] as const)(
   }
 )
 
-it('[H1-D6] live inbound metadata rejects its getter without running it', () => {
+it('live inbound metadata rejects its getter without running it', () => {
   /** This value is intentionally live; no codec factory has established decoded-record provenance. */
   const value = { profile: 'migaia.rpc.runtime-api/1' }
   /** Executing a metadata getter would cross the unchanged strict receive boundary. */

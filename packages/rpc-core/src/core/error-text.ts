@@ -22,7 +22,7 @@ export const RpcCoreErrorText = {
   probeSampleInvalid: 'Probe sample must be in (0, 1]',
   /** Method filtering accepts only a list of method names at definition time. */
   probeMethodsInvalid: 'Probe methods must be an array of strings',
-  /** D7 requires an extensible unregistered host with no own probe fields before any attachment. */
+  /** Requires an extensible unregistered host with no own probe fields before any attachment. */
   probeHostInvalid: 'Probe host must be an extensible unregistered object without own probe fields',
   /** Original process transfer rejection occurs before getters or first caller admission. */
   runtimeProcessTransferInvalid: 'Runtime process calls do not accept transfer',
@@ -32,23 +32,23 @@ export const RpcCoreErrorText = {
   runtimeIngressFrameLimitExceeded: 'rpc frame limit exceeded',
   /** Stable fence refusal discloses no foreign task, payload or generation identity. */
   providerGenerationMismatch: 'Provider generation does not match the selected task',
-  /** D35 runtime keys are unique across methods/bodies; callers must choose a new key for new work. */
+  /** Runtime keys are unique across methods/bodies; callers must choose a new key for new work. */
   runtimeIdempotencyConflict: 'Runtime idempotency key conflicts with its original operation',
-  /** D52 forbids splitting one atomic group across local business and distinct downstream providers. */
+  /** Forbids splitting one atomic group across local business and distinct downstream providers. */
   runtimeGroupTargetsInvalid: 'Runtime group must use one local provider or one forwarding target',
   /** Public local group configuration must use the canonical request-only dense step grammar. */
   runtimeGroupStepsInvalid: 'Runtime group steps are invalid',
   /** A completed group must settle a bounded failure when its full protected result cannot fit. */
   runtimeGroupResultTooLarge: 'Runtime group result exceeds the physical frame limit',
-  /** U40 rejects a forgotten receiver challenge before decoding any business payload. */
+  /** Rejects a forgotten receiver challenge before decoding any business payload. */
   authenticationSessionUnknown: 'Authentication challenge session is unknown',
-  /** U40 rejects malformed or misdirected signed challenge/control bindings. */
+  /** Rejects malformed or misdirected signed challenge/control bindings. */
   authenticationChallengeInvalid: 'Authentication challenge binding is invalid',
-  /** A108 retains the departed execution's failure instead of targeting its replacement. */
+  /** Retains the departed execution's failure instead of targeting its replacement. */
   providerGenerationRetired: 'Provider generation retired',
-  /** D51 refuses a repeated Host before provider admission; node ids remain structured route data. */
+  /** Refuses a repeated Host before provider admission; node ids remain structured route data. */
   forwardLoop: 'RPC forwarding route revisits a Host',
-  /** D51 fixes three forwarding nodes independently of a caller's timeout or provider limits. */
+  /** Fixes three forwarding nodes independently of a caller's timeout or provider limits. */
   forwardHopLimit: 'RPC forwarding route exceeds three forwarding Hosts',
   /** Stable fail-closed text for a Runtime API mode absent from the actual peer agreement. */
   capabilityUnsupported: 'Runtime operation capability is unavailable',

@@ -308,7 +308,10 @@ export function bindJsonRpcWire(
       )
   }
 
-  /** Apply IB1–IB7 in order before allowing any response to settle one pending request. */
+  /**
+   * Apply every inbound admission check in order before allowing any response to settle one pending
+   * request.
+   */
   const receiveOne = (value: unknown): void => {
     if (closed) return
     if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -533,7 +536,7 @@ export function bindJsonRpcWire(
     }
   }
 
-  /** Negotiated arrays preserve each original IB1–IB7 admission and isolate malformed siblings. */
+  /** Negotiated arrays preserve each original inbound admission and isolate malformed siblings. */
   const receive = (value: unknown): void => {
     if (probe !== undefined) observe(RpcProbeDirection.inbound, value, -1)
     if (!Array.isArray(value)) return receiveOne(value)

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('[closure A2/A3] Browser Peer forwards peer and original Window carrier events', async ({
+test('Browser Peer forwards peer and original Window carrier events', async ({
   page
 }) => {
   await page.goto('/browser-peer/index.html')
@@ -17,7 +17,7 @@ test('[closure A2/A3] Browser Peer forwards peer and original Window carrier eve
   expect(result.failures).toEqual([])
 })
 
-test('[BP-E1] cross-origin Window Peer carries request, notify and stream and borrows its iframe', async ({
+test('cross-origin Window Peer carries request, notify and stream and borrows its iframe', async ({
   page
 }) => {
   await page.goto('/browser-peer/index.html')
@@ -30,7 +30,7 @@ test('[BP-E1] cross-origin Window Peer carries request, notify and stream and bo
   })
 })
 
-test('[BP-E2] iframe unload settles pending request with the original Core deadline code', async ({
+test('iframe unload settles pending request with the original Core deadline code', async ({
   page
 }) => {
   await page.goto('/browser-peer/index.html')
@@ -41,7 +41,7 @@ test('[BP-E2] iframe unload settles pending request with the original Core deadl
   })
 })
 
-test('[BP-E3] one SharedWorker serves two page Peers and keeps the surviving page callable', async ({
+test('one SharedWorker serves two page Peers and keeps the surviving page callable', async ({
   context
 }) => {
   /** Real pages share one worker URL while owning independent native MessagePorts. */

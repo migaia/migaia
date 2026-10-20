@@ -15,7 +15,7 @@ import {
 } from '../../dist/core/internal/probe-emitter.js'
 import type { IRpcProbeEventView } from '../../dist/core/probe/types.js'
 
-it('[A1] isolates throwing subscribers, uses one view, updates stages and skips reentrant sequence', () => {
+it('isolates throwing subscribers, uses one view, updates stages and skips reentrant sequence', () => {
   /** Snapshots belong to this explicit copying test oracle. */
   const seen: Readonly<IRpcProbeEventView>[] = []
   /** View identities detect accidental per-event allocation. */
@@ -26,7 +26,7 @@ it('[A1] isolates throwing subscribers, uses one view, updates stages and skips 
   const failures: unknown[] = []
   /** Descriptor invocation count proves cold activation isolation. */
   let described = 0
-  /** Genuine P1 observes every logical event, even beside failing P3. */
+  /** The healthy probe observes every logical event, even beside the failing probe. */
   const first = defineProbe({
     stages: ['message'],
     describe: () => {
@@ -37,7 +37,7 @@ it('[A1] isolates throwing subscribers, uses one view, updates stages and skips 
       seen.push(snapshotProbeEvent(view))
     }
   })
-  /** Genuine P3 reports its original failure once per callback. */
+  /** The failing probe reports its original failure once per callback. */
   const failing = defineProbe({
     stages: ['message'],
     emit: () => {
@@ -71,7 +71,7 @@ it('[A1] isolates throwing subscribers, uses one view, updates stages and skips 
   expect(emitter.mask).toBe(0)
 })
 
-it('[A1] sample keys agree across stages; filtering happens before redaction', () => {
+it('sample keys agree across stages; filtering happens before redaction', () => {
   /** Sampled frame identifiers must match the public deterministic predictor. */
   const ids: string[] = []
   /** Unmatched methods must never invoke content redaction. */
@@ -103,7 +103,7 @@ it('[A1] sample keys agree across stages; filtering happens before redaction', (
   emitter.dispose()
 })
 
-it('[A1] reentrant calls are dropped, counted and leave a sequence gap', () => {
+it('reentrant calls are dropped, counted and leave a sequence gap', () => {
   /** Recorded sequence detects a nested observation rather than recursive sink entry. */
   const sequence: number[] = []
   /** Construction completes before this callback can reenter the same emitter. */
@@ -161,7 +161,7 @@ it('[A1] reentrant calls are dropped, counted and leave a sequence gap', () => {
   emitter.dispose()
 })
 
-it('[A1] reports asynchronous describe, redact and emit failures without interrupting another probe', async () => {
+it('reports asynchronous describe, redact and emit failures without interrupting another probe', async () => {
   /** Original failures are retained separately so every report can prove exact cause identity. */
   const originals = [
     new Error('describe fixture'),
@@ -215,7 +215,7 @@ it('[A1] reports asynchronous describe, redact and emit failures without interru
   emitter.dispose()
 })
 
-it('[A1] one transport retains its canonical observer and rolls back a conflicting installation', () => {
+it('one transport retains its canonical observer and rolls back a conflicting installation', () => {
   /** The actual transport identity is the construction binding key, independent of payload state. */
   const transport = {}
   /** First installation retains the one endpoint emitter. */
@@ -241,7 +241,7 @@ it('[A1] one transport retains its canonical observer and rolls back a conflicti
   expect(readInstalledProbe(transport)).toBeUndefined()
 })
 
-it('[A1] method filtering applies only to logical and envelope stages from the frozen contract', () => {
+it('method filtering applies only to logical and envelope stages from the frozen contract', () => {
   /** Only stages whose contract knows the method participate in method selection. */
   const seen: number[] = []
   /** Peer and frame observations remain available even when a logical method filter is configured. */
@@ -252,7 +252,7 @@ it('[A1] method filtering applies only to logical and envelope stages from the f
       seen.push(view.stage)
     }
   })
-  /** Source-side filtering follows contract §4, without inventing frame metadata. */
+  /** Source-side filtering follows contract, without inventing frame metadata. */
   const emitter = createProbeEmitter([probe], () => 0, 'methods')
   emitter.message(
     0,

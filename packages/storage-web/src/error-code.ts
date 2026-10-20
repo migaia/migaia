@@ -8,7 +8,7 @@
  * Code values are public API, so renaming one is a breaking change. Five contract codes move to
  * `@migaia/storage-contract`: `UNSUPPORTED_CAPABILITY`, `ABORTED`, `STORE_DISPOSED`,
  * `INVALID_ARGUMENT`, and `INVALID_KEY`. `INVALID_CONFIG` covers web adapter configuration
- * validation. See `docs/store-persist/storage-web-integration.sdd.md` §4.2.
+ * validation.
  */
 export const StorageErrorCode = Object.freeze({
   /**
@@ -16,8 +16,7 @@ export const StorageErrorCode = Object.freeze({
    * or `document` is disabled or missing.
    *
    * The caller selects `memoryStorageHost` explicitly or asks the user to enable storage access,
-   * rather than retrying the same unavailable backend. Enforces the availability probe contract in
-   * §10.1.
+   * rather than retrying the same unavailable backend. Enforces the availability probe contract.
    */
   unavailable: 'BACKEND_UNAVAILABLE',
 
@@ -139,9 +138,8 @@ export const StorageErrorCode = Object.freeze({
    * migration, schema, entity, and namespace codecs; backend options; and `selectCodec`'s
    * `onDiagnostic`.
    *
-   * Enforces `docs/store-persist/storage-web-integration.sdd.md` §4.2/D-13. Contract shape
-   * validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers adapter configuration
-   * only, as a local exception to unified argument validation in `error-code-rollout.sdd.md` §3.
+   * Contract shape validation uses `storage-contract`'s `INVALID_ARGUMENT`. This code covers
+   * adapter configuration only, as a local exception to unified argument validation.
    *
    * The caller corrects the configuration before retrying. The argument or configuration failure
    * persists until it changes.
@@ -156,30 +154,30 @@ export const StorageErrorCode = Object.freeze({
   indexOrphan: 'INDEX_ORPHAN',
 
   /**
-   * An indexed mutation would assign one logical unique key to two authoritative records. Enforces
-   * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different
+   * An indexed mutation would assign one logical unique key to two authoritative records.
+   * Uniqueness is enforced inside the record/sidecar transaction; callers must choose a different
    * indexed value or remove the competing record before retrying.
    */
   indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT',
 
   /**
    * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between
-   * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then
-   * closes it before yielding; callers must restart the query rather than trust a mixed snapshot.
+   * pages. Each page validates a short readonly transaction, then closes it before yielding;
+   * callers must restart the query rather than trust a mixed snapshot.
    */
   indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED',
 
   /**
    * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2
-   * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a
-   * new live query instead of reusing the disposed handle.
+   * Disposal cannot revive subscriptions or owned reactive state; callers must create a new live
+   * query instead of reusing the disposed handle.
    */
   liveQueryDisposed: 'LIVE_QUERY_DISPOSED',
 
   /**
    * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint.
-   * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should
-   * retry through a fresh repository operation after the current handle is reacquired.
+   * The batch must be rejected and rolled back; callers should retry through a fresh repository
+   * operation after the current handle is reacquired.
    */
   indexBackfillStale: 'INDEX_BACKFILL_STALE',
 
@@ -191,98 +189,98 @@ export const StorageErrorCode = Object.freeze({
   indexBackfillFailed: 'INDEX_BACKFILL_FAILED',
 
   /**
-   * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must
-   * correct the bounded backend ID before retrying installation.
+   * A backend definition contains an invalid identifier. Callers must correct the bounded backend
+   * ID before retrying installation.
    */
   backendIdInvalid: 'BACKEND_ID_INVALID',
 
   /**
-   * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23;
-   * callers must use a distinct ID or wait for the existing batch before retrying.
+   * A backend ID is already present in the host install batch or registry. Callers must use a
+   * distinct ID or wait for the existing batch before retrying.
    */
   backendDuplicate: 'BACKEND_DUPLICATE',
 
   /**
-   * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17;
-   * callers must install that exact backend or select an installed ID.
+   * A lookup requested a valid backend ID that has not been installed. Callers must install that
+   * exact backend or select an installed ID.
    */
   backendNotInstalled: 'BACKEND_NOT_INSTALLED',
 
   /**
-   * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers
-   * must repair the plugin definition rather than relying on an unvalidated store.
+   * A backend plugin or store failed its runtime contract check. Callers must repair the plugin
+   * definition rather than relying on an unvalidated store.
    */
   backendPluginInvalid: 'BACKEND_PLUGIN_INVALID',
 
   /**
-   * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30;
-   * callers may retry after fixing the cause, while the failed batch remains unpublished.
+   * Backend creation, preparation, or PluginHost installation failed. Callers may retry after
+   * fixing the cause, while the failed batch remains unpublished.
    */
   backendInstallFailed: 'BACKEND_INSTALL_FAILED',
 
   /**
-   * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82;
-   * callers must wait for that batch to settle and explicitly retry.
+   * A host mutation was requested while another install batch is active. Callers must wait for that
+   * batch to settle and explicitly retry.
    */
   storageHostBusy: 'STORAGE_HOST_BUSY',
 
   /**
-   * A host or its public operation was used after sealing or terminal disposal. Enforces
-   * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one.
+   * A host or its public operation was used after sealing or terminal disposal. Callers must create
+   * a new host instead of reviving this one.
    */
   storageHostDisposed: 'STORAGE_HOST_DISPOSED',
 
   /**
-   * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host
-   * as terminal while inspecting the aggregate errors for cleanup diagnostics.
+   * Host cleanup collected one or more failures. Callers must treat the host as terminal while
+   * inspecting the aggregate errors for cleanup diagnostics.
    */
   storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED',
 
   /**
-   * Live-query request or owned reactive cleanup collected one or more failures. Enforces
-   * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors.
+   * Live-query request or owned reactive cleanup collected one or more failures. Callers must treat
+   * the query as terminal and inspect AggregateError.errors.
    */
   liveQueryDisposeFailed: 'LIVE_QUERY_DISPOSE_FAILED',
 
   /**
-   * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces
-   * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying.
+   * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Callers must
+   * correct the exact feature/backend pairing before retrying.
    */
   reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID',
 
   /**
-   * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces
-   * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs.
+   * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Callers
+   * must repair the feature set before any host mutation occurs.
    */
   reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID',
 
   /**
-   * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the
-   * admitted reactive service before requesting a query.
+   * Host live-query service is not installed. Callers must install the admitted reactive service
+   * before requesting a query.
    */
   reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED',
 
   /**
-   * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87;
-   * callers must use an installed adapter-bound backend ID, with no default fallback.
+   * The requested backend lacks its reactive adapter or is not installed. Callers must use an
+   * installed adapter-bound backend ID, with no default fallback.
    */
   reactiveAdapterNotInstalled: 'REACTIVE_ADAPTER_NOT_INSTALLED',
 
   /**
-   * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers
-   * should observe the query error state and allow a later invalidation or poll to recover.
+   * A reactive adapter event, poll, or authoritative read failed. Callers should observe the query
+   * error state and allow a later invalidation or poll to recover.
    */
   reactiveAdapterFailed: 'REACTIVE_ADAPTER_FAILED',
 
   /**
-   * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81;
-   * callers must treat the adapter as terminal and inspect AggregateError.errors.
+   * Reactive adapter, poller, query, or service cleanup collected failures. Callers must treat the
+   * adapter as terminal and inspect AggregateError.errors.
    */
   reactiveAdapterDisposeFailed: 'REACTIVE_ADAPTER_DISPOSE_FAILED',
 
   /**
    * Direct backend quiescence, transport, connection, or channel cleanup collected failures.
-   * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors.
+   * Callers must treat the backend as terminal and inspect all errors.
    */
   backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'
 } as const)

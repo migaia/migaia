@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run current wire vectors and U36 runtime behavior through independent Python rules."""
+"""Run current wire vectors and runtime-baseline behavior through independent Python rules."""
 
 from __future__ import annotations
 

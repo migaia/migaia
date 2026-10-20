@@ -59,7 +59,7 @@ function endpoint(
   )
 }
 
-it('[A56] a pre-aborted one-way send keeps its reason and produces no physical frame', async () => {
+it('a pre-aborted one-way send keeps its reason and produces no physical frame', async () => {
   /** Both endpoints execute the current canonical provider/outbound/one-way graph. */
   const [callerTransport, providerTransport] = createMemoryTransportPair()
   /** This counter observes the real carrier, rather than client in-flight bookkeeping. */
@@ -91,11 +91,11 @@ it('[A56] a pre-aborted one-way send keeps its reason and produces no physical f
         caller.sendOneWay('provider', 'ready', null, { signal: controller.signal })
       )
     ])
-    assert.equal(sent, 0, '[A56] pre-aborted notify must not reach the physical transport')
-    assert.equal(result?.status, 'rejected', '[A56] cancellation is observable to the sender')
+    assert.equal(sent, 0, 'pre-aborted notify must not reach the physical transport')
+    assert.equal(result?.status, 'rejected', 'cancellation is observable to the sender')
     if (result?.status !== 'rejected') return
-    assert.equal(result.reason.code, 'CANCELLED', '[A56] the original abort code is preserved')
-    assert.equal(result.reason.cause, reason, '[A56] the caller reason keeps local identity')
+    assert.equal(result.reason.code, 'CANCELLED', 'the original abort code is preserved')
+    assert.equal(result.reason.cause, reason, 'the caller reason keeps local identity')
   } finally {
     await caller.dispose()
     await provider.dispose()
@@ -103,7 +103,7 @@ it('[A56] a pre-aborted one-way send keeps its reason and produces no physical f
   }
 })
 
-it('[A56] a cancelled one-way item leaves the canonical send queue without a frame or retry', async () => {
+it('a cancelled one-way item leaves the canonical send queue without a frame or retry', async () => {
   /** One genuine host write holds the original gate while the next operation becomes queued. */
   const [base, providerTransport] = createMemoryTransportPair()
   /** Actual writes, including recovery, distinguish queue withdrawal from a dropped response. */
@@ -121,7 +121,7 @@ it('[A56] a cancelled one-way item leaves the canonical send queue without a fra
     enter = resolve
   })
   /** The same existing bounded gate is registered by its Feature and wrapped transport. */
-  const queue = createIpcSendQueueFeature({ connectionId: 'a56-real-queue' })
+  const queue = createIpcSendQueueFeature({ connectionId: 'real-queue' })
   /** Native delivery is retained, while completion of only the first write is deliberately held. */
   const transport = createIpcSendQueueTransport(
     {
@@ -160,7 +160,7 @@ it('[A56] a cancelled one-way item leaves the canonical send queue without a fra
     controller.abort(reason)
     /** Cancellation settles while the first physical write is still held. */
     const [result] = await cancelled
-    assert.equal(result?.status, 'rejected', '[A56] queued cancellation is local and immediate')
+    assert.equal(result?.status, 'rejected', 'queued cancellation is local and immediate')
     if (result?.status === 'rejected') {
       assert.equal(result.reason.code, 'CANCELLED')
       assert.equal(result.reason.cause, reason)
@@ -169,7 +169,7 @@ it('[A56] a cancelled one-way item leaves the canonical send queue without a fra
     await first
     await caller.sendOneWay('provider', 'ready', null)
     await queue.gate.whenIdle()
-    assert.equal(sends, 2, '[A56] only the original and explicit later sends reach the carrier')
+    assert.equal(sends, 2, 'only the original and explicit later sends reach the carrier')
   } finally {
     release()
     await caller.dispose()
@@ -180,7 +180,7 @@ it('[A56] a cancelled one-way item leaves the canonical send queue without a fra
 
 /** Both cancellation paths must withdraw the same genuine preparation before commit. */
 for (const control of ['abort', 'deadline', 'late-failure'] as const) {
-  it(`[A56] ${control} during asynchronous signing withdraws the one-way frame before physical send`, async () => {
+  it(`${control} during asynchronous signing withdraws the one-way frame before physical send`, async () => {
     /** Actual caller writes are counted after the canonical authentication transform. */
     const [callerTransport, providerTransport] = createMemoryTransportPair()
     /** Count the actual transport boundary independently of the operation's settled Promise. */
@@ -209,7 +209,7 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
     })
     /** A public fixture key gives a real complete-frame signature with no private credential. */
     const signature = (value: unknown) =>
-      createHmac('sha256', 'a56-public-fixture-key').update(JSON.stringify(value)).digest('hex')
+      createHmac('sha256', 'public-fixture-key').update(JSON.stringify(value)).digest('hex')
     /** The native transform failure arrives only after the caller has already cancelled. */
     const lateFailure = new RangeError(RuntimeApiFixtureText.lateAuthentication)
     /** Reporting is observed through the original failure hook without any per-request listener. */
@@ -265,19 +265,19 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
       await nextTurn()
       assert.equal(await caller.send('provider', 'ready', null), 'ready')
       /** Only the later baseline request may be physically emitted. */
-      assert.equal(sent, 1, '[A56] an aborted signing operation emits zero notification frames')
+      assert.equal(sent, 1, 'an aborted signing operation emits zero notification frames')
       if (control === 'late-failure') {
         /** The late failure does not replace cancellation, disappear, or trigger a retry. */
         const reported = failures.find(
           (error) => (error as { cause?: unknown }).cause === lateFailure
         ) as { source?: string; code?: string; name?: string } | undefined
-        assert.ok(reported, '[A56] late transform failure is reported with its original cause')
+        assert.ok(reported, 'late transform failure is reported with its original cause')
         assert.equal(reported.source, '@migaia/rpc/core')
         assert.equal(reported.code, 'AUTHENTICATION_FAILED')
       }
       /** Cancellation uses the native code and exact local cause. */
       const [result] = await settlement
-      assert.equal(result?.status, 'rejected', '[A56] abort during signing remains observable')
+      assert.equal(result?.status, 'rejected', 'abort during signing remains observable')
       if (result?.status === 'rejected') {
         assert.equal(result.reason.code, control !== 'deadline' ? 'CANCELLED' : 'DEADLINE_EXCEEDED')
         if (control !== 'deadline') assert.equal(result.reason.cause, reason)

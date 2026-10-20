@@ -57,7 +57,7 @@ type IStorageNativeRegistrationContext = {
 }
 
 /**
- * Canonical lifecycle owner used by the R02 facade shell.
+ * Canonical lifecycle owner used by the facade shell.
  *
  * Built with `defineHost` rather than by extending `PluginHost`: the shell needed one domain-core
  * hook and one extra setter, and inheritance handed it the host's entire surface as well.
@@ -806,7 +806,7 @@ export class StorageHostFacade<
   }
 }
 
-/** Creates an async R02 facade shell; constructor sync work never reads platform globals. */
+/** Creates an async facade shell; constructor sync work never reads platform globals. */
 export const createStorageHost = async <
   const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
 >(

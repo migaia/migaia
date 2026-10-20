@@ -1,6 +1,7 @@
 /**
- * Tracked package-owned inventory used by T31 when the workspace-local documentation is ignored.
- * The Luna evidence command separately reconciles this inventory with the canonical SDD registry.
+ * Tracked package-owned inventory used by the registry check when the workspace-local documentation
+ * is ignored. The Luna evidence command separately reconciles this inventory with the canonical
+ * registry.
  */
 export const storageWebErrorCodeInventory = [
   'BACKEND_DISPOSE_FAILED',

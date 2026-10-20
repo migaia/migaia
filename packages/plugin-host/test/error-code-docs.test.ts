@@ -4,7 +4,7 @@ import { PluginHostErrorCode } from '../src/typing'
 import { PluginHostError, createPluginHostTypeError } from '../src/error-text'
 import ERROR_TEXT from '../src/error-text.js'
 
-/** A12 links PLUGIN_SUSPENDED and every public error code to maintained documentation. */
+/** Links PLUGIN_SUSPENDED and every public error code to maintained documentation. */
 describe('PluginHost public error-code documentation', () => {
   it('documents every exported error code in README and USEGUIDE', async () => {
     const [readme, useguide] = await Promise.all([
@@ -17,7 +17,7 @@ describe('PluginHost public error-code documentation', () => {
     }
   })
 
-  it('每个 PluginHostError 都携带 (source, code) 二元组（M-T41）', () => {
+  it('每个 PluginHostError 都携带 (source, code) 二元组', () => {
     const error = new PluginHostError('HOST_DISPOSED', 'host is disposed')
     expect(error.source).toBe('@migaia/plugin-host')
     expect(error.code).toBe('HOST_DISPOSED')
@@ -30,7 +30,7 @@ describe('PluginHost public error-code documentation', () => {
     expect(source).toMatch(/\/\*\*[\s\S]+temporarily suspended[\s\S]+pluginSuspended/)
   })
 
-  it('A7 registers the async setup sync-path code and its package texts', async () => {
+  it('registers the async setup sync-path code and its package texts', async () => {
     expect(PluginHostErrorCode.setupRequiresAsyncInstall).toBe('SETUP_REQUIRES_ASYNC_INSTALL')
     const [codes, texts] = await Promise.all([
       readFile(new URL('../src/error-code.ts', import.meta.url), 'utf8'),
@@ -46,7 +46,7 @@ describe('PluginHost public error-code documentation', () => {
       expect(texts).toContain(name)
   })
 
-  it('入参校验 TypeError 保持类型不变并携带 (source, INVALID_OPTION)（§7 裸抛扫描门禁）', () => {
+  it('入参校验 TypeError 保持类型不变并携带 (source, INVALID_OPTION)（裸抛扫描门禁）', () => {
     const error = createPluginHostTypeError('plugin name must be a non-empty string')
     expect(error).toBeInstanceOf(TypeError)
     expect(error.source).toBe('@migaia/plugin-host')
@@ -55,7 +55,7 @@ describe('PluginHost public error-code documentation', () => {
   })
 })
 
-describe('A8 release hook error contract', () => {
+describe('release hook error contract', () => {
   it('keeps the release phase and invalid hook messages in the canonical text owner', () => {
     expect(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION).toContain('beforeRelease')
     expect(ERROR_TEXT.BEFORE_RELEASE_PHASE).toContain('beforeRelease')
@@ -80,8 +80,7 @@ describe('A8 release hook error contract', () => {
       expect(text).toContain('beforeRelease')
       expect(text).toContain('affected')
       expect(text).toContain('dryRun: true')
-      expect(text).toContain('BC1')
-      expect(text).toContain('BC3')
+      expect(text).toContain('迁移')
     }
     for (const code of ['PLUGIN_DISPOSE_FAILED', 'LIFECYCLE_MUTATION', 'DISPOSE_STEP_TIMEOUT']) {
       const row = useguide.split('\n').find((line) => line.startsWith(`| \`${code}\``))

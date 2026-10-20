@@ -3,7 +3,7 @@ import { createEventChannel, invokeEachLive, withSnapshotEntries } from '../src/
 import { subscribeUntil } from '../src/subscriber.js'
 
 describe('audited event delivery contracts', () => {
-  it('ES-T203 D-03 preserves an explicitly thrown undefined visitor value as cause', () => {
+  it('preserves an explicitly thrown undefined visitor value as cause', () => {
     /** Primitive visitor throws still need a reachable original on their coded wrapper. */
     const channel = createEventChannel<number>()
     try {
@@ -18,7 +18,7 @@ describe('audited event delivery contracts', () => {
     }
   })
   it.each(['recursive', 'queued'] as const)(
-    'ES-T197 D-01 reports unfinished snapshot delivery under %s dispatch',
+    'reports unfinished snapshot delivery under %s dispatch',
     (dispatchPolicy) => {
       /** Two targets exceed one top-level transaction invocation budget. */
       const channel = createEventChannel<number>({ dispatchPolicy, publishBudget: 1 })
@@ -37,7 +37,7 @@ describe('audited event delivery contracts', () => {
     }
   )
 
-  it('ES-T200 D-02 retains the projected alias through abort-linked context controls', () => {
+  it('retains the projected alias through abort-linked context controls', () => {
     /** Canonical projection is evaluated once before either subscription sees the payload. */
     const channel = createEventChannel<
       { count: number },
@@ -69,7 +69,7 @@ describe('audited event delivery contracts', () => {
   })
 
   it.each(['snapshot', 'live'] as const)(
-    'ES-T198 D-03 annotates a native %s visitor failure in place',
+    'annotates a native %s visitor failure in place',
     (kind) => {
       /** Public visitor failure retains its exact native instance and stack. */
       const failure = new RangeError('visitor failed')
@@ -89,7 +89,7 @@ describe('audited event delivery contracts', () => {
     }
   )
 
-  it('ES-T201 D-03 codes asynchronous snapshot visitor rejection and closes its entries', async () => {
+  it('codes asynchronous snapshot visitor rejection and closes its entries', async () => {
     /** Rejection observation must use the same package boundary as a synchronous visitor throw. */
     const failure = new Error('async visitor failed')
     /** Retained invocation cannot be called after the failed visitor settles. */
