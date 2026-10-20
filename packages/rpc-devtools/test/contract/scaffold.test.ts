@@ -1,16 +1,16 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '@migaia/rpc-devtools'
-import { createRpcDevtoolsHub, RpcDevtoolsTargetStatus } from '@migaia/rpc-devtools/hub'
+import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
+import { createRpcDevtoolsHub, RpcDevtoolsTargetStatus } from '../../src/hub/index.js'
 import {
   decodeRpcDevtoolsRecord,
   encodeRpcDevtoolsRecord,
   RpcDevtoolsRecordFormat
-} from '@migaia/rpc-devtools/contract'
+} from '../../src/contract/index.js'
 import type {
   IRpcDevtoolsCounters,
   IRpcDevtoolsServiceApi,
   IRpcDevtoolsStats
-} from '@migaia/rpc-devtools/contract'
+} from '../../src/contract/index.js'
 import type { IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
 
 /** A typed Peer call must preserve the service's concrete stats result across the public API. */

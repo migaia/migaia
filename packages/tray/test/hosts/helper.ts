@@ -3,21 +3,24 @@ import { randomUUID } from 'node:crypto'
 import { BroadcastChannel } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
 
-/** These cases use the genuine built boundary also consumed by Node child entry fixtures. */
+/** Main-process fixture declarations share source brands; native Node entry fixtures keep dist. */
+vi.mock('@migaia/tray', () => import('../../src/index.js'))
+
+/** Main-process calls exercise source while child entry fixtures retain their built boundary. */
 export async function fixture() {
   /** Dynamic file URLs avoid a TypeScript declaration dependency on the plain-JS fixtures. */
   const hostsUrl = new URL('./fixtures/hosts.mjs', import.meta.url).href
-  /** Built root owns the same host brand as the imported child fixture declarations. */
-  const apiUrl = new URL('../../dist/index.js', import.meta.url).href
+  /** Source root owns the same host brand as this realm's redirected fixture declarations. */
+  const apiUrl = new URL('../../src/index.ts', import.meta.url).href
   return { ...(await import(hostsUrl)), ...(await import(apiUrl)) }
 }
 
 /** Canonical parent assembly exposes its existing internal PluginHost for outlet observation. */
 export async function assembled(options: any) {
   /** Internal owner is read directly; no public instrumentation method is introduced. */
-  const ownerUrl = new URL('../../dist/hosts/parent/tray.js', import.meta.url).href
+  const ownerUrl = new URL('../../src/hosts/parent/tray.ts', import.meta.url).href
   return (await import(ownerUrl)).createTrayRuntime(options)
 }
 

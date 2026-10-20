@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { RpcProbeOutcome } from '@migaia/rpc-core/probe'
-import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { createRpcDevtools } from '../../src/index.js'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 /** Exact fixture quantiles provide an independent oracle for bucket interpolation. */

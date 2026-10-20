@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createPeerPair } from '@migaia/rpc-core/testing'
 import { RpcProbeStage } from '@migaia/rpc-core/probe'
-import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '@migaia/rpc-devtools'
-import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'
+import { createRpcDevtools, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
+import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '../../src/contract/index.js'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 describe('collector query, watch and service', () => {

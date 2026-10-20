@@ -4,7 +4,7 @@ import { fixture } from './helper.js'
 
 describe('Tray public boundary and lifecycle events', () => {
   it('exports routing capabilities and registered mesh diagnostics', async () => {
-    /** The built package root is the public consumer boundary. */
+    /** The source package root exercises the public consumer boundary. */
     const api = await fixture()
     for (const name of ['defineRoutingPolicy', 'roundRobin', 'leastInFlight'])
       expect(api[name]).toBeDefined()
@@ -18,7 +18,7 @@ describe('Tray public boundary and lifecycle events', () => {
       expect(Object.values(api.TrayErrorCode)).toContain(code)
   })
   it('exposes the complete instances runtime API, coded messages and listed native child fixtures', async () => {
-    /** Built root is the package boundary also used by Node fixtures. */
+    /** Source root exercises the same public contract as native Node fixtures. */
     const api = await fixture()
     for (const symbol of [
       'defineTrayHost',
@@ -34,9 +34,9 @@ describe('Tray public boundary and lifecycle events', () => {
       false
     )
     /** Package-owned errors remain the one runtime constructor and canonical code owner. */
-    const errorsUrl = new URL('../../dist/errors.js', import.meta.url).href
+    const errorsUrl = new URL('../../src/errors.ts', import.meta.url).href
     /** Canonical table is consumed directly rather than copied into the fixture. */
-    const codesUrl = new URL('../../dist/error-code.js', import.meta.url).href
+    const codesUrl = new URL('../../src/error-code.ts', import.meta.url).href
     /** Runtime constructors must provide non-placeholder registered messages for every added code. */
     const errors = await import(errorsUrl)
     /** Unique semantic code values are declared only in this existing owner. */

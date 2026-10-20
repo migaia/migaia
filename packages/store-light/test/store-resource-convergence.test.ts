@@ -1,6 +1,6 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
-import { createStoreResource, type IStoreResource } from '@migaia/store-light'
+import { createStoreResource, type IStoreResource } from '../src/index.js'
 
 /** Captures the exact public Suspense operation without adding an adapter test seam. */
 function pending<T>(resource: IStoreResource<T>): Promise<T> {

@@ -5,7 +5,7 @@ import { createThreadPeer } from '@migaia/rpc-threads'
 import { createProcessPeer } from '@migaia/rpc-process'
 import type { IRuntimePeer } from '@migaia/rpc-core/remote'
 import { defineProbe, RpcProbeKind, RpcProbeStage } from '@migaia/rpc-core/probe'
-import { createThreadPool, createProcessPool } from '../dist/index.js'
+import { createThreadPool, createProcessPool } from '../src/index.js'
 
 vi.mock('@migaia/rpc-threads', async (importOriginal) => {
   /** Spy on the actual public factory; every native launch and restart still uses its original code. */

@@ -2,7 +2,7 @@ import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IRuntimePeer } from '@migaia/rpc-core/remote'
-import { createThreadPool } from '../dist/index.js'
+import { createThreadPool } from '../src/index.js'
 
 /** Public factory mocks observe pool scheduling without introducing a production test seam. */
 const factories = vi.hoisted(() => ({
