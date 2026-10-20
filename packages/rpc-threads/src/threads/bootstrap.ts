@@ -21,14 +21,6 @@ export type IThreadRuntimeBootstrap = Readonly<{
   generation?: IRpcRuntimeGeneration
 }>
 
-/** Snapshot actual offer labels once at bootstrap; no per-request capability scan is added. */
-export function threadCapabilityOffer(value: unknown): readonly string[] {
-  /** Contract owns the same bounded startup proposal grammar used by Core raw ACK reads. */
-  const parsed = rpcMessageCapabilityControl.readOffer(value)
-  if (!parsed.valid) return invalidThreadConfig(parsed.field, ThreadErrorText.bootstrapFailed)
-  return parsed.value
-}
-
 /**
  * A local clone adapter offers native storage only when its compiled endpoint restores portable
  * binary. Peer declarations stay untouched; core still requires the actual clone carrier.
@@ -75,14 +67,6 @@ export function createThreadRuntimeBootstrap(
       ...(context.generation ? { generation: context.generation } : {})
     }
   })
-}
-
-/** A runtime ACK proves the child's actual offer, without claiming endpoint activation. */
-export function readThreadRuntimeAcknowledgement(value: unknown): readonly string[] {
-  /** The compatibility reader delegates to the one public wire grammar, without minting trust. */
-  const parsed = rpcMessageCapabilityControl.readAcknowledgement(value)
-  if (!parsed.valid) return invalidThreadConfig(parsed.field, ThreadErrorText.bootstrapFailed)
-  return parsed.value
 }
 
 /** Read Node workerData or Web bootstrap without leaking its wrapper into business configuration. */
