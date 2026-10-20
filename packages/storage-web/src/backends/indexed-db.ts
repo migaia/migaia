@@ -3673,6 +3673,31 @@ export const indexedDbHost = <TValue = unknown>(
           )
         })
       ),
+    /** Delete one byte key under the existing mutation lease and publish only after native commit. */
+    removeBytes: (key, ctx) =>
+      withMutationLease((lease) =>
+        withAbort(ctx, async (signal, _context, runtime) => {
+          assertLive()
+          assertStringStorageKey(key, StorageBackend.indexedDb)
+          /** Membership and deletion share one native transaction; no-op deletes stay silent. */
+          let existed = false
+          await writeTo(
+            bytesStoreName,
+            (store) => {
+              /** Queue deletion from this request's active transaction, before commit can settle. */
+              const request = store.getKey(key)
+              request.onsuccess = () => {
+                existed = request.result !== undefined
+                if (existed) store.delete(key)
+              }
+            },
+            signal,
+            runtime,
+            lease
+          )
+          if (existed) publishChange({ channel: StorageChannel.bytes, kind: 'remove', keys: [key] })
+        })
+      ),
     clearBytes: (ctx) =>
       withMutationLease((lease) =>
         withAbort(ctx, async (signal, _context, runtime) => {

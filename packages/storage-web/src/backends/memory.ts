@@ -399,6 +399,14 @@ export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecord
         bytes.set(key, prepared)
         publishCommittedWrite(key, 'bytes', removed)
       }),
+    /** Remove one byte entry synchronously before publishing its committed membership change. */
+    removeBytes: (key, ctx) =>
+      withAbort(ctx, async () => {
+        assertLive()
+        assertStringStorageKey(key, StorageBackend.memory)
+        if (bytes.delete(key))
+          publishChange({ channel: StorageChannel.bytes, kind: 'remove', keys: [key] })
+      }),
     clearBytes: (ctx) =>
       withAbort(ctx, async () => {
         assertLive()

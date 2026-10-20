@@ -59,6 +59,11 @@ export type ISyncCapableStore<TStore extends { readonly sync?: object }> = TStor
 export type IRecordStore<TValue = unknown> = IKeyValueStore & {
   getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>
   setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>
+  /**
+   * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed
+   * without mutation; asynchronous backends resolve only after the deletion commits.
+   */
+  removeBytes(key: string, ctx?: IOperationContext): Promise<void>
   clearBytes(ctx?: IOperationContext): Promise<void>
   getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>
   putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>
@@ -134,6 +139,7 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
         ...[
           'getBytes',
           'setBytes',
+          'removeBytes',
           'clearBytes',
           'getRecord',
           'putRecord',

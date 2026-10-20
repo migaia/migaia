@@ -29,6 +29,7 @@ const fakeStore = (capabilities: Partial<IStorageCapabilities>) => ({
   dispose: async () => {},
   getBytes: async () => null,
   setBytes: async () => {},
+  removeBytes: async () => {},
   clearBytes: async () => {},
   getRecord: async () => undefined,
   putRecord: async () => 'key',

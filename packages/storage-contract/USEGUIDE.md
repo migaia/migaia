@@ -62,6 +62,7 @@ type ISyncCapableStore<TStore extends { readonly sync?: object }> = TStore & {
 type IRecordStore<TValue = unknown> = IKeyValueStore & {
   getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;
   setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;
+  removeBytes(key: string, ctx?: IOperationContext): Promise<void>;
   clearBytes(ctx?: IOperationContext): Promise<void>;
   getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;
   putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;
@@ -86,6 +87,10 @@ type IRecordStore<TValue = unknown> = IKeyValueStore & {
 
 `IRecordStore<T>` 是 L1：结构化后端额外提供的字节通道、结构化记录（`IStorageKey` 主键而非字符串）、范围迭代与事务。`putRecord` 未传 `key` 时由后端生成并返回该键。`metadata` 是后端自有、供可恢复的维护迁移使用的可选通道，与 `records`/`bytes`/`values` 通道相互独立，不受 `clearAll`/`clearRecords` 影响。`clearAll` 覆盖 L0 定义，同时清空 values/bytes/records 三个通道。
 
+`removeBytes(key, ctx?)` 仅删除 bytes 通道中的该键，键不存在时成功，因此重复删除是幂等的。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道；这些单键删除操作均保留其他通道的数据。
+
+`removeBytes` 是 L1 必需方法：自定义 `IRecordStore` 实现需补齐此方法；缺失时 `isRecordStore` 返回 `false`，`asRecordStore` 拒绝。完整 L0 准入不受影响。
+
 ```ts
 function isKeyValueStore(store: unknown): store is IKeyValueStore;
 ```
@@ -96,7 +101,7 @@ function isKeyValueStore(store: unknown): store is IKeyValueStore;
 function isRecordStore(store: IKeyValueStore): store is IRecordStore;
 ```
 
-在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。
+在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。
 
 ```ts
 function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;

@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- `@migaia/storage-contract` requires `IRecordStore.removeBytes(key, ctx?)`.
+  Custom L1 backends must delete only that byte entry, succeed idempotently
+  when it is absent, and preserve text and records. `isRecordStore()` and
+  `asRecordStore()` reject complete L1 implementations missing this method.
+  L0 clients and the built-in `@migaia/storage-web` backends need no migration.
+
 - Capability topology readers no longer expose `metrics()` or
   `ITopologyIndexMetrics`. Dynamic mutation results no longer contain `metrics`
   or export `IGraphTraversalMetrics`. Use `affected`, `topologyChanged` and

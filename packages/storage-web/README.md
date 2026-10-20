@@ -176,7 +176,9 @@ if (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')
 const records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)
 ```
 
-单参数 `store: IKeyValueStore`，均无选项。判定同时检查 `backend` 是否为已知种类、`capabilities.records/binary/transactions/iteration` 是否全为 `true`，以及 L1 全部方法（`getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）是否都是函数。
+单参数 `store: IKeyValueStore`，均无选项。判定同时检查 `backend` 是否为已知种类、`capabilities.records/binary/transactions/iteration` 是否全为 `true`，以及 L1 全部方法（`getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）是否都是函数。
+
+`removeBytes(key: string, ctx?: IOperationContext): Promise<void>` 仅删除 bytes 通道中的该键，缺失时成功。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道；这些单键删除操作均保留其他通道的数据。
 
 **`ConflictPolicy`｜3 秒上手** —— 常量对象，无调用参数：
 

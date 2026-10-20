@@ -103,6 +103,7 @@ const record = await asRecordStore<{ name: string }>(store).getRecord('profile')
 
 - `getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>`
 - `setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>`
+- `removeBytes(key: string, ctx?: IOperationContext): Promise<void>` —— 仅删除字节通道中的该键；不存在时成功
 - `clearBytes(ctx?: IOperationContext): Promise<void>`
 - `getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>`
 - `putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>` —— 未传 `key` 时由后端生成
@@ -112,6 +113,8 @@ const record = await asRecordStore<{ name: string }>(store).getRecord('profile')
 - `metadata?: { get, set, delete }`（只读，可选，后端自有的元数据通道，供可恢复的维护迁移使用）
 - `iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>`
 - `transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>`
+
+`remove` 仅删除 values 通道，`removeBytes` 仅删除 bytes 通道，`deleteRecord` 仅删除 records 通道；三者均保留其他通道的数据。
 
 **`isKeyValueStore`｜5 秒上手** —— 运行时校验未知值是否满足完整 L0 形状：
 

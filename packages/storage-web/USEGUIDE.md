@@ -364,6 +364,7 @@ type IIndexedDbOptions = {
 
 - `getBytes(key, ctx?)`：从 `bytesStoreName` 读取。IndexedDB 的 structured clone 可能把写入的 `Uint8Array` 还原为 `ArrayBuffer`（取决于实现），源码用 `@migaia/utils/bytes` 的 `isUint8Array` / `isArrayBuffer` 内部槽 guard 处理两种还原形态；它们不依赖 `instanceof` 或可伪造的 `constructor.name`，能正确覆盖 fake-indexeddb、jsdom、iframe 与 Worker 的跨 realm 值。不存在返回 `null`。
 - `setBytes(key, value, ctx?)`：`value` 必须是 `Uint8Array`（`isUint8Array`），否则抛 `INVALID_CONFIG`。写入前会 `.slice()` 出一份独立副本再走 `writeWithConflict('bytes', ...)`，避免调用方在异步边界之外继续修改同一份底层缓冲区。
+- `removeBytes(key, ctx?)`：仅删除 `bytesStoreName` 中该 key，缺失时成功；保留 values/records 通道中的数据。等事务 commit 后 resolve，仅实际删除已有字节时发布变更。
 - `clearBytes(ctx?)`：清空 `bytesStoreName`。
 
 ### L1（记录）方法
@@ -480,6 +481,7 @@ function memoryStorageHost<TValue = unknown>(): ISyncCapableStore<IRecordStore<T
 ### 行为要点
 
 - `sync` 通道只暴露 L0（`get`/`set`/`remove`/`has`/`keys`/`clearValues`）；异步 L0/L1/事务方法是完整实现，不是对 `sync` 的包装。
+- `removeBytes(key, ctx?)` 仅删除 bytes 通道中的该键，缺失时成功，且仅实际删除已有字节时发布变更。`remove` 仅删除 values 通道，`deleteRecord` 仅删除 records 通道，均保留其他通道的数据。
 - 跨通道冲突检测（value/bytes/record 共享同一逻辑 key）与 `indexedDbHost` 遵循相同的 `planChannelWrite` 规则（见[契约与能力模块](#契约与能力模块)）。
 - `transaction(run, ctx?)`：与 IndexedDB 相同的乐观并发模型——草稿隔离、提交前比对 `recordEpoch`（对应 `clearAll`）与每个访问过的 key 的 revision；不一致抛 `TRANSACTION_CONFLICT`。**与旧实现的关键差异**：草稿在提交前完全不触碰真实的 `documents` Map；早期实现直接在真实 Map 上写入、失败时用开头拍的快照整体覆盖回去——如果事务执行期间（`run(scope)` 内任意一次 `await` 之间）有其他并发的 `putRecord` 或另一个事务成功提交，那次快照恢复会把那次无关的成功写入一起抹掉。当前实现下失败只需丢弃草稿，真实数据从未被动过；成功时的合并循环是纯同步的（没有 `await`），不会被其他调用交错。
 - `iterateRecords(range?, ctx?)`：对当前全部记录按 `compareStorageKeys` 排序后再按 range 过滤 yield；不分页（内存数据集通常不需要）。
@@ -516,7 +518,7 @@ function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>
 
 1. `store.backend` 是已知种类之一（`'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'`）；
 2. `store.capabilities` 是完整、合法的 `IStorageCapabilities` 描述符，且 `records`/`binary`/`transactions`/`iteration` **全部**为 `true`；
-3. L0 全部方法（`get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose`）与 L1 全部方法（`getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）均为函数。
+3. L0 全部方法（`get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose`）与 L1 全部方法（`getBytes`/`setBytes`/`removeBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction`）均为函数。
 
 `isRecordStore` 是类型守卫，返回 `boolean`，读取任何字段抛错时视为 `false`（不上抛）。`asRecordStore` 收窄失败时抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`（`backend` 字段取判定过程中读到的种类，若种类本身不合法则为 `undefined`）。
 
@@ -595,6 +597,7 @@ type IKeyValueStore = {
 type IRecordStore<TValue = unknown> = IKeyValueStore & {
   getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>
   setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>
+  removeBytes(key: string, ctx?: IOperationContext): Promise<void>
   clearBytes(ctx?: IOperationContext): Promise<void>
   getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>
   putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>
