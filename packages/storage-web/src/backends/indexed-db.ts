@@ -2494,16 +2494,15 @@ export const indexedDbHost = <TValue = unknown>(
     }
   }
 
-  /** 写入等事务 commit，而不是等单条请求 success。 */
+  /** Every caller already holds a mutation lease; resolve only after the native write commits. */
   const writeTo = async (
     storeName: string,
     run: (store: IDBObjectStore) => unknown,
     signal: AbortSignal | undefined,
     runtime: IStorageOperationRuntime,
-    inheritedLease?: IMutationLeaseContext
+    inheritedLease: IMutationLeaseContext
   ): Promise<void> => {
     const database = await open(runtime, inheritedLease)
-    assertLive()
     const transaction = createTransaction(database, storeName, 'readwrite')
     const committed = idbTransactionCommit(transaction, { signal }, runtime)
     void committed.catch(() => {})

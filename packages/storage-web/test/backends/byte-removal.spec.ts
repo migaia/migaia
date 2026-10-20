@@ -123,3 +123,36 @@ it('rolls back an in-flight IndexedDB byte deletion without publishing a removal
     await store.dispose()
   }
 })
+
+it('finishes an admitted IndexedDB byte deletion before disposal closes the database and feed', async () => {
+  /** Reopening the same native factory proves the deletion became durable before disposal finished. */
+  const factory = new IDBFactory()
+  /** Both handles address one existing physical database through the ordinary public factory. */
+  const options = { factory, keyRange: IDBKeyRange, dbName: 'byte-removal-dispose' }
+  /** This store's mutation lease must outlive asynchronous connection preparation. */
+  const store = indexedDbHost(options)
+  /** Publication remains live until the already-admitted deletion commits. */
+  const changes: IStorageChange[] = []
+  try {
+    await store.setBytes('target', new Uint8Array([1]))
+    store.subscribeChanges((change) => changes.push(change))
+    /** Attach the result observer before closing so an erroneous late rejection is still observed. */
+    const deleted = expect(store.removeBytes('target')).resolves.toBeUndefined()
+    /** Disposal must wait for that same public operation instead of revoking its admitted lease. */
+    const closing = store.dispose()
+    await deleted
+    await closing
+    expect(changes.map(({ channel, kind, keys }) => ({ channel, kind, keys }))).toEqual([
+      { channel: 'bytes', kind: 'remove', keys: ['target'] }
+    ])
+    /** The original instance is closed, so a fresh public handle verifies the committed contents. */
+    const reopened = indexedDbHost(options)
+    try {
+      await expect(reopened.getBytes('target')).resolves.toBeNull()
+    } finally {
+      await reopened.dispose()
+    }
+  } finally {
+    await store.dispose()
+  }
+})
