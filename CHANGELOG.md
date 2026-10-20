@@ -41,6 +41,10 @@
 
 ### Behavior
 
+- `@migaia/reactive` ownership queries accept registered function references.
+  `ownerOf()` returns their runtime instead of `undefined`, and `assertOwnedBy()`
+  rejects a different runtime with the existing `CROSS_RUNTIME` error.
+
 - Plugin-host rejects synchronous hook calls to `activate()` before returning a shared
   activation Promise. Outside callers still share that Promise while a hook is pending.
   After an `await`, hook origin cannot be distinguished: activating the same registration
