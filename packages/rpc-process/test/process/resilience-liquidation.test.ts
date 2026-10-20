@@ -106,7 +106,9 @@ describe('process resilience committed liquidation', () => {
       name: 'P',
       host
     })
-    source.enter(new Error('terminal'))
+    /** Both owner and dependant call guards must retain this same terminal cause. */
+    const terminal = new Error('terminal')
+    source.enter(terminal)
     await settle()
     scheduler.advance(1)
     await settle()
@@ -114,6 +116,26 @@ describe('process resilience committed liquidation', () => {
     expect(resilience.inspect('P')).toMatchObject({ liquidated: true })
     expect(resilience.inspect('D2')).toMatchObject({ id: 'D2', unhandled: 1 })
     expect(resilience.inspect('D1')).toBeUndefined()
+    for (const [name, code] of [
+      ['P', 'PROCESS_LIQUIDATED'],
+      ['D2', 'PROCESS_TERMINAL_CALL']
+    ] as const) {
+      /** Each public rejection must retain the exact original terminal reason. */
+      let failure: unknown
+      try {
+        resilience
+          .callGuard(name)
+          .beforeDispatch({ method: 'read', mode: 'request', generation: 1 })
+      } catch (error) {
+        failure = error
+      }
+      expect(failure).toMatchObject({
+        source: '@migaia/rpc/process',
+        code,
+        detail: { registrationId: name }
+      })
+      expect((failure as Error).cause).toBe(terminal)
+    }
     expect(
       reports.filter(
         (error) =>
@@ -124,6 +146,51 @@ describe('process resilience committed liquidation', () => {
       )
     ).toHaveLength(1)
     await expect(registration.restart()).rejects.toMatchObject({ code: 'PROCESS_LIQUIDATED' })
+    await resilience.close()
+  })
+
+  it('lets a successful terminal handler stop the diagnostic clock while reporting a rejected sibling', async () => {
+    /** One deterministic owner receives the original supervisor terminal event. */
+    const scheduler = createManualScheduler()
+    /** Reports retain the rejected application's exact failure rather than replacing terminal state. */
+    const reports: unknown[] = []
+    /** This existing supervisor fixture supplies the real public registration port. */
+    const source = terminalSource((error) => reports.push(error))
+    /** A handled terminal event must not start automatic liquidation or future diagnostics. */
+    const resilience = createProcessResilience({
+      scheduler,
+      report: (error) => reports.push(error),
+      reportAtMs: [0, 1],
+      unhandledLimit: 1
+    })
+    /** One independent subscriber fails while the other handles the same terminal event. */
+    const failure = new Error('terminal handler rejected')
+    /** Public passive handlers observe the same canonical snapshot as inspect(). */
+    const handled = vi.fn(async () => undefined)
+    /** Automatic release must remain unused while at least one handler takes responsibility. */
+    const release = vi.fn(async () => undefined)
+    resilience.onTerminal(async () => {
+      throw failure
+    })
+    resilience.onTerminal(handled)
+    resilience.attachRegistration('P', source.binding, { kind: 'standalone-host', release })
+    /** Preserve the original reason independently from the failed diagnostic callback. */
+    const terminal = new Error('terminal')
+    source.enter(terminal)
+    await settle()
+    expect(reports).toEqual([terminal, failure])
+    expect(handled).toHaveBeenCalledOnce()
+    expect(resilience.inspect('P')).toMatchObject({
+      state: 'terminal',
+      unhandled: 0,
+      liquidated: false,
+      reason: terminal
+    })
+    scheduler.advance(100)
+    await settle()
+    expect(handled).toHaveBeenCalledOnce()
+    expect(release).not.toHaveBeenCalled()
+    expect(scheduler.pendingCount).toBe(0)
     await resilience.close()
   })
 
