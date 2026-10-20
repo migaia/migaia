@@ -54035,7 +54035,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -54045,12 +54045,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -54273,7 +54273,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -54283,12 +54283,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -55206,7 +55206,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -55216,12 +55216,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -55386,7 +55386,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -55396,12 +55396,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -56796,7 +56796,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -56806,12 +56806,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -57336,7 +57336,7 @@
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/ownership.d.ts:assertOwnedBy:export declare function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void;",
           "guidance": [],
-          "usageScore": 22,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "reactive-extension--assertOwnedBy"
         },
@@ -57526,7 +57526,7 @@
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/ownership.d.ts:claimOwnership:export declare function claimOwnership(value: object, runtime: IRuntime): void;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "reactive-extension--claimOwnership"
         },
@@ -59010,7 +59010,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -59020,12 +59020,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -59250,7 +59250,7 @@
                     [
                       "`crossRuntime`",
                       "`CROSS_RUNTIME`",
-                      "一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
+                      "一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验"
                     ],
                     [
                       "`notRuntimeOwned`",
@@ -59260,12 +59260,12 @@
                     [
                       "`ownershipConflict`",
                       "`OWNERSHIP_CONFLICT`",
-                      "同一个节点对象被重复登记到不同的 `Runtime`"
+                      "同一个对象或函数引用被重复登记到不同的 `Runtime`"
                     ],
                     [
                       "`copyConflict`",
                       "`COPY_CONFLICT`",
-                      "检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
+                      "检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一"
                     ],
                     ["`brandCorrupted`", "`BRAND_CORRUPTED`", "跨副本诊断品牌被发现处于非预期形状"],
                     [
@@ -60064,7 +60064,7 @@
           "declaredConfiguration": [],
           "identity": "packages/reactive/dist/runtime/ownership.d.ts:ownerOf:export declare function ownerOf(value: unknown): IRuntime | undefined;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "reactive-extension--ownerOf"
         },
@@ -154289,7 +154289,7 @@
           "name": "readThreadBootstrap",
           "kind": "function",
           "signature": "export declare function readThreadBootstrap(value: unknown): IThreadBootstrapData;",
-          "declarationLine": 39,
+          "declarationLine": 35,
           "source": "packages/rpc-threads/dist/threads/bootstrap.d.ts",
           "purpose": "Validates the bootstrap value a launcher wrote (Node `workerData` or the first Web message).",
           "core": "value: The raw bootstrap value received by the Worker.\n`{ peerId, data? }`; invalid input throws `INVALID_CONFIG`.",
@@ -154368,7 +154368,7 @@
           "name": "receiveThreadData",
           "kind": "function",
           "signature": "export declare function receiveThreadData(\n  port: IThreadWebPort,\n  prepare: (\n    data: IRpcPortableValue | undefined,\n    peerId: string,\n  ) => PromiseLike<void> | void,\n): Promise<IRpcPortableValue | undefined>;",
-          "declarationLine": 41,
+          "declarationLine": 37,
           "source": "packages/rpc-threads/dist/threads/bootstrap.d.ts",
           "purpose": "In a Web Worker, waits for the bootstrap message, runs `prepare`, then acknowledges readiness to the launcher.",
           "core": "port: The Worker global scope or port receiving the bootstrap.\nprepare: `(data, peerId) => void | Promise`; `data` is `spec.data` from the launcher, and `peerId` is the launched handle fingerprint used for the fixed channel address.\nResolves with the bootstrap data after acknowledging.",
