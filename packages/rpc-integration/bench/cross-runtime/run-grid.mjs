@@ -7,6 +7,10 @@ import { CrossRuntimeErrorText } from '../error-text.mjs'
 
 /** This migrated driver runs only the user's finite 27-pair directed source inventory. */
 const directory = fileURLToPath(new URL('.', import.meta.url))
+/** Repository exclusive-window runner, resolved from this checkout instead of a host path. */
+const exclusiveWindow = fileURLToPath(
+  new URL('../../../../scripts/exclusive-window.mjs', import.meta.url)
+)
 /** Existing public-source endpoints execute on the owner's checkout, never a simulated SDK. */
 const repository = resolve(directory, '../../../..')
 /** Count, formal timing and finite functional execution retain distinct receipt scopes. */
@@ -144,7 +148,7 @@ for (const row of rows) {
   /** Every actual runtime invocation is an argv array; fixture values never become shell code. */
   const args = [
     'node',
-    '/Users/kaeo/workspack/migai/scripts/exclusive-window.mjs',
+    exclusiveWindow,
     'run',
     '--window',
     'core-final-' + mode + '-' + row.pairOrdinal + '-' + row.carrier.split('-')[0],

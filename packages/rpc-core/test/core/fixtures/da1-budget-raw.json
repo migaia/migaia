@@ -161,7 +161,7 @@
             {
               "tool": "rust",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/rustc",
+              "path": "~/.cargo/bin/rustc",
               "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -169,7 +169,7 @@
             {
               "tool": "cargo",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/cargo",
+              "path": "~/.cargo/bin/cargo",
               "output": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -177,7 +177,7 @@
             {
               "tool": "go",
               "minimum": "1.26.4",
-              "path": "/Users/kaeo/.local/share/mise/installs/go/1.26.4/bin/go",
+              "path": "~/.local/share/mise/installs/go/1.26.4/bin/go",
               "output": "go version go1.26.4 darwin/arm64\n",
               "version": "1.26.4",
               "status": "accepted"
@@ -185,7 +185,7 @@
             {
               "tool": "node",
               "minimum": "24.16.0",
-              "path": "/Users/kaeo/.local/share/mise/installs/node/24.16.0/bin/node",
+              "path": "~/.local/share/mise/installs/node/24.16.0/bin/node",
               "output": "v24.16.0\n",
               "version": "24.16.0",
               "status": "accepted"
@@ -193,7 +193,7 @@
             {
               "tool": "typescript",
               "minimum": "6.0.2",
-              "path": "/Users/kaeo/workspack/migai/node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
+              "path": "node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
               "output": "Version 6.0.2\n",
               "version": "6.0.2",
               "status": "accepted"
@@ -349,7 +349,7 @@
             {
               "tool": "rust",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/rustc",
+              "path": "~/.cargo/bin/rustc",
               "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -357,7 +357,7 @@
             {
               "tool": "cargo",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/cargo",
+              "path": "~/.cargo/bin/cargo",
               "output": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -365,7 +365,7 @@
             {
               "tool": "go",
               "minimum": "1.26.4",
-              "path": "/Users/kaeo/.local/share/mise/installs/go/1.26.4/bin/go",
+              "path": "~/.local/share/mise/installs/go/1.26.4/bin/go",
               "output": "go version go1.26.4 darwin/arm64\n",
               "version": "1.26.4",
               "status": "accepted"
@@ -373,7 +373,7 @@
             {
               "tool": "node",
               "minimum": "24.16.0",
-              "path": "/Users/kaeo/.local/share/mise/installs/node/24.16.0/bin/node",
+              "path": "~/.local/share/mise/installs/node/24.16.0/bin/node",
               "output": "v24.16.0\n",
               "version": "24.16.0",
               "status": "accepted"
@@ -381,7 +381,7 @@
             {
               "tool": "typescript",
               "minimum": "6.0.2",
-              "path": "/Users/kaeo/workspack/migai/node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
+              "path": "node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
               "output": "Version 6.0.2\n",
               "version": "6.0.2",
               "status": "accepted"
@@ -541,7 +541,7 @@
             {
               "tool": "rust",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/rustc",
+              "path": "~/.cargo/bin/rustc",
               "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -549,7 +549,7 @@
             {
               "tool": "cargo",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/cargo",
+              "path": "~/.cargo/bin/cargo",
               "output": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -557,7 +557,7 @@
             {
               "tool": "go",
               "minimum": "1.26.4",
-              "path": "/Users/kaeo/.local/share/mise/installs/go/1.26.4/bin/go",
+              "path": "~/.local/share/mise/installs/go/1.26.4/bin/go",
               "output": "go version go1.26.4 darwin/arm64\n",
               "version": "1.26.4",
               "status": "accepted"
@@ -565,7 +565,7 @@
             {
               "tool": "node",
               "minimum": "24.16.0",
-              "path": "/Users/kaeo/.local/share/mise/installs/node/24.16.0/bin/node",
+              "path": "~/.local/share/mise/installs/node/24.16.0/bin/node",
               "output": "v24.16.0\n",
               "version": "24.16.0",
               "status": "accepted"
@@ -573,7 +573,7 @@
             {
               "tool": "typescript",
               "minimum": "6.0.2",
-              "path": "/Users/kaeo/workspack/migai/node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
+              "path": "node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
               "output": "Version 6.0.2\n",
               "version": "6.0.2",
               "status": "accepted"
@@ -726,7 +726,7 @@
             {
               "tool": "rust",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/rustc",
+              "path": "~/.cargo/bin/rustc",
               "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -734,7 +734,7 @@
             {
               "tool": "cargo",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/cargo",
+              "path": "~/.cargo/bin/cargo",
               "output": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -742,7 +742,7 @@
             {
               "tool": "go",
               "minimum": "1.26.4",
-              "path": "/Users/kaeo/.local/share/mise/installs/go/1.26.4/bin/go",
+              "path": "~/.local/share/mise/installs/go/1.26.4/bin/go",
               "output": "go version go1.26.4 darwin/arm64\n",
               "version": "1.26.4",
               "status": "accepted"
@@ -750,7 +750,7 @@
             {
               "tool": "node",
               "minimum": "24.16.0",
-              "path": "/Users/kaeo/.local/share/mise/installs/node/24.16.0/bin/node",
+              "path": "~/.local/share/mise/installs/node/24.16.0/bin/node",
               "output": "v24.16.0\n",
               "version": "24.16.0",
               "status": "accepted"
@@ -758,7 +758,7 @@
             {
               "tool": "typescript",
               "minimum": "6.0.2",
-              "path": "/Users/kaeo/workspack/migai/node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
+              "path": "node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
               "output": "Version 6.0.2\n",
               "version": "6.0.2",
               "status": "accepted"
@@ -914,7 +914,7 @@
             {
               "tool": "rust",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/rustc",
+              "path": "~/.cargo/bin/rustc",
               "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -922,7 +922,7 @@
             {
               "tool": "cargo",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/cargo",
+              "path": "~/.cargo/bin/cargo",
               "output": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -930,7 +930,7 @@
             {
               "tool": "go",
               "minimum": "1.26.4",
-              "path": "/Users/kaeo/.local/share/mise/installs/go/1.26.4/bin/go",
+              "path": "~/.local/share/mise/installs/go/1.26.4/bin/go",
               "output": "go version go1.26.4 darwin/arm64\n",
               "version": "1.26.4",
               "status": "accepted"
@@ -938,7 +938,7 @@
             {
               "tool": "node",
               "minimum": "24.16.0",
-              "path": "/Users/kaeo/.local/share/mise/installs/node/24.16.0/bin/node",
+              "path": "~/.local/share/mise/installs/node/24.16.0/bin/node",
               "output": "v24.16.0\n",
               "version": "24.16.0",
               "status": "accepted"
@@ -946,7 +946,7 @@
             {
               "tool": "typescript",
               "minimum": "6.0.2",
-              "path": "/Users/kaeo/workspack/migai/node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
+              "path": "node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
               "output": "Version 6.0.2\n",
               "version": "6.0.2",
               "status": "accepted"
@@ -1103,7 +1103,7 @@
             {
               "tool": "rust",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/rustc",
+              "path": "~/.cargo/bin/rustc",
               "output": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -1111,7 +1111,7 @@
             {
               "tool": "cargo",
               "minimum": "1.96.0",
-              "path": "/Users/kaeo/.cargo/bin/cargo",
+              "path": "~/.cargo/bin/cargo",
               "output": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
               "version": "1.96.0",
               "status": "accepted"
@@ -1119,7 +1119,7 @@
             {
               "tool": "go",
               "minimum": "1.26.4",
-              "path": "/Users/kaeo/.local/share/mise/installs/go/1.26.4/bin/go",
+              "path": "~/.local/share/mise/installs/go/1.26.4/bin/go",
               "output": "go version go1.26.4 darwin/arm64\n",
               "version": "1.26.4",
               "status": "accepted"
@@ -1127,7 +1127,7 @@
             {
               "tool": "node",
               "minimum": "24.16.0",
-              "path": "/Users/kaeo/.local/share/mise/installs/node/24.16.0/bin/node",
+              "path": "~/.local/share/mise/installs/node/24.16.0/bin/node",
               "output": "v24.16.0\n",
               "version": "24.16.0",
               "status": "accepted"
@@ -1135,7 +1135,7 @@
             {
               "tool": "typescript",
               "minimum": "6.0.2",
-              "path": "/Users/kaeo/workspack/migai/node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
+              "path": "node_modules/.pnpm/typescript@6.0.2/node_modules/typescript/bin/tsc",
               "output": "Version 6.0.2\n",
               "version": "6.0.2",
               "status": "accepted"
