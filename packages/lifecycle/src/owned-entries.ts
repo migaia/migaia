@@ -33,8 +33,8 @@ type ISlot<E> = {
 export function createOwnedEntryList<E extends IOwnedEntry>(): IOwnedEntryList<E> {
   /** Insertion-ordered slots; a released slot keeps its position with `entry: undefined`. */
   let slots: ISlot<E>[] = []
-  /** Live slots per resource, oldest first, so `release()` finds its target without scanning. */
-  const byResource = new Map<unknown, ISlot<E>[]>()
+  /** Single registrations avoid an array; repeated resources retain oldest-first release order. */
+  const byResource = new Map<unknown, ISlot<E> | ISlot<E>[]>()
   /** Count of tombstoned slots still present in `slots`; drives compaction. */
   let tombstones = 0
 
@@ -51,14 +51,18 @@ export function createOwnedEntryList<E extends IOwnedEntry>(): IOwnedEntryList<E
       const slot: ISlot<E> = { entry }
       slots.push(slot)
       const list = byResource.get(entry.resource)
-      if (list === undefined) byResource.set(entry.resource, [slot])
-      else list.push(slot)
+      if (list === undefined) byResource.set(entry.resource, slot)
+      else if (Array.isArray(list)) list.push(slot)
+      else byResource.set(entry.resource, [list, slot])
     },
     release(resource) {
       const list = byResource.get(resource)
       if (list === undefined) return undefined
-      const slot = list.shift()!
-      if (list.length === 0) byResource.delete(resource)
+      /** Arrays exist only for two or more live registrations of the same resource. */
+      const slot = Array.isArray(list) ? list.shift()! : list
+      if (Array.isArray(list)) {
+        if (list.length === 1) byResource.set(resource, list[0]!)
+      } else byResource.delete(resource)
       const entry = slot.entry
       slot.entry = undefined
       tombstones++

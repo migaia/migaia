@@ -139,4 +139,52 @@ describe('SyncLifecycleScope: dispose() is fully synchronous and returns (not a 
     scope.dispose()
     expect(force).not.toHaveBeenCalled()
   })
+
+  it('releases repeated resources oldest first and preserves remaining LIFO order', () => {
+    /** Multiple registrations share one resource but retain independent descriptors. */
+    const resource = {}
+    /** The unrelated registration exposes whether release disturbs insertion order. */
+    const other = {}
+    /** Only still-owned descriptors may execute at disposal. */
+    const calls: string[] = []
+    /** Public scope exercises promotion, collapse and later duplicate registration. */
+    const scope = createSyncLifecycleScope()
+    scope.own(resource, {
+      syncSafe: true,
+      force: () => {
+        calls.push('first')
+      }
+    })
+    scope.own(other, {
+      syncSafe: true,
+      force: () => {
+        calls.push('other')
+      }
+    })
+    scope.own(resource, {
+      syncSafe: true,
+      force: () => {
+        calls.push('second')
+      }
+    })
+    scope.own(resource, {
+      syncSafe: true,
+      force: () => {
+        calls.push('third')
+      }
+    })
+    expect(scope.release(resource)).toBe(true)
+    expect(scope.release(resource)).toBe(true)
+    scope.own(resource, {
+      syncSafe: true,
+      force: () => {
+        calls.push('fourth')
+      }
+    })
+    expect(scope.release(resource)).toBe(true)
+    expect(calls).toEqual([])
+    scope.dispose()
+    expect(calls).toEqual(['fourth', 'other'])
+    expect(scope.release(resource)).toBe(false)
+  })
 })
