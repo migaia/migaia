@@ -1,443 +1,419 @@
-# `@migaia/storage-contract` 使用指南
+# storage-contract 使用指南
 
-本指南逐个模块覆盖公开运行时 API、实现契约所需的关键类型、语义与用法示例。二级索引等大型结构的完整字段签名以正文概念说明和发布的 `.d.ts` 共同为准，避免复制一份易漂移的声明文件；包的定位与安装方式见 [README](./README.md)。
+[English](./USEGUIDE.en.md) · [返回 README](./README.md)
 
-## 目录
+先按手头问题选择场景，再查接口、参数和实现责任。本指南只调用契约工具与内置 codec，不模拟存储后端。
 
-- [`store` 模块](#store-模块)
-- [`capabilities` 模块](#capabilities-模块)
-- [`context` / `operation-context` 模块](#context-模块)
-- [`key` 模块](#key-模块)
-- [`codec` / `codec-guard` 模块](#codec-模块)
-- [`transaction` 模块](#transaction-模块)
-- [`errors` 模块](#errors-模块)
-- [`bytes` / `policy-constants` 模块](#bytes-模块)
-- [组合工作流示例](#组合工作流示例)
-- [排查与构建门禁](#排查与构建门禁)
+## 按场景查找
 
----
+| 场景                                   | 怎么组合                      | 详细说明                                                       |
+| -------------------------------------- | ----------------------------- | -------------------------------------------------------------- |
+| 在调用方修改前捕获复合键               | `snapshotStorageKey`          | [完整示例](./USEGUIDE.md#在调用方修改前捕获复合键)             |
+| 把普通对象作为记录键前先拒绝           | `snapshotStorageKey`          | [完整示例](./USEGUIDE.md#把普通对象作为记录键前先拒绝)         |
+| 只读取一次操作选项，把取消执行留给后端 | `snapshotOperationContext`    | [完整示例](./USEGUIDE.md#只读取一次操作选项把取消执行留给后端) |
+| 从文本恢复嵌套的 Map 与 Set            | `collectionsJsonCodec`        | [完整示例](./USEGUIDE.md#从文本恢复嵌套的-map-与-set)          |
+| 选择通道前规范化旧版能力描述           | `snapshotStorageCapabilities` | [完整示例](./USEGUIDE.md#选择通道前规范化旧版能力描述)         |
+| 报告契约错误时保留原始失败             | `StorageContractError`        | [完整示例](./USEGUIDE.md#报告契约错误时保留原始失败)           |
 
-<a id="store-模块"></a>
+## 在调用方修改前捕获复合键
 
-## `store` 模块
+异步操作仍引用调用方的数组、日期和缓冲区，原对象变化可能改变后续使用的键。只浅拷贝数组仍会共享两个嵌套对象。`snapshotStorageKey()` 校验并递归复制键组件，再次校验副本；结果与原键分离，但没有冻结。
 
-```ts
-type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';
+`value` 是调用方提供的未知键；本例为字符串、Date、ArrayBuffer 组成的数组。`backend: memory` 只标记错误归属，不创建内存存储；可选 label 默认 `key`。返回键会深拷贝这些可变组件，但不冻结。
 
-type ISyncKeyValueStore = {
-  get(key: string): string | null;
-  set(key: string, value: string, options?: ISyncWriteOptions): void;
-  remove(key: string): void;
-  has(key: string): boolean;
-  keys(): string[];
-  clearValues(): void;
-};
+```ts doc-test=run
+import { snapshotStorageKey } from '@migaia/storage-contract'
 
-type IKeyValueStore = {
-  readonly backend: IBackendKind;
-  readonly capabilities: IStorageCapabilities;
-  get(key: string, ctx?: IOperationContext): Promise<string | null>;
-  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;
-  remove(key: string, ctx?: IOperationContext): Promise<void>;
-  has(key: string, ctx?: IOperationContext): Promise<boolean>;
-  keys(ctx?: IOperationContext): Promise<string[]>;
-  clearValues(ctx?: IOperationContext): Promise<void>;
-  clearAll(ctx?: IOperationContext): Promise<void>;
-  dispose(): Promise<void>;
-  readonly sync?: ISyncKeyValueStore;
-};
+const date = new Date(0)
+const bytes = new Uint8Array([7, 8])
+const original: [string, Date, ArrayBuffer] = ['orders', date, bytes.buffer]
+const saved = snapshotStorageKey(original, 'memory') as readonly [string, Date, ArrayBuffer]
+original[0] = 'changed'
+date.setTime(1000)
+bytes[0] = 99
+console.log('原键:', original[0], date.getTime(), bytes[0])
+console.log('快照:', saved[0], saved[1].getTime(), new Uint8Array(saved[2])[0])
+console.log('独立数组:', saved !== original)
 ```
 
-`IKeyValueStore` 是 L0：所有后端都实现的字符串键值通道。`get` 缺失返回 `null`（不是 `undefined`）。`sync` 仅同步后端（localStorage/sessionStorage/内存/cookies）提供；异步后端（IndexedDB）上恒为 `undefined`。
+输出：
 
-```ts
-type ISyncCapableStore<TStore extends { readonly sync?: object }> = TStore & {
-  readonly sync: NonNullable<TStore['sync']>;
-};
+```text
+原键: changed 1000 99
+快照: orders 0 7
+独立数组: true
 ```
 
-把某个 `IKeyValueStore` 变体的 `sync` 字段从可选收紧为必然存在，同步后端的工厂函数用它标注返回类型，调用方无需 `?.`。
+依次输出 `原键: changed 1000 99`、`快照: orders 0 7`、`独立数组: true`。修改原数组、日期与字节都没有改变已捕获的键。调用方仍持有可变快照，操作期间应自行保管它。
 
-```ts
-type IRecordStore<TValue = unknown> = IKeyValueStore & {
-  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;
-  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;
-  clearBytes(ctx?: IOperationContext): Promise<void>;
-  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;
-  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;
-  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;
-  clearRecords(ctx?: IOperationContext): Promise<void>;
-  clearAll(ctx?: IOperationContext): Promise<void>;
-  readonly metadata?: {
-    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;
-    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;
-    delete(key: string, ctx?: IOperationContext): Promise<void>;
-  };
-  iterateRecords(
-    range?: IKeyRange,
-    ctx?: IOperationContext
-  ): AsyncIterableIterator<[IStorageKey, TValue]>;
-  transaction<T>(
-    run: (tx: ITransactionScope<TValue>) => Promise<T>,
-    ctx?: IOperationContext
-  ): Promise<T>;
-};
-```
+## 把普通对象作为记录键前先拒绝
 
-`IRecordStore<T>` 是 L1：结构化后端额外提供的字节通道、结构化记录（`IStorageKey` 主键而非字符串）、范围迭代与事务。`putRecord` 未传 `key` 时由后端生成并返回该键。`metadata` 是后端自有、供可恢复的维护迁移使用的可选通道，与 `records`/`bytes`/`values` 通道相互独立，不受 `clearAll`/`clearRecords` 影响。`clearAll` 覆盖 L0 定义，同时清空 values/bytes/records 三个通道。
+应用把普通对象当作记录键，直到后端开始工作才失败。手写字符串转换又可能把不同对象压成相同的键。`snapshotStorageKey()` 以 `INVALID_KEY` 拒绝对象，并保留后端标签、原值与类型错误原因；应改用由标量字段组成的数组等有效键。
 
-```ts
-function isKeyValueStore(store: unknown): store is IKeyValueStore;
-```
+`candidate` 是不被键域接受的普通对象。`memory` 仍只是后端标签，`orderKey` 覆盖默认 label `key`，只影响错误文字。错误码、backend、key 和 cause 来自本包的契约错误。
 
-运行时校验一个未知值是否满足完整 L0 形状：`backend` 属于 `{'memory','local','session','cookie','indexeddb'}`、`capabilities` 通过 `isStorageCapabilities`、且 `get`/`set`/`remove`/`has`/`keys`/`clearValues`/`clearAll`/`dispose` 全部是函数。属性访问（含代理陷阱）抛错时返回 `false`，绝不向上抛出。
+```ts doc-test=run
+import { snapshotStorageKey, StorageContractError } from '@migaia/storage-contract'
 
-```ts
-function isRecordStore(store: IKeyValueStore): store is IRecordStore;
-```
-
-在 `isKeyValueStore` 的基础上，额外要求 `getBytes`/`setBytes`/`clearBytes`/`getRecord`/`putRecord`/`deleteRecord`/`clearRecords`/`iterateRecords`/`transaction` 均是函数，且 `capabilities.records && capabilities.binary && capabilities.transactions && capabilities.iteration` 全部为 `true`。
-
-```ts
-function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;
-```
-
-运行时收窄断言版：形状或能力不满足时立即抛出 `StorageContractError(code: 'UNSUPPORTED_CAPABILITY', details: { backend })`，`backend` 取探测到的合法后端名（探测失败则 `undefined`）。不做任何静默降级或包装。
-
-```ts
-const record = await asRecordStore<{ name: string }>(store).getRecord('profile');
-```
-
-### 一次性准入快照
-
-`snapshotKeyValueStoreDetailed(candidate)` 面向需要审计 hostile getter 的适配器：它按固定顺序读取一次基础 store 表面，成功返回 `{ valid: true, store, backend, capabilities, dispose, receiver }`；失败返回 `{ valid: false, cause }`，其中 `cause` 保留精确的属性读取异常。`snapshotKeyValueStore(candidate)` 与 `snapshotRecordStore(candidate)` 是更轻量的组合入口，合法时返回 `{ store, backend, capabilities }`，否则返回 `undefined`。它们只完成准入与快照，不调用后端操作；已经拿到快照的能力守卫应复用它，避免重复触发 getter。
-
-### Change feed 与二级索引能力
-
-`isChangeFeedStore(candidate)` / `asChangeFeedStore(store)` 只有在基础 L0 契约有效、`capabilities.changeFeed === true` 且 `subscribeChanges` 可调用时才通过。订阅回调收到 `IStorageChange`（递增 `sequence`、`origin`、channel/kind，以及可选 scope/keys），退订函数必须由调用方持有并执行；断言版能力不足时抛 `UNSUPPORTED_CAPABILITY`。
-
-`isSecondaryIndexRecordStore(candidate)` / `asSecondaryIndexRecordStore(store)` 要求完整 L1 契约、`capabilities.secondaryIndexes === true`，以及 ensure/readiness/indexed put/index iteration/indexed transaction 五个方法全部可调用。守卫不会调用任何后端方法；断言版失败同样抛 `UNSUPPORTED_CAPABILITY`。应用应先保存 `ensureRecordIndexes()` 返回的 generation-bound handle，再把它传给 readiness、写入、查询和事务，不能只按索引名绕过 handle。
-
----
-
-<a id="capabilities-模块"></a>
-
-## `capabilities` 模块
-
-```ts
-type IStorageCapabilities = {
-  readonly syncRead: boolean;
-  readonly binary: boolean;
-  readonly records: boolean;
-  readonly transactions: boolean;
-  readonly iteration: boolean;
-  readonly secondaryIndexes: boolean;
-  readonly changeFeed: boolean;
-  readonly maxValueBytes: number | undefined;
-  readonly opaqueEntries: boolean;
-};
-```
-
-`maxValueBytes` 是单值近似上限（字节）：cookie 约 4096，localStorage 约 5MB，IndexedDB 为 `undefined`（受配额而非单值限制）。`opaqueEntries` 表示该后端上不可见的键是否可能存在（例如 cookies 的 `HttpOnly` 条目）。
-
-```ts
-function snapshotStorageCapabilities(value: unknown): IStorageCapabilities | undefined;
-```
-
-读一次候选值的全部 9 个字段并校验类型；`maxValueBytes` 必须是非负安全整数或 `undefined`，`secondaryIndexes`/`changeFeed` 可在旧描述器中省略并规范化为 `false`，其余字段必须是 `boolean`。任一字段访问抛错、类型不符时返回 `undefined`（不抛错）；合法时返回新构造的快照对象（非原值引用）。
-
-```ts
-function isStorageCapabilities(value: unknown): value is IStorageCapabilities;
-```
-
-等价于 `snapshotStorageCapabilities(value) !== undefined` 的类型守卫。
-
----
-
-<a id="context-模块"></a>
-
-## `context` / `operation-context` 模块
-
-```ts
-type IOperationContext = {
-  readonly signal?: IAbortSignal;
-  readonly timeoutMs?: number;
-  readonly pageSize?: number;
-};
-type IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };
-type ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };
-const ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;
-type IConflictPolicy = 'conflict' | 'replace';
-type IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];
-type IKeyRange = {
-  readonly lower?: IStorageKey;
-  readonly lowerOpen?: boolean;
-  readonly upper?: IStorageKey;
-  readonly upperOpen?: boolean;
-};
-```
-
-`IOperationContext` 是所有公开异步方法的最后一个可选参数：`signal` 是协作式取消（取消感知操作以契约 `ABORTED` 停止等待，不保证原生 `AbortError` 类；进入原子提交后返回真实结局；结构化信号类型，不引全局 `AbortSignal`）；`timeoutMs` 是由实现层处理的便捷超时，契约包只校验，不创建计时器或取消引擎；`pageSize` 限定迭代器的分页大小（IndexedDB 等），用于保护游标内存。`ISyncWriteOptions` 是同步写唯一支持的选项形状——不接受 `signal`/`timeoutMs`（同步调用无法协作式取消或超时）。
-
-```ts
-function snapshotOperationContext(
-  ctx: IOperationContext | undefined
-): IOperationContextSnapshot | undefined;
-```
-
-读一次 `ctx` 的全部字段（含 `conflictPolicy`，供实现层内部复用）并校验，返回 `Object.freeze` 后的快照；`ctx === undefined` 时返回 `undefined`。若传入值已经是本函数产出的快照（内部 `WeakSet` 标记），幂等直接返回原值。校验规则：`signal` 若提供必须满足 `IAbortSignal` 形状（`aborted: boolean`、`addEventListener`/`removeEventListener` 均为函数）；`timeoutMs` 必须是非负安全整数；`pageSize` 必须是 `1`~`4096` 之间的整数；`conflictPolicy` 必须是 `'conflict'`/`'replace'`/`undefined`。任一校验失败或字段访问抛错，均抛出 `StorageContractError(code: 'INVALID_ARGUMENT')`。
-
-```ts
-function assertOperationContext(ctx: IOperationContext | undefined): void;
-```
-
-内部即调用 `snapshotOperationContext`，只做校验，丢弃返回值。
-
-```ts
-function snapshotSyncWriteOptions(options: unknown): { readonly conflictPolicy?: IConflictPolicy };
-function assertSyncWriteOptions(options: unknown): void;
-```
-
-校验同步写选项：`options` 必须是对象或 `undefined`；`signal` 或 `timeoutMs` 的值非 `undefined` 时立即抛 `StorageContractError(invalidArgument)`；`conflictPolicy` 校验同上。显式 `{ signal: undefined, timeoutMs: undefined }` 被接纳；额外 `pageSize` 不读取、被忽略，并不提供同步分页。
-
-```ts
-snapshotSyncWriteOptions({ conflictPolicy: 'replace' }); // { conflictPolicy: 'replace' }
-snapshotSyncWriteOptions({ timeoutMs: 100 }); // 抛错
-```
-
----
-
-<a id="key-模块"></a>
-
-## `key` 模块
-
-```ts
-const KEY_DOMAIN_LIMITS = { maxDepth: 32, maxNodes: 4096, maxBinaryBytes: 1048576 } as const;
-```
-
-硬限制，保护平铺键解码免受病态持久化输入影响。
-
-```ts
-function assertStorageKey(
-  value: unknown,
-  backend: IBackendKind,
-  label?: string
-): asserts value is IStorageKey;
-```
-
-校验值落在 `IStorageKey` 域内：字符串永远合法；数字须 `Number.isFinite`；`Date` 须非 `NaN`（跨 realm 通过 `structuredClone` 识别，无 `structuredClone` 时退化为 `instanceof Date`）；`ArrayBuffer` 须 `byteLength <= maxBinaryBytes`（同样用 `structuredClone` 做跨 realm 识别）；数组须非空、无循环引用、每个元素递归合法，且总深度 `<= maxDepth`、总节点数 `<= maxNodes`。`label`（默认 `'key'`）只影响错误消息文案。不合法抛 `StorageContractError(code: 'INVALID_KEY', details: { backend, key: value })`。
-
-```ts
-function snapshotStorageKey(value: unknown, backend: IBackendKind, label?: string): IStorageKey;
-```
-
-先校验，再深拷贝出一份与原值分离的键（字符串/数字原样，`Date`/`ArrayBuffer` 重新构造，数组递归拷贝），拷贝完成后对拷贝结果**再次**校验。用于避免调用方在异步操作进行期间修改原始键对象。拷贝或二次校验过程中的任何异常都会被包装为 `StorageContractError(invalidKey)` 抛出（若原本已是 `StorageContractError` 则直接透传）。
-
-```ts
-function assertStringStorageKey(
-  value: unknown,
-  backend: IBackendKind,
-  label?: string
-): asserts value is string;
-```
-
-L0/字节/元数据通道要求纯字符串键；非字符串抛 `StorageContractError(code: 'INVALID_ARGUMENT')`（注意：此处是 `invalidArgument` 而非 `invalidKey`，因为这些通道的契约本身就规定键必须是字符串，不是键域越界问题）。
-
-```ts
-function compareStorageKeys(a: IStorageKey, b: IStorageKey): number;
-```
-
-跨类型稳定比较器：先按类型排名（`number < Date < string < ArrayBuffer < 数组`），同类型再具体比较（数字直接相减；日期取时间戳相减；字符串按 `<`/`>`；`ArrayBuffer` 逐字节比较，短者优先，前缀相同则短的更小；数组逐元素递归比较，前缀相同则短的更小）。用于对键排序或作为 `Array.prototype.sort` 的比较函数。
-
----
-
-<a id="codec-模块"></a>
-
-## `codec` / `codec-guard` 模块
-
-```ts
-type ICodecOutput = 'text' | 'binary' | 'structured';
-type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = {
-  readonly name: string;
-  readonly output: ICodecOutput;
-  encode(value: T, ctx?: IOperationContext): Promise<TRaw>;
-  decode(raw: TRaw, ctx?: IOperationContext): Promise<T>;
-};
-```
-
-序列化是面向开发者的开放契约，不绑定任何宿主。本包内置运行时中立的 `collectionsJsonCodec`，用于以版本化 JSON tuple 往返真实 `Map`/`Set`；浏览器通道相关的 structured/binary codec 在 `@migaia/storage-web` 中提供。任何自定义编解码——压缩、加密、走 Worker 的重编码——都通过实现同一接口接入。`output` 声明产出形态，用于与后端能力选路（例如 `output: 'binary'` 的 codec 遇到只支持文本的后端应由调用方决定降级策略，本包不做隐式转换）。
-
-```ts
-import {
-  COLLECTIONS_JSON_CODEC_NAME,
-  collectionsJsonCodec
-} from '@migaia/storage-contract';
-```
-
-`collectionsJsonCodec.name === COLLECTIONS_JSON_CODEC_NAME`（固定值 `'migaia-collections-json-v1'`），`output === 'text'`。编码只为真实 `Map`/`Set` 生成精确 tuple；解码只还原完全匹配该版本、kind 与 payload 形状的 tuple，普通数组保持原样。根值不能被 JSON 表示、输入不是字符串或 JSON 解析失败时抛 `StorageContractError(code: 'INVALID_ARGUMENT')`，原始失败保留在 `cause`。
-
-```ts
-function snapshotCodec(codec: unknown): ICodec;
-```
-
-读一次并校验：`codec` 必须是非空、非数组的结构对象（接纳符合形状的 class 实例）；`name` 必须是非空字符串（trim 后非空）；`output` 必须属于 `['text','binary','structured']`；`encode`/`decode` 必须是函数。返回浅拷贝出的 4 字段新对象（`{ name, output, encode, decode }`），不透传原对象引用。不合法抛 `StorageContractError(code: 'INVALID_ARGUMENT')`。
-
-```ts
-function assertCodec(codec: unknown): asserts codec is ICodec;
-```
-
-内部即调用 `snapshotCodec` 并丢弃返回值，仅用于类型断言场景。
-
----
-
-<a id="transaction-模块"></a>
-
-## `transaction` 模块
-
-```ts
-type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy };
-type ITransactionScope<TValue = unknown> = {
-  get(key: IStorageKey): Promise<TValue | undefined>;
-  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;
-  delete(key: IStorageKey): Promise<void>;
-};
-```
-
-后端无关的事务作用域，由内存和 IndexedDB 提交引擎共享此类型。隔离级别、提交时机、失败重试都是**实现定义**的，本契约不做约束。回调 resolve 之后不要继续保留并使用该 scope——底层连接/快照生命周期可能已随回调结束而释放。
-
-```ts
-function assertTransactionCallback(run: unknown, backend: IBackendKind): void;
-```
-
-在后端分配快照/连接资源之前校验回调是函数；非函数抛 `StorageContractError(code: 'INVALID_ARGUMENT', details: { backend })`。
-
-```ts
-function readTransactionConflictPolicy(options: unknown, backend: IBackendKind): IConflictPolicy;
-```
-
-校验并读出事务写选项里的冲突策略：`options === undefined` 返回 `'conflict'`；对象且 `conflictPolicy` 为 `undefined`/`'conflict'` 返回 `'conflict'`；为 `'replace'` 返回 `'replace'`；其余任何形状（非对象、非法值、属性访问抛错）都抛 `StorageContractError(code: 'INVALID_ARGUMENT', details: { backend })`。
-
----
-
-<a id="errors-模块"></a>
-
-## `errors` 模块
-
-```ts
-class StorageContractError extends Error {
-  readonly source: string; // 恒为 '@migaia/storage-contract'
-  readonly code: IStorageContractErrorCode;
-  readonly backend?: IBackendKind;
-  readonly key?: string | IStorageKey;
-  constructor(
-    code: IStorageContractErrorCode,
-    details?: {
-      readonly backend?: IBackendKind;
-      readonly key?: string | IStorageKey;
-      readonly cause?: unknown;
-    },
-    message?: string
-  );
+const candidate = { orderId: 1 }
+try {
+  snapshotStorageKey(candidate, 'memory', 'orderKey')
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log('错误码:', error.code)
+  console.log('后端:', error.backend)
+  console.log('原始键:', (error.key as unknown) === candidate)
+  console.log('类型原因:', error.cause instanceof TypeError)
 }
 ```
 
-构造后立即 `Object.freeze`；不重写 `stack`；`cause` 通过标准 `Error` 机制可达（不被冻结阻断）。`message` 默认取 `` `[storage-contract] ${code}` ``。
+输出：
 
-```ts
-const StorageContractErrorCode = {
-  invalidArgument: 'INVALID_ARGUMENT',
-  invalidKey: 'INVALID_KEY',
-  unsupported: 'UNSUPPORTED_CAPABILITY',
-  disposed: 'STORE_DISPOSED',
-  aborted: 'ABORTED'
-} as const;
+```text
+错误码: INVALID_KEY
+后端: memory
+原始键: true
+类型原因: true
 ```
 
-| Code                     | 含义                                                                                                                   | 调用方应对                                                                       |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `INVALID_ARGUMENT`       | 契约级入参/描述符结构校验失败（codec、capabilities、transaction 选项、operation context 等公共契约类型不符合声明形状） | 修正入参后重试；这是永久性传参错误，不是可重试的瞬时失败                         |
-| `INVALID_KEY`            | `IStorageKey` 违反键域（类型非法、深度/节点/二进制字节超限、循环、空数组）                                             | 修正键；永久性错误，不要重试同一键                                               |
-| `UNSUPPORTED_CAPABILITY` | 调用了当前后端不提供的能力（`asRecordStore` 收窄失败、structured codec 落到 text-only 后端）                           | 先用 `capabilities`/`isRecordStore` 分支，或换一个具备该能力的后端；不做静默降级 |
-| `STORE_DISPOSED`         | store 已 `dispose()` 后继续调用其任何方法                                                                              | 新建 store，不要复用已关闭实例                                                   |
-| `ABORTED`                | 操作被 `signal` 取消或 `timeoutMs` 到期                                                                                | 按取消处理；已进入原子提交的写按提交事实返回，不伪报回滚                         |
+依次输出 `错误码: INVALID_KEY`、`后端: memory`、`原始键: true`、`类型原因: true`。无效值在同步调用时被拒绝，函数没有调用存储后端。
 
-`code` 值是公开 API 的一部分，改名等同破坏性变更；`source` 恒为 `'@migaia/storage-contract'`，与实现包（如 `storage-web`）自己的错误 `source` 互不冲突，可用 `(source, code)` 二元组唯一定位错误来源。
+## 只读取一次操作选项，把取消执行留给后端
 
-```ts
-const STORAGE_CONTRACT_SOURCE: '@migaia/storage-contract';
-function isStorageContractError(value: unknown): value is StorageContractError;
+通过访问器提供的选项可能在校验和使用之间变化，各层重读又可能得到不同的超时或策略。`snapshotOperationContext()` 只读取一次四个字段并冻结记录；再次传入该快照会复用同一对象。已取消的信号仍可被接纳，因为函数只校验意图，实际取消与超时由后端实现。
+
+本例四个字段各由一个 getter 提供：signal 是原生 AbortSignal，timeoutMs 为允许的 0，pageSize 为 1–4096 内的 100，conflictPolicy 为 `replace`（覆盖）。字段省略都保持 undefined；另一策略 `conflict` 表示已存在则失败。取消和计时由实际后端执行。
+
+```ts doc-test=run
+import { snapshotOperationContext } from '@migaia/storage-contract'
+
+const controller = new AbortController()
+controller.abort()
+let reads = 0
+const options = {
+  get signal() {
+    reads += 1
+    return controller.signal
+  },
+  get timeoutMs() {
+    reads += 1
+    return 0
+  },
+  get pageSize() {
+    reads += 1
+    return 100
+  },
+  get conflictPolicy() {
+    reads += 1
+    return 'replace' as const
+  }
+}
+const snapshot = snapshotOperationContext(options)
+console.log('冻结:', Object.isFrozen(snapshot))
+console.log('复用快照:', snapshotOperationContext(snapshot) === snapshot)
+console.log('字段读取次数:', reads)
+console.log('信号已取消:', snapshot?.signal?.aborted)
+console.log('选项:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)
 ```
 
----
+输出：
 
-<a id="bytes-模块"></a>
-
-## `bytes` 模块
-
-字节 guard 直接从 `@migaia/utils/bytes` 导入，不再从本包转出。它们使用 intrinsic 内部槽检测，不信任可篡改的原型；detached 对象仍保留品牌，字节可用性须另行判断。
-
-```ts
-function intrinsicConstructorName(value: unknown): string | undefined;
+```text
+冻结: true
+复用快照: true
+字段读取次数: 4
+信号已取消: true
+选项: 0 100 replace
 ```
 
-该 helper 仅供尽力诊断，会观察可篡改的原型、`constructor` 与 `name`；非对象、`null`、或读取过程抛错返回 `undefined`。不得用于安全、类型或协议判定。
+依次输出 `冻结: true`、`复用快照: true`、`字段读取次数: 4`、`信号已取消: true`、`选项: 0 100 replace`。两次调用合计每字段只读取一次，保留原信号且允许零超时；函数没有建立定时器或取消订阅。
 
-冲突策略统一从本包导入 `ConflictPolicy` / `IConflictPolicy`，不保留重复常量对象或类型别名。
+## 从文本恢复嵌套的 Map 与 Set
 
-三个能力断言 `asRecordStore` / `asSecondaryIndexRecordStore` / `asChangeFeedStore` 在准入失败时抛 `UNSUPPORTED_CAPABILITY`；若反射或访问器抛错，精确原始对象保留在标准 `cause`。轻量谓词与快照返回失败结果，Detailed 准入同时保留 `cause`。
+权限对象中的 `Map`、`Set` 经普通 JSON 序列化后变成空对象。手写替换器和还原器又必须协调集合标记及嵌套规则。`collectionsJsonCodec` 在编码和解码两端使用同一版本元组格式，在其余部分兼容 JSON 的数据中保留这些集合类型。
 
----
+`encode(value, ctx?)` 将本例对象转成文本，`decode(raw, ctx?)` 接收该文本并恢复集合。两个 ctx 省略时都是 undefined。output 固定为 `text`；这里的类型断言只说明预期对象形状，Map/Set 实例由 codec 的还原器创建。
 
-<a id="组合工作流示例"></a>
+```ts doc-test=run
+import { collectionsJsonCodec } from '@migaia/storage-contract'
 
-## 组合工作流示例：契约边界的能力收窄与校验前置
-
-```ts
-import {
-  asRecordStore,
-  isRecordStore,
-  snapshotOperationContext,
-  type IKeyValueStore,
-  type IOperationContext
-} from '@migaia/storage-contract';
-
-type IProfile = { readonly name: string; readonly avatar?: Uint8Array };
-
-export const saveProfile = async (
-  store: IKeyValueStore,
-  profile: IProfile,
-  ctx: IOperationContext
-): Promise<void> => {
-  // 提前校验 ctx，坏参数在真正发起 I/O 之前就抛出 INVALID_ARGUMENT
-  const snapshot = snapshotOperationContext(ctx);
-
-  if (!isRecordStore(store)) throw new Error('profile storage requires an L1-capable backend');
-  const records = asRecordStore<IProfile>(store);
-
-  await records.transaction(async (tx) => {
-    await tx.put(profile, 'profile');
-  }, snapshot);
-};
+const settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }
+const raw = await collectionsJsonCodec.encode(settings)
+const restored = (await collectionsJsonCodec.decode(raw)) as typeof settings
+console.log('输出形式:', collectionsJsonCodec.output)
+console.log('Map:', restored.roles instanceof Map)
+console.log('Set:', restored.roles.get('Ada') instanceof Set)
+console.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))
 ```
 
-这个模式把"契约层能表达的校验"（操作上下文形状、能力收窄）尽量提前到功能函数入口，真正的持久化细节（连接、提交、重试）完全交给具体实现包（如 `storage-web`）。
+输出：
 
----
+```text
+输出形式: text
+Map: true
+Set: true
+权限: read, write
+```
 
-<a id="排查与构建门禁"></a>
+依次输出 `输出形式: text`、`Map: true`、`Set: true`、`权限: read, write`。编解码器从字符串中恢复两种嵌套集合，不负责保存字符串。其余值仍受 JSON 能力边界限制，不支持循环引用。
 
-## 排查与构建门禁
+## 选择通道前规范化旧版能力描述
 
-- **`UNSUPPORTED_CAPABILITY`**：检查 `store.capabilities`；说明当前 provider 只是 L0（或缺少 `records`/`binary`/`transactions`/`iteration` 之一）。
-- **`INVALID_ARGUMENT`**：核对 `signal` 形状（须实现 `aborted`/`addEventListener`/`removeEventListener`）、`timeoutMs`/`pageSize` 取值范围、`conflictPolicy` 取值，以及同步写选项是否误传了 `signal`/`timeoutMs`。
-- **`INVALID_KEY`**：使用文档列出的键形式（字符串/有限数字/`Date`/`ArrayBuffer`/以上类型的非空嵌套数组），不要传普通对象；检查是否超过深度 32 层或 4096 节点。
-- **`STORE_DISPOSED`**：说明拥有该 store 的代码已结束其生命周期；不要在 `dispose()` 之后继续持有引用调用方法。
-- 本包不提供任何持久化实现——如果需要真正把数据写进 localStorage/IndexedDB/cookies，去用 `@migaia/storage-web`（或另一个实现本契约的包），本包只负责跨实现的类型与校验共享。
+在二级索引和变更流支持之前创建的能力描述缺少两个新标志。只检查真假会掩盖字段类型错误，继续持有原描述又会让后续修改改变接纳判断。`snapshotStorageCapabilities()` 校验完整形状，只把这两个旧版缺失字段补为 `false`，并返回独立记录。
+
+输入必须包含 syncRead、binary、records、transactions、iteration、opaqueEntries 的布尔值，以及 maxValueBytes 的非负安全整数或 undefined。本例省略旧版尚无的 secondaryIndexes/changeFeed，快照将二者补为 false。完整字段含义见后文能力描述符表。
+
+```ts doc-test=run
+import { snapshotStorageCapabilities } from '@migaia/storage-contract'
+
+const legacy = {
+  syncRead: true,
+  binary: false,
+  records: false,
+  transactions: false,
+  iteration: false,
+  opaqueEntries: false,
+  maxValueBytes: undefined
+}
+const snapshot = snapshotStorageCapabilities(legacy)
+legacy.records = true
+console.log('新增标志:', snapshot?.secondaryIndexes, snapshot?.changeFeed)
+console.log('记录能力:', legacy.records, snapshot?.records)
+console.log('独立记录:', snapshot !== legacy)
+console.log('冻结:', Object.isFrozen(snapshot))
+```
+
+输出：
+
+```text
+新增标志: false false
+记录能力: true false
+独立记录: true
+冻结: false
+```
+
+依次输出 `新增标志: false false`、`记录能力: true false`、`独立记录: true`、`冻结: false`。原描述修改后，捕获的标志仍保留接纳时的值。形状无效或访问器失败返回 `undefined`，成功返回的快照自身仍可修改。
+
+## 报告契约错误时保留原始失败
+
+校验边界捕获原生失败后只报告消息，调用方无法再检查原始原因。手写诊断字段也容易遗漏来源和错误码。用相应公开错误码及原始 `cause` 构造 `StorageContractError`，由它持有稳定身份字段和原生原因链。
+
+第一个参数是公开码 INVALID_ARGUMENT；第二个参数的 backend 为 `memory`，cause 为同一个 TypeError。可选 key 本例省略，默认 undefined；details 默认空对象。可选第三个 message 省略，使用由 code 生成的默认消息。冻结错误实例不会冻结 cause。
+
+```ts doc-test=run
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
+
+const cause = new TypeError('分页大小无效')
+const error = new StorageContractError(StorageContractErrorCode.invalidArgument, {
+  backend: 'memory',
+  cause
+})
+console.log('来源:', error.source)
+console.log('错误码:', error.code)
+console.log('后端:', error.backend)
+console.log('保留原错:', error.cause === cause)
+console.log('原错消息:', (error.cause as Error).message)
+console.log('冻结:', Object.isFrozen(error))
+```
+
+输出：
+
+```text
+来源: @migaia/storage-contract
+错误码: INVALID_ARGUMENT
+后端: memory
+保留原错: true
+原错消息: 分页大小无效
+冻结: true
+```
+
+依次输出 `来源: @migaia/storage-contract`、`错误码: INVALID_ARGUMENT`、`后端: memory`、`保留原错: true`、`原错消息: 分页大小无效`、`冻结: true`。原生原因链指向同一个原始对象。错误实例已冻结，但不会冻结原因对象。
+
+## 契约细节
+
+### 公开入口、归属与边界
+
+本包只有根入口 `@migaia/storage-contract`，没有子路径导出。它提供存储接口、能力描述、键域、操作上下文、编解码器接口、事务作用域和契约错误，也提供校验与快照函数、集合 JSON 编解码器。运行时依赖 `@migaia/utils`；结构化取消信号类型 `IAbortSignal` 来自 `@migaia/utils/promise`。
+
+这里没有持久化后端，不打开数据库、不写磁盘，不依赖 DOM、IndexedDB 或 Node。真正的连接、读写、提交、隔离与重试属于实现包，例如 `@migaia/storage-web`。功能模块依赖接口；实现包依赖这份契约，契约不反向依赖实现。压缩、加密或 Worker 重编码可以实现同一个 codec 接口接入，但本包不实现这些扩展。
+
+L0 指所有后端提供的字符串键值通道；L1 指额外提供字节、结构化记录、迭代与事务的通道。能力描述说“能做什么”，不是按后端名字猜测。收窄函数检查描述符和可调用方法，不执行后端读写。
+
+### L0、同步通道与 L1
+
+`IBackendKind` 只允许 `'local'`、`'session'`、`'cookie'`、`'indexeddb'`、`'memory'`。`IKeyValueStore` 的只读 `backend`、`capabilities` 描述后端与能力。下表的 key 均为字符串；异步方法的 ctx 默认 `undefined`，字段见操作上下文。
+
+| IKeyValueStore 成员     | 返回与语义                                                      |
+| ----------------------- | --------------------------------------------------------------- |
+| `get(key, ctx?)`        | `Promise<string \| null>`；不存在返回 null，不是 undefined。    |
+| `set(key, value, ctx?)` | value 为字符串，ctx 使用 IWriteOptions，返回 `Promise<void>`。  |
+| `remove(key, ctx?)`     | 返回 `Promise<void>`。                                          |
+| `has(key, ctx?)`        | 返回 `Promise<boolean>`。                                       |
+| `keys(ctx?)`            | 返回 `Promise<string[]>`。                                      |
+| `clearValues(ctx?)`     | 只清字符串值通道，返回 `Promise<void>`。                        |
+| `clearAll(ctx?)`        | 清当前 store 的业务数据通道，返回 `Promise<void>`。             |
+| `dispose()`             | 结束后端实例的使用寿命，返回 `Promise<void>`。                  |
+| `sync?`                 | 可选 ISyncKeyValueStore；仅同步后端提供，异步后端为 undefined。 |
+
+`ISyncKeyValueStore` 有 `get(key): string | null`、`set(key, value, options?): void`、`remove(key): void`、`has(key): boolean`、`keys(): string[]`、`clearValues(): void`。同步 set 的唯一选项为 conflictPolicy，不接受有效 signal 或 timeoutMs。local、session、memory、cookie 等同步后端可暴露 sync；IndexedDB 等异步后端不提供它。`ISyncCapableStore<TStore>` 把某个 store 变体的可选 sync 字段收紧为必有，供实现方工厂标注返回类型，不创建同步实现。
+
+`IRecordStore<TValue>` 保留完整 L0，增加下列成员。TValue 默认 unknown；记录主键使用 IStorageKey，字节与元数据仍用字符串键。
+
+| IRecordStore 新成员                             | 返回与语义                                                                                                                                                  |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getBytes(key, ctx?)`                           | `Promise<Uint8Array \| null>`；缺失为 null。                                                                                                                |
+| `setBytes(key, value, ctx?)`                    | value 为 Uint8Array，ctx 为 IWriteOptions，返回 `Promise<void>`。                                                                                           |
+| `clearBytes(ctx?)`                              | 清字节通道。                                                                                                                                                |
+| `getRecord(key, ctx?)`                          | `Promise<TValue \| undefined>`；缺失为 undefined。                                                                                                          |
+| `putRecord(value, key?, ctx?)`                  | `Promise<IStorageKey>`；省略 key 由后端生成并返回，ctx 为 IWriteOptions。                                                                                   |
+| `deleteRecord(key, ctx?)`、`clearRecords(ctx?)` | 删除记录，返回 `Promise<void>`。                                                                                                                            |
+| `clearAll(ctx?)`                                | 同时清 values、bytes、records 三个业务通道。                                                                                                                |
+| `metadata?`                                     | 后端自有的可选维护通道；get(key, ctx?) 返回 unknown 或 undefined，set(key, value, ctx?) 与 delete(key, ctx?) 返回 `Promise<void>`。set 使用 IWriteOptions。 |
+| `iterateRecords(range?, ctx?)`                  | 返回异步迭代器，每项为 [IStorageKey, TValue]。                                                                                                              |
+| `transaction(run, ctx?)`                        | run 接收 `ITransactionScope<TValue>` 并返回 `Promise<T>`；事务方法返回相同类型的 `Promise<T>`。                                                             |
+
+metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，不属于 clearAll/clearRecords 的清理范围。range 省略时没有显式范围参数；查询行为由实现解释。
+
+#### 运行时准入与能力收窄
+
+| API                                                             | 输入与结果                                                                                                                                                                     |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `isKeyValueStore(store)`                                        | store 为 unknown；要求合法 backend、完整能力描述符和全部 L0 方法可调用。返回布尔，不调用方法，属性访问失败返回 false。                                                         |
+| `isRecordStore(store)`                                          | 接收 IKeyValueStore；额外要求全部 L1 方法可调用，并且 records、binary、transactions、iteration 都为 true。                                                                     |
+| `asRecordStore<T>(store)`                                       | 返回同一对象的 `IRecordStore<T>` 视图，不包装、不降级；能力不足抛 UNSUPPORTED_CAPABILITY，默认 T 为 unknown。                                                                  |
+| `snapshotKeyValueStore(store)`、`snapshotRecordStore<T>(store)` | 输入 unknown；合法时返回新说明对象 { store, backend, capabilities }，否则 undefined，store 仍是原引用。                                                                        |
+| `snapshotKeyValueStoreDetailed(store)`                          | 成功为 { valid: true, store, backend, capabilities, dispose, receiver }；失败为 { valid: false, cause }。dispose 是接纳时取得的函数，receiver 是原 store，供所有者保持接收者。 |
+
+准入一次读取相关属性，Detailed 保留精确的反射或 getter 失败原因。轻量谓词和快照返回失败结果；as 断言抛 StorageContractError，并把原始访问器错误保留在标准 cause。`asRecordStore` 的 backend 是探测到的合法后端名，探测失败为 undefined。说明快照不冻结原 store，也不证明后端方法的实现结果；已经拿到说明的组合方应复用它，避免再次触发同一 getter。
+
+### 能力描述符
+
+`IStorageCapabilities` 的九个字段均只读。snapshotStorageCapabilities(value) 接收 unknown，只读取一次并返回新说明对象；不是原引用，也不保证 Object.freeze。字段访问失败或类型非法返回 undefined，不抛错。`isStorageCapabilities(value)` 等价于该快照函数成功与否的布尔判断，不会把规范化字段写回原对象。
+
+| 字段               | 含义、默认与范围                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| `syncRead`         | 必填 boolean，是否有同步读取能力。                                                                       |
+| `binary`           | 必填 boolean，是否有字节通道。                                                                           |
+| `records`          | 必填 boolean，是否有结构化记录通道。                                                                     |
+| `transactions`     | 必填 boolean，是否有事务能力。                                                                           |
+| `iteration`        | 必填 boolean，是否有迭代能力。                                                                           |
+| `secondaryIndexes` | 新描述符为 boolean；旧描述符可省略，快照规范化为 false。                                                 |
+| `changeFeed`       | 新描述符为 boolean；旧描述符可省略，快照规范化为 false。                                                 |
+| `maxValueBytes`    | 非负安全整数或 undefined，表示近似单值字节上限；undefined 表示没有这种单值限制声明，仍可能受总配额限制。 |
+| `opaqueEntries`    | 必填 boolean，是否可能存在脚本不可见的条目，例如 HttpOnly cookie。                                       |
+
+原有后端说明中的近似值为 cookie 约 4096 字节、localStorage 约 5 MB；IndexedDB 常用 undefined 表示主要受总配额约束。这是能力说明，不是本包测量或实现的配额。
+
+### 操作上下文、写选项与快照
+
+`IOperationContext` 是异步方法末尾的可选参数；`IWriteOptions` 额外允许 conflictPolicy。
+
+| 字段             | 省略值与约束                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `signal`         | undefined。结构兼容 IAbortSignal：aborted 为 boolean，addEventListener/removeEventListener 为函数。保留原信号引用。 |
+| `timeoutMs`      | undefined；提供时为非负安全整数，允许 0。实现层负责超时计时和与外部信号组合，本包只校验。                           |
+| `pageSize`       | undefined；提供时必须为 1 到 4096 的整数，用于实现层的分页迭代。                                                    |
+| `conflictPolicy` | 快照未提供时仍为 undefined；写入契约的缺省策略为 conflict。合法值是 'conflict'、'replace' 或 undefined。            |
+
+`ConflictPolicy.conflict` 的值为 `'conflict'`，表示已存在则失败；`ConflictPolicy.replace` 的值为 `'replace'`，表示覆盖。使用该常量和 IConflictPolicy，不另造重复常量或别名。
+
+`snapshotOperationContext(ctx)` 接受上下文或 undefined。undefined 原样返回；合法对象的 signal、timeoutMs、pageSize、conflictPolicy 各读一次，返回冻结快照。再次传入本函数产物会返回同一个对象，不重复读取原 getter。非法对象、字段、信号结构或 getter 失败抛 INVALID_ARGUMENT，原始原因通过 cause 保留。`assertOperationContext(ctx)` 调用相同校验，只丢弃返回值。
+
+冻结的是上下文字段，不是信号状态。已经 aborted 的有效信号也能通过形状校验；本包不等待操作、不启动计时器、不创建取消引擎。取消感知后端用 ABORTED 结束等待，不保证原生 AbortError；已经进入原子提交的写应报告真实提交结果，不伪报回滚。
+
+`ISyncWriteOptions` 只允许可选 conflictPolicy。`snapshotSyncWriteOptions(options)` 接受对象或 undefined，读取 signal、timeoutMs、conflictPolicy，拒绝非 undefined 的 signal/timeoutMs；显式的 undefined 字段合法。额外 pageSize 不读取，也不提供同步分页。返回新对象 { conflictPolicy }，不冻结，省略策略仍为 undefined；`assertSyncWriteOptions(options)` 只校验、不返回快照。非法结构、字段或 getter 失败均为 INVALID_ARGUMENT。
+
+### 存储键与范围
+
+`IStorageKey` 为 string、有限 number、有效 Date、ArrayBuffer，或这些值的非空嵌套只读数组。数组不能有空洞或循环。
+
+| API 或常量                                       | 规则                                                                                                                                      |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `assertStorageKey(value, backend, label?)`       | value 为 unknown，backend 为调用方选用的 IBackendKind，只用于错误详情；label 默认 'key'，用于错误文字。非法键抛 INVALID_KEY，并记录原键。 |
+| `snapshotStorageKey(value, backend, label?)`     | 同样参数；先校验，再复制 Date、ArrayBuffer 和嵌套数组，最后复验。字符串和数字原样返回；结果与可变原输入分离，但不冻结。                   |
+| `assertStringStorageKey(value, backend, label?)` | L0、字节、元数据通道只接受字符串。label 默认 'key'；非字符串为 INVALID_ARGUMENT，不是 INVALID_KEY。                                       |
+| `compareStorageKeys(a, b)`                       | 接受两个有效 IStorageKey，返回负数、零或正数，可直接交给 sort；不承诺只返回 -1/0/1。                                                      |
+| `KEY_DOMAIN_LIMITS.maxDepth`                     | 32，根深度为 0。                                                                                                                          |
+| `KEY_DOMAIN_LIMITS.maxNodes`                     | 4096，包含遍历中的数组和叶节点。                                                                                                          |
+| `KEY_DOMAIN_LIMITS.maxBinaryBytes`               | 1,048,576 字节，每个二进制键组件的上限。                                                                                                  |
+
+日期不能是 NaN，数字必须有限。日期和二进制在可用时通过 structuredClone 支持跨 realm 识别；没有该能力时日期使用本地 Date 识别。二进制品牌来自 utils/bytes；constructor.name 不能伪装有效键。复制或复验失败包装为 INVALID_KEY，已是 StorageContractError 的失败直接透传。
+
+排序依次为 number < Date < string < ArrayBuffer < 数组。同类型数字按差值，日期按时间戳，字符串按字典顺序；二进制逐字节比较、相同前缀时短者优先；数组逐段递归比较、相同前缀时短者优先。
+
+`IKeyRange` 有可选 lower、upper（IStorageKey）和 lowerOpen、upperOpen（boolean），表达下界、上界以及是否排除对应边界，语义对应 IDBKeyRange，但不依赖它。字段省略时本包不补默认值，交给实现解释。
+
+### 编解码契约与集合 JSON
+
+`ICodec<T, TRaw>` 的 T 默认 unknown，TRaw 声明默认值为 string | Uint8Array | unknown（等效 unknown）。它有必填 name、output、encode、decode；encode(value, ctx?) 返回 `Promise<TRaw>`，decode(raw, ctx?) 返回 `Promise<T>`。ctx 默认 undefined，使用操作上下文。`ICodecOutput` 的三个值为 text（文本）、binary（二进制）、structured（结构化值）。调用方按输出形态和后端能力选路；本包不把不支持的形态隐式转成其他形态。
+
+`snapshotCodec(codec)` 接受 unknown；要求非 null、非数组的对象，也接纳满足结构的 class 实例。name 必须是 trim 后非空字符串，output 是三种值之一，encode/decode 必须可调用。四个属性各读取一次，返回新的浅说明对象 { name, output, encode, decode }；函数引用不变，不绑定旧 receiver，也不冻结。`assertCodec(codec)` 使用相同校验并将输入类型收窄，不返回说明对象。非法形状或读取失败为 INVALID_ARGUMENT。
+
+`collectionsJsonCodec` 是内置、冻结的 codec，name 固定为 `COLLECTIONS_JSON_CODEC_NAME`，即 `'migaia-collections-json-v1'`，output 为 text。Map 和 Set 编为带版本名、map/set kind 与数组 payload 的三元 tuple；解码只解释完全匹配的保留形式。普通或仅相似数组不猜成集合；精确匹配该保留形式的数组会被解释为集合，因此不要把这组 tuple 当普通业务数组使用。
+
+集合之外仍遵循 JSON 表达能力，不是任意对象图的无损序列化。无法表示的根值、循环、BigInt 等 JSON 编码失败，非字符串输入、坏 JSON 或坏保留集合内容，都以 INVALID_ARGUMENT 保留原始 cause。浏览器 structured/binary codec 属于 storage-web；压缩、加密等自定义 codec 实现同一接口接入，不在本包提供。
+
+### 事务作用域与冲突策略
+
+`ITransactionScope<TValue>` 只有 get(key): `Promise<TValue | undefined>`、put(value, key?, options?): `Promise<IStorageKey>`、delete(key): `Promise<void>`。key 为 IStorageKey；put 省略 key 时由实现生成。`ITransactionWriteOptions` 只有可选 conflictPolicy。
+
+隔离级别、提交时机、失败重试由实现定义。本包不执行事务。run 回调 resolve 之后不要继续保存并使用 scope，连接或快照可能已经释放。`assertTransactionCallback(run, backend)` 在实现方分配资源前检查 run 是函数；否则抛 INVALID_ARGUMENT，附 backend。
+
+`readTransactionConflictPolicy(options, backend)` 接受 undefined 或对象；省略 options 或 conflictPolicy 返回 conflict，replace 返回 replace。直接传策略字符串、非法对象或非法字段都会抛 INVALID_ARGUMENT，getter 失败保留精确 cause。它只读取策略，不执行写入。
+
+### 变更通知与二级索引扩展
+
+`IChangeFeedStore` 扩展 L0，提供 subscribeChanges(listener): unsubscribe。listener 接收提交后的 IStorageChange，取消函数由调用方持有并执行。change 的 sequence 是递增序号，origin 是来源；channel 取 value、bytes、record、all，kind 取 put、remove、clear、batch、migrate；scope 与 keys 可省略，keys 为 IStorageKey 数组。这里声明通知形状，不创建通道或跨窗口载体。
+
+`isChangeFeedStore(candidate)` 要求完整 L0、changeFeed 为 true、subscribeChanges 可调用；`asChangeFeedStore(store)` 返回相同对象的能力视图。能力不完整为 UNSUPPORTED_CAPABILITY；方法或能力 getter 失败的原值保留在 cause。
+
+`ISecondaryIndexRecordStore<TValue>` 保留完整 L1，增加以下五个方法：
+
+| 方法                                                     | 输入和返回                                                                        |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `ensureRecordIndexes(scope, definitions, ctx?)`          | scope 是调用方命名的索引作用域，definitions 是定义数组，返回 IRecordIndexHandle。 |
+| `getRecordIndexReadiness(handle, ctx?)`                  | handle 来自 ensureRecordIndexes，返回状态及 scanned/indexed 数量。                |
+| `putIndexedRecord(value, key, handle, projection, ctx?)` | 使用明确主键、对应句柄和投影写入，ctx 为 IWriteOptions，返回主键。                |
+| `iterateRecordIndex(query, ctx?)`                        | 按 query 返回 [主键, TValue] 的异步迭代器。                                       |
+| `transactionIndexed(handle, run, ctx?)`                  | run 接收 ISecondaryIndexTransactionScope，返回与回调一致的 Promise 结果。         |
+
+定义的必填字段是 name、unique、multiEntry、revision；句柄的必填字段是 scope、generation、fingerprint。readiness.status 为 pending、running、complete、failed，另有 scanned、indexed 数量。句柄绑定具体 generation，不要仅按索引名字绕过它。
+
+query 必填 handle、index，可选 range、direction（next/prev）、limit；可选字段未提供时保持未设置，具体查询默认由实现决定。projection 按索引名映射到 undefined、{ kind: 'single', key } 或 { kind: 'multiple', keys }。索引事务 scope 有 get(key)、put(value, key, projection)、delete(key)，与普通事务 put 的可选 key/冲突选项形状不同。
+
+`isSecondaryIndexRecordStore(candidate)` 与 `asSecondaryIndexRecordStore(store)` 同时要求完整 L1、secondaryIndexes 为 true、五个扩展方法可调用；不调用方法。断言失败为 UNSUPPORTED_CAPABILITY，反射或 getter 原错在 cause。扩展断言不额外承诺可用 backend 详情，失败时 backend 为 undefined。
+
+### 错误与诊断归属
+
+`new StorageContractError(code, details?, message?)` 创建错误后立即冻结。code 必填；details 默认 {}，字段 backend、key、cause 都可选，默认 undefined。backend 为 IBackendKind，key 为字符串或 IStorageKey，cause 是原始失败。message 省略时为 `[storage-contract] ${code}`。name 为 StorageContractError，source 恒为 `STORAGE_CONTRACT_SOURCE`，即 `'@migaia/storage-contract'`，不重写 stack，标准 cause 仍可追到原对象。
+
+`isStorageContractError(value)` 使用本包类的 instanceof 判断。错误码属于公开 API；实现包自己的错误 source 与这里不同，使用 (source, code) 判断归属。web codec、迁移和扩展的附加诊断细节属于 storage-web，不扩进本包错误详情。
+
+| StorageContractErrorCode 成员 | 码值                     | 应对                                                                 |
+| ----------------------------- | ------------------------ | -------------------------------------------------------------------- |
+| `invalidArgument`             | `INVALID_ARGUMENT`       | 描述符、上下文、同步写或事务选项等非法；修正参数，不重试相同坏输入。 |
+| `invalidKey`                  | `INVALID_KEY`            | 键类型、深度、节点、字节限制、循环、空数组或空洞非法；修正键。       |
+| `unsupported`                 | `UNSUPPORTED_CAPABILITY` | 所需能力不存在；先做能力分支或换实现，不静默降级。                   |
+| `disposed`                    | `STORE_DISPOSED`         | 已结束的实例继续使用；新建 store。                                   |
+| `aborted`                     | `ABORTED`                | 实现层操作被信号或超时取消；按取消处理，原子提交返回真实结果。       |
+
+字节 guard 从 `@migaia/utils/bytes` 导入，不再从本包转出。内部槽品牌识别与字节是否仍可读是两件事，detached 对象仍可能保持品牌。`intrinsicConstructorName(value)` 只做尽力诊断：会观察可修改的原型、constructor 和 name，非对象、null 或读取失败返回 undefined。不能把它用于安全、类型或协议判断。
+
+### 接入步骤与构建
+
+功能模块可以只接受 IKeyValueStore，在真正需要记录能力时按以下顺序接入：
+
+1. 用 snapshotOperationContext(ctx) 校验并保留本次上下文。
+2. 用 `asRecordStore<IProfile>`(store) 收窄；不足时直接使用既有的 UNSUPPORTED_CAPABILITY，不另造裸 Error。
+3. 在 records.transaction 的回调里使用 tx.get/put/delete，将上下文快照传给 transaction。
+4. 返回回调结果；连接、原子提交与失败重试由实际后端负责。
+
+只支持文本的后端需要调用方明确选文本 codec 或转换方式；不能仅看到 binary 标志就跳过完整记录能力准入。自定义 gzip、加密或 Worker codec 先用 assertCodec/snapshotCodec 校验，再交给实现层使用。
 
 ```bash
-pnpm --filter @migaia/storage-contract run fmt
-pnpm --filter @migaia/storage-contract run lint
-pnpm --filter @migaia/storage-contract run typecheck
-pnpm --filter @migaia/storage-contract run typecheck:test
-pnpm --filter @migaia/storage-contract run test
+pnpm run fmt
+pnpm run lint
+pnpm run typecheck
+pnpm run typecheck:test
+pnpm run test
 ```
