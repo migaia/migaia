@@ -3187,7 +3187,20 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "基础订阅签名为 `subscribe(listener, options?: { taskId?: string }): subscription`：`listener` 接收事件上下文，可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。"
+                  "text": "基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "只处理 payload 时可显式选择 value："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createEventChannel, EventDelivery } from '@migaia/event-subscriber'\n\nconst updates = createEventChannel<{ id: number }>()\nconst stop = updates.subscribe((value) => console.log(value.id), { delivery: EventDelivery.value })\nupdates.publish({ id: 1 })\nstop()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "value 模式保持 payload 身份，不提供 `abort()`、`setTaskId()` 或 `taskId` 上下文成员；登记时的 `taskId` 仍可用于任务过滤。需要上下文控制或 `valueConfig` 别名时保留默认 context。通道订阅链、命名别名及 Hub 的第三个订阅参数都接受相同的 delivery 选择；Hub 不接受任务标签。`subscribeOnce`、`subscribeUntil` 仍只接收上下文监听器。"
                 },
                 {
                   "type": "paragraph",
@@ -3203,7 +3216,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为上下文附加一个路径值，不转换事件。"
+                  "text": "订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。"
                 },
                 {
                   "type": "paragraph",
@@ -3537,7 +3550,11 @@
                   "rows": [
                     [
                       "`subscribe(listener, options?)`",
-                      "按登记顺序添加监听器，返回可调用、可链式扩展的句柄。`listener(event)` 接收下面的上下文，返回 `R` 或 PromiseLike。监听器必须是函数。"
+                      "按登记顺序添加监听器，返回可调用、可链式扩展的句柄。默认 `listener(event)` 接收下面的上下文；显式 `delivery: EventDelivery.value` 时 `listener(value)` 接收原始 payload。两者返回 `R` 或 PromiseLike，监听器必须是函数。"
+                    ],
+                    [
+                      "`subscribe.options.delivery`",
+                      "默认 `EventDelivery.context`（`'context'`），保留 payload 与上下文控制；`EventDelivery.value`（`'value'`）直接传入原始 payload，不复制或包装。其他值抛 `INVALID_OPTIONS`。"
                     ],
                     [
                       "`subscribe.options.taskId`",
@@ -3560,11 +3577,24 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`unique` 模式下，重复订阅同一个监听器会得到控制同一代登记的句柄；只有首次取消生效。重复订阅的 `taskId` 必须与已有值相同，包括两次都省略，否则修改状态前抛 `INVALID_OPTIONS`。`clear()` 或退订后重新订阅会创建新一代；`unique` 的句柄绑定原登记代，所以旧句柄不会取消新登记。Hub 和包装监听器的独立 helper 不按原始监听器身份去重。缺省 `multiple` 与 `removalPolicy: 'handle'` 组合下，每次登记可以分别取消。"
+                  "text": "`unique` 模式下，重复订阅同一个监听器会得到控制同一代登记的句柄；只有首次取消生效。重复订阅的 `taskId` 和 delivery 必须与已有值相同，否则修改状态前抛 `INVALID_OPTIONS`；省略 delivery 与显式 `EventDelivery.context` 相同，省略 `taskId` 只匹配同样未设置的标签。`clear()` 或退订后重新订阅会创建新一代；`unique` 的句柄绑定原登记代，所以旧句柄不会取消新登记。Hub 和包装监听器的独立 helper 不按原始监听器身份去重。缺省 `multiple` 与 `removalPolicy: 'handle'` 组合下，每次登记可以分别取消。"
                 },
                 {
                   "type": "paragraph",
                   "text": "不要把这种隔离套用于 `admissionPolicy: 'multiple'` 与 `removalPolicy: 'listener-all'` 的组合：尚未调用的旧句柄会按监听器函数身份移除当前全部匹配登记。即使先 `clear()`、再用同一个函数创建新登记，该旧句柄仍会移除它们。需要旧句柄与新登记隔离时，保留默认的 `handle` 移除策略；`unique` 则另有上述登记代绑定保证。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "公开订阅选项类型为 `IEventSubscribeOptions`。默认/显式 context 重载使用 `IEventListener<T, R, V>`；显式 value 重载将原始 `T` 交给监听器，并接收 `R` 或 `PromiseLike<R>` 结果，必须提供 `{ delivery: EventDelivery.value }`。两种模式可在同一通道共存，调用工具沿用各自登记的模式和结果语义。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createEventChannel, EventDelivery, invokeTask } from '@migaia/event-subscriber'\n\nconst tasks = createEventChannel<{ id: number }, number>()\nconst stop = tasks.subscribe((value) => value.id, {\n  delivery: EventDelivery.value,\n  taskId: 'read-id'\n})\nconsole.log(await invokeTask(tasks, 'read-id', { id: 7 })) // 7\nstop()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "value 模式不附加 `abort()`、`aborted`、`abortReason`、`setTaskId()`、`taskId` 或 `valueConfig` 别名；payload 本身不被修改。登记标签仍可由 `filterTaskId()`、`invokeTask()` 选择。需要监听器内的取消、改标签或投影别名时保留默认 context。"
                 },
                 {
                   "type": "table",
@@ -3620,7 +3650,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`channel.subscribe()` 返回 `IEventChannelSubscription`，`hub.subscribe()` 返回 `IEventHubSubscription`。句柄本身可调用，`handle.unsubscribe === handle`；链式 `handle.subscribe(...)` 返回同一条链，风格的订阅别名与取消别名也保持函数身份。取消按追加顺序的逆序执行整条链，只真正执行一次。单个释放失败原样抛出；多个失败合为 `SUBSCRIPTION_DISPOSE_FAILED`，`AggregateError.errors` 保留执行顺序。关闭后追加订阅抛 `SUBSCRIPTION_CLOSED`。"
+                  "text": "`channel.subscribe()` 返回 `IEventChannelSubscription`，`hub.subscribe()` 返回 `IEventHubSubscription`。句柄本身可调用，`handle.unsubscribe === handle`；链式 `handle.subscribe(...)` 返回同一条链，风格的订阅别名与取消别名也保持函数身份。通道及句柄的 `subscribe`/订阅别名均接受 `taskId`、delivery 选项；Hub 及句柄的 `subscribe(key, listener, options?)`/订阅别名只接受 delivery，不接受 `taskId`。取消按追加顺序的逆序执行整条链，只真正执行一次。单个释放失败原样抛出；多个失败合为 `SUBSCRIPTION_DISPOSE_FAILED`，`AggregateError.errors` 保留执行顺序。关闭后追加订阅抛 `SUBSCRIPTION_CLOSED`。"
                 },
                 {
                   "type": "paragraph",
@@ -3634,7 +3664,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "这些函数从 `@migaia/event-subscriber/subscriber` 导入，只要求结构兼容的 `channel.subscribe(listener, options?)`，不要求包内工厂身份。`subscribe` 必须返回函数，不能在安装尚未结束时同步交付事件；非法结构为 `INVALID_CHANNEL`。helper 保留对象方法的接收者。"
+                  "text": "这些函数从 `@migaia/event-subscriber/subscriber` 导入，只要求结构兼容的 `channel.subscribe(listener, options?)`，不要求包内工厂身份。`subscribe` 必须返回函数，不能在安装尚未结束时同步交付事件；非法结构为 `INVALID_CHANNEL`。helper 保留对象方法的接收者。`subscribeOnce`、`subscribeUntil` 和对象订阅者保持 context-only，不接受 value 交付选项。"
                 },
                 {
                   "type": "table",
@@ -3747,8 +3777,8 @@
                   "headers": ["成员", "行为"],
                   "rows": [
                     [
-                      "`subscribe(key, listener)`",
-                      "key 是事件表中的字符串、数字或 symbol，listener 必须是函数。首次订阅该 key 时才创建内部 channel；返回可调用的订阅链。"
+                      "`subscribe(key, listener, options?)`",
+                      "key 是事件表中的字符串、数字或 symbol，listener 必须是函数。第三参只接受 delivery：默认/显式 `EventDelivery.context` 接收上下文，`EventDelivery.value` 接收该 key 的原始 payload；不接受 `taskId`。首次订阅该 key 时才创建内部 channel；返回可调用的订阅链。"
                     ],
                     [
                       "`publish(key, value)`",
@@ -3776,7 +3806,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`valueConfig` 在构造时固定路径，把原始 payload 中的一个值附加到上下文，同时保留原始 `event.value` 和所有控制方法。它不保存、转换或重放事件。"
+                  "text": "`valueConfig` 在构造时固定路径，把原始 payload 中的一个值附加到 context 模式的上下文，同时保留原始 `event.value` 和所有控制方法。value 模式仍直接收到原始 payload，不附加别名。它不保存、转换或重放事件。"
                 },
                 {
                   "type": "table",
@@ -4155,7 +4185,20 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "The basic subscription signature is `subscribe(listener, options?: { taskId?: string }): subscription`. The listener receives an event context; optional `taskId` names this registration. The returned subscription cancels its registrations and can extend the chain."
+                    "text": "Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener. The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` names the registration. The returned subscription cancels its registrations and can extend the chain."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Select value delivery explicitly when only the payload is needed:"
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createEventChannel, EventDelivery } from '@migaia/event-subscriber'\n\nconst updates = createEventChannel<{ id: number }>()\nconst stop = updates.subscribe((value) => console.log(value.id), { delivery: EventDelivery.value })\nupdates.publish({ id: 1 })\nstop()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Value delivery preserves payload identity and provides no context members such as `abort()`, `setTaskId()` or `taskId`. A registration's `taskId` still supports task filtering. Keep default context delivery when context controls or `valueConfig` aliases are needed. Channel chains, naming aliases and the Hub's third subscribe argument accept the same delivery selection; the Hub accepts no task label. `subscribeOnce` and `subscribeUntil` still accept context listeners only."
                   },
                   {
                     "type": "paragraph",
@@ -4171,7 +4214,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to the context without transforming events."
+                    "text": "Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads."
                   },
                   {
                     "type": "paragraph",
@@ -4533,7 +4576,11 @@
                     "rows": [
                       [
                         "`subscribe(listener, options?)`",
-                        "Adds a listener in registration order and returns a callable chain handle. `listener(event)` receives the context below and returns `R` or a PromiseLike. The listener must be a function."
+                        "Adds a listener in registration order and returns a callable chain handle. By default `listener(event)` receives the context below; explicit `delivery: EventDelivery.value` calls `listener(value)` with the original payload. Both return `R` or a PromiseLike. The listener must be a function."
+                      ],
+                      [
+                        "`subscribe.options.delivery`",
+                        "Defaults to `EventDelivery.context` (`'context'`), retaining the payload and context controls. `EventDelivery.value` (`'value'`) passes the original payload without copying or wrapping. Other values throw `INVALID_OPTIONS`."
                       ],
                       [
                         "`subscribe.options.taskId`",
@@ -4559,11 +4606,24 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "In `unique` mode, subscribing the same function again returns a handle controlling the existing registration generation. Only the first removal changes state. A duplicate subscription must use the same `taskId`, including both calls omitting it, or throws `INVALID_OPTIONS` before state changes. Resubscribing after removal or `clear()` creates a new generation. A `unique` handle stays bound to its original generation, so it cannot cancel the new registration. The Hub and helpers that register wrappers do not deduplicate the original listener identity. The default combination of `multiple` admission and `removalPolicy: 'handle'` gives each registration independent cancellation."
+                    "text": "In `unique` mode, subscribing the same function again returns a handle controlling the existing registration generation. Only the first removal changes state. A duplicate subscription must use the same `taskId` and delivery or throws `INVALID_OPTIONS` before state changes. Omitted delivery equals explicit `EventDelivery.context`; an omitted `taskId` matches only an unset label. Resubscribing after removal or `clear()` creates a new generation. A `unique` handle stays bound to its original generation, so it cannot cancel the new registration. The Hub and helpers that register wrappers do not deduplicate the original listener identity. The default combination of `multiple` admission and `removalPolicy: 'handle'` gives each registration independent cancellation."
                   },
                   {
                     "type": "paragraph",
                     "text": "That isolation does not apply to `admissionPolicy: 'multiple'` combined with `removalPolicy: 'listener-all'`. An old handle that has not yet been called removes all current registrations of its listener function, including new registrations created with that function after `clear()`. Keep the default `handle` removal policy when old handles must not affect later registrations; `unique` separately provides the generation binding described above."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The public subscription options type is `IEventSubscribeOptions`. Default or explicit context overloads use `IEventListener<T, R, V>`. Explicit value overloads pass the original `T` to the listener, accept an `R` or `PromiseLike<R>` result, and require `{ delivery: EventDelivery.value }`. Both modes can coexist on one channel; invocation helpers retain each registration's mode and result semantics."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createEventChannel, EventDelivery, invokeTask } from '@migaia/event-subscriber'\n\nconst tasks = createEventChannel<{ id: number }, number>()\nconst stop = tasks.subscribe((value) => value.id, {\n  delivery: EventDelivery.value,\n  taskId: 'read-id'\n})\nconsole.log(await invokeTask(tasks, 'read-id', { id: 7 })) // 7\nstop()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Value delivery adds no `abort()`, `aborted`, `abortReason`, `setTaskId()`, `taskId` or `valueConfig` alias; the payload itself is not modified. The registration label still supports `filterTaskId()` and `invokeTask()`. Keep default context delivery for cancellation, retagging or projected aliases inside a listener."
                   },
                   {
                     "type": "table",
@@ -4622,7 +4682,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "`channel.subscribe()` returns `IEventChannelSubscription`; `hub.subscribe()` returns `IEventHubSubscription`. A handle is callable, and `handle.unsubscribe === handle`. Chained `handle.subscribe(...)` returns the same chain. Styled subscription and cancellation aliases preserve function identity too. Cancellation runs every disposer in reverse append order and executes only once. A single disposal failure is rethrown unchanged; several produce `SUBSCRIPTION_DISPOSE_FAILED` with original failures in execution order on `AggregateError.errors`. Extending a closed chain throws `SUBSCRIPTION_CLOSED`."
+                    "text": "`channel.subscribe()` returns `IEventChannelSubscription`; `hub.subscribe()` returns `IEventHubSubscription`. A handle is callable, and `handle.unsubscribe === handle`. Chained `handle.subscribe(...)` returns the same chain. Styled subscription and cancellation aliases preserve function identity too. Channel and handle subscribe methods or aliases accept both `taskId` and delivery options. Hub and Hub-handle `subscribe(key, listener, options?)` methods or aliases accept only delivery, without `taskId`. Cancellation runs every disposer in reverse append order and executes only once. A single disposal failure is rethrown unchanged; several produce `SUBSCRIPTION_DISPOSE_FAILED` with original failures in execution order on `AggregateError.errors`. Extending a closed chain throws `SUBSCRIPTION_CLOSED`."
                   },
                   {
                     "type": "paragraph",
@@ -4636,7 +4696,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "Import these functions from `@migaia/event-subscriber/subscriber`. They require only a structurally compatible `channel.subscribe(listener, options?)`, not factory identity. The method must return a cancellation function and must not deliver an event synchronously before installation finishes; an invalid source produces `INVALID_CHANNEL`. Object method receivers are preserved."
+                    "text": "Import these functions from `@migaia/event-subscriber/subscriber`. They require only a structurally compatible `channel.subscribe(listener, options?)`, not factory identity. The method must return a cancellation function and must not deliver an event synchronously before installation finishes; an invalid source produces `INVALID_CHANNEL`. Object method receivers are preserved. `subscribeOnce`, `subscribeUntil` and object subscribers remain context-only; they accept no value delivery option."
                   },
                   {
                     "type": "table",
@@ -4749,8 +4809,8 @@
                     "headers": ["Member", "Behavior"],
                     "rows": [
                       [
-                        "`subscribe(key, listener)`",
-                        "The event-map key is a string, number or symbol, and the listener must be a function. Creates an internal channel only for the first subscription to a key. Returns a callable chain."
+                        "`subscribe(key, listener, options?)`",
+                        "The event-map key is a string, number or symbol, and the listener must be a function. The third argument accepts only delivery: default or explicit `EventDelivery.context` receives the context; `EventDelivery.value` receives that key’s original payload. It accepts no `taskId`. Creates an internal channel only for the first subscription to a key. Returns a callable chain."
                       ],
                       [
                         "`publish(key, value)`",
@@ -4778,7 +4838,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "`valueConfig` fixes a path at construction and adds that payload value to each context while preserving the original `event.value` and all controls. It stores, transforms and replays no events."
+                    "text": "`valueConfig` fixes a path at construction and adds that payload value to context delivery while preserving the original `event.value` and all controls. Value delivery still receives the original payload without an alias. It stores, transforms and replays no events."
                   },
                   {
                     "type": "table",
@@ -37446,7 +37506,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                  "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
                 }
               ]
             },
@@ -37674,7 +37734,12 @@
                       "termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。"
                     ],
                     [
-                      "Bun、Deno、浏览器、Electron renderer",
+                      "Bun",
+                      "node 子入口的两个工厂",
+                      "termination / exit-observation enforced；heap-limit unsupported。"
+                    ],
+                    [
+                      "Deno、浏览器、Electron renderer",
                       "根入口的两个 Web 工厂",
                       "三项均 unsupported；terminate 请求不产生真实 exit 回执。"
                     ],
@@ -37703,7 +37768,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。本轮场景只对真实 Node Worker / MessagePort 给出运行证据，浏览器、Bun、Deno、Electron 的权限与退出行为不据此冒称已实测。"
+                  "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
                 }
               ]
             },
@@ -38193,7 +38258,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                  "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
                 }
               ]
             },
@@ -38421,7 +38486,12 @@
                       "termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。"
                     ],
                     [
-                      "Bun、Deno、浏览器、Electron renderer",
+                      "Bun",
+                      "node 子入口的两个工厂",
+                      "termination / exit-observation enforced；heap-limit unsupported。"
+                    ],
+                    [
+                      "Deno、浏览器、Electron renderer",
                       "根入口的两个 Web 工厂",
                       "三项均 unsupported；terminate 请求不产生真实 exit 回执。"
                     ],
@@ -38450,7 +38520,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。本轮场景只对真实 Node Worker / MessagePort 给出运行证据，浏览器、Bun、Deno、Electron 的权限与退出行为不据此冒称已实测。"
+                  "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
                 }
               ]
             },
@@ -38798,7 +38868,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                    "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                   }
                 ]
               },
@@ -39038,7 +39108,12 @@
                         "termination, exit-observation, and heap-limit are enforced; only a real exit settles exited."
                       ],
                       [
-                        "Bun, Deno, browsers, Electron renderer",
+                        "Bun",
+                        "The two node-entry factories",
+                        "termination and exit-observation are enforced; heap-limit remains unsupported."
+                      ],
+                      [
+                        "Deno, browsers, Electron renderer",
                         "The root Web factories",
                         "All three are unsupported; a terminate request supplies no actual-exit receipt."
                       ],
@@ -39067,7 +39142,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. This delivery's runnable examples establish Node Worker / MessagePort behavior only; they do not establish browser, Bun, Deno, or Electron permissions and exit behavior."
+                    "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
                   }
                 ]
               },
@@ -39560,7 +39635,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                    "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                   }
                 ]
               },
@@ -39800,7 +39875,12 @@
                         "termination, exit-observation, and heap-limit are enforced; only a real exit settles exited."
                       ],
                       [
-                        "Bun, Deno, browsers, Electron renderer",
+                        "Bun",
+                        "The two node-entry factories",
+                        "termination and exit-observation are enforced; heap-limit remains unsupported."
+                      ],
+                      [
+                        "Deno, browsers, Electron renderer",
                         "The root Web factories",
                         "All three are unsupported; a terminate request supplies no actual-exit receipt."
                       ],
@@ -39829,7 +39909,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. This delivery's runnable examples establish Node Worker / MessagePort behavior only; they do not establish browser, Bun, Deno, or Electron permissions and exit behavior."
+                    "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
                   }
                 ]
               },

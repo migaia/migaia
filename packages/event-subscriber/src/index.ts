@@ -12,6 +12,7 @@ export {
 export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js'
 export {
   EventAdmissionPolicy,
+  EventDelivery,
   EventDispatchPolicy,
   EventRemovalPolicy,
   EventSubscriberState
@@ -38,6 +39,7 @@ export type {
   IEventInvocation,
   IEventInvocationVisitor,
   IEventListener,
+  IEventSubscribeOptions,
   IEventMap,
   IEventReport,
   IEventSubscriber,

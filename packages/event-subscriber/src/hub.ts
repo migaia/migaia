@@ -1,5 +1,9 @@
 import { EventSubscriberErrorCode } from './error-code.js'
-import { createCanonicalChannel, createChannelWithProjection } from './channel.js'
+import {
+  createCanonicalChannel,
+  createChannelWithProjection,
+  readDeliveryOption
+} from './channel.js'
 import {
   copyEventProjection,
   createEventValueProjectionPlan,
@@ -13,12 +17,15 @@ import type {
   IEventChannelOptions,
   IEventMap,
   IEventListener,
+  IEventSubscribeOptions,
+  IEventValueListener,
   IEventHubSubscription,
   IEventValueConfig,
   IStyledEventHub,
   IStyledEventHubOptions
 } from './types.js'
 import { createRawSubscriptionOwner } from './internal/subscription.js'
+import { EventDelivery } from './state-constants.js'
 import {
   normalizeEventApiStyle,
   projectEventApiStyle,
@@ -185,12 +192,15 @@ export function createEventHub<C extends IEventMap, V = undefined>(
   const hub: IEventHub<C, undefined, V> = {
     subscribe<K extends keyof C>(
       key: K,
-      listener: IEventListener<C[K], void, V extends IEventValueConfig<C[K]> ? V : undefined>
+      listener:
+        | IEventListener<C[K], void, V extends IEventValueConfig<C[K]> ? V : undefined>
+        | IEventValueListener<C[K]>,
+      listenerOptions?: Pick<IEventSubscribeOptions, 'delivery'>
     ): IEventHubSubscription<C, K, undefined, V> {
-      const release = registerRaw(key, listener)
+      const release = registerRaw(key, listener, listenerOptions)
       return createRawSubscriptionOwner(
         release,
-        (nextKey, nextListener) => registerRaw(nextKey, nextListener),
+        (nextKey, nextListener, nextOptions) => registerRaw(nextKey, nextListener, nextOptions),
         stylePlan
       ) as IEventHubSubscription<C, K, undefined, V>
     },
@@ -225,7 +235,10 @@ export function createEventHub<C extends IEventMap, V = undefined>(
   }
   function registerRaw<K extends keyof C>(
     key: K,
-    listener: IEventListener<C[K], void, V extends IEventValueConfig<C[K]> ? V : undefined>
+    listener:
+      | IEventListener<C[K], void, V extends IEventValueConfig<C[K]> ? V : undefined>
+      | IEventValueListener<C[K]>,
+    listenerOptions?: Pick<IEventSubscribeOptions, 'delivery'>
   ): () => void {
     if (typeof listener !== 'function') {
       throw createEventTypeError(
@@ -233,33 +246,40 @@ export function createEventHub<C extends IEventMap, V = undefined>(
         eventErrorText(EventSubscriberErrorCode.invalidListener)
       )
     }
+    /** Validate the mode before creating a keyed channel or acquiring registration ownership. */
+    const delivery = readDeliveryOption(listenerOptions)
     const { channel, validated } = getChannel(key)
     let deactivateRegistration: (() => void) | undefined
-    const channelRelease = channel.subscribe((event) => {
-      const context = {
-        get value() {
-          return event.value
-        },
-        get aborted() {
-          return event.aborted
-        },
-        get abortReason() {
-          return event.abortReason
-        },
-        get taskId() {
-          return event.taskId
-        },
-        abort(reason?: unknown) {
-          event.abort(reason)
-          deactivateRegistration?.()
-        },
-        setTaskId(taskId: string | undefined) {
-          event.setTaskId(taskId)
-        }
-      }
-      copyEventProjection(context, event, projectionPlan)
-      return listener(context as never)
-    })
+    /** Value delivery needs no context overlay; canonical dispatch still owns results and errors. */
+    const channelRelease =
+      delivery === EventDelivery.value
+        ? channel.subscribe(listener as IEventValueListener<unknown>, { delivery })
+        : channel.subscribe((event) => {
+            /** Context cancellation also updates the Hub's existing aggregate registration count. */
+            const context = {
+              get value() {
+                return event.value
+              },
+              get aborted() {
+                return event.aborted
+              },
+              get abortReason() {
+                return event.abortReason
+              },
+              get taskId() {
+                return event.taskId
+              },
+              abort(reason?: unknown) {
+                event.abort(reason)
+                deactivateRegistration?.()
+              },
+              setTaskId(taskId: string | undefined) {
+                event.setTaskId(taskId)
+              }
+            }
+            copyEventProjection(context, event, projectionPlan)
+            return (listener as IEventListener<C[K], void>)(context as never)
+          })
     totalSize += 1
     let active = true
     const channelRegistrations = registrations.get(channel) ?? new Set<() => void>()

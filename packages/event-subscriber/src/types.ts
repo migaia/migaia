@@ -1,5 +1,5 @@
 import type { IObjectPath, IObjectPathValue } from '@migaia/utils/object-path'
-import { EventSubscriberState } from './state-constants.js'
+import { EventDelivery, EventSubscriberState } from './state-constants.js'
 import type {
   IEventAdmissionPolicy,
   IEventDispatchPolicy,
@@ -9,6 +9,30 @@ import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } 
 
 /** Releases an owned subscription synchronously. Repeated calls do not release it again. */
 export type IUnsubscribe = () => void
+
+/** Registration metadata shared by canonical channels, naming aliases, and subscription chains. */
+export type IEventSubscribeOptions = {
+  /** Optional nonempty task label, captured when a dispatch selects this registration. */
+  readonly taskId?: string
+  /** Selects the listener argument; omission preserves context delivery and its controls. */
+  readonly delivery?: EventDelivery
+}
+
+/** Selects payload-only delivery explicitly so listener argument inference remains unambiguous. */
+type IEventValueSubscribeOptions = IEventSubscribeOptions & {
+  readonly delivery: typeof EventDelivery.value
+}
+
+/** Retains context delivery for existing subscriptions and an explicit context selection. */
+type IEventContextSubscribeOptions = IEventSubscribeOptions & {
+  readonly delivery?: typeof EventDelivery.context
+}
+
+/** Shares overloads across channel and chain methods without introducing a runtime facade. */
+type IEventSubscribe<T, R, V, H> = {
+  (listener: IEventValueListener<T, R>, options: IEventValueSubscribeOptions): H
+  (listener: IEventListener<T, R, V>, options?: IEventContextSubscribeOptions): H
+}
 
 /** Adds one selected payload field to listener contexts without replacing their original value. */
 export type IEventValueConfig<T> = {
@@ -67,11 +91,8 @@ export type IEventChannelSubscription<
 > = IUnsubscribe & {
   /** The handle itself, exposed as an immutable cancellation alias. */
   readonly unsubscribe: IEventChannelSubscription<T, R, S, V>
-  /** Adds a listener to this chain and returns the same handle. Optional taskId must be nonempty. */
-  readonly subscribe: (
-    listener: IEventListener<T, R, V>,
-    options?: { readonly taskId?: string }
-  ) => IEventChannelSubscription<T, R, S, V>
+  /** Adds a context or value listener to this chain and returns the same handle. */
+  readonly subscribe: IEventSubscribe<T, R, V, IEventChannelSubscription<T, R, S, V>>
 } & IEventChannelSubscriptionStyleProjection<T, R, S, V>
 
 /**
@@ -88,10 +109,17 @@ export type IEventHubSubscription<
   /** The handle itself. Calling either form closes the entire chain idempotently. */
   readonly unsubscribe: IEventHubSubscription<C, UsedKeys, S, V>
   /** Adds an available event key and listener, returning this same owner; a closed chain throws. */
-  readonly subscribe: <K extends IEventHubAvailableKey<C, UsedKeys>>(
+  subscribe<K extends IEventHubAvailableKey<C, UsedKeys>>(
     key: K,
-    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>
-  ) => IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>
+    listener: IEventValueListener<C[K]>,
+    options: Pick<IEventValueSubscribeOptions, 'delivery'>
+  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>
+  /** Retains context controls and key-specific projection when value delivery is not selected. */
+  subscribe<K extends IEventHubAvailableKey<C, UsedKeys>>(
+    key: K,
+    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>,
+    options?: Pick<IEventContextSubscribeOptions, 'delivery'>
+  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>
 } & IEventHubSubscriptionStyleProjection<C, UsedKeys, S, V>
 
 type IIsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never
@@ -152,7 +180,9 @@ export type IEventDispatchControl = {
 }
 
 export type IEventDispatchSnapshot<T, R, V = undefined> = {
-  readonly listener: IEventListener<T, R, V>
+  readonly listener: IEventListener<T, R, V> | IEventValueListener<T, R>
+  /** Argument mode captured with this listener; dispatch helpers share one invocation branch. */
+  readonly delivery: EventDelivery
   readonly taskId: string | undefined
   readonly control: IEventDispatchControl
 }
@@ -183,6 +213,9 @@ export type IEventInvocationVisitor<R> = (
 export type IEventListener<T, R = void, V = undefined> = (
   event: IProjectedEventContext<T, V>
 ) => R | PromiseLike<R>
+
+/** Receives the original payload; results and failures use the same dispatch policy as contexts. */
+export type IEventValueListener<T, R = void> = (value: T) => R | PromiseLike<R>
 
 /**
  * Object subscription accepted by subscribeSubscriber; handle executes with this object as
@@ -215,8 +248,13 @@ export type IListenerResult<R> =
  * reject malformed sources and installation-time delivery with `INVALID_CHANNEL`.
  */
 export type IEventChannelLike<T, R = void, V = undefined> = {
-  /** Registers a context listener. Optional taskId is forwarded; its default is no task label. */
-  subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string }): IUnsubscribe
+  /** Registers the selected listener argument mode and forwards its optional task label. */
+  subscribe(listener: IEventValueListener<T, R>, options: IEventValueSubscribeOptions): IUnsubscribe
+  /** Omitted or explicit context delivery preserves the structural source's context contract. */
+  subscribe(
+    listener: IEventListener<T, R, V>,
+    options?: IEventContextSubscribeOptions
+  ): IUnsubscribe
 }
 
 type IEventChannelStyleProjection<T, R, S extends IEventApiStyle | undefined, V> = [
@@ -228,10 +266,12 @@ type IEventChannelStyleProjection<T, R, S extends IEventApiStyle | undefined, V>
         readonly publish: infer TPublish extends string
       }
     ? {
-        readonly [K in Exclude<TSubscribe, 'subscribe'>]: (
-          listener: IEventListener<T, R, V>,
-          options?: { readonly taskId?: string }
-        ) => IEventChannelSubscription<T, R, S, V>
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventSubscribe<
+          T,
+          R,
+          V,
+          IEventChannelSubscription<T, R, S, V>
+        >
       } & {
         readonly [K in Exclude<TPublish, 'publish'>]: (value: T) => void
       }
@@ -246,10 +286,12 @@ type IEventChannelSubscriptionStyleProjection<T, R, S extends IEventApiStyle | u
         readonly unsubscribe: infer TUnsubscribe extends string
       }
     ? {
-        readonly [K in Exclude<TSubscribe, 'subscribe'>]: (
-          listener: IEventListener<T, R, V>,
-          options?: { readonly taskId?: string }
-        ) => IEventChannelSubscription<T, R, S, V>
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventSubscribe<
+          T,
+          R,
+          V,
+          IEventChannelSubscription<T, R, S, V>
+        >
       } & {
         readonly [K in Exclude<TUnsubscribe, 'unsubscribe'>]: IEventChannelSubscription<T, R, S, V>
       }
@@ -266,10 +308,15 @@ export type IEventChannel<
   S extends IEventApiStyle | undefined = undefined,
   V = undefined
 > = {
-  /** Registers a callable listener and returns its chain owner. taskId defaults to undefined. */
+  /** Registers a context listener by default, or an explicit value listener, with its chain owner. */
+  subscribe(
+    listener: IEventValueListener<T, R>,
+    options: IEventValueSubscribeOptions
+  ): IEventChannelSubscription<T, R, S, V>
+  /** Context listeners retain registration controls and the channel's configured value projection. */
   subscribe(
     listener: IEventListener<T, R, V>,
-    options?: { readonly taskId?: string }
+    options?: IEventContextSubscribeOptions
   ): IEventChannelSubscription<T, R, S, V>
   /**
    * Delivers synchronously without waiting for listener promises; synchronous failures aggregate as
@@ -381,7 +428,14 @@ export type IEventHub<
    */
   subscribe<K extends keyof C>(
     key: K,
-    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>
+    listener: IEventValueListener<C[K]>,
+    options: Pick<IEventValueSubscribeOptions, 'delivery'>
+  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>
+  /** Keeps the existing key-specific context contract when payload-only delivery is not selected. */
+  subscribe<K extends keyof C>(
+    key: K,
+    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>,
+    options?: Pick<IEventContextSubscribeOptions, 'delivery'>
   ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>
   /** Publishes synchronously for this key. A valid key with no listeners is a no-op. */
   publish<K extends keyof C>(key: K, value: C[K]): void

@@ -24,6 +24,8 @@ import type {
   IEventInvocation,
   IEventInvocationVisitor,
   IEventListener,
+  IEventSubscribeOptions,
+  IEventValueListener,
   IFilteredEventChannel,
   IUnsubscribe,
   IStyledEventChannel,
@@ -33,6 +35,7 @@ import { createRawSubscriptionOwner, installSubscriptionSource } from './interna
 import { isRecord } from './internal/record.js'
 import {
   EventAdmissionPolicy,
+  EventDelivery,
   EventDispatchPolicy,
   EventRemovalPolicy,
   EventSubscriberState
@@ -58,7 +61,9 @@ import {
 } from './value-projection.js'
 
 type IRegistrationOwner<T, R, V> = {
-  listener: IEventListener<T, R, V>
+  listener: IEventListener<T, R, V> | IEventValueListener<T, R>
+  /** Fixed argument mode owned by this registration and copied into every dispatch snapshot. */
+  delivery: EventDelivery
   active: boolean
   aborted: boolean
   abortReason: unknown
@@ -138,6 +143,29 @@ const readTaskOption = (options: unknown): string | undefined => {
   }
 }
 
+/** Reads the listener argument mode once, preserving existing options-error identity and coding. */
+export const readDeliveryOption = (options: unknown): EventDelivery => {
+  if (options === undefined) return EventDelivery.context
+  try {
+    if (!isRecord(options))
+      throw createEventTypeError(
+        EventSubscriberErrorCode.invalidOptions,
+        eventErrorText(EventSubscriberErrorCode.invalidOptions)
+      )
+    /** Omission alone selects the incumbent context contract; malformed supplied modes reject. */
+    const delivery = options.delivery
+    if (delivery === undefined) return EventDelivery.context
+    if (delivery !== EventDelivery.context && delivery !== EventDelivery.value)
+      throw createEventTypeError(
+        EventSubscriberErrorCode.invalidOptions,
+        eventErrorText(EventSubscriberErrorCode.invalidOptions)
+      )
+    return delivery
+  } catch (error) {
+    throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
+  }
+}
+
 /** Validates a structural channel before registration state can be changed. */
 export const validateChannelLike = <T, R, V = undefined>(
   channel: unknown
@@ -161,7 +189,10 @@ export const validateChannelLike = <T, R, V = undefined>(
   return {
     subscribe(listener, options) {
       try {
-        return (channel as IEventChannelLike<T, R, V>).subscribe(listener, options)
+        return (channel as IEventChannelLike<T, R, V>).subscribe(
+          listener as never,
+          options as never
+        )
       } catch (error) {
         throw codeExistingError(error, EventSubscriberErrorCode.invalidChannel)
       }
@@ -282,6 +313,7 @@ const snapshotOwner = <T, R, V>(
   owner: IRegistrationOwner<T, R, V>
 ): IEventDispatchSnapshot<T, R, V> => ({
   listener: owner.listener,
+  delivery: owner.delivery,
   taskId: owner.currentTaskId,
   control: owner.control
 })
@@ -291,7 +323,12 @@ export const invokeDispatchSnapshot = <T, R, V = undefined>(
   snapshot: IEventDispatchSnapshot<T, R, V>,
   value: T,
   projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
-): R | PromiseLike<R> => snapshot.listener(createEventContext(value, snapshot, projection) as never)
+): R | PromiseLike<R> =>
+  snapshot.delivery === EventDelivery.value
+    ? (snapshot.listener as IEventValueListener<T, R>)(value)
+    : (snapshot.listener as IEventListener<T, R, V>)(
+        createEventContext(value, snapshot, projection) as never
+      )
 
 /**
  * Gives a visitor a frozen, registration-ordered list of single-use listener invocations. Use when
@@ -629,7 +666,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   /** Unique channels alone index active owners by listener identity. */
   const uniqueOwners =
     admissionPolicy === EventAdmissionPolicy.unique
-      ? new Map<IEventListener<T, R, V>, IRegistrationOwner<T, R, V>>()
+      ? new Map<IEventListener<T, R, V> | IEventValueListener<T, R>, IRegistrationOwner<T, R, V>>()
       : undefined
   /** Queued values used only when the caller explicitly opts into queued reentrancy. */
   let publishing = false
@@ -650,8 +687,9 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     if (incrementEpoch) membershipEpoch += 1
   }
   const registerRaw = (
-    listener: IEventListener<T, R, V>,
-    taskId: string | undefined
+    listener: IEventListener<T, R, V> | IEventValueListener<T, R>,
+    taskId: string | undefined,
+    delivery: EventDelivery
   ): { readonly release: IUnsubscribe; readonly commit: () => void } => {
     let released = false
     let committed = false
@@ -671,6 +709,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       } else removeOwner(owner, true)
     }
     owner.listener = listener
+    owner.delivery = delivery
     owner.active = true
     owner.aborted = false
     owner.abortReason = undefined
@@ -696,12 +735,13 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   }
   /** Returns the current owner's release without changing its order or task label. */
   const admitUnique = (
-    listener: IEventListener<T, R, V>,
-    taskId: string | undefined
+    listener: IEventListener<T, R, V> | IEventValueListener<T, R>,
+    taskId: string | undefined,
+    delivery: EventDelivery
   ): IUnsubscribe | undefined => {
     const existing = uniqueOwners?.get(listener)
     if (!existing) return undefined
-    if (existing.currentTaskId !== taskId) {
+    if (existing.currentTaskId !== taskId || existing.delivery !== delivery) {
       throw createEventTypeError(
         EventSubscriberErrorCode.invalidOptions,
         eventErrorText(EventSubscriberErrorCode.invalidOptions)
@@ -824,8 +864,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   }
   /** Shares chain extension across handles; registration ownership stays in each returned release. */
   const extendSubscription = (
-    nextListener: IEventListener<T, R, V>,
-    nextOptions?: { readonly taskId?: string }
+    nextListener: IEventListener<T, R, V> | IEventValueListener<T, R>,
+    nextOptions?: IEventSubscribeOptions
   ): IUnsubscribe => {
     if (typeof nextListener !== 'function') {
       throw createEventTypeError(
@@ -834,14 +874,19 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       )
     }
     const nextTaskId = readTaskOption(nextOptions)
-    const nextShared = admitUnique(nextListener, nextTaskId)
+    /** Argument mode is admitted with the task label before a chain can acquire a new owner. */
+    const nextDelivery = readDeliveryOption(nextOptions)
+    const nextShared = admitUnique(nextListener, nextTaskId, nextDelivery)
     if (nextShared) return nextShared
-    const nextAdmission = registerRaw(nextListener, nextTaskId)
+    const nextAdmission = registerRaw(nextListener, nextTaskId, nextDelivery)
     nextAdmission.commit()
     return nextAdmission.release
   }
   const channel = {
-    subscribe(listener, listenerOptions) {
+    subscribe(
+      listener: IEventListener<T, R, V> | IEventValueListener<T, R>,
+      listenerOptions?: IEventSubscribeOptions
+    ) {
       if (typeof listener !== 'function') {
         throw createEventTypeError(
           EventSubscriberErrorCode.invalidListener,
@@ -849,8 +894,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         )
       }
       const taskId = readTaskOption(listenerOptions)
-      const shared = admitUnique(listener, taskId)
-      const admission = shared ? undefined : registerRaw(listener, taskId)
+      /** Mode stays immutable for the registration, including all handles sharing unique admission. */
+      const delivery = readDeliveryOption(listenerOptions)
+      const shared = admitUnique(listener, taskId, delivery)
+      const admission = shared ? undefined : registerRaw(listener, taskId, delivery)
       /** A duplicate handle may release the shared owner only after projection succeeds. */
       let bound = false
       try {

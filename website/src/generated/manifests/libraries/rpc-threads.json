@@ -248,7 +248,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
               }
             ]
           },
@@ -473,7 +473,12 @@
                     "termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。"
                   ],
                   [
-                    "Bun、Deno、浏览器、Electron renderer",
+                    "Bun",
+                    "node 子入口的两个工厂",
+                    "termination / exit-observation enforced；heap-limit unsupported。"
+                  ],
+                  [
+                    "Deno、浏览器、Electron renderer",
                     "根入口的两个 Web 工厂",
                     "三项均 unsupported；terminate 请求不产生真实 exit 回执。"
                   ],
@@ -502,7 +507,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。本轮场景只对真实 Node Worker / MessagePort 给出运行证据，浏览器、Bun、Deno、Electron 的权限与退出行为不据此冒称已实测。"
+                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
               }
             ]
           },
@@ -989,7 +994,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Web、Bun、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
+                "text": "Bun 短 spawn 默认使用 node 子入口的工厂，按 worker_threads 的原生 exit 回收；heap-limit 仍 unsupported。显式 Web launcher 保持原能力声明。Web、Deno 和 Electron renderer 使用根入口的 `createWebThreadLauncher`、`createWebThreadChannelFactory`。`INodeThreadHandle`、`IWebThreadHandle`、`IWebThreadLauncherOptions` 和高级原生运行时类型从根入口导入。根入口还重新导出 Core 的 typed surface、查询、详情、列表、事件与 thread stop 类型；这些不是另一套调用协议。"
               }
             ]
           },
@@ -1214,7 +1219,12 @@
                     "termination / exit-observation / heap-limit 均 enforced，真实 exit 才结算 exited。"
                   ],
                   [
-                    "Bun、Deno、浏览器、Electron renderer",
+                    "Bun",
+                    "node 子入口的两个工厂",
+                    "termination / exit-observation enforced；heap-limit unsupported。"
+                  ],
+                  [
+                    "Deno、浏览器、Electron renderer",
                     "根入口的两个 Web 工厂",
                     "三项均 unsupported；terminate 请求不产生真实 exit 回执。"
                   ],
@@ -1243,7 +1253,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。本轮场景只对真实 Node Worker / MessagePort 给出运行证据，浏览器、Bun、Deno、Electron 的权限与退出行为不据此冒称已实测。"
+                "text": "新适配器复用 Core adapter SDK 的 defineMessageAdapter；复杂原生组装可使用它的 internal-advanced 入口，不复制能力协商、重试或生命周期 owner。Node 与 Bun 1.4.3 的 worker_threads 路径已有业务与关闭运行证据；这些结果不证明显式 Web launcher、浏览器、Deno 或 Electron 的权限与退出能力。"
               }
             ]
           },
@@ -1588,7 +1598,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                  "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                 }
               ]
             },
@@ -1828,7 +1838,12 @@
                       "termination, exit-observation, and heap-limit are enforced; only a real exit settles exited."
                     ],
                     [
-                      "Bun, Deno, browsers, Electron renderer",
+                      "Bun",
+                      "The two node-entry factories",
+                      "termination and exit-observation are enforced; heap-limit remains unsupported."
+                    ],
+                    [
+                      "Deno, browsers, Electron renderer",
                       "The root Web factories",
                       "All three are unsupported; a terminate request supplies no actual-exit receipt."
                     ],
@@ -1857,7 +1872,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. This delivery's runnable examples establish Node Worker / MessagePort behavior only; they do not establish browser, Bun, Deno, or Electron permissions and exit behavior."
+                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
                 }
               ]
             },
@@ -2350,7 +2365,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Web, Bun, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
+                  "text": "Bun short spawn defaults to the node-entry factories and reaps through the worker_threads native exit contract; heap-limit remains unsupported. An explicit Web launcher retains its existing capability declaration. Web, Deno, and Electron renderer use the root Web launcher and channel factory. Import `INodeThreadHandle`, `IWebThreadHandle`, `IWebThreadLauncherOptions`, and advanced native runtime types from the root. Core's typed surfaces, query/detail/list/event types, and thread stop options are re-exported rather than defining another call protocol."
                 }
               ]
             },
@@ -2590,7 +2605,12 @@
                       "termination, exit-observation, and heap-limit are enforced; only a real exit settles exited."
                     ],
                     [
-                      "Bun, Deno, browsers, Electron renderer",
+                      "Bun",
+                      "The two node-entry factories",
+                      "termination and exit-observation are enforced; heap-limit remains unsupported."
+                    ],
+                    [
+                      "Deno, browsers, Electron renderer",
                       "The root Web factories",
                       "All three are unsupported; a terminate request supplies no actual-exit receipt."
                     ],
@@ -2619,7 +2639,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. This delivery's runnable examples establish Node Worker / MessagePort behavior only; they do not establish browser, Bun, Deno, or Electron permissions and exit behavior."
+                  "text": "New adapters reuse defineMessageAdapter from the Core adapter SDK; complex native assembly may use its internal-advanced entry without duplicating capability negotiation, retries, or lifecycle ownership. The worker_threads path has business and shutdown evidence on Node and Bun 1.4.3; these results do not establish explicit Web launcher, browser, Deno, or Electron permissions and exit capabilities."
                 }
               ]
             },
@@ -7080,7 +7100,7 @@
           "name": "isThreadChild",
           "kind": "function",
           "signature": "export declare function isThreadChild(): Promise<boolean>;",
-          "declarationLine": 14,
+          "declarationLine": 20,
           "source": "packages/rpc-threads/dist/threads/child.d.ts",
           "purpose": "Tells whether the current module runs inside a Worker started by this library, so one file can branch between parent and Worker for `spawn: true`.",
           "core": "Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.",

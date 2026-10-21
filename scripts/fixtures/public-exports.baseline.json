@@ -49,6 +49,7 @@
         "EVENT_SUBSCRIBER_SOURCE",
         "EventAdmissionPolicy",
         "EventApiStyle",
+        "EventDelivery",
         "EventDispatchPolicy",
         "EventRemovalPolicy",
         "EventSubscriberErrorCode",

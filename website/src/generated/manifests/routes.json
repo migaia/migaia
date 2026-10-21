@@ -633,6 +633,12 @@
       "library": "event-subscriber"
     },
     {
+      "path": "/en/docs/event-subscriber/api/EventDelivery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
       "path": "/en/docs/event-subscriber/api/EventDispatchPolicy",
       "locale": "en",
       "domain": "docs",
@@ -754,6 +760,12 @@
     },
     {
       "path": "/en/docs/event-subscriber/api/IEventReport",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/api/IEventSubscribeOptions",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -17157,6 +17169,12 @@
       "library": "event-subscriber"
     },
     {
+      "path": "/zh/docs/event-subscriber/api/EventDelivery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
       "path": "/zh/docs/event-subscriber/api/EventDispatchPolicy",
       "locale": "zh",
       "domain": "docs",
@@ -17278,6 +17296,12 @@
     },
     {
       "path": "/zh/docs/event-subscriber/api/IEventReport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/api/IEventSubscribeOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"

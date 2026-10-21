@@ -1,7 +1,8 @@
 /**
  * Reference documentation of `@migaia/event-subscriber`. Rules: `app/reference/contract.ts`.
  * Verified against `packages/event-subscriber/src` (types.ts, channel.ts, hub.ts, async.ts,
- * style.ts, state-constants.ts, error-code.ts) on 2026-10-17.
+ * style.ts, state-constants.ts, error-code.ts) on 2026-10-17. Delivery options reviewed against
+ * types.ts and channel.ts on 2026-10-21.
  */
 import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText } from './contract.js'
 import { eventSubscriberCases } from './event-subscriber-cases.js'
@@ -120,6 +121,25 @@ const stop = prices.subscribe(render)
 prices.subscribe(render)
 onPricePanelClosed(() => stop())`
 
+/** Listener argument selection shared by channel, Hub, naming aliases, and subscription chains. */
+const deliveryField: IMemberDoc = {
+  summary: t(
+    'Selects what the listener receives. Context delivery retains payload, controls and configured aliases; value delivery passes the original payload without copying or adding context members. Keep context delivery when the listener needs abort or task controls.',
+    '选择监听者参数。context 保留 payload、控制方法与配置的别名；value 直接传入原始 payload，不复制，也不附加上下文成员。监听者需要取消或任务控制时保留 context。'
+  ),
+  default: t(
+    '`EventDelivery.context` (`context`); omission and explicit context are equivalent.',
+    '`EventDelivery.context`（`context`）；省略与显式 context 相同。'
+  ),
+  values: { enum: 'EventDelivery' },
+  example: `import { createEventChannel, EventDelivery } from '@migaia/event-subscriber'
+
+const updates = createEventChannel<{ id: number }>()
+const stop = updates.subscribe((value) => console.log(value.id), { delivery: EventDelivery.value })
+updates.publish({ id: 1 })
+stop()`
+}
+
 /** `report` field shared by channel and hub options. */
 const reportField = (hub: boolean): IMemberDoc => ({
   summary: t(
@@ -157,8 +177,8 @@ const terminalReportField = (hub: boolean): IMemberDoc => ({
 /** `style` field shared by channel and hub options. */
 const styleField: IMemberDoc = {
   summary: t(
-    'Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior. Older examples may call defineEventApiStyle; that helper has been removed. Write custom names directly as an object and use the type check above to validate its fields while keeping the exact alias names for checking later method calls.',
-    '在构造时为订阅、发布、退订增加别名方法。可传预设名（`on-emit`、`on-trigger`、`listen-fire`），或用 `as const satisfies IEventApiStyleNames` 检查的自定义名称表。原有的 `subscribe`/`publish` 始终保留，别名也引用原来的函数。style 不改变顺序、调度、错误或生命周期语义：换个方法名不会改变监听器调用次序、执行时机、错误处理或退订方式。旧版的 defineEventApiStyle 已移除。自定义名称直接写成对象，并用上面的类型检查方式检查名称表；这样会保留 observe、dispatch 等具体方法名，供编辑器检查后续调用。'
+    'Adds alias method names for subscribe, publish and unsubscribe at construction time. Accepts a preset name (`on-emit`, `on-trigger`, `listen-fire`) or a custom name map checked with `as const satisfies IEventApiStyleNames`. The original methods stay available, and aliases refer to the same function objects, forwarding subscription delivery options unchanged. Changing style does not change listener order, delivery timing, error handling or unsubscribe behavior. Older examples may call defineEventApiStyle; that helper has been removed. Write custom names directly as an object and use the type check above to validate its fields while keeping the exact alias names for checking later method calls.',
+    '在构造时为订阅、发布、退订增加别名方法。可传预设名（`on-emit`、`on-trigger`、`listen-fire`），或用 `as const satisfies IEventApiStyleNames` 检查的自定义名称表。原有的 `subscribe`/`publish` 始终保留，别名也引用原来的函数，原样传递订阅的 delivery 选项。style 不改变顺序、调度、错误或生命周期语义：换个方法名不会改变监听器调用次序、执行时机、错误处理或退订方式。旧版的 defineEventApiStyle 已移除。自定义名称直接写成对象，并用上面的类型检查方式检查名称表；这样会保留 observe、dispatch 等具体方法名，供编辑器检查后续调用。'
   ),
   default: t('`subscribe-publish`: no aliases are added.', '`subscribe-publish`：不增加别名。'),
   values: {
@@ -194,8 +214,8 @@ onNotificationPanelClosed(() => stop.off())`
 /** `valueConfig` field shared by channel and hub options. */
 const valueConfigField: IMemberDoc = {
   summary: t(
-    'Reads one fixed path of each published payload and attaches the result to the event context under `alias`, so listeners can read `event.<alias>` while `event.value` stays the original payload. The path is read once per publish. A missing, blocked or throwing path still calls listeners with `undefined` and reports `VALUE_PROJECTION_FAILED` through `report`. An empty `readPath` disables it.',
-    '从每次发布的 payload 中读取一个固定路径，并以 `alias` 为名挂到事件上下文上：listener 读 `event.<alias>`，`event.value` 仍是原始 payload。每次发布只读取一次路径。路径不存在、中途不是对象或 getter 抛错时，listener 照常被调用、别名为 `undefined`，同时通过 `report` 上报 `VALUE_PROJECTION_FAILED`。`readPath` 为空字符串时不启用。'
+    'Reads one fixed path of each published payload and attaches the result to context delivery under `alias`, so context listeners can read `event.<alias>` while `event.value` stays the original payload. Value delivery receives the original payload without adding an alias. The path is read once per publish. A missing, blocked or throwing path leaves the context alias `undefined` and reports `VALUE_PROJECTION_FAILED` through `report`; all listeners still run. An empty `readPath` disables it.',
+    '从每次发布的 payload 中读取一个固定路径，并以 `alias` 为名挂到 context 模式的事件上下文上：上下文 listener 读 `event.<alias>`，`event.value` 仍是原始 payload。value 模式直接收到原始 payload，不附加别名。每次发布只读取一次路径。路径不存在、中途不是对象或 getter 抛错时，上下文别名为 `undefined`，通过 `report` 上报 `VALUE_PROJECTION_FAILED`；所有 listener 照常被调用。`readPath` 为空字符串时不启用。'
   ),
   default: t('Not set: the context has no alias.', '不设置：事件上下文上没有别名字段。'),
   example: `import { createEventChannel } from '@migaia/event-subscriber'
@@ -218,12 +238,12 @@ const channelMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: {
       listener: t(
-        'Function called with the event context (`event.value`, `event.abort()`, `event.taskId`); its return value is the listener result collected by the `invoke*` helpers.',
-        '收到事件上下文（`event.value`、`event.abort()`、`event.taskId`）的函数；它的返回值就是 `invoke*` 系列函数收集到的结果。'
+        'Function called with the event context by default (`event.value`, `event.abort()`, `event.taskId`), or the original payload when `delivery: EventDelivery.value` is explicit. Its return value is collected by the `invoke*` helpers in either mode.',
+        '默认收到事件上下文（`event.value`、`event.abort()`、`event.taskId`）的函数；显式 `delivery: EventDelivery.value` 时直接收到原始 payload。两种模式的返回值都由 `invoke*` 系列函数收集。'
       ),
       options: t(
-        '`taskId`: a non-empty name for this registration, used by `filterTaskId()` and `invokeTask()` to select it.',
-        '`taskId`：给这条登记起的非空名称，`filterTaskId()` 和 `invokeTask()` 用它选中这条登记。'
+        '`taskId` optionally gives this registration a non-empty name for `filterTaskId()` and `invokeTask()`, including value delivery. `delivery` defaults to `EventDelivery.context`; explicit `EventDelivery.value` selects a payload listener. Options type: `IEventSubscribeOptions`.',
+        '`taskId` 可为登记指定非空名称，`filterTaskId()` 和 `invokeTask()` 用它选中登记，value 模式也支持。`delivery` 默认 `EventDelivery.context`；显式 `EventDelivery.value` 选择 payload 监听者。选项类型为 `IEventSubscribeOptions`。'
       )
     },
     returns: t(
@@ -236,7 +256,7 @@ const channelMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     example: `const stop = channel
   .subscribe((event) => console.log('log', event.value))
-  .subscribe((event) => audit(event.value), { taskId: 'audit' })
+  .subscribe((value) => audit(value), { taskId: 'audit', delivery: EventDelivery.value })
 stop() // 两条登记一起移除`
   },
   publish: {
@@ -246,8 +266,8 @@ stop() // 两条登记一起移除`
     ),
     params: {
       value: t(
-        'Payload delivered as `event.value`.',
-        '本次的 payload，listener 通过 `event.value` 读取。'
+        'Payload delivered as `event.value` in context mode, or directly in value mode, with its original identity.',
+        '本次的原始 payload；context 模式通过 `event.value` 读取，value 模式直接接收，保持原始身份。'
       )
     },
     returns: t(
@@ -314,8 +334,12 @@ const hubMembers: Readonly<Record<string, IMemberDoc>> = {
     params: {
       key: t('Event name from the event map `C`.', '事件映射类型 `C` 中的事件名。'),
       listener: t(
-        'Receives the event context of that key; hub listeners return nothing.',
-        '收到该事件的上下文；hub 的 listener 不返回结果。'
+        'Receives that key’s context by default, or its original payload when explicit value delivery is selected; Hub listeners return no result.',
+        '默认收到该事件的上下文，显式 value 模式时收到该 key 的原始 payload；Hub listener 不返回结果。'
+      ),
+      options: t(
+        'Optional third argument: only `delivery`, defaulting to `EventDelivery.context`; `EventDelivery.value` passes the payload directly. Hub subscriptions accept no `taskId`.',
+        '可选第三参只接受 `delivery`，默认 `EventDelivery.context`；`EventDelivery.value` 直接传入 payload。Hub 订阅不接受 `taskId`。'
       )
     },
     returns: t(
@@ -541,8 +565,8 @@ subscribeOnce(channel, (event) => console.log('只执行一次', event.value))`
       ),
       options: 'IEventHubOptions',
       exampleIntro: t(
-        'The type map assigns a payload to each event name. `subscribe(key, listener)` receives the payload as `event.value`; chaining a different key joins the same cleanup handle. `size()` without a key counts all registrations.',
-        '事件映射为每个事件名指定数据类型。`subscribe(key, listener)` 的监听者通过 `event.value` 接收数据；链式订阅另一个事件名时，登记加入同一个清理句柄。不传事件名的 `size()` 统计全部登记。'
+        'The type map assigns a payload to each event name. `subscribe(key, listener, options?)` receives the payload as `event.value` by default, or directly with `{ delivery: EventDelivery.value }`; chaining a different key joins the same cleanup handle. `size()` without a key counts all registrations.',
+        '事件映射为每个事件名指定数据类型。`subscribe(key, listener, options?)` 默认通过 `event.value` 接收数据，设置 `{ delivery: EventDelivery.value }` 时直接接收 payload；链式订阅另一个事件名时，登记加入同一个清理句柄。不传事件名的 `size()` 统计全部登记。'
       ),
       cases: eventSubscriberCases.createEventHub,
       example: eventSubscriberCases.createEventHub[0].example,
@@ -581,6 +605,14 @@ subscribeOnce(channel, (event) => console.log('只执行一次', event.value))`
         'channel 与 hub 的 `style` 选项可用的预设名。每个预设在默认的 `subscribe` / `publish` 旁增加一组别名方法。'
       ),
       example: `createEventChannel<number>({ style: EventApiStyle.onEmit }).emit(1)`
+    },
+    EventDelivery: {
+      role: 'constant',
+      purpose: t(
+        'Values for the `delivery` subscribe option: whether a listener receives the event context or only the original payload. Value delivery skips building a context for each listener call.',
+        '订阅选项 `delivery` 的取值：listener 收到事件上下文，还是只收到原始 payload。value 模式在每次调用 listener 时都不再创建上下文对象。'
+      ),
+      example: `channel.subscribe((value) => render(value), { delivery: EventDelivery.value })`
     },
     EventDispatchPolicy: {
       role: 'constant',
@@ -783,7 +815,10 @@ if (result.status === 'fulfilled') console.log(result.value)`
           'Any object with `subscribe(listener, options)`.',
           '任何提供 `subscribe(listener, options)` 的对象。'
         ),
-        listener: t('The one-shot listener.', '只执行一次的 listener。'),
+        listener: t(
+          'The one-shot context listener; value delivery is not supported by this helper.',
+          '只执行一次的上下文 listener；此 helper 不支持 value 模式。'
+        ),
         options: t('`taskId` for the registration.', '这条登记的 `taskId`。')
       },
       returns: t(
@@ -834,7 +869,10 @@ const stop = subscribeSubscriber(numbers, new Counter())`
           '`AbortSignal` (or a compatible object) whose abort removes the registration.',
           '`AbortSignal`（或结构兼容的对象），取消时移除这条登记。'
         ),
-        listener: t('The listener.', '要登记的 listener。'),
+        listener: t(
+          'The context listener; value delivery is not supported by this helper.',
+          '要登记的上下文 listener；此 helper 不支持 value 模式。'
+        ),
         options: t('`taskId` for the registration.', '这条登记的 `taskId`。')
       },
       returns: t(
@@ -868,8 +906,8 @@ const stop = subscribeSubscriber(numbers, new Counter())`
     },
     IStyledEventChannel: {
       summary: t(
-        'A channel created with the `style` option: `IEventChannel` plus alias methods named by the style (for example `on` and `emit`).',
-        '设置了 `style` 选项的 channel：在 `IEventChannel` 之外，还带有该风格命名的别名方法（例如 `on`、`emit`）。'
+        'A channel created with the `style` option: `IEventChannel` plus alias methods named by the style (for example `on` and `emit`). Subscribe aliases retain the same context/value overloads and options.',
+        '设置了 `style` 选项的 channel：在 `IEventChannel` 之外，还带有该风格命名的别名方法（例如 `on`、`emit`）。订阅别名保留相同的 context/value 重载与选项。'
       ),
       members: {}
     },
@@ -887,8 +925,8 @@ const stop = subscribeSubscriber(numbers, new Counter())`
         },
         subscribe: {
           summary: t(
-            'Adds another registration on the same channel to this chain and returns the extended handle; releasing the chain removes all of its registrations in reverse order. After the chain was released it throws `SUBSCRIPTION_CLOSED`.',
-            '在同一个 channel 上再登记一个 listener 并加入这条链，返回扩展后的句柄；释放整条链时按相反顺序移除其中全部登记。链已释放后再调用会抛 `SUBSCRIPTION_CLOSED`。'
+            'Adds another registration on the same channel to this chain and returns the extended handle; releasing the chain removes all of its registrations in reverse order. It accepts the same `taskId` and delivery options as `channel.subscribe`. After the chain was released it throws `SUBSCRIPTION_CLOSED`.',
+            '在同一个 channel 上再登记一个 listener 并加入这条链，返回扩展后的句柄；释放整条链时按相反顺序移除其中全部登记。接受与 `channel.subscribe` 相同的 `taskId`、delivery 选项。链已释放后再调用会抛 `SUBSCRIPTION_CLOSED`。'
           )
         }
       }
@@ -914,6 +952,8 @@ const stop = subscribeSubscriber(numbers, new Counter())`
         'The handle returned by `hub.subscribe()`. Call it to unsubscribe, or call `handle.subscribe(key, listener)` to add another event to the same chain.',
         '`hub.subscribe()` 返回的句柄。调用即退订；`handle.subscribe(key, listener)` 可在同一条链上登记另一个事件。'
       ),
+      scenarios: hubScenarios,
+      example: hubExample,
       members: {
         unsubscribe: {
           summary: t(
@@ -923,11 +963,40 @@ const stop = subscribeSubscriber(numbers, new Counter())`
         },
         subscribe: {
           summary: t(
-            'Adds a registration for another event name to the same chain. In a chain with a finite event map, the same name cannot be added twice (checked by the type system).',
-            '在同一条链上为另一个事件名登记。事件映射为有限键时，同一个事件名不能在一条链上重复登记（由类型系统检查）。'
-          )
+            'Adds a registration for another event name to the same chain; the optional third argument selects context or value delivery, as on `hub.subscribe`, without a task label. In a chain with a finite event map, the same name cannot be added twice (checked by the type system).',
+            '在同一条链上为另一个事件名登记；可选第三参与 `hub.subscribe` 相同，选择 context 或 value 模式，不接受任务标签。事件映射为有限键时，同一个事件名不能在一条链上重复登记（由类型系统检查）。'
+          ),
+          params: {
+            key: t(
+              'Another event name from the event map; a finite map rejects names already in this chain.',
+              '事件映射中的另一个事件名；有限键映射不接受这条链上已有的事件名。'
+            ),
+            listener: t(
+              'Receives that event’s context by default, or its original payload with value delivery.',
+              '默认收到该事件的上下文；选择 value 模式时收到原始 payload。'
+            ),
+            options: t(
+              'Optional; only `delivery`, defaulting to `EventDelivery.context`.',
+              '可选；只接受 `delivery`，默认 `EventDelivery.context`。'
+            )
+          },
+          returns: t(
+            'The extended handle; calling it releases every registration of the chain in reverse order.',
+            '扩展后的句柄；调用它会按相反顺序释放链上全部登记。'
+          ),
+          example: `const stop = hub
+  .subscribe('ready', (event) => console.log('ready at', event.value.at))
+  .subscribe('warning', (warning) => console.warn(warning.message), { delivery: EventDelivery.value })
+stop()`
         }
       }
+    },
+    IEventSubscribeOptions: {
+      summary: t(
+        'Per-registration channel options. Context delivery is the default; explicit value delivery changes only the listener argument. Hub subscribe options accept only delivery.',
+        '通道每条登记的选项。默认使用 context；显式 value 只改变监听者参数。Hub 订阅选项只接受 delivery。'
+      ),
+      members: { ...subscriptionOptionDocs, delivery: deliveryField }
     },
     IEventChannelOptions: {
       optionCases: [
@@ -1341,7 +1410,10 @@ for (const result of await invokeParallelSettled(channel, 3)) {
           ),
           params: {
             listener: t('The listener to register.', '要登记的 listener。'),
-            options: t('`taskId` for the registration.', '这条登记的 `taskId`。')
+            options: t(
+              '`taskId` and delivery for the registration; explicit `EventDelivery.value` selects the payload overload. Once/until helpers use only the context overload and taskId.',
+              '登记的 `taskId` 与 delivery；显式 `EventDelivery.value` 选择 payload 重载。once/until helper 只使用上下文重载与 taskId。'
+            )
           },
           returns: t('A function that removes the registration.', '移除这条登记的函数。')
         }
@@ -1349,8 +1421,8 @@ for (const result of await invokeParallelSettled(channel, 3)) {
     },
     IEventContext: {
       summary: t(
-        'The object every listener receives. It carries the payload and lets the listener cancel its own registration or rename its task for later deliveries.',
-        '每个 listener 收到的对象。它携带 payload，并允许 listener 撤销自己的登记，或修改之后交付时使用的任务名。'
+        'The object received by default or explicit context listeners. It carries the payload and lets the listener cancel its own registration or rename its task for later deliveries. Value listeners receive only the original payload.',
+        '默认或显式 context listener 收到的对象。它携带 payload，并允许 listener 撤销自己的登记，或修改之后交付时使用的任务名。value listener 只收到原始 payload。'
       ),
       members: {
         value: {
@@ -1407,8 +1479,8 @@ for (const result of await invokeParallelSettled(channel, 3)) {
     },
     IEventListener: {
       summary: t(
-        'A listener function: receives the event context and may return a result or a Promise.',
-        'listener 函数：接收事件上下文，可以返回结果或 Promise。'
+        'A context listener function: receives the event context and may return a result or a Promise. Used when delivery is omitted or `EventDelivery.context`.',
+        '上下文 listener 函数：接收事件上下文，可以返回结果或 Promise；省略 delivery 或指定 `EventDelivery.context` 时使用。'
       ),
       members: {}
     },
@@ -1437,6 +1509,22 @@ for (const result of await invokeParallelSettled(channel, 3)) {
     }
   },
   enums: {
+    EventDelivery: {
+      summary: t(
+        'Listener argument selected per registration by the delivery option of channels, Hub subscriptions, chains and naming aliases.',
+        '由通道、Hub 订阅、订阅链与命名别名的每条登记 delivery 选项选择的监听者参数。'
+      ),
+      values: {
+        context: t(
+          'Default (`context`). Receives the event context with the original payload, live abort controls, task label and configured alias.',
+          '默认值（`context`）。接收事件上下文，保留原始 payload、实时取消控制、任务标签与配置的别名。'
+        ),
+        value: t(
+          '`value`: receives the original payload directly, preserving identity without adding context members. Keep default context when controls are needed. Channel taskId filtering still applies to the registration.',
+          '`value`：直接接收原始 payload，保持身份且不附加上下文成员。需要控制方法时保留默认 context。通道 taskId 过滤仍作用于该登记。'
+        )
+      }
+    },
     EventAdmissionPolicy: {
       summary: t(
         'Used by the `admissionPolicy` option of `createEventChannel()`.',
@@ -1448,8 +1536,8 @@ for (const result of await invokeParallelSettled(channel, 3)) {
           '默认值。每次 `subscribe()` 都建立独立登记，同一个函数订阅两次会被调用两次；每个句柄只移除自己那一条。'
         ),
         unique: t(
-          'One function keeps at most one registration per channel. Subscribing it again returns a handle bound to the existing registration; the `taskId` must then be the same, otherwise `INVALID_OPTIONS` is thrown. Only the first of several such handles removes it.',
-          '同一个函数在一个 channel 中最多保留一条登记。再次订阅时返回绑定到已有登记的句柄，此时 `taskId` 必须相同，否则抛 `INVALID_OPTIONS`。多个这样的句柄中，只有第一次调用会真正移除。'
+          'One function keeps at most one registration per channel. Subscribing it again returns a handle bound to the existing registration; the `taskId` and delivery must then be the same, otherwise `INVALID_OPTIONS` is thrown. Omitted delivery equals explicit context. Only the first of several such handles removes it.',
+          '同一个函数在一个 channel 中最多保留一条登记。再次订阅时返回绑定到已有登记的句柄，此时 `taskId` 与 delivery 必须相同，否则抛 `INVALID_OPTIONS`；省略 delivery 与显式 context 相同。多个这样的句柄中，只有第一次调用会真正移除。'
         )
       }
     },

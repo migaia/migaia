@@ -82,7 +82,14 @@ describe('runtime-neutral boundary', () => {
     const readme = readFileSync(resolve(packageRoot, 'README.md'), 'utf8')
     const useguide = readFileSync(resolve(packageRoot, 'USEGUIDE.md'), 'utf8')
     const contractRows = [
-      [readme, 'subscribe(listener, options?: { taskId?: string }): subscription'],
+      [
+        readme,
+        "subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription"
+      ],
+      [
+        readme,
+        "subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription"
+      ],
       [readme, '动态事件名可在运行时广播；有限字面量事件表的同一条链禁止重复事件名'],
       [useguide, 'handle.unsubscribe === handle'],
       [useguide, '取消按追加顺序的逆序执行整条链，只真正执行一次'],
@@ -120,12 +127,14 @@ describe('runtime-neutral boundary', () => {
     handle.unsubscribe()
     expect(eventHub.size()).toBe(0)
     const channelSource = readFileSync(resolve(import.meta.dirname, '../src/channel.ts'), 'utf8')
-    expect(channelSource).toContain('const shared = admitUnique(listener, taskId)')
+    expect(channelSource).toContain('const shared = admitUnique(listener, taskId, delivery)')
     expect(channelSource).toContain(
-      'const admission = shared ? undefined : registerRaw(listener, taskId)'
+      'const admission = shared ? undefined : registerRaw(listener, taskId, delivery)'
     )
     expect(channelSource).toContain('createRawSubscriptionOwner(')
-    expect(channelSource).toContain('const nextAdmission = registerRaw(nextListener, nextTaskId)')
+    expect(channelSource).toContain(
+      'const nextAdmission = registerRaw(nextListener, nextTaskId, nextDelivery)'
+    )
   })
 
   it('gives every package test a unique name', () => {

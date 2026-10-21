@@ -8,6 +8,17 @@ export const EventSubscriberState = {
   rejected: 'rejected'
 } as const
 
+/** Selects the listener argument without changing channel dispatch or registration ownership. */
+export const EventDelivery = {
+  /** Default delivery exposes the payload together with live registration controls. */
+  context: 'context',
+  /** Delivers the original payload without allocating or exposing a listener context. */
+  value: 'value'
+} as const
+
+/** Public listener-argument choices; omitted delivery retains the context contract. */
+export type EventDelivery = keyof typeof EventDelivery
+
 /** Stable synchronous fanout policies; queued delivery is opt-in for consumers that need it. */
 export const EventDispatchPolicy = {
   /** Default: synchronously deliver a nested publish before resuming its caller's snapshot. */

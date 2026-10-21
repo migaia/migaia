@@ -122,7 +122,20 @@ The root entry provides channels, the Hub and invocation helpers. Import standal
 
 ## Contract details
 
-The basic subscription signature is `subscribe(listener, options?: { taskId?: string }): subscription`. The listener receives an event context; optional `taskId` names this registration. The returned subscription cancels its registrations and can extend the chain.
+Subscription has two signatures: `subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` retains event contexts; `subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` passes the original payload directly to the listener. The public options type is `IEventSubscribeOptions`; mode constants are `EventDelivery.context` and `EventDelivery.value`. Optional `taskId` names the registration. The returned subscription cancels its registrations and can extend the chain.
+
+Select value delivery explicitly when only the payload is needed:
+
+```ts
+import { createEventChannel, EventDelivery } from '@migaia/event-subscriber'
+
+const updates = createEventChannel<{ id: number }>()
+const stop = updates.subscribe((value) => console.log(value.id), { delivery: EventDelivery.value })
+updates.publish({ id: 1 })
+stop()
+```
+
+Value delivery preserves payload identity and provides no context members such as `abort()`, `setTaskId()` or `taskId`. A registration's `taskId` still supports task filtering. Keep default context delivery when context controls or `valueConfig` aliases are needed. Channel chains, naming aliases and the Hub's third subscribe argument accept the same delivery selection; the Hub accepts no task label. `subscribeOnce` and `subscribeUntil` still accept context listeners only.
 
 Dynamic event names support runtime fan-out. A finite literal event map rejects repeated event names on the same subscription chain through its TypeScript types; a separate chain can still subscribe to that name.
 
@@ -130,7 +143,7 @@ Defaults are recursive synchronous dispatch, multiple independent registrations,
 
 Synchronous `publish()` does not await Promises. Synchronous throws become `PUBLISH_FAILED`; late rejection goes to report. Async helpers await settlement and deliver results or rejection. Settled helpers collect listener failures, while invalid channels and task admission still throw synchronously.
 
-Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to the context without transforming events.
+Subscription handles chain and cancel once in reverse order; closed chains cannot extend. Once, signal and object helpers return ordinary cancellation functions without style aliases. Styles rename the same functions; static `valueConfig` adds one path value to context delivery without transforming events or value listeners’ payloads.
 
 The Hub fixes its internal channels to the default policies and accepts no channel policy configuration. It does not aggregate listener results; use a channel with a result type when results matter.
 

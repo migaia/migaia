@@ -275,18 +275,35 @@ channel（事件通道）只分发当前发布的事件，不保存当前值，�
 
 ### 通道方法与事件上下文
 
-| 成员                            | 调用后的结果                                                                                                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `subscribe(listener, options?)` | 按登记顺序添加监听器，返回可调用、可链式扩展的句柄。`listener(event)` 接收下面的上下文，返回 `R` 或 PromiseLike。监听器必须是函数。                                    |
-| `subscribe.options.taskId`      | 默认 `undefined`，不设置任务标签。提供时必须是非空字符串；该值由订阅调用者命名，用于之后的任务选择。                                                                   |
-| `publish(value)`                | 同步按入口快照调用目标，不等待 Promise，也不返回监听器结果。快照内的监听器即使中途被退订或 `clear()`，仍收到本轮；新订阅留到之后的快照。                               |
-| `filterTaskId(taskId)`          | `taskId` 为订阅时设置的非空标签。返回只读选择视图 `IFilteredEventChannel`，交给并行、串行或 visitor 工具；视图没有订阅或发布方法，之后每次调用都会重新选择当前匹配项。 |
-| `clear()`                       | 删除全部活动登记，不执行监听器内部的用户清理函数；默认 `removalPolicy: 'handle'` 下，旧取消句柄不会移除之后的新登记。                                                  |
-| `size`                          | 只读的当前活动登记数。空通道发布无操作，异步多目标调用得到空数组。                                                                                                     |
+| 成员                            | 调用后的结果                                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `subscribe(listener, options?)` | 按登记顺序添加监听器，返回可调用、可链式扩展的句柄。默认 `listener(event)` 接收下面的上下文；显式 `delivery: EventDelivery.value` 时 `listener(value)` 接收原始 payload。两者返回 `R` 或 PromiseLike，监听器必须是函数。 |
+| `subscribe.options.delivery`    | 默认 `EventDelivery.context`（`'context'`），保留 payload 与上下文控制；`EventDelivery.value`（`'value'`）直接传入原始 payload，不复制或包装。其他值抛 `INVALID_OPTIONS`。                                               |
+| `subscribe.options.taskId`      | 默认 `undefined`，不设置任务标签。提供时必须是非空字符串；该值由订阅调用者命名，用于之后的任务选择。                                                                                                                     |
+| `publish(value)`                | 同步按入口快照调用目标，不等待 Promise，也不返回监听器结果。快照内的监听器即使中途被退订或 `clear()`，仍收到本轮；新订阅留到之后的快照。                                                                                 |
+| `filterTaskId(taskId)`          | `taskId` 为订阅时设置的非空标签。返回只读选择视图 `IFilteredEventChannel`，交给并行、串行或 visitor 工具；视图没有订阅或发布方法，之后每次调用都会重新选择当前匹配项。                                                   |
+| `clear()`                       | 删除全部活动登记，不执行监听器内部的用户清理函数；默认 `removalPolicy: 'handle'` 下，旧取消句柄不会移除之后的新登记。                                                                                                    |
+| `size`                          | 只读的当前活动登记数。空通道发布无操作，异步多目标调用得到空数组。                                                                                                                                                       |
 
-`unique` 模式下，重复订阅同一个监听器会得到控制同一代登记的句柄；只有首次取消生效。重复订阅的 `taskId` 必须与已有值相同，包括两次都省略，否则修改状态前抛 `INVALID_OPTIONS`。`clear()` 或退订后重新订阅会创建新一代；`unique` 的句柄绑定原登记代，所以旧句柄不会取消新登记。Hub 和包装监听器的独立 helper 不按原始监听器身份去重。缺省 `multiple` 与 `removalPolicy: 'handle'` 组合下，每次登记可以分别取消。
+`unique` 模式下，重复订阅同一个监听器会得到控制同一代登记的句柄；只有首次取消生效。重复订阅的 `taskId` 和 delivery 必须与已有值相同，否则修改状态前抛 `INVALID_OPTIONS`；省略 delivery 与显式 `EventDelivery.context` 相同，省略 `taskId` 只匹配同样未设置的标签。`clear()` 或退订后重新订阅会创建新一代；`unique` 的句柄绑定原登记代，所以旧句柄不会取消新登记。Hub 和包装监听器的独立 helper 不按原始监听器身份去重。缺省 `multiple` 与 `removalPolicy: 'handle'` 组合下，每次登记可以分别取消。
 
 不要把这种隔离套用于 `admissionPolicy: 'multiple'` 与 `removalPolicy: 'listener-all'` 的组合：尚未调用的旧句柄会按监听器函数身份移除当前全部匹配登记。即使先 `clear()`、再用同一个函数创建新登记，该旧句柄仍会移除它们。需要旧句柄与新登记隔离时，保留默认的 `handle` 移除策略；`unique` 则另有上述登记代绑定保证。
+
+公开订阅选项类型为 `IEventSubscribeOptions`。默认/显式 context 重载使用 `IEventListener<T, R, V>`；显式 value 重载将原始 `T` 交给监听器，并接收 `R` 或 `PromiseLike<R>` 结果，必须提供 `{ delivery: EventDelivery.value }`。两种模式可在同一通道共存，调用工具沿用各自登记的模式和结果语义。
+
+```ts
+import { createEventChannel, EventDelivery, invokeTask } from '@migaia/event-subscriber'
+
+const tasks = createEventChannel<{ id: number }, number>()
+const stop = tasks.subscribe((value) => value.id, {
+  delivery: EventDelivery.value,
+  taskId: 'read-id'
+})
+console.log(await invokeTask(tasks, 'read-id', { id: 7 })) // 7
+stop()
+```
+
+value 模式不附加 `abort()`、`aborted`、`abortReason`、`setTaskId()`、`taskId` 或 `valueConfig` 别名；payload 本身不被修改。登记标签仍可由 `filterTaskId()`、`invokeTask()` 选择。需要监听器内的取消、改标签或投影别名时保留默认 context。
 
 | `IEventContext<T>` 成员  | 含义                                                                               |
 | ------------------------ | ---------------------------------------------------------------------------------- |
@@ -313,13 +330,13 @@ channel（事件通道）只分发当前发布的事件，不保存当前值，�
 
 canonical（固定的原名）方法始终存在；别名与原名指向同一函数，不创建另一个派发器。默认风格不增加别名属性；额外别名是不可枚举、不可写、不可配置的自有数据属性。style 不增加 `flush`、队列、排空、背压或跨进程能力。
 
-`channel.subscribe()` 返回 `IEventChannelSubscription`，`hub.subscribe()` 返回 `IEventHubSubscription`。句柄本身可调用，`handle.unsubscribe === handle`；链式 `handle.subscribe(...)` 返回同一条链，风格的订阅别名与取消别名也保持函数身份。取消按追加顺序的逆序执行整条链，只真正执行一次。单个释放失败原样抛出；多个失败合为 `SUBSCRIPTION_DISPOSE_FAILED`，`AggregateError.errors` 保留执行顺序。关闭后追加订阅抛 `SUBSCRIPTION_CLOSED`。
+`channel.subscribe()` 返回 `IEventChannelSubscription`，`hub.subscribe()` 返回 `IEventHubSubscription`。句柄本身可调用，`handle.unsubscribe === handle`；链式 `handle.subscribe(...)` 返回同一条链，风格的订阅别名与取消别名也保持函数身份。通道及句柄的 `subscribe`/订阅别名均接受 `taskId`、delivery 选项；Hub 及句柄的 `subscribe(key, listener, options?)`/订阅别名只接受 delivery，不接受 `taskId`。取消按追加顺序的逆序执行整条链，只真正执行一次。单个释放失败原样抛出；多个失败合为 `SUBSCRIPTION_DISPOSE_FAILED`，`AggregateError.errors` 保留执行顺序。关闭后追加订阅抛 `SUBSCRIPTION_CLOSED`。
 
 链式扩展不是事务：后一次订阅失败时，前面成功的登记仍归原句柄所有，需要调用该句柄清理。第一条登记之后的句柄别名投影失败，则回滚该登记并以 `SUBSCRIPTION_HANDLE_PROJECTION_FAILED` 保留原始失败。有限字面量事件表在同一条 Hub 链上排除已经使用的 key；同 key 的另一条独立链仍可订阅。宽 key、索引签名或运行时联合 key 保留动态广播。
 
 ## 独立订阅 helper
 
-这些函数从 `@migaia/event-subscriber/subscriber` 导入，只要求结构兼容的 `channel.subscribe(listener, options?)`，不要求包内工厂身份。`subscribe` 必须返回函数，不能在安装尚未结束时同步交付事件；非法结构为 `INVALID_CHANNEL`。helper 保留对象方法的接收者。
+这些函数从 `@migaia/event-subscriber/subscriber` 导入，只要求结构兼容的 `channel.subscribe(listener, options?)`，不要求包内工厂身份。`subscribe` 必须返回函数，不能在安装尚未结束时同步交付事件；非法结构为 `INVALID_CHANNEL`。helper 保留对象方法的接收者。`subscribeOnce`、`subscribeUntil` 和对象订阅者保持 context-only，不接受 value 交付选项。
 
 | API                                                   | 参数与行为                                                                                                                                            |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -362,18 +379,18 @@ canonical（固定的原名）方法始终存在；别名与原名指向同一�
 
 `createEventHub<C, S, V>(options?)` 用事件表 `C` 关联 key 和 payload。options 只接受 `report`、`terminalReport`、`style`、`valueConfig`，默认值与含义同 channel；`report` 的参数额外带本次发布的 `key`。Hub listener 返回 `void` 或 `PromiseLike<void>`，不聚合结果；需要结果的事件另建 `createEventChannel<T, R>()`。
 
-| 成员                       | 行为                                                                                                                  |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `subscribe(key, listener)` | key 是事件表中的字符串、数字或 symbol，listener 必须是函数。首次订阅该 key 时才创建内部 channel；返回可调用的订阅链。 |
-| `publish(key, value)`      | 只向该 key 分发对应类型的值；从未订阅或已经没有登记的 key 无操作，不会创建 channel。                                  |
-| `clear(key?)`              | 指定 key 清除该事件所有登记并移除空 channel；省略时清除全部事件。                                                     |
-| `size(key?)`               | 指定 key 返回该事件的活动登记数，不存在为零；省略返回总数。总数由计数器维护，不遍历所有 key。                         |
+| 成员                                 | 行为                                                                                                                                                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `subscribe(key, listener, options?)` | key 是事件表中的字符串、数字或 symbol，listener 必须是函数。第三参只接受 delivery：默认/显式 `EventDelivery.context` 接收上下文，`EventDelivery.value` 接收该 key 的原始 payload；不接受 `taskId`。首次订阅该 key 时才创建内部 channel；返回可调用的订阅链。 |
+| `publish(key, value)`                | 只向该 key 分发对应类型的值；从未订阅或已经没有登记的 key 无操作，不会创建 channel。                                                                                                                                                                         |
+| `clear(key?)`                        | 指定 key 清除该事件所有登记并移除空 channel；省略时清除全部事件。                                                                                                                                                                                            |
+| `size(key?)`                         | 指定 key 返回该事件的活动登记数，不存在为零；省略返回总数。总数由计数器维护，不遍历所有 key。                                                                                                                                                                |
 
 非法 key 为 `INVALID_EVENT_KEY`，非法 listener 为 `INVALID_LISTENER`。旧句柄不会取消 `clear()` 后新创建的同名事件登记。Hub 内部固定使用 `recursive`、`multiple`、`handle`、`100_000` 调用预算与非严格的已取消准入；不暴露内部 channel，也不接受单通道策略选项。需要自选这些策略时使用 channel。`EventRemovalPolicy.listenerAll` 适用于复用相同函数身份的整体注销，例如 logger hook 的注销路径。
 
 ## 静态值路径
 
-`valueConfig` 在构造时固定路径，把原始 payload 中的一个值附加到上下文，同时保留原始 `event.value` 和所有控制方法。它不保存、转换或重放事件。
+`valueConfig` 在构造时固定路径，把原始 payload 中的一个值附加到 context 模式的上下文，同时保留原始 `event.value` 和所有控制方法。value 模式仍直接收到原始 payload，不附加别名。它不保存、转换或重放事件。
 
 | 字段                   | 含义                                                                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |

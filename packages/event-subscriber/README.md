@@ -122,7 +122,20 @@ pnpm add @migaia/event-subscriber
 
 ## 契约细节
 
-基础订阅签名为 `subscribe(listener, options?: { taskId?: string }): subscription`：`listener` 接收事件上下文，可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。
+基础订阅有两种签名：`subscribe(listener, options?: { taskId?: string; delivery?: 'context' }): subscription` 保留事件上下文；`subscribe(listener, options: { taskId?: string; delivery: 'value' }): subscription` 把原始 payload 直接交给监听器。公开选项类型为 `IEventSubscribeOptions`，模式常量为 `EventDelivery.context`、`EventDelivery.value`。可选的 `taskId` 为本次登记命名，返回的 `subscription` 负责取消并可追加订阅。
+
+只处理 payload 时可显式选择 value：
+
+```ts
+import { createEventChannel, EventDelivery } from '@migaia/event-subscriber'
+
+const updates = createEventChannel<{ id: number }>()
+const stop = updates.subscribe((value) => console.log(value.id), { delivery: EventDelivery.value })
+updates.publish({ id: 1 })
+stop()
+```
+
+value 模式保持 payload 身份，不提供 `abort()`、`setTaskId()` 或 `taskId` 上下文成员；登记时的 `taskId` 仍可用于任务过滤。需要上下文控制或 `valueConfig` 别名时保留默认 context。通道订阅链、命名别名及 Hub 的第三个订阅参数都接受相同的 delivery 选择；Hub 不接受任务标签。`subscribeOnce`、`subscribeUntil` 仍只接收上下文监听器。
 
 动态事件名可在运行时广播；有限字面量事件表的同一条链禁止重复事件名。这是 TypeScript 的订阅链类型约束；另一条独立链仍可订阅同名事件。
 
@@ -130,7 +143,7 @@ pnpm add @migaia/event-subscriber
 
 同步 `publish()` 不等待 Promise。同步抛错收集为 `PUBLISH_FAILED`，迟到拒绝交给 report；异步调用工具等待结算，通过返回值或拒绝交付结果。settled 只收集监听器失败，通道与任务准入错误仍同步抛出。
 
-订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为上下文附加一个路径值，不转换事件。
+订阅句柄可以串联，并按相反顺序、幂等地取消；关闭后不能追加。一次性、信号与对象订阅 helper 只返回普通取消函数，不附加 style 别名。style 只是同一函数的名字投影；静态 `valueConfig` 只为 context 模式的上下文附加一个路径值，不转换事件或 value 监听器的 payload。
 
 Hub 的内部策略固定为上述默认值，不接受单通道策略配置。它不聚合监听器结果；需要返回值时使用带结果类型的 channel。
 
