@@ -10,7 +10,14 @@
  * readThreadBootstrap().peerId the parent address, but both launchers write the launched handle
  * fingerprint there. Runtime parent identity lives separately in Core bootstrap.
  */
-import type { ICode, ILibraryReference, IMemberDoc, IText, ISymbolDoc } from './contract.js'
+import type {
+  ICode,
+  ILibraryReference,
+  IMemberDoc,
+  IText,
+  ISymbolDoc,
+  IOptionCaseDoc
+} from './contract.js'
 import { rpcThreadsCases } from './rpc-threads-cases.js'
 import {
   runtimePeerOptionMembers,
@@ -163,7 +170,7 @@ const threadSpawnMembers: Readonly<Record<string, IMemberDoc>> = {
 }
 
 /** Node launch fields shared by direct and runtime-resource launcher factories. */
-const nodeLauncherOptions = {
+const nodeLauncherOptions: Record<string, IMemberDoc> = {
   runtimeApi: {
     summary: t(
       'Advanced `IRuntimePeerSourceContext` supplied by the Core source owner; per-launch held metadata takes precedence over this configured context.',
@@ -907,7 +914,535 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** Application helpers own existing ports and expose no private adapter operations. */
+const threadOptionExamples = {
+  peerListen: `import { createThreadPeer } from '@migaia/rpc-threads'
+import { acceptWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+const worker = await createThreadPeer<{ math: { double(value: number): number } }>({
+  listen: acceptWorkerChannel
+})
+try { console.log(await worker.request('math.double', 21)) }
+finally { await worker.close(); await closeApplicationThreads() }`,
+  peerEndpoint: `import { createThreadPeer } from '@migaia/rpc-threads'
+import { openRawWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+const failure = new Error('application endpoint setup failed')
+try {
+  await createThreadPeer({
+    connect: openRawWorkerChannel,
+    endpointFactory: async (_channel, signal) => {
+      if (signal.aborted) throw signal.reason
+      throw failure
+    }
+  })
+} catch (error) { console.log(error === failure) }
+finally { await closeApplicationThreads() }`,
+  peerPolicy: `import { createThreadPeer } from '@migaia/rpc-threads'
+import { defineProbe } from '@migaia/rpc-core/probe'
+import { openWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+const stages: number[] = []
+const probe = defineProbe({ stages: ['message'], emit: (event) => { stages.push(event.stage) } })
+const worker = await createThreadPeer<{ math: { double(value: number): number } }>({
+  connect: openWorkerChannel,
+  provide: { math: { double: (value: number) => value * 2 } },
+  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },
+  probe,
+  defaultTimeoutMs: 2000,
+  contract: { schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }
+})
+try { console.log(await worker.request('math.double', 21), stages.length > 0) }
+finally { await worker.close(); await closeApplicationThreads() }`,
+  peerRetry: `import { createThreadPeer } from '@migaia/rpc-threads'
+import { openWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+let keyCalls = 0
+let retryCalls = 0
+const worker = await createThreadPeer<{ math: { double(value: number): number } }>({
+  connect: openWorkerChannel,
+  keyFactory: () => { keyCalls += 1; return 'logical-call-1' },
+  retryPort: {
+    dispatch: async (input) => {
+      retryCalls += 1
+      return input.sendOnce({ expectedGeneration: input.generation, key: input.key })
+    }
+  }
+})
+try { console.log(await worker.request('math.double', 21), keyCalls, retryCalls) }
+finally { await worker.close(); await closeApplicationThreads() }`,
+  pluginHost: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { applicationHost, applicationCatalog, resolveApplicationPlugin, openWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+const worker = createThreadPlugin({
+  name: 'worker',
+  connect: openWorkerChannel,
+  expose: ['host'],
+  host: applicationHost,
+  catalog: applicationCatalog,
+  resolvePlugin: resolveApplicationPlugin
+})
+try {
+  await applicationHost.use(worker)
+  console.log(applicationHost.revision > 0)
+} finally { await applicationHost.dispose(); await closeApplicationThreads() }`,
+  nodeLauncher: `import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
+import { openNodeSession } from './app-thread.js'
+
+const session = await openNodeSession((context) => createNodeThreadLauncher({
+  runtimeApi: context,
+  execArgv: []
+}))
+try { console.log(await session.peer.request('math.double', 21)) }
+finally { await session.close() }`,
+  nodeAdapterLauncher: `import { createAdapterNodeThreadLauncher } from '@migaia/rpc-threads'
+import { nodeRuntime, openNodeSession } from './app-thread.js'
+
+const session = await openNodeSession((context) => createAdapterNodeThreadLauncher(nodeRuntime, {
+  runtimeApi: context,
+  execArgv: []
+}))
+try { console.log(await session.peer.request('math.double', 21)) }
+finally { await session.close() }`,
+  webLauncher: `import { createWebThreadLauncher } from '@migaia/rpc-threads'
+import { AppWorker, openWebSession } from './app-thread.js'
+
+const failures: unknown[] = []
+const session = await openWebSession((context) => createWebThreadLauncher({
+  Worker: AppWorker,
+  report: (error) => { failures.push(error) },
+  runtimeApi: context
+}))
+try { console.log(await session.peer.request('math.double', 21)) }
+finally { await session.close() }`,
+  webGlobalLauncher: `import { createWebThreadLauncher } from '@migaia/rpc-threads'
+import { openWebSession } from './app-thread.js'
+
+const session = await openWebSession((context) => createWebThreadLauncher({
+  report: (error) => { console.error(error) },
+  runtimeApi: context
+}))
+try { console.log(await session.peer.request('math.double', 21)) }
+finally { await session.close() }`,
+  pluginListen: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+import { acceptWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+const plugin = createThreadPlugin<{ math: { double(value: number): number } }>({
+  name: 'worker',
+  listen: acceptWorkerChannel
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+try {
+  await host.use(plugin)
+  console.log(await host.thread!.request('worker', 'math.double', 21))
+} finally { await host.dispose(); await closeApplicationThreads() }`,
+  pluginPolicy: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+import { defineProbe } from '@migaia/rpc-core/probe'
+import { openAuthenticatedWorkerChannel, applicationAuthentication, closeApplicationThreads } from './app-thread.js'
+
+const stages: number[] = []
+const probe = defineProbe({ stages: ['message'], emit: (event) => { stages.push(event.stage) } })
+const plugin = createThreadPlugin<{ math: { double(value: number): number } }>({
+  name: 'worker',
+  connect: openAuthenticatedWorkerChannel,
+  authentication: applicationAuthentication,
+  provide: { math: { double: (value: number) => value * 2 } },
+  providerLimits: { maxGlobal: 8, maxPerPeer: 2 },
+  probe,
+  defaultTimeoutMs: 2000,
+  contract: { schemaVersion: 1, plugin: 'math', features: { api: { methods: { double: { mode: 'request', idempotent: true } } } } }
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+try {
+  await host.use(plugin)
+  console.log(await host.thread!.request('worker', 'math.double', 21), stages.length > 0)
+} finally { await host.dispose(); await closeApplicationThreads() }`,
+  pluginRetry: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+import { openWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+let keyCalls = 0
+let retryCalls = 0
+const plugin = createThreadPlugin<{ math: { double(value: number): number } }>({
+  name: 'worker',
+  connect: openWorkerChannel,
+  keyFactory: () => { keyCalls += 1; return 'logical-call-1' },
+  retryPort: {
+    dispatch: async (input) => {
+      retryCalls += 1
+      return input.sendOnce({ expectedGeneration: input.generation, key: input.key })
+    }
+  }
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+try {
+  await host.use(plugin)
+  console.log(await host.thread!.request('worker', 'math.double', 21), keyCalls, retryCalls)
+} finally { await host.dispose(); await closeApplicationThreads() }`,
+  pluginEndpoint: `import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+import { openRawWorkerChannel, closeApplicationThreads } from './app-thread.js'
+
+const failure = new Error('application endpoint setup failed')
+const plugin = createThreadPlugin({ name: 'worker', connect: openRawWorkerChannel,
+  endpointFactory: async (_channel, signal) => {
+    if (signal.aborted) throw signal.reason
+    throw failure
+  }
+})
+const host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+try { await host.use(plugin) }
+catch (error) { console.log(error instanceof Error) }
+finally { await host.dispose(); await closeApplicationThreads() }`,
+  peerSpawn: pairedThreadExample(`import { createThreadPeer } from '@migaia/rpc-threads'
+import type { IWorkerApi, IParentApi } from './contracts.js'
+
+const failures: unknown[] = []
+const worker = await createThreadPeer<IWorkerApi>({
+  spawn: new URL('./worker.js', import.meta.url),
+  self: { name: 'main', instanceId: 'main-1' },
+  provide: { audit: { record: (message: string) => console.log(message) } } satisfies IParentApi,
+  report: (error) => { failures.push(error) }
+})
+try { console.log(await worker.request('math.double', 21)) }
+finally { await worker.close() }`),
+  peerConnect: borrowedPortExample(false),
+  webChannel: borrowedPortExample(true),
+  pluginSpawn: pairedThreadExample(`import { createThreadPlugin } from '@migaia/rpc-threads'
+import { defineHost } from '@migaia/plugin-host'
+import type { IWorkerApi, IParentApi } from './contracts.js'
+
+const plugin = createThreadPlugin<IWorkerApi, IParentApi, 'worker'>({
+  name: 'worker', spawn: new URL('./worker.js', import.meta.url), expose: [],
+  self: { name: 'main', instanceId: 'main-1' },
+  provide: { audit: { record: (message: string) => console.log(message) } },
+  report: (error) => { console.error(error) }
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })
+try { await host.use(plugin); console.log(await host.thread!.request('worker', 'math.double', 21)) }
+finally { await host.dispose() }`)
+}
+/** Configuration cases stay within the source and ownership model each caller already uses. */
+const threadOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
+  peer: [
+    {
+      title: t('Name an owned worker and its reverse service', '为持有的线程及反向服务命名'),
+      problem: t(
+        'spawn starts a library-owned worker. self supplies the parent identity, provide publishes the reverse audit method, and report collects background failures. Without provide the worker cannot call audit.record; without report the default writes to console.error.',
+        'spawn 启动由库持有的线程。self 提供父端身份，provide 发布反向 audit 方法，report 收集后台失败。省略 provide 后，线程无法调用 audit.record；省略 report 时默认输出到控制台错误通道。'
+      ),
+      example: threadOptionExamples.peerSpawn,
+      result: t(
+        'The worker calls audit.record with double, then returns 42. Closing the peer requests worker termination.',
+        '线程用 double 调用 audit.record，然后返回 42。关闭 Peer 会请求终止线程。'
+      ),
+      covers: ['spawn', 'self', 'provide', 'report']
+    },
+    {
+      title: t('Borrow application-owned ports', '借用应用持有的端口'),
+      problem: t(
+        'Use connect when the application already owns the port. The callback receives the actual capability proposal and returns its channel. Do not also set spawn or listen; closing the peer does not close the borrowed native ports.',
+        '应用已经持有端口时使用 connect。回调接收实际能力提议并返回通道。不能同时设置 spawn 或 listen；关闭 Peer 不会关闭借用的原生端口。'
+      ),
+      example: threadOptionExamples.peerConnect,
+      result: t(
+        'The right peer calls double and receives 42; the application closes both ports afterwards.',
+        '右端调用 double 得到 42，随后由应用关闭两个端口。'
+      ),
+      covers: ['connect', 'self', 'provide']
+    },
+    {
+      title: t('Accept an application-owned session', '接受应用持有的会话'),
+      problem: t(
+        'acceptWorkerChannel is the application helper that accepts one session and returns a real thread channel. Select listen for this direction; omission requires another source, and sources are mutually exclusive.',
+        'acceptWorkerChannel 是应用接受一次会话并返回真实线程通道的辅助函数。这个方向选择 listen；省略时必须选择其它来源，几种来源互斥。'
+      ),
+      example: threadOptionExamples.peerListen,
+      result: t(
+        'The accepted session returns 42. The application helper releases its borrowed ports after peer closure.',
+        '已接受会话返回 42；Peer 关闭后，应用辅助函数释放借用端口。'
+      ),
+      covers: ['listen']
+    },
+    {
+      title: t('Roll back a failed custom endpoint setup', '回滚失败的自定义端点准备'),
+      problem: t(
+        'An advanced host can assemble its own endpoint for the acquired channel. endpointFactory receives that channel and the construction signal. Here setup fails deliberately; omission would use canonical endpoint assembly. openRawWorkerChannel supplies an application-owned real port.',
+        '高级宿主可以为取得的通道自行组装端点。endpointFactory 接收通道和构造信号。这里刻意使准备失败；省略时使用规范端点组装。openRawWorkerChannel 提供应用持有的真实端口。'
+      ),
+      example: threadOptionExamples.peerEndpoint,
+      result: t(
+        'The original setup failure is preserved and construction rolls back.',
+        '保留原始准备失败，并回滚构造。'
+      ),
+      covers: ['endpointFactory', 'connect']
+    },
+    {
+      title: t('Bound and observe the local provider', '限制并观察本端提供方'),
+      problem: t(
+        'An application exposes math.double with an explicit contract and small admission limits. probe observes message stages, while defaultTimeoutMs limits request and stream calls to 2000 ms. openWorkerChannel owns the existing port session. Omission uses inferred declarations, standard limits, no probe and a 30000 ms call default.',
+        '应用以显式契约和较小接纳上限提供 math.double。probe 观察消息阶段，defaultTimeoutMs 把请求和流的默认等待设为 2000 毫秒。openWorkerChannel 持有已有端口会话。省略时推导声明、使用标准上限、不安装观察者，默认调用等待 30000 毫秒。'
+      ),
+      example: threadOptionExamples.peerPolicy,
+      result: t(
+        'The request returns 42 and at least one message observation is recorded.',
+        '请求返回 42，并记录至少一次消息观察。'
+      ),
+      covers: ['connect', 'provide', 'providerLimits', 'probe', 'defaultTimeoutMs', 'contract']
+    },
+    {
+      title: t('Keep inherited proxy hooks out of direct calls', '明确继承代理钩子不控制直接调用'),
+      problem: t(
+        'keyFactory and retryPort belong to advanced proxy paths. A borrowed connect peer does not read them for a direct request. The application’s openWorkerChannel supplies that borrowed channel; this example shows why these inherited fields do not enable direct-call retry.',
+        'keyFactory 和 retryPort 属于高级代理路径。使用借用 connect 的 Peer 不会为直接请求读取它们。应用的 openWorkerChannel 提供该借用通道；此例说明继承字段不会开启直接调用重试。'
+      ),
+      example: threadOptionExamples.peerRetry,
+      result: t(
+        'The call returns 42; keyCalls and retryCalls both remain 0.',
+        '调用返回 42，keyCalls 和 retryCalls 都保持 0。'
+      ),
+      covers: ['connect', 'keyFactory', 'retryPort']
+    }
+  ],
+  plugin: [
+    {
+      title: t('Publish only the plugin’s reverse audit method', '只发布插件自己的反向审计方法'),
+      problem: t(
+        'name selects the installed outlet registration. spawn owns the worker, provide publishes audit.record, and an empty expose list publishes no extra Host methods. self names the parent; report receives background errors.',
+        'name 选择安装后的出口登记。spawn 持有线程，provide 发布 audit.record，空 expose 不额外发布 Host 方法。self 为父端命名，report 接收后台错误。'
+      ),
+      example: threadOptionExamples.pluginSpawn,
+      result: t(
+        'The worker calls audit.record and returns 42 through the Host thread outlet.',
+        '线程调用 audit.record，并通过 Host 的 thread 出口返回 42。'
+      ),
+      covers: ['name', 'spawn', 'provide', 'expose', 'self', 'report']
+    },
+    {
+      title: t('Install a signed and bounded provider session', '安装带认证且有上限的提供方会话'),
+      problem: t(
+        'openAuthenticatedWorkerChannel returns the application’s existing port session, using the same applicationAuthentication at both ends. The explicit contract, providerLimits and probe stay with endpoint assembly; defaultTimeoutMs sets request and stream waiting. Omitting authentication adds no signing or verification.',
+        'openAuthenticatedWorkerChannel 返回应用已有端口会话，两端使用同一 applicationAuthentication。显式 contract、providerLimits 和 probe 仍由端点组装处理，defaultTimeoutMs 设置请求和流的等待。省略 authentication 时不增加签名或校验。'
+      ),
+      example: threadOptionExamples.pluginPolicy,
+      result: t(
+        'The installed outlet returns 42 and records a message observation.',
+        '安装后的出口返回 42，并记录消息观察。'
+      ),
+      covers: [
+        'name',
+        'connect',
+        'authentication',
+        'provide',
+        'providerLimits',
+        'probe',
+        'defaultTimeoutMs',
+        'contract'
+      ]
+    },
+    {
+      title: t('Install an accepted session', '安装已接受的会话'),
+      problem: t(
+        'acceptWorkerChannel is an application-owned channel accepter. listen selects that source without starting another worker; choose exactly one of listen, connect and spawn. The Host owns plugin removal.',
+        'acceptWorkerChannel 是应用持有的通道接收函数。listen 选择该来源，不启动另一线程；listen、connect 和 spawn 只能选择一个。Host 负责移除插件。'
+      ),
+      example: threadOptionExamples.pluginListen,
+      result: t(
+        'The Host outlet calls math.double and receives 42.',
+        'Host 出口调用 math.double，得到 42。'
+      ),
+      covers: ['name', 'listen']
+    },
+    {
+      title: t(
+        'Reject installation when custom endpoint setup fails',
+        '自定义端点准备失败时拒绝安装'
+      ),
+      problem: t(
+        'An application endpointFactory can fail after a real port is acquired. The plugin installation then rejects and rolls back instead of publishing a callable outlet. Omission uses the canonical endpoint; openRawWorkerChannel owns the borrowed port.',
+        '应用的 endpointFactory 可能在取得真实端口后失败。插件安装随后拒绝并回滚，不发布可调用出口。省略时使用规范端点；openRawWorkerChannel 持有借用端口。'
+      ),
+      example: threadOptionExamples.pluginEndpoint,
+      result: t(
+        'Installation rejects with an Error and the Host remains disposable.',
+        '安装以 Error 拒绝，Host 仍可释放。'
+      ),
+      covers: ['name', 'connect', 'endpointFactory']
+    },
+    {
+      title: t(
+        'Inspect inherited hooks on a borrowed plugin source',
+        '查看借用插件来源上的继承钩子'
+      ),
+      problem: t(
+        'The application’s openWorkerChannel returns a borrowed connect source. Direct outlet requests on that source do not consume proxy keyFactory or retryPort. Omission keeps the original direct-call behavior.',
+        '应用的 openWorkerChannel 返回借用 connect 来源。该来源上的直接出口请求不使用代理 keyFactory 或 retryPort。省略时保持原直接调用行为。'
+      ),
+      example: threadOptionExamples.pluginRetry,
+      result: t(
+        'The call returns 42; neither inherited hook runs.',
+        '调用返回 42，两个继承钩子均不运行。'
+      ),
+      covers: ['name', 'connect', 'keyFactory', 'retryPort']
+    },
+    {
+      title: t('Expose controlled Host management explicitly', '显式公开受控的 Host 管理'),
+      problem: t(
+        'applicationHost is the same Host that installs this plugin. applicationCatalog declares allowed plugin contracts, and resolveApplicationPlugin returns only local definitions admitted by that catalog. expose must include host before these controls are published; omitting the three helpers is allowed when host is not exposed.',
+        'applicationHost 是安装本插件的同一 Host。applicationCatalog 声明允许的插件契约，resolveApplicationPlugin 仅返回目录接纳的本地定义。只有 expose 含 host 才发布这些控制；不公开 host 时可以省略这三个辅助项。'
+      ),
+      example: threadOptionExamples.pluginHost,
+      result: t(
+        'The plugin installs and the Host revision advances. The example grants no remote access outside the explicit catalog.',
+        '插件安装成功，Host revision 推进；此例不公开目录之外的远程管理能力。'
+      ),
+      covers: ['name', 'connect', 'expose', 'host', 'catalog', 'resolvePlugin']
+    }
+  ],
+  channel: [
+    {
+      title: t('Negotiate a Node MessagePort pair', '协商 Node MessagePort 端口对'),
+      problem: t(
+        'The channel uses the same systemScheduler as its source and forwards the Core context capabilities to the other side. Omitting capabilities uses the fixed basic profile; an application-owned raw channel does not invent runtime guarantees.',
+        '通道与来源共用 systemScheduler，并把 Core 上下文 capabilities 提议给另一端。省略 capabilities 时使用固定基础能力；应用持有的原始通道不会凭空获得运行时保证。'
+      ),
+      example: threadOptionExamples.peerConnect,
+      result: t(
+        'A real MessagePort pair carries the request and result 42.',
+        '真实 MessagePort 对传递请求及结果 42。'
+      ),
+      covers: ['scheduler', 'capabilities']
+    },
+    {
+      title: t('Negotiate an EventTarget MessagePort pair', '协商 EventTarget MessagePort 端口对'),
+      problem: t(
+        'Web-style MessagePorts need start() before message delivery. scheduler supplies their timer owner, and capabilities forwards the actual source proposal. These options change neither native port ownership nor unsupported exit observation.',
+        'Web 风格 MessagePort 必须先 start() 才投递消息。scheduler 提供计时拥有者，capabilities 转交实际来源提议。这些选项不改变原生端口归属，也不提供不受支持的退出观察。'
+      ),
+      example: threadOptionExamples.webChannel,
+      result: t(
+        'The Web-style ports carry double and return 42, then the application closes both ports.',
+        'Web 风格端口传递 double 并返回 42，随后应用关闭两个端口。'
+      ),
+      covers: ['scheduler', 'capabilities']
+    }
+  ],
+  nodeLauncher: [
+    {
+      title: t(
+        'Launch with the actual Core context and clean flags',
+        '使用真实 Core 上下文及独立参数启动'
+      ),
+      problem: t(
+        'The application helper openNodeSession supplies its actual Core source context and owns native teardown. runtimeApi forwards that context to child bootstrap. execArgv [] prevents inheriting parent controller flags; omission preserves native inheritance.',
+        '应用辅助函数 openNodeSession 提供实际 Core 来源上下文，并负责原生释放。runtimeApi 将上下文送入子端启动数据。execArgv [] 避免继承父端控制参数；省略时保持原生继承。'
+      ),
+      example: threadOptionExamples.nodeLauncher,
+      result: t(
+        'The launched Node worker returns 42, then the helper closes the peer and observes actual exit.',
+        '启动的 Node 线程返回 42，辅助函数随后关闭 Peer 并观察实际退出。'
+      ),
+      covers: ['runtimeApi', 'execArgv']
+    },
+    {
+      title: t('Supply a native runtime loader explicitly', '显式提供原生运行时加载器'),
+      problem: t(
+        'An adapter already owns its native runtime loader. createAdapterNodeThreadLauncher receives that loader plus actual runtimeApi context and explicit execArgv. openNodeSession opens the resulting real handle and owns cleanup.',
+        '适配器已有自己的原生运行时加载器。createAdapterNodeThreadLauncher 接收加载器、实际 runtimeApi 上下文和显式 execArgv。openNodeSession 打开返回的真实句柄，并负责清理。'
+      ),
+      example: threadOptionExamples.nodeAdapterLauncher,
+      result: t(
+        'The adapted native worker returns 42 and its owner waits for actual exit.',
+        '适配后的原生线程返回 42，拥有者等待实际退出。'
+      ),
+      covers: ['runtimeApi', 'execArgv']
+    }
+  ],
+  webLauncher: [
+    {
+      title: t('Inject the host’s module Worker constructor', '注入宿主的模块 Worker 构造函数'),
+      problem: t(
+        'AppWorker is the application-selected real Worker constructor. openWebSession supplies the actual Core context, opens the handle and owns termination. Worker selects the constructor, report receives native background errors, and runtimeApi forwards bootstrap data. Omission reads global Worker at launch time.',
+        'AppWorker 是应用选择的真实 Worker 构造函数。openWebSession 提供实际 Core 上下文、打开句柄并负责终止。Worker 选择构造函数，report 接收原生后台错误，runtimeApi 透传启动数据。省略 Worker 时在启动时读取全局构造函数。'
+      ),
+      example: threadOptionExamples.webLauncher,
+      result: t(
+        'The module worker returns 42. Closing requests termination; this platform has no actual-exit receipt.',
+        '模块线程返回 42。关闭时请求终止；此平台没有实际退出回执。'
+      ),
+      covers: ['Worker', 'report', 'runtimeApi']
+    },
+    {
+      title: t('Use the global constructor with a diagnostic sink', '使用全局构造函数及诊断出口'),
+      problem: t(
+        'When the host already provides Worker, omit the constructor and keep an explicit report callback. The launcher requires that sink. openWebSession supplies runtimeApi and owns the physical Worker; no native exit guarantee is added.',
+        '宿主已有 Worker 时省略构造函数，并保留显式 report 回调。启动器要求提供此出口。openWebSession 提供 runtimeApi 并持有物理 Worker，不增加原生退出保证。'
+      ),
+      example: threadOptionExamples.webGlobalLauncher,
+      result: t(
+        'The global Worker returns 42 and its owner requests termination after closing the peer.',
+        '全局 Worker 返回 42，拥有者在关闭 Peer 后请求终止。'
+      ),
+      covers: ['report', 'runtimeApi']
+    }
+  ]
+}
+/** Usage belongs to this Thread entry and does not mutate shared runtime documentation. */
+const threadPeerUsageMembers = {
+  ...threadPeerOptionMembers,
+  report: {
+    ...threadPeerOptionMembers.report!,
+    whenToUse: t(
+      'Set a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.',
+      '应用需要把后台或隔离失败与请求拒绝分开记录时设置。省略时使用 defaultRpcReporter 和 console.error；它不会让失败请求成功。'
+    ),
+    example: threadOptionExamples.peerSpawn
+  },
+  endpointFactory: {
+    ...threadPeerOptionMembers.endpointFactory!,
+    whenToUse: t(
+      'Use it only when the application already owns advanced endpoint assembly for the acquired channel. The callback receives the construction signal and must return a real IRemoteServeEndpoint. Failure rolls back construction; omission uses canonical assembly.',
+      '仅当应用已有取得通道后的高级端点组装逻辑时设置。回调接收构造信号，必须返回真实 IRemoteServeEndpoint。失败回滚构造；省略时使用规范组装。'
+    ),
+    example: threadOptionExamples.peerEndpoint
+  },
+  keyFactory: {
+    ...threadPeerOptionMembers.keyFactory!,
+    whenToUse: t(
+      'Use it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.',
+      '需要为可重试调用生成键的托管代理路径使用此项。借用的直接 connect/listen Peer 不读取它。省略时代理路径使用 defaultRpcId，直接调用选项中的键保持原语义。'
+    ),
+    example: threadOptionExamples.peerRetry
+  }
+}
+/** Plugin-specific callback examples run through Host installation. */
+const threadPluginUsageMembers = {
+  ...threadPluginOptionMembers,
+  ...threadPeerUsageMembers,
+  report: { ...threadPeerUsageMembers.report, example: threadOptionExamples.pluginSpawn },
+  endpointFactory: {
+    ...threadPeerUsageMembers.endpointFactory,
+    example: threadOptionExamples.pluginEndpoint
+  },
+  keyFactory: { ...threadPeerUsageMembers.keyFactory, example: threadOptionExamples.pluginRetry }
+}
+nodeLauncherOptions.runtimeApi = {
+  ...nodeLauncherOptions.runtimeApi!,
+  example: threadOptionExamples.nodeLauncher
+}
+nodeLauncherOptions.execArgv = {
+  ...nodeLauncherOptions.execArgv!,
+  example: threadOptionExamples.nodeLauncher
+}
 /** Reference of `@migaia/rpc-threads`. */
+/** Node adapter aliases share the same public option group as the advanced launcher. */
+if (platformSymbols['adapters/node:createNodeThreadLauncher'])
+  platformSymbols['adapters/node:createNodeThreadLauncher'] = {
+    ...platformSymbols['adapters/node:createNodeThreadLauncher'],
+    optionCases: threadOptionCases.nodeLauncher
+  }
 export const rpcThreadsReference: ILibraryReference = {
   modules: {
     index: {
@@ -1068,6 +1603,7 @@ export const rpcThreadsReference: ILibraryReference = {
     createAdapterNodeThreadLauncher: {
       role: 'factory',
       optionDocs: nodeLauncherOptions,
+      optionCases: threadOptionCases.nodeLauncher,
       purpose: t(
         'Creates a Node Worker launcher over a custom `worker_threads` resource (`IThreadRuntimeResource`); for adapter authors and tests.',
         '基于自定义的 `worker_threads` 资源（`IThreadRuntimeResource`）创建 Node Worker launcher；面向适配器作者与测试。'
@@ -1241,13 +1777,14 @@ console.log(event)`
     },
     ...runtimePairedTypes('thread'),
     IRuntimeThreadPeerOptions: {
+      optionCases: threadOptionCases.peer,
       summary: t(
         'Options of `createThreadPeer()`: the Worker source plus the Core Peer options.',
         '`createThreadPeer()` 的选项：Worker 来源以及 Core Peer 的通用选项。'
       ),
       example: transferExample,
       members: {
-        ...threadPeerOptionMembers,
+        ...threadPeerUsageMembers,
         authentication: {
           ...threadPeerOptionMembers.authentication!,
           example: transferExample
@@ -1255,11 +1792,12 @@ console.log(event)`
       }
     },
     IRuntimeThreadPluginOptions: {
+      optionCases: threadOptionCases.plugin,
       summary: t(
         'Options of `createThreadPlugin()`.',
         '`createThreadPlugin()` 的选项：连接名称、来源、提供与公开的方法。'
       ),
-      members: threadPluginOptionMembers
+      members: threadPluginUsageMembers
     },
     IRuntimeThreadShortSpawn: {
       summary: t(
@@ -1400,6 +1938,7 @@ try {
       }
     },
     IThreadChannelOptions: {
+      optionCases: threadOptionCases.channel,
       summary: t(
         'Options of channel constructors and factories.',
         '通道构造函数与通道工厂的选项。'
@@ -1487,8 +2026,27 @@ try {
       }
     },
     IWebThreadLauncherOptions: {
+      optionCases: threadOptionCases.webLauncher,
       summary: t('Options of Web-style launchers.', 'Web 风格 launcher 的选项：构造函数与上报。'),
-      members: webLauncherOptionMembers
+      members: {
+        ...webLauncherOptionMembers,
+        Worker: {
+          ...webLauncherOptionMembers.Worker!,
+          whenToUse: t(
+            'Inject the actual module Worker constructor when the host does not expose it globally or an application supplies its own runtime. Omission reads global Worker only when launch starts; this does not add exit observation.',
+            '宿主没有全局构造函数，或应用自选运行时时，注入真实模块 Worker 构造函数。省略时只在启动时读取全局 Worker，不会增加退出观察。'
+          ),
+          example: threadOptionExamples.webLauncher
+        },
+        report: {
+          ...webLauncherOptionMembers.report!,
+          whenToUse: t(
+            'Always supply the native launcher diagnostic sink. It receives background Worker errors; there is no default callback. The owner must still close the peer and request Worker termination.',
+            '必须提供原生启动器诊断出口。它接收 Worker 后台错误，没有默认回调。拥有者仍须关闭 Peer 并请求终止 Worker。'
+          ),
+          example: threadOptionExamples.webLauncher
+        }
+      }
     },
     IWebThreadHandle: {
       summary: t(
