@@ -134,7 +134,9 @@ function invalidRecord(cause: unknown): never {
 
 /**
  * Encode an ordered offline record as UTF-8-compatible NDJSON text. Errors delegate to Contract; a
- * serialization failure throws instead of being silently omitted. Neither input nor stack changes.
+ * failure throws RECORD_FORMAT_INVALID with its cause. Uint8Array/ArrayBuffer use reserved $bytes
+ * Base64 syntax at any depth; other content follows JSON rather than arbitrary lossless-object
+ * semantics. Text has a trailing newline and is not persisted. Input error stacks are not changed.
  */
 export function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string {
   try {
@@ -175,7 +177,9 @@ export function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string {
 
 /**
  * Decode the frozen v1 header, byte tags and native error graph without regenerating any stack.
- * Invalid input throws RECORD_FORMAT_INVALID with the original failure on cause.
+ * Preserve file order without sorting/alignment. A final newline is optional; interior blank lines,
+ * unsupported headers and malformed byte/error data throw RECORD_FORMAT_INVALID with the original
+ * cause. Decoding returns data without registering or opening a target.
  */
 export function decodeRpcDevtoolsRecord(text: string): IRpcDevtoolsRecord {
   try {

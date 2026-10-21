@@ -47,7 +47,11 @@ type IHubListenerSlot<T> = { listener: T | undefined }
 
 /**
  * Aggregate existing service clients and offline records without acquiring transports or Peers.
- * Target registration owns alignment/watch resources; returned queries reuse retained references.
+ * Per-target retention defaults to 50000; optional realignMs refreshes clock estimates. Target
+ * registration owns watches/timers, while queries reuse references that realignment may update.
+ * Invalid options throw INVALID_OPTION. close shares a Promise, joins all watch returns and reports
+ * release errors before resolving; removeTarget instead rejects its original release failure.
+ * Neither operation closes borrowed clients. Public queries after close throw CLOSED.
  */
 export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub {
   if (options !== undefined && (typeof options !== 'object' || options === null))

@@ -12,7 +12,9 @@
   "files": [
     "dist",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -37,7 +39,7 @@
     }
   },
   "scripts": {
-    "fmt": "oxfmt src test vitest.config.ts",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",
@@ -51,15 +53,15 @@
   "dependencies": {
     "@migaia/utils": "workspace:^"
   },
-  "peerDependencies": {
-    "@migaia/rpc-contract": "workspace:*",
-    "@migaia/rpc-core": "workspace:*"
-  },
   "devDependencies": {
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-core": "workspace:*",
     "@types/node": "24.13.2",
     "typescript": "^7.0.2",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*"
   }
 }

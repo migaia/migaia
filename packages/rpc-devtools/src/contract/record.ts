@@ -2,7 +2,9 @@ import type { IRpcDevtoolsWireEvent, IRpcWireError } from './wire.js'
 
 /** Header identity freezes the v1 NDJSON grammar for collectors and offline hub imports. */
 export const RpcDevtoolsRecordFormat = Object.freeze({
+  /** Exact first-line NDJSON discriminator. */
   format: 'migaia-rpc-devtools',
+  /** Supported grammar version; other versions are not migrated. */
   version: 1
 } as const)
 
@@ -23,6 +25,8 @@ export type IRpcDevtoolsRecordEvent = Readonly<
 
 /** An offline recording retains order and uses native errors/bytes before and after codec calls. */
 export type IRpcDevtoolsRecord = Readonly<{
+  /** Format identity only, without clock-alignment or descriptor metadata. */
   header: IRpcDevtoolsRecordHeader
+  /** File-order events; codec conversion restores native errors and reserved byte tags. */
   events: readonly IRpcDevtoolsRecordEvent[]
 }>

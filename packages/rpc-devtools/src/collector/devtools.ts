@@ -73,7 +73,15 @@ function captureBytes(content: unknown, view: IRpcProbeEventView): number {
   return view.sizeBytes < 0 ? 0 : view.sizeBytes
 }
 
-/** Build the complete host, then attach defineProbe once without copying or retaining a view. */
+/**
+ * Create a bounded collector installable directly as a Core probe. Defaults observe message/peer
+ * metadata without content; invalid capacities or probe options throw INVALID_OPTION. Consume
+ * reusable views immediately, retaining nested payload/error/detail references rather than clones.
+ * query reads history, watch subscribes on first next, and recording owns an independent ring. The
+ * caller closes this collector and its separate serving Peer. close is synchronous/idempotent,
+ * releases retention and rejects pending watches with CLOSED, without closing any Peer/transport.
+ * Pure record codecs remain callable after close.
+ */
 export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtools {
   if (typeof options !== 'object' || options === null) invalid()
   /** One capacity is shared by all main-ring columns. */
