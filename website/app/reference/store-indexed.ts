@@ -88,6 +88,35 @@ const options: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
+/** A collection guard rejects writes after the application removes edit permission. */
+const guardedCollectionExample = `import { ObservableMap } from '@migaia/store-indexed'
+import { createRuntime } from '@migaia/reactive'
+const runtime = createRuntime()
+let canEdit = true
+const quantities = new ObservableMap<string, number>([['item-1', 1]], runtime, {
+  mutationGuard: {
+    assertMutationAllowed: () => {
+      if (!canEdit) throw new Error('editing disabled')
+    }
+  }
+})
+quantities.set('item-1', 2)
+canEdit = false
+try { quantities.set('item-1', 3) } catch (error) { console.log((error as Error).message) }
+console.log(quantities.get('item-1'))
+quantities.dispose()`
+/** A custom name makes mutation operation labels recognizable to the application guard. */
+const namedCollectionExample = `import { ObservableArray } from '@migaia/store-indexed'
+import { createRuntime } from '@migaia/reactive'
+const runtime = createRuntime()
+const operations: (string | undefined)[] = []
+const rows = new ObservableArray([10], runtime, {
+  debugName: 'cartRows',
+  mutationGuard: { assertMutationAllowed: (operation) => { operations.push(operation) } }
+})
+rows.push(20)
+console.log(operations, rows.snapshot())
+rows.dispose()`
 /** Object example shows tracked reading and explicit lifecycle ownership. */
 const objectExample = `const user = new ObservableObject({ name: 'Ada', age: 30 })
 const watch = user.runtime.effect(() => console.log(user.get('name')))
@@ -169,6 +198,40 @@ const errorFactory = (native: string, withCause: boolean): ISymbolDoc => ({
   },
   ...(withCause
     ? {
+        optionCases: [
+          {
+            title: t('Keep the original exception', '保留原始异常'),
+            problem: t(
+              'An application adds a collection-specific explanation to a failure. Pass cause to keep the original exception; omitting it creates an error without that link.',
+              '应用为失败添加集合相关的说明时，传入 cause 可保留原始异常；省略它时，新错误没有这个关联。'
+            ),
+            example: `import { createStoreIndexed${native === 'Error' ? '' : 'Type'}Error, StoreIndexedErrorCode } from '@migaia/store-indexed'
+const cause = new TypeError('invalid imported rows')
+const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(StoreIndexedErrorCode.invalidOption, 'cannot import rows', { cause })
+console.log(error.cause === cause)`,
+            result: t(
+              'Prints true; the original exception remains reachable.',
+              '输出 true；仍可找到原始异常。'
+            ),
+            covers: ['cause']
+          },
+          {
+            title: t('Keep structured import details', '保留结构化导入详情'),
+            problem: t(
+              'An importer reports a row number instead of throwing Error. cause accepts that object, preserving details without converting them to message text.',
+              '导入器可能返回行号详情，而非抛出 Error。cause 接受该对象，无需把详情转换成消息文本。'
+            ),
+            example: `import { createStoreIndexed${native === 'Error' ? '' : 'Type'}Error, StoreIndexedErrorCode } from '@migaia/store-indexed'
+const cause = { row: 3, field: 'quantity' }
+const error = createStoreIndexed${native === 'Error' ? '' : 'Type'}Error(StoreIndexedErrorCode.invalidOption, 'cannot import rows', { cause })
+console.log(error.cause === cause)`,
+            result: t(
+              'Prints true; cause is the same details object.',
+              '输出 true；cause 是同一个详情对象。'
+            ),
+            covers: ['cause']
+          }
+        ],
         optionDocs: {
           cause: {
             summary: t(
@@ -272,7 +335,35 @@ export const storeIndexedReference: ILibraryReference = {
         'Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission.',
         '所有显式集合类共用的构造策略，提供诊断命名与可选写入接纳。'
       ),
-      members: options
+      members: options,
+      optionCases: [
+        {
+          title: t('Reject edits after permission changes', '权限变化后拒绝编辑'),
+          problem: t(
+            'A collection should stop accepting edits when its page becomes read-only. Without mutationGuard, writes have no extra permission check. A guard throws before changing the collection, so the previous value remains available.',
+            '页面变成只读后，集合应停止接收编辑。不设置 mutationGuard 时，写入没有额外的权限检查。守卫在集合变更前抛错，因此原值仍然保留。'
+          ),
+          example: guardedCollectionExample,
+          result: t(
+            'Prints editing disabled and 2; the rejected write does not replace the value.',
+            '输出 editing disabled 和 2；被拒绝的写入没有替换原值。'
+          ),
+          covers: ['mutationGuard']
+        },
+        {
+          title: t('Name collection writes in diagnostics', '为诊断中的集合写入命名'),
+          problem: t(
+            'Several arrays use one mutation policy, and their default ObservableArray label does not identify the owning feature. debugName prefixes operation labels and internal signal diagnostics. The guard can collect those labels before allowing each write.',
+            '多个数组共用一种写入策略，默认的 ObservableArray 标签无法区分所属功能。debugName 为操作标签和内部信号诊断添加前缀。守卫可以先收集标签，再允许写入。'
+          ),
+          example: namedCollectionExample,
+          result: t(
+            "Prints ['cartRows.push'] and [10, 20]. The application name appears in the write label.",
+            "输出 ['cartRows.push'] 和 [10, 20]；写入标签包含应用指定的名称。"
+          ),
+          covers: ['debugName', 'mutationGuard']
+        }
+      ]
     },
     IIndexedOperation: {
       summary: t(
