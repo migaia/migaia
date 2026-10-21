@@ -8,6 +8,7 @@ import {
   createListenerFailureState,
   createMessageListenerHub,
   drainListenerFailures,
+  identifyRpcBoundaryFailure,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
@@ -17,19 +18,34 @@ import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 
 /** Minimal SharedWorker port surface accepted by the adapter. */
 export type ISharedWorkerPort = {
+  /** Native structured-clone send; supplied transfers retain the platform's detachment semantics. */
   postMessage(message: unknown, transfer?: readonly Transferable[]): void
+  /** Optional native MessagePort activation, invoked when the first message subscriber attaches. */
   start?(): void
+  /** Register message delivery or native deserialization failure without taking port ownership. */
   addEventListener(
     type: 'message' | 'messageerror',
     listener: (event: MessageEvent<unknown> | Event) => void
   ): void
+  /** Remove the exact registered callback; final unsubscribe leaves the native port open. */
   removeEventListener(
     type: 'message' | 'messageerror',
     listener: (event: MessageEvent<unknown> | Event) => void
   ): void
 }
 
-/** Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime. */
+/**
+ * Wrap an existing SharedWorker port as a borrowed exclusive Endpoint transport, without creating a
+ * worker or importing browser globals. send forwards structured-clone data and optional native
+ * transfers. The first subscribe starts the port and installs shared message/messageerror hooks;
+ * final unsubscribe removes them, retaining failed cleanup for a later retry rather than closing
+ * the port. The caller must close its own port and worker resources.
+ *
+ * Native messageerror and event-read failures use onTransportError; listener/probe failures use
+ * onListenerError. Native send failures receive Core TRANSPORT identity while retaining the
+ * original exception or its cause chain. Subscription registration can throw; returned disposers
+ * can surface cleanup or retained reporter failures.
+ */
 export function createSharedWorkerTransport(
   port: ISharedWorkerPort
 ): IRpcTransport<unknown, Transferable> {
@@ -89,7 +105,15 @@ export function createSharedWorkerTransport(
       /** Observe before postMessage can detach an explicitly transferred byte buffer. */
       const probe = observation.probe
       if (probe !== undefined) observation.emit(probe, 0, message, undefined, transfer)
-      port.postMessage(message, transfer)
+      try {
+        port.postMessage(message, transfer)
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          BrowserRpcErrorText.carrierOperationFailed
+        )
+      }
     },
     /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
     observe(probe) {

@@ -17,25 +17,40 @@ import { RpcCoreErrorCode } from '@migaia/rpc-core'
 
 /** Outbound Window-like target that owns postMessage delivery. */
 export type IWindowMessageTarget = {
+  /** Perform native structured-clone delivery; an explicit transfer list can detach its buffers. */
   postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void
 }
 
 /** Inbound realm that owns message listener registration. */
 export type IWindowMessageReceiver = {
+  /** Register the adapter's shared native message callback on the receiving realm. */
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void
+  /** Remove that same callback when the final logical subscription leaves. */
   removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void
 }
 
+/** Separate send and receive owners for a borrowed multiplexed Window Endpoint transport. */
 export type IWindowMessageTransportOptions = {
+  /** Required outgoing target and exact native identity used by sourceProof. */
   readonly target: IWindowMessageTarget
+  /** Omitted uses a Window-like global; required outside a realm with addEventListener. */
   readonly receiver?: IWindowMessageReceiver
-  /** Defaults to current window.location.origin when available. */
+  /** Defaults to current location.origin when available; empty/unavailable origins reject. */
   readonly targetOrigin?: string
   /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */
   readonly allowUnsafeTargetOrigin?: boolean
 }
 
-/** Adapts distinct outbound and inbound Window owners without weakening source proof. */
+/**
+ * Adapt a borrowed Window for an Endpoint. Returns a multiplexed transport; sourceProof requires
+ * both target identity and targetOrigin, except an explicitly permitted '*' relaxes origin only.
+ * Raw subscribe preserves source/origin metadata; Endpoint connect or the Peer bridge applies the
+ * proof before accepting messages. Invalid receiver/origin configuration throws INVALID_CONFIG.
+ *
+ * First subscription installs one native listener and the last disposer removes it. No Window close
+ * is provided. send forwards one transfer choice to postMessage; observation runs before native
+ * detachment. Listener/probe failures use onListenerError, separately from business I/O.
+ */
 export function createWindowMessageTransport(
   options: IWindowMessageTransportOptions
 ): IRpcTransport<unknown, Transferable> {

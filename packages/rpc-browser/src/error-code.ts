@@ -20,4 +20,8 @@ export const RpcBrowserErrorCode = {
   /** Rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */
   messageDecodeFailed: 'MESSAGE_DECODE_FAILED'
 } as const
+/**
+ * Value union of Browser-owned admission/decoding codes; adapters also retain Core error
+ * identities.
+ */
 export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode]

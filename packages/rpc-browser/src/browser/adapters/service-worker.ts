@@ -6,6 +6,7 @@ import {
   createListenerFailureState,
   createMessageListenerHub,
   drainListenerFailures,
+  identifyRpcBoundaryFailure,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
@@ -18,16 +19,21 @@ import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Outbound ServiceWorker or Client target. */
 export type IServiceWorkerMessageTarget = {
+  /** Native send to the chosen ServiceWorker or Client; transfers can detach caller-owned buffers. */
   postMessage(message: unknown, transfer?: readonly Transferable[]): void
+  /** Optional stable Client identity used as the default peerId for cross-realm source wrappers. */
   readonly id?: string
 }
 
 /** Inbound page or ServiceWorkerGlobalScope event target. */
 export type IServiceWorkerMessageReceiver = {
+  /** Register incoming messages on navigator.serviceWorker or the worker's own event scope. */
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void
+  /** Remove the exact native callback when the last logical subscription ends. */
   removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void
 }
 
+/** Explicit outgoing target and incoming event owner; no browser-global fallback is selected. */
 export type IServiceWorkerTransportOptions = {
   /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */
   readonly target: IServiceWorkerMessageTarget
@@ -37,7 +43,19 @@ export type IServiceWorkerTransportOptions = {
   readonly peerId?: string
 }
 
-/** Wraps distinct ServiceWorker send and receive owners. */
+/**
+ * Adapt a borrowed ServiceWorker/Client pair for an Endpoint, not a Runtime Peer connection.
+ * sourceProof accepts the target itself or its configured stable Client id; a proved wrapper is
+ * normalized to target in received metadata. Raw subscribe also forwards unproved sources, so
+ * Endpoint connect remains responsible for admission. A failed id read reports TRANSPORT with the
+ * original cause rather than turning an unknown source into a trusted one.
+ *
+ * First/last subscriptions install/remove one receiver callback. No worker/client close is
+ * provided. send preserves the native transfer choice and classifies native send failures with Core
+ * TRANSPORT while retaining the original exception or its cause chain. Event-read failures use
+ * onTransportError while listener/probe failures use onListenerError. The caller owns worker
+ * lifecycle/reconnection.
+ */
 export function createServiceWorkerTransport(
   options: IServiceWorkerTransportOptions
 ): IRpcTransport<unknown, Transferable> {
@@ -107,7 +125,15 @@ export function createServiceWorkerTransport(
       /** Observe before postMessage can detach an explicitly transferred byte buffer. */
       const probe = observation.probe
       if (probe !== undefined) observation.emit(probe, 0, message, undefined, transfer)
-      target.postMessage(message, transfer)
+      try {
+        target.postMessage(message, transfer)
+      } catch (error) {
+        throw identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          BrowserRpcErrorText.carrierOperationFailed
+        )
+      }
     },
     /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
     observe(probe) {

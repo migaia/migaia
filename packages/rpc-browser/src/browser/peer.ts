@@ -13,11 +13,21 @@ import type {
   IRuntimeBrowserWindowConnect
 } from './peer-types.js'
 
-/** A declared remote surface retains the same method, payload and generator typing as other Peers. */
+/**
+ * Open a Core Runtime Peer over one existing Window, SharedWorker port or reliable ordered RTC
+ * channel, or attach a SharedWorker listener. Connect resolves after the real handshake; listen
+ * resolves after acceptance is installed and can have zero or many connections. The remote type
+ * preserves method, payload and scalar/generator distinctions without changing runtime dispatch.
+ *
+ * Supply exactly one source. Invalid source/origin/reliability rejects with a Browser TypeError;
+ * carrier and Core negotiation failures retain their existing owners and original causes. Caller
+ * cancellation can retire an unfinished opening. close()/asyncDispose release logical sessions and
+ * subscriptions, retain Core's shared close Promise, and never close borrowed native carriers.
+ */
 export function createBrowserPeer<TRemote = never>(
   options: IRuntimeBrowserPeerOptions
 ): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>
-/** Preserve the same dynamic factory signature used by the canonical Runtime Peer constructor. */
+/** Open the same Peer without a declared remote surface, using dynamic Core method names. */
 export function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>
 /** The dynamic implementation returns Core's original facade without a Proxy or lifecycle wrapper. */
 export async function createBrowserPeer(
