@@ -25,9 +25,13 @@ function createJsonRpcFrameError(cause?: unknown): Error {
 
 /** A decoder retains at most one bounded header/body while accepting arbitrary OS read splits. */
 export type IJsonRpcFrameDecoder = Readonly<{
+  /** Returns complete JSON values from arbitrary byte chunks; malformed framing/UTF-8/JSON throws. */
   push(chunk: Uint8Array): readonly unknown[]
+  /** Checks for a partial frame and throws if present; successful finish does not close the decoder. */
   finish(): void
+  /** Drops retained bytes and makes later push() calls return an empty list. */
   close(): void
+  /** Currently retained header/body bytes, excluding complete values already returned. */
   readonly bufferedBytes: number
 }>
 
@@ -38,7 +42,11 @@ export type IJsonRpcFrameDecoder = Readonly<{
  */
 const nativeEncodingSafeLength = Math.floor(JsonRpcLimit.bodyBytes / 3)
 
-/** Emit exactly one normalized ASCII header and UTF-8 body in one physical write chunk. */
+/**
+ * JSON-stringifies one value and returns its Content-Length ASCII header plus UTF-8 body as one
+ * owned byte chunk. Empty/oversized bodies throw JSONRPC_FRAME_INVALID. Native stringify errors
+ * retain their host behavior; this operation does not validate a JSON-RPC request or error schema.
+ */
 export function encodeJsonRpcFrame(value: unknown): Uint8Array {
   /** Undefined JSON results retain the existing empty-body frame rejection. */
   const body = JSON.stringify(value) ?? ''
@@ -92,7 +100,12 @@ function parseLength(header: Uint8Array): number {
   return length
 }
 
-/** Incrementally decode frames without concatenating the accumulated body on every chunk. */
+/**
+ * Creates a connection-owned Content-Length decoder with fixed header/body limits. push() returns
+ * all completed JSON values in order and throws JSONRPC_FRAME_INVALID for malformed frames, fatal
+ * UTF-8 or JSON. finish() detects a truncated tail without closing; close() releases retained
+ * state. This differs from the native length-prefix decoder's first-error callback contract.
+ */
 export function createJsonRpcFrameDecoder(): IJsonRpcFrameDecoder {
   /** Header has a fixed budget; body allocation starts only after length validation. */
   const header = new Uint8Array(JsonRpcLimit.headerBytes)

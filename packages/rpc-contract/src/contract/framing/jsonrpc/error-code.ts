@@ -18,5 +18,6 @@ export const JsonRpcBridgeErrorCode = {
   /** The hello deadline expires; the caller may establish a new connection. */
   handshakeTimeout: 'JSONRPC_HANDSHAKE_TIMEOUT'
 } as const
+/** Stable semantic values used with the dedicated JSON-RPC bridge error source. */
 export type IJsonRpcBridgeErrorCode =
   (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode]

@@ -119,7 +119,7 @@ function resolveTopLevelShape(
     : shape
 }
 
-/** Validate a top-level scalar while preserving the V4 field order. */
+/** Validate a top-level scalar in the declared stable field order. */
 function validateTopLevelScalar(
   record: Record<string, unknown>,
   [field, domain]: IRpcTopLevelScalar
@@ -134,7 +134,11 @@ function validateTopLevelScalar(
   if (!valid) throw invalidRpcEnvelope(RpcEnvelopeViolation.type, `/${field}`)
 }
 
-/** Normalize a V1 envelope in the frozen V1–V7 first-failure order. */
+/**
+ * Validate one legacy semantic envelope and return a fresh frozen snapshot in stable first-failure
+ * order. Unknown fields are omitted and optionally reported; variation payloads remain opaque for
+ * their control owner. Invalid fields throw INVALID_ENVELOPE with a pointer, violation and cause.
+ */
 export function normalizeRpcEnvelope(value: unknown, options?: IRpcEnvelopeOptions): IRpcEnvelope {
   const record = snapshotRpcRecord(value, '', RpcEnvelopeViolation.type)
   const kind = record.kind

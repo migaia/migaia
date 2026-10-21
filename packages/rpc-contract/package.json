@@ -13,7 +13,9 @@
     "dist",
     "schema",
     "README.md",
-    "USEGUIDE.md"
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -104,7 +106,7 @@
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
-    "fmt": "oxfmt src test vitest.config.ts",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage",
     "typecheck:contract": "bun check -p tsconfig.contract.json"
@@ -113,7 +115,6 @@
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
-  "peerDependenciesMeta": {},
   "devDependencies": {
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
@@ -123,6 +124,7 @@
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
+  "peerDependenciesMeta": {},
   "engines": {
     "node": ">=18"
   }

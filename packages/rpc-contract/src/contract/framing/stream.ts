@@ -8,18 +8,30 @@ export const RPC_STREAM_MAX_FRAME_BYTES = RpcBatchPhysical.maxBytes
 
 /** A decoder owns one bounded frame buffer and reports the first malformed frame. */
 export type IRpcStreamFrameDecoder = Readonly<{
+  /** Consumes arbitrary chunk boundaries; terminal or non-byte input throws INVALID_FRAME. */
   push(chunk: Uint8Array): void
+  /** Ends input, reporting a partial tail through onError and making the decoder terminal. */
   finish(): void
+  /** Silently drops a partial frame and becomes terminal without emitting another framing error. */
   close(): void
 }>
 
 /** Callbacks consume complete payloads or the first framing error. */
 export type IRpcStreamFrameDecoderOptions = Readonly<{
+  /** Receives each owned complete payload; may close/finish the decoder to stop the current chunk. */
   onFrame(frame: Uint8Array): void
+  /**
+   * Receives the first malformed-length, size-limit or truncated-tail error; later errors are
+   * suppressed.
+   */
   onError(error: Error): void
 }>
 
-/** Encode one nonempty payload with an unsigned four-byte network-order length. */
+/**
+ * Copies a nonempty Uint8Array behind an unsigned four-byte network-order length. Returns owned
+ * contiguous bytes; empty/non-byte input throws INVALID_FRAME and payloads above 16 MiB throw
+ * FRAME_LIMIT_EXCEEDED. The caller owns writing those bytes and preserving message order.
+ */
 export function encodeRpcStreamFrame(payload: Uint8Array): Uint8Array {
   if (!isUint8Array(payload) || payload.byteLength === 0)
     throw createContractError(RpcContractErrorCode.invalidFrame)
@@ -32,12 +44,25 @@ export function encodeRpcStreamFrame(payload: Uint8Array): Uint8Array {
   return framed
 }
 
-/** Encode process text into its final frame; a drained backing remains owned by its connection. */
+/**
+ * Encodes text behind the same four-byte length prefix using the required encoder. Optional storage
+ * is borrowed only when large enough; the returned subarray can alias it, so do not reuse that
+ * backing until its physical write drains. Empty or oversized payloads follow
+ * encodeRpcStreamFrame's errors.
+ */
 export function encodeRpcStreamTextFrame(
   text: string,
   encoder: {
+    /** Encode a complete UTF-8 payload for the fallback allocation path. */
     encode(input: string): Uint8Array
-    encodeInto(input: string, destination: Uint8Array): Readonly<{ written: number }>
+    /** Write UTF-8 bytes into the provided payload region without retaining it. */
+    encodeInto(
+      input: string,
+      destination: Uint8Array
+    ): Readonly<{
+      /** Actual complete payload bytes written, used for the wire length prefix. */
+      written: number
+    }>
   },
   storage?: Uint8Array
 ): Uint8Array {
@@ -54,14 +79,22 @@ export function encodeRpcStreamTextFrame(
   return frame.subarray(0, result.written + 4)
 }
 
-/** Decode arbitrary chunk boundaries while retaining at most one frame. */
+/**
+ * Creates a length-prefix decoder retaining at most one payload of up to 16 MiB. It reports the
+ * first wire framing failure through required onError, then stops delivery. The owner must call
+ * finish() on input end or close() to abandon the frame; neither closes a physical connection.
+ */
 export function createRpcStreamFrameDecoder(
   options: IRpcStreamFrameDecoderOptions
 ): IRpcStreamFrameDecoder {
   return createRpcStreamFrameDecoderWithLimit(options, () => RPC_STREAM_MAX_FRAME_BYTES)
 }
 
-/** Internal process boundary supplies a phase-specific cap before payload allocation. */
+/**
+ * Uses the same decoder with a required maxFrameBytes callback, read once for each completed length
+ * header before payload allocation. Carriers can select a smaller bootstrap/handshake cap. Callback
+ * exceptions retain their caller-owned behavior; the decoder installs no timer or I/O.
+ */
 export function createRpcStreamFrameDecoderWithLimit(
   options: IRpcStreamFrameDecoderOptions,
   maxFrameBytes: () => number

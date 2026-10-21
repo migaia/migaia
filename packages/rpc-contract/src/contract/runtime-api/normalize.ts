@@ -7,7 +7,13 @@ import type { IRpcRuntimeEnvelope } from './types.js'
 
 export { normalizeRuntimeSteps, normalizeRuntimeGeneration } from './metadata.js'
 
-/** Public explicit normalization retains the full synchronous parser and native error boundary. */
+/**
+ * Validate a strict runtime-envelope own-data graph synchronously and return frozen metadata
+ * snapshots. Metadata accessors and extra fields are rejected without invoking them. Business
+ * values default to negotiated-native portable admission; a supplied portable operation owns its
+ * payload policy. Invalid grammar throws INVALID_ENVELOPE with the failing pointer and cause;
+ * stream grammar keeps its INVALID_STREAM boundary. No execution or replay state is changed.
+ */
 export function normalizeRuntimeEnvelope(
   value: unknown,
   portable: (value: unknown) => IRpcPortableValue = normalizeRuntimePortable

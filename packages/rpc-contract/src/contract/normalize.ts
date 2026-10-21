@@ -20,13 +20,24 @@ export function normalizeRuntimePortable(value: unknown): IRpcPortableValue {
   return normalizePortable(value, 0, new Set<object>(), true)
 }
 
-/** Validate and snapshot a portable value, reading each ordinary object field once. */
+/**
+ * Validate and snapshot wire business data with a default starting depth of zero and a maximum
+ * traversal depth of 64. Object fields are read once in own-key order into frozen null-prototype
+ * records; arrays are copied/frozen and Uint8Array becomes a canonical bytes record. Nonfinite
+ * numbers, cycles, unsupported values and malformed bytes tags throw a Contract-coded error. Native
+ * ArrayBuffer values require the explicit negotiated-native overload, not this default wire path.
+ */
 export function normalizePortable(
   value: unknown,
   depth?: number,
   active?: Set<object>
 ): IRpcWirePortableValue
-/** Only the negotiated runtime branch may preserve a native value in the semantic snapshot. */
+/**
+ * The negotiated runtime branch can preserve original genuine ArrayBuffer/Uint8Array identities
+ * instead of encoding bytes; those native values are not frozen or copied. The supplied active
+ * ancestor set and starting depth belong to the current traversal. A guard function can reject
+ * native values at the original admission point without granting a transport capability.
+ */
 export function normalizePortable(
   value: unknown,
   depth: number,

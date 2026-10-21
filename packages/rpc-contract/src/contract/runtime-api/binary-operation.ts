@@ -22,7 +22,13 @@ export type {
 } from './binary-capture.js'
 export { RpcBinaryProfile, RpcBinaryStorage, RpcNativeBinaryKind } from './binary-constants.js'
 
-/** Prepare protocol data with the actual held codec; raw coordination callbacks remain private. */
+/**
+ * Snapshot binary-bearing runtime business data synchronously, then finish a frozen manifest and
+ * backing list asynchronously. The default allocation budget is 16 MiB; native storage requires a
+ * whole-backing digest and preserves original sidecar identity. An optional held codec owns exact
+ * representation accounting. Invalid grammar, budgets or digest failures reject with the original
+ * cause reachable; preparation grants no authentication or transfer authority.
+ */
 export function prepareRpcBinary(
   message: IRpcRuntimeEnvelope,
   storage: RpcBinaryStorage,
@@ -44,6 +50,7 @@ export function prepareRpcBinary(
  * flags.
  */
 export type IRpcCapturedBinaryData = Readonly<{
+  /** Finish the captured graph/backings through the canonical digest/codec path; failures reject. */
   prepare(): Promise<IRpcPreparedBinary>
 }>
 
@@ -91,7 +98,12 @@ class CapturedBinaryData implements IRpcCapturedBinaryData {
   }
 }
 
-/** Capture one binary-bearing envelope at a caller-selected synchronous snapshot point. */
+/**
+ * Capture one binary-bearing envelope synchronously for a later prepare call. Inline visible bytes
+ * are snapshotted now; native sidecars retain original backing references until digest/preparation.
+ * The default budget is 16 MiB. Invalid input throws INVALID_ENVELOPE with its cause, rather than
+ * returning a rejected capture resource; this operation performs no physical transfer.
+ */
 export function captureRpcBinaryData(
   message: IRpcRuntimeEnvelope,
   storage: RpcBinaryStorage,

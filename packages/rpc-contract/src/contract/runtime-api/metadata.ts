@@ -22,9 +22,13 @@ import type {
 
 /** Typed call fields supplied by Core's existing owned input and held generation resources. */
 export type IRpcRuntimeCallHeader = Readonly<{
+  /** Bounded original operation correlation identity. */
   id: string
+  /** Core-owned protected hop routing data, copied into the returned envelope. */
   route: IRpcRuntimeRoute
+  /** Held caller/target generation tuple with a request, notify or stream mode. */
   task: IRpcRuntimeTask
+  /** Explicit operation options, independently copied and validated. */
   options: IRpcRuntimeOptions
 }>
 
@@ -364,7 +368,11 @@ export function invalid(pointer: string, cause?: unknown): never {
   throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, pointer, cause)
 }
 
-/** Local factories and wire admission share this exact closed, request-only group step snapshot. */
+/**
+ * Validate a nonempty dense own-data step list and return fresh frozen steps/list. Payloads use the
+ * supplied portable operation, defaulting to runtime-native admission. Invalid structure or method
+ * values throw INVALID_ENVELOPE with the failing pointer; this performs no provider execution.
+ */
 export function normalizeRuntimeSteps(
   value: unknown,
   portable: (value: unknown) => IRpcPortableValue = normalizeRuntimePortable
@@ -432,7 +440,11 @@ export function identifier(value: unknown, pointer: string): string {
   return value
 }
 
-/** Generation counters are separate nonnegative safe-integer facts issued by their existing owners. */
+/**
+ * Validate a closed generation record and return a frozen snapshot of its issuer, kind and
+ * nonnegative safe-integer counter. Invalid fields throw INVALID_ENVELOPE; this parser does not
+ * establish that a remote generation is current or authorized.
+ */
 export function normalizeRuntimeGeneration(value: unknown): IRpcRuntimeGeneration {
   return generation(value, readStrictRecord)
 }

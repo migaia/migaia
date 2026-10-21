@@ -5,7 +5,12 @@ import { readDecodedRecord } from './metadata.js'
 import type { IRpcPortableValue } from '../types.js'
 import type { IRpcRuntimeEnvelope } from './types.js'
 
-/** Share the complete canonical union; only its actual stream branch may enter cold parsing. */
+/**
+ * Apply the same strict runtime-envelope grammar and default native portable policy as the full
+ * normalizer. Scalar variants return synchronously; an actual stream branch can return a Promise
+ * while its canonical parser loads. Callers must handle both synchronous throws and rejection; this
+ * changes loading only, not admission authority or wire shape.
+ */
 export function normalizeRuntimeEnvelopeLazy(
   value: unknown,
   portable: (value: unknown) => IRpcPortableValue = normalizeRuntimePortable

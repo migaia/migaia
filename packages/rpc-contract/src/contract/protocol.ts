@@ -2,7 +2,11 @@ import { RpcContractErrorCode } from './error-code.js'
 import { createContractError } from './contract-error.js'
 import type { IRpcDescriptor } from './types.js'
 
-/** Construct a frozen descriptor after validating stable lowercase token identity. */
+/**
+ * Construct a frozen component descriptor from a lowercase token and positive safe-integer version.
+ * Use this for codec/framer component identity, independently of protocol negotiation; invalid
+ * arguments throw INVALID_DESCRIPTOR before a descriptor is exposed.
+ */
 export function createDescriptor<const TId extends string, const TVersion extends number>(
   id: TId,
   version: TVersion

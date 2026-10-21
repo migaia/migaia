@@ -2,7 +2,9 @@ import { identifyContractCallbackFailure } from './contract-error.js'
 
 /** A bounded endpoint-owned warning cache for additive protocol fields. */
 export type IRpcUnknownFieldWarner = Readonly<{
+  /** Warn once per normalized field key, then emit at most one overflow marker per cache entry. */
   note: (connection: string, kind: string, pointer: string, field: string) => void
+  /** Drop retained identities so later notes may warn again. */
   clear: () => void
 }>
 
@@ -22,10 +24,18 @@ function normalizedPointer(pointer: string): string {
   return pointer.replace(/\/[0-9]+(?=\/|$)/gu, '/*')
 }
 
-/** Deduplicate unknown fields per inbound connection with bounded LRU admission. */
+/**
+ * Deduplicate unknown fields per inbound connection with bounded LRU retention. Numeric pointer
+ * indexes share one identity; overflow emits `*` once. A failing warn hook propagates with
+ * Contract's callback-failure identity. This owns only diagnostic cache state, not connection
+ * cleanup.
+ */
 export function createRpcUnknownFieldWarner(options: {
+  /** Maximum distinct retained keys per connection; defaults to 256. */
   readonly maxKeysPerConnection?: number
+  /** Maximum retained connection entries in least-recently-used order; defaults to 1024. */
   readonly maxConnections?: number
+  /** Required diagnostic sink, receiving bounded normalized keys or the overflow marker. */
   readonly warn: (connection: string, fieldKey: string) => void
 }): IRpcUnknownFieldWarner {
   /** A connection is refreshed on each message and evicted from the oldest end. */

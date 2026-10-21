@@ -15,14 +15,24 @@ import type { IRpcPortableValue, IRpcSerializedError } from '../types.js'
 
 /** A normalized event leaves direction and sequence credit to the core stream owner. */
 export type IRpcStreamPayload = Readonly<{
+  /** One of open/pull/item/end/fail/cancel/cancelled; each event admits its own optional field. */
   event: IRpcStreamEvent
+  /** Nonnegative safe-integer sequence; this normalizer does not own held sequencing state. */
   seq: number
+  /** Required on item, optional on end, absent on the other events; budget is 16384 units. */
   value?: IRpcPortableValue
+  /** Required on fail and optional on cancelled; validated as a complete wire error graph. */
   error?: IRpcSerializedError
+  /** Optional cancellation reason only on cancel. */
   reason?: IRpcSerializedError
 }>
 
-/** Validate event shape and portable value budget before core touches stream state. */
+/**
+ * Validates/snapshots one stream event and its value/error fields before a runtime touches held
+ * stream state. portableValue defaults to normalizePortable; invalid grammar or value budget throws
+ * INVALID_STREAM with its first pointer. Direction, sequence continuity and credit remain the
+ * caller's responsibility, using the separate checkRpcStream* helpers.
+ */
 export function normalizeStreamPayload(
   value: unknown,
   portableValue: (value: unknown) => IRpcPortableValue = normalizePortable

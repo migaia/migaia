@@ -107,7 +107,12 @@ function snapshotOptions(
   return result
 }
 
-/** Creates a codec-independent string framer with strict ordered bounded reassembly. */
+/**
+ * Create independent source/message reassembly state for strings. Small values pass through; larger
+ * values split by UTF-16 code units, retaining strict fragment order and configured limits. Invalid
+ * options throw before construction; accept returns pending/complete/rejected rather than throwing
+ * for ordinary frame violations. Close releases assembly timers and rejects later input.
+ */
 export function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(
   options?: TOptions
 ): IValidatedFramer<string, string | IRpcStringFrame> {
@@ -119,7 +124,12 @@ export function createStringFramer<const TOptions extends IRpcFramerOptions = IR
   ) as IValidatedFramer<string, string | IRpcStringFrame>
 }
 
-/** Creates a codec-independent binary framer with strict ordered bounded reassembly. */
+/**
+ * Create independent source/message reassembly state for Uint8Array carriers. Large outbound values
+ * use copied byte fragments; complete inbound fragments join into one owned buffer. Limits use
+ * bytes, invalid options throw before construction, and ordinary invalid frames return a rejected
+ * result. Close releases assembly timers and prevents subsequent framing/admission.
+ */
 export function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(
   options?: TOptions
 ): IValidatedFramer<Uint8Array, Uint8Array | IRpcBinaryFrame> {
@@ -466,13 +476,18 @@ function snapshotFrame(value: IFrame): IFrameSnapshot | undefined {
 /** Canonical V1 whole-frame identity framer; it never fragments or allocates buffers. */
 export const messageFramerV1 = Object.freeze({
   ...createDescriptor('message', 1),
+  /** Accepts opaque whole carriers without inspecting their codec representation. */
   inputEncodedType: 'unknown' as const,
+  /** Emits the same opaque carrier category; descriptor text grants no semantic admission. */
   outputEncodedType: 'unknown' as const,
+  /** Returns the original value in a one-element list without copying its business data. */
   frame: <T>(value: T, _context: IRpcFrameContext): readonly T[] => [value],
+  /** Always completes with the original whole value; callers still own semantic validation. */
   accept: <T>(value: T, _context?: IRpcFrameContext): IRpcFrameAcceptResult<T> => ({
     status: 'complete',
     value
   }),
+  /** Stateless cleanup; later whole-frame operations remain available. */
   close: (_reason?: unknown): void => undefined
 })
 

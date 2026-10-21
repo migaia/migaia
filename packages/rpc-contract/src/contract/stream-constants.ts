@@ -4,33 +4,52 @@ import { rpcPortableBackingLength, rpcPortableViewLength } from './normalize.js'
 
 /** The seven protocol 1.1 stream events; direction and sequence are checked by the stream owner. */
 export const RpcStreamEvent = {
+  /** Producer announces a stream before any item is pulled. */
   open: 'open',
+  /** Consumer grants the next unit of item demand. */
   pull: 'pull',
+  /** Producer supplies the next sequenced business value. */
   item: 'item',
+  /** Producer completes without another item. */
   end: 'end',
+  /** Producer terminates with a serialized business error. */
   fail: 'fail',
+  /** Consumer requests cancellation with an optional serialized reason. */
   cancel: 'cancel',
+  /** Producer acknowledges cancellation as the terminal event. */
   cancelled: 'cancelled'
 } as const
 export type RpcStreamEvent = keyof typeof RpcStreamEvent
 
 /** Stable first-failure categories shared by the contract and core state machine. */
 export const RpcStreamViolation = {
+  /** Stream event discriminator is unsupported. */
   event: 'event',
+  /** The event came from the wrong stream participant. */
   direction: 'direction',
+  /** Event fields do not match the selected closed grammar. */
   field: 'field',
+  /** The event sequence is outside its admitted domain or expected position. */
   seq: 'seq',
+  /** The stream value or owner admission exceeds its allowed budget. */
   budget: 'budget'
 } as const
 export type RpcStreamViolation = keyof typeof RpcStreamViolation
 
 /** Portable value budget and per-peer admission ceiling for streaming. */
 export const RpcStreamLimit = {
+  /** Maximum portable value accounting size for open/item business data. */
   maxItemValueBytes: 16_384,
+  /** Per-peer open-stream admission ceiling enforced by the stream owner. */
   maxOpenStreamsPerPeer: 256
 } as const
 
-/** Count JSON-compatible bytes without depending on a codec, route header or key order. */
+/**
+ * Compute the stream owner's portable-value budget independently of a codec or route header. Finite
+ * numbers charge a fixed conservative 24 bytes; native buffers/views charge their actual admitted
+ * lengths. An unpaired surrogate returns Infinity. Use this on already admitted values; it does not
+ * validate arbitrary inputs or enforce a stream limit itself.
+ */
 export function measurePortableStreamValue(value: IRpcPortableValue): number {
   if (value === null) return 4
   if (typeof value === 'boolean') return value ? 4 : 5

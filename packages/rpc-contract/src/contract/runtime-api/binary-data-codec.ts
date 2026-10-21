@@ -8,8 +8,11 @@ import { RpcBinaryStorage } from './binary-constants.js'
  * admission.
  */
 export type IRpcBinaryDataCodec = Readonly<{
+  /** Encode actual protected metadata for exact physical-size accounting when capture is absent. */
   encode(value: unknown): unknown
+  /** Optional canonical whole-JSON capture; the resource owns its representation's quota policy. */
   captureJsonData?(value: object, roots: ReadonlyMap<object, number>, backingBytes: number): unknown
+  /** Optional inline-byte spelling operation used by the same canonical binary preparation. */
   encodeInline?: (bytes: Uint8Array) => string
 }>
 

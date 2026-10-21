@@ -29,32 +29,60 @@ import { compareRpcFieldNames } from './v1/route.js'
 import { RpcWireErrorViolation } from './wire-error-constants.js'
 
 /** One supported protocol version and its highest minor version. */
-export type IRpcHandshakeVersion = Readonly<{ major: number; minor: number }>
+export type IRpcHandshakeVersion = Readonly<{
+  /** Supported positive major revision; each major appears at most once in an offer. */
+  major: number
+  /** Highest supported nonnegative minor revision within that major. */
+  minor: number
+}>
 
 /** A peer identity used only for diagnostics and connection-owned policy. */
 export type IRpcPeerInfo = Readonly<{
+  /** Bounded nonempty diagnostic peer identifier; not authentication authority. */
   id: string
+  /** Lowercase runtime label; valid custom labels need not be RpcPeerRuntime members. */
   runtime: string
+  /** Optional display version, retained only when supplied. */
   runtimeVersion?: string
-  implementation?: Readonly<{ name: string; version: string }>
+  /** Optional implementation descriptor for diagnostics, without capability implications. */
+  implementation?: Readonly<{
+    /** Implementation display label; validation requires a string. */
+    name: string
+    /** Implementation display version; validation requires a string. */
+    version: string
+  }>
 }>
 
 /** A local handshake proposal sent by an initiator or used by a responder. */
 export type IRpcHandshakeOffer = Readonly<{
+  /** Required bounded nonempty version list; negotiation selects the highest common major. */
   versions: readonly IRpcHandshakeVersion[]
+  /** Required ordered codec list including mandatory json; the initiator's order wins. */
   codecs: readonly string[]
+  /** Required bounded unique capability proposals; an empty list proposes no optional capabilities. */
   capabilities: readonly string[]
+  /** Required local diagnostic identity, snapshotted before being put on the wire. */
   peer: IRpcPeerInfo
+  /**
+   * Optional portable authentication data; the upper layer must validate credentials and redact
+   * logs.
+   */
   auth?: IRpcPortableValue
 }>
 
 /** Negotiated values and the remote peer retained after a completed handshake. */
 export type IRpcHandshakeAgreement = Readonly<{
+  /** Negotiated highest shared major. */
   major: number
+  /** Smaller supported minor for that shared major. */
   minor: number
+  /** First initiator-preferred codec also supported by the responder. */
   codec: string
+  /** Frozen capability intersection in initiator order, not proof of installed runtime resources. */
   capabilities: readonly string[]
+  /** Remote peer's validated diagnostic identity. */
   peer: IRpcPeerInfo
+  /** Remote hello auth retained by the responder when supplied; accepted replies do not echo it. */
   auth?: IRpcPortableValue
 }>
 
@@ -63,21 +91,42 @@ export type IRpcHandshakeText = string | Uint8Array
 
 /** The three accepted handshake forms, after a fresh validated snapshot. */
 export type IRpcHandshakeMessage =
-  | Readonly<{ kind: 'handshake'; step: 'hello'; protocol: string } & IRpcHandshakeOffer>
+  | Readonly<
+      {
+        /** Handshake discriminator, outside ordinary semantic envelope kinds. */
+        kind: 'handshake'
+        /** Initiator's proposal. */
+        step: 'hello'
+        /** Wire protocol identity being negotiated. */
+        protocol: string
+      } & IRpcHandshakeOffer
+    >
   | Readonly<{
+      /** Handshake discriminator. */
       kind: 'handshake'
+      /** Responder's selected agreement. */
       step: 'accept'
+      /** Selected protocol identity. */
       protocol: string
+      /** Selected major supported by the original offer. */
       major: number
+      /** Selected minor no greater than the offered minor. */
       minor: number
+      /** Selected codec from the original offer. */
       codec: string
+      /** Selected capability subset, without unoffered additions. */
       capabilities: readonly string[]
+      /** Responder's diagnostic identity. */
       peer: IRpcPeerInfo
     }>
   | Readonly<{
+      /** Handshake discriminator. */
       kind: 'handshake'
+      /** Responder refused this exchange. */
       step: 'reject'
+      /** Protocol identity used for the rejection frame. */
       protocol: string
+      /** Bounded serialized failure, restored as the initiator's HANDSHAKE_REJECTED cause. */
       error: IRpcSerializedError
     }>
 
@@ -468,7 +517,12 @@ function parseText(text: IRpcHandshakeText): unknown {
   }
 }
 
-/** Validate a first-channel message; input failures retain only a bounded diagnostic summary. */
+/**
+ * Parses UTF-8 JSON handshake text into a fresh validated frozen message, enforcing byte/list and
+ * scalar limits. Optional unknown-field warnings observe additive fields. Malformed input throws
+ * HANDSHAKE_INVALID with bounded safe evidence rather than retaining credential-bearing input. This
+ * validates grammar only; it does not authenticate auth or complete capability negotiation.
+ */
 export function normalizeRpcHandshake(
   text: IRpcHandshakeText,
   options?: IRpcEnvelopeOptions
@@ -561,7 +615,11 @@ export function normalizeRpcHandshake(
   throw handshakeInvalid(RpcHandshakeViolation.step, redactHandshake(text, record))
 }
 
-/** Encode a local offer without retaining its original value in an invalid-input error. */
+/**
+ * Validates a local offer and returns the initial hello JSON text. Required fields have no inferred
+ * version/codec/capability defaults; auth is optional portable data. Invalid offers throw
+ * HANDSHAKE_INVALID without exposing the original credential-bearing object as diagnostic data.
+ */
 export function createRpcHello(offer: IRpcHandshakeOffer): string {
   let text: string
   try {
@@ -620,14 +678,34 @@ function runtimeBaselineReason(
   return undefined
 }
 
-/** A responder negotiates the common version and codec; failures omit the received hello. */
+/**
+ * Negotiates an incoming hello against the local offer and returns reply text plus an agreement, or
+ * ok:false with a sendable reject reply and incompatibility error. Highest shared major wins; minor
+ * is the smaller offer, and codec/capability order follows the initiator. A runtime-api offer
+ * requires the runtime baseline. Malformed messages throw HANDSHAKE_INVALID; auth remains
+ * upper-layer policy.
+ */
 export function acceptRpcHandshake(
   local: IRpcHandshakeOffer,
   hello: IRpcHandshakeText,
   options?: IRpcEnvelopeOptions
 ):
-  | Readonly<{ ok: true; reply: string; agreement: IRpcHandshakeAgreement }>
-  | Readonly<{ ok: false; reply: string; error: Error }> {
+  | Readonly<{
+      /** Negotiation succeeded; this is not a completed channel authentication. */
+      ok: true
+      /** Accept text for the caller to send. */
+      reply: string
+      /** Frozen negotiated values and remote peer identity. */
+      agreement: IRpcHandshakeAgreement
+    }>
+  | Readonly<{
+      /** Well-formed hello was incompatible with the local protocol/baseline. */
+      ok: false
+      /** Rejection text for the caller to send. */
+      reply: string
+      /** Local HANDSHAKE_INCOMPATIBLE diagnostic. */
+      error: Error
+    }> {
   const localOffer = normalizeRpcHandshake(createRpcHello(local))
   const remote = normalizeRpcHandshake(hello, options)
   if (localOffer.step !== RpcHandshakeStep.hello || remote.step !== RpcHandshakeStep.hello)
@@ -681,7 +759,13 @@ export function acceptRpcHandshake(
   return { ok: true, reply, agreement }
 }
 
-/** Verify the responder's choices; failures omit the received reply and local offer. */
+/**
+ * Verifies a responder's accept against the original local offer and returns the frozen agreement.
+ * Remote reject throws HANDSHAKE_REJECTED with the restored remote failure as cause; an invalid
+ * selection throws HANDSHAKE_INVALID, and a runtime-baseline downgrade throws
+ * HANDSHAKE_INCOMPATIBLE. It neither opens a connection nor authenticates the remote peer's
+ * diagnostic identity.
+ */
 export function completeRpcHandshake(
   local: IRpcHandshakeOffer,
   reply: IRpcHandshakeText,
