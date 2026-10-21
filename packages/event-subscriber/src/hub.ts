@@ -227,12 +227,14 @@ export function createEventHub<C extends IEventMap, V = undefined>(
         stylePlan
       ) as IEventHubSubscription<C, K, undefined, V>
     },
+    /** Delivers `value` to the listeners of `key`; a key without listeners does nothing. */
     publish<K extends keyof C>(key: K, value: C[K]): void {
       /** Channel of the key; publishing to a key without listeners does nothing. */
       const channel = channels.get(validateKey(key as PropertyKey))
       if (!channel) return
       channel.publish(value)
     },
+    /** Removes the registrations of one key, or of every key when `key` is omitted. */
     clear(key?: keyof C): void {
       if (key !== undefined) {
         /** Key after validation. */
@@ -254,6 +256,7 @@ export function createEventHub<C extends IEventMap, V = undefined>(
       channels.clear()
       totalSize = 0
     },
+    /** Number of registrations of one key, or of all keys when `key` is omitted. */
     size(key?: keyof C): number {
       if (key === undefined) return totalSize
       return channels.get(validateKey(key as PropertyKey))?.size ?? 0
@@ -288,22 +291,28 @@ export function createEventHub<C extends IEventMap, V = undefined>(
         : channel.subscribe((event) => {
             /** Context cancellation also updates the Hub's existing aggregate registration count. */
             const context = {
+              /** Payload of the source event. */
               get value() {
                 return event.value
               },
+              /** Whether the registration was aborted. */
               get aborted() {
                 return event.aborted
               },
+              /** Reason passed to `abort()`. */
               get abortReason() {
                 return event.abortReason
               },
+              /** Task name at dispatch start. */
               get taskId() {
                 return event.taskId
               },
+              /** Cancels the registration and removes it from the Hub's bookkeeping. */
               abort(reason?: unknown) {
                 event.abort(reason)
                 deactivateRegistration?.()
               },
+              /** Changes the task name of the registration. */
               setTaskId(taskId: string | undefined) {
                 event.setTaskId(taskId)
               }

@@ -143,8 +143,11 @@ type IEventApiStyleResolvedNames<
   TPublish extends string,
   TUnsubscribe extends string
 > = {
+  /** Name of the subscribe method, or its alias. */
   readonly subscribe: TSubscribe
+  /** Name of the publish method, or its alias. */
   readonly publish: TPublish
+  /** Name of the unsubscribe member of subscription handles, or its alias. */
   readonly unsubscribe: TUnsubscribe
 }
 

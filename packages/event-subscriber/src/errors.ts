@@ -8,8 +8,11 @@ import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 /** Native error with the optional identity fields this package attaches. */
 type IEventError = Error & {
+  /** Package that created the error, when attached. */
   readonly source?: string
+  /** Package error code, when attached. */
   readonly code?: string
+  /** Wrapped original error, when present. */
   readonly cause?: unknown
 }
 
@@ -151,6 +154,8 @@ export const eventErrorText = (code: IEventSubscriberErrorCode): string =>
 
 /** Error that carries this package's `source` and one of its codes. */
 export type IEventErrorWithCode = IEventError & {
+  /** Always `@migaia/event-subscriber`. */
   readonly source: typeof EVENT_SUBSCRIBER_SOURCE
+  /** One of `EventSubscriberErrorCode`. */
   readonly code: IEventSubscriberErrorCode
 }

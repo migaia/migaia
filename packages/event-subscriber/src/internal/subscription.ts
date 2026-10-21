@@ -11,7 +11,9 @@ import type { IEventApiStylePlan } from '../style.js'
 
 /** Builds one callable, chain-owning subscription handle. */
 type ISubscriptionHandle<T> = IUnsubscribe & {
+  /** The handle itself under a readable name. */
   readonly unsubscribe: ISubscriptionHandle<T>
+  /** Adds another registration to the chain and returns the same handle. */
   readonly subscribe: (...args: never[]) => ISubscriptionHandle<T>
 }
 

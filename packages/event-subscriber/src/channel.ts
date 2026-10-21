@@ -82,10 +82,18 @@ type IRegistrationOwner<T, R, V> = {
  * WeakMap by the helpers.
  */
 type IChannelCapability<T, R, V = undefined> = {
+  /**
+   * Snapshots the registrations in delivery order; with `taskId`, only those carrying that task
+   * name.
+   */
   snapshot(taskId?: string): readonly IEventDispatchSnapshot<T, R, V>[]
+  /** Reads the value alias path of the channel's `valueConfig` for one published value. */
   project(value: T): IEventProjectionOutcome
+  /** Projection plan of the value alias, or `undefined` when the channel has no `valueConfig`. */
   readonly plan: IEventProjectionPlan | undefined
+  /** Validated channel options, read by helpers that report failures. */
   readonly options: IEventChannelOptions<T, IEventApiStyle | undefined, V>
+  /** Visits registrations live, admitting ones added during the visit until a removal happens. */
   liveVisit(
     value: T,
     taskId: string | undefined,
@@ -95,12 +103,15 @@ type IChannelCapability<T, R, V = undefined> = {
 
 /** Internal record of a task-filter view: the source channel and the task name it selects. */
 type IFilteredCapability<T, R, V = undefined> = {
+  /** Canonical channel the view filters. */
   readonly channel: ICanonicalEventChannel<T, R, undefined, V>
+  /** Task name the view selects. */
   readonly taskId: string
 }
 
 /** Structural channel after validation: `subscribe` is known to be callable. */
 type IValidatedChannel<T, R, V = undefined> = IEventChannelLike<T, R, V> & {
+  /** The channel's `subscribe`, checked to be callable. */
   readonly subscribe: IEventChannelLike<T, R, V>['subscribe']
 }
 
@@ -195,6 +206,7 @@ export const validateChannelLike = <T, R, V = undefined>(
     throw codeExistingError(error, EventSubscriberErrorCode.invalidChannel)
   }
   return {
+    /** Forwards to the source channel's `subscribe` and codes a failure as `INVALID_CHANNEL`. */
     subscribe(listener, options) {
       try {
         return (channel as IEventChannelLike<T, R, V>).subscribe(
@@ -210,7 +222,9 @@ export const validateChannelLike = <T, R, V = undefined>(
 
 /** Per-dispatch data shared by the prototype accessors, never reused between contexts. */
 type IEventContextState<T, R, V> = {
+  /** Payload delivered by this dispatch. */
   readonly value: T
+  /** Registration snapshot of this dispatch: listener, task name at dispatch start and live control. */
   readonly snapshot: IEventDispatchSnapshot<T, R, V>
 }
 
@@ -279,15 +293,19 @@ const controlOwners = new WeakMap<
 
 /** Reuses control functions while preserving the original plain object's own descriptors and order. */
 const ownerControlDescriptors = Object.getOwnPropertyDescriptors({
+  /** Whether the registration is still linked into its channel. */
   get active(): boolean {
     return controlOwners.get(this)!.active
   },
+  /** Whether the registration was cancelled through `abort()`. */
   get aborted(): boolean {
     return controlOwners.get(this)!.aborted
   },
+  /** Reason passed to `abort()`, kept with its identity. */
   get abortReason(): unknown {
     return controlOwners.get(this)!.abortReason
   },
+  /** Cancels only this registration: records the reason and releases it. Does nothing once inactive. */
   abort(reason?: unknown): void {
     /** Only the control's registration is released, even when another owner has the same listener. */
     const owner = controlOwners.get(this)!
@@ -296,6 +314,10 @@ const ownerControlDescriptors = Object.getOwnPropertyDescriptors({
     owner.abortReason = reason
     owner.release()
   },
+  /**
+   * Changes the task name later dispatches see; snapshots already taken keep their name. Does
+   * nothing once inactive.
+   */
   setTaskId(taskId: string | undefined): void {
     /** Retagging remains live while each dispatch snapshot keeps its earlier fixed task label. */
     const owner = controlOwners.get(this)!
@@ -370,6 +392,10 @@ export const withSnapshotEntries = <T, R, V = undefined>(
     let invoked = false
     return Object.freeze({
       taskId: snapshot.taskId,
+      /**
+       * Runs this entry's listener once; a second call or a call after the visit throws
+       * `INVOCATION_CLOSED`.
+       */
       invoke: (): R | PromiseLike<R> => {
         if (closed || invoked)
           throw createEventTypeError(
@@ -1005,9 +1031,14 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         throw error
       }
     },
+    /** Delivers `value` to every registration according to the dispatch policy; see `publishValue`. */
     publish(value) {
       publishValue(value)
     },
+    /**
+     * Returns a view that selects registrations by task name, for `invokeTask` and the other
+     * helpers.
+     */
     filterTaskId(taskId) {
       /** Task name after validation. */
       const validated = validateTaskId(taskId, false) as string
@@ -1019,6 +1050,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       })
       return filtered
     },
+    /** Removes every registration at once and ends admission for live visits in progress. */
     clear() {
       if (count > 0) membershipEpoch += 1
       /** Cursor over the registration list. */
@@ -1036,6 +1068,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       count = 0
       uniqueOwners?.clear()
     },
+    /** Number of committed registrations. */
     get size() {
       return count
     }
@@ -1044,9 +1077,11 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   const capability: IChannelCapability<T, R, V> = {
     plan: projectionPlan,
     options: normalizedOptions,
+    /** Reads the value alias path for one value. */
     project(value) {
       return projectEventValue(value, projectionPlan)
     },
+    /** Snapshots the registrations in delivery order, optionally only those with one task name. */
     snapshot(taskId) {
       /** Snapshots of the matching registrations, in registration order. */
       const snapshots: IEventDispatchSnapshot<T, R, V>[] = []
@@ -1059,6 +1094,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       }
       return Object.freeze(snapshots)
     },
+    /**
+     * Offers registrations to `visitor` one by one, admitting ones added during the visit until a
+     * removal or clear happens. Every invocation is closed when the visit ends.
+     */
     liveVisit(value, taskId, visitor) {
       /** Membership epoch at dispatch start; any removal or clear afterwards stops admission. */
       const epoch = membershipEpoch
@@ -1113,6 +1152,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
           /** Single-use invocation handed to the visitor. */
           const invocation: IEventInvocation<R> = {
             taskId: snapshot.taskId,
+            /**
+             * Runs this registration's listener once; a second call or a call after the visit
+             * throws `INVOCATION_CLOSED`.
+             */
             invoke: () => {
               if (closed || invoked)
                 throw createEventTypeError(
@@ -1401,21 +1444,27 @@ export const subscribeUntil = <T, R, V = undefined>(
   const eventWrapper = (sourceEvent: IEventContext<T>): IEventContext<T> =>
     copyEventProjection(
       {
+        /** Payload of the source event. */
         get value() {
           return sourceEvent.value
         },
+        /** True when either the signal or the source registration has aborted. */
         get aborted() {
           return overlayAborted || sourceEvent.aborted
         },
+        /** Signal reason once the signal aborted; otherwise the source registration's reason. */
         get abortReason() {
           return overlayAborted ? overlayReason : sourceEvent.abortReason
         },
+        /** Task name of the source registration at dispatch start. */
         get taskId() {
           return sourceEvent.taskId
         },
+        /** Cancels the source registration. */
         abort(reason?: unknown) {
           sourceEvent.abort(reason)
         },
+        /** Changes the task name of the source registration. */
         setTaskId(taskId: string | undefined) {
           sourceEvent.setTaskId(taskId)
         }

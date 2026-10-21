@@ -20,6 +20,7 @@ export type IEventSubscribeOptions = {
 
 /** Selects payload-only delivery explicitly so listener argument inference remains unambiguous. */
 type IEventValueSubscribeOptions = IEventSubscribeOptions & {
+  /** Required in this overload: listeners receive the payload instead of a context. */
   readonly delivery: typeof EventDelivery.value
 }
 
@@ -184,19 +185,27 @@ export type IEventContext<T> = {
 
 /** Live control of one registration, shared by every dispatch snapshot of it. */
 export type IEventDispatchControl = {
+  /** Whether the registration is still linked into its channel. */
   readonly active: boolean
+  /** Whether the registration was cancelled through `abort()`. */
   readonly aborted: boolean
+  /** Reason passed to `abort()`, kept with its identity. */
   readonly abortReason: unknown
+  /** Cancels only this registration and records the reason. */
   abort(reason?: unknown): void
+  /** Changes the task name later dispatches see. */
   setTaskId(taskId: string | undefined): void
 }
 
 /** Registration state fixed when a dispatch starts. Package-internal; never reaches user code. */
 export type IEventDispatchSnapshot<T, R, V = undefined> = {
+  /** Listener to call; its argument depends on `delivery`. */
   readonly listener: IEventListener<T, R, V> | IEventValueListener<T, R>
   /** Argument mode captured with this listener; dispatch helpers share one invocation branch. */
   readonly delivery: EventDelivery
+  /** Task name when the dispatch started; later `setTaskId()` calls do not change it. */
   readonly taskId: string | undefined
+  /** Live control of the registration, shared by all its snapshots. */
   readonly control: IEventDispatchControl
 }
 

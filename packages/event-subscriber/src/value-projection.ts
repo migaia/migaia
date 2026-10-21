@@ -17,14 +17,19 @@ import type { IEventApiStyle } from './style.js'
 
 /** Validated value alias: its property name, the dotted read path, and the parsed path segments. */
 export type IEventProjectionPlan = {
+  /** Property name the projected value is added under on the event context. */
   readonly alias: string
+  /** Dotted path read from the payload, as configured. */
   readonly readPath: string
+  /** Path segments parsed once from `readPath`. */
   readonly segments: IObjectPathTuple
 }
 
 /** Result of reading the path for one value: the value, or a diagnostic when reading failed. */
 export type IEventProjectionOutcome = {
+  /** Value read from the path; `undefined` when reading failed. */
   readonly value: unknown
+  /** `VALUE_PROJECTION_FAILED` error when reading failed; otherwise `undefined`. */
   readonly diagnostic: Error | undefined
 }
 
